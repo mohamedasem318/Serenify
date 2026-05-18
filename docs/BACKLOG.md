@@ -142,7 +142,7 @@ as acceptance scenarios; feature 011 (admin-dashboard) likewise for org-wide agg
 
 ---
 
-## From feature 002 (demo-seed-data) — implementation complete 2026-05-18
+## From feature 002 (demo-seed-data) — merged 2026-05-18
 
 ### CI integration for `npm run test:seed:integration`
 **Status**: deferred-feature
