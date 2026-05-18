@@ -34,3 +34,21 @@ treats light/dark as equal-priority.
 
 ## 2026-05-17 — constitution(V) — display font: Instrument Serif → DM Serif Display
 The design token `--font-display` was already swapped on the implementation side (DECISIONS.md entry "Lock display font to DM Serif Display"). The constitution is brought into alignment with the implementation.
+
+## 2026-05-18 — Feature ordering reshuffle
+
+Two reorderings, both because the original ordering put consumers before
+their dependencies:
+
+- **005 ↔ 006**: per-user-calibration now precedes stress-inference-service.
+  The constitution requires predictions to be deltas from a per-user
+  baseline; inference has nothing to subtract from until calibration ships
+  first.
+- **010/011/012**: privacy-controls-and-transparency moves to 010, ahead of
+  the two manager dashboards (now 011 team-lead, 012 admin). The privacy
+  slider and visibility-scope rules determine what data the dashboards
+  are allowed to query; building them against placeholder defaults would
+  force rework when privacy lands.
+
+No code or specs affected — only 001 has shipped; the rest were names in
+a list.

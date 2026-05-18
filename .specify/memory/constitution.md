@@ -287,10 +287,10 @@ implement, in that order. Implementation without a spec is forbidden.
   `docs/CHANGELOG.md`):
   `001-auth-and-roles`, `002-demo-seed-data`,
   `003-employee-dashboard-shell`, `004-webcam-and-rppg`,
-  `005-stress-inference-service`, `006-per-user-calibration`,
+  `005-per-user-calibration`, `006-stress-inference-service`,
   `007-questionnaire`, `008-llm-client-and-chatbot`,
-  `009-recommendations`, `010-team-lead-dashboard`,
-  `011-admin-dashboard`, `012-privacy-controls-and-transparency`,
+  `009-recommendations`, `010-privacy-controls-and-transparency`,
+  `011-team-lead-dashboard`, `012-admin-dashboard`,
   `013-audio-modality`, `014-physio-modality`, `015-fusion`.
 
 **Rationale**: A four-person team building an ML product needs a single
