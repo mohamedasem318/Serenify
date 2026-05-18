@@ -126,3 +126,16 @@ strength meters are OWASP-discouraged because entropy estimation is unreliable. 
 current checklist (✓ 8 characters, ✓ letter, ✓ number) is the chosen approach. Listed
 here only so a future Claude doesn't re-propose it without context.
 **Address by**: keep listed; not a follow-up to action.
+
+### Manager dashboard time-range insights
+**Status**: deferred-feature
+**Observed**: scope discussion during feature 001 wrap-up
+**Description**: Team-lead and admin dashboards should support multiple time ranges
+for viewing stress trends — 1 week, 1 month, 1 quarter, 6 months, 1 year. Required UX:
+a time-range selector control that re-aggregates the underlying daily data into
+weekly/monthly bars as appropriate. Compatible with the existing privacy model since
+broader windows are MORE privacy-preserving (less granular), not less.
+**Fix scope**: medium — UI control, query-side aggregation in the Supabase
+signal-event tables, charting in Recharts.
+**Address by**: feature 010 (team-lead-dashboard) spec must include these time ranges
+as acceptance scenarios; feature 011 (admin-dashboard) likewise for org-wide aggregates.
