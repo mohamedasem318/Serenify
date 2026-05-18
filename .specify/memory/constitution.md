@@ -349,7 +349,7 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 
 | Layer                | Technology                                                |
 |----------------------|-----------------------------------------------------------|
-| Frontend             | Next.js 15 (App Router) on Vercel                         |
+| Frontend             | Next.js 16 (App Router; `proxy.ts` replaces `middleware.ts`) on Vercel |
 | Backend + ML serving | FastAPI on a DigitalOcean Droplet                         |
 | Database / Auth / Storage / Realtime | Supabase (Postgres-based)                  |
 | Primary LLM          | Groq — Llama-3.3-70B via API                              |
@@ -359,7 +359,7 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Error tracking       | Sentry                                                    |
 | Product analytics    | PostHog Cloud                                             |
 | CI/CD                | GitHub Actions                                            |
-| Component library    | shadcn/ui                                                 |
+| Component library    | shadcn/ui (install deferred until feature 003 per `docs/DECISIONS.md`) |
 | Styling              | Tailwind CSS v4                                           |
 | Icons                | Lucide                                                    |
 | Charts               | Recharts                                                  |
