@@ -201,7 +201,7 @@ non-negotiable rules:
 - Whitespace is generous; cramming is a violation. White space signals
   calm.
 
-**Typography**: Inter for all UI text. Instrument Serif is reserved for
+**Typography**: Inter for all UI text. DM Serif Display is reserved for
 hero/display moments and MUST be used sparingly — not for body, buttons,
 labels, or chart text.
 

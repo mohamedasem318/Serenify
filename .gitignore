@@ -1,0 +1,66 @@
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment files
+.env
+.env.local
+.env.*.local
+.env.development
+.env.production
+!.env.example
+!.env.local.example
+
+# Python (feature 005 onward — FastAPI lands then)
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.python-version
+*.egg-info/
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Test artifacts
+coverage/
+.nyc_output/
+playwright-report/
+playwright/.cache/
+test-results/
+*.lcov
+
+# Supabase local CLI
+supabase/.branches/
+supabase/.temp/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Project-specific
+specs/.staging/
+
+# Claude Code (per-user local settings, never commit)
+.claude/
+
+# Playwright MCP server cache
+.playwright-mcp/
+
+# SpecKit per-branch state (the constitution at .specify/memory/ stays tracked)
+.specify/feature.json

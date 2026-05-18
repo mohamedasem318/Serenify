@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+/*
+ * Mist & Meadow palette — locked by Constitution Principle V.
+ * Light mode is the default; dark mode swaps tokens via data-theme="dark"
+ * on the <html> element (next-themes attribute="data-theme").
+ *
+ * Red is forbidden in any state. Stress signals use --color-amber.
+ */
+@theme {
+  /* Light mode (default) */
+  --color-bg:       #ECEEE9;
+  --color-surface:  #F5F6F2;
+  --color-ink:      #1F2522;
+  --color-muted:    #6E7572;
+  --color-meadow:   #7A9275;
+  --color-foggy:    #8AA9B6;
+  --color-amber:    #DCB587;
+  --color-border:   #D6D7D1;
+
+  --radius-card:    12px;
+  --radius-control: 8px;
+  --shadow-soft:    0 1px 2px rgba(0, 0, 0, 0.04);
+
+  --font-sans:      "Inter", system-ui, sans-serif;
+  --font-display:   "DM Serif Display", serif;
+}
+
+@layer base {
+  /* Dark mode override — equal-priority per Constitution Principle VI. */
+  :root[data-theme="dark"] {
+    --color-bg:      #161917;
+    --color-surface: #20231F;
+    --color-ink:     #DCDED5;
+    --color-muted:   #8B928F;
+    --color-meadow:  #97AE91;
+    --color-foggy:   #9CBBC7;
+    --color-amber:   #DCB587;
+    --color-border:  #2D3130;
+  }
+
+  html, body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+  }
+
+  /* Respect prefers-reduced-motion per Constitution Principle VI. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

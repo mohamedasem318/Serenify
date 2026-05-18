@@ -17,8 +17,8 @@ first-login profile-completion step, and password recovery by email.
 
 A new Serenify user creates an account so they can begin using the platform.
 They provide their email, choose a password, and give their full name. After
-confirming their email, they can sign in for the first time. Team selection
-is deferred to the profile-completion step on first sign-in.
+confirming their email, they can sign in for the first time. No further fields
+are collected at signup; the user confirms their profile on first sign-in.
 
 **Why this priority**: Nothing else in the product is reachable until a
 user can create an account. Sign-up is the front door of the entire
@@ -43,8 +43,18 @@ credentials.
    system presents a calm, non-blaming message explaining the email is
    already registered and offers a path to sign in or reset the password.
 4. **Given** a new user, **When** their account is created, **Then** the
-   default role is `employee` and the team affiliation is unset (to be
-   chosen during profile completion on first sign-in).
+   default role is `employee` and no direct manager is assigned. Direct
+   managers are linked to a user by an administrator, not by the user
+   themselves.
+5. **Given** a user who received a confirmation email containing both a
+   link and a 6-digit code, **When** they enter the code at the OTP entry
+   surface and submit, **Then** their account activates and they land on
+   `/onboarding` or `/app` — the same outcome they would have reached by
+   clicking the link.
+6. **Given** any unauthenticated surface (`/login`, `/signup`,
+   `/forgot-password`, `/reset-password`), **When** the user toggles
+   theme via a visible control, **Then** the new theme persists and
+   propagates to every other authenticated and unauthenticated page.
 
 ---
 
@@ -94,40 +104,33 @@ redirected away.
 
 ### User Story 3 - Complete profile on first sign-in (Priority: P2)
 
-On their very first successful sign-in, a user is prompted to set their
-display name (defaulting to their full name) and select their team from
-the published list. Until this is done, the workspace is not yet
-reachable.
+On their very first successful sign-in, a user is prompted to confirm
+their full name before reaching the workspace. Direct-manager assignment
+is performed by an administrator and is not part of this step.
 
-**Why this priority**: A correct display name and team affiliation are
-prerequisites for every other feature that surfaces "who" a stress event
-or message belongs to. Without this step, the user appears as a raw email
-across the product and is not yet associated with any team.
+**Why this priority**: A confirmed full name is the prerequisite for
+every other feature that surfaces "who" a stress event or message
+belongs to. Without this step the user appears as a raw email across
+the product.
 
 **Independent Test**: After completing User Story 1 and signing in for
 the first time, confirm the user is presented with the profile-completion
-form (display name + team selection), fill it, and verify they then
-reach the workspace. Sign out and sign back in — the profile-completion
-form does not appear a second time.
+form (full name), fill it, and verify they then reach the workspace.
+Sign out and sign back in — the profile-completion form does not appear
+a second time.
 
 **Acceptance Scenarios**:
 
 1. **Given** a user signing in for the first time after activation,
    **When** they reach the post-sign-in flow, **Then** the system presents
-   a profile-completion form with display name (pre-filled from full
-   name) and a team selector populated from the published list of teams.
-2. **Given** a user on the profile-completion form with at least one team
-   available, **When** they submit a valid display name and team
-   selection, **Then** the system saves their profile and routes them to
-   the workspace.
+   a profile-completion form containing the full-name field, pre-filled
+   from the value captured at signup if one was provided.
+2. **Given** a user on the profile-completion form, **When** they submit
+   a valid full name, **Then** the system saves the profile and routes
+   them to the workspace.
 3. **Given** a user who has already completed profile setup, **When**
    they sign in on a subsequent session, **Then** they bypass the
    profile-completion form and go directly to the workspace.
-4. **Given** a user reaching the profile-completion form when the
-   published list of teams is empty, **When** the form renders, **Then**
-   the team field is disabled and the user sees a calm "no teams
-   available — ask your administrator" state, and the form cannot be
-   submitted until an administrator creates at least one team.
 
 ---
 
@@ -162,6 +165,11 @@ set a new password, sign in successfully with the new password.
    correspond to an account, **When** the request is submitted, **Then**
    the response is indistinguishable from a successful request (to avoid
    leaking which emails are registered).
+5. **Given** a user who received a password-reset email containing both
+   a link and a 6-digit code, **When** they enter the code at the OTP
+   entry surface, **Then** they reach the new-password form and can
+   complete the reset — the same outcome they would have reached by
+   clicking the link.
 
 ---
 
@@ -185,19 +193,14 @@ set a new password, sign in successfully with the new password.
   — the platform creates exactly one account.
 - A user opens the signup form on a 360px-wide mobile viewport — every
   control is visible and tappable with a 44px minimum touch target.
-- A newly activated user reaches the profile-completion form before any
-  teams have been created in the system — the team field is disabled,
-  the form surfaces a calm "no teams available — ask your administrator"
-  message, and the workspace remains unreachable until a team exists and
-  the user selects one.
 
 ## Requirements *(mandatory)*
 
 ### Functional Requirements
 
 - **FR-001**: The system MUST allow a new user to create an account
-  using email, password, and full name. Team selection is NOT part of
-  signup; it is performed during the profile-completion step on first
+  using email, password, and full name. No additional fields are
+  collected at signup; the user confirms their profile on first
   sign-in.
 - **FR-002**: The system MUST default new accounts to the `employee`
   role. Elevation to `team_lead` or `admin` is a manual maintainer
@@ -215,11 +218,12 @@ set a new password, sign in successfully with the new password.
   requests for registered and unregistered emails (to avoid disclosing
   which emails are registered).
 - **FR-008**: After a user's first successful sign-in following
-  activation, the system MUST prompt them to set their display name and
-  select their team from the published list before reaching the
-  workspace. If no teams exist, the team field MUST be disabled and the
-  user MUST see a calm "no teams available — ask your administrator"
-  state until a team is created.
+  activation, the system MUST prompt them to confirm their full name
+  before reaching the workspace. Direct-manager assignment is performed
+  by an administrator, not by the user themselves. New accounts have no
+  assigned direct manager by default; an administrator links a user to
+  their direct manager via an admin-only assignment path. A user MUST
+  NOT be able to set, change, or clear their own manager.
 - **FR-009**: The system MUST route each signed-in user to a workspace
   view that reflects their role (`employee`, `team_lead`, or `admin`).
 - **FR-010**: The system MUST redirect unauthenticated visitors away
@@ -250,6 +254,19 @@ set a new password, sign in successfully with the new password.
   error messages, transactional email content — MUST follow the calm,
   non-alarmist voice established by the project's design language and
   MUST NOT use red as a signal color.
+- **FR-020**: The system MUST allow users to enter the 6-digit OTP code
+  included in confirmation and password-reset emails as a fallback to
+  clicking the link. The same outcome is achieved — account activation
+  for signup, password reset for forgot-password — whether the user
+  clicks the link or enters the OTP. The OTP entry surface MUST be
+  reachable on the same page as the "check your email" panel (signup)
+  and the reset-password page so users who never received the link can
+  still proceed.
+- **FR-021**: Light and dark theme toggle MUST be available on every
+  authentication surface (`/login`, `/signup`, `/forgot-password`,
+  `/reset-password`), at equal priority with the authed-surface toggle.
+  Toggling on any surface persists the choice across all authenticated
+  and unauthenticated pages.
 
 ### Key Entities
 
@@ -257,10 +274,13 @@ set a new password, sign in successfully with the new password.
   and activation status. The unique identifier for a real person on the
   platform.
 - **Profile**: The application-side representation of a user — full
-  name, display name, role (`employee` / `team_lead` / `admin`), and
-  team affiliation. Linked one-to-one with a user account.
-- **Team**: A small organizational grouping. Has a name and an optional
-  designated team lead. Many profiles may belong to one team.
+  name, role (`employee` / `team_lead` / `admin`), and an optional
+  reference to a direct manager. Linked one-to-one with a user account.
+- **Manager Relationship**: A self-referential link from one Profile to
+  another, recording who reports directly to whom. Each user has at
+  most one direct manager; users at the top of the chain (typically
+  admins) may have none. The relationship is set, changed, or cleared
+  only by administrators.
 - **Session**: The signed-in state of a user. Begins on successful
   sign-in, ends on sign-out, expiration, or password change.
 
@@ -283,6 +303,10 @@ in later features or are deferred indefinitely:
 - Seeded demo accounts for a fictional company (feature 002)
 - Self-serve role management — role elevation is performed manually by
   a maintainer for this feature
+- Skip-level (manager-of-manager) visibility into per-employee data is
+  forbidden in this and all future features. Skip-level managers see
+  only org-aggregated views, never per-employee data, even where their
+  transitive report set is computable.
 
 ## Success Criteria *(mandatory)*
 
@@ -315,9 +339,6 @@ in later features or are deferred indefinitely:
 
 - Users have a working email inbox capable of receiving activation and
   password-reset emails.
-- The list of teams is small enough at this stage that a published
-  list picker is acceptable. Team management (create / rename /
-  delete) is not part of this feature.
 - The platform's built-in transactional email transport is sufficient
   for this feature; the production-grade branded email transport
   swap-in is deferred to a later feature.
