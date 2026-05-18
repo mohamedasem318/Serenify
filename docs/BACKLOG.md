@@ -139,3 +139,43 @@ broader windows are MORE privacy-preserving (less granular), not less.
 signal-event tables, charting in Recharts.
 **Address by**: feature 010 (team-lead-dashboard) spec must include these time ranges
 as acceptance scenarios; feature 011 (admin-dashboard) likewise for org-wide aggregates.
+
+---
+
+## From feature 002 (demo-seed-data) — implementation complete 2026-05-18
+
+### CI integration for `npm run test:seed:integration`
+**Status**: deferred-feature
+**Observed**: scope decision during /speckit.implement of feature 002
+**Description**: The seed integration test suite (`scripts/__tests__/seed-demo.integration.test.ts`)
+runs locally against the developer's Supabase Docker stack and is gated by
+`SUPABASE_INTEGRATION=1`. CI does not currently run it because GitHub Actions has no
+Supabase service spun up — adding one is a non-trivial workflow change (docker-compose
+or the `supabase/cli` action, plus seeded migrations on each PR). The 8 integration
+assertions therefore run only on Mohamed's laptop today; the Vitest unit suite (9 assertions
+against the pure hierarchy generator) is the only piece of feature 002's testing that runs
+in CI.
+**Fix scope**: medium — Add a docker-compose Supabase service to the GitHub Actions workflow
+(or use the `supabase/setup-cli` action), apply feature 001's migrations on each PR run,
+and gate `test:seed:integration` to PRs touching `scripts/` so the cost only pays on
+diff-relevant runs. Pair with feature 006's CI work since stress-inference-service will
+need Supabase in CI anyway.
+**Address by**: feature 006 (stress-inference-service) CI setup, or sooner if PRs to
+`scripts/` start landing without integration coverage.
+
+### Cleaner error output when local Supabase is unreachable
+**Status**: polish
+**Observed**: smoke test ST-10, feature 002
+**Description**: When the seed script encounters a fetch failure
+(Supabase not running, network down, wrong URL), it surfaces the
+raw `fetch failed` / `ECONNREFUSED` stack trace from Node. The
+script still exits non-zero with no partial writes, so the
+behaviour is correct — just noisy. A friendlier surface would be a
+single-line message like `ERROR: Cannot reach Supabase at <url>.
+Is it running?` followed by `(run "supabase start" or check your
+NEXT_PUBLIC_SUPABASE_URL)`, then a clean non-zero exit.
+**Fix scope**: small. Wrap the first network call in env.ts or the
+orchestrator with a try/catch that detects fetch / ECONNREFUSED
+errors and substitutes a friendly message. Probably 20 lines.
+**Address by**: any polish pass, or whoever next touches the seed
+script (e.g. the signal-event seeding follow-up before feature 011).

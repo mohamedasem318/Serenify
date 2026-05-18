@@ -3,8 +3,11 @@
 // Responsibilities:
 //   1. Refuse to run unless NEXT_PUBLIC_SUPABASE_URL points at localhost.
 //      This prevents accidentally wiping a staging or production database.
-//   2. Truncate auth.users (cascades to public.profiles via FK ON DELETE
-//      CASCADE) and clear any orphan profile rows defensively.
+//   2. Delete every existing auth.users row whose email matches the
+//      Playwright FIXTURE pattern @example.com (cascades to public.profiles
+//      via FK ON DELETE CASCADE). The demo cohort created by
+//      `npm run seed` (FR-019, feature 002) uses @demo.serenify.local
+//      and is left untouched so an e2e run never destroys it.
 //   3. Seed a known-credentials test admin and promote its role.
 //   4. Export TEST_ADMIN_EMAIL / TEST_ADMIN_PASSWORD for the role specs.
 //
@@ -16,6 +19,7 @@ import { createAdminClient } from "./admin-client";
 
 const TEST_ADMIN_EMAIL = "test-admin@example.com";
 const TEST_ADMIN_PASSWORD = "TestAdmin123!";
+const FIXTURE_EMAIL_SUFFIX = "@example.com";
 
 export default async function globalSetup() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -27,7 +31,8 @@ export default async function globalSetup() {
 
   const admin = createAdminClient();
 
-  // Step 2: delete every existing auth user (cascades to profiles).
+  // Step 2: delete every @example.com fixture user (cascades to
+  // profiles via FK; demo cohort users at @demo.serenify.local survive).
   let page = 1;
   while (true) {
     const { data, error } = await admin.auth.admin.listUsers({
@@ -37,19 +42,14 @@ export default async function globalSetup() {
     if (error) throw error;
     if (data.users.length === 0) break;
     for (const u of data.users) {
-      const { error: delErr } = await admin.auth.admin.deleteUser(u.id);
-      if (delErr) throw delErr;
+      if (u.email?.toLowerCase().endsWith(FIXTURE_EMAIL_SUFFIX)) {
+        const { error: delErr } = await admin.auth.admin.deleteUser(u.id);
+        if (delErr) throw delErr;
+      }
     }
     if (data.users.length < 200) break;
     page += 1;
   }
-
-  // Belt-and-braces: clear any orphan profiles rows (should be zero
-  // because of ON DELETE CASCADE, but cheap to be sure).
-  await admin
-    .from("profiles")
-    .delete()
-    .gte("created_at", "1970-01-01");
 
   // Step 3: seed the test admin and promote.
   const { data: created, error: createErr } =

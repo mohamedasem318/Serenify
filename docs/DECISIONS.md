@@ -174,3 +174,134 @@ the complexity.
 **Decision**: GHSA-qx2v-qp2m-jg93 (PostCSS XSS via CSS Stringify with </style>) is a transitive dependency of Next.js. The recommended `npm audit fix --force` downgrades Next to 9.3.3, which is not viable. The vulnerability requires stringifying untrusted CSS input, which is not a code path the Serenify app exercises — PostCSS runs only at build time on first-party CSS files in this project.
 
 **Revisit when**: a new Next.js major version is adopted (re-run `npm audit` and re-triage); or if the app ever processes user-supplied CSS at runtime (which is not on any roadmap).
+
+---
+
+## 2026-05-18 — TypeScript runner for repo-root scripts: `tsx` 4.19.2 (exact pin)
+
+**Status**: Accepted.
+
+**Decision**: `scripts/seed-demo.ts` and any future repo-root TypeScript
+tooling are executed via `tsx`, pinned exactly to `4.19.2` in
+`package.json`.
+
+**Rationale**:
+
+- `tsx` is ESM-first, zero-config, and uses esbuild internally — no
+  separate build step, no `dist/` artifact to remember to rebuild.
+- Trade-off vs. `ts-node`: more `node_modules` weight, but no
+  ESM-loader-flag rituals (`--loader ts-node/esm`) that have been a
+  recurring source of toolchain confusion.
+- Trade-off vs. a dedicated esbuild build step: one extra dev
+  dependency, but no "did you rebuild?" footgun for a casual fixture
+  script developers run rarely.
+- Exact pin (no caret/tilde) because `tsx` is part of the deterministic
+  toolchain — a major bump could shift ESM path resolution and break
+  reproducibility across machines.
+
+**Revisit if**: Node ships a native TS loader that subsumes this niche,
+or if a CI environment introduces an `tsx`-incompatible Node flag.
+
+---
+
+## 2026-05-18 — Playwright orphan-profile sweep removed
+
+**Status**: Accepted.
+
+**Decision**: `apps/web/tests/e2e/setup/global-setup.ts` no longer
+deletes orphan `public.profiles` rows. The "belt-and-braces" sweep that
+ran `admin.from("profiles").delete().gte("created_at", "1970-01-01")`
+is removed entirely.
+
+**Rationale**:
+
+- Once the upstream `auth.users` deletion in the same file became
+  pattern-scoped to `@example.com` (FR-019 of feature 002), the
+  unscoped orphan sweep would actively destroy demo profile rows whose
+  `auth.users` parents survive — breaking FR-008 idempotency on the
+  first e2e run after `npm run seed`.
+- The FK constraint `profiles.id REFERENCES auth.users(id) ON DELETE
+  CASCADE` already guarantees orphan profile rows cannot exist:
+  `auth.users` delete cascades to `profiles`; an `INSERT INTO profiles`
+  without a matching `auth.users` row fails the FK constraint.
+- The sweep was a no-op when working as intended (no orphans to
+  delete) and is destructive after FR-019. Removing is simpler than
+  pattern-scoping the sweep against the same FK contract.
+
+**Revisit when**: the FK is ever dropped (it should not be); the
+canonical orphan-prevention contract is the FK itself.
+
+---
+
+## 2026-05-18 — Demo email format: `<first>.<last>.<NN>@demo.serenify.local`
+
+**Status**: Accepted.
+
+**Decision**: All seeded demo users in `scripts/seed-demo.ts` (and any
+future seed work that extends this script — e.g., the deferred
+signal-event seeding immediately before feature 011) follow the email
+format:
+
+```
+<normalize(first)>.<normalize(last)>.<NN>@demo.serenify.local
+```
+
+- `normalize(s)` = `s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().replace(/[^a-z0-9]/g, "")`
+- `NN` = the 2-digit slot index, `01..30` (in this cohort).
+
+**Rationale**:
+
+- The trailing slot suffix makes email uniqueness independent of
+  faker name collisions. The cohort's determinism guarantee (FR-007 /
+  SC-005) is unconditional — 30 distinct emails for 30 slots,
+  regardless of whether faker happens to emit two identical
+  `(first, last)` pairs at the current pin.
+- Diacritic stripping prevents non-ASCII characters in the local part
+  (faker's `en_GB`/`en_IE` corpora occasionally produce them).
+- The `.local` TLD is RFC 6762 reserved (Multicast DNS) and is not
+  deliverable on the public internet — by design, no demo account can
+  receive mail.
+
+**Future cohorts** (beyond the 30-user demo) MUST keep the same
+`<name>.<NN>@<cohort-suffix>.serenify.local` shape and swap only the
+cohort suffix (never the slot suffix). The pattern is the single
+authority used to detect cohort membership across the seed's idempotent,
+reset, and Playwright-coexistence paths.
+
+**Revisit if**: a cohort needs more than 99 members (slot index width
+would need to grow from 2 digits to 3); or if a real domain ever
+collides with `demo.serenify.local` (currently impossible per RFC 6762).
+
+---
+
+## 2026-05-18 — Windows npm CLI flag passthrough fallback
+
+**Status**: Accepted.
+
+**Context**: On Windows PowerShell, `npm.ps1` strips flags passed after
+the `--` separator (e.g. `npm run seed -- --remote`) before reaching
+the underlying script. This is a long-standing npm-on-Windows behaviour,
+not a bug in our code. Bash/zsh on macOS/Linux do not have this issue.
+Smoke test ST-7a (feature 002) caught the divergence — the script
+silently targeted LOCAL with exit 0 instead of failing fast with exit 1.
+
+**Decision**: `scripts/lib/env.ts`'s argv parser also reads
+`process.env.npm_config_<flagname>` as a fallback. npm sets these
+env vars for any unrecognised flag, so `npm run seed -- --remote`
+on Windows leaves `npm_config_remote=true` in the env even after
+stripping the flag. The parser treats either signal (argv or env)
+as equivalent. Defensive check: only the literal string `"true"`
+triggers the fallback, so `npm_config_remote=1` or stale shell
+exports of other values cannot accidentally arm the remote path.
+
+**Consequence**: The `--remote` flag works identically across
+platforms via `npm run seed -- --remote`. Direct invocation
+(`npx tsx scripts/seed-demo.ts --remote`) bypasses npm entirely and
+relies on argv parsing alone — also works on all platforms. The same
+fallback is wired for `--reset` so the cross-platform behaviour is
+consistent across both flags.
+
+**Revisit if**: npm ever ships a Windows release that stops stripping
+`--`-separated flags, OR a future contributor adds a new CLI flag to
+`scripts/seed-demo.ts` — the same env-var fallback must be wired for
+that flag.

@@ -4,5 +4,19 @@
   "workspaces": [
     "apps/*",
     "packages/*"
-  ]
+  ],
+  "scripts": {
+    "seed": "tsx scripts/seed-demo.ts",
+    "seed:reset": "tsx scripts/seed-demo.ts --reset",
+    "test:seed": "vitest run",
+    "test:seed:integration": "cross-env SUPABASE_INTEGRATION=1 vitest run"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "9.2.0",
+    "@supabase/supabase-js": "^2.105.4",
+    "cross-env": "^7.0.3",
+    "dotenv": "^17.4.2",
+    "tsx": "4.19.2",
+    "vitest": "^4.1.6"
+  }
 }
