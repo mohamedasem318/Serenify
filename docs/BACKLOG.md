@@ -14,8 +14,14 @@ Status values:
 
 ## From feature 001 (auth-and-roles) — merged 2026-05-17
 
-### `/login` page does not render the `?error=expired_link` notice
-**Status**: bug
+### ~~`/login` page does not render the `?error=expired_link` notice~~ — resolved
+**Status**: resolved
+**Resolved**: 2026-05-19 on `hotfix/login-expired-link-notice` — `login/page.tsx` now
+awaits `searchParams` and renders a calm amber `role="status"` notice above the form
+when `error === "expired_link"`. Covered by a Vitest + RTL component test
+(`tests/unit/login-page.test.tsx`) and a Playwright spec
+(`tests/e2e/login-expired-link.spec.ts`). The shared error-alert component extraction
+remains deferred to feature 003 per the auth-primitives backlog entry below.
 **Observed**: smoke test ST-1 of feature 001
 **Description**: When the PKCE callback fails and redirects to `/login?error=expired_link`,
 the URL carries the error but the page renders the bare login form with no error message.
