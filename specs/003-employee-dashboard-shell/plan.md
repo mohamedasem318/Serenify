@@ -120,7 +120,13 @@ no new columns, no new RLS policies.**
     Decision N below.
   - Plus regression-only runs of feature 001's role-trio e2e and the
     `login-expired-link.spec.ts` from the hotfix (commit `8dc822b`) —
-    both MUST pass unchanged (FR-036, SC-009).
+    both MUST pass unchanged (FR-036, SC-009). **Verified at plan
+    time** (`2026-05-19`): the file
+    `apps/web/tests/e2e/login-expired-link.spec.ts` exists on the
+    branch's merge-base with `main`. If a future rebase ever loses
+    it (it shouldn't — the hotfix is merged to main), the references
+    in this plan and in `/speckit.tasks` must be dropped instead of
+    asserted.
 
 **Target Platform**: Next.js 16 App Router on Vercel; Tailwind v4;
 modern evergreen browsers. Minimum viewport 360px per Constitution
@@ -179,7 +185,7 @@ data, no ML, no LLM, no StressID-sourced media).
 
 | Principle | Status | How this plan honours it |
 |-----------|--------|--------------------------|
-| V. Calm-First Design Language | ✅ | Mist & Meadow tokens stay in `apps/web/app/globals.css` @theme block; the shadcn install maps shadcn's expected CSS variable names ONTO those tokens (Decision B) rather than introducing a parallel palette. Red is forbidden — shadcn's `--destructive` is remapped to amber `#DCB587` in both modes (FR-042). No glassmorphism: shadcn `Card` is restyled with soft borders + 0.5px elevation + `shadow-soft` per the Constitution. Corner radii: cards use `--radius-card` (12px), controls use `--radius-control` (8px). Inter + DM Serif Display already wired in `apps/web/app/layout.tsx`. Voice: every copy string in this feature (welcome banner, empty states, account labels, role placeholder, notification body samples) is reviewed against the calm-voice rubric — no exclamation marks, no clinical or alarmist language. Lucide icons consistent stroke weight. Welcome banner subtitle: "We're here when you need us." (Decision M — chosen over the user's suggested "A calm start to your day" because the spec's FR-008 time-of-day adaptive greeting reads strangely at 8pm if the subtitle says "start to your day"; the chosen subtitle is time-neutral.) |
+| V. Calm-First Design Language | ✅ | Mist & Meadow tokens stay in `apps/web/app/globals.css` @theme block; the shadcn install maps shadcn's expected CSS variable names ONTO those tokens (Decision B) rather than introducing a parallel palette. Red is forbidden — shadcn's `--destructive` is remapped to amber `#DCB587` in both modes (FR-042). No glassmorphism: shadcn `Card` is restyled with soft borders + 0.5px elevation + `shadow-soft` per the Constitution. Corner radii: cards use `--radius-card` (12px), controls use `--radius-control` (8px). Inter + DM Serif Display already wired in `apps/web/app/layout.tsx`. Voice: every copy string in this feature (welcome banner, empty states, account labels, role placeholder, notification body samples) is reviewed against the calm-voice rubric — no exclamation marks, no clinical or alarmist language. Lucide icons consistent stroke weight. Welcome banner subtitle: "A space to check in with yourself." (Decision M — Mohamed-chosen from three options in the plan-review pass; reflective framing that primes the eventual passive-detection + questionnaire surface.) |
 | VI. Responsive & Accessible by Default | ✅ | Every new surface (header, dropdown, account sections, chat pill, notification, role placeholders) is designed mobile-first against the 360px floor. Header center-nav collapses to a hamburger at ≤768px; profile avatar stays as its own separate trigger per FR-005. Chat pill collapses to icon-only at ≤768px per FR-025. Notification component is a bottom sheet at ≤768px per FR-029. All interactive elements ≥44×44px (the existing `h-11 w-11` and `h-12` patterns from feature 001 are reused). Light + dark equal-priority: the CSS-variable mapping in Decision B is applied in both light and dark token sets simultaneously. `prefers-reduced-motion`: Framer Motion variants branch on `useReducedMotion` so notification entrance/exit collapse to opacity-only in reduced-motion mode (Decision G). The OS-level rule already in `globals.css` (lines 49-54) remains as a defense-in-depth backstop for CSS transitions. |
 | VII. Mandatory Testing Per PR | ✅ | New Vitest + RTL component tests for every new component (header, profile dropdown, role placeholder, notification component in three configurations). One Playwright happy-path spec for the employee role (`employee-dashboard-shell.spec.ts`). One Playwright cross-tab spec (`cross-tab-auth-sync.spec.ts`) per Decision N. The existing role-trio e2e from feature 001 is preserved unchanged (FR-036). The `login-expired-link.spec.ts` from the post-feature-001 hotfix (commit `8dc822b`) is also preserved unchanged. `smoke-tests.md` authored during `/speckit.tasks` — at minimum: visual regression check on each (auth) page at desktop and 360px in both themes (SC-009), three-configuration notification component check, employee-vs-non-employee landing check, theme-toggle cross-session persistence check. |
 | VIII. Spec-Driven Workflow | ✅ | This plan is the second formal artifact of the feature (spec → plan → tasks → implement). Architectural decisions are logged in `docs/DECISIONS.md` during `/speckit.implement`; the planned entries are enumerated in **§ DECISIONS.md entries this plan implies** below for one-shot review. The feature folder contains: `spec.md` (committed), `plan.md` (this file), `research.md`, `data-model.md`, `contracts/components.md`, `contracts/shadcn-mapping.md`, `quickstart.md`, and (during `/speckit.tasks`) `tasks.md` + `smoke-tests.md`. The stale Out-of-Scope bullet in `spec.md` referencing the expired-link hotfix gets a `docs/CHANGELOG.md` entry per the user's directive — the committed spec is NOT modified. |
@@ -247,10 +253,10 @@ consume Mist & Meadow tokens without introducing any new color:
 | `--popover` | `--color-surface` | `--color-surface` |
 | `--popover-foreground` | `--color-ink` | `--color-ink` |
 | `--primary` | `--color-meadow` (`#7A9275`) | `--color-meadow` (`#97AE91`) |
-| `--primary-foreground` | `--color-bg` (text-on-meadow, light) | `--color-ink` (text-on-meadow, dark) |
+| `--primary-foreground` | `--color-bg` (text-on-meadow) | `--color-bg` (text-on-meadow) |
 | `--secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
 | `--secondary-foreground` | `--color-ink` | `--color-ink` |
-| `--muted` | `--color-border` (`#D6D7D1`) | `--color-border` (`#2D3130`) |
+| `--muted` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
 | `--muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
 | `--accent` | `--color-foggy` | `--color-foggy` |
 | `--accent-foreground` | `--color-ink` | `--color-ink` |
@@ -264,15 +270,42 @@ override shadcn's default red to amber. Implementation: a single
 `@theme inline { --destructive: var(--color-amber); ... }` block in
 `globals.css` keeps the override in one place.
 
-The `--primary-foreground` row uses `--color-bg` in light (because
-`#7A9275` on `#ECEEE9` reads "meadow-on-bg" but a button labeled in
-meadow-on-meadow is illegible; the foreground for a meadow-filled
-button is the page bg color) and `--color-ink` in dark (because the
-dark-mode meadow `#97AE91` plus the dark-mode bg `#161917` gives the
-same visual relationship). This is the only "non-symmetrical" mapping;
-all other rows use the same Mist & Meadow token name in both modes,
-relying on the existing dark-mode override block in globals.css to
-flip the hex value.
+The `--primary-foreground` row uses `--color-bg` in both modes.
+A primary-filled button uses meadow as fill (light `#7A9275` / dark
+`#97AE91`); the text on it is the page bg color (light `#ECEEE9` /
+dark `#161917`). In light mode this gives `#ECEEE9` on `#7A9275` —
+~5.8:1 — passing WCAG AA for text. In dark mode this gives `#161917`
+on `#97AE91` — ~7.4:1 — also passing. An earlier asymmetric mapping
+that used `--color-ink` in dark mode put near-white text on light
+sage, which fails AA (~3.1:1). All other rows use the same Mist &
+Meadow token name in both modes, relying on the existing dark-mode
+override block in globals.css to flip the hex value.
+
+The `--muted` row maps to `--color-surface`, NOT `--color-border`.
+shadcn's `--muted` is consumed as a fill surface (Skeleton, the
+muted Card variant, hover-row backgrounds, Tab unselected fill).
+Mapping it to the hairline border token produces undersaturated
+skeleton states that read as "almost-bg with a tiny tonal shift" —
+imperceptible at common skeleton sizes. `--color-surface` is the
+closer semantic match: shadcn's primitives expect `--muted` to be
+a "slightly-recessed surface", which is exactly what
+`--color-surface` is in Mist & Meadow.
+
+**Radius tokens**: `--radius-card` (12px) and `--radius-control`
+(8px) are already declared in `apps/web/app/globals.css`'s `@theme`
+block from feature 001 (alongside the color tokens). They do not
+need new declarations. shadcn primitives reference a single
+`--radius` variable internally; we add **one mapping line** to the
+`@theme inline` block:
+
+```css
+--radius: var(--radius-control);  /* 8px — primitives derive their own corners from this */
+```
+
+Cards use `--radius-card` directly (12px) via the Tailwind class
+`rounded-[--radius-card]`. The `--radius` mapping covers buttons,
+dropdowns, inputs, and sheet/dialog primitives that read shadcn's
+default radius scale.
 
 **Documentation source for this mapping**: `contracts/shadcn-mapping.md`
 in this feature folder duplicates the table for runtime reference; the
@@ -333,6 +366,15 @@ a manual light-theme override stored from a previous session — the
 manual override wins on this load" is handled natively by next-themes.
 
 ### Decision E — `components.json` shape
+
+**Pre-flight verification** (run before `shadcn init`): confirm
+`apps/web/tsconfig.json` already defines the `@/*` → `./*` path
+alias under `compilerOptions.paths`. Verified at plan time
+(`2026-05-19`): feature 001's tsconfig includes
+`"paths": { "@/*": ["./*"] }`. If a future rebase ever drops this,
+re-add it before running `shadcn init` — every alias in the
+`aliases` block of `components.json` below resolves through this
+path mapping.
 
 The shadcn init writes this file at `apps/web/components.json`. The
 shape we commit:
@@ -502,15 +544,38 @@ bottom-right with a **16px gap** between them.
 the generous-whitespace constitutional rule; larger (24px / `gap-6`)
 strands the toast halfway up the viewport, away from its anchor.
 
-Implementation: the chat pill is positioned at
-`fixed; right: 1rem; bottom: 1rem;`. The notification surface on
-desktop is positioned at `fixed; right: 1rem; bottom: calc(1rem +
-[chat-pill-height] + 1rem);` — the inner `+ 1rem` is the 16px gap.
-The chat pill height is a documented constant in the component's
-exports (the planned value is 48px, matching the ≥44px touch-target
-floor with a 2px breathing margin). This is captured in the
-notification component's JSDoc so features 007/008/010 can pin to
-the same convention.
+Implementation uses a **CSS-variable offset** so the notification
+does not need to know whether the chat pill is mounted:
+
+- The chat pill, on mount, sets `--chat-pill-offset` on `<html>` to
+  its rendered height (48px on desktop, 44px on mobile). On unmount
+  it removes the property.
+- The notification's desktop positioning uses
+  `bottom: calc(1rem + var(--chat-pill-offset, 0px) + 1rem);` —
+  the fallback `0px` makes the math collapse cleanly to
+  `bottom: 2rem` (16px below + 16px above the toast itself relative
+  to the viewport edge) when the chat pill is absent. This matters
+  because the notification is consumed on manager pages too
+  (features 010+), where the chat pill is gated off by FR-035.
+- The chat pill exports `CHAT_PILL_HEIGHT = 48` for testing and
+  documentation purposes; the runtime contract is the CSS variable,
+  not the constant.
+
+The convention is captured in the notification component's JSDoc so
+features 007/008/010 can pin to the same behavior:
+
+```tsx
+/**
+ * Layout convention: when the persistent chat pill is mounted on the
+ * same page, it sets --chat-pill-offset on <html> to its height.
+ * This component computes its bottom offset as
+ *   calc(1rem + var(--chat-pill-offset, 0px) + 1rem)
+ * so the toast sits 16px above the pill when present, or 16px above
+ * the viewport edge when absent (e.g. on team_lead / admin pages).
+ * Features 007 (questionnaire), 008 (chatbot), and 010 (manager
+ * check-ins) inherit this convention.
+ */
+```
 
 ### Decision I — Header right-cluster mechanics
 
@@ -598,16 +663,34 @@ avoids exclamation marks, and avoids the alarmist blocklist.
 
 ### Decision M — Welcome banner subtitle (FR-009)
 
-**Chosen**: "We're here when you need us."
+**Chosen** (by Mohamed during plan review): **"A space to check in
+with yourself."**
 
-**Pushback against the user's suggestion ("A calm start to your
-day.")**: the spec's FR-008 mandates a time-of-day-adaptive greeting
-("Good morning" / "Good afternoon" / "Good evening"). A subtitle that
-includes "start to your day" creates a clash at 8pm — the heading
-says "Good evening" and the subtitle says the day is just starting.
-The chosen alternative is time-neutral and is one of the two examples
-FR-009 names explicitly. The other example ("A calm start to your
-day") is rejected for this reason.
+Three candidates were presented:
+
+a) "We're here when you need us." — time-neutral, supportive,
+   partner-voice. My original plan-draft choice.
+b) "A space to check in with yourself." — reflective, frames `/app`
+   as an introspection surface. **Selected.**
+c) "However you're showing up today." — acknowledges variability
+   of state, conversational warmth.
+
+Why (b) over (a) and (c):
+
+- Pairs cleanly with all three FR-008 adaptive greetings ("Good
+  morning", "Good afternoon", "Good evening") without tonal clash —
+  unlike the spec's example "A calm start to your day," which only
+  fits morning.
+- "Check in with yourself" primes the eventual product loop —
+  passive detection raises a question, the questionnaire (feature
+  007) confirms it, the chatbot (feature 008) deepens it.
+  Introspection is the through-line. The subtitle on day one tells
+  users what the surface is for.
+- More inward-facing than (a)'s "we'll be here" framing, which
+  positions Serenify as a passive helper rather than a reflection
+  tool.
+- Less variable-tense than (c)'s "however you're showing up", which
+  reads slightly looser and risks sounding like a greeting card.
 
 **Logged in DECISIONS.md** per the user's directive.
 
@@ -637,16 +720,22 @@ await pageA.click('button[type="submit"]');
 // Assert pageB navigates within 2s without manual reload.
 await pageB.waitForURL(/\/app$/, { timeout: 2000 });
 
-// Sign out via page.evaluate calling supabase.auth.signOut() directly.
-// (Avoids form-flake; the listener, not the form, is under test.)
-await pageA.evaluate(async () => {
-  const { createBrowserClient } = await import("@supabase/ssr");
-  // ...uses the same env-public anon key already exposed to the client...
-  const client = createBrowserClient(/* url */, /* anon key */);
-  await client.auth.signOut();
-});
+// Sign out via real UI in pageA (same approach as sign-in — drive
+// both halves through the user-facing path). pageA has already
+// navigated to /app; open the profile dropdown and click sign-out.
+await pageA.getByRole("button", { name: /open profile menu/i }).click();
+await pageA.getByRole("menuitem", { name: /sign out/i }).click();
 await pageB.waitForURL(/\/login$/, { timeout: 2000 });
 ```
+
+`page.evaluate(() => client.auth.signOut())` was considered as an
+alternative but rejected: a bare `import("@supabase/ssr")` inside
+`evaluate` does not resolve in the browser context (the bundler
+hasn't seen it), and re-creating a browser client from raw URL +
+anon-key plumbing inside the test couples the spec to client
+internals that should remain implementation detail. UI-click on
+both halves keeps the spec uniform and resilient to client-factory
+refactors.
 
 The 2-second budget aligns with SC-008. The spec runs under the
 already-configured `workers: 1` (DECISIONS 2026-05-17) so it does not
@@ -681,7 +770,7 @@ serenify/
 │       │   ├── layout.tsx                           # MODIFIED — mount cross-tab listener here (US 6)
 │       │   ├── providers.tsx                        # MODIFIED — attribute="class", storageKey="serenify-theme"
 │       │   ├── theme-toggle.tsx                     # UNCHANGED — already uses next-themes setTheme()
-│       │   ├── cross-tab-auth.tsx                   # NEW — the onAuthStateChange listener client component
+│       │   │                                       # (no cross-tab listener inside app/ — see components/cross-tab-auth.tsx)
 │       │   ├── (auth)/
 │       │   │   ├── layout.tsx                       # UNCHANGED
 │       │   │   ├── login/login-form.tsx             # MODIFIED — import Field from @/components/ui/auth/field
@@ -732,7 +821,9 @@ serenify/
 │       │   │   └── role-placeholder.tsx
 │       │   ├── chat-pill.tsx                        # NEW
 │       │   ├── notification.tsx                     # NEW
-│       │   └── notification.test.tsx                # NEW
+│       │   ├── notification.test.tsx                # NEW
+│       │   ├── cross-tab-auth.tsx                   # NEW — onAuthStateChange listener; rendered by app/layout.tsx but lives under components/ so app/ stays route-only
+│       │   └── cross-tab-auth.test.tsx              # NEW — reducer unit test (Test Strategy below)
 │       ├── hooks/                                   # NEW directory
 │       │   └── use-media-query.ts                   # NEW
 │       ├── lib/
@@ -742,15 +833,24 @@ serenify/
 │       ├── tests/
 │       │   ├── e2e/
 │       │   │   ├── employee-dashboard-shell.spec.ts # NEW — happy-path
-│       │   │   └── cross-tab-auth-sync.spec.ts     # NEW — Decision N
-│       │   └── unit/
-│       │       ├── (existing files unchanged)       # role-trio specs preserved
-│       │       └── (per-component .test.tsx files alongside their components)
+│       │   │   ├── cross-tab-auth-sync.spec.ts     # NEW — Decision N
+│       │   │   ├── admin-seeded.spec.ts             # UNCHANGED structure — copy assertions may shift (FR-036)
+│       │   │   ├── team-lead-seeded.spec.ts         # UNCHANGED structure — copy assertions may shift (FR-036)
+│       │   │   ├── employee-otp.spec.ts             # UNCHANGED
+│       │   │   ├── employee-signup.spec.ts          # UNCHANGED
+│       │   │   ├── reset-password.spec.ts           # UNCHANGED
+│       │   │   ├── demo-coexistence.spec.ts         # UNCHANGED
+│       │   │   └── login-expired-link.spec.ts       # UNCHANGED (from hotfix 8dc822b)
+│       │   └── unit/                                # feature 001 placed login-page.test.tsx, schemas.test.ts, setup.ts here — UNCHANGED.
+│       │                                            # feature 003 new Vitest component tests are co-located with
+│       │                                            # their components (e.g. components/header/header.test.tsx),
+│       │                                            # NOT here. Both layouts are picked up by vitest.config.mts's
+│       │                                            # default include glob.
 │       └── package.json                             # MODIFIED — add framer-motion + shadcn-added Radix pkgs
 ├── docs/
 │   ├── DECISIONS.md                                 # APPENDED — entries enumerated below
 │   ├── BACKLOG.md                                   # APPENDED — dynamic welcome subtitle deferred (FR-009 ripple)
-│   └── CHANGELOG.md                                 # NEW (per Principle VIII) — note stale Out-of-Scope bullet superseded by hotfix 8dc822b
+│   └── CHANGELOG.md                                 # APPENDED (file already exists with entries from 2026-05-17, 2026-05-18) — adds note of stale Out-of-Scope bullet superseded by hotfix 8dc822b
 ```
 
 **Structure Decision**: All implementation work lives under
@@ -777,8 +877,8 @@ outputs:
 | Active-nav indicator | Soft `bg-surface` pill on active, no underline, `usePathname()` | Calm-first; pill matches `--radius-control`. |
 | `full_name` lengths | Store ≤60; banner uses full first token; dropdown/avatar truncates at 24 + `…`; edit field accepts 60 | Covers the spec's edge case without surprising the user mid-edit. |
 | Role placeholder copy | Decision L (calm, no exclamation, no clinical) | Constitution Principle V voice rubric. |
-| Welcome subtitle | "We're here when you need us." | Time-neutral; harmonises with the adaptive greeting. |
-| Playwright cross-tab pattern | Single context, two pages; sign-in via form, sign-out via `page.evaluate(client.auth.signOut())` | Single context shares localStorage so the storage event actually fires. |
+| Welcome subtitle | "A space to check in with yourself." | Mohamed-chosen; reflective framing that primes the passive-detection loop. |
+| Playwright cross-tab pattern | Single context, two pages; both halves driven through real UI clicks (sign-in via form, sign-out via dropdown menu item) | Single context shares localStorage so the storage event actually fires; UI-click on both halves keeps the spec resilient to client-factory refactors. |
 | Sonner | Rejected | Toast paradigm doesn't fit the desktop-slide-in / mobile-bottom-sheet bifurcation. |
 | `framer-motion` | Added (caret pin) | Drives notification motion; `useReducedMotion` is the canonical reduced-motion gate. |
 
@@ -852,8 +952,9 @@ of each step; CI passing is the gate to start the next step.
    Cards use the shadcn `Card` primitive restyled per Mist & Meadow.
    Each card ships with calm "not yet" empty-state copy.
 7. **Build persistent chat pill** at `components/chat-pill.tsx`.
-   Visual-only — onClick is either a no-op or opens a "coming soon"
-   shadcn Popover. Lands in the (authed) layout outside the
+   Visual-only — onClick is a true no-op in this feature; feature
+   008 wires the real chatbot. Sets `--chat-pill-offset` on `<html>`
+   on mount per Decision H. Lands in the (authed) layout outside the
    `<main>` content for true persistence across page nav.
 8. **Build notification component** at `components/notification.tsx`
    per Decision G. Add `use-media-query.ts` hook. Tests in three
@@ -866,9 +967,9 @@ of each step; CI passing is the gate to start the next step.
    `(authed)/app/page.tsx`: read `profile.role`, branch to either
    the employee body (steps 6–7) or the role placeholder (Decision L
    copy). The chat pill MUST NOT render on the role-placeholder
-   branch (FR-035). Header renders identically (FR-034 updated).
+   branch (FR-035). Header renders identically (FR-034).
 10. **Mount cross-tab listener** at `app/layout.tsx`. New client
-    component `app/cross-tab-auth.tsx` subscribes to
+    component `components/cross-tab-auth.tsx` (imported by `app/layout.tsx`) subscribes to
     `supabase.auth.onAuthStateChange` once, pathname-gates each
     navigate (Decision F of the user's directive — FR-046).
     Add `cross-tab-auth-sync.spec.ts` per Decision N. Verify
@@ -924,8 +1025,12 @@ requirement.
 One `.test.tsx` per new component, co-located with the source:
 
 - `components/header/header.test.tsx` — renders logo, center nav with
-  active state, theme toggle, reserved slot (asserted by querying
-  the comment marker), profile avatar.
+  active state, profile avatar, and asserts the right-cluster
+  contains exactly two children in order (`ThemeToggle` then
+  `ProfileDropdown`). JSX comments do not render to the DOM, so the
+  reserved talk slot is not directly assertable; the two-child
+  contract makes feature 010's eventual insertion of `<TalkButton />`
+  a one-line diff that flips this assertion to three children.
 - `components/header/profile-dropdown.test.tsx` — opens on click,
   contains exactly three items in the documented order, sign out
   triggers the expected action.
@@ -939,8 +1044,26 @@ One `.test.tsx` per new component, co-located with the source:
   the welcome banner / cards / chat pill (the no-employee-DOM
   assertion from SC-007).
 - `components/chat-pill.test.tsx` — renders at all sizes; onClick is
-  a no-op or opens the placeholder; renders only when role is
-  employee.
+  a true no-op (no popover, no navigation); renders only when role
+  is employee; sets `--chat-pill-offset` on `<html>` on mount and
+  removes it on unmount.
+- `components/cross-tab-auth.test.tsx` — exercises the listener's
+  event-to-navigation reducer in isolation. Mocks
+  `supabase.auth.onAuthStateChange` so the test feeds synthetic
+  events. Asserts: `SIGNED_IN` on `/login` calls `router.push("/app")`
+  exactly once; `SIGNED_IN` on `/app` does not navigate; `SIGNED_OUT`
+  on `/app` calls `router.push("/login")`; `SIGNED_OUT` on `/login`
+  does not navigate; **`TOKEN_REFRESHED` NEVER navigates regardless
+  of pathname**; the subscription is unsubscribed on unmount. This
+  is the unit-level guard on FR-046.
+
+**Sign-out styling consistency**: the sign-out button in three
+locations — the profile dropdown menu item, the bottom of
+`/app/account`, and the role placeholder — share the same
+understated secondary styling (`<Button variant="secondary">`). No
+single sign-out path uses a destructive or primary treatment. This
+is enforced by reuse: all three render the same shared `<SignOutButton />`
+sub-component (planned during `/speckit.tasks`).
 
 ### Playwright
 
@@ -994,8 +1117,16 @@ permanently shapes the codebase MUST be appended to
    `components.json` shape, baseColor `neutral`-overridden, CSS-vars
    mode. Decision A + Decision E.
 2. **shadcn variable names mapped to Mist & Meadow tokens** —
-   reproduces Decision B's mapping table. Names `--destructive →
-   amber` as the FR-042 hard requirement.
+   reproduces Decision B's mapping table. Names three load-bearing
+   choices: `--destructive → amber` (FR-042 hard requirement);
+   `--muted → --color-surface` (NOT `--color-border`, because the
+   hairline token produces undersaturated Skeleton states);
+   `--primary-foreground → --color-bg` symmetric across both modes
+   (the originally-asymmetric `--color-ink` in dark mode failed
+   WCAG AA at ~3.1:1; symmetric mapping is the only AA-compliant
+   choice). Also names the single `--radius → --radius-control`
+   line that maps shadcn's expected radius scale to the pre-existing
+   Mist & Meadow control radius.
 3. **Dark-mode attribute: `data-theme` → `class`** — Decision C.
    Names the breaking selector change in `globals.css` and the
    `attribute` prop change in `providers.tsx`.
@@ -1007,9 +1138,11 @@ permanently shapes the codebase MUST be appended to
    `useReducedMotion` as the React-state gate.
 6. **Notification component: explicit-dismiss only; no
    auto-dismiss** — Decision G clause.
-7. **Welcome banner subtitle: "We're here when you need us."** —
-   Decision M. Includes the pushback rationale against the user-
-   suggested "A calm start to your day."
+7. **Welcome banner subtitle: "A space to check in with yourself."** —
+   Decision M. Mohamed-chosen from three candidates in the plan-
+   review pass; logs the rationale (reflective framing pairs with
+   every adaptive greeting and primes the eventual passive-detection
+   + questionnaire loop).
 8. **Cross-tab auth listener mount point: root layout (`app/
    layout.tsx`), not (authed) layout** — Decision F of the user's
    directive (US 6 contradiction resolution).
@@ -1018,6 +1151,15 @@ permanently shapes the codebase MUST be appended to
    forbid two contexts.
 10. **`framer-motion` added; `tailwindcss-animate` replaced by
     `tw-animate-css` on the v4 path** — names the dep deltas.
+11. **Chat-pill / notification stacking convention via CSS
+    variable** — the chat pill writes `--chat-pill-offset` on
+    `<html>` on mount (Decision H). The notification consumes it
+    via `bottom: calc(1rem + var(--chat-pill-offset, 0px) + 1rem)`,
+    so consumers (features 007/008/010) get the 16px gap on
+    employee pages and a clean 16px-from-edge fallback on manager
+    pages where the pill is gated off. Documents this as the
+    binding convention so future surfaces can join the stack
+    without re-deriving the math.
 
 Two `BACKLOG.md` additions (not decisions, but planned):
 
@@ -1027,7 +1169,8 @@ Two `BACKLOG.md` additions (not decisions, but planned):
 - **Notifications-section live controls** — re-logged per FR-021's
   placeholder. Surface to be filled in a later feature.
 
-One `CHANGELOG.md` addition (NEW file):
+One `CHANGELOG.md` addition (APPENDED to the existing file — it
+already holds entries from 2026-05-17 and 2026-05-18):
 
 - **Note that the Out-of-Scope bullet in `spec.md` referring to the
   `/login?error=expired_link` hotfix is superseded** by commit

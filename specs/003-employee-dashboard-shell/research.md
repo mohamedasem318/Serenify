@@ -59,30 +59,37 @@ The mapping table is reproduced in `plan.md` (Decision B) and again
 in `contracts/shadcn-mapping.md`. This entry explains the
 why-not-other-mappings.
 
-**The `--primary-foreground` asymmetry**:
+**The `--primary-foreground` mapping is symmetric across modes**:
 
-- Light mode `--primary-foreground` = `--color-bg` (`#ECEEE9`),
-  because a button with `bg-primary` (= meadow `#7A9275`) needs a
-  text color that contrasts ≥4.5:1. Meadow-on-meadow fails contrast;
-  ink-on-meadow gives 6.2:1 and is the better choice. But — `bg`
-  (`#ECEEE9`) on meadow gives 5.8:1 and reads softer; `ink`
-  (`#1F2522`) on meadow gives 11.4:1 and reads stark. Calm-first
-  picks the 5.8:1 reading over the 11.4:1 reading.
-- Dark mode `--primary-foreground` = `--color-ink` (`#DCDED5`),
-  because dark-mode meadow (`#97AE91`) plus dark-mode bg
-  (`#161917`) inverts the relationship: bg-on-meadow in dark mode
-  has 8.8:1 (too stark) and ink-on-meadow has 4.7:1 (the soft
-  reading). The mapping flips to keep "the soft reading wins."
+- Light mode `--primary-foreground` = `--color-bg` (`#ECEEE9`):
+  the button has `bg-primary` (= meadow `#7A9275`), text is page bg
+  on top. Contrast: `#ECEEE9` on `#7A9275` ≈ 5.8:1 — passes WCAG AA
+  for text.
+- Dark mode `--primary-foreground` = `--color-bg` (`#161917`):
+  text is dark-mode page bg on dark-mode meadow `#97AE91`.
+  Contrast: `#161917` on `#97AE91` ≈ 7.4:1 — passes AA.
+- An earlier asymmetric proposal mapped dark-mode
+  `--primary-foreground` to `--color-ink` (`#DCDED5`), giving
+  near-white text on light sage. Contrast: ≈ 3.1:1 — **fails WCAG
+  AA**. The symmetric mapping is the only WCAG-compliant choice.
+  Both modes now use the same near-black-on-sage reading.
 
-**The `--muted` row mapping to `--color-border` is intentional**:
+**The `--muted` row mapping to `--color-surface` is intentional**:
 
-- shadcn's `--muted` is a surface fill, not a text color. It is used
-  by `Tab`, `Skeleton`, and the muted Card variant. Mapping to the
-  Mist & Meadow `border` token gives the right tonal stop — soft,
-  almost-bg but distinguishable.
-- shadcn's `--muted-foreground` IS a text color. Mapping it to the
-  Mist & Meadow `muted` token (`#6E7572` light / `#8B928F` dark) is
-  the direct semantic match.
+- shadcn's `--muted` is consumed as a fill surface: Skeleton, the
+  muted Card variant, hover-row backgrounds, Tab unselected fill.
+- Mapping it to `--color-border` (hairline color) produces
+  weird Skeleton states — `#D6D7D1` on `#ECEEE9` in light mode is
+  a barely-perceptible tonal shift, and at common Skeleton sizes
+  reads as "almost-bg with a faint tinge" rather than a clear
+  recessed surface.
+- `--color-surface` (light `#F5F6F2` / dark `#20231F`) is the
+  closer semantic match: it IS the Mist & Meadow "slightly
+  recessed surface" token, which is exactly what shadcn's `--muted`
+  is supposed to be.
+- shadcn's `--muted-foreground` is a text color and maps to the
+  Mist & Meadow `muted` token (`#6E7572` light / `#8B928F` dark) —
+  the direct semantic match. Unchanged from earlier drafts.
 
 **The `--destructive` hard requirement** (FR-042):
 
@@ -481,31 +488,35 @@ The copy is in `plan.md` Decision L. Justification:
 
 ## R-14 — Welcome banner subtitle (Decision M)
 
-**Chosen**: "We're here when you need us."
+**Chosen** (by Mohamed during plan review): **"A space to check in
+with yourself."**
 
-**Pushback rationale against the user's suggestion ("A calm start to
-your day."):**
+Three candidates were on the table:
 
-The spec's FR-008 mandates a time-of-day-adaptive greeting:
+a) "We're here when you need us." — time-neutral partner-voice.
+b) "A space to check in with yourself." — reflective, introspective.
+c) "However you're showing up today." — variable-state warmth.
 
-- "Good morning" before noon
-- "Good afternoon" noon–6pm
-- "Good evening" after 6pm
+The spec's FR-008 mandates a time-of-day-adaptive greeting ("Good
+morning" / "Good afternoon" / "Good evening"). All three candidates
+pair cleanly with every adaptive prefix — unlike the spec's example
+"A calm start to your day," which only fits morning. That spec
+example was eliminated up front for this reason.
 
-A subtitle including "start to your day" creates a tonal clash at
-8pm:
+Of the three remaining candidates, (b) was chosen because:
 
-> Good evening, Mohamed
-> A calm start to your day.
+- "Check in with yourself" primes the eventual product loop —
+  passive detection raises a question, the questionnaire (feature
+  007) confirms it, the chatbot (feature 008) deepens it.
+  Introspection is the through-line; the subtitle on day one
+  signals what the surface is for.
+- It is more inward-facing than (a)'s "we'll be here" framing,
+  which positions Serenify as a passive helper rather than a
+  reflection tool.
+- It is less variable-tense than (c)'s "however you're showing up,"
+  which reads slightly looser and risks sounding like a greeting
+  card.
 
-The user's stated alternative ("We're here when you need us.") is
-time-neutral and remains calm at every hour:
-
-> Good evening, Mohamed
-> We're here when you need us.
-
-The chosen subtitle is one of the two examples FR-009 named
-explicitly. The rejected alternative is the other named example.
 The rationale is logged in `docs/DECISIONS.md` per the user's
 directive.
 
@@ -533,17 +544,28 @@ The mechanics behind "single context, two pages":
 pages share localStorage by virtue of being in the same context.
 The `storage` event fires in page B when page A writes.
 
-The sign-in is driven through the real `/login` form (clicks the
-submit button). The sign-out is driven through
-`page.evaluate(() => client.auth.signOut())` because:
+Both the sign-in and sign-out are driven through the real UI in
+pageA:
 
-- The sign-out form in the new shell is a `<form action={signOut}>`
-  inside the profile dropdown — clicking it requires opening the
-  dropdown first, which makes the test more fragile than the
-  listener it's actually exercising.
-- The listener, not the form, is under test. Calling
-  `client.auth.signOut()` directly hits the same code path the
-  form would have hit and isolates the listener behavior.
+- Sign-in: fill the `/login` form, click submit.
+- Sign-out: pageA (now on `/app`) opens the profile dropdown and
+  clicks the "Sign out" menu item.
+
+A `page.evaluate(() => client.auth.signOut())` shortcut was
+considered for the sign-out half — calling the Supabase client
+directly bypasses the dropdown-click and isolates the listener
+behavior — but **rejected** for two reasons:
+
+1. Inside `page.evaluate`, a bare `import("@supabase/ssr")` does
+   not resolve in the browser context (the page bundler hasn't seen
+   it), so the shortcut would actually require constructing a
+   client from raw URL + anon-key plumbing inside the test. That
+   couples the spec to client-internal details that should stay
+   implementation detail.
+2. Driving both halves through real UI keeps the spec uniform and
+   resilient to client-factory refactors. The dropdown-click adds
+   one selector but does not introduce flakiness — the dropdown is
+   a Radix primitive with deterministic open/close semantics.
 
 The 2-second budget aligns with SC-008. Under `workers: 1`
 (DECISIONS 2026-05-17) the spec does not race other auth specs.

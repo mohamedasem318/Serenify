@@ -7,7 +7,7 @@ are TypeScript-style; final `.tsx` files will have richer JSDoc.
 
 ---
 
-## `apps/web/components/header/header.tsx`
+## `apps/web/components/header/header.tsx` **[server]**
 
 Server Component. Reads the current user's `full_name` + `role` from
 `profiles` and renders the persistent top header for the authed
@@ -42,7 +42,7 @@ Accessibility:
 
 ---
 
-## `apps/web/components/header/center-nav.tsx`
+## `apps/web/components/header/center-nav.tsx` **[client]**
 
 Client Component (uses `usePathname()` for active-state).
 
@@ -66,7 +66,7 @@ Mobile: this component renders `null` at ≤768px viewports;
 
 ---
 
-## `apps/web/components/header/profile-dropdown.tsx`
+## `apps/web/components/header/profile-dropdown.tsx` **[client]**
 
 Client Component (uses Radix dropdown via `@/components/ui/dropdown-menu`).
 
@@ -101,7 +101,7 @@ Accessibility:
 
 ---
 
-## `apps/web/components/header/mobile-menu.tsx`
+## `apps/web/components/header/mobile-menu.tsx` **[client]**
 
 Client Component, rendered only at ≤768px.
 
@@ -119,7 +119,7 @@ sits in the header separately at all viewport widths.
 
 ---
 
-## `apps/web/components/home/welcome-banner.tsx`
+## `apps/web/components/home/welcome-banner.tsx` **[server]**
 
 Server Component.
 
@@ -136,8 +136,8 @@ Renders:
 - An `<h1>` in DM Serif Display: the adaptive greeting per FR-008
   + first name per FR-010, or the name-less form if `fullName` is
   null.
-- A `<p>` subtitle: the static line from Decision M ("We're here
-  when you need us.").
+- A `<p>` subtitle: the static line from Decision M ("A space to
+  check in with yourself.").
 
 **Timezone**: the time-of-day prefix is computed server-side in this
 feature using the server's local time. This is correct for users in
@@ -151,7 +151,7 @@ broad geographic footprint.
 
 ---
 
-## `apps/web/components/home/todays-checkin-card.tsx`
+## `apps/web/components/home/todays-checkin-card.tsx` **[server]**
 
 Server Component. Renders the large primary card on the left ~60%
 of the desktop layout.
@@ -171,7 +171,7 @@ No exclamation marks. No alarmist language.
 
 ---
 
-## `apps/web/components/home/things-that-might-help-card.tsx`
+## `apps/web/components/home/things-that-might-help-card.tsx` **[server]**
 
 Server Component. Smaller secondary card, upper-right.
 
@@ -180,7 +180,7 @@ something like "Suggestions land here when they're useful."
 
 ---
 
-## `apps/web/components/home/recent-chats-card.tsx`
+## `apps/web/components/home/recent-chats-card.tsx` **[server]**
 
 Server Component. Smaller secondary card, lower-right.
 
@@ -191,7 +191,7 @@ Final copy is set in `/speckit.tasks`.
 
 ---
 
-## `apps/web/components/account/profile-section.tsx`
+## `apps/web/components/account/profile-section.tsx` **[client]**
 
 Client Component (form state requires `"use client"`).
 
@@ -225,7 +225,7 @@ Layout: stacked label-above-input, generous spacing, single primary
 
 ---
 
-## `apps/web/components/account/security-section.tsx`
+## `apps/web/components/account/security-section.tsx` **[server]**
 
 Server Component.
 
@@ -245,7 +245,7 @@ into feature 001's existing flow.
 
 ---
 
-## `apps/web/components/account/privacy-placeholder.tsx`
+## `apps/web/components/account/privacy-placeholder.tsx` **[server]**
 
 Server Component.
 
@@ -264,7 +264,7 @@ Renders the Privacy section as a muted dashed-border container
 
 ---
 
-## `apps/web/components/account/notifications-placeholder.tsx`
+## `apps/web/components/account/notifications-placeholder.tsx` **[server]**
 
 Server Component. Same shape as `<PrivacyPlaceholder>` but with
 "Notifications" labeling and a TBD-flavored copy line. No live
@@ -272,9 +272,13 @@ controls.
 
 ---
 
-## `apps/web/components/account/sign-out-section.tsx`
+## `apps/web/components/account/sign-out-section.tsx` **[server]**
 
-Server Component.
+Server Component. Uses the shared `<SignOutButton variant="secondary">`
+sub-component (introduced in this feature) — the same button used by
+the profile dropdown and the role placeholder, ensuring all three
+sign-out paths share understated styling per the
+"sign-out styling consistency" rule in plan.md.
 
 ```ts
 type SignOutSectionProps = {};
@@ -291,7 +295,7 @@ Renders the Sign out section at the bottom of `/app/account`
 
 ---
 
-## `apps/web/components/role-placeholder/role-placeholder.tsx`
+## `apps/web/components/role-placeholder/role-placeholder.tsx` **[server]**
 
 Server Component.
 
@@ -327,15 +331,15 @@ DOES render (FR-034):
 
 ---
 
-## `apps/web/components/chat-pill.tsx`
+## `apps/web/components/chat-pill.tsx` **[client]**
 
-Client Component (interactive — onClick is a no-op or opens a
-"coming soon" Popover).
+Client Component (interactive — onClick is a true no-op in this
+feature; feature 008 wires the real chatbot).
 
 ```ts
 type ChatPillProps = {};  // visual-only; no consumer-supplied state in this feature
 
-export const CHAT_PILL_HEIGHT = 48;  // exported for notification's layout math (Decision H)
+export const CHAT_PILL_HEIGHT = 48;  // exported for testing and documentation; runtime contract is --chat-pill-offset (Decision H)
 ```
 
 Renders a `fixed bottom-4 right-4` pill — a horizontal capsule on
@@ -343,14 +347,21 @@ desktop (icon + "Chat" label), an icon-only floating circle on
 mobile (≤768px). Background uses `--color-surface`, border uses
 `--color-border`, icon uses `--color-meadow`.
 
-Touch target ≥44×44px on mobile (Constitution VI; FR-025). The
-height constant is exported so `<Notification>` on desktop can
-position itself above the pill with the 16px gap (Decision H).
+Touch target ≥44×44px on mobile (Constitution VI; FR-025).
 
-Click handler: opens a small Popover (`@/components/ui/dropdown-menu`
-or `@/components/ui/sheet`-as-popover) with the copy "Chat lands in
-a later release." No network call, no analytics, no chat surface
-(FR-024).
+Click handler: a **true no-op**. FR-024 explicitly allows "either do
+nothing or open a placeholder 'coming soon' empty state" — we pick
+"do nothing" so feature 008's wiring is a pure addition rather than
+a substitution. No network call, no analytics, no popover, no chat
+surface.
+
+CSS-variable offset (Decision H): on mount the pill sets
+`document.documentElement.style.setProperty("--chat-pill-offset",
+"${CHAT_PILL_HEIGHT}px")`; on unmount it removes the property. The
+notification component reads this variable to compute its bottom
+offset, so notifications on manager pages (where the pill is gated
+off) collapse the math to `bottom: 2rem` automatically via the
+CSS `var(..., 0px)` fallback.
 
 Persistence: rendered by `(authed)/layout.tsx` outside the
 `<main>` content so navigations between `/app` and `/app/account` do
@@ -361,7 +372,7 @@ threads role from its profile read to the pill (FR-035).
 
 ---
 
-## `apps/web/components/notification.tsx`
+## `apps/web/components/notification.tsx` **[client]**
 
 Client Component (Decision G).
 
@@ -385,10 +396,18 @@ Renders a controlled notification surface:
 Composition: Radix Dialog + Framer Motion + `useMediaQuery` hook.
 
 Stacking with the chat pill (Decision H, FR-032): on desktop the
-component positions itself at `bottom: calc(1rem + ${CHAT_PILL_HEIGHT}px + 1rem)`
-when both surfaces are visible. On mobile the bottom sheet covers
-the chat pill area entirely; the chat pill remains in the DOM but
-sits below the sheet's backdrop.
+component positions itself at
+`bottom: calc(1rem + var(--chat-pill-offset, 0px) + 1rem)`. The
+chat pill (when mounted on the employee shell) writes its height
+to `--chat-pill-offset` on `<html>` on mount; the notification
+reads it via the CSS `var()` chain. The `0px` fallback collapses
+the math to `bottom: 2rem` (16px above the viewport edge) when the
+pill is absent — which is the case on team_lead / admin pages
+(features 010+) where the pill is gated off by FR-035. No
+component-to-component prop wiring needed.
+
+On mobile the bottom sheet covers the chat pill area entirely; the
+chat pill remains in the DOM but sits below the sheet's backdrop.
 
 In this feature, NO production code mounts the component (FR-033).
 The Vitest + RTL test exercises the three configurations directly.
@@ -398,9 +417,14 @@ Exports `Notification`, `type NotificationProps`, and
 
 ---
 
-## `apps/web/app/cross-tab-auth.tsx`
+## `apps/web/components/cross-tab-auth.tsx` **[client]**
 
-Client Component, mounted at the root layout (Decision R-7 / FR-045).
+Client Component, imported and rendered by the root layout
+(`apps/web/app/layout.tsx`). Lives under `components/` rather than
+inside `app/` so the `app/` tree stays route-only and the
+non-route helper does not co-mingle with route segments.
+
+Decision R-7 / FR-045.
 
 ```ts
 export function CrossTabAuth(): null;
@@ -447,6 +471,20 @@ export function truncateName(input: string, max: number = 24): string;
 
 Returns `input` if `input.length <= max`; otherwise returns
 `input.slice(0, max - 1) + "…"` (Unicode ellipsis, U+2026).
+
+**Purity contract**: a pure function. No `Intl` APIs, no `toLocale*`
+methods, no `Date` access, no environment reads. The output for a
+given input is byte-identical on the server and the client — this
+matters because the truncated name is computed in Server Components
+(the header) and consumed in Client Components (the profile
+dropdown) within the same render; any divergence between SSR and
+CSR output would surface as a React hydration warning.
+
+Counts characters using `.length` (UTF-16 code units). For the names
+in scope (BMP characters, no astral-plane codepoints) this is
+equivalent to grapheme count. Astral-plane names (emoji-in-name,
+some scripts outside common usage) are not in the demo cohort and
+not in the spec's edge cases.
 
 Used by the header avatar tooltip and the profile dropdown header
 item. Trivial — co-located in `lib/` rather than `components/` so

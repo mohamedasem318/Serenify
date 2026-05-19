@@ -20,10 +20,10 @@ Principle VIII.
 | `--popover` | `var(--color-surface)` | `var(--color-surface)` | Dropdown/popover fill. |
 | `--popover-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on a popover. |
 | `--primary` | `var(--color-meadow)` (`#7A9275`) | `var(--color-meadow)` (`#97AE91`) | Primary actions. |
-| `--primary-foreground` | `var(--color-bg)` | `var(--color-ink)` | **Asymmetric.** See R-2 in `research.md` — calm-first picks the softer contrast in each mode. |
+| `--primary-foreground` | `var(--color-bg)` | `var(--color-bg)` | Symmetric. Light gives bg-on-meadow ≈ 5.8:1 AA; dark gives bg-on-meadow ≈ 7.4:1 AA. An earlier asymmetric `--color-ink` mapping in dark mode failed WCAG AA (~3.1:1). |
 | `--secondary` | `var(--color-foggy)` (`#8AA9B6`) | `var(--color-foggy)` (`#9CBBC7`) | Secondary actions. |
 | `--secondary-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on a secondary button. |
-| `--muted` | `var(--color-border)` (`#D6D7D1`) | `var(--color-border)` (`#2D3130`) | Muted fill (skeleton, tab background). |
+| `--muted` | `var(--color-surface)` (`#F5F6F2`) | `var(--color-surface)` (`#20231F`) | Muted fill (Skeleton, muted Card, hover rows, Tab unselected). Mapped to surface, NOT border — see research.md R-2. |
 | `--muted-foreground` | `var(--color-muted)` (`#6E7572`) | `var(--color-muted)` (`#8B928F`) | Muted text. |
 | `--accent` | `var(--color-foggy)` | `var(--color-foggy)` | Hover / focus accent. |
 | `--accent-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on an accent fill. |
@@ -58,7 +58,7 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --primary-foreground: var(--color-bg);
   --secondary: var(--color-foggy);
   --secondary-foreground: var(--color-ink);
-  --muted: var(--color-border);
+  --muted: var(--color-surface);
   --muted-foreground: var(--color-muted);
   --accent: var(--color-foggy);
   --accent-foreground: var(--color-ink);
@@ -66,6 +66,7 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --border: var(--color-border);
   --input: var(--color-border);
   --ring: var(--color-meadow);
+  --radius: var(--radius-control);  /* 8px — primitives derive their corners from this */
 }
 
 :root.dark {
@@ -78,11 +79,17 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --color-foggy:   #9CBBC7;
   --color-amber:   #DCB587;
   --color-border:  #2D3130;
-
-  /* Asymmetric override for primary-foreground in dark mode */
-  --primary-foreground: var(--color-ink);
+  /* All shadcn variables track through their @theme inline mapping —
+     including --primary-foreground (= --color-bg) and --muted
+     (= --color-surface), which are symmetric across modes. */
 }
 ```
+
+`--radius-card` (12px) and `--radius-control` (8px) are pre-existing
+in `globals.css`'s `@theme` block from feature 001 and are NOT
+re-declared. The `--radius` line above maps shadcn's expected
+radius scale to the control radius; cards use `--radius-card`
+directly via `rounded-[--radius-card]`.
 
 The `@theme inline` block is the only place where shadcn variable
 names appear at top level. Tailwind v4 reads `@theme` to register
