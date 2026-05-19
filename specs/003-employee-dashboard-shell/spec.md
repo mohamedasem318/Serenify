@@ -60,11 +60,12 @@ persists across page navigations and across sign-out / sign-in.
 **Acceptance Scenarios**:
 
 1. **Given** a confirmed employee user, **When** they sign in, **Then**
-   they land on `/app` and the page renders the welcome banner with their
-   first name (derived from `profiles.full_name` — first whitespace-
-   separated token), the three skeleton cards in the documented
-   primary-plus-secondary layout, the persistent header, and the
-   persistent chat pill bottom-right.
+   they land on `/app` and the page renders the welcome banner with a
+   time-of-day-appropriate greeting (Good morning / afternoon /
+   evening), [first name] — derived from `profiles.full_name`, first
+   whitespace-separated token — followed by the three skeleton cards
+   in the documented primary-plus-secondary layout, the persistent
+   header, and the persistent chat pill bottom-right.
 2. **Given** the rendered shell, **When** the employee clicks the theme
    toggle in the header, **Then** the theme flips immediately, persists
    across page navigations within the authed surface, and persists across
@@ -91,11 +92,12 @@ persists across page navigations and across sign-out / sign-in.
    "elevated"), and no copy contains any color in the red sector
    (340–20°) — the cards inherit the Mist & Meadow palette only.
 7. **Given** a user whose `profiles.full_name` is empty or null,
-   **When** they land on `/app`, **Then** the welcome banner falls back
-   to a calm greeting that does not address them by name (e.g. "Good
-   morning") and the profile avatar shows initials derived from the
-   user's email local-part (first letter, uppercased) — not a placeholder
-   silhouette.
+   **When** they land on `/app`, **Then** the welcome banner falls
+   back to a name-less calm greeting that still uses the time-of-day
+   adaptive prefix (e.g. "Good evening" at 8pm, NOT a fixed "Good
+   morning" fallback) and the profile avatar shows two-letter
+   initials derived from the user's email local-part per FR-010 — not
+   a placeholder silhouette.
 
 ---
 
@@ -228,10 +230,12 @@ are visually consistent with the rest of the authed surface.
 confirm `/app` shows the one-screen placeholder + sign-out affordance,
 no welcome banner, no skeleton cards, no chat pill. Repeat for the demo
 cohort's `admin`. Confirm sign-out from the placeholder returns them to
-`/login`. Confirm a `team_lead` attempting to navigate to
-`/app/account` either lands on a similarly minimal account surface or
-is routed back to the placeholder — the employee dashboard surfaces
-MUST NOT render.
+`/login`. Confirm a `team_lead` navigating to
+`/app/account` sees the same role-agnostic account page (Profile,
+Security, Privacy placeholder, Notifications placeholder, Sign out)
+that an employee sees — the employee dashboard surfaces (welcome
+banner, skeleton cards, chat pill) MUST NOT render at `/app` for
+team_lead or admin, but the account page itself is shared.
 
 **Acceptance Scenarios**:
 
@@ -250,13 +254,12 @@ MUST NOT render.
    terminates and they are redirected to `/login` — identical semantics
    to the employee sign-out path.
 4. **Given** a `team_lead` or `admin`, **When** they attempt to
-   navigate directly to `/app/account`, **Then** they either see a
-   non-employee placeholder version of that page or are redirected back
-   to `/app`. The full employee account page (Profile editor + Security
-   + Privacy/Notifications placeholders) is acceptable to render for
-   non-employees only if it carries no employee-specific copy or
-   affordances; otherwise it MUST be gated. This decision is finalized
-   in `/speckit.plan`.
+   navigate directly to `/app/account`, **Then** they land on the
+   same `/app/account` page rendered for employees. The five
+   sections (Profile, Security, Privacy placeholder, Notifications
+   placeholder, Sign out) are role-agnostic — team_lead and admin
+   users can edit their name, change their password, and sign out
+   from the same page. No role-specific carve-outs, no redirect.
 5. **Given** the existing role-trio Playwright e2e suite from feature
    001, **When** it runs against this feature's branch, **Then** the
    employee, team_lead, and admin landing tests all pass — the
@@ -416,11 +419,13 @@ animation has shifted relative to `main`.
 ### Edge Cases
 
 - A user whose `profiles.full_name` is empty / null lands on `/app` —
-  the welcome banner falls back to "Good morning" without a name, and
-  the profile avatar shows initials derived from the user's email
-  local-part (first letter, uppercased). No placeholder silhouette is
-  rendered; the surface MUST NOT visually advertise that something is
-  missing.
+  the welcome banner falls back to a name-less calm greeting that
+  still uses the time-of-day adaptive prefix per FR-008 (e.g. "Good
+  afternoon" at 2pm, NOT a fixed "Good morning"), and the profile
+  avatar shows two-letter initials derived from the user's email
+  local-part per FR-010 (e.g. "m.assem@example.com" → "MA"). No
+  placeholder silhouette is rendered; the surface MUST NOT visually
+  advertise that something is missing.
 - A user's `profiles.full_name` is unusually long (e.g., a multi-part
   hyphenated name) — the header avatar's tooltip / dropdown name area
   truncates with a tasteful ellipsis at the documented max length; the
@@ -507,20 +512,31 @@ animation has shifted relative to `main`.
 ### Functional Requirements — Home page (`/app`)
 
 - **FR-008**: `/app` MUST render, in this order top-to-bottom: (a) a
-  welcome banner reading "Good morning, [first name]" with a subtle
-  static subtitle line beneath it, and (b) a primary-plus-secondary
-  card layout containing three skeleton cards.
+  welcome banner with a time-of-day adaptive greeting ("Good morning"
+  before noon local time, "Good afternoon" noon to 6pm, "Good
+  evening" after 6pm) followed by the user's first name, with a
+  subtle static subtitle line beneath it, and (b) a primary-plus-
+  secondary card layout containing three skeleton cards.
 - **FR-009**: The welcome banner subtitle MUST be a single static
-  string for all employees in this feature. Dynamic state-aware
-  subtitle variants (e.g. "you've been busy this week") are explicitly
-  deferred and re-logged in BACKLOG; the markup MUST accommodate a
-  future swap to a dynamic variant (a single `<p>` slot beneath the
-  greeting) but the wiring is out of scope.
+  string for all employees in this feature. Example direction: a
+  calm, non-perky line like "We're here when you need us" or "A calm
+  start to your day." Final copy is set during `/speckit.plan`
+  against the Constitution Principle V calm-voice rubric. Dynamic
+  state-aware subtitle variants are explicitly deferred and re-logged
+  in BACKLOG; the markup MUST accommodate a future swap to a dynamic
+  variant (a single `<p>` slot beneath the greeting) but the wiring
+  is out of scope.
 - **FR-010**: First-name derivation MUST be the first whitespace-
   separated token of `profiles.full_name`. If `full_name` is empty or
-  null, the banner MUST fall back to a name-less calm greeting ("Good
-  morning") rather than an empty bracket, an obvious placeholder, or
-  the user's email.
+  null, the banner MUST fall back to a name-less calm greeting (using
+  the time-of-day adaptive prefix per FR-008 — e.g., "Good morning")
+  rather than an empty bracket, an obvious placeholder, or the user's
+  email. The profile avatar's initials derivation MUST be: when
+  `full_name` is available, the first letter of the first token plus
+  the first letter of the last token, uppercased (e.g., "Mohamed
+  Assem" → "MA"). When `full_name` is missing, the first two letters
+  of the email local-part, uppercased (e.g., "m.assem@example.com" →
+  "MA"). Single-token names use the first two letters of that token.
 - **FR-011**: At desktop widths (≥768px) the layout MUST be:
   - Left column ~60% width: a large "Today's check-in" card that will
     host (in subsequent features) passive detection state, signal
@@ -549,7 +565,14 @@ animation has shifted relative to `main`.
 
 - **FR-015**: `/app/account` MUST be reachable only via the Account
   link in the profile dropdown — no center-nav entry, no other entry
-  point introduced by this feature.
+  point introduced by this feature. The page's body content is
+  role-agnostic: the five sections (Profile, Security, Privacy
+  placeholder, Notifications placeholder, Sign out) render
+  identically for `employee`, `team_lead`, and `admin` users — no
+  redirect for non-employees, no role-specific carve-out within the
+  page body. The chat pill remains employee-only per FR-023 /
+  FR-035: it renders on `/app/account` for employees but NOT for
+  team_lead or admin users visiting the same page.
 - **FR-016**: `/app/account` MUST render five sections stacked
   vertically in this exact order:
   (a) **Profile** — `full_name` (editable), email (display-only), an
@@ -612,11 +635,11 @@ animation has shifted relative to `main`.
 ### Functional Requirements — Notification toast/sheet component
 
 - **FR-027**: A generic reusable notification toast/sheet component
-  MUST be implemented in this feature. The component MUST be exported
-  from a stable path (e.g., `apps/web/components/ui/notification.tsx`
-  or the agreed shadcn-compatible path set in `/speckit.plan`) such
-  that features 007, 008, and 010 can import and mount it without
-  re-deriving it.
+  MUST be implemented in this feature. The component MUST be
+  exported from a stable, well-known path in the shared components
+  directory such that features 007, 008, and 010 can import and
+  mount it without re-deriving it. The exact path is set in
+  `/speckit.plan`.
 - **FR-028**: At desktop widths (≥768px) the component MUST render as
   a bottom-right slide-in card with subtle motion consistent with the
   Mist & Meadow visual finish (soft border, generous whitespace,
@@ -637,19 +660,22 @@ animation has shifted relative to `main`.
   exact gap value is set in `/speckit.plan` against the Mist & Meadow
   spacing scale. The convention applies to features 007, 008, and 010
   when they consume the component.
-- **FR-033**: In this feature, NO event source in production code MUST
-  trigger the notification component. The component is built for later
-  consumption only. Developer-preview mounts (Vitest stories, a
-  `/_dev/` route, or equivalent) are permitted and are the intended way
-  to satisfy the Independent Test for User Story 5.
+- **FR-033**: In this feature, no event source in production code
+  triggers the notification component. The component is built for
+  later consumption only. Developer-preview mounts (Vitest stories or
+  an equivalent preview surface) are permitted and are the intended
+  way to satisfy the Independent Test for User Story 5.
 
 ### Functional Requirements — Role-based landing
 
-- **FR-034**: For users with `profiles.role` of `team_lead` or `admin`,
-  `/app` MUST render a one-screen placeholder containing calm
-  role-acknowledging copy ("Your team-lead view is being built…" /
-  "Your admin view is being built…" or equivalent) plus a sign-out
-  affordance. The employee welcome banner, the three skeleton cards,
+- **FR-034**: For users with `profiles.role` of `team_lead` or
+  `admin`, `/app` MUST render a one-screen placeholder containing
+  calm role-acknowledging copy ("Your team-lead view is being built…"
+  / "Your admin view is being built…" or equivalent) plus a sign-out
+  affordance. The persistent header (logo, theme toggle, reserved
+  talk slot, profile avatar/dropdown with Account link and sign out)
+  MUST render identically to the employee shell. Only the body
+  content differs — the welcome banner, the three skeleton cards,
   and the persistent chat pill MUST NOT render for these roles.
 - **FR-035**: The persistent chat pill (FR-023) MUST be scoped to
   employee-role landings only. team_lead and admin placeholders MUST
@@ -670,14 +696,16 @@ animation has shifted relative to `main`.
 
 - **FR-038**: The bespoke auth form primitives currently inlined in
   `apps/web/app/(auth)/**` page files MUST be extracted to
-  `apps/web/components/ui/` as the FIRST commit on the
-  `003-employee-dashboard-shell` branch, before any new shell work,
-  before the shadcn install, and before any cross-tab sync wiring. The
-  primitives in scope are at minimum: `PasswordInput`, the password-
-  requirements checklist, and the `Field`/`Label`/`ErrorText` wrappers.
-  Any other auth-only primitive discovered during extraction that meets
-  the same criteria (inlined, reused across multiple auth pages) is
-  also in scope.
+  `apps/web/components/ui/` before any shadcn dependency or component
+  is added to the repository in this feature's scope. The ordering
+  ensures `components/ui/` exists and is populated with the bespoke
+  auth primitives before shadcn additions land alongside them. The
+  exact commit sequencing is set in `/speckit.tasks`. The primitives
+  in scope are at minimum: `PasswordInput`, the password-requirements
+  checklist, and the `Field`/`Label`/`ErrorText` wrappers. Any other
+  auth-only primitive discovered during extraction that meets the
+  same criteria (inlined, reused across multiple auth pages) is also
+  in scope.
 - **FR-039**: After extraction, the (auth) pages (`/login`, `/signup`,
   `/forgot-password`, `/reset-password`, `/onboarding`) MUST render
   visually identical to the pre-extraction state — same DOM structure,
