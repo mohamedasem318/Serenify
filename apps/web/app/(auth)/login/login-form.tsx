@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { signInSchema, type SignInInput } from "@/lib/auth/schemas";
-import { PasswordInput } from "@/components/ui/password-input";
+import { Field } from "@/components/ui/auth/field";
 import {
   resendConfirmation,
   signIn,
@@ -150,46 +150,3 @@ export function LoginForm() {
     </section>
   );
 }
-
-type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
-  id: string;
-  label: string;
-  error?: string;
-};
-
-const Field = (props: FieldProps) => {
-  const { id, label, error, type, ...inputProps } = props;
-  const errorId = error ? `${id}-error` : undefined;
-  return (
-    <div className="space-y-1.5">
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium uppercase tracking-wide text-muted"
-      >
-        {label}
-      </label>
-      {type === "password" ? (
-        <PasswordInput
-          id={id}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={errorId}
-          {...inputProps}
-        />
-      ) : (
-        <input
-          id={id}
-          type={type}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={errorId}
-          {...inputProps}
-          className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-meadow"
-        />
-      )}
-      {error && (
-        <p id={errorId} className="text-xs text-ink">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};
