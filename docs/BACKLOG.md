@@ -9,6 +9,7 @@ Status values:
 - `tech-debt` — structural cleanup, address before it grows
 - `watch` — monitor; act if condition changes
 - `deferred-feature` — intentional scope cut, future work
+- `deferred-tooling` — blocked on a tooling or harness capability that does not yet exist
 
 ---
 
@@ -185,3 +186,27 @@ orchestrator with a try/catch that detects fetch / ECONNREFUSED
 errors and substitutes a friendly message. Probably 20 lines.
 **Address by**: any polish pass, or whoever next touches the seed
 script (e.g. the signal-event seeding follow-up before feature 011).
+
+---
+
+## From feature 003 (employee-dashboard-shell) — in progress
+
+### Onboarding visual regression untestable on completed accounts
+**Status**: deferred-tooling
+**Observed**: ST-1 / T014 of feature 003
+**Description**: ST-1's visual matrix includes `/onboarding`, but the
+(authed) route guard redirects any account with a non-null
+`profiles.full_name` to `/app` — so onboarding can only be reached by
+a never-onboarded user. The 30 demo cohort users seeded by feature 002
+all complete onboarding, leaving zero eligible accounts to drive the
+`/onboarding` cell of the visual diff. Future visual gates (any ST-1
+rerun on this branch, and equivalent regressions in features 004+)
+hit the same wall.
+**Fix scope**: small. Either (a) extend `scripts/seed-demo.ts` with a
+"reset onboarding state" option that nulls `profiles.full_name` for a
+named user, OR (b) reserve one demo slot as the
+"onboarding-pristine" probe — never assigned a `full_name`, never
+asserted against in role-trio specs.
+**Address by**: when the demo-seed harness gains a "reset onboarding
+state" option — natural pairing with the CI integration work logged
+above against feature 006.
