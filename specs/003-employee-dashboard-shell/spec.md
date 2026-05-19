@@ -284,8 +284,8 @@ layout question independently. This is foundational scaffolding, but it
 is not user-facing on its own — hence P2, not P1.
 
 **Independent Test**: Mount the toast/sheet component in a developer
-preview surface (a Vitest story, a route under `/app/_dev/`, or
-equivalent) with sample copy. Confirm at desktop width it slides in
+preview surface (a Vitest story or an equivalent preview surface)
+with sample copy. Confirm at desktop width it slides in
 from bottom-right and is dismissable via an explicit control. Confirm at
 360px width it renders as a bottom sheet. Confirm with
 `prefers-reduced-motion: reduce` set in the OS / browser, the entrance
@@ -376,16 +376,16 @@ feature.
 feature 001's BACKLOG. The reason it ships on this branch is that
 shadcn/ui adoption (for dashboard primitives) is most cleanly bootstrapped
 when there is a real `components/ui/` directory already in place. By
-extracting the auth primitives FIRST (as the first commit of the
-branch), the shadcn install lands into an existing `components/ui/`
-folder rather than creating one and immediately complicating the diff.
+extracting the auth primitives before shadcn lands, the shadcn
+install drops into an existing `components/ui/` folder rather than
+creating one and immediately complicating the diff.
 It is P2 because no user behavior changes — but a regression here would
 be a feature-001 regression, so the bar for "visually identical" is
 high.
 
-**Independent Test**: Before any other commit on this branch, run the
-existing Playwright auth happy-path specs from feature 001 against the
-extracted-primitives state. Confirm every spec passes unchanged. Open
+**Independent Test**: After the auth-primitives extraction lands and
+before the shadcn install, run the existing Playwright auth happy-path
+specs from feature 001 against the extracted-primitives state. Confirm every spec passes unchanged. Open
 each (auth) page (`/login`, `/signup`, `/forgot-password`,
 `/reset-password`, `/onboarding`) at desktop and at 360px in both light
 and dark themes; confirm by eye that no spacing, typography, color, or
@@ -393,10 +393,11 @@ animation has shifted relative to `main`.
 
 **Acceptance Scenarios**:
 
-1. **Given** the feature-003 branch with the auth-primitives extraction
-   landed as the first commit, **When** the existing role-trio Playwright
-   e2e suite from feature 001 runs, **Then** every auth spec passes
-   without changes to spec files.
+1. **Given** the feature-003 branch after the auth-primitives
+   extraction has landed and before any shadcn dependency is added,
+   **When** the existing role-trio Playwright e2e suite from feature
+   001 runs, **Then** every auth spec passes without changes to spec
+   files.
 2. **Given** the same branch, **When** the auth pages (`/login`,
    `/signup`, `/forgot-password`, `/reset-password`, `/onboarding`) are
    rendered at desktop and 360px in both themes, **Then** the visual
