@@ -52,3 +52,28 @@ their dependencies:
 
 No code or specs affected — only 001 has shipped; the rest were names in
 a list.
+
+## 2026-05-19 — spec(003-employee-dashboard-shell) — Out-of-Scope bullet superseded by hotfix `8dc822b`
+
+`specs/003-employee-dashboard-shell/spec.md` (committed as `f4a1218`,
+review-edited through `5de64d2`) contains an Out-of-Scope bullet
+naming the `/login?error=expired_link` notice bug as a separate
+hotfix branch off `main`, with a recon step before the branch opens.
+
+That hotfix shipped between spec commit and `/speckit.plan`:
+
+- `0acb0e1` — `fix(001): render expired-link notice on /login`
+- `8dc822b` — merge of PR #2 onto `main`
+- The `003-employee-dashboard-shell` branch's merge-base with
+  `main` is `8dc822b`, confirming the branch is rebased onto
+  post-hotfix `main`.
+
+The bullet is therefore stale: the bug it points at is fixed, and
+the recon step is unnecessary. **The committed spec is NOT
+modified.** This entry records the supersession per Principle VIII
+(spec amendments live in CHANGELOG, not in retroactive edits to
+the spec).
+
+`docs/BACKLOG.md` will be updated during feature 003's
+`/speckit.implement` step 13 (smoke tests) to reclassify the
+expired-link entry as `merged`.

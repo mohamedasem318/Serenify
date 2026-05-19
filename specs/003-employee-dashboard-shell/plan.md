@@ -1,0 +1,1048 @@
+# Implementation Plan: Employee Dashboard Shell
+
+**Branch**: `003-employee-dashboard-shell` | **Date**: 2026-05-19 | **Spec**: [spec.md](./spec.md)
+
+**Input**: Feature specification from `/specs/003-employee-dashboard-shell/spec.md`
+
+## Summary
+
+This feature replaces the bare `/app` placeholder shipped by feature 001
+with the actual authenticated employee surface: a persistent header
+(logo, center nav, theme toggle, reserved talk slot, profile avatar/
+dropdown), a Home page (welcome banner + three skeleton cards in a
+60/40 primary-plus-secondary layout), an `/app/account` page (five
+stacked sections), a visual-only persistent chat pill, a reusable
+notification toast/sheet component, and a one-screen role placeholder
+for team_lead / admin that preserves the role-routing contract from
+feature 001 while replacing its placeholder copy.
+
+The technical work falls in three streams:
+
+1. **Refactor**: extract feature 001's bespoke auth form primitives
+   from inlined page-file code into `apps/web/components/ui/auth/`
+   without behavior change. Two of the five named primitives
+   (`PasswordInput`, `RequirementsChecklist`) already live in
+   `components/ui/`; they MOVE into the `auth/` subfolder so the
+   forthcoming shadcn flat install does not collide with them. `Field`
+   is still inlined in every (auth) form file and is the bulk of the
+   extraction work.
+2. **Foundation**: install `shadcn/ui` on the Tailwind v4 path against
+   the existing Mist & Meadow tokens in `apps/web/app/globals.css`,
+   migrate the dark-mode attribute from `data-theme` to `class` (the
+   shadcn convention), set `next-themes`'s `storageKey` to
+   `serenify-theme`, and pull in `framer-motion` for the notification
+   component's motion.
+3. **Shell**: build the header, profile dropdown, `/app` cards layout,
+   `/app/account` sections, persistent chat pill, notification
+   toast/sheet component, role placeholders, and the cross-tab auth
+   listener at `apps/web/app/layout.tsx` (the root, not the (authed)
+   subtree — per US 6 AS-1 the two tabs may both be at `/login` when
+   propagation must fire).
+
+All resolutions to spec-deferred decisions (FR-009 final subtitle copy,
+FR-022 sign-out button styling, FR-027 export path, FR-032 toast/pill
+gap, FR-044 Tailwind v4 + shadcn config, FR-053 theme persistence
+mechanism, edge-case truncation lengths, role-placeholder copy) are
+closed in this plan and enumerated in **§ Plan-Level Decisions** below
+for one-shot review. Architectural decisions become entries in
+`docs/DECISIONS.md` during `/speckit.implement` per Constitution
+Principle VIII; this plan lists those entries explicitly in
+**§ DECISIONS.md entries this plan implies**.
+
+## Technical Context
+
+**Language/Version**: TypeScript 5.x strict mode (matches `apps/web`'s
+existing pin). React 19.2.4 (already installed). Next.js 16.2.6
+(already installed; the `proxy.ts` file convention from DECISIONS
+2026-05-17 stays in force; per `apps/web/AGENTS.md` consult
+`node_modules/next/dist/docs/` before applying training-data knowledge
+of Next).
+
+**Primary Dependencies**:
+
+Already installed (`apps/web/package.json`, do not re-add):
+
+- `next` 16.2.6
+- `react` / `react-dom` 19.2.4
+- `next-themes` ^0.4.6 (the v0.4.x the directive names; configured at
+  `apps/web/app/providers.tsx`, currently with
+  `attribute="data-theme"` — migrates to `attribute="class"` in this
+  feature, see Decision C)
+- `@supabase/ssr` ^0.10.3 and `@supabase/supabase-js` ^2.105.4
+- `react-hook-form` ^7.76.0 + `@hookform/resolvers` ^5.2.2 + `zod`
+  ^4.4.3 (reused for the account-page profile editor)
+- `lucide-react` (already present; reused for header/dropdown icons)
+- `tailwindcss` ^4 + `@tailwindcss/postcss` ^4 (Tailwind v4 is the
+  current stack; the shadcn install follows the v4-specific path —
+  see Decision A)
+
+Newly added by this feature:
+
+- `framer-motion` (latest stable, caret pin) — drives the notification
+  component's entrance/exit motion and respects
+  `prefers-reduced-motion` via Framer's `useReducedMotion` hook.
+- shadcn primitives are vendor-pasted into the repo (the shadcn
+  install model is a code generator, not a runtime dependency), so
+  shadcn itself does not appear in `package.json`. Its transitive
+  Radix UI primitives (`@radix-ui/react-dropdown-menu`,
+  `@radix-ui/react-dialog`, `@radix-ui/react-avatar`,
+  `@radix-ui/react-separator`) DO appear in `package.json` as
+  `shadcn add` adds them. `class-variance-authority`, `clsx`,
+  `tailwind-merge`, and `tw-animate-css` are also added by the
+  shadcn init (replacing the now-deprecated `tailwindcss-animate`,
+  per the shadcn Tailwind v4 docs).
+- `tw-animate-css` — replaces `tailwindcss-animate` on the v4 path
+  (the shadcn Tailwind v4 doc names this swap explicitly).
+
+NOT used (decisions rejected, see Phase 0):
+
+- `sonner` — rejected for the notification component because its
+  toast paradigm does not fit the desktop-slide-in / mobile-bottom-
+  sheet bifurcation FR-029 mandates. See Decision G.
+
+**Storage**: Reuses `public.profiles` exactly as feature 001 shipped
+it. The only column this feature reads/writes is `full_name`
+(editable in the account page). `role` is read for the role-based
+landing branch but never written by this feature. **No new migrations,
+no new columns, no new RLS policies.**
+
+**Testing**:
+
+- **Vitest + React Testing Library** for component logic — header,
+  profile dropdown, account sections, notification component (three
+  configurations: desktop slide-in, mobile bottom sheet, reduced-
+  motion). Uses `apps/web/vitest.config.mts` (`happy-dom` environment
+  per DECISIONS 2026-05-17).
+- **Playwright** for two new specs:
+  - `employee-dashboard-shell.spec.ts` — the happy path: sign in →
+    home → open dropdown → navigate to account → edit name → sign out.
+  - `cross-tab-auth-sync.spec.ts` — two-page propagation spec per
+    Decision N below.
+  - Plus regression-only runs of feature 001's role-trio e2e and the
+    `login-expired-link.spec.ts` from the hotfix (commit `8dc822b`) —
+    both MUST pass unchanged (FR-036, SC-009).
+
+**Target Platform**: Next.js 16 App Router on Vercel; Tailwind v4;
+modern evergreen browsers. Minimum viewport 360px per Constitution
+Principle VI.
+
+**Project Type**: Web (frontend in `apps/web/`). No backend changes
+in this feature; the FastAPI app under `apps/api/` is not touched.
+
+**Performance Goals**: SC-008 — cross-tab auth sync propagates within
+2s under normal local conditions. SC-002 — theme toggle has no
+visible flicker on flip (next-themes'
+`disableTransitionOnChange` is already configured in providers.tsx
+and is kept).
+
+**Constraints**:
+
+- **No red anywhere** (Constitution Principle V). shadcn's default
+  destructive-button red is remapped to amber `#DCB587` via the CSS-
+  variable mapping in Decision B; the `destructive` variant is
+  re-skinned, not removed.
+- **Auth surfaces stay bespoke** (FR-040, FR-043). The (auth) page
+  files (`/login`, `/signup`, `/forgot-password`, `/reset-password`,
+  `/onboarding`) MUST render byte-equivalent to `main` after the
+  primitives extraction — verified by the unchanged-pass of feature
+  001's auth Playwright specs.
+- **Dark-mode attribute change ripples through the existing
+  CSS**: globals.css currently targets `:root[data-theme="dark"]`.
+  After Decision C this becomes `.dark` (shadcn's expected selector).
+  The change is mechanical but touches a file feature 001 shipped, so
+  the regression bar is high — the auth surfaces and the existing
+  theme-toggle component MUST behave identically.
+- **`useReducedMotion` is the canonical reduced-motion gate** for
+  this feature's Framer Motion code. The global CSS rule already in
+  `globals.css` (lines 49-54) suppresses animations to 0.01ms, but
+  Framer Motion's variants are React-state-driven and won't respect
+  that CSS rule unless the variants themselves branch on the hook —
+  see Decision G.
+- **Constitution Principle IX (Secrets)**: this feature introduces
+  zero new secrets, env vars, or service-account-bearing surfaces.
+  Cross-tab auth listener uses the same anon Supabase client already
+  configured in `apps/web/lib/supabase/client.ts`.
+
+**Scale/Scope**: A single Next.js route group changes shape
+(`apps/web/app/(authed)/`). One new route added (`/app/account`).
+Approximately 12 new components, 5 modified pages, 1 modified layout,
+1 modified providers file, 1 modified globals.css. Two new Playwright
+specs. Roughly 1,500–2,500 added/changed lines on `apps/web/`.
+
+## Constitution Check
+
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+
+This feature touches Principles **V, VI, VII, VIII, IX**. Principles
+I, II, III, IV, X are not engaged by this UI-shell feature (no signal
+data, no ML, no LLM, no StressID-sourced media).
+
+| Principle | Status | How this plan honours it |
+|-----------|--------|--------------------------|
+| V. Calm-First Design Language | ✅ | Mist & Meadow tokens stay in `apps/web/app/globals.css` @theme block; the shadcn install maps shadcn's expected CSS variable names ONTO those tokens (Decision B) rather than introducing a parallel palette. Red is forbidden — shadcn's `--destructive` is remapped to amber `#DCB587` in both modes (FR-042). No glassmorphism: shadcn `Card` is restyled with soft borders + 0.5px elevation + `shadow-soft` per the Constitution. Corner radii: cards use `--radius-card` (12px), controls use `--radius-control` (8px). Inter + DM Serif Display already wired in `apps/web/app/layout.tsx`. Voice: every copy string in this feature (welcome banner, empty states, account labels, role placeholder, notification body samples) is reviewed against the calm-voice rubric — no exclamation marks, no clinical or alarmist language. Lucide icons consistent stroke weight. Welcome banner subtitle: "We're here when you need us." (Decision M — chosen over the user's suggested "A calm start to your day" because the spec's FR-008 time-of-day adaptive greeting reads strangely at 8pm if the subtitle says "start to your day"; the chosen subtitle is time-neutral.) |
+| VI. Responsive & Accessible by Default | ✅ | Every new surface (header, dropdown, account sections, chat pill, notification, role placeholders) is designed mobile-first against the 360px floor. Header center-nav collapses to a hamburger at ≤768px; profile avatar stays as its own separate trigger per FR-005. Chat pill collapses to icon-only at ≤768px per FR-025. Notification component is a bottom sheet at ≤768px per FR-029. All interactive elements ≥44×44px (the existing `h-11 w-11` and `h-12` patterns from feature 001 are reused). Light + dark equal-priority: the CSS-variable mapping in Decision B is applied in both light and dark token sets simultaneously. `prefers-reduced-motion`: Framer Motion variants branch on `useReducedMotion` so notification entrance/exit collapse to opacity-only in reduced-motion mode (Decision G). The OS-level rule already in `globals.css` (lines 49-54) remains as a defense-in-depth backstop for CSS transitions. |
+| VII. Mandatory Testing Per PR | ✅ | New Vitest + RTL component tests for every new component (header, profile dropdown, role placeholder, notification component in three configurations). One Playwright happy-path spec for the employee role (`employee-dashboard-shell.spec.ts`). One Playwright cross-tab spec (`cross-tab-auth-sync.spec.ts`) per Decision N. The existing role-trio e2e from feature 001 is preserved unchanged (FR-036). The `login-expired-link.spec.ts` from the post-feature-001 hotfix (commit `8dc822b`) is also preserved unchanged. `smoke-tests.md` authored during `/speckit.tasks` — at minimum: visual regression check on each (auth) page at desktop and 360px in both themes (SC-009), three-configuration notification component check, employee-vs-non-employee landing check, theme-toggle cross-session persistence check. |
+| VIII. Spec-Driven Workflow | ✅ | This plan is the second formal artifact of the feature (spec → plan → tasks → implement). Architectural decisions are logged in `docs/DECISIONS.md` during `/speckit.implement`; the planned entries are enumerated in **§ DECISIONS.md entries this plan implies** below for one-shot review. The feature folder contains: `spec.md` (committed), `plan.md` (this file), `research.md`, `data-model.md`, `contracts/components.md`, `contracts/shadcn-mapping.md`, `quickstart.md`, and (during `/speckit.tasks`) `tasks.md` + `smoke-tests.md`. The stale Out-of-Scope bullet in `spec.md` referencing the expired-link hotfix gets a `docs/CHANGELOG.md` entry per the user's directive — the committed spec is NOT modified. |
+| IX. Secrets Discipline (NON-NEG) | ✅ | This feature introduces zero new env vars, no new service-role surfaces, no new API keys. The cross-tab auth listener uses the existing anon Supabase client at `apps/web/lib/supabase/client.ts`. The account-page profile editor calls a Server Action that uses the SSR Supabase client at `apps/web/lib/supabase/server.ts` (already feature-001 territory). No `.env*` files are added, modified, or referenced. |
+
+**Gate result**: PASS. No complexity-tracking entries needed.
+
+## Plan-Level Decisions (resolved here, not deferred)
+
+These items were flagged in the spec as decisions the plan must close,
+or were pre-resolved in the user's `/speckit.plan` directive. Each
+heading names the spec FR / edge case it closes.
+
+### Decision A — shadcn CLI on the Tailwind v4 path
+
+Run `npx shadcn@latest init` against `apps/web/` (NOT the repo root —
+the monorepo's web workspace is the only consumer). Follow the
+"Tailwind v4" branch of the install story: pick CSS-vars mode, choose
+base color `neutral` (it will be overridden by Decision B's mapping),
+let the CLI rewrite `globals.css` if it offers, then **reconcile by
+hand** — the existing Mist & Meadow `@theme` block must survive
+verbatim.
+
+What the shadcn v4 init brings into the repo:
+
+- `apps/web/components.json` — the install manifest (see Decision E
+  for the exact shape).
+- A handful of CSS-variable declarations in `globals.css` that shadcn
+  components reference. We map these to existing Mist & Meadow tokens
+  (Decision B) rather than letting the CLI emit fresh oklch colors.
+- `tw-animate-css` instead of `tailwindcss-animate` — per the shadcn
+  Tailwind v4 doc, the older animation lib is deprecated on the v4
+  path.
+- `class-variance-authority`, `clsx`, `tailwind-merge`, and the
+  per-primitive `@radix-ui/*` packages as `shadcn add` is run for
+  each primitive in scope.
+
+The auth pages (`/login`, `/signup`, `/forgot-password`,
+`/reset-password`, `/onboarding`) are NOT touched by the init. The
+init writes only to `components.json`, `globals.css` (which we then
+hand-reconcile), and the components added by subsequent `shadcn add`
+commands.
+
+**Pinned shadcn primitives in scope** (in commit order to be locked
+during `/speckit.tasks`):
+`button`, `card`, `dropdown-menu`, `sheet`, `dialog`, `avatar`,
+`separator`.
+
+### Decision B — CSS-variable mapping: shadcn names → Mist & Meadow tokens
+
+The Mist & Meadow palette already lives in `apps/web/app/globals.css`
+@theme block in hex (lines 10-27, light) and `@layer base
+:root.dark { ... }` (post-migration; currently
+`:root[data-theme="dark"]`, see Decision C). shadcn primitives
+reference CSS variables by their own names (`--background`,
+`--foreground`, etc.). The mapping below makes shadcn primitives
+consume Mist & Meadow tokens without introducing any new color:
+
+| shadcn variable | Mist & Meadow token (light) | Mist & Meadow token (dark) |
+|---|---|---|
+| `--background` | `--color-bg` (`#ECEEE9`) | `--color-bg` (`#161917`) |
+| `--foreground` | `--color-ink` (`#1F2522`) | `--color-ink` (`#DCDED5`) |
+| `--card` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
+| `--card-foreground` | `--color-ink` | `--color-ink` |
+| `--popover` | `--color-surface` | `--color-surface` |
+| `--popover-foreground` | `--color-ink` | `--color-ink` |
+| `--primary` | `--color-meadow` (`#7A9275`) | `--color-meadow` (`#97AE91`) |
+| `--primary-foreground` | `--color-bg` (text-on-meadow, light) | `--color-ink` (text-on-meadow, dark) |
+| `--secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
+| `--secondary-foreground` | `--color-ink` | `--color-ink` |
+| `--muted` | `--color-border` (`#D6D7D1`) | `--color-border` (`#2D3130`) |
+| `--muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
+| `--accent` | `--color-foggy` | `--color-foggy` |
+| `--accent-foreground` | `--color-ink` | `--color-ink` |
+| `--destructive` | `--color-amber` (`#DCB587`) | `--color-amber` (`#DCB587`) |
+| `--border` | `--color-border` | `--color-border` |
+| `--input` | `--color-border` | `--color-border` |
+| `--ring` | `--color-meadow` | `--color-meadow` |
+
+The `--destructive` row is a hard requirement per FR-042 — both modes
+override shadcn's default red to amber. Implementation: a single
+`@theme inline { --destructive: var(--color-amber); ... }` block in
+`globals.css` keeps the override in one place.
+
+The `--primary-foreground` row uses `--color-bg` in light (because
+`#7A9275` on `#ECEEE9` reads "meadow-on-bg" but a button labeled in
+meadow-on-meadow is illegible; the foreground for a meadow-filled
+button is the page bg color) and `--color-ink` in dark (because the
+dark-mode meadow `#97AE91` plus the dark-mode bg `#161917` gives the
+same visual relationship). This is the only "non-symmetrical" mapping;
+all other rows use the same Mist & Meadow token name in both modes,
+relying on the existing dark-mode override block in globals.css to
+flip the hex value.
+
+**Documentation source for this mapping**: `contracts/shadcn-mapping.md`
+in this feature folder duplicates the table for runtime reference; the
+plan and that contract file must stay in sync.
+
+### Decision C — Dark-mode attribute migration: `data-theme` → `class`
+
+Today: `apps/web/app/providers.tsx` configures
+`<ThemeProvider attribute="data-theme" ...>`, and `globals.css`
+targets `:root[data-theme="dark"] { ... }`.
+
+shadcn primitives expect `.dark` on `<html>`. Two paths considered:
+
+1. **Migrate to shadcn's convention** (`attribute="class"`, CSS
+   targets `.dark`). The change is mechanical:
+   `providers.tsx` flips the attribute prop; `globals.css` swaps the
+   selector. The existing theme-toggle component (which writes via
+   `next-themes`'s `setTheme()`) is untouched. The (auth) pages and
+   the auth Playwright specs do not select on the attribute — they
+   query computed styles or visible text — so they pass unchanged.
+2. **Stay on `data-theme` and configure shadcn primitives to read
+   from a custom selector.** shadcn's CSS variables are namespaced to
+   `.dark` by default in its templates; overriding requires editing
+   every primitive's emitted CSS. Painful and ongoing.
+
+Path 1 wins. **Risk callout**: any external code that selects on
+`[data-theme="dark"]` (e.g., a `.user.css` snippet, a custom
+extension, a third-party widget) breaks. We grep for the literal
+string `data-theme` across `apps/web/` to confirm scope before
+flipping; the only known consumer is `globals.css` itself.
+
+Also adds `storageKey="serenify-theme"` to the `ThemeProvider` props
+so the localStorage namespace is explicit and project-scoped. Without
+it, next-themes uses the default `theme` key, which is fine
+functionally but mingles with any other next-themes-using app loaded
+under the same origin during local development.
+
+### Decision D — Theme persistence mechanism (FR-053)
+
+`next-themes`' built-in localStorage write through `setTheme()` (with
+the explicit `storageKey="serenify-theme"` from Decision C) handles
+all of FR-053 by construction:
+
+- Persists across page navigations within the session — localStorage
+  survives client-side navigation by definition.
+- Persists across sign-out / sign-in — localStorage is not auth-
+  scoped; the theme key lives on the origin, not the session.
+- No server round-trip on flip — `setTheme` is a client-only write.
+- OS-preference fallback (`defaultTheme="system"`, `enableSystem`)
+  for first-load and any user without a stored override.
+- Manual override priority — once `setTheme("light")` or
+  `setTheme("dark")` runs, the stored value wins until the user picks
+  `setTheme("system")`.
+
+No `profiles` column, no Server Action, no Supabase write. The
+edge-case "user has `prefers-color-scheme: dark` set in their OS and
+a manual light-theme override stored from a previous session — the
+manual override wins on this load" is handled natively by next-themes.
+
+### Decision E — `components.json` shape
+
+The shadcn init writes this file at `apps/web/components.json`. The
+shape we commit:
+
+```json
+{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "default",
+  "rsc": true,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "app/globals.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
+```
+
+Notes:
+
+- `tailwind.config` is empty because Tailwind v4 has no JS config
+  file by default — config lives in `globals.css`'s `@theme` block.
+  The shadcn v4 path expects this empty string.
+- `tailwind.css` points at the relative path from the workspace root
+  (`apps/web/`). The CLI runs from inside `apps/web/`, so the path is
+  workspace-relative.
+- `aliases.ui` is `@/components/ui` — flat. The bespoke auth
+  primitives live under `@/components/ui/auth/*` (see Decision F);
+  shadcn's `add` writes to the flat root.
+- `iconLibrary: "lucide"` matches the project standard.
+
+### Decision F — Component folder layout
+
+```text
+apps/web/components/
+├── ui/                                 # shadcn primitives (flat) + bespoke auth subfolder
+│   ├── button.tsx                      # shadcn add button     (new)
+│   ├── card.tsx                        # shadcn add card        (new)
+│   ├── dropdown-menu.tsx               # shadcn add dropdown-menu (new)
+│   ├── sheet.tsx                       # shadcn add sheet       (new)
+│   ├── dialog.tsx                      # shadcn add dialog      (new)
+│   ├── avatar.tsx                      # shadcn add avatar      (new)
+│   ├── separator.tsx                   # shadcn add separator   (new)
+│   └── auth/                           # bespoke, NOT shadcn   (extracted)
+│       ├── password-input.tsx          # was components/ui/password-input.tsx (MOVE)
+│       ├── password-requirements.tsx   # was components/ui/password-requirements.tsx (MOVE)
+│       ├── field.tsx                   # extracted from each (auth) form file's inlined Field
+│       └── otp-panel.tsx               # was app/(auth)/otp-panel.tsx (MOVE — auth-only primitive)
+├── header/                             # employee-shell header pieces (new)
+│   ├── header.tsx
+│   ├── center-nav.tsx
+│   ├── profile-dropdown.tsx
+│   └── mobile-menu.tsx
+├── home/                               # /app body pieces (new)
+│   ├── welcome-banner.tsx
+│   ├── todays-checkin-card.tsx
+│   ├── things-that-might-help-card.tsx
+│   └── recent-chats-card.tsx
+├── account/                            # /app/account sections (new)
+│   ├── profile-section.tsx
+│   ├── security-section.tsx
+│   ├── privacy-placeholder.tsx
+│   ├── notifications-placeholder.tsx
+│   └── sign-out-section.tsx
+├── role-placeholder/                   # team_lead / admin landing (new)
+│   └── role-placeholder.tsx
+├── chat-pill.tsx                       # persistent bottom-right pill (new, visual-only)
+├── notification.tsx                    # the reusable notification (new — NOT in ui/)
+└── notification.test.tsx               # Vitest + RTL test for the notification component
+```
+
+Rationale for the auth subfolder:
+
+- The two already-extracted primitives (`password-input.tsx`,
+  `password-requirements.tsx`) currently sit at `components/ui/`.
+  shadcn's flat install will pour `button.tsx`, `card.tsx`, etc.
+  into the same flat directory. Keeping the bespoke and shadcn
+  primitives at the same level invites someone to import
+  `@/components/ui/button` thinking it is bespoke when it is shadcn,
+  or vice versa.
+- Moving the bespoke primitives into `components/ui/auth/` makes the
+  separation by import path explicit and signals "do not migrate
+  these to shadcn equivalents" (FR-040).
+
+Rationale for `notification.tsx` NOT in `ui/`:
+
+- `ui/` is reserved for primitives (button, card, dropdown-menu).
+  The notification component is composite — it composes Radix Dialog
+  + a media-query-driven layout switch + Framer Motion variants. The
+  shadcn convention is that composite components live outside `ui/`.
+- Importing it as `@/components/notification` reads as a single
+  surface ("the notification"), which matches its conceptual
+  status — a reusable surface that features 007 / 008 / 010 will
+  mount.
+
+Rationale for keeping the per-feature subfolders (`header/`, `home/`,
+etc.) outside `ui/`:
+
+- These are application components, not primitives. Each one is
+  used by exactly one route (or by the (authed) layout); they are
+  not API-shaped reusables. Hosting them outside `ui/` keeps `ui/`'s
+  semantic meaning ("the shared design-system primitives") intact.
+
+### Decision G — Notification component composition
+
+The notification is **not Sonner**. Sonner's toast paradigm is a
+top-right stack with auto-dismiss and limited layout control; FR-029
+requires a full-width bottom sheet at ≤768px and FR-030 requires a
+specific reduced-motion fallback. Sonner's APIs do not let us swap
+to a sheet at a viewport breakpoint without re-implementing most of
+the surface.
+
+The component is built on Radix Dialog primitives (the same
+primitives shadcn's `dialog` is built on) with a viewport-conditional
+positioner:
+
+- `useMediaQuery("(max-width: 768px)")` (a new hook at
+  `apps/web/hooks/use-media-query.ts`) selects between two
+  `Dialog.Content` placements.
+- Desktop (`≥768px`): `Dialog.Content` is positioned bottom-right
+  with `position: fixed; right: 1rem; bottom: 1rem;` and a
+  slide-in-from-bottom-right Framer Motion variant. The card is
+  bordered in `--color-border`, padded generously, has `--radius-card`
+  (12px), and uses `--shadow-soft` for elevation. No glassmorphism.
+- Mobile (`≤768px`): `Dialog.Content` is anchored to the bottom edge
+  full-width with a slide-up-from-bottom variant. Top radius
+  `--radius-card` (12px); bottom radius 0.
+
+Reduced motion: the Framer Motion `variants` object branches on
+`useReducedMotion()` (from Framer Motion). When the hook returns
+`true`, the variant collapses to opacity-only (`animate: { opacity:
+1 }`, `exit: { opacity: 0 }`, no `y` or `x` offsets). The OS-level
+CSS `* { animation-duration: 0.01ms; transition-duration: 0.01ms; }`
+rule already in `globals.css` (lines 49-54) remains as a backstop for
+non-React-state animations.
+
+Explicit dismiss control only; no auto-dismiss (FR-031). Consumers
+(features 007/008/010) layer auto-dismiss on top if they want it.
+
+Export path: `@/components/notification`. The component exports
+`Notification` (the controlled surface) and a `NotificationProps`
+type. There is no Provider or NotificationContainer to mount at the
+shell root — each consumer mounts the surface directly when it has
+something to surface, which keeps the API simple and avoids a global
+queue this feature doesn't need.
+
+### Decision H — Toast-above-pill gap: 16px
+
+When the notification surface is rendered concurrently with the
+persistent chat pill on a viewport that shows both (desktop only;
+on mobile the bottom sheet covers the chat pill area entirely and
+the pill's z-order is below the sheet's backdrop), the surfaces stack
+bottom-right with a **16px gap** between them.
+
+16px = Tailwind `gap-4` = the Mist & Meadow spacing scale's
+"comfortable" tier. Smaller (8px / `gap-2`) reads as cramped against
+the generous-whitespace constitutional rule; larger (24px / `gap-6`)
+strands the toast halfway up the viewport, away from its anchor.
+
+Implementation: the chat pill is positioned at
+`fixed; right: 1rem; bottom: 1rem;`. The notification surface on
+desktop is positioned at `fixed; right: 1rem; bottom: calc(1rem +
+[chat-pill-height] + 1rem);` — the inner `+ 1rem` is the 16px gap.
+The chat pill height is a documented constant in the component's
+exports (the planned value is 48px, matching the ≥44px touch-target
+floor with a 2px breathing margin). This is captured in the
+notification component's JSDoc so features 007/008/010 can pin to
+the same convention.
+
+### Decision I — Header right-cluster mechanics
+
+The header's right cluster is a flex container ordered
+`[ThemeToggle] [ReservedTalkSlot] [ProfileAvatar]` with
+`gap-3` (12px) between items. FR-006 reserves the slot for feature
+010's `<TalkButton />`. We use a JSX **comment marker**, not an
+invisible placeholder element:
+
+```tsx
+<div className="flex items-center gap-3">
+  <ThemeToggle />
+  {/* feature 010 inserts <TalkButton /> here */}
+  <ProfileDropdown />
+</div>
+```
+
+Rejected alternatives:
+
+- `<div className="hidden" />` placeholder — adds DOM weight, would
+  break the `gap-3` math when feature 010 swaps it out.
+- An empty `<div>` with explicit width — same problem.
+
+Flex `gap-3` absorbs the future insertion without reflow: feature 010
+deletes the comment and inserts `<TalkButton />` in the same position;
+the gap stays 12px on both sides.
+
+### Decision J — Active-nav indicator
+
+The active nav item ("Home" on `/app`) renders with a soft
+surface-token pill background (`bg-surface`), `rounded-md` (matches
+the `--radius-control` 8px), normal text weight (no bold), and no
+underline. Inactive items have no background and only a hover
+treatment (`hover:bg-surface/60`).
+
+The active state is determined by `usePathname()` from
+`next/navigation`. The pill background renders only when the
+pathname starts with the destination's href — so a future Insights
+sub-route under `/app/insights/...` would still light up the
+Insights nav item.
+
+### Decision K — `full_name` length handling
+
+- **Store**: `profiles.full_name` is unconstrained `text` in the
+  feature-001 schema. Application-level: enforce a **60-character
+  max** in the account-page profile editor's zod schema (`z.string()
+  .max(60, "Keep it under 60 characters")`). 60 covers
+  multi-part hyphenated names and Arabic transliterations with room
+  to spare; longer values are almost always test data.
+- **Welcome banner**: uses the full first whitespace-separated token,
+  no truncation. (A 30-character first name is rare and the layout
+  has room.)
+- **Header avatar / dropdown name area**: truncate at **24
+  characters** with a single-character ellipsis (Unicode `…`,
+  not three ASCII dots). 24 is chosen by sampling: Arabic and
+  Egyptian names common in the demo cohort fit at 24; English
+  doubles like "Christopher" + a 12-char family name fit at 24.
+  Implementation: a `truncate-name.ts` helper at `apps/web/lib/` that
+  the dropdown and avatar tooltip both call.
+- **Edit field**: the input accepts the full 60-character value
+  unhindered; truncation is a display-side concern only.
+
+### Decision L — Role placeholder copy
+
+- **team_lead**
+  - Heading: "Your team-lead view is coming together."
+  - Subtitle: "We're building something that respects your team's
+    privacy. Check back soon."
+- **admin**
+  - Heading: "Your admin view is in progress."
+  - Subtitle: "Org-wide tools land in a later release. Account
+    settings are available below."
+
+Layout for both: centered single column, generous whitespace
+(`py-24 sm:py-32`), DM Serif Display heading at the same scale as the
+welcome banner's adaptive greeting (`font-display text-3xl sm:text-4xl`),
+Inter subtitle in `text-muted`, sign-out as a secondary-styled
+button (`bg-surface text-ink border border-border hover:bg-border`)
+beneath the subtitle. The header above is identical to the employee
+header (FR-034) so the surface stays familiar.
+
+The phrasing avoids the word "build" in the imperative ("we are
+building"), avoids any future-tense promise about a specific date,
+avoids exclamation marks, and avoids the alarmist blocklist.
+
+### Decision M — Welcome banner subtitle (FR-009)
+
+**Chosen**: "We're here when you need us."
+
+**Pushback against the user's suggestion ("A calm start to your
+day.")**: the spec's FR-008 mandates a time-of-day-adaptive greeting
+("Good morning" / "Good afternoon" / "Good evening"). A subtitle that
+includes "start to your day" creates a clash at 8pm — the heading
+says "Good evening" and the subtitle says the day is just starting.
+The chosen alternative is time-neutral and is one of the two examples
+FR-009 names explicitly. The other example ("A calm start to your
+day") is rejected for this reason.
+
+**Logged in DECISIONS.md** per the user's directive.
+
+### Decision N — Playwright cross-tab spec mechanics (FR-047)
+
+**Do not use two `BrowserContexts`**. `browser.newContext()` creates
+contexts with separate cookies and separate localStorage, which is
+the opposite of what cross-tab sync needs:
+`supabase.auth.onAuthStateChange`'s cross-tab firing is driven by the
+`storage` event on the same-origin localStorage, and two contexts do
+not share storage. The test would silently never fire.
+
+**Pattern**:
+
+```ts
+const context = await browser.newContext();
+const pageA = await context.newPage();
+const pageB = await context.newPage();
+await pageA.goto("/login");
+await pageB.goto("/login");
+
+// Sign in via the actual form in pageA (real-world behavior).
+await pageA.fill('input[name="email"]', "employee@demo.serenify.local");
+await pageA.fill('input[name="password"]', "DemoUser123!");
+await pageA.click('button[type="submit"]');
+
+// Assert pageB navigates within 2s without manual reload.
+await pageB.waitForURL(/\/app$/, { timeout: 2000 });
+
+// Sign out via page.evaluate calling supabase.auth.signOut() directly.
+// (Avoids form-flake; the listener, not the form, is under test.)
+await pageA.evaluate(async () => {
+  const { createBrowserClient } = await import("@supabase/ssr");
+  // ...uses the same env-public anon key already exposed to the client...
+  const client = createBrowserClient(/* url */, /* anon key */);
+  await client.auth.signOut();
+});
+await pageB.waitForURL(/\/login$/, { timeout: 2000 });
+```
+
+The 2-second budget aligns with SC-008. The spec runs under the
+already-configured `workers: 1` (DECISIONS 2026-05-17) so it does not
+race other auth specs.
+
+## Project Structure
+
+### Documentation (this feature)
+
+```text
+specs/003-employee-dashboard-shell/
+├── plan.md                            # this file
+├── spec.md                            # committed
+├── research.md                        # Phase 0 — long-form treatment of Decisions A–N
+├── data-model.md                      # Phase 1 — references feature 001's schema, no new columns
+├── contracts/
+│   ├── components.md                  # component contracts: props, events, accessibility
+│   └── shadcn-mapping.md              # CSS-variable mapping table (Decision B), runtime-reference
+├── quickstart.md                      # Phase 1 — fresh-developer steps to land on this feature
+├── tasks.md                           # written by /speckit.tasks (NOT yet)
+└── smoke-tests.md                     # written during /speckit.tasks (NOT yet)
+```
+
+### Source Code (repository — additions and modifications)
+
+```text
+serenify/
+├── apps/
+│   └── web/
+│       ├── app/
+│       │   ├── globals.css                          # MODIFIED — Decision B (var mapping), Decision C (.dark)
+│       │   ├── layout.tsx                           # MODIFIED — mount cross-tab listener here (US 6)
+│       │   ├── providers.tsx                        # MODIFIED — attribute="class", storageKey="serenify-theme"
+│       │   ├── theme-toggle.tsx                     # UNCHANGED — already uses next-themes setTheme()
+│       │   ├── cross-tab-auth.tsx                   # NEW — the onAuthStateChange listener client component
+│       │   ├── (auth)/
+│       │   │   ├── layout.tsx                       # UNCHANGED
+│       │   │   ├── login/login-form.tsx             # MODIFIED — import Field from @/components/ui/auth/field
+│       │   │   ├── signup/signup-form.tsx           # MODIFIED — same import change
+│       │   │   ├── forgot-password/forgot-form.tsx  # MODIFIED — same import change
+│       │   │   ├── reset-password/reset-form.tsx    # MODIFIED — same import change
+│       │   │   └── otp-panel.tsx                    # DELETED (moves to @/components/ui/auth/)
+│       │   └── (authed)/
+│       │       ├── layout.tsx                       # MODIFIED — replaced with new shell (header + chat pill)
+│       │       ├── app/
+│       │       │   ├── page.tsx                     # MODIFIED — welcome banner + 3 cards or role placeholder
+│       │       │   └── account/
+│       │       │       ├── page.tsx                 # NEW
+│       │       │       └── actions.ts               # NEW — update-profile server action
+│       │       └── onboarding/
+│       │           └── onboarding-form.tsx          # MODIFIED — import Field from @/components/ui/auth/field
+│       ├── components/
+│       │   ├── ui/                                  # see Decision F for the full tree
+│       │   │   ├── auth/                            # NEW subfolder
+│       │   │   │   ├── password-input.tsx           # MOVED from components/ui/password-input.tsx
+│       │   │   │   ├── password-requirements.tsx    # MOVED from components/ui/password-requirements.tsx
+│       │   │   │   ├── field.tsx                    # NEW — extracted from each (auth) form file
+│       │   │   │   └── otp-panel.tsx                # MOVED from app/(auth)/otp-panel.tsx
+│       │   │   ├── button.tsx                       # NEW — shadcn add
+│       │   │   ├── card.tsx                         # NEW — shadcn add
+│       │   │   ├── dropdown-menu.tsx                # NEW — shadcn add
+│       │   │   ├── sheet.tsx                        # NEW — shadcn add
+│       │   │   ├── dialog.tsx                       # NEW — shadcn add
+│       │   │   ├── avatar.tsx                       # NEW — shadcn add
+│       │   │   └── separator.tsx                    # NEW — shadcn add
+│       │   ├── header/                              # NEW
+│       │   │   ├── header.tsx
+│       │   │   ├── center-nav.tsx
+│       │   │   ├── profile-dropdown.tsx
+│       │   │   └── mobile-menu.tsx
+│       │   ├── home/                                # NEW
+│       │   │   ├── welcome-banner.tsx
+│       │   │   ├── todays-checkin-card.tsx
+│       │   │   ├── things-that-might-help-card.tsx
+│       │   │   └── recent-chats-card.tsx
+│       │   ├── account/                             # NEW
+│       │   │   ├── profile-section.tsx
+│       │   │   ├── security-section.tsx
+│       │   │   ├── privacy-placeholder.tsx
+│       │   │   ├── notifications-placeholder.tsx
+│       │   │   └── sign-out-section.tsx
+│       │   ├── role-placeholder/                    # NEW
+│       │   │   └── role-placeholder.tsx
+│       │   ├── chat-pill.tsx                        # NEW
+│       │   ├── notification.tsx                     # NEW
+│       │   └── notification.test.tsx                # NEW
+│       ├── hooks/                                   # NEW directory
+│       │   └── use-media-query.ts                   # NEW
+│       ├── lib/
+│       │   ├── utils.ts                             # NEW (or augmented) — shadcn's `cn()`
+│       │   └── truncate-name.ts                     # NEW — Decision K
+│       ├── components.json                          # NEW — Decision E
+│       ├── tests/
+│       │   ├── e2e/
+│       │   │   ├── employee-dashboard-shell.spec.ts # NEW — happy-path
+│       │   │   └── cross-tab-auth-sync.spec.ts     # NEW — Decision N
+│       │   └── unit/
+│       │       ├── (existing files unchanged)       # role-trio specs preserved
+│       │       └── (per-component .test.tsx files alongside their components)
+│       └── package.json                             # MODIFIED — add framer-motion + shadcn-added Radix pkgs
+├── docs/
+│   ├── DECISIONS.md                                 # APPENDED — entries enumerated below
+│   ├── BACKLOG.md                                   # APPENDED — dynamic welcome subtitle deferred (FR-009 ripple)
+│   └── CHANGELOG.md                                 # NEW (per Principle VIII) — note stale Out-of-Scope bullet superseded by hotfix 8dc822b
+```
+
+**Structure Decision**: All implementation work lives under
+`apps/web/` (Next.js workspace). No changes to `apps/api/`, no
+changes to `packages/`, no changes to `supabase/`, no changes to
+repo-root `scripts/`. The monorepo's other workspaces are untouched.
+
+## Phase 0: Research
+
+The full discussion lives in [`research.md`](./research.md). Headline
+outputs:
+
+| Topic | Decision | One-line rationale |
+|---|---|---|
+| shadcn install path | `npx shadcn@latest init` from `apps/web/`, Tailwind v4 branch, CSS-vars mode, baseColor `neutral` overridden by Decision B | Project is on Tailwind v4; shadcn's v4 path is well-documented. |
+| CSS-variable mapping | shadcn variable names → Mist & Meadow tokens, per Decision B table | No new color introduced; FR-042 honoured by `--destructive → amber`. |
+| Dark-mode attribute | Migrate `data-theme` → `class`; CSS targets `.dark` | shadcn convention; mechanical change with low blast radius (one selector in `globals.css`). |
+| Theme persistence | `next-themes` localStorage with `storageKey="serenify-theme"` | Covers FR-053 by construction; no server round-trip. |
+| Component folder layout | shadcn flat in `components/ui/`; bespoke in `components/ui/auth/`; composite in `components/` | Import path encodes provenance; FR-040 made structural. |
+| Cross-tab listener mount | `app/layout.tsx` root layout, not `(authed)/layout.tsx` | US 6 AS-1 requires propagation between two `/login` tabs; an authed-only mount fires too late. |
+| Notification composition | Radix Dialog + Framer Motion + `useMediaQuery`; NOT Sonner | Sonner can't bifurcate to a bottom sheet at the viewport breakpoint; the bifurcation is FR-029. |
+| Toast/pill gap | 16px (Tailwind `gap-4`) | Comfortable tier of Mist & Meadow spacing; documented in the notification's JSDoc for features 007/008/010. |
+| Header right-cluster | Flex container, JSX comment marker for the talk slot, `gap-3` between items | No invisible DOM weight; feature 010's insertion is a one-line diff. |
+| Active-nav indicator | Soft `bg-surface` pill on active, no underline, `usePathname()` | Calm-first; pill matches `--radius-control`. |
+| `full_name` lengths | Store ≤60; banner uses full first token; dropdown/avatar truncates at 24 + `…`; edit field accepts 60 | Covers the spec's edge case without surprising the user mid-edit. |
+| Role placeholder copy | Decision L (calm, no exclamation, no clinical) | Constitution Principle V voice rubric. |
+| Welcome subtitle | "We're here when you need us." | Time-neutral; harmonises with the adaptive greeting. |
+| Playwright cross-tab pattern | Single context, two pages; sign-in via form, sign-out via `page.evaluate(client.auth.signOut())` | Single context shares localStorage so the storage event actually fires. |
+| Sonner | Rejected | Toast paradigm doesn't fit the desktop-slide-in / mobile-bottom-sheet bifurcation. |
+| `framer-motion` | Added (caret pin) | Drives notification motion; `useReducedMotion` is the canonical reduced-motion gate. |
+
+## Phase 1: Design & Contracts
+
+The full artifacts are in:
+
+- [`data-model.md`](./data-model.md) — no schema change; documents
+  the `profiles` columns this feature reads/writes (`full_name`
+  editable; `role` read-only for the landing branch).
+- [`contracts/components.md`](./contracts/components.md) — every new
+  component's props, events, accessibility attributes, and consumer
+  contract. Covers header / dropdown / cards / account sections /
+  chat pill / notification / role placeholder.
+- [`contracts/shadcn-mapping.md`](./contracts/shadcn-mapping.md) —
+  the CSS-variable mapping table from Decision B in runtime-reference
+  form, plus the `--destructive → amber` override block.
+- [`quickstart.md`](./quickstart.md) — fresh-developer steps from a
+  clean clone to a running `/app` with the new shell.
+
+## Branch Commit Ordering
+
+The user's directive establishes the canonical 13-step ordering. This
+list is reproduced here as the contract /speckit.tasks decomposes
+into task IDs. Each step is one PR-sized unit and lands on the
+`003-employee-dashboard-shell` branch in order. Tests run at the end
+of each step; CI passing is the gate to start the next step.
+
+1. **Extract auth primitives** to `components/ui/auth/`. `Field`
+   extracted from each form file; `password-input.tsx` and
+   `password-requirements.tsx` moved from `components/ui/`;
+   `otp-panel.tsx` moved from `(auth)/`. Update imports in
+   `login-form.tsx`, `signup-form.tsx`, `forgot-form.tsx`,
+   `reset-form.tsx`, `onboarding-form.tsx`. Run feature 001's
+   role-trio Playwright e2e — MUST pass unchanged (SC-009). No
+   visual regression at desktop or 360px in either theme.
+2. **Install + configure `next-themes` attribute migration**. Flip
+   `providers.tsx` to `attribute="class"`, add
+   `storageKey="serenify-theme"`. Update `globals.css` selector
+   `:root[data-theme="dark"]` → `.dark`. Grep `apps/web/` for any
+   remaining `data-theme` references; remove or update. Verify
+   theme toggle on the (auth) pages behaves identically.
+3. **Install shadcn (Tailwind v4 path)**. `npx shadcn@latest init`
+   from `apps/web/`, choose CSS-vars mode + baseColor `neutral` +
+   `iconLibrary: "lucide"`. Commit `components.json`. Hand-
+   reconcile `globals.css` so the existing Mist & Meadow `@theme`
+   block survives and the shadcn variable names from Decision B map
+   correctly. Run `shadcn add` for `button card dropdown-menu sheet
+   dialog avatar separator` (in this order). Verify visual regression
+   on (auth) pages — they import zero shadcn primitives, so the
+   diff MUST be visually empty.
+4. **Build header + center nav + profile dropdown**. New components
+   under `apps/web/components/header/`. Header reads the user's
+   `profiles.full_name` and `profiles.role` in the (authed) layout
+   (single Server Component read, passed down as props). Center nav
+   has only "Home" active (Decision J active-state). Profile dropdown
+   uses `@/components/ui/dropdown-menu`. Mobile menu (hamburger) is
+   a separate component; profile avatar stays as its own trigger on
+   mobile per FR-005. Add Vitest + RTL tests.
+5. **Build `/app/account`** with all five sections (Profile,
+   Security, Privacy placeholder, Notifications placeholder, Sign
+   out). Profile section uses the existing react-hook-form + zod +
+   `useTransition` pattern from feature 001's forms. Security
+   section's "Change password" is a `<Link href="/forgot-password">`
+   styled as a secondary button (FR-020). Add the
+   `update-profile` server action at
+   `(authed)/app/account/actions.ts`. Add Vitest + RTL tests.
+6. **Build `/app`** for employee role — welcome banner (Decision M
+   subtitle, FR-010 first-name derivation, FR-008 time-of-day
+   greeting) + three skeleton cards in the documented 60/40 layout.
+   Cards use the shadcn `Card` primitive restyled per Mist & Meadow.
+   Each card ships with calm "not yet" empty-state copy.
+7. **Build persistent chat pill** at `components/chat-pill.tsx`.
+   Visual-only — onClick is either a no-op or opens a "coming soon"
+   shadcn Popover. Lands in the (authed) layout outside the
+   `<main>` content for true persistence across page nav.
+8. **Build notification component** at `components/notification.tsx`
+   per Decision G. Add `use-media-query.ts` hook. Tests in three
+   configurations: desktop slide-in, mobile bottom sheet, reduced-
+   motion (SC-010). No production code mounts it in this feature
+   (FR-033). Add a developer-preview test that imports and asserts
+   the rendering directly via RTL.
+9. **Build role placeholders** for team_lead / admin at
+   `components/role-placeholder/role-placeholder.tsx`. Wire from
+   `(authed)/app/page.tsx`: read `profile.role`, branch to either
+   the employee body (steps 6–7) or the role placeholder (Decision L
+   copy). The chat pill MUST NOT render on the role-placeholder
+   branch (FR-035). Header renders identically (FR-034 updated).
+10. **Mount cross-tab listener** at `app/layout.tsx`. New client
+    component `app/cross-tab-auth.tsx` subscribes to
+    `supabase.auth.onAuthStateChange` once, pathname-gates each
+    navigate (Decision F of the user's directive — FR-046).
+    Add `cross-tab-auth-sync.spec.ts` per Decision N. Verify
+    `TOKEN_REFRESHED` does not navigate.
+11. **Final import migration sweep** through the (auth) page files
+    — already done in step 1, but this step re-verifies and runs
+    the full role-trio Playwright suite + the
+    `login-expired-link.spec.ts` from the hotfix `8dc822b`. Both
+    MUST pass unchanged.
+12. **Test pass**: full Vitest + RTL suite; full Playwright suite
+    including the two new specs; coverage spot-check on the new
+    components.
+13. **`smoke-tests.md` authored** with the human-validated checks
+    from the Constitution Principle VII requirement. Mohamed runs
+    them after `/speckit.implement`; results recorded in the file.
+
+This ordering is the contract for `/speckit.tasks`. Any deviation
+during `/speckit.implement` requires a `docs/CHANGELOG.md` entry per
+Constitution Principle VIII.
+
+## Edits to Feature 001
+
+Three categories of edits land on feature 001 artifacts:
+
+1. **Inlined primitives extracted** (step 1 above). `login-form.tsx`,
+   `signup-form.tsx`, `forgot-form.tsx`, `reset-form.tsx`,
+   `onboarding-form.tsx` — each loses its locally-defined `Field`
+   and gains an import from `@/components/ui/auth/field`. No DOM
+   structure change; no CSS change; no behavior change.
+2. **Dark-mode attribute migration** (step 2). `globals.css`'s
+   `:root[data-theme="dark"]` becomes `.dark`. `providers.tsx`'s
+   `attribute="data-theme"` becomes `attribute="class"`, gains
+   `storageKey="serenify-theme"`.
+3. **`/app` (employee placeholder)** is replaced by the new shell.
+   The existing `data-testid="role-banner"` on the role text becomes
+   irrelevant — the role-trio Playwright specs were asserting on it,
+   so they need a small update to assert against the new role-
+   conditional copy. **This is the one place the role-trio e2e
+   spec files DO change** — limited to copy assertions, per FR-036.
+   Any other change is a regression and blocks the merge.
+
+No changes to feature 001's data model, RLS policies, route guards,
+auth flows, `/forgot-password` / `/reset-password` machinery, or
+e2e fixture infrastructure beyond the assertion update.
+
+## Test Strategy
+
+This section satisfies Constitution Principle VII's PR-gate scoping
+requirement.
+
+### Vitest + React Testing Library
+
+One `.test.tsx` per new component, co-located with the source:
+
+- `components/header/header.test.tsx` — renders logo, center nav with
+  active state, theme toggle, reserved slot (asserted by querying
+  the comment marker), profile avatar.
+- `components/header/profile-dropdown.test.tsx` — opens on click,
+  contains exactly three items in the documented order, sign out
+  triggers the expected action.
+- `components/account/profile-section.test.tsx` — full_name editor
+  validates length, submits, optimistic-updates the displayed name.
+- `components/notification.test.tsx` — three configurations:
+  desktop (≥768px), mobile (<768px), reduced-motion (mocked).
+  Asserts the dismissable explicit-control contract (FR-031).
+- `components/role-placeholder/role-placeholder.test.tsx` — renders
+  the team_lead and admin copy variants; renders the header but NOT
+  the welcome banner / cards / chat pill (the no-employee-DOM
+  assertion from SC-007).
+- `components/chat-pill.test.tsx` — renders at all sizes; onClick is
+  a no-op or opens the placeholder; renders only when role is
+  employee.
+
+### Playwright
+
+Two new specs in `apps/web/tests/e2e/`:
+
+- `employee-dashboard-shell.spec.ts` — the happy path covering US 1
+  and US 2: sign in as a `demo.serenify.local` employee → land on
+  `/app` → assert welcome banner with adaptive greeting + first
+  name + three cards in correct order → open profile dropdown →
+  assert three items → navigate to `/app/account` → assert five
+  sections → edit full name → assert header updates → sign out →
+  assert at `/login`. Theme toggle persistence asserted via a
+  reload after toggle.
+- `cross-tab-auth-sync.spec.ts` — per Decision N.
+
+Preserved unchanged:
+
+- All three role-trio specs from feature 001 (employee / team_lead /
+  admin landing) — except for the role-conditional copy assertion on
+  `/app`, which is updated to match the new shell or the role
+  placeholder copy. FR-036.
+- `login-expired-link.spec.ts` from hotfix `8dc822b` — unchanged.
+
+### Smoke tests (`smoke-tests.md`)
+
+Authored during `/speckit.tasks`. At minimum:
+
+- **ST-1** Visual regression on each (auth) page at desktop and
+  360px in both themes (SC-009).
+- **ST-2** Notification component three-configuration check (SC-010)
+  performed manually via the developer-preview mount.
+- **ST-3** Employee vs. team_lead vs. admin landing rendered side-
+  by-side (SC-007).
+- **ST-4** Theme toggle persistence across browser restart (SC-002
+  hardened — beyond the in-spec acceptance).
+- **ST-5** Cross-tab sync timing observed (SC-008 ≤ 2s with a
+  stopwatch on a local environment).
+- **ST-6** Account-page full-name edit updates the header avatar
+  initials and dropdown name on the same render cycle (SC-006).
+- **ST-7** `prefers-reduced-motion: reduce` set in the OS — confirm
+  notification entrance is opacity-only.
+
+## DECISIONS.md entries this plan implies
+
+Per Constitution Principle VIII, each architectural choice that
+permanently shapes the codebase MUST be appended to
+`docs/DECISIONS.md` during `/speckit.implement`. The planned entries
+(date `2026-05-19+`, all under feature 003):
+
+1. **shadcn/ui adopted on the Tailwind v4 path** — install command,
+   `components.json` shape, baseColor `neutral`-overridden, CSS-vars
+   mode. Decision A + Decision E.
+2. **shadcn variable names mapped to Mist & Meadow tokens** —
+   reproduces Decision B's mapping table. Names `--destructive →
+   amber` as the FR-042 hard requirement.
+3. **Dark-mode attribute: `data-theme` → `class`** — Decision C.
+   Names the breaking selector change in `globals.css` and the
+   `attribute` prop change in `providers.tsx`.
+4. **Component folder convention: bespoke under `components/ui/
+   auth/`; shadcn flat in `components/ui/`; composite in
+   `components/`** — Decision F.
+5. **Notification component built on Radix Dialog + Framer Motion,
+   NOT Sonner** — Decision G, including the rationale for
+   `useReducedMotion` as the React-state gate.
+6. **Notification component: explicit-dismiss only; no
+   auto-dismiss** — Decision G clause.
+7. **Welcome banner subtitle: "We're here when you need us."** —
+   Decision M. Includes the pushback rationale against the user-
+   suggested "A calm start to your day."
+8. **Cross-tab auth listener mount point: root layout (`app/
+   layout.tsx`), not (authed) layout** — Decision F of the user's
+   directive (US 6 contradiction resolution).
+9. **Playwright cross-tab spec pattern: single context, two
+   pages** — Decision N. Names the storage-event mechanics that
+   forbid two contexts.
+10. **`framer-motion` added; `tailwindcss-animate` replaced by
+    `tw-animate-css` on the v4 path** — names the dep deltas.
+
+Two `BACKLOG.md` additions (not decisions, but planned):
+
+- **Dynamic welcome banner subtitle variants** — re-logged per
+  FR-009's deferral. Mention that the surface accommodates a future
+  swap (the single `<p>` slot beneath the greeting).
+- **Notifications-section live controls** — re-logged per FR-021's
+  placeholder. Surface to be filled in a later feature.
+
+One `CHANGELOG.md` addition (NEW file):
+
+- **Note that the Out-of-Scope bullet in `spec.md` referring to the
+  `/login?error=expired_link` hotfix is superseded** by commit
+  `8dc822b` (merge of PR #2). The committed spec is NOT modified;
+  the CHANGELOG entry records the supersession per the user's
+  directive and Principle VIII's "spec amendments are recorded in
+  CHANGELOG" rule.
+
+Mohamed reviews all entries (and the CHANGELOG note) before
+`/speckit.tasks`.
+
+## Complexity Tracking
+
+| Violation | Why Needed | Simpler Alternative Rejected Because |
+|---|---|---|
+| (none) | — | — |
+
+The plan passes the Constitution Check without any waivers.
