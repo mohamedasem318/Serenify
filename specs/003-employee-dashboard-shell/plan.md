@@ -634,7 +634,9 @@ Insights nav item.
   Egyptian names common in the demo cohort fit at 24; English
   doubles like "Christopher" + a 12-char family name fit at 24.
   Implementation: a `truncate-name.ts` helper at `apps/web/lib/` that
-  the dropdown and avatar tooltip both call.
+  the dropdown and avatar tooltip both call. Pure function, no
+  Intl/locale APIs — identical output on server and client, so SSR
+  and post-edit client-side renders never disagree.
 - **Edit field**: the input accepts the full 60-character value
   unhindered; truncation is a display-side concern only.
 
