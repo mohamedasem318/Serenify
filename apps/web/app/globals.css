@@ -2,8 +2,9 @@
 
 /*
  * Mist & Meadow palette — locked by Constitution Principle V.
- * Light mode is the default; dark mode swaps tokens via data-theme="dark"
- * on the <html> element (next-themes attribute="data-theme").
+ * Light mode is the default; dark mode swaps tokens via the `.dark`
+ * class on the <html> element (next-themes attribute="class") —
+ * shadcn's expected selector convention.
  *
  * Red is forbidden in any state. Stress signals use --color-amber.
  */
@@ -28,7 +29,7 @@
 
 @layer base {
   /* Dark mode override — equal-priority per Constitution Principle VI. */
-  :root[data-theme="dark"] {
+  :root.dark {
     --color-bg:      #161917;
     --color-surface: #20231F;
     --color-ink:     #DCDED5;
