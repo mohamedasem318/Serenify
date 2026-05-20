@@ -16,8 +16,8 @@ export function SecuritySection() {
           Security
         </h2>
         <p className="text-sm leading-relaxed text-muted">
-          Change your password using the same flow you'd use if you forgot it
-          — we'll email you a fresh reset link.
+          Change your password using the same flow you&apos;d use if you forgot it
+          — we&apos;ll email you a fresh reset link.
         </p>
       </header>
       <Button asChild variant="secondary">

@@ -126,7 +126,7 @@ export function ProfileSection({
           </p>
           <p className="text-base text-ink">{email}</p>
           <p className="text-xs leading-relaxed text-muted">
-            Your email isn't editable here. Reach out if you need it changed.
+            Your email isn&apos;t editable here. Reach out if you need it changed.
           </p>
         </div>
 

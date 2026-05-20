@@ -14,7 +14,7 @@ export function SignOutSection() {
           Sign out
         </h2>
         <p className="text-sm leading-relaxed text-muted">
-          You'll need to sign in again to come back.
+          You&apos;ll need to sign in again to come back.
         </p>
       </header>
       <SignOutButton variant="secondary" />

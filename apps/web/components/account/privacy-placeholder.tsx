@@ -21,9 +21,9 @@ export function PrivacyPlaceholder() {
         className="rounded-card border-2 border-dashed border-border bg-bg/40 p-6"
       >
         <p className="text-sm leading-relaxed text-muted">
-          Visibility controls arrive with the transparency view. You'll be
+          Visibility controls arrive with the transparency view. You&apos;ll be
           able to choose what your manager sees and what stays private —
-          there's nothing to configure yet.
+          there&apos;s nothing to configure yet.
         </p>
       </div>
     </section>
