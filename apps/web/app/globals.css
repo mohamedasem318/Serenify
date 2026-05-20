@@ -36,39 +36,61 @@
  * shadcn primitive variables, mapped onto Mist & Meadow tokens per
  * contracts/shadcn-mapping.md (plan.md Decision B). The 19-row table
  * is reproduced verbatim here. Three load-bearing choices:
- *   --destructive       → crimson + --destructive-foreground → bg
- *                         (FR-042 scope-clarified per CHANGELOG
+ *   --color-destructive       → crimson + --color-destructive-foreground
+ *                         → bg (FR-042 scope-clarified per CHANGELOG
  *                         2026-05-20; supersedes the earlier amber
  *                         mapping that failed dark-mode WCAG AA at
  *                         1.4:1)
- *   --muted             → surface (not border — research.md R-2)
- *   --primary-foreground→ bg, symmetric across modes (WCAG AA)
+ *   --color-muted             → surface (not border — research.md R-2)
+ *   --color-primary-foreground→ bg, symmetric across modes (WCAG AA)
+ *
+ * The `--color-*` prefix is load-bearing — Tailwind v4 generates
+ * color utility classes (bg-destructive, text-foreground, etc.)
+ * only from tokens that match the `--color-*` naming convention in
+ * @theme blocks. The earlier unprefixed shape (`--destructive: ...`)
+ * registered the variables to :root but did NOT produce any Tailwind
+ * utility classes, leaving shadcn primitives unstyled. See research.md
+ * R-2.1 and CHANGELOG 2026-05-20 for the discovery.
+ *
  * Dark-mode flips happen automatically via the :root.dark block
  * below (Mist & Meadow tokens swap; the shadcn variables track them
  * through the var() chain). Sits BELOW the Mist & Meadow @theme
  * block so any conflict resolves in favor of the explicit mapping.
  */
 @theme inline {
-  --background:         var(--color-bg);
-  --foreground:         var(--color-ink);
-  --card:               var(--color-surface);
-  --card-foreground:    var(--color-ink);
-  --popover:            var(--color-surface);
-  --popover-foreground: var(--color-ink);
-  --primary:            var(--color-meadow);
-  --primary-foreground: var(--color-bg);
-  --secondary:          var(--color-foggy);
-  --secondary-foreground: var(--color-ink);
-  --muted:              var(--color-surface);
-  --muted-foreground:   var(--color-muted);
-  --accent:             var(--color-foggy);
-  --accent-foreground:  var(--color-ink);
-  --destructive:        var(--color-crimson);
-  --destructive-foreground: var(--color-bg);
-  --border:             var(--color-border);
-  --input:              var(--color-border);
-  --ring:               var(--color-meadow);
-  --radius:             var(--radius-control);
+  --color-background:         var(--color-bg);
+  --color-foreground:         var(--color-ink);
+  --color-card:               var(--color-surface);
+  --color-card-foreground:    var(--color-ink);
+  --color-popover:            var(--color-surface);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary:            var(--color-meadow);
+  --color-primary-foreground: var(--color-bg);
+  --color-secondary:          var(--color-foggy);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted:              var(--color-surface);
+  --color-muted-foreground:   var(--color-muted);
+  --color-accent:             var(--color-foggy);
+  --color-accent-foreground:  var(--color-ink);
+  --color-destructive:        var(--color-crimson);
+  --color-destructive-foreground: var(--color-bg);
+  --color-border:             var(--color-border);
+  --color-input:              var(--color-border);
+  --color-ring:               var(--color-meadow);
+
+  /* Radius ladder — anchored to Mist & Meadow's --radius-control (8px,
+     buttons/inputs/dropdowns) and --radius-card (12px, cards). The
+     ladder gives shadcn primitives the rounded-{sm,md,lg,xl,2xl,3xl,4xl}
+     utility classes they may reference; sm/md/lg/xl mapped to known
+     Mist & Meadow values, 2xl+ extrapolated for larger surfaces. */
+  --radius:     var(--radius-control);
+  --radius-sm:  6px;
+  --radius-md:  var(--radius-control);
+  --radius-lg:  var(--radius-card);
+  --radius-xl:  16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
 }
 
 @layer base {

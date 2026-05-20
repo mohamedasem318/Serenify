@@ -78,6 +78,80 @@ the spec).
 `/speckit.implement` step 13 (smoke tests) to reclassify the
 expired-link entry as `merged`.
 
+## 2026-05-20 — feat(003-employee-dashboard-shell) — Tailwind v4 @theme inline contract corrected: `--color-*` prefix required for shadcn utility-class generation
+
+Discovered during T019 verification: shadcn primitives' Tailwind
+class names (`bg-destructive`, `text-foreground`, `bg-primary`, etc.)
+resolved to no CSS rule, leaving `<Button variant="destructive">`
+rendered with transparent background. A computed-style probe on
+`<html>` returned empty strings for `--destructive`, `--background`,
+`--color-destructive`, and `--color-background`. A stylesheet grep
+for `bg-destructive` and related selectors returned zero matches
+across all loaded sheets.
+
+Root cause: the original `@theme inline` mapping shape (R-2 /
+Decision B) registered shadcn tokens as **unprefixed** names
+(`--background`, `--destructive`, etc.). Tailwind v4 generates color
+utility classes only from tokens that match the **`--color-*`
+prefix** in `@theme` blocks. The unprefixed shape declared the
+variables but generated no utility classes, so shadcn primitives
+rendered unstyled. The same prefix rule applies to `--radius-*` for
+the `rounded-{sm,md,lg,xl,2xl,3xl,4xl}` utility ladder — the single
+`--radius: var(--radius-control)` declaration that T017 shipped
+left `rounded-md` (used by button.tsx) unstyled too.
+
+Correction (single commit):
+
+- `apps/web/app/globals.css` — all 19 entries in `@theme inline`
+  renamed to use `--color-*` prefix on the shadcn side. RHS stays
+  `var(--color-bg)`, `var(--color-crimson)`, etc. — preserving the
+  var-chain to Mist & Meadow tokens. 7-step radius ladder added
+  in the same block: `--radius-sm` (6px), `--radius-md`
+  (`var(--radius-control)` = 8px), `--radius-lg`
+  (`var(--radius-card)` = 12px), `--radius-xl` (16px),
+  `--radius-2xl` (20px), `--radius-3xl` (24px), `--radius-4xl`
+  (28px). T017's header comment block updated to document the
+  prefix convention and the load-bearing role.
+- `specs/003-employee-dashboard-shell/contracts/shadcn-mapping.md`
+  — all 19 mapping rows renamed; radius-ladder rows added; three-
+  load-bearing-choices annotation updated; canonical
+  implementation block updated; verification checklist gets two
+  new computed-style probes (`background-color` on destructive
+  button; `border-radius` on default button). The load-bearing
+  prefix convention is called out explicitly so future
+  contributors don't strip it.
+- `specs/003-employee-dashboard-shell/plan.md` Decision B — same
+  row updates; radius ladder added below the color table; load-
+  bearing prefix note inserted; destructive/primary-foreground/muted
+  prose paragraphs updated to use `--color-*` token names.
+- `specs/003-employee-dashboard-shell/research.md` — new R-2.1
+  section appended documenting the discovery sequence, the
+  symptom evidence (transparent button, empty getPropertyValue,
+  zero stylesheet matches), the prefix correction, and the
+  authoritative reference (shadcn 4.7.0's own init emission used
+  the same `--color-*` shape). R-2's original analysis preserved
+  verbatim as historical context.
+- `specs/003-employee-dashboard-shell/tasks.md` — T017 description
+  amended with a one-line addendum about the prefix convention;
+  T020 description amended with computed-style verification probes.
+
+Authoritative reference: shadcn 4.7.0's own `init` emission
+(observed before the rollback in commit `89995aa`) followed the
+same `--color-*` prefix pattern — confirming the convention is part
+of the shadcn-on-Tailwind-v4 contract.
+
+Post-commit verification: re-running the same probes that surfaced
+this bug — destructive button MUST render with crimson background
+and bg-colored text; `--color-destructive` and `--color-background`
+MUST resolve to real values on `:root` computed style; `rounded-md`
+MUST resolve to a real border-radius (not 0).
+
+This is a contract amendment, not a decision change. Decisions A/B/E
+intent is unchanged — shadcn primitives consume Mist & Meadow tokens
+through the var() chain, with no parallel oklch palette. The
+amendment corrects the contract's mapping shape to match Tailwind v4
+/ shadcn 4.x's prefix convention.
+
 ## 2026-05-20 — feat(003-employee-dashboard-shell) — FR-042 scope clarification: red permitted on destructive action surfaces only
 
 FR-042 originally banned red anywhere in the UI. This amendment

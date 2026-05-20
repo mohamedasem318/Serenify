@@ -266,40 +266,62 @@ consume Mist & Meadow tokens without introducing any new color:
 
 | shadcn variable | Mist & Meadow token (light) | Mist & Meadow token (dark) |
 |---|---|---|
-| `--background` | `--color-bg` (`#ECEEE9`) | `--color-bg` (`#161917`) |
-| `--foreground` | `--color-ink` (`#1F2522`) | `--color-ink` (`#DCDED5`) |
-| `--card` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
-| `--card-foreground` | `--color-ink` | `--color-ink` |
-| `--popover` | `--color-surface` | `--color-surface` |
-| `--popover-foreground` | `--color-ink` | `--color-ink` |
-| `--primary` | `--color-meadow` (`#7A9275`) | `--color-meadow` (`#97AE91`) |
-| `--primary-foreground` | `--color-bg` (text-on-meadow) | `--color-bg` (text-on-meadow) |
-| `--secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
-| `--secondary-foreground` | `--color-ink` | `--color-ink` |
-| `--muted` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
-| `--muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
-| `--accent` | `--color-foggy` | `--color-foggy` |
-| `--accent-foreground` | `--color-ink` | `--color-ink` |
-| `--destructive` | `--color-crimson` (`#7B4244`) | `--color-crimson` (`#C17F81`) |
-| `--destructive-foreground` | `--color-bg` (text-on-crimson) | `--color-bg` (text-on-crimson) |
-| `--border` | `--color-border` | `--color-border` |
-| `--input` | `--color-border` | `--color-border` |
-| `--ring` | `--color-meadow` | `--color-meadow` |
+| `--color-background` | `--color-bg` (`#ECEEE9`) | `--color-bg` (`#161917`) |
+| `--color-foreground` | `--color-ink` (`#1F2522`) | `--color-ink` (`#DCDED5`) |
+| `--color-card` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
+| `--color-card-foreground` | `--color-ink` | `--color-ink` |
+| `--color-popover` | `--color-surface` | `--color-surface` |
+| `--color-popover-foreground` | `--color-ink` | `--color-ink` |
+| `--color-primary` | `--color-meadow` (`#7A9275`) | `--color-meadow` (`#97AE91`) |
+| `--color-primary-foreground` | `--color-bg` (text-on-meadow) | `--color-bg` (text-on-meadow) |
+| `--color-secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
+| `--color-secondary-foreground` | `--color-ink` | `--color-ink` |
+| `--color-muted` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
+| `--color-muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
+| `--color-accent` | `--color-foggy` | `--color-foggy` |
+| `--color-accent-foreground` | `--color-ink` | `--color-ink` |
+| `--color-destructive` | `--color-crimson` (`#7B4244`) | `--color-crimson` (`#C17F81`) |
+| `--color-destructive-foreground` | `--color-bg` (text-on-crimson) | `--color-bg` (text-on-crimson) |
+| `--color-border` | `--color-border` | `--color-border` |
+| `--color-input` | `--color-border` | `--color-border` |
+| `--color-ring` | `--color-meadow` | `--color-meadow` |
 
-The `--destructive` row enforces FR-042's clarified scope (red
+Plus the radius ladder (added per R-2.1 — Tailwind v4 generates
+`rounded-{sm,md,lg,xl,2xl,3xl,4xl}` from `--radius-*` tokens):
+
+| shadcn variable | Value | Notes |
+|---|---|---|
+| `--radius` | `var(--radius-control)` (8px) | Base for `rounded-[--radius]` direct uses. |
+| `--radius-sm` | `6px` | Small interactive elements. |
+| `--radius-md` | `var(--radius-control)` (8px) | Buttons, inputs, dropdowns. |
+| `--radius-lg` | `var(--radius-card)` (12px) | Cards. |
+| `--radius-xl` | `16px` | Larger surfaces. |
+| `--radius-2xl` | `20px` | Hero surfaces. |
+| `--radius-3xl` | `24px` | Reserved. |
+| `--radius-4xl` | `28px` | Reserved. |
+
+The `--color-*` and `--radius-*` prefixes are load-bearing —
+Tailwind v4 generates utility classes (e.g. `bg-primary`,
+`rounded-md`) only from tokens with these prefixes. An earlier
+unprefixed shape registered the variables to `:root` but produced
+NO utility classes, leaving shadcn primitives unstyled. See
+research.md R-2.1 for the discovery.
+
+The `--color-destructive` row enforces FR-042's clarified scope (red
 permitted on destructive action surfaces only; see CHANGELOG
 2026-05-20). Both modes map shadcn's default-red destructive to the
 Mist & Meadow `crimson` token — `#7B4244` in light, `#C17F81` in
 dark. The earlier mapping to amber is superseded; amber + dark-mode
 ink failed WCAG AA at 1.4:1, while crimson + bg-as-foreground passes
-AA in both modes (6.08:1 light, 5.02:1 dark). `--destructive-foreground`
-uses `--color-bg` symmetric across modes, mirroring the
-`--primary-foreground` pattern. Implementation: a single
-`@theme inline { --destructive: var(--color-crimson);
---destructive-foreground: var(--color-bg); ... }` pair in
+AA in both modes (6.08:1 light, 5.02:1 dark).
+`--color-destructive-foreground` uses `--color-bg` symmetric across
+modes, mirroring the `--color-primary-foreground` pattern.
+Implementation: a single `@theme inline {
+--color-destructive: var(--color-crimson);
+--color-destructive-foreground: var(--color-bg); ... }` pair in
 `globals.css` keeps the override in one place.
 
-The `--primary-foreground` row uses `--color-bg` in both modes.
+The `--color-primary-foreground` row uses `--color-bg` in both modes.
 A primary-filled button uses meadow as fill (light `#7A9275` / dark
 `#97AE91`); the text on it is the page bg color (light `#ECEEE9` /
 dark `#161917`). In light mode this gives `#ECEEE9` on `#7A9275` —
@@ -310,31 +332,42 @@ sage, which fails AA (~3.1:1). All other rows use the same Mist &
 Meadow token name in both modes, relying on the existing dark-mode
 override block in globals.css to flip the hex value.
 
-The `--muted` row maps to `--color-surface`, NOT `--color-border`.
-shadcn's `--muted` is consumed as a fill surface (Skeleton, the
-muted Card variant, hover-row backgrounds, Tab unselected fill).
-Mapping it to the hairline border token produces undersaturated
-skeleton states that read as "almost-bg with a tiny tonal shift" —
-imperceptible at common skeleton sizes. `--color-surface` is the
-closer semantic match: shadcn's primitives expect `--muted` to be
-a "slightly-recessed surface", which is exactly what
-`--color-surface` is in Mist & Meadow.
+The `--color-muted` row maps to `--color-surface`, NOT
+`--color-border`. shadcn's `--color-muted` is consumed as a fill
+surface (Skeleton, the muted Card variant, hover-row backgrounds,
+Tab unselected fill). Mapping it to the hairline border token
+produces undersaturated skeleton states that read as "almost-bg
+with a tiny tonal shift" — imperceptible at common skeleton sizes.
+`--color-surface` is the closer semantic match: shadcn's primitives
+expect `--color-muted` to be a "slightly-recessed surface", which is
+exactly what `--color-surface` is in Mist & Meadow.
 
 **Radius tokens**: `--radius-card` (12px) and `--radius-control`
 (8px) are already declared in `apps/web/app/globals.css`'s `@theme`
 block from feature 001 (alongside the color tokens). They do not
-need new declarations. shadcn primitives reference a single
-`--radius` variable internally; we add **one mapping line** to the
-`@theme inline` block:
+need new declarations. shadcn primitives use Tailwind's
+`rounded-{sm,md,lg,xl,2xl,3xl,4xl}` utility classes, which Tailwind
+v4 generates from `--radius-*` tokens registered in `@theme` blocks
+— so the `@theme inline` block adds a 7-step ladder anchored to
+those Mist & Meadow values:
 
 ```css
---radius: var(--radius-control);  /* 8px — primitives derive their own corners from this */
+--radius:     var(--radius-control);  /* 8px base */
+--radius-sm:  6px;
+--radius-md:  var(--radius-control);  /* 8px — buttons, inputs, dropdowns */
+--radius-lg:  var(--radius-card);     /* 12px — cards */
+--radius-xl:  16px;
+--radius-2xl: 20px;
+--radius-3xl: 24px;
+--radius-4xl: 28px;
 ```
 
-Cards use `--radius-card` directly (12px) via the Tailwind class
-`rounded-[--radius-card]`. The `--radius` mapping covers buttons,
-dropdowns, inputs, and sheet/dialog primitives that read shadcn's
-default radius scale.
+Buttons (`rounded-md`) resolve to 8px; cards (`rounded-lg`) resolve
+to 12px; smaller and larger surfaces have a calm gradation in between.
+The single `--radius` (no suffix) covers primitives that use
+`rounded-[--radius]` directly. The earlier shape of a single
+`--radius: var(--radius-control)` line without the ladder left
+`rounded-md` and friends unstyled — see R-2.1 of research.md.
 
 **Documentation source for this mapping**: `contracts/shadcn-mapping.md`
 in this feature folder duplicates the table for runtime reference; the

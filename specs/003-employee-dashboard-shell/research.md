@@ -122,6 +122,62 @@ why-not-other-mappings.
 
 ---
 
+## R-2.1 — `@theme inline` token-prefix discovery (correction to R-2)
+
+**Discovered**: 2026-05-20 during T019 commit-3 verification, after
+the FR-042 scope clarification + crimson palette amendment landed
+(commits `c6c8375` + `89c418d`).
+
+**Symptom**: `<Button variant="destructive">` rendered with
+`background-color: rgba(0, 0, 0, 0)` and inherited body text color.
+`getComputedStyle(html).getPropertyValue('--destructive')` returned
+`""` (empty). A grep across loaded stylesheets for `bg-destructive`,
+`--color-destructive`, or `--color-background` returned zero matches
+— Tailwind v4 had emitted zero shadcn-named utility-class rules.
+
+**Root cause**: R-2 / Decision B's mapping shape registered shadcn
+tokens as unprefixed names in `@theme inline`:
+
+```css
+@theme inline {
+  --background: var(--color-bg);
+  --destructive: var(--color-crimson);
+  /* ... */
+}
+```
+
+Tailwind v4 generates color utility classes (`bg-*`, `text-*`,
+`border-*`) only from tokens that match the **`--color-*` prefix**
+in `@theme` blocks. The unprefixed shape declares CSS variables but
+generates no utility classes, so shadcn primitives' Tailwind classes
+(e.g. button.tsx's `bg-destructive`) resolve to nothing — the
+elements render unstyled. The same prefix rule applies to
+`--radius-*` for the `rounded-{sm,md,lg,xl,2xl,3xl,4xl}` ladder.
+
+**Correction**: All 19 mapping rows updated to use `--color-*`
+prefix, e.g. `--color-destructive: var(--color-crimson);`. The RHS
+keeps the `var(--color-bg)` / `var(--color-crimson)` chain to Mist
+& Meadow tokens — mode-flip behavior preserved. A 7-step radius
+ladder (`--radius-sm` through `--radius-4xl`) was added in the
+same block, anchored to the existing `--radius-control` (8px) and
+`--radius-card` (12px) Mist & Meadow radii so `rounded-md` resolves
+to 8px (controls) and `rounded-lg` to 12px (cards).
+
+**Authoritative reference**: shadcn 4.7.0's own `init` emission
+(observed before the rollback in `89995aa`) followed the same
+`--color-*` prefix pattern — confirming the convention is part of
+the shadcn-on-Tailwind-v4 contract, not just a Tailwind detail.
+
+**Affected artifacts**: `apps/web/app/globals.css`,
+`contracts/shadcn-mapping.md`, `plan.md` Decision B, `tasks.md`
+T017/T020 descriptions, `CHANGELOG.md` 2026-05-20 entry. R-2's
+original analysis above is preserved verbatim as historical
+context; this R-2.1 correction supersedes it on the prefix point
+(and complements the FR-042 scope clarification documented in
+R-2's "SUPERSEDED 2026-05-20" callout).
+
+---
+
 ## R-3 — Dark-mode attribute migration (Decision C)
 
 **The mechanical change**:
