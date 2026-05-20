@@ -11,7 +11,12 @@ export default defineConfig({
     environment: "happy-dom",
     globals: true,
     setupFiles: ["./tests/unit/setup.ts"],
-    include: ["tests/unit/**/*.test.{ts,tsx}"],
+    include: [
+      "tests/unit/**/*.test.{ts,tsx}",
+      "components/**/*.test.{ts,tsx}",
+      "lib/**/*.test.{ts,tsx}",
+      "hooks/**/*.test.{ts,tsx}",
+    ],
   },
   resolve: {
     alias: {
