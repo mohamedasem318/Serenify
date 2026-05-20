@@ -23,8 +23,8 @@ Principle VIII.
 | `--color-primary-foreground` | `var(--color-bg)` | `var(--color-bg)` | Symmetric. Light gives bg-on-meadow ≈ 5.8:1 AA; dark gives bg-on-meadow ≈ 7.4:1 AA. An earlier asymmetric `--color-ink` mapping in dark mode failed WCAG AA (~3.1:1). |
 | `--color-secondary` | `var(--color-foggy)` (`#8AA9B6`) | `var(--color-foggy)` (`#9CBBC7`) | Secondary actions. |
 | `--color-secondary-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on a secondary button. |
-| `--color-muted` | `var(--color-surface)` (`#F5F6F2`) | `var(--color-surface)` (`#20231F`) | Muted fill (Skeleton, muted Card, hover rows, Tab unselected). Mapped to surface, NOT border — see research.md R-2. |
-| `--color-muted-foreground` | `var(--color-muted)` (`#6E7572`) | `var(--color-muted)` (`#8B928F`) | Muted text. |
+| `--color-muted` | *(not remapped — inherits M&M `--color-muted`: `#6E7572`)* | *(not remapped — inherits M&M `--color-muted`: `#8B928F`)* | Name collision with M&M's muted-gray text token. Remapping to surface washed out every `text-muted` site on auth/authed surfaces because Tailwind v4's `@theme inline` inlines the resolved value into the `.text-muted` utility at compile time, defeating the `:root.dark` runtime override. `bg-muted` (only consumed by DropdownMenuSeparator) therefore renders as muted gray rather than surface — a visible 1px divider rather than the surface-on-surface line that was effectively invisible. |
+| `--color-muted-foreground` | `var(--color-muted)` (`#6E7572`) | `var(--color-muted)` (`#8B928F`) | Muted text. Resolves through M&M's `--color-muted` token. |
 | `--color-accent` | `var(--color-foggy)` | `var(--color-foggy)` | Hover / focus accent. |
 | `--color-accent-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on an accent fill. |
 | `--color-destructive` | `var(--color-crimson)` (`#7B4244`) | `var(--color-crimson)` (`#C17F81`) | **FR-042 scope-clarified per CHANGELOG 2026-05-20**: crimson permitted on destructive action surfaces only. Supersedes the earlier amber mapping (amber + dark-mode ink failed WCAG AA at 1.4:1). |
@@ -62,7 +62,7 @@ unstyled (e.g. `<Button variant="destructive">` resolved to
 parent). See research.md R-2.1 for the discovery sequence. The same
 prefix convention applies to `--radius-*` for radius utilities.
 
-**Three load-bearing choices** (out of the 19 rows above), called
+**Two load-bearing choices** (out of the 19 rows above), called
 out explicitly because each was forced by a non-obvious constraint:
 
 - `--color-destructive` → `var(--color-crimson)` AND
@@ -72,12 +72,25 @@ out explicitly because each was forced by a non-obvious constraint:
   failed dark-mode WCAG AA at 1.4:1 (`#DCB587` amber + `#DCDED5`
   dark-ink ≈ 1.4:1). Crimson + bg-as-foreground clears AA in both
   modes.
-- `--color-muted` → `var(--color-surface)`, not `--color-border` —
-  see research.md R-2. shadcn's `--color-muted` is consumed as a
-  fill surface, not a hairline border.
 - `--color-primary-foreground` → `var(--color-bg)`, symmetric across
   modes — see research.md R-2. The originally-asymmetric
   `--color-ink` mapping in dark mode failed WCAG AA at ~3.1:1.
+
+**Load-bearing NON-mapping**: `--color-muted` is intentionally NOT
+re-declared in `@theme inline`. The original draft of this contract
+mapped `--color-muted` → `var(--color-surface)` for shadcn's
+Skeleton/hover-row/Tab-unselected idioms, but that collided with the
+Mist & Meadow `--color-muted` token (the muted-gray TEXT color used
+by `text-muted` across `(auth)` and `(authed)` surfaces). Tailwind
+v4's `@theme inline` resolves and INLINES the value into the
+`.text-muted` utility at compile time, so the `:root.dark`
+runtime override no longer reaches that utility — the muted text
+washed out symmetrically in both modes. Leaving `--color-muted`
+unmapped lets `text-muted` and `text-muted-foreground` both resolve
+through the M&M gray as intended. The only shadcn consumer of
+`bg-muted` is `DropdownMenuSeparator`, which now renders as a 1px
+muted-gray divider instead of the invisible surface-on-popover line
+the original mapping produced.
 
 ---
 
@@ -98,7 +111,9 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --color-primary-foreground: var(--color-bg);
   --color-secondary: var(--color-foggy);
   --color-secondary-foreground: var(--color-ink);
-  --color-muted: var(--color-surface);
+  /* --color-muted intentionally NOT remapped — see "Load-bearing
+     NON-mapping" note above. M&M's --color-muted (#6E7572 / #8B928F)
+     is consumed by Tailwind's text-muted utility on auth surfaces. */
   --color-muted-foreground: var(--color-muted);
   --color-accent: var(--color-foggy);
   --color-accent-foreground: var(--color-ink);

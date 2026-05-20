@@ -34,15 +34,30 @@
 
 /*
  * shadcn primitive variables, mapped onto Mist & Meadow tokens per
- * contracts/shadcn-mapping.md (plan.md Decision B). The 19-row table
- * is reproduced verbatim here. Three load-bearing choices:
+ * contracts/shadcn-mapping.md (plan.md Decision B). Two load-bearing
+ * choices:
  *   --color-destructive       → crimson + --color-destructive-foreground
  *                         → bg (FR-042 scope-clarified per CHANGELOG
  *                         2026-05-20; supersedes the earlier amber
  *                         mapping that failed dark-mode WCAG AA at
  *                         1.4:1)
- *   --color-muted             → surface (not border — research.md R-2)
  *   --color-primary-foreground→ bg, symmetric across modes (WCAG AA)
+ *
+ * NAME COLLISION NOTE: `--color-muted` is intentionally NOT remapped
+ * here. The Mist & Meadow `--color-muted` token (the muted-gray TEXT
+ * color, #6E7572 / #8B928F) is consumed across (auth) and (authed)
+ * surfaces via the `text-muted` utility. Reassigning it to
+ * `var(--color-surface)` washes out every `text-muted` site because
+ * Tailwind v4's `@theme inline` resolves and INLINES the value into
+ * the `.text-muted` utility at compile time — so the runtime
+ * `:root.dark { --color-muted: ... }` override no longer participates
+ * for that utility. `--color-muted-foreground: var(--color-muted)`
+ * below still resolves through the M&M token, giving shadcn's
+ * `text-muted-foreground` the muted-gray it wants. `bg-muted`
+ * (consumed by the DropdownMenuSeparator) then renders as M&M muted
+ * gray rather than surface — a visible 1px divider rather than the
+ * surface-on-surface line that was effectively invisible. (Earlier
+ * iteration mapped muted→surface; see CHANGELOG 2026-05-20 backlog.)
  *
  * The `--color-*` prefix is load-bearing — Tailwind v4 generates
  * color utility classes (bg-destructive, text-foreground, etc.)
@@ -68,7 +83,6 @@
   --color-primary-foreground: var(--color-bg);
   --color-secondary:          var(--color-foggy);
   --color-secondary-foreground: var(--color-ink);
-  --color-muted:              var(--color-surface);
   --color-muted-foreground:   var(--color-muted);
   --color-accent:             var(--color-foggy);
   --color-accent-foreground:  var(--color-ink);

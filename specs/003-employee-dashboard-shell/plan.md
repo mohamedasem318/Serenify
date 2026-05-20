@@ -276,7 +276,7 @@ consume Mist & Meadow tokens without introducing any new color:
 | `--color-primary-foreground` | `--color-bg` (text-on-meadow) | `--color-bg` (text-on-meadow) |
 | `--color-secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
 | `--color-secondary-foreground` | `--color-ink` | `--color-ink` |
-| `--color-muted` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
+| `--color-muted` | *(not remapped — inherits M&M `#6E7572`)* | *(not remapped — inherits M&M `#8B928F`)* |
 | `--color-muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
 | `--color-accent` | `--color-foggy` | `--color-foggy` |
 | `--color-accent-foreground` | `--color-ink` | `--color-ink` |
@@ -332,15 +332,21 @@ sage, which fails AA (~3.1:1). All other rows use the same Mist &
 Meadow token name in both modes, relying on the existing dark-mode
 override block in globals.css to flip the hex value.
 
-The `--color-muted` row maps to `--color-surface`, NOT
-`--color-border`. shadcn's `--color-muted` is consumed as a fill
-surface (Skeleton, the muted Card variant, hover-row backgrounds,
-Tab unselected fill). Mapping it to the hairline border token
-produces undersaturated skeleton states that read as "almost-bg
-with a tiny tonal shift" — imperceptible at common skeleton sizes.
-`--color-surface` is the closer semantic match: shadcn's primitives
-expect `--color-muted` to be a "slightly-recessed surface", which is
-exactly what `--color-surface` is in Mist & Meadow.
+The `--color-muted` row is intentionally NOT remapped in
+`@theme inline`. The original draft mapped it to `--color-surface`
+for shadcn's Skeleton/hover-row/Tab-unselected idioms, but that
+collides with the Mist & Meadow `--color-muted` token (the
+muted-gray TEXT color used by `text-muted` across `(auth)` and
+`(authed)` surfaces). Tailwind v4's `@theme inline` resolves and
+INLINES the value into the `.text-muted` utility at compile time, so
+the `:root.dark` runtime override no longer reaches that utility —
+muted text washed out symmetrically in both modes. Leaving
+`--color-muted` unmapped lets `text-muted` and `text-muted-foreground`
+both resolve through the M&M gray. The only shadcn consumer of
+`bg-muted` is `DropdownMenuSeparator`, which now renders as a 1px
+muted-gray divider instead of the invisible surface-on-popover line
+the original mapping produced. See contracts/shadcn-mapping.md
+"Load-bearing NON-mapping".
 
 **Radius tokens**: `--radius-card` (12px) and `--radius-control`
 (8px) are already declared in `apps/web/app/globals.css`'s `@theme`
@@ -1183,19 +1189,23 @@ permanently shapes the codebase MUST be appended to
    `components.json` shape, baseColor `neutral`-overridden, CSS-vars
    mode. Decision A + Decision E.
 2. **shadcn variable names mapped to Mist & Meadow tokens** —
-   reproduces Decision B's mapping table. Names three load-bearing
+   reproduces Decision B's mapping table. Names two load-bearing
    choices: `--destructive → crimson` + `--destructive-foreground →
    --color-bg` (FR-042 scope-clarified per CHANGELOG 2026-05-20:
    crimson permitted on destructive action surfaces, supersedes the
    earlier amber mapping that failed dark-mode WCAG AA at 1.4:1);
-   `--muted → --color-surface` (NOT `--color-border`, because the
-   hairline token produces undersaturated Skeleton states);
    `--primary-foreground → --color-bg` symmetric across both modes
    (the originally-asymmetric `--color-ink` in dark mode failed
    WCAG AA at ~3.1:1; symmetric mapping is the only AA-compliant
-   choice). Also names the single `--radius → --radius-control`
-   line that maps shadcn's expected radius scale to the pre-existing
-   Mist & Meadow control radius.
+   choice). One load-bearing NON-mapping: `--color-muted` is
+   intentionally NOT remapped — the original `--muted → --color-surface`
+   draft collided with M&M's `--color-muted` (the muted-gray text
+   token consumed by `text-muted`) and washed out every auth-page
+   muted-text site because Tailwind v4's `@theme inline` inlines the
+   resolved value into the `.text-muted` utility at compile time.
+   Also names the single `--radius → --radius-control` line that maps
+   shadcn's expected radius scale to the pre-existing Mist & Meadow
+   control radius.
 3. **Dark-mode attribute: `data-theme` → `class`** — Decision C.
    Names the breaking selector change in `globals.css` and the
    `attribute` prop change in `providers.tsx`.
