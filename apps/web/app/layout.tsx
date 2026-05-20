@@ -41,7 +41,7 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html:
-              "(function(){try{var l=localStorage.getItem('theme');if(l&&!localStorage.getItem('serenify-theme')){localStorage.setItem('serenify-theme',l);localStorage.removeItem('theme');}}catch(e){}})();",
+              "(function(){try{var l=localStorage.getItem('theme');if(l){localStorage.setItem('serenify-theme',l);localStorage.removeItem('theme');}}catch(e){}})();",
           }}
         />
       </head>
