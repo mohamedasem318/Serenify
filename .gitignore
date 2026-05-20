@@ -61,7 +61,8 @@ specs/.staging/
 bug-repro-no-notice.png
 fix-notice-light.png
 
-# Smoke-test screenshot outputs (reproducible from chore/smoke-test-scripts)
+# Smoke-test scripts and outputs (live on chore/smoke-test-scripts off main)
+st1-*.js
 st1-shots/
 
 # Claude Code (per-user local settings, never commit)
