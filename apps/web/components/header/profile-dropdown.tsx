@@ -57,7 +57,7 @@ export function ProfileDropdown({ fullName, email }: ProfileDropdownProps) {
           className="inline-flex h-11 w-11 items-center justify-center rounded-full transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <Avatar className="h-9 w-9">
-            <AvatarFallback className="bg-muted text-foreground font-medium text-sm">
+            <AvatarFallback className="bg-surface text-foreground font-medium text-sm border border-border">
               {initials}
             </AvatarFallback>
           </Avatar>
