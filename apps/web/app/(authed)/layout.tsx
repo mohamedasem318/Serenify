@@ -31,7 +31,7 @@ export default async function AuthedLayout({
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
       <Header fullName={fullName} email={email} role={role} />
-      <main className="flex-1 px-4 sm:px-6">{children}</main>
+      <main className="flex-1 px-4 pt-6 sm:px-6 sm:pt-8">{children}</main>
     </div>
   );
 }
