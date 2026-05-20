@@ -211,6 +211,45 @@ asserted against in role-trio specs.
 state" option — natural pairing with the CI integration work logged
 above against feature 006.
 
+### Avatar disc reads "out of character" in dark mode
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
+**Description**: After the 515984c contrast fix the AvatarFallback
+uses `bg-surface text-foreground border border-border`, which lands
+WCAG AAA contrast in both modes (light 14.4:1, dark 11.7:1). The
+disc itself, however, reads as a slightly washed grey blob in
+dark mode — surface (#20231F) on bg (#161917) is only ~1.2:1
+self-vs-bg, and the border (#2D3130) is also subtle. The fix is
+correct for accessibility but the disc feels visually weaker than
+the meadow / amber accents elsewhere in the surface. May want a
+circle-specific design token (e.g. `--color-avatar-bg`) tuned for
+identity rather than reusing the generic surface stack.
+**Fix scope**: small if just a token swap, medium if it widens
+into a "calm identity accents" pass (avatars, badges, status
+chips). Eyeball-driven, not WCAG-driven — current state PASSES
+all contrast thresholds.
+**Address by**: token-tuning pass alongside the muted-on-bg item
+above; not blocking any feature.
+
+### Mobile / tablet typography bump
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
+**Description**: At 360px and tablet widths (~600–900px) the body
+text and labels feel small. text-sm (14px) is heavily used across
+the header, the (authed) layout's nav, and the placeholder body;
+text-xs (12px) shows up on form labels. On a phone held at arm's
+length these read as cramped. A broader responsive-typography
+pass — likely a viewport-stepped fluid-type scale (e.g. `clamp()`
+for headings, larger base for narrow viewports) — would help.
+Avoid one-off `sm:text-base` patches that ratchet up complexity
+without solving the system.
+**Fix scope**: medium. Audit usage of text-xs / text-sm / text-base
+across (auth) and (authed) surfaces, propose a fluid scale, eyeball
+on every page at 360px / 600px / 900px / desktop. May involve
+adding tokens to the M&M `@theme` block.
+**Address by**: alongside the M&M token-tuning pass — typography
+and color rhythm belong in the same review.
+
 ### Token tune — `--color-muted` underweight on light bg (WCAG AA)
 **Status**: bug
 **Observed**: 2026-05-20, feature 003 T020 visual sweep
