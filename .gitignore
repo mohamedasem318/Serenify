@@ -45,6 +45,7 @@ test-results/
 # Supabase local CLI
 supabase/.branches/
 supabase/.temp/
+supabase/snippets/
 
 # Logs
 *.log
@@ -55,6 +56,13 @@ pnpm-debug.log*
 
 # Project-specific
 specs/.staging/
+
+# Local debug screenshots (root-level repro captures, not committed)
+bug-repro-no-notice.png
+fix-notice-light.png
+
+# Smoke-test screenshot outputs (reproducible from chore/smoke-test-scripts)
+st1-shots/
 
 # Claude Code (per-user local settings, never commit)
 .claude/
