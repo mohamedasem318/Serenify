@@ -1,12 +1,74 @@
-import Link from "next/link";
+"use client";
 
+import { useState, useTransition } from "react";
+import { useForm, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+
+import {
+  changePassword,
+  type ChangePasswordResult,
+} from "@/app/(authed)/app/account/actions";
 import { Button } from "@/components/ui/button";
+import { Field } from "@/components/ui/auth/field";
+import { PasswordRequirements } from "@/components/ui/auth/password-requirements";
+import { CALM_SECONDARY_BUTTON } from "@/components/sign-out-button";
+import {
+  changePasswordSchema,
+  type ChangePasswordInput,
+} from "@/lib/auth/schemas";
+
+const EMPTY_FORM: ChangePasswordInput = {
+  current_password: "",
+  new_password: "",
+  confirm_password: "",
+};
 
 export function SecuritySection() {
+  const [pending, startTransition] = useTransition();
+  const [submitState, setSubmitState] =
+    useState<ChangePasswordResult | null>(null);
+
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    formState: { errors },
+  } = useForm<ChangePasswordInput>({
+    resolver: zodResolver(changePasswordSchema),
+    mode: "onTouched",
+    defaultValues: EMPTY_FORM,
+  });
+
+  // useWatch (not the watch() function returned by useForm) is the
+  // memoization-safe way to read a single field reactively — matches
+  // the pattern feature 001's reset-form.tsx uses to keep the
+  // PasswordRequirements checklist live without tripping the
+  // react-hooks/incompatible-library warning.
+  const newPasswordValue =
+    useWatch({ control, name: "new_password" }) ?? "";
+
+  function onSubmit(values: ChangePasswordInput) {
+    setSubmitState(null);
+    startTransition(async () => {
+      const form = new FormData();
+      form.set("current_password", values.current_password);
+      form.set("new_password", values.new_password);
+      form.set("confirm_password", values.confirm_password);
+      const result = await changePassword(form);
+      setSubmitState(result);
+      if (result.status === "ok") {
+        // Wipe the form back to empty so a refresh of the section
+        // doesn't leave the new password sitting in the inputs.
+        reset(EMPTY_FORM);
+      }
+    });
+  }
+
   return (
     <section
       aria-labelledby="account-security-heading"
-      className="space-y-4"
+      className="space-y-6"
     >
       <header className="space-y-1.5">
         <h2
@@ -16,13 +78,75 @@ export function SecuritySection() {
           Security
         </h2>
         <p className="text-sm leading-relaxed text-muted">
-          Change your password using the same flow you&apos;d use if you forgot it
-          — we&apos;ll email you a fresh reset link.
+          Change your password without leaving the page.
         </p>
       </header>
-      <Button asChild variant="secondary">
-        <Link href="/forgot-password">Change password</Link>
-      </Button>
+
+      <form
+        noValidate
+        onSubmit={handleSubmit(onSubmit)}
+        className="space-y-6"
+      >
+        <Field
+          id="current_password"
+          label="Current password"
+          type="password"
+          autoComplete="current-password"
+          {...register("current_password")}
+          error={errors.current_password?.message}
+        />
+
+        <div className="space-y-2">
+          <Field
+            id="new_password"
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            aria-describedby="security-new-password-requirements"
+            {...register("new_password")}
+            error={errors.new_password?.message}
+          />
+          <PasswordRequirements
+            id="security-new-password-requirements"
+            value={newPasswordValue}
+          />
+        </div>
+
+        <Field
+          id="confirm_password"
+          label="Confirm new password"
+          type="password"
+          autoComplete="new-password"
+          {...register("confirm_password")}
+          error={errors.confirm_password?.message}
+        />
+
+        {submitState?.status === "invalid" && (
+          <p
+            role="alert"
+            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+          >
+            {submitState.message}
+          </p>
+        )}
+
+        {submitState?.status === "ok" && (
+          <p
+            role="status"
+            className="rounded-control border border-meadow/50 bg-meadow/10 px-3 py-2 text-sm text-ink"
+          >
+            Password updated.
+          </p>
+        )}
+
+        <Button
+          type="submit"
+          disabled={pending}
+          className={CALM_SECONDARY_BUTTON}
+        >
+          {pending ? "Saving…" : "Save password"}
+        </Button>
+      </form>
     </section>
   );
 }

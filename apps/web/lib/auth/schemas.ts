@@ -46,6 +46,27 @@ export const resetPasswordSchema = z
   });
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
+// Authenticated change-password (FR-020 amendment 2026-05-21). Used by
+// the /app/account Security section. Mirrors resetPasswordSchema's
+// strength rules and confirmation check; adds the current_password
+// field that the server action verifies via a one-off signInWithPassword
+// call before updating.
+export const changePasswordSchema = z
+  .object({
+    current_password: z.string().min(1, "Enter your current password."),
+    new_password: z
+      .string()
+      .min(8, passwordMinMessage)
+      .regex(/[A-Za-z]/, passwordLetterMessage)
+      .regex(/[0-9]/, passwordNumberMessage),
+    confirm_password: z.string(),
+  })
+  .refine((d) => d.new_password === d.confirm_password, {
+    path: ["confirm_password"],
+    message: "Passwords do not match.",
+  });
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+
 export const onboardingSchema = z.object({
   full_name: z.string().trim().min(1).max(120),
 });
