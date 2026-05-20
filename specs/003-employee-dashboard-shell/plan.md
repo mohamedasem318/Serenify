@@ -143,10 +143,13 @@ and is kept).
 
 **Constraints**:
 
-- **No red anywhere** (Constitution Principle V). shadcn's default
-  destructive-button red is remapped to amber `#DCB587` via the CSS-
-  variable mapping in Decision B; the `destructive` variant is
-  re-skinned, not removed.
+- **No red on affective and ambient surfaces** (Constitution
+  Principle V; FR-042 scope-clarified per CHANGELOG 2026-05-20).
+  shadcn's default destructive-button red is remapped to the new
+  `crimson` Mist & Meadow token (`#7B4244` light, `#C17F81` dark)
+  via the CSS-variable mapping in Decision B; the `destructive`
+  variant is re-skinned, not removed, and is permitted on
+  destructive action surfaces only.
 - **Auth surfaces stay bespoke** (FR-040, FR-043). The (auth) page
   files (`/login`, `/signup`, `/forgot-password`, `/reset-password`,
   `/onboarding`) MUST render byte-equivalent to `main` after the
@@ -185,7 +188,7 @@ data, no ML, no LLM, no StressID-sourced media).
 
 | Principle | Status | How this plan honours it |
 |-----------|--------|--------------------------|
-| V. Calm-First Design Language | ✅ | Mist & Meadow tokens stay in `apps/web/app/globals.css` @theme block; the shadcn install maps shadcn's expected CSS variable names ONTO those tokens (Decision B) rather than introducing a parallel palette. Red is forbidden — shadcn's `--destructive` is remapped to amber `#DCB587` in both modes (FR-042). No glassmorphism: shadcn `Card` is restyled with soft borders + 0.5px elevation + `shadow-soft` per the Constitution. Corner radii: cards use `--radius-card` (12px), controls use `--radius-control` (8px). Inter + DM Serif Display already wired in `apps/web/app/layout.tsx`. Voice: every copy string in this feature (welcome banner, empty states, account labels, role placeholder, notification body samples) is reviewed against the calm-voice rubric — no exclamation marks, no clinical or alarmist language. Lucide icons consistent stroke weight. Welcome banner subtitle: "A space to check in with yourself." (Decision M — Mohamed-chosen from three options in the plan-review pass; reflective framing that primes the eventual passive-detection + questionnaire surface.) |
+| V. Calm-First Design Language | ✅ | Mist & Meadow tokens stay in `apps/web/app/globals.css` @theme block; the shadcn install maps shadcn's expected CSS variable names ONTO those tokens (Decision B) rather than introducing a parallel palette. Red is forbidden on affective and ambient surfaces — shadcn's `--destructive` is remapped to the new `crimson` Mist & Meadow token (`#7B4244` light, `#C17F81` dark) in both modes (FR-042 scope-clarified per CHANGELOG 2026-05-20; the earlier amber mapping failed dark-mode WCAG AA at 1.4:1). Crimson permitted on destructive action surfaces only. No glassmorphism: shadcn `Card` is restyled with soft borders + 0.5px elevation + `shadow-soft` per the Constitution. Corner radii: cards use `--radius-card` (12px), controls use `--radius-control` (8px). Inter + DM Serif Display already wired in `apps/web/app/layout.tsx`. Voice: every copy string in this feature (welcome banner, empty states, account labels, role placeholder, notification body samples) is reviewed against the calm-voice rubric — no exclamation marks, no clinical or alarmist language. Lucide icons consistent stroke weight. Welcome banner subtitle: "A space to check in with yourself." (Decision M — Mohamed-chosen from three options in the plan-review pass; reflective framing that primes the eventual passive-detection + questionnaire surface.) |
 | VI. Responsive & Accessible by Default | ✅ | Every new surface (header, dropdown, account sections, chat pill, notification, role placeholders) is designed mobile-first against the 360px floor. Header center-nav collapses to a hamburger at ≤768px; profile avatar stays as its own separate trigger per FR-005. Chat pill collapses to icon-only at ≤768px per FR-025. Notification component is a bottom sheet at ≤768px per FR-029. All interactive elements ≥44×44px (the existing `h-11 w-11` and `h-12` patterns from feature 001 are reused). Light + dark equal-priority: the CSS-variable mapping in Decision B is applied in both light and dark token sets simultaneously. `prefers-reduced-motion`: Framer Motion variants branch on `useReducedMotion` so notification entrance/exit collapse to opacity-only in reduced-motion mode (Decision G). The OS-level rule already in `globals.css` (lines 49-54) remains as a defense-in-depth backstop for CSS transitions. |
 | VII. Mandatory Testing Per PR | ✅ | New Vitest + RTL component tests for every new component (header, profile dropdown, role placeholder, notification component in three configurations). One Playwright happy-path spec for the employee role (`employee-dashboard-shell.spec.ts`). One Playwright cross-tab spec (`cross-tab-auth-sync.spec.ts`) per Decision N. The existing role-trio e2e from feature 001 is preserved unchanged (FR-036). The `login-expired-link.spec.ts` from the post-feature-001 hotfix (commit `8dc822b`) is also preserved unchanged. `smoke-tests.md` authored during `/speckit.tasks` — at minimum: visual regression check on each (auth) page at desktop and 360px in both themes (SC-009), three-configuration notification component check, employee-vs-non-employee landing check, theme-toggle cross-session persistence check. |
 | VIII. Spec-Driven Workflow | ✅ | This plan is the second formal artifact of the feature (spec → plan → tasks → implement). Architectural decisions are logged in `docs/DECISIONS.md` during `/speckit.implement`; the planned entries are enumerated in **§ DECISIONS.md entries this plan implies** below for one-shot review. The feature folder contains: `spec.md` (committed), `plan.md` (this file), `research.md`, `data-model.md`, `contracts/components.md`, `contracts/shadcn-mapping.md`, `quickstart.md`, and (during `/speckit.tasks`) `tasks.md` + `smoke-tests.md`. The stale Out-of-Scope bullet in `spec.md` referencing the expired-link hotfix gets a `docs/CHANGELOG.md` entry per the user's directive — the committed spec is NOT modified. |
@@ -277,14 +280,23 @@ consume Mist & Meadow tokens without introducing any new color:
 | `--muted-foreground` | `--color-muted` (`#6E7572`) | `--color-muted` (`#8B928F`) |
 | `--accent` | `--color-foggy` | `--color-foggy` |
 | `--accent-foreground` | `--color-ink` | `--color-ink` |
-| `--destructive` | `--color-amber` (`#DCB587`) | `--color-amber` (`#DCB587`) |
+| `--destructive` | `--color-crimson` (`#7B4244`) | `--color-crimson` (`#C17F81`) |
+| `--destructive-foreground` | `--color-bg` (text-on-crimson) | `--color-bg` (text-on-crimson) |
 | `--border` | `--color-border` | `--color-border` |
 | `--input` | `--color-border` | `--color-border` |
 | `--ring` | `--color-meadow` | `--color-meadow` |
 
-The `--destructive` row is a hard requirement per FR-042 — both modes
-override shadcn's default red to amber. Implementation: a single
-`@theme inline { --destructive: var(--color-amber); ... }` block in
+The `--destructive` row enforces FR-042's clarified scope (red
+permitted on destructive action surfaces only; see CHANGELOG
+2026-05-20). Both modes map shadcn's default-red destructive to the
+Mist & Meadow `crimson` token — `#7B4244` in light, `#C17F81` in
+dark. The earlier mapping to amber is superseded; amber + dark-mode
+ink failed WCAG AA at 1.4:1, while crimson + bg-as-foreground passes
+AA in both modes (6.08:1 light, 5.02:1 dark). `--destructive-foreground`
+uses `--color-bg` symmetric across modes, mirroring the
+`--primary-foreground` pattern. Implementation: a single
+`@theme inline { --destructive: var(--color-crimson);
+--destructive-foreground: var(--color-bg); ... }` pair in
 `globals.css` keeps the override in one place.
 
 The `--primary-foreground` row uses `--color-bg` in both modes.
@@ -885,7 +897,7 @@ outputs:
 | Topic | Decision | One-line rationale |
 |---|---|---|
 | shadcn install path | `npx shadcn@latest init` from `apps/web/`, Tailwind v4 branch, CSS-vars mode, baseColor `neutral` overridden by Decision B | Project is on Tailwind v4; shadcn's v4 path is well-documented. |
-| CSS-variable mapping | shadcn variable names → Mist & Meadow tokens, per Decision B table | No new color introduced; FR-042 honoured by `--destructive → amber`. |
+| CSS-variable mapping | shadcn variable names → Mist & Meadow tokens, per Decision B table | One new color introduced (`--color-crimson`, per FR-042 scope clarification 2026-05-20); FR-042 honoured by `--destructive → crimson` + `--destructive-foreground → bg`. |
 | Dark-mode attribute | Migrate `data-theme` → `class`; CSS targets `.dark` | shadcn convention; mechanical change with low blast radius (one selector in `globals.css`). |
 | Theme persistence | `next-themes` localStorage with `storageKey="serenify-theme"` | Covers FR-053 by construction; no server round-trip. |
 | Component folder layout | shadcn flat in `components/ui/`; bespoke in `components/ui/auth/`; composite in `components/` | Import path encodes provenance; FR-040 made structural. |
@@ -914,7 +926,9 @@ The full artifacts are in:
   chat pill / notification / role placeholder.
 - [`contracts/shadcn-mapping.md`](./contracts/shadcn-mapping.md) —
   the CSS-variable mapping table from Decision B in runtime-reference
-  form, plus the `--destructive → amber` override block.
+  form, plus the `--destructive → crimson` + `--destructive-foreground
+  → bg` override pair (per the FR-042 scope clarification recorded
+  in CHANGELOG 2026-05-20).
 - [`quickstart.md`](./quickstart.md) — fresh-developer steps from a
   clean clone to a running `/app` with the new shell.
 
@@ -1137,7 +1151,10 @@ permanently shapes the codebase MUST be appended to
    mode. Decision A + Decision E.
 2. **shadcn variable names mapped to Mist & Meadow tokens** —
    reproduces Decision B's mapping table. Names three load-bearing
-   choices: `--destructive → amber` (FR-042 hard requirement);
+   choices: `--destructive → crimson` + `--destructive-foreground →
+   --color-bg` (FR-042 scope-clarified per CHANGELOG 2026-05-20:
+   crimson permitted on destructive action surfaces, supersedes the
+   earlier amber mapping that failed dark-mode WCAG AA at 1.4:1);
    `--muted → --color-surface` (NOT `--color-border`, because the
    hairline token produces undersaturated Skeleton states);
    `--primary-foreground → --color-bg` symmetric across both modes

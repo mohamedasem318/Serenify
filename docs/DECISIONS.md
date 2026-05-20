@@ -274,6 +274,30 @@ collides with `demo.serenify.local` (currently impossible per RFC 6762).
 
 ---
 
+## 2026-05-20 — FR-042 scope clarification: red permitted on destructive action surfaces only
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.0.0 → 1.1.0`).
+
+**Decision**: Added `crimson` token to Mist & Meadow (`#7B4244` light,
+`#C17F81` dark). Replaces the earlier amber mapping for
+`--destructive` that originated from a contract pre-authorized fix
+later proven WCAG-noncompliant in dark mode (`#DCB587` amber +
+`#DCDED5` dark-ink = 1.4:1, fails AA). Crimson + bg-as-foreground
+passes AA in both modes (6.08:1 light, 5.02:1 dark). Constitution
+Principle V amended in same commit; CHANGELOG records the
+amendment.
+
+**Source tasks**: T017 (mapping), T019 (button emission triggered the
+contrast discovery).
+
+**Revisit if**: a future palette overhaul re-tones amber such that
+amber + ink achieves AA in both modes — at which point the crimson
+token may be folded back if destructive-action urgency can be
+adequately signalled by amber without ambiguity against stress
+indicators.
+
+---
+
 ## 2026-05-18 — Windows npm CLI flag passthrough fallback
 
 **Status**: Accepted.

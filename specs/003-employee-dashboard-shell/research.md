@@ -93,6 +93,19 @@ why-not-other-mappings.
 
 **The `--destructive` hard requirement** (FR-042):
 
+> **SUPERSEDED 2026-05-20** by the FR-042 scope clarification recorded in
+> `docs/CHANGELOG.md` and `docs/DECISIONS.md`. The current mapping is
+> `--destructive → var(--color-crimson)` + `--destructive-foreground →
+> var(--color-bg)`, not amber. The contrast claim below ("dark mode is
+> 11.2:1") was computed incorrectly — dark mode's `--foreground` is the
+> light-ink `#DCDED5`, not the dark-ink `#1F2522`, so amber + dark-ink is
+> actually `1.4:1`, well below WCAG AA. The error surfaced at T019 when
+> the shadcn button primitive emitted a `text-destructive-foreground`
+> reference that exposed the dark-mode contrast gap. Crimson +
+> bg-as-foreground passes AA in both modes (6.08:1 light, 5.02:1 dark).
+> The original Phase 0 analysis below is preserved verbatim as
+> historical context.
+
 - shadcn's default `--destructive` is a red-sector hue. This
   violates Constitution Principle V's "red is forbidden anywhere in
   the UI."

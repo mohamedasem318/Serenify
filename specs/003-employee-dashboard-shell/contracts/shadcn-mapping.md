@@ -27,17 +27,27 @@ Principle VIII.
 | `--muted-foreground` | `var(--color-muted)` (`#6E7572`) | `var(--color-muted)` (`#8B928F`) | Muted text. |
 | `--accent` | `var(--color-foggy)` | `var(--color-foggy)` | Hover / focus accent. |
 | `--accent-foreground` | `var(--color-ink)` | `var(--color-ink)` | Text on an accent fill. |
-| `--destructive` | `var(--color-amber)` (`#DCB587`) | `var(--color-amber)` (`#DCB587`) | **FR-042 hard requirement.** No red. Same hex both modes. |
+| `--destructive` | `var(--color-crimson)` (`#7B4244`) | `var(--color-crimson)` (`#C17F81`) | **FR-042 scope-clarified per CHANGELOG 2026-05-20**: crimson permitted on destructive action surfaces only. Supersedes the earlier amber mapping (amber + dark-mode ink failed WCAG AA at 1.4:1). |
+| `--destructive-foreground` | `var(--color-bg)` | `var(--color-bg)` | Symmetric. Light gives bg-on-crimson ≈ 6.08:1 AA; dark gives bg-on-crimson ≈ 5.02:1 AA. Same theme-adaptation pattern as `--primary-foreground`. |
 | `--border` | `var(--color-border)` | `var(--color-border)` | Soft border. |
 | `--input` | `var(--color-border)` | `var(--color-border)` | Form input border. |
 | `--ring` | `var(--color-meadow)` | `var(--color-meadow)` | Focus ring. |
 
-`--destructive-foreground` is not in the table because shadcn's
-recent CLI emits primitives that derive the destructive variant's
-text color from `--foreground` (mapped above to `--color-ink`). If
-a future `shadcn add` introduces a primitive that references
-`--destructive-foreground` directly, set it to `var(--color-ink)`
-in both modes and update this table.
+**Three load-bearing choices** (out of the 19 rows above), called
+out explicitly because each was forced by a non-obvious constraint:
+
+- `--destructive` → `var(--color-crimson)` AND `--destructive-foreground`
+  → `var(--color-bg)`. FR-042's scope clarification (CHANGELOG
+  2026-05-20) permits red only on destructive action surfaces.
+  Amber was the original mapping but failed dark-mode WCAG AA at
+  1.4:1 (`#DCB587` amber + `#DCDED5` dark-ink ≈ 1.4:1). Crimson +
+  bg-as-foreground clears AA in both modes.
+- `--muted` → `var(--color-surface)`, not `--color-border` — see
+  research.md R-2. shadcn's `--muted` is consumed as a fill surface,
+  not a hairline border.
+- `--primary-foreground` → `var(--color-bg)`, symmetric across modes
+  — see research.md R-2. The originally-asymmetric `--color-ink`
+  mapping in dark mode failed WCAG AA at ~3.1:1.
 
 ---
 
@@ -62,7 +72,8 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --muted-foreground: var(--color-muted);
   --accent: var(--color-foggy);
   --accent-foreground: var(--color-ink);
-  --destructive: var(--color-amber);
+  --destructive: var(--color-crimson);
+  --destructive-foreground: var(--color-bg);
   --border: var(--color-border);
   --input: var(--color-border);
   --ring: var(--color-meadow);
@@ -70,7 +81,9 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
 }
 
 :root.dark {
-  /* Mist & Meadow dark overrides (already present in feature 001) */
+  /* Mist & Meadow dark overrides (already present in feature 001;
+     `--color-crimson` added 2026-05-20 per the FR-042 scope
+     clarification in CHANGELOG). */
   --color-bg:      #161917;
   --color-surface: #20231F;
   --color-ink:     #DCDED5;
@@ -78,9 +91,11 @@ The mapping is implemented in `apps/web/app/globals.css` as a single
   --color-meadow:  #97AE91;
   --color-foggy:   #9CBBC7;
   --color-amber:   #DCB587;
+  --color-crimson: #C17F81;
   --color-border:  #2D3130;
   /* All shadcn variables track through their @theme inline mapping —
-     including --primary-foreground (= --color-bg) and --muted
+     including --primary-foreground (= --color-bg),
+     --destructive-foreground (= --color-bg), and --muted
      (= --color-surface), which are symmetric across modes. */
 }
 ```
@@ -112,8 +127,9 @@ checklist gates the commit:
   errors.
 - [ ] `apps/web/components.json` matches the shape in `plan.md`
   Decision E.
-- [ ] The 18 mapping rows above are present in `globals.css`'s
-  `@theme inline` block.
+- [ ] The 19 mapping rows above are present in `globals.css`'s
+  `@theme inline` block (18 originals + `--destructive-foreground`
+  added 2026-05-20).
 - [ ] The `--primary-foreground` dark-mode override is present in
   `:root.dark` (or `.dark`).
 - [ ] No `--destructive` rule outside the table — search
@@ -126,7 +142,10 @@ checklist gates the commit:
   step MUST be visually empty on those surfaces).
 - [ ] Manual visual review: a destructive-variant button (e.g., a
   placeholder mounted in a developer-preview surface) renders with
-  amber `#DCB587` fill in both light and dark mode — NOT red.
+  crimson fill — `#7B4244` in light mode, `#C17F81` in dark mode —
+  and bg-colored text per the symmetric `--destructive-foreground`
+  → `--color-bg` mapping (light text `#ECEEE9`, dark text `#161917`).
+  Not amber, not shadcn-default red.
 
 ---
 

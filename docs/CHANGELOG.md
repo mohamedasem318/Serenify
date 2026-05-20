@@ -78,6 +78,58 @@ the spec).
 `/speckit.implement` step 13 (smoke tests) to reclassify the
 expired-link entry as `merged`.
 
+## 2026-05-20 — feat(003-employee-dashboard-shell) — FR-042 scope clarification: red permitted on destructive action surfaces only
+
+FR-042 originally banned red anywhere in the UI. This amendment
+narrows the ban to **in-product affective and ambient surfaces** —
+stress detection states, physiological indicators, charts, status
+badges, notifications, and any in-product affective copy or imagery.
+Red IS permitted on **destructive action surfaces** — delete-account,
+leave-team confirmations, revoke-session, and inline destructive text
+links — using the Mist & Meadow `crimson` token, because hiding
+visual urgency on irreversible user actions is hostile design.
+
+Introduces a new Mist & Meadow token, `--color-crimson` — a washed
+red in the same low-saturation tonal family as `--color-amber`.
+Values: light `#7B4244`, dark `#C17F81`.
+
+Maps shadcn `--destructive` → `--color-crimson` (was `--color-amber`),
+and `--destructive-foreground` → `--color-bg` (symmetric across modes,
+same WCAG-AA pattern as `--primary-foreground`).
+
+Affected artifacts, all updated in this commit:
+
+- `.specify/memory/constitution.md` Principle V — palette amended,
+  red-rule clarified, version bumped `1.0.0 → 1.1.0` (MINOR per
+  Governance: palette addition + scope clarification of an existing
+  rule). Sync Impact Report appended with amendment record.
+- `docs/DECISIONS.md` — formal architectural decision entry.
+- `specs/003-employee-dashboard-shell/plan.md` Decision B — mapping
+  table updated; `--destructive` row remapped; `--destructive-foreground`
+  row added; load-bearing-choices reference at line 1139 updated.
+- `specs/003-employee-dashboard-shell/contracts/shadcn-mapping.md` —
+  table updated; `--destructive-foreground` moved out of notes into
+  the table proper; canonical implementation block updated to
+  crimson + destructive-foreground pair.
+- `specs/003-employee-dashboard-shell/tasks.md` — DECISION-2 source
+  descriptions at lines 112 and 322 updated to crimson-not-amber.
+
+Rationale: amber + dark-mode ink fails WCAG AA at `1.4:1` (`#DCB587`
+amber + `#DCDED5` dark-ink ≈ 1.4:1, well below the 4.5:1 AA floor for
+normal text). Symmetric amber → bg mapping fails light mode at
+`1.6:1`. Hardcoded dark-text fixes contrast but loses theme
+adaptation. A crimson-family color whose luminance positions allow a
+symmetric bg-foreground pair to clear AA in both modes (6.08:1 light,
+5.02:1 dark) is the cleanest resolution that preserves the
+theme-adaptation pattern shared with `--primary-foreground`.
+
+Calm-first compatibility: the chosen crimson values are washed (not
+saturated/vibrant). The dark-mode value (`#C17F81`) is closer to a
+dusty rose than a red. Both modes feel earthy/muted, consistent with
+the Mist & Meadow tonal language. The dark-mode value's lower
+saturation + higher lightness counteract the visual weight of dark
+backgrounds.
+
 ## 2026-05-20 — plan(003-employee-dashboard-shell) — manual shadcn install substituted for `shadcn init`
 
 Feature 003: shadcn CLI 4.7.0's `--preset=base-nova` default
