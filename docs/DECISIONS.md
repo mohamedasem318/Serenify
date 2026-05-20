@@ -329,3 +329,83 @@ consistent across both flags.
 `--`-separated flags, OR a future contributor adds a new CLI flag to
 `scripts/seed-demo.ts` — the same env-var fallback must be wired for
 that flag.
+
+---
+
+## 2026-05-21 — `.claude/` tooling tracked in git; per-user files ignored individually
+
+**Status**: Accepted (rule correction from earlier `d4621fe`).
+
+**Context**: spec-kit v0.8.12's Claude integration installs the
+`/speckit.<command>` surface as **Claude Code Skills**, not as slash-
+command files. Specifically, its `SkillsIntegration` writer uses
+`commands_subdir="skills"` and emits 14 files at
+`.claude/skills/speckit-<command>/SKILL.md` (one per command:
+`speckit-analyze`, `speckit-checklist`, `speckit-clarify`,
+`speckit-constitution`, `speckit-git-commit`,
+`speckit-git-feature`, `speckit-git-initialize`,
+`speckit-git-remote`, `speckit-git-validate`, `speckit-implement`,
+`speckit-plan`, `speckit-specify`, `speckit-tasks`,
+`speckit-taskstoissues`). These files MUST be tracked in git —
+without them, none of the `/speckit.<command>` invocations dispatch
+through the Skill tool inside a Claude Code session and the
+spec-driven workflow silently degrades to plain LLM responses.
+
+**How it broke**: `d4621fe` (feat 001 auth) added `.claude/` to
+`.gitignore` under the heuristic "Claude Code local settings — per-
+user, never commit". That broad rule retroactively swept the 14
+`SKILL.md` files installed by `f2102c8` (chore: initialize
+spec-kit) into being untracked, then they were never recommitted.
+For multiple weeks across features 001, 002, and the early phases of
+003, the four spec-kit slash commands appeared to "work" inside a
+single session (the model has the speckit prompts in its head and
+can fake the output) but no skill machinery actually ran — no
+Skill-tool dispatch, no skill-specific permissioning, no
+checkpointed sub-invocation. The degradation surfaced during
+feature 003 Phase 5 when `/speckit.implement` did not produce the
+expected skill announcement and skill-tool call in the transcript.
+
+**Fix**: chore branch `chore/speckit-command-registration` (commit
+`7a7beff`, merged to `main` via PR #3 at commit `68b7d47`).
+
+- Restored the 14 `.claude/skills/speckit-*/SKILL.md` files from
+  `f2102c8` byte-for-byte (the spec-kit installer had not changed
+  the file contents in the v0.8.12 → v0.8.12 timeframe, so the
+  restoration was a clean revert of the unintended sweep, not a
+  re-install).
+- Narrowed `.gitignore`: removed the broad `.claude/` entry,
+  replaced with `.claude/settings.local.json` (the one file
+  legitimately classified as per-user — it holds permission
+  decisions that vary by developer).
+
+Verification: post-merge, a fresh Claude Code session in this repo
+sees all 14 speckit Skills in the user-invocable list; typing
+`/speckit.implement` triggers the Skill tool and dispatches the
+`speckit-implement` skill body. Confirmed during the Phase 5
+resume that produced commits `c51ee67` through `309e78d`.
+
+**Rule going forward**:
+
+- `.claude/` is **not** broadly gitignored. The default state for
+  any file under `.claude/` is **tracked**.
+- Per-user files inside `.claude/` are ignored **individually** by
+  full path. Today that list is one entry:
+  `.claude/settings.local.json`. Future additions (if Claude Code
+  ever ships a second per-user file under that tree) are added by
+  their exact path, not by a folder wildcard.
+- Tooling installed under `.claude/` by integrations (skills today;
+  potentially commands/agents in future spec-kit or Claude Code
+  releases) is treated as **repo-shared infrastructure** and stays
+  tracked. The "this is local-only" instinct is wrong for anything
+  that affects how teammates interact with the codebase.
+- Any future PR that proposes broadening `.claude/` exclusion in
+  `.gitignore` MUST first enumerate which tracked files would be
+  swept and justify each exclusion individually.
+
+**Revisit when**: spec-kit (or any other Claude Code integration)
+adds a file under `.claude/` that genuinely IS per-user and
+shouldn't be shared. Add that file by its exact path to
+`.gitignore`; don't reach for a broader pattern. If the
+per-user files start to outnumber the tracked ones, revisit
+whether the integration should be writing to a `.claude/local/`
+sub-directory by convention instead.
