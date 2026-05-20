@@ -27,6 +27,40 @@
   --font-display:   "DM Serif Display", serif;
 }
 
+/*
+ * shadcn primitive variables, mapped onto Mist & Meadow tokens per
+ * contracts/shadcn-mapping.md (plan.md Decision B). The 18-row table
+ * is reproduced verbatim here. Three load-bearing choices:
+ *   --destructive       → amber (FR-042: no red anywhere)
+ *   --muted             → surface (not border — research.md R-2)
+ *   --primary-foreground→ bg, symmetric across modes (WCAG AA)
+ * Dark-mode flips happen automatically via the :root.dark block
+ * below (Mist & Meadow tokens swap; the shadcn variables track them
+ * through the var() chain). Sits BELOW the Mist & Meadow @theme
+ * block so any conflict resolves in favor of the explicit mapping.
+ */
+@theme inline {
+  --background:         var(--color-bg);
+  --foreground:         var(--color-ink);
+  --card:               var(--color-surface);
+  --card-foreground:    var(--color-ink);
+  --popover:            var(--color-surface);
+  --popover-foreground: var(--color-ink);
+  --primary:            var(--color-meadow);
+  --primary-foreground: var(--color-bg);
+  --secondary:          var(--color-foggy);
+  --secondary-foreground: var(--color-ink);
+  --muted:              var(--color-surface);
+  --muted-foreground:   var(--color-muted);
+  --accent:             var(--color-foggy);
+  --accent-foreground:  var(--color-ink);
+  --destructive:        var(--color-amber);
+  --border:             var(--color-border);
+  --input:              var(--color-border);
+  --ring:               var(--color-meadow);
+  --radius:             var(--radius-control);
+}
+
 @layer base {
   /* Dark mode override — equal-priority per Constitution Principle VI. */
   :root.dark {
