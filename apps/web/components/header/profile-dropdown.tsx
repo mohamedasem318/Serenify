@@ -13,29 +13,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { deriveInitials } from "@/lib/initials";
 import { truncateName } from "@/lib/truncate-name";
 
 type ProfileDropdownProps = {
   fullName: string | null;
   email: string;
 };
-
-function deriveInitials(fullName: string | null, email: string): string {
-  if (fullName) {
-    const tokens = fullName.trim().split(/\s+/).filter(Boolean);
-    if (tokens.length >= 2) {
-      const first = tokens[0]!;
-      const last = tokens[tokens.length - 1]!;
-      return (first[0]! + last[0]!).toUpperCase();
-    }
-    if (tokens.length === 1) {
-      const only = tokens[0]!;
-      return (only.slice(0, 2) || only[0] || "").toUpperCase();
-    }
-  }
-  const local = email.split("@")[0] ?? "";
-  return (local.slice(0, 2) || "?").toUpperCase();
-}
 
 function deriveDisplayName(fullName: string | null, email: string): string {
   if (fullName && fullName.trim().length > 0) {
