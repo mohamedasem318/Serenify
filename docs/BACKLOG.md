@@ -210,3 +210,23 @@ asserted against in role-trio specs.
 **Address by**: when the demo-seed harness gains a "reset onboarding
 state" option — natural pairing with the CI integration work logged
 above against feature 006.
+
+### Token tune — `--color-muted` underweight on light bg (WCAG AA)
+**Status**: bug
+**Observed**: 2026-05-20, feature 003 T020 visual sweep
+**Description**: M&M `--color-muted` at `#6E7572` against light bg
+`#ECEEE9` gives ~3.8:1 contrast — under WCAG AA body-text minimum
+(4.5:1) by ~15%. Affects every `text-muted` site in light mode: auth
+field labels, password-requirements rule rows, page intros, footer
+links, helper text. Dark mode is fine (~5.6:1, comfortably over AA).
+Not caused by the sidecar fix in 2b0c2b3 — that fix correctly
+restored `--color-muted` to its M&M value (it had been clobbered by
+an `@theme inline` remap). The underlying issue is the M&M palette
+value itself.
+**Fix scope**: medium — dedicated design-token pass. Likely darken
+the light value from `#6E7572` to ~`#5A615F` (target 4.6:1+), with
+eyeball verification across every authed surface. NOT to be embedded
+in feature implementation work; deserves its own task.
+**Address by**: secondary-text contrast, not blocking — primary text
+reads fine and WCAG AA-large threshold (3:1) is satisfied. Belongs
+in a deliberate token-tuning pass, not in active feature work.
