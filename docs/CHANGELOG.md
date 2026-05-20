@@ -204,6 +204,77 @@ the Mist & Meadow tonal language. The dark-mode value's lower
 saturation + higher lightness counteract the visual weight of dark
 backgrounds.
 
+## 2026-05-21 — spec(003-employee-dashboard-shell) — FR-020 amendment: inline change-password form on /app/account
+
+Phase 6 manual smoke (T039) surfaced a UX issue: the Security
+section's "Change password" affordance was a `<Link
+href="/forgot-password">` styled as a button. Clicking it bounced
+the user back to /app — because feature 001's (auth) route guard
+in `proxy.ts` correctly redirects already-signed-in users off
+the /forgot-password page (signed-in users can't request a reset
+they don't need). The contract collision was inevitable: routing
+an authenticated user through a signed-out reset flow is
+self-contradictory by design.
+
+**Amendment**: replace the "route to /forgot-password" pattern
+with an inline change-password form rendered directly on
+/app/account. The Security section becomes a client component
+with three fields (current password, new password, confirm
+new password), submitting to a new `changePassword` server
+action.
+
+  - Current password verified by calling
+    `supabase.auth.signInWithPassword({ email: user.email,
+    password: current })` against the user's own session — returns
+    an error on mismatch without disturbing the current session.
+  - New password updated via `supabase.auth.updateUser({
+    password: newPassword })`.
+  - Validation: Zod schema mirrors feature 001's signUpSchema
+    rules (min 8, contains a letter, contains a number) on the
+    new password field, plus a refine() asserting `confirm ===
+    new_password`. Calm-voice messages, no regex sources
+    surfaced to the UI.
+  - Live <PasswordRequirements> checklist reused from
+    @/components/ui/auth — same rule semantics as signup and
+    reset-password.
+  - <PasswordInput> reused from the same module — show/hide
+    toggle behaviour is consistent across all four password
+    surfaces.
+
+The /forgot-password flow stays intact for signed-out password
+recovery; this amendment narrows the AUTHENTICATED change-
+password path to its own surface.
+
+**FR-020 final wording** (effective on this commit):
+> The Security section on /app/account renders an inline change-
+> password form. The user supplies their current password, a new
+> password, and a confirmation. Validation matches signup rules
+> (min 8 characters, a letter, a number). On success the form
+> resets and renders a brief calm confirmation. Signed-out
+> password recovery continues to live at /forgot-password as
+> shipped in feature 001.
+
+**Affected artifacts**, all updated in the implementing commit
+that follows this CHANGELOG entry:
+
+  - apps/web/app/(authed)/app/account/actions.ts — adds
+    `changePassword` server action alongside the existing
+    `updateProfile`.
+  - apps/web/components/account/security-section.tsx —
+    rewritten from server component (Link) to client component
+    (inline form with react-hook-form + zodResolver +
+    useTransition, matching ProfileSection's pattern from
+    61828a4).
+  - apps/web/components/account/security-section.test.tsx —
+    test shape rewritten; coverage added for the changePassword
+    failure modes (wrong current password, weak new password,
+    mismatch on confirm).
+
+The Phase 6 commit 42f121e (page composition) and 3f84d1d
+(SignOutSection) do not change shape. The five-section order on
+/app/account is preserved; only the Security section's
+implementation changes.
+
 ## 2026-05-20 — plan(003-employee-dashboard-shell) — manual shadcn install substituted for `shadcn init`
 
 Feature 003: shadcn CLI 4.7.0's `--preset=base-nova` default
