@@ -19,7 +19,13 @@ export async function signInAs(
 }
 
 export async function signOut(page: Page) {
-  await page.getByRole("button", { name: "Sign out" }).click();
+  // Feature 003 moved Sign out into the ProfileDropdown (T024). The
+  // dropdown trigger is the avatar; Sign out is a DropdownMenuItem
+  // queried by test-id (resolved guidance (d): the role=menuitem
+  // count does not include the DropdownMenuLabel for the display
+  // name, so a role-based lookup undercounts).
+  await page.getByLabel("Open profile menu").click();
+  await page.getByTestId("profile-dropdown-signout").click();
   await expect(page).toHaveURL(/\/login$/);
 }
 
