@@ -109,6 +109,41 @@ describe("ProfileSection", () => {
     expect(routerRefreshMock).toHaveBeenCalledTimes(1);
   });
 
+  it("re-baselines the form after a successful save so the OLD name reads as a valid new change", async () => {
+    updateProfileMock.mockResolvedValue({ status: "ok" });
+    const user = userEvent.setup();
+    render(
+      <ProfileSection
+        initialFullName="Jane Doe"
+        email="jane@demo.serenify.local"
+      />,
+    );
+
+    // First save: Jane Doe → Jane Smith.
+    const input = screen.getByLabelText("Full name");
+    const button = screen.getByRole("button", { name: /Save changes/ });
+    await user.clear(input);
+    await user.type(input, "Jane Smith");
+    await user.click(button);
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent("Saved.");
+    });
+
+    // Save button is now disabled (form is clean against the new baseline).
+    await waitFor(() => {
+      expect(button).toBeDisabled();
+    });
+
+    // Type the OLD name back. This MUST count as a change — the bug
+    // was that isDirty compared to the stale initial baseline and the
+    // Save button stayed disabled.
+    await user.clear(input);
+    await user.type(input, "Jane Doe");
+    await waitFor(() => {
+      expect(button).not.toBeDisabled();
+    });
+  });
+
   it("surfaces an alert with the server's invalid message and skips router.refresh", async () => {
     updateProfileMock.mockResolvedValue({
       status: "invalid",
