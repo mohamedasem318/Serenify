@@ -151,11 +151,81 @@ commit trail and four-scenario verification matrix.
 
 ---
 
+## T019-crimson — Crimson destructive button verification (2026-05-20)
+
+**Task**: Verify that after the FR-042 scope clarification (crimson palette token,
+`--destructive` remapped from amber to crimson) and the corrected `@theme inline` prefix
+contract, `<Button variant="destructive">` renders with the documented Mist & Meadow
+values in both light and dark modes — confirmed via `getComputedStyle` (not visual eyeball,
+because the original prefix-bug failure mode looked like "the button just isn't styled yet"
+rather than a visible wrong color).
+
+**Branch**: `003-employee-dashboard-shell` @ commit `b4c7b38`
+**Validator**: Claude via Playwright MCP against the local dev server, reviewed by Mohamed
+**Run date**: 2026-05-20
+
+### Discovery trail
+
+| Commit | What |
+|--------|------|
+| `e551791` | `shadcn add button` — first primitive, surfaced the `text-destructive-foreground` reference |
+| `c6c8375` | FR-042 scope clarification docs (CHANGELOG + DECISIONS + constitution V1.1.0 + plan/contracts/research/tasks) |
+| `89c418d` | Code: added `--color-crimson` to Mist & Meadow @theme blocks; remapped `--destructive` to crimson; added `--destructive-foreground` |
+| (would-be commit 3/3) | Verification revealed the button still rendered transparent — Tailwind v4 hadn't generated any shadcn-named utility classes |
+| `b4c7b38` | `@theme inline` contract corrected: all 19 mapping rows renamed to `--color-*` prefix; 7-step radius ladder added |
+
+### Computed-style probes (post-`b4c7b38`)
+
+Transient preview page mounted at `apps/web/app/destructive-preview/page.tsx`
+(rendering `<Button variant="destructive">Delete account</Button>`), then probed via
+Playwright MCP with transitions disabled to capture final-state styles. Preview deleted
+before commit.
+
+| Mode | Property | Expected | Measured | Pass |
+|------|----------|----------|----------|:---:|
+| Light | `background-color` | `rgb(123, 66, 68)` = `#7B4244` (crimson light) | `rgb(123, 66, 68)` | ✅ |
+| Light | `color` | `rgb(236, 238, 233)` = `#ECEEE9` (`--color-bg` light) | `rgb(236, 238, 233)` | ✅ |
+| Light | `border-radius` | `8px` (`--radius-md` = `--radius-control`) | `8px` | ✅ |
+| Dark | `background-color` | `rgb(193, 127, 129)` = `#C17F81` (crimson dark) | `rgb(193, 127, 129)` | ✅ |
+| Dark | `color` | `rgb(22, 25, 23)` = `#161917` (`--color-bg` dark) | `rgb(22, 25, 23)` | ✅ |
+| Dark | `border-radius` | `8px` | `8px` | ✅ |
+
+### Generated Tailwind utility rules (sanity check)
+
+| Selector | Rule |
+|----------|------|
+| `.bg-destructive` | `background-color: var(--color-crimson);` |
+| `.text-destructive-foreground` | `color: var(--color-bg);` |
+| `.rounded-md` | `border-radius: var(--radius-control);` |
+
+The `var()` chain is preserved through Tailwind v4's `@theme inline` — the
+mode-flip happens at runtime via the `:root.dark` Mist & Meadow override. Note that
+`getPropertyValue('--color-destructive')` on `:root` returns `""` empty (which is
+how `inline` semantics work — Tailwind generates utility rules referencing the underlying
+Mist & Meadow tokens directly, without intermediating through `--color-destructive`).
+The shadcn-named tokens are real to Tailwind's class generator but not direct CSS vars
+on `:root`.
+
+### Cross-cutting confirmations
+
+- ✅ Zero amber on destructive surfaces anywhere (button bg resolves to crimson hex).
+- ✅ Zero red-sector colors on affective/ambient surfaces (FR-042 scope-clarified).
+- ✅ Lint + typecheck green.
+
+### Overall T019-crimson verdict: **PASS**
+
+Destructive button renders correctly in both modes. The R-2.1 prefix correction
+(`b4c7b38`) unblocks T019 to continue with the remaining six primitives (card,
+dropdown-menu, sheet, dialog, avatar, separator) per the same per-primitive checkpoint
+pattern.
+
+---
+
 ## Cross-cutting visual checks (run as part of ST-1 through ST-7, no separate row)
 
 While running each row above, also visually confirm the following invariants. Any failure is a row-level ❌ for the relevant ST.
 
-- **No red anywhere** (Constitution Principle V; FR-052). Inspect any callout, button-destructive variant, error message, or hover state for hues in the 340–20° sector. Stress-related callouts (none in this feature, but the convention applies) use amber `#DCB587`.
+- **No red on affective or ambient surfaces** (Constitution Principle V; FR-042 scope-clarified per CHANGELOG 2026-05-20). Inspect any callout, error message, hover state, status badge, notification, or stress-related affective copy for hues in the 340–20° sector. Stress-related callouts (none in this feature, but the convention applies) use amber `#DCB587`. **Red IS permitted on destructive action surfaces** via the `--color-crimson` token (light `#7B4244`, dark `#C17F81`) — verified at the crimson-destructive verification entry below; any future destructive surfaces (delete-account, leave-team, revoke-session) should match those exact computed-style values.
 - **No exclamation marks** (FR-013, FR-052) in any visible copy on `/app`, `/app/account`, or the role placeholders.
 - **No alarmist language** ("alert", "detected", "elevated risk", "abnormal") in any visible copy.
 - **All interactive targets ≥44×44px on the 360px viewport** (FR-007, FR-025, FR-049). Includes header buttons, profile avatar, dropdown items, account page buttons, chat pill, notification dismiss.
