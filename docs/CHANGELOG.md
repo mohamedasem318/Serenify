@@ -77,3 +77,18 @@ the spec).
 `docs/BACKLOG.md` will be updated during feature 003's
 `/speckit.implement` step 13 (smoke tests) to reclassify the
 expired-link entry as `merged`.
+
+## 2026-05-20 — plan(003-employee-dashboard-shell) — manual shadcn install substituted for `shadcn init`
+
+Feature 003: shadcn CLI 4.7.0's `--preset=base-nova` default
+introduces Inter→Geist font swap, red `--destructive`, and a generic
+oklch palette that conflict with Constitution Principle V, FR-042,
+and Decision B respectively. Manual init (hand-authored
+`components.json` + `lib/utils.ts` + direct dep installs) substituted
+for `shadcn init`. `shadcn add` retained for primitive scaffolding
+only. Decisions A, B, E unchanged; their target outputs match the
+manual-init result.
+
+This is a plan AMENDMENT recorded via CHANGELOG, not a re-decision.
+Any future re-init must use the manual path until shadcn's defaults
+realign with the Decision A/B/E target shape.

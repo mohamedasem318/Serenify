@@ -234,6 +234,23 @@ during `/speckit.tasks`):
 `button`, `card`, `dropdown-menu`, `sheet`, `dialog`, `avatar`,
 `separator`.
 
+**CLI-version caveat (amendment recorded 2026-05-20 via CHANGELOG)**:
+shadcn `4.7.0`'s `--preset=base-nova` default bundles changes that
+violate Constitution V (Inter→Geist font swap), FR-042 (red
+`--destructive`), and Decision B's mapping intent (a generic oklch
+palette in fresh `:root` / `.dark` blocks that override the Mist &
+Meadow tokens at runtime). For this feature and any future re-init,
+the workflow is **manual**: hand-author `components.json` per
+Decision E, hand-author `lib/utils.ts` per Decision E, `npm i -D` the
+dep list (`class-variance-authority`, `clsx`, `tailwind-merge`,
+`tw-animate-css`, `@radix-ui/react-slot`), then use `npx shadcn@latest
+add <primitive>` for each primitive in scope. `shadcn add` reads
+`components.json` for paths and writes to `components/ui/` without
+touching `layout.tsx` or the palette CSS. Until shadcn's defaults
+realign with Decision A/B/E's target shape, the `init` step is
+bypassed; the rest of Decision A (Tailwind v4 path, CSS-vars mode,
+neutral baseColor overridden by Decision B's mapping) still binds.
+
 ### Decision B — CSS-variable mapping: shadcn names → Mist & Meadow tokens
 
 The Mist & Meadow palette already lives in `apps/web/app/globals.css`
