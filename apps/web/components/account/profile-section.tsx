@@ -45,6 +45,7 @@ export function ProfileSection({
   const {
     register,
     handleSubmit,
+    reset,
     watch,
     formState: { errors, isDirty },
   } = useForm<ProfileInput>({
@@ -66,6 +67,12 @@ export function ProfileSection({
       setSubmitState(result);
       if (result.status === "ok") {
         setDisplayName(values.full_name);
+        // Re-baseline the form so isDirty correctly tracks future
+        // changes against the just-saved value. Without this, typing
+        // the OLD name back into the field still matches the stale
+        // initial baseline and the Save button stays disabled —
+        // surfaced during Phase 6 smoke.
+        reset({ full_name: values.full_name });
         // The server action revalidatePath()-s /app and /app/account; refresh
         // here re-fetches the (authed) layout so the header avatar and
         // dropdown name pick up the new full_name on the same render
