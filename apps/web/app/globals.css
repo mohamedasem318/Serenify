@@ -6,7 +6,11 @@
  * class on the <html> element (next-themes attribute="class") —
  * shadcn's expected selector convention.
  *
- * Red is forbidden in any state. Stress signals use --color-amber.
+ * Red is forbidden on affective and ambient surfaces. Stress signals
+ * use --color-amber. Red IS permitted on destructive action surfaces
+ * (delete-account, leave-team, revoke-session, inline destructive
+ * text links) via --color-crimson — see CHANGELOG 2026-05-20 for
+ * the FR-042 scope clarification.
  */
 @theme {
   /* Light mode (default) */
@@ -17,6 +21,7 @@
   --color-meadow:   #7A9275;
   --color-foggy:    #8AA9B6;
   --color-amber:    #DCB587;
+  --color-crimson:  #7B4244;
   --color-border:   #D6D7D1;
 
   --radius-card:    12px;
@@ -29,9 +34,13 @@
 
 /*
  * shadcn primitive variables, mapped onto Mist & Meadow tokens per
- * contracts/shadcn-mapping.md (plan.md Decision B). The 18-row table
+ * contracts/shadcn-mapping.md (plan.md Decision B). The 19-row table
  * is reproduced verbatim here. Three load-bearing choices:
- *   --destructive       → amber (FR-042: no red anywhere)
+ *   --destructive       → crimson + --destructive-foreground → bg
+ *                         (FR-042 scope-clarified per CHANGELOG
+ *                         2026-05-20; supersedes the earlier amber
+ *                         mapping that failed dark-mode WCAG AA at
+ *                         1.4:1)
  *   --muted             → surface (not border — research.md R-2)
  *   --primary-foreground→ bg, symmetric across modes (WCAG AA)
  * Dark-mode flips happen automatically via the :root.dark block
@@ -54,7 +63,8 @@
   --muted-foreground:   var(--color-muted);
   --accent:             var(--color-foggy);
   --accent-foreground:  var(--color-ink);
-  --destructive:        var(--color-amber);
+  --destructive:        var(--color-crimson);
+  --destructive-foreground: var(--color-bg);
   --border:             var(--color-border);
   --input:              var(--color-border);
   --ring:               var(--color-meadow);
@@ -71,6 +81,7 @@
     --color-meadow:  #97AE91;
     --color-foggy:   #9CBBC7;
     --color-amber:   #DCB587;
+    --color-crimson: #C17F81;
     --color-border:  #2D3130;
   }
 
