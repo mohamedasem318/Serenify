@@ -331,3 +331,66 @@ Specifics the future pass should evaluate:
 **Address by**: design-system pass — same workstream as the
 three existing token-tuning entries above. Not blocking any
 in-progress feature; deferred polish.
+
+### Card heading typography — fresh design read needed
+**Status**: polish
+**Observed**: 2026-05-22, feature 003 Phase 7 eyeball (T045 re-look)
+**Description**: The three home cards ship with their headings in
+`font-display` (DM Serif Display) — `text-2xl` on TodaysCheckinCard
+and `text-xl` on ThingsThatMightHelpCard / RecentChatsCard. Mohamed
+flagged that this treatment "doesn't resonate" without articulating
+which axis is off — family, weight, or scale all candidates.
+The visual hierarchy in question pairs:
+
+  - `<h1>` welcome-banner heading: font-display text-3xl /
+    sm:text-4xl ("Good morning, Jane")
+  - `<h2>` card headings: font-display text-2xl /
+    text-xl
+
+Both currently use the same display family (DM Serif Display)
+which may be over-using the "one display moment" Constitution V
+intended for the wordmark and the highest-level page heading.
+Cards may want Inter — possibly at a heavier weight or a
+distinct scale — to read as informational headings rather than
+editorial moments. The shadcn `<CardTitle>` default
+(`text-2xl font-semibold leading-none tracking-tight`) was
+explicitly overridden in 533e8ba's commit body's spirit — that
+override may have gone too far in the editorial direction.
+
+**Fix scope**: small-to-medium. Recoverable className swap across
+three card components (todays-checkin-card.tsx,
+things-that-might-help-card.tsx, recent-chats-card.tsx) plus
+any sibling section headings that share the treatment (the five
+account-section headings in `components/account/*` currently
+also use font-display text-2xl — they're hierarchical peers and
+should move together). Future passes that ship more cards
+(welcome-banner is structurally a card-shaped header; T054's
+role-placeholder; features 004-009's eventual content surfaces)
+will inherit whatever the design pass settles on.
+
+Specifics the future pass should evaluate:
+  - Should card headings shift family from DM Serif Display
+    (editorial) to Inter (informational)?
+  - Re-weighting within the chosen family — Inter at 500 / 600
+    vs DM Serif Display default 400?
+  - Re-sizing — is the text-2xl / text-xl split between primary
+    and secondary cards the right hierarchy, or should they all
+    match?
+  - Whether a new heading scale token belongs in the M&M
+    `@theme` block (e.g. `--font-card-heading`) to lock the
+    decision and prevent drift.
+  - Whether the welcome banner `<h1>` (font-display) and the
+    card `<h2>` (under review) read as the right hierarchical
+    pair — moving cards to Inter would create a clearer
+    family-driven hierarchy with DM Serif reserved for the page
+    title.
+
+No tests assert on font family / weight / size — the calm-voice
+text-content assertions in T045 are agnostic. No structural risk.
+
+**Address by**: design-system pass — same workstream as the four
+existing entries above (button-system character, mobile/tablet
+typography bump, avatar disc dark-mode tint, muted-on-bg
+contrast). Card heading typography belongs in the same revision
+because it touches the same family/weight/scale decisions the
+mobile-typography-bump entry already names.
