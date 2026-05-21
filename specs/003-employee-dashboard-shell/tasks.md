@@ -197,9 +197,9 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
 
 ### Implementation for Step 7 (US1)
 
-- [ ] T046 [US1] Create `apps/web/components/chat-pill.tsx` **[client]** per `contracts/components.md`. Exports `ChatPill` and `CHAT_PILL_HEIGHT = 48`. Renders a `fixed bottom-4 right-4` capsule on desktop, icon-only circle on mobile (≤768px). `bg-surface`, `border-border`, meadow icon. Touch target ≥44×44px (FR-025). On click: **true no-op** (no popover per medium-fix-11, FR-024). On mount: `document.documentElement.style.setProperty("--chat-pill-offset", "${CHAT_PILL_HEIGHT}px")`; on unmount: `document.documentElement.style.removeProperty("--chat-pill-offset")`. ⚠ Principle VII: covered by T048.
-- [ ] T047 [US1] Update `apps/web/app/(authed)/layout.tsx`: render `<ChatPill />` outside the `<main>` element (so it persists across `/app` → `/app/account` navigation) and conditionally on `role === "employee"` (FR-035). The layout already reads `role` from T027.
-- [ ] T048 [P] [US1] Create `apps/web/components/chat-pill.test.tsx`: renders at desktop and mobile sizes; onClick is a true no-op (no popover opens); sets `--chat-pill-offset` on mount; removes it on unmount; renders only when `role === "employee"`.
+- [x] T046 [US1] Create `apps/web/components/chat-pill.tsx` **[client]** per `contracts/components.md`. Exports `ChatPill` and `CHAT_PILL_HEIGHT = 48`. Renders a `fixed bottom-4 right-4` capsule on desktop, icon-only circle on mobile (≤768px). `bg-surface`, `border-border`, meadow icon. Touch target ≥44×44px (FR-025). On click: **true no-op** (no popover per medium-fix-11, FR-024). On mount: `document.documentElement.style.setProperty("--chat-pill-offset", "${CHAT_PILL_HEIGHT}px")`; on unmount: `document.documentElement.style.removeProperty("--chat-pill-offset")`. ⚠ Principle VII: covered by T048.
+- [x] T047 [US1] Update `apps/web/app/(authed)/layout.tsx`: render `<ChatPill />` outside the `<main>` element (so it persists across `/app` → `/app/account` navigation) and conditionally on `role === "employee"` (FR-035). The layout already reads `role` from T027.
+- [x] T048 [P] [US1] Create `apps/web/components/chat-pill.test.tsx`: renders at desktop and mobile sizes; onClick is a true no-op (no popover opens); sets `--chat-pill-offset` on mount; removes it on unmount; renders only when `role === "employee"`.
 
 **Checkpoint**: Step 7 complete. Chat pill ships on employee pages. CSS-variable offset is wired for the notification's positioning math.
 
