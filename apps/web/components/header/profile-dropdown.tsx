@@ -13,6 +13,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { broadcastSignOut } from "@/lib/auth-broadcast";
 import { deriveInitials } from "@/lib/initials";
 import { truncateName } from "@/lib/truncate-name";
 
@@ -70,7 +71,19 @@ export function ProfileDropdown({ fullName, email }: ProfileDropdownProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <form ref={formRef} action={signOut} className="hidden" />
+      <form
+        ref={formRef}
+        action={signOut}
+        onSubmit={() => {
+          // Cross-tab sign-out broadcast (📌 DECISION-N amendment
+          // 2026-05-22). Same contract as SignOutButton — write the
+          // marker before the server action runs so sibling tabs
+          // catch the storage event while the user still has a
+          // session.
+          broadcastSignOut();
+        }}
+        className="hidden"
+      />
     </>
   );
 }

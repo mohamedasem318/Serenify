@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { signInSchema, type SignInInput } from "@/lib/auth/schemas";
 import { Field } from "@/components/ui/auth/field";
+import { broadcastSignIn } from "@/lib/auth-broadcast";
 import {
   resendConfirmation,
   signIn,
@@ -38,6 +39,13 @@ export function LoginForm() {
       const result = await signIn(form);
       setSubmitState(result);
       if (result.status === "ok") {
+        // Cross-tab sign-in broadcast (📌 DECISION-N amendment 2026-05-22):
+        // cookies don't fire storage events, so feature 003's
+        // cross-tab listener relies on this explicit marker. Writing
+        // happens BEFORE router.replace so sibling tabs see the storage
+        // event while their CrossTabAuth listeners are still subscribed
+        // at the /login pathname.
+        broadcastSignIn();
         router.replace("/app");
         router.refresh();
       }

@@ -3,12 +3,14 @@
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-import { createClient } from "@/lib/supabase/client";
+import {
+  AUTH_BROADCAST_KEY,
+  parseAuthBroadcast,
+} from "@/lib/auth-broadcast";
 
 /**
- * Pathnames where a SIGNED_IN event in a SIBLING tab means the user
- * landed on /app from a sign-in elsewhere — this tab should follow.
- * All five are "signed-out surfaces" plus the bare `/` landing.
+ * Pathnames where a sibling tab's sign-in should pull this tab to
+ * /app. The bare `/` landing plus the five "signed-out surfaces."
  */
 const SIGNED_IN_FROM_PATHS = [
   "/",
@@ -19,12 +21,10 @@ const SIGNED_IN_FROM_PATHS = [
 ] as const;
 
 /**
- * Pathnames where a SIGNED_OUT event in a SIBLING tab means the user
- * signed out elsewhere — this tab should bounce to /login. /onboarding
- * is included because it lives in its own (onboarding) route group as
- * of Phase 5's restructure (309e78d) — it is authed but sits outside
- * the (authed) layout, so the layout-level guard would not catch a
- * cross-tab sign-out on its own.
+ * Pathnames where a sibling tab's sign-out should bounce this tab
+ * to /login. /onboarding is included because it lives in its own
+ * (onboarding) route group as of Phase 5's restructure (309e78d)
+ * — authed but outside the (authed) layout's reach.
  */
 const SIGNED_OUT_FROM_PATHS = ["/app", "/onboarding"] as const;
 
@@ -38,72 +38,63 @@ function pathMatches(
 }
 
 /**
- * Cross-tab auth state listener (📌 DECISION-8).
+ * Cross-tab auth state listener (📌 DECISION-8 + amended Decision N).
  *
  * Mounted at the ROOT layout (apps/web/app/layout.tsx) — NOT the
  * (authed) layout — so the listener is live on every surface,
- * including /login itself. Per US-6 AS-1 the listener must fire when
- * both tabs are at /login (e.g. user opens two sign-in tabs, signs
- * in via Tab A, expects Tab B to follow), which would not work if
- * the listener only mounted inside the (authed) tree.
+ * including /login itself. Per US-6 AS-1 the listener must fire
+ * when both tabs are at /login (e.g. user opens two sign-in tabs,
+ * signs in via Tab A, expects Tab B to follow), which would not
+ * work if the listener only mounted inside the (authed) tree.
  *
  * Lives under components/ rather than under app/ so the app/
  * directory stays route-only (medium-fix-14 in plan.md).
  *
  * Returns null — no visible UI, just side effects.
  *
+ * Subscription target — `window` storage events on the custom key
+ * `serenify-auth-broadcast` (📌 DECISION-N amendment 2026-05-22,
+ * see CHANGELOG). The original Decision N pointed at supabase-js's
+ * storage-event firing, which assumes session-in-localStorage.
+ * @supabase/ssr stores the session in COOKIES, so supabase-js's
+ * cross-tab BroadcastChannel never fires for the Server-Action
+ * sign-in / sign-out path feature 001 uses. The marker-on-
+ * localStorage bridge in lib/auth-broadcast.ts is what makes
+ * cross-tab work in cookie-session world.
+ *
  * FR-046 navigation rules (pathname-gated):
- *   - SIGNED_IN  on /, /login, /signup, /forgot-password,
+ *   - "signin"  on /, /login, /signup, /forgot-password,
  *     /reset-password  →  router.push("/app")
- *   - SIGNED_OUT on /app, /onboarding  →  router.push("/login")
- *   - TOKEN_REFRESHED  →  no-op, regardless of pathname
+ *   - "signout" on /app, /onboarding  →  router.push("/login")
  *   - All other transitions  →  no-op
  *
- * Storage-event mechanics: supabase-js (the @supabase/ssr browser
- * client) subscribes its own `storage` listener internally when
- * persistSession is enabled (the default). When Tab A's
- * onAuthStateChange fires due to a sign-in, the same client writes
- * the new session to localStorage; Tab B's `storage` event handler
- * picks it up and re-emits onAuthStateChange in Tab B. The listener
- * here sees that re-emission and navigates if the pathname matches.
- *
- * Subscription cleanup: the effect captures the
- * `{ data: { subscription } }` return value and calls
- * subscription.unsubscribe() on cleanup. The effect re-runs when
- * pathname changes — which is fine, because we WANT the listener
- * to evaluate against the latest pathname. The re-subscribe window
- * is sub-millisecond.
+ * The window `storage` event fires in OTHER same-origin
+ * documents — not in the tab that wrote — so the tab that
+ * called broadcastSignIn/broadcastSignOut won't react to its
+ * own broadcast (and shouldn't, because it's navigating itself
+ * via the same flow that wrote the marker).
  */
 export function CrossTabAuth(): null {
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    const supabase = createClient();
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "TOKEN_REFRESHED") return;
-
-      if (
-        event === "SIGNED_IN" &&
-        pathMatches(pathname, SIGNED_IN_FROM_PATHS)
-      ) {
+    function onStorage(event: StorageEvent) {
+      if (event.key !== AUTH_BROADCAST_KEY) return;
+      const auth = parseAuthBroadcast(event.newValue);
+      if (auth === "signin" && pathMatches(pathname, SIGNED_IN_FROM_PATHS)) {
         router.push("/app");
-        return;
-      }
-
-      if (
-        event === "SIGNED_OUT" &&
+      } else if (
+        auth === "signout" &&
         pathMatches(pathname, SIGNED_OUT_FROM_PATHS)
       ) {
         router.push("/login");
-        return;
       }
-    });
+    }
 
+    window.addEventListener("storage", onStorage);
     return () => {
-      subscription.unsubscribe();
+      window.removeEventListener("storage", onStorage);
     };
   }, [pathname, router]);
 

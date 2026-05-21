@@ -290,6 +290,90 @@ This is a plan AMENDMENT recorded via CHANGELOG, not a re-decision.
 Any future re-init must use the manual path until shadcn's defaults
 realign with the Decision A/B/E target shape.
 
+## 2026-05-22 — plan(003-employee-dashboard-shell) — Decision N amendment: explicit broadcast helper replaces supabase-js storage propagation
+
+Phase 11 implementation surfaced a mismatch between Decision N's
+mechanism and feature 001's session model. Decision N (research.md
+R-15) assumed `supabase.auth.onAuthStateChange`'s built-in
+cross-tab firing — which relies on the session living in
+localStorage so the `storage` event fires in sibling same-origin
+tabs.
+
+The actual implementation uses `@supabase/ssr`'s
+`createBrowserClient`, which stores the session in **cookies**, not
+localStorage. supabase-js's cross-tab BroadcastChannel is keyed
+on the localStorage `storageKey`; with a cookie-based session,
+no localStorage write happens on sign-in / sign-out, so no
+`storage` event fires cross-tab, so onAuthStateChange never sees
+the transition in sibling tabs.
+
+A Playwright probe captured the symptom directly: after Tab A
+signs in via the `/login` form (Server Action path that sets
+cookies server-side), Tab B's `localStorage.keys()` was `[]`. The
+listener subscription was healthy; the underlying event simply
+never reached it.
+
+**Amendment**: bridge the cross-tab path with a tiny explicit
+broadcast helper. Sign-in / sign-out callers write a marker
+value to `localStorage` under the key
+`serenify-auth-broadcast`. Sibling tabs receive the `storage`
+event on that key and navigate per FR-046's pathname rules. The
+listener subscription target shifts from
+`supabase.auth.onAuthStateChange` to
+`window.addEventListener("storage", ...)`.
+
+**Affected artifacts**, all updated in the implementing commit:
+
+  - `apps/web/lib/auth-broadcast.ts` (new) — exports
+    `AUTH_BROADCAST_KEY`, `broadcastSignIn`,
+    `broadcastSignOut`, `parseAuthBroadcast`. Single source of
+    truth for the key + value format.
+  - `apps/web/components/cross-tab-auth.tsx` — subscribes to
+    `window` storage events on the broadcast key; pathname-gated
+    navigation per FR-046 stays unchanged. Same mount point
+    (root layout per Decision 8) and same return-null contract.
+  - `apps/web/components/cross-tab-auth.test.tsx` — Vitest
+    suite rewritten to fire synthetic StorageEvents instead of
+    mocking supabase callbacks. 22 cases cover every
+    pathname × event combination plus the storage-event
+    negative space (wrong key, unrecognised value, null
+    newValue, unmount, pathname re-subscribe).
+  - `apps/web/app/(auth)/login/login-form.tsx` — calls
+    `broadcastSignIn()` immediately before `router.replace
+    ("/app")` on a successful sign-in. Writing to localStorage
+    before the navigation ensures sibling tabs see the storage
+    event while their listeners are still at the
+    pre-navigation pathname.
+  - `apps/web/components/sign-out-button.tsx` — form's onSubmit
+    calls `broadcastSignOut()`. Fires synchronously before the
+    Server Action runs.
+  - `apps/web/components/header/profile-dropdown.tsx` — hidden
+    form's onSubmit also calls `broadcastSignOut()`. Both
+    sign-out paths converge on the same broadcast.
+
+Original Decision N's intent — single-context, two-page
+Playwright spec; storage-event mechanics; UI-driven sign-in and
+sign-out — is preserved. Only the underlying event source
+changes.
+
+The shared-localStorage requirement that Decision N called out
+for the Playwright spec still holds: `browser.newContext()` +
+two `context.newPage()` instances share localStorage, so the
+storage event fires in pageB when pageA writes via the
+broadcast helper. Two contexts would not share localStorage and
+the cross-tab path would never fire.
+
+Bonus contract clarification: same-context cross-tab password
+changes propagate as `USER_UPDATED` events (not `SIGNED_OUT`)
+because both tabs share the rotated session via cookies. The
+cross-tab listener correctly ignores `USER_UPDATED`. The Phase 6
+"cross-tab session invalidation on password change" flag was
+based on a misread of supabase-js's behavior in
+cookie-session mode; no propagation is needed and none should
+happen. (Other-device session invalidation is a separate
+concern handled by Supabase's refresh-token rotation, not by
+this listener.)
+
 ## 2026-05-22 — plan(003-employee-dashboard-shell) — Decision L admin subtitle: "available below" → "available from the header dropdown"
 
 Phase 10 manual smoke (T058) surfaced a copy-vs-layout disconnect
