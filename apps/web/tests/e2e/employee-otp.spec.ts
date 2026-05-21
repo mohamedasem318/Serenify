@@ -35,7 +35,12 @@ test("employee can sign up and verify with the 6-digit OTP fallback (FR-020)", a
   // Proxy lands the verified user on /app (full_name was carried via
   // raw_user_meta_data at signup, so no onboarding stop).
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByTestId("role-banner")).toHaveText(
-    /signed in as an employee/i,
-  );
+  // Phase 7 T044: the role-banner testid is no longer rendered for
+  // employees — they see the welcome banner + skeleton cards now.
+  // T057's "drop role-banner / use welcome banner" guidance applied
+  // here; the locked Decision M subtitle is the deterministic employee
+  // signal that survives time-of-day greeting variation.
+  await expect(
+    page.getByText("A space to check in with yourself."),
+  ).toBeVisible();
 });
