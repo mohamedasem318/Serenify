@@ -9,13 +9,25 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        // Primary CTA. Uses Mist & Meadow's ink + bg pair directly
+        // (same idiom as the (auth) submit buttons: Sign in, Create
+        // account, Update password). Yields ~13:1 contrast in light
+        // mode and ~14:1 in dark — well above WCAG AA. The hover
+        // opacity-90 mirrors the (auth) pattern for visual continuity
+        // between the sign-up funnel and the in-app primary actions.
+        default: "bg-ink text-bg hover:opacity-90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
           "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        // Secondary action with character. Outlined meadow on a
+        // surface tile carries the brand accent without competing
+        // with the primary's solid ink. Yields AAA contrast in both
+        // modes for the ink-on-surface text (~13:1 light, ~12:1 dark)
+        // and a meadow border that signals brand-button. Hover wash
+        // is meadow at 10% — feedback without contrast collapse.
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+          "bg-surface text-ink border border-meadow hover:bg-meadow/10",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
       },

@@ -11,7 +11,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field } from "@/components/ui/auth/field";
 import { PasswordRequirements } from "@/components/ui/auth/password-requirements";
-import { CALM_SECONDARY_BUTTON } from "@/components/sign-out-button";
 import {
   changePasswordSchema,
   type ChangePasswordInput,
@@ -139,11 +138,7 @@ export function SecuritySection() {
           </p>
         )}
 
-        <Button
-          type="submit"
-          disabled={pending}
-          className={CALM_SECONDARY_BUTTON}
-        >
+        <Button type="submit" variant="secondary" disabled={pending}>
           {pending ? "Saving…" : "Save password"}
         </Button>
       </form>
