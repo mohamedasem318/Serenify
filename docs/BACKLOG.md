@@ -394,3 +394,60 @@ typography bump, avatar disc dark-mode tint, muted-on-bg
 contrast). Card heading typography belongs in the same revision
 because it touches the same family/weight/scale decisions the
 mobile-typography-bump entry already names.
+
+### Cursor pointer on Link-wrapped anchors and other clickable surfaces
+**Status**: polish
+**Observed**: 2026-05-22, feature 003 Phase 8 eyeball (T048 re-look)
+**Description**: Mohamed confirmed the cursor-pointer treatment
+on the shadcn Button base (9cdfb6b) and the ChatPill (81cdb39)
+feels right - hovering a button shows the pointing-finger cursor
+as expected. Wants the same affordance extended to other
+clickable elements that currently fall back to the default arrow
+cursor under Tailwind v4's preflight:
+
+  - `<Link>` (Next.js) wrapped anchors throughout the (authed)
+    surface - the "Account" row in the profile dropdown (which
+    uses `<DropdownMenuItem asChild><Link>...`), CenterNav's
+    "Home" link, the MobileMenu's sheet links, the Serenify
+    wordmark link in the header, the forthcoming employee-shell
+    spec's Account / Sign out / theme-toggle navigation paths.
+  - Any future clickable non-Button surface (radio cards,
+    sortable list items, expandable rows in features 010+).
+
+Tailwind v4's preflight removes the native `cursor: pointer`
+from anchors AND buttons (the button case was the source of
+9cdfb6b's fix). Anchors carrying interactive behaviour through
+`<Link>` or onClick handlers should restore the cursor so the
+affordance reads as clickable.
+
+Restoring it is a single globals.css rule under `@layer base`
+covering the broad class of clickable elements without forcing
+every call-site to add `cursor-pointer`:
+
+```css
+@layer base {
+  a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+```
+
+The `button:not(:disabled)` half is redundant with shadcn
+Button's `cursor-pointer disabled:cursor-not-allowed` (9cdfb6b),
+but having a base rule means future bespoke `<button>` elements
+(if any) also inherit the affordance without needing to
+remember the className. Decision belongs in the design-system
+pass: bare CSS rule vs. per-component className vs. a Tailwind
+plugin that injects the class. Probably option A (bare CSS) is
+simplest.
+
+**Fix scope**: small. One `@layer base` block in
+`apps/web/app/globals.css`. No structural impact; no tests
+break (no spec asserts on `cursor:` properties).
+
+**Address by**: design-system pass — bundle with the five
+existing entries above (button-system character, mobile/tablet
+typography bump, avatar disc dark-mode tint, muted-on-bg
+contrast, card heading typography). Cursor affordance is part
+of the same UX-polish revision. Not blocking any in-progress
+phase.
