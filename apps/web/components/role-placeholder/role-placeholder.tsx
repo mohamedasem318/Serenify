@@ -21,8 +21,11 @@ const COPY: Record<Role, { heading: string; subtitle: string }> = {
   },
   admin: {
     heading: "Your admin view is in progress.",
+    // Subtitle amended 2026-05-22 (see CHANGELOG). The prior wording
+    // ended in "available below." which was misdirective — Account
+    // lives in the header dropdown, not below the subtitle.
     subtitle:
-      "Org-wide tools land in a later release. Account settings are available below.",
+      "Org-wide tools land in a later release. Account settings are available from the header dropdown.",
   },
 };
 

@@ -57,13 +57,23 @@ describe("RolePlaceholder — admin variant", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the locked Decision L subtitle", () => {
+  it("renders the locked Decision L subtitle (amended 2026-05-22)", () => {
     render(<RolePlaceholder role="admin" />);
     expect(
       screen.getByText(
-        "Org-wide tools land in a later release. Account settings are available below.",
+        "Org-wide tools land in a later release. Account settings are available from the header dropdown.",
       ),
     ).toBeInTheDocument();
+  });
+
+  it("does NOT render the superseded 'available below' wording", () => {
+    render(<RolePlaceholder role="admin" />);
+    // Locks the amendment against future regression — if someone
+    // reverts the subtitle to the pre-2026-05-22 wording without a
+    // CHANGELOG entry, this assertion catches it.
+    expect(
+      screen.queryByText(/Account settings are available below\./),
+    ).not.toBeInTheDocument();
   });
 
   it("does NOT render the team_lead copy variant", () => {

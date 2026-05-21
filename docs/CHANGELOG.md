@@ -289,3 +289,49 @@ manual-init result.
 This is a plan AMENDMENT recorded via CHANGELOG, not a re-decision.
 Any future re-init must use the manual path until shadcn's defaults
 realign with the Decision A/B/E target shape.
+
+## 2026-05-22 — plan(003-employee-dashboard-shell) — Decision L admin subtitle: "available below" → "available from the header dropdown"
+
+Phase 10 manual smoke (T058) surfaced a copy-vs-layout disconnect
+in the admin role-placeholder subtitle. The locked Decision L
+copy ended in "Account settings are available below." but the
+placeholder body has only the Sign out button below the subtitle
+— Account lives in the header dropdown, not "below." The phrasing
+sent admins looking for an affordance the layout never showed.
+
+**Amendment**: the admin subtitle becomes:
+
+  "Org-wide tools land in a later release. Account settings are
+  available from the header dropdown."
+
+Previous wording (superseded): "Org-wide tools land in a later
+release. Account settings are available below."
+
+The team_lead subtitle is unchanged.
+
+The replacement keeps the constraints Decision L's original copy
+satisfied: informational, no exclamation marks, no clinical or
+alarmist phrasing, calm voice. "From the header dropdown" is a
+concrete locator — admins reading it know exactly where to look.
+
+**Affected artifacts**, all updated in the implementing commit:
+
+  - `specs/003-employee-dashboard-shell/plan.md` Decision L —
+    amended subtitle named; previous subtitle preserved
+    alongside as superseded.
+  - `apps/web/components/role-placeholder/role-placeholder.tsx`
+    — COPY.admin.subtitle string updated; inline comment notes
+    the amendment date and points at this CHANGELOG entry.
+  - `apps/web/components/role-placeholder/role-placeholder.test.tsx`
+    — admin subtitle assertion swapped to the amended wording;
+    a new assertion locks the negative space ("available below"
+    is NOT present) to catch a future revert.
+  - `apps/web/tests/e2e/admin-seeded.spec.ts` — adds the
+    subtitle assertion alongside the existing heading
+    assertion. Permitted by FR-036's copy-only-change scope
+    (the spec already updated for the role-banner removal in
+    6420799; this commit refines the same assertion block).
+
+No layout change. No new tokens. No new components. The
+amendment is one sentence of copy + the test coverage that
+locks it.

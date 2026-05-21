@@ -716,8 +716,14 @@ Insights nav item.
     privacy. Check back soon."
 - **admin**
   - Heading: "Your admin view is in progress."
-  - Subtitle: "Org-wide tools land in a later release. Account
-    settings are available below."
+  - Subtitle (amended 2026-05-22 — see CHANGELOG): "Org-wide tools
+    land in a later release. Account settings are available from
+    the header dropdown."
+  - Previous subtitle (superseded): "Org-wide tools land in a
+    later release. Account settings are available below." The
+    "below" was misdirective — the placeholder layout has only
+    the Sign out button below the subtitle; Account lives in the
+    header dropdown.
 
 Layout for both: centered single column, generous whitespace
 (`py-24 sm:py-32`), DM Serif Display heading at the same scale as the

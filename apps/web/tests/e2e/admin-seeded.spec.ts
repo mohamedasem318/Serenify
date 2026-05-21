@@ -42,11 +42,19 @@ test("seeded admin can invite another admin; employee invite caller is 403", asy
   await signInAs(page, { email: newAdminEmail, password: TEST_PASSWORD });
   // Phase 10 T055/T057: the role-banner testid is gone for managers
   // too. Admins see the RolePlaceholder with Decision L copy.
+  // Subtitle assertion locks the 2026-05-22 amendment (see
+  // CHANGELOG) so a future revert of the placeholder copy doesn't
+  // silently pass the heading-only check.
   // Copy-only assertion per FR-036.
   await expect(
     page.getByRole("heading", {
       name: "Your admin view is in progress.",
     }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(
+      "Org-wide tools land in a later release. Account settings are available from the header dropdown.",
+    ),
   ).toBeVisible();
 
   // Now seed an employee and confirm their /api/admin/invite is 403.
