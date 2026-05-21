@@ -7,6 +7,7 @@ import {
   AUTH_BROADCAST_KEY,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
+import { createClient } from "@/lib/supabase/client";
 
 /**
  * Pathnames where a sibling tab's sign-in should pull this tab to
@@ -88,7 +89,26 @@ export function CrossTabAuth(): null {
         auth === "signout" &&
         pathMatches(pathname, SIGNED_OUT_FROM_PATHS)
       ) {
-        router.push("/login");
+        // Race-condition guard: the originating tab's Server Action
+        // clears session cookies via its HTTP response, which may
+        // not have landed in the browser by the time the broadcast's
+        // storage event fires. If we router.push("/login") right
+        // now, feature 001's proxy.ts sees the still-valid cookies
+        // and redirects us back to /app. Calling supabase.auth.signOut()
+        // locally ensures the cookies are cleared (it issues its own
+        // logout request and a Set-Cookie clearing response) before
+        // we navigate. The IIFE swallows any auth-server error so
+        // the navigation still happens — best-effort UX.
+        void (async () => {
+          try {
+            await createClient().auth.signOut();
+          } catch {
+            // Auth server unreachable or already-cleared session —
+            // navigate anyway so the user isn't stuck on the authed
+            // surface.
+          }
+          router.push("/login");
+        })();
       }
     }
 
