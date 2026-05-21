@@ -69,16 +69,13 @@ export function SecuritySection() {
       aria-labelledby="account-security-heading"
       className="space-y-6"
     >
-      <header className="space-y-1.5">
+      <header>
         <h2
           id="account-security-heading"
           className="font-display text-2xl leading-tight text-ink"
         >
           Security
         </h2>
-        <p className="text-sm leading-relaxed text-muted">
-          Change your password without leaving the page.
-        </p>
       </header>
 
       <form
