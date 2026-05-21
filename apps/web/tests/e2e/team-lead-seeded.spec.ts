@@ -37,10 +37,14 @@ test("seeded team_lead can be invited and signs in to their role placeholder", a
   await signOut(page);
   await signInAs(page, { email: leadEmail, password: TEST_PASSWORD });
 
-  // Role banner reflects team_lead.
-  await expect(page.getByTestId("role-banner")).toHaveText(
-    /signed in as a team lead/i,
-  );
+  // Phase 10 T055/T057: the role-banner testid is gone for managers.
+  // team_leads see the RolePlaceholder with Decision L copy.
+  // Copy-only assertion per FR-036.
+  await expect(
+    page.getByRole("heading", {
+      name: "Your team-lead view is coming together.",
+    }),
+  ).toBeVisible();
 
   // POST /api/admin/invite from the team_lead session is forbidden.
   const forbiddenResponse = await page.request.post("/api/admin/invite", {

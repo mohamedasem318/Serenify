@@ -40,9 +40,14 @@ test("seeded admin can invite another admin; employee invite caller is 403", asy
   });
   await signOut(page);
   await signInAs(page, { email: newAdminEmail, password: TEST_PASSWORD });
-  await expect(page.getByTestId("role-banner")).toHaveText(
-    /signed in as an admin/i,
-  );
+  // Phase 10 T055/T057: the role-banner testid is gone for managers
+  // too. Admins see the RolePlaceholder with Decision L copy.
+  // Copy-only assertion per FR-036.
+  await expect(
+    page.getByRole("heading", {
+      name: "Your admin view is in progress.",
+    }),
+  ).toBeVisible();
 
   // Now seed an employee and confirm their /api/admin/invite is 403.
   await signOut(page);
