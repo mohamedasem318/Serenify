@@ -1,51 +1,57 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 
 /**
  * SSR-safe matchMedia hook.
  *
  *   useMediaQuery("(min-width: 768px)") → boolean
  *
- * Returns `false` during SSR and on the first client render. After
- * mount, the first effect queries `matchMedia(query).matches` and
- * subscribes to its `change` event, flipping the state to the real
- * value and tracking subsequent viewport changes.
+ * Returns `false` during SSR (and on the first client render before
+ * the store resolves) — matches the server's "no viewport knowledge"
+ * default and prevents hydration mismatch. After mount,
+ * useSyncExternalStore queries `matchMedia(query).matches`,
+ * subscribes to the `change` event, and re-renders on viewport
+ * transitions.
  *
- * The deliberate "false during SSR + first client render" choice
- * prevents hydration mismatch: the server can't know the viewport,
- * so any value other than false would risk diverging from the
- * client. Consumers should design their default-state UI to be
- * correct at `false` — e.g. the notification component renders its
- * desktop slide-in variant when `useMediaQuery("(max-width: 768px)")`
- * is false, which matches what the SSR pass would produce.
+ * Built on useSyncExternalStore (React's recommended pattern for
+ * sync-with-external-state) rather than useState + useEffect because
+ * the latter trips react-hooks/set-state-in-effect — calling
+ * setState synchronously inside an effect to seed initial external
+ * state is exactly the cascading-render anti-pattern that rule
+ * catches.
  *
  * Used by:
- *   - components/notification.tsx (Step 8 / T051)
+ *   - components/notification.tsx (Step 8 / T051) for desktop /
+ *     mobile variant gating.
  *   - any future component that needs runtime viewport awareness
- *     beyond what Tailwind's responsive classes can express
+ *     beyond what Tailwind's responsive classes can express.
  *
  * Not used by the header / center nav / chat pill — those gate
  * visibility via Tailwind responsive utilities which are SSR-safe
  * without a hook.
  */
 export function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState<boolean>(false);
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (typeof window === "undefined" || !window.matchMedia) {
+        return () => {};
+      }
+      const mql = window.matchMedia(query);
+      mql.addEventListener("change", onChange);
+      return () => {
+        mql.removeEventListener("change", onChange);
+      };
+    },
+    [query],
+  );
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !window.matchMedia) return;
-
-    const mql = window.matchMedia(query);
-    setMatches(mql.matches);
-
-    const onChange = (event: MediaQueryListEvent) => {
-      setMatches(event.matches);
-    };
-    mql.addEventListener("change", onChange);
-    return () => {
-      mql.removeEventListener("change", onChange);
-    };
+  const getSnapshot = useCallback(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return false;
+    return window.matchMedia(query).matches;
   }, [query]);
 
-  return matches;
+  const getServerSnapshot = () => false;
+
+  return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
