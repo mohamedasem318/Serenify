@@ -133,16 +133,17 @@ export function Notification({
                   "fixed z-50 border border-border bg-surface p-6 text-ink shadow-soft",
                   isMobile
                     ? "inset-x-0 bottom-0 rounded-t-card"
-                    : "right-4 w-80 max-w-[calc(100vw-2rem)] rounded-card",
+                    : // bottom expression lives in a Tailwind arbitrary-
+                      // value class instead of an inline style because
+                      // framer-motion's animate engine overwrites
+                      // element.style each frame (opacity, transform,
+                      // pointer-events); the class rule survives that
+                      // overwrite. The var() chain still resolves at
+                      // runtime — `--chat-pill-offset` is set on <html>
+                      // by ChatPill (81cdb39) when employees mount;
+                      // manager pages get the 0px fallback automatically.
+                      "right-4 w-80 max-w-[calc(100vw-2rem)] rounded-card bottom-[calc(1rem+var(--chat-pill-offset,0px)+1rem)]",
                 )}
-                style={
-                  isMobile
-                    ? undefined
-                    : {
-                        bottom:
-                          "calc(1rem + var(--chat-pill-offset, 0px) + 1rem)",
-                      }
-                }
                 initial={motionVariants.initial}
                 animate={motionVariants.animate}
                 exit={motionVariants.exit}
