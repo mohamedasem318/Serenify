@@ -118,6 +118,28 @@ describe("SecuritySection", () => {
     expect(changePasswordMock).not.toHaveBeenCalled();
   });
 
+  it("surfaces the action's same-password message verbatim", async () => {
+    changePasswordMock.mockResolvedValue({
+      status: "invalid",
+      message: "That's already your current password — try a different one.",
+    });
+    const user = userEvent.setup();
+    render(<SecuritySection />);
+    await fillForm(user, {
+      current: STRONG_PW,
+      next: STRONG_PW,
+      confirm: STRONG_PW,
+    });
+    await user.click(screen.getByRole("button", { name: /Save password/ }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toHaveTextContent(
+        "That's already your current password — try a different one.",
+      );
+    });
+    expect(changePasswordMock).toHaveBeenCalledTimes(1);
+  });
+
   it("surfaces the action's wrong-current-password message verbatim", async () => {
     changePasswordMock.mockResolvedValue({
       status: "invalid",

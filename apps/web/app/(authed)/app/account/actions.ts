@@ -88,6 +88,20 @@ export async function changePassword(
     };
   }
 
+  // Catch the "I retyped my current password into the new field" case
+  // before hitting Supabase. supabase.auth.updateUser would silently
+  // succeed on a no-op password write, which leaks the (probably
+  // unintentional) sameness back through the generic "couldn't update"
+  // fallback — wrong message for the actual user mistake. Compared
+  // here in plain text because both values are already in memory and
+  // never leave the server action.
+  if (parsed.data.new_password === parsed.data.current_password) {
+    return {
+      status: "invalid",
+      message: "That's already your current password — try a different one.",
+    };
+  }
+
   // Verify the current password via a throwaway anon client so the
   // user's existing session cookies aren't replaced by a fresh sign-in.
   // The SSR client at @/lib/supabase/server would also work, but
