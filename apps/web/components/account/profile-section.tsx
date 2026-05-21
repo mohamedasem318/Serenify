@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 
@@ -46,7 +46,7 @@ export function ProfileSection({
     register,
     handleSubmit,
     reset,
-    watch,
+    control,
     formState: { errors, isDirty },
   } = useForm<ProfileInput>({
     resolver: zodResolver(profileSchema),
@@ -54,7 +54,11 @@ export function ProfileSection({
     defaultValues: { full_name: initialFullName },
   });
 
-  const watchedName = watch("full_name") ?? "";
+  // useWatch (not the watch() function returned by useForm) is the
+  // memoization-safe way to read a single field reactively — matches
+  // the SecuritySection / reset-form.tsx pattern and clears the
+  // react-hooks/incompatible-library warning that watch() emits.
+  const watchedName = useWatch({ control, name: "full_name" }) ?? "";
   const avatarName = (watchedName.trim() || displayName).trim();
   const initials = deriveInitials(avatarName || null, email);
 
