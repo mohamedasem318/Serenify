@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, DM_Serif_Display } from "next/font/google";
+import { CrossTabAuth } from "@/components/cross-tab-auth";
 import { Providers } from "./providers";
 import "./globals.css";
 
@@ -46,6 +47,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-full flex flex-col">
+        <CrossTabAuth />
         <Providers>{children}</Providers>
       </body>
     </html>
