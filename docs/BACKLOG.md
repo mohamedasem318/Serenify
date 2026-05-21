@@ -269,3 +269,65 @@ in feature implementation work; deserves its own task.
 **Address by**: secondary-text contrast, not blocking — primary text
 reads fine and WCAG AA-large threshold (3:1) is satisfied. Belongs
 in a deliberate token-tuning pass, not in active feature work.
+
+### Button-system character pass — semantic-weight differentiation + variant cleanup
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 6 polish re-eyeball
+**Description**: Post-Phase-6, `button.tsx` ships three production
+variants — `default` (bg-ink + bg-color text, AAA in both modes),
+`secondary` (bg-surface + ink text + meadow border + meadow/10
+hover, AAA in both modes), `destructive` (FR-042 crimson, AAA).
+Contrast is solved. Character is not. Mohamed's re-eyeball
+flagged that the variants feel under-differentiated — they
+"match the theme" but lack distinct identity, and `Sign out`
+specifically reads as **perceptually destructive** even though
+it isn't data-destructive: it ends the session and requires
+re-auth to come back. Currently `Sign out` and `Save password`
+share `variant="secondary"`, which the visual hierarchy doesn't
+distinguish from each other or signal Sign out's session-boundary
+weight.
+
+Calm-first (Constitution V) intentionally restrains the palette;
+FR-042 scopes amber and crimson to specific use cases. Richer
+character requires either (a) variant tweaks within the existing
+palette (e.g. `Sign out` → `ghost` for "peripheral exit" framing,
+or a distinct sign-out-specific treatment that acknowledges
+perceptual weight without invoking crimson), or (b) a
+constitution-level amendment introducing a fourth scoped color
+(e.g. session-boundary actions). Either decision belongs in a
+dedicated design-system pass, not a piecemeal Phase 6 patch.
+
+Also outstanding (bundled into the same pass for coherence):
+  - `variant="ghost"` and `variant="outline"` hover state in
+    dark mode currently resolves to bg-accent (foggy) +
+    text-accent-foreground (ink-light) = ~1.49:1 — hard fail
+    WCAG AA. No production surface uses them yet, so deferred
+    rather than patched.
+  - `variant="link"` uses `text-primary` (= meadow) which gives
+    ~3:1 contrast against light bg-bg — fails AA for normal
+    text. No production surface uses it yet.
+  - `variant="secondary"` hover wash `bg-meadow/10` computed
+    ratio wasn't fully verified in the Phase 6 probe (the 10%
+    overlay didn't parse cleanly via regex). Visual inspection
+    is fine; the math deserves a proper measurement.
+
+**Fix scope**: medium. Bundle with the existing M&M token-tuning
+queue (avatar disc dark-mode greyness, muted-on-bg light-mode
+contrast under AA, mobile/tablet typography bump) so the four
+items land as ONE coherent design-tokens revision instead of
+four sequential patches that each touch overlapping surfaces.
+
+Specifics the future pass should evaluate:
+  - Sign out variant choice: does it warrant its own visual
+    treatment distinct from both primary action AND `Save
+    password`? Mohamed's "perceptually destructive" framing is
+    the conversation starter here.
+  - Fix ghost/outline dark-mode hover contrast.
+  - Fix link variant light-mode contrast.
+  - Measure secondary hover wash in computed ratio terms.
+  - Decide whether to amend FR-042 with a fourth scoped color
+    or hold the line at three (meadow / amber / crimson).
+
+**Address by**: design-system pass — same workstream as the
+three existing token-tuning entries above. Not blocking any
+in-progress feature; deferred polish.
