@@ -286,7 +286,7 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
 
 ### Implementation for Steps 11–12
 
-- [ ] T064 [P] [US1] [US2] Create `apps/web/tests/e2e/employee-dashboard-shell.spec.ts` — the Playwright happy-path covering US 1 and US 2:
+- [x] T064 [P] [US1] [US2] Create `apps/web/tests/e2e/employee-dashboard-shell.spec.ts` — the Playwright happy-path covering US 1 and US 2:
   1. Sign in as a `*@demo.serenify.local` employee.
   2. Assert `/app` shows the welcome banner with the adaptive greeting + first name; the three skeleton cards in the documented order; the persistent header; the chat pill bottom-right.
   3. Click the theme toggle. Reload. Assert theme persists.
