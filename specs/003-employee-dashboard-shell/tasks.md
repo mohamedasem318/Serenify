@@ -296,7 +296,7 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
   7. Click the bottom Sign out button. Assert at `/login`.
 
   This is the SC-012 employee-role Playwright gate.
-- [ ] T065 [P] Grep `apps/web/` for stale import paths after the extraction:
+- [x] T065 [P] Grep `apps/web/` for stale import paths after the extraction:
   - `from "@/components/ui/password-input"` → expected zero matches (all paths use `@/components/ui/auth/password-input` now).
   - `from "@/components/ui/password-requirements"` → expected zero.
   - `from "./otp-panel"` → expected zero (all paths use `@/components/ui/auth/otp-panel`).
