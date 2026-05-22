@@ -69,15 +69,11 @@ test("employee shell: sign-in → /app → theme → account edit → password c
   await expect(
     page.getByText("A space to check in with yourself."),
   ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Today's check-in" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Things that might help" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Recent chats" }),
-  ).toBeVisible();
+  // shadcn CardTitle renders as a <div>, not a heading — use text
+  // matching instead of getByRole("heading").
+  await expect(page.getByText("Today's check-in")).toBeVisible();
+  await expect(page.getByText("Things that might help")).toBeVisible();
+  await expect(page.getByText("Recent chats")).toBeVisible();
   await expect(page.getByTestId("chat-pill")).toBeVisible();
   // Header: logo link to /app, theme toggle, profile avatar trigger.
   await expect(page.getByLabel("Go to home")).toBeVisible();
@@ -142,10 +138,16 @@ test("employee shell: sign-in → /app → theme → account edit → password c
   // ProfileSection calls router.refresh() in the success branch, which
   // re-renders the (authed) layout server component on the same render
   // cycle as the "Saved." status flip.
+  const profileSection = page.locator(
+    "section[aria-labelledby='account-profile-heading']",
+  );
+  const securitySection = page.locator(
+    "section[aria-labelledby='account-security-heading']",
+  );
   const nameField = page.getByLabel("Full name");
   await nameField.fill(RENAMED_FULL_NAME);
   await page.getByRole("button", { name: "Save changes" }).click();
-  await expect(page.getByRole("status")).toHaveText("Saved.");
+  await expect(profileSection.getByRole("status")).toHaveText("Saved.");
 
   // No page.reload() before this dropdown check — if it shows the new
   // name, the same render cycle that flipped to "Saved." re-fetched
@@ -170,7 +172,9 @@ test("employee shell: sign-in → /app → theme → account edit → password c
     .getByLabel("Confirm new password", { exact: true })
     .fill(newPassword);
   await page.getByRole("button", { name: "Save password" }).click();
-  await expect(page.getByRole("status")).toHaveText("Password updated.");
+  await expect(securitySection.getByRole("status")).toHaveText(
+    "Password updated.",
+  );
 
   // ── Step 8: bottom Sign out button (SignOutSection / SignOutButton —
   // distinct from the dropdown's sign out, FR-022 + sign-out-styling-
@@ -205,15 +209,11 @@ test("employee shell at 360px: hamburger menu, single-column cards, icon-only ch
   // their x coordinates are roughly aligned (within a few px) and the
   // y coordinates are strictly increasing. Direct grid-template-columns
   // probing would couple the test to Tailwind class names.
-  const checkin = await page
-    .getByRole("heading", { name: "Today's check-in" })
-    .boundingBox();
+  const checkin = await page.getByText("Today's check-in").boundingBox();
   const things = await page
-    .getByRole("heading", { name: "Things that might help" })
+    .getByText("Things that might help")
     .boundingBox();
-  const recent = await page
-    .getByRole("heading", { name: "Recent chats" })
-    .boundingBox();
+  const recent = await page.getByText("Recent chats").boundingBox();
   if (!checkin || !things || !recent) {
     throw new Error("Card headings did not produce bounding boxes");
   }

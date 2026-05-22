@@ -301,7 +301,7 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
   - `from "@/components/ui/password-requirements"` → expected zero.
   - `from "./otp-panel"` → expected zero (all paths use `@/components/ui/auth/otp-panel`).
   Any non-zero match → fix the import and re-grep.
-- [ ] T066 Run the full test pass:
+- [x] T066 Run the full test pass:
   - `npm run typecheck --workspace=apps/web` — zero errors.
   - `npm run lint --workspace=apps/web` — zero warnings.
   - `npm run test --workspace=apps/web` — Vitest suite green (all per-component tests + cross-tab-auth reducer test + truncate-name test).
