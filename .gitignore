@@ -65,8 +65,9 @@ fix-notice-light.png
 st1-*.js
 st1-shots/
 
-# Claude Code (per-user local settings, never commit)
-.claude/
+# Claude Code: per-user local settings only; track everything else under .claude/
+# See 7a7beff (PR #3) and DECISIONS.md @ 512c1d6 — never broaden back to `.claude/`
+.claude/settings.local.json
 
 # Playwright MCP server cache
 .playwright-mcp/

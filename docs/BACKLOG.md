@@ -451,3 +451,84 @@ typography bump, avatar disc dark-mode tint, muted-on-bg
 contrast, card heading typography). Cursor affordance is part
 of the same UX-polish revision. Not blocking any in-progress
 phase.
+
+### CI guard for speckit skills + gitignore rule
+**Status**: tech-debt
+**Observed**: 2026-05-22, feature 003 — second regression of
+`.claude/skills/speckit-*/SKILL.md` going missing on disk,
+mirroring the PR #3 incident (7a7beff restore) only days
+earlier. DECISIONS.md @ 512c1d6 already documents the rule;
+documentation alone has not been sufficient.
+**Description**: Two structural failure modes have now each
+caused the spec-kit slash commands (`/speckit.implement` et al)
+to silently stop dispatching:
+
+  - **Mode A — `.gitignore` broadening.** The original `.claude/`
+    rule from d4621fe (feat 001 auth) was inherited into 003's
+    branch base, then never narrowed. PR #3 narrowed it on main
+    to `.claude/settings.local.json` but the change did not
+    propagate to 003 because 003 forked before the PR merged.
+  - **Mode B — branch ancestry drift.** 003 was forked from
+    8dc822b — before the PR #3 merge at 68b7d47 — and was never
+    rebased onto main. The 14 SKILL.md blobs that exist on main
+    (tracked from 7a7beff) are simply absent from 003's tree.
+
+Both modes produce the identical user-facing symptom: typing
+`/speckit.implement` returns no schema; Mohamed has to diagnose
+and Claude has to restore. The cost per occurrence is ~15-20 min
+plus a context reset (CC must restart to register the skills).
+
+A trivial CI check would catch both modes pre-merge:
+
+```js
+// scripts/check-speckit-skills.mjs (sketch)
+import fs from "node:fs";
+const REQUIRED = [
+  "speckit-analyze", "speckit-checklist", "speckit-clarify",
+  "speckit-constitution", "speckit-git-commit", "speckit-git-feature",
+  "speckit-git-initialize", "speckit-git-remote", "speckit-git-validate",
+  "speckit-implement", "speckit-plan", "speckit-specify",
+  "speckit-tasks", "speckit-taskstoissues",
+];
+const missing = REQUIRED.filter(
+  (s) => !fs.existsSync(`.claude/skills/${s}/SKILL.md`),
+);
+if (missing.length) {
+  console.error("Missing speckit skill files:", missing);
+  console.error("See DECISIONS.md @ 512c1d6 and commit 7a7beff.");
+  process.exit(1);
+}
+const gitignore = fs.readFileSync(".gitignore", "utf8");
+if (/^\.claude\/?\s*$/m.test(gitignore)) {
+  console.error(
+    "Broad `.claude/` rule found in .gitignore — narrow to " +
+    "`.claude/settings.local.json` per 7a7beff.",
+  );
+  process.exit(1);
+}
+```
+
+Wire into `package.json` as `"check:speckit-skills": "node
+scripts/check-speckit-skills.mjs"` and add to the CI workflow
+ahead of the test step. Optionally add a husky pre-commit hook
+for the local layer.
+
+**Why this is worth doing despite the existing DECISIONS.md
+entry**: 512c1d6 documents the rule; this guard *enforces* it.
+The first regression happened because a feature commit (d4621fe)
+swept the skills as collateral damage. The second happened
+because a branch was forked before the documenting fix merged.
+Neither failure mode is detectable by reading DECISIONS.md.
+Both are trivially caught by file-existence + regex on
+`.gitignore`. The maintenance surface is near-zero (the rule
+itself does not change unless spec-kit's skill set changes,
+which is a deliberate spec-kit version bump).
+
+**Fix scope**: small — ~25 lines of script, 3 lines of
+`package.json`, 2 lines of CI workflow YAML. ~15 min total.
+
+**Address by**: before feature 004 begins, or sooner if a third
+occurrence is observed. Pair with whoever next touches the CI
+workflow (currently empty per repo structure, so this may also
+be the first CI workflow file — in which case scope grows to
+"medium" to include the workflow scaffolding itself).
