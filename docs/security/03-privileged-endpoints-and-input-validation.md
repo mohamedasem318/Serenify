@@ -84,7 +84,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
   ```
 
   (Allow a `null`/absent Origin so same-origin server-to-server and non-CORS clients are not broken; reject only a *present, mismatched* Origin. Pair with Finding 3's auth-first reordering so the Origin check sits alongside the authN gate.)
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`.
+- **Status**: `adjudicated 2026-05-25 → fix at low`. Severity **held at `low`** — severity is informational and the patch happens regardless; raising to `med` would inflate the rating without changing the fix. The Origin allowlist **is** added (cheap defense-in-depth on a privileged endpoint that gets a browser UI in feature 011; no live exploit today because `SameSite=Lax` already blocks the browser path).
 
 ## Finding 2: Raw Supabase/RPC `error.message` + Zod `issues` forwarded to the client in `/api/admin/invite`
 
@@ -123,7 +123,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
 - **What**: Three independently-defined `full_name` constraints disagree on the maximum length: signup and onboarding allow **120**; the account update path allows **60**. The DB column is unbounded `text` (no `CHECK`). There is no shared `full_name` schema — the rule is written in four places.
 - **Why it's a risk**: **not a security exploit** (OWASP A04 insecure-design / data-integrity). Reachable deterministically with no attacker: a user who sets a 61–120-char name at signup or onboarding (allowed) later lands on `/app/account` where the form's `max(60)` rejects their *existing* name — they cannot save any profile edit until they shorten it. Verified empirically: an 80-char `full_name` persists to `profiles` via the signup/onboarding-equivalent path; the account schema's `max(60)` would reject the same value. The deeper issue is the absent single source of truth — a future change to the rule must be made in four spots or they drift again.
 - **Suggested fix** (fix pass): pick one authoritative cap (120 is the less-breaking choice given data may already be stored at that length), export a single `fullNameSchema` from `lib/auth/schemas.ts`, and consume it in `updateProfileSchema`, `profile-section.tsx` (schema + `maxLength`), and the onboarding/signup schemas. Optionally add a DB `CHECK (char_length(full_name) <= 120)` as the backstop (ties to Finding 6).
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`. Closes the length half of slice-1 Finding 7.
+- **Status**: `adjudicated 2026-05-25 → standardize at max(120)`. Chosen over 60 as the **less-breaking** option: existing data may already exceed 60, compound/cultural names legitimately run >60, and the anti-DoS goal is met by any sub-1KB cap. Fix pass: export a single `fullNameSchema` (cap 120) from `lib/auth/schemas.ts` and consume it in `updateProfileSchema`, `profile-section.tsx` (schema **and** the `maxLength` attribute), and the signup/onboarding schemas. Closes the length half of slice-1 Finding 7.
 
 ## Finding 6: `full_name` accepts arbitrary character classes / control chars / RTL-override and has no hard upper cap
 
@@ -139,7 +139,12 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
   - **Control chars / null bytes** stored in a display field are an integrity smell.
   - **No hard upper cap** at the DB layer: the app schemas cap length, but a non-form writer (a future Server Action, a job, or a direct trigger path) without the Zod gate could persist an arbitrarily large string into an unbounded `text` column.
 - **Suggested fix** (fix pass): tighten the shared `fullNameSchema` (Finding 5) — keep it permissive enough for real names (letters incl. diacritics, spaces, hyphens, apostrophes, periods) but strip/reject C0/C1 control chars and bidi-override codepoints, and add a DB `CHECK (char_length(full_name) <= 120)` as the layer-independent backstop. Render escaping stays the primary XSS control; this is defense-in-depth + integrity.
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`. Closes the character-class half of slice-1 Finding 7; the render-escape half is recorded under Audited-clean.
+- **Status**: `adjudicated 2026-05-25 → DB CHECK + reject (not sanitize), \p{Cc}\p{Cf} only`. Fix pass:
+  - **(a) Add a DB `CHECK (char_length(full_name) <= 120)`** — the unbounded `text` column is an integrity smell independent of app-layer correctness; a future Server Action, scheduled job, or direct write could persist arbitrarily large data without the Zod gate. (This deliberately *diverges* from slice-1 Finding 7's "trust the app layer for character class" routing: **length and character class are different calculus** — length matters even when render-escape holds.)
+  - **(b) Reject, don't sanitize** — silent sanitization is surprising; reject with a friendly message (e.g. "Name can't contain hidden control characters — please remove and try again.").
+  - **(c) Reject only `\p{Cc}\p{Cf}`** (control chars + format chars incl. bidi overrides) via `z.string().refine((s) => !/[\p{Cc}\p{Cf}]/u.test(s), "…")` — **not** a positive whitelist like `[\p{L}\p{M}\p{N} '\-.,]`, which would break legitimate non-Latin names and unusual-but-valid punctuation (e.g. the Catalan middle dot). The minimal-reject approach allows all scripts, marks, punctuation, and symbols, blocking only the never-legitimate-in-a-display-name categories.
+
+  Render escaping stays the primary XSS control; the above is defense-in-depth + integrity. Closes the character-class half of slice-1 Finding 7; the render-escape half is recorded under Audited-clean.
 
 ---
 
