@@ -809,3 +809,53 @@ turns the slice-2 throwaway-Node verification into a permanent regression gate.
 `config.toml` `[auth]` settings affecting the recovery flow. Pairs naturally with
 the "auth-broadcast forward-looking guard" entry above — both harden the auth
 suite against silent regressions.
+
+---
+
+## From security slice 3 (privileged-endpoints-and-input-validation) — in progress
+
+### Invite audit log — record who invited whom
+**Status**: deferred-feature
+**Category**: observability / admin
+**Observed**: 2026-05-25, security slice 3 (Out-of-scope note + Finding 2 review)
+**Description**: `POST /api/admin/invite` records nothing about *who invited
+whom*. The handler has both identifiers in hand at success — the caller's
+verified `user.id` (from `getUser()`) and the invitee's `user_id` (from
+`inviteUserByEmail`) — but writes no audit trail. There is no way after the fact
+to answer "which admin invited this user, and when." For an admin dashboard
+(feature 011) this is table-stakes provenance.
+**Fix scope**: small-to-medium. Two viable shapes:
+  - (a) Structured server-side log line at the 201 branch
+    (`console.info("[invite] issued", { by: user.id, invited: invitedId, role })`)
+    — cheap, immediate, but not queryable from the product.
+  - (b) A dedicated `public.invite_audit` table (`id`, `invited_by`,
+    `invited_user_id`, `role`, `manager_id`, `created_at`) written in the same
+    request — queryable, surfaces invite history in the admin dashboard. Needs a
+    migration + RLS (admin-read-only) and a write from the handler after step 2
+    succeeds.
+**Address by**: feature 011 (admin-dashboard), which is the first consumer that
+needs invite history. Decide (a) vs (b) there; (b) is the durable answer if the
+dashboard surfaces invite provenance.
+
+### Concurrent-duplicate-invite idempotency
+**Status**: tech-debt
+**Category**: handler design / correctness
+**Observed**: 2026-05-25, security slice 3 (Finding 2 empirical — concurrent race)
+**Description**: Two parallel invites for the *same* email produce one `201` and
+one `500`. The handler's `/already/i` → `409` branch only catches the
+**sequential** duplicate (the second request sees GoTrue's "already registered"
+error); two *concurrent* requests both pass the pre-check and the loser falls
+through to the generic `500 invite_failed` (GoTrue raises "Database error saving
+new user" on the unique-constraint collision). The slice-3 fix pass made that 500
+body generic (no raw detail), but the underlying non-idempotent behavior remains:
+a concurrent dupe is a 500, not a clean 409/200.
+**Fix scope**: medium. Introduce an idempotency key — either caller-supplied
+(an `Idempotency-Key` header the admin UI generates per submit) or derived from
+`(admin_id, normalized_email)` — and deduplicate at the handler so a concurrent
+or retried dupe collapses to a single deterministic outcome (200 with the
+existing `user_id`, or a clean 409) instead of a 500. The partial-success /
+transactional-rollback item from slice 1's Out-of-scope note benefits from the
+same plumbing — both want the invite to be a single idempotent unit of work.
+**Address by**: when `/api/admin/invite` gets a real browser client (feature 011
+admin dashboard) and concurrent submits become reachable in practice; pair with
+the invite partial-success / transactional-semantics handler-design item.
