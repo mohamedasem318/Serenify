@@ -1259,3 +1259,119 @@ Component (it cannot be — that is exactly the bug the `server-only` boundary w
 catch at build time); a future env var needs cross-environment defaults beyond
 `SITE_URL`'s localhost default (choice 1); or the seed tooling moves into CI where
 even the summary table's synthetic emails warrant suppression (choice 3).
+
+---
+
+## 2026-05-26 — Security slice 5: Content Security Policy + auxiliary security headers
+
+**Status**: Accepted.
+
+**Context**: The slice-5 audit (`docs/security/05-csp-header.md`) designed a
+nonce-based CSP + auxiliary security headers; Mohamed adjudicated the five design
+decisions (recorded in that doc's Adjudication section). The fix pass implemented
+the policy, drove the Report-Only → empirical-capture → enforcing rollout against
+a **production build** (Playwright capturing `securitypolicyviolation` events on
+all 8 routes + Radix overlay interactions), and flipped to enforcing once the
+violation list was empty. CSP is the planned second layer under React
+auto-escaping and the mitigation for the slice-2 `httpOnly:false` cookie exposure.
+These are the policy choices it codifies.
+
+**Decision**:
+
+1. **CSP `script-src` is nonce-based, not hash-based.** Next.js 16 emits
+   per-request, streamed inline scripts (the `__next_f` RSC flight payload and the
+   `__next_r` router marker) that are content-dependent and therefore cannot be
+   hashed. Next auto-stamps the nonce onto all of its own inline scripts when the
+   `Content-Security-Policy` header carrying `'nonce-…'` is present on the
+   **inbound request** (verified against `next/dist/.../get-script-nonce-from-header.js`
+   — it parses the nonce from `script-src`/`default-src` on the request). So the
+   middleware sets the CSP on both the forwarded request headers (for stamping)
+   and the response (for enforcement). The two app-authored inline scripts — the
+   `layout.tsx` theme-migration IIFE and the next-themes FOUC script — carry the
+   nonce manually (`<script nonce>` and `<ThemeProvider nonce>` respectively).
+   `'strict-dynamic'` propagates trust to the chunk scripts the nonced bootstrap
+   loads. The 128-bit nonce is generated with the Edge-runtime-safe global Web
+   Crypto `getRandomValues(new Uint8Array(16))` (the Node `crypto.randomBytes`
+   import is unavailable in the Edge runtime the middleware runs in).
+
+2. **Zod 4's JIT compiler is disabled app-wide (`jitless: true`) instead of
+   allowing `'unsafe-eval'` in production.** *Empirical finding from the
+   Report-Only capture*: a production build emitted ~2 `script-src`
+   `blocked=eval` `securitypolicyviolation`s per page. The source is Zod 4.4.3's
+   JIT validator compiler, which builds parsers with `new Function(...)` (and runs
+   a `new Function("")` capability probe). Zod swallows the CSP-blocked throw and
+   falls back to the interpreted validator (functionally identical), but the
+   blocked call still fires a violation report. The fix routes every app schema
+   module through a `@/lib/zod` barrel that calls `z.config({ jitless: true })` as
+   an import side effect — which skips both the compile and the probe (Zod
+   `v4/core/util.js` `allowsEval`). Critically, the `jitless` flag is read at
+   schema **build** time, so the barrel (imported before any `z.object(...)`
+   evaluates) is the reliable place to set it; a later `z.config` call (e.g. in
+   `env/client.ts` after the schema import) is too late. This keeps `script-src`
+   free of `'unsafe-eval'` in production — a real XSS-control win over the
+   alternative of allowlisting `eval`. (Dev still adds `'unsafe-eval'`: Turbopack's
+   React dev build genuinely uses `eval` for debug stacks; prod does not.)
+
+3. **CSP `style-src` uses `'self' 'unsafe-inline'`, NOT a nonce.** Radix UI
+   (Dialog/Dropdown, via the transitive `react-remove-scroll` →
+   `react-style-singleton`) injects a runtime `<style>` element on overlay open
+   for scroll-lock; under Next 16's Turbopack/SWC bundler that element is
+   un-nonced (`__webpack_nonce__` is not populated). Per CSP3, a nonce on
+   `style-src` makes the browser **ignore** `'unsafe-inline'`, so adding a nonce
+   would break the Radix scroll-lock. `'unsafe-inline'` on `style-src` is
+   materially lower-risk than on `script-src` (CSS cannot execute JS). The
+   Report-Only capture confirmed empirically: opening the profile dropdown under
+   the enforcing policy produced **zero** `style-src` violations. Future hardening
+   to a nonce'd `style-src` (wire `setNonce()` from `get-nonce` before any Radix
+   overlay mounts, then drop `'unsafe-inline'`) is deferred.
+
+4. **HSTS ships with `includeSubDomains` but WITHOUT `preload`.** `preload` is a
+   near-irreversible commitment (removal takes 6–12 months to wash out of
+   browser-baked lists); combined with `includeSubDomains`, any future
+   non-HTTPS-ready `serenify.tech` subdomain would become permanently unreachable
+   for users who received the preload entry. `includeSubDomains` alone still
+   qualifies the domain for preload when that decision is consciously made after
+   every planned subdomain is audited HTTPS-ready. HSTS is **production-only**
+   (`NODE_ENV === "production"`) — on `localhost` it would force `http→https` and
+   break dev.
+
+5. **Cross-Origin-Embedder-Policy (COEP) skipped.** `require-corp` would break
+   Supabase cross-origin fetch/WebSocket (Supabase sends no CORP header) for no
+   current benefit (no `SharedArrayBuffer`/WASM-thread need today). COOP and CORP
+   (`same-origin`) ARE set. Revisit when feature 004's WASM inference path lands
+   (it will need `'wasm-unsafe-eval'` in `script-src`, and COEP may become
+   relevant then).
+
+6. **Forward-looking telemetry PII policy (no telemetry code investigated — none
+   is installed; slice-4 Audited-clean #10).** When Sentry / PostHog are adopted
+   (per the locked Technology Stack table): (a) add the ingest origins to
+   `connect-src` (`https://*.ingest.sentry.io`, `https://*.posthog.com`); (b)
+   configure PII scrubbing — Sentry `beforeSend` to redact session tokens, user
+   PII, and full URLs; PostHog session-recording input/text masking; (c) keep the
+   Sentry DSN exposure minimal. A slice-5-style CSP + PII revisit happens at
+   adoption time, before the telemetry ships.
+
+**Header placement**: per-request nonce CSP + prod-only HSTS-class logic is
+emitted in `proxy.ts` (middleware); the static aux headers (nosniff,
+X-Frame-Options, Referrer-Policy, Permissions-Policy, X-XSS-Protection:0, COOP,
+CORP — and HSTS via a `NODE_ENV` branch) live in `next.config.ts` `headers()` so
+they also cover the `/_next/static` asset responses the middleware matcher
+excludes. The middleware matcher additionally skips RSC prefetch requests
+(`next-router-prefetch` / `purpose: prefetch`) so the CSP is set only on HTML
+document responses.
+
+**Permissions-Policy camera/microphone**: denied now
+(`camera=(), microphone=(), …`); features 004 (webcam+rPPG) and 013 (audio) MUST
+relax them scoped to their capture routes when they land — not pre-enabled.
+
+**Cloud-dashboard parity**: n/a — all changes are in-repo (`next.config.ts`,
+`proxy.ts`, `layout.tsx`, `providers.tsx`, `lib/zod.ts`). No Supabase or platform
+config changed. (Vercel may also inject HSTS at the edge; that is platform config,
+not repo config, and does not conflict.)
+
+**Revisit if**: a future inline script needs a hash rather than the nonce (choice
+1); Zod ships a release that removes the JIT or changes the `jitless` API (choice
+2); a future need to drop `'unsafe-inline'` from `style-src` justifies wiring
+`setNonce()` (choice 3); all `serenify.tech` subdomains become HTTPS-ready and
+`preload` is wanted (choice 4); feature 004's WASM path lands (choices 5 + the
+`'wasm-unsafe-eval'` note); or Sentry/PostHog are adopted (choice 6).
