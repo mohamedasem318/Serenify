@@ -33,27 +33,43 @@ the error param matches a known value. Add to the (auth) shell's error-alert com
 one exists.
 **Address by**: feature 003 start or sooner.
 
-### Auth form components inlined in page files, not extracted
-**Status**: tech-debt
+### ~~Auth form components inlined in page files, not extracted~~ — resolved
+**Status**: resolved
+**Resolved**: 2026-05-20 on `003-employee-dashboard-shell` Phase 2 (T004–T010 +
+commits surrounding the auth-primitive extraction sweep). `PasswordInput`,
+`PasswordRequirements`, `OtpPanel`, and a new `Field` wrapper now live under
+`apps/web/components/ui/auth/`; the four (auth) page forms (`login-form.tsx`,
+`signup-form.tsx`, `forgot-form.tsx`, `reset-form.tsx`) and `security-section.tsx`
+import them by path. The (auth) pages render byte-equivalent to `main` per FR-040;
+verified by feature 001's auth Playwright suite passing unchanged. The shadcn
+install in feature 003 Phase 4 landed primitives flat in `components/ui/` per the
+three-tier convention in DECISIONS.md 2026-05-25 (DECISION-4).
 **Observed**: during feature 001 polish
-**Description**: `apps/web/components/ui/` does not exist. The bespoke form primitives
-(`PasswordInput`, the requirements checklist, the field/label wrappers) live inside the
-(auth) page files. When shadcn/ui is introduced in feature 003, retrofitting will require
-touching every page rather than swapping primitives in one location.
-**Fix scope**: medium — extract `PasswordInput`, `Field`, `Label`, `ErrorText` to
-`components/ui/` as the first commit on the feature-003 branch, before shadcn lands.
-**Address by**: feature 003, first commit.
+**Description**: `apps/web/components/ui/` did not exist. The bespoke form
+primitives (`PasswordInput`, the requirements checklist, the field/label
+wrappers) lived inside the (auth) page files. When shadcn/ui was introduced in
+feature 003, retrofitting would have required touching every page rather than
+swapping primitives in one location — hence the Phase 2 extraction.
 
-### Cross-tab auth state sync
-**Status**: deferred-feature
+### ~~Cross-tab auth state sync~~ — resolved
+**Status**: resolved
+**Resolved**: 2026-05-22 on `003-employee-dashboard-shell` Phase 11 (T059–T063 +
+the Decision N amendment in commit 0e4637f). `CrossTabAuth` listener mounts at
+the root layout (DECISIONS.md 2026-05-25 / DECISION-8) and navigates sibling tabs
+per FR-046's pathname rules. The Decision N amendment replaced the plan-time
+`supabase.auth.onAuthStateChange` mechanism with an explicit broadcast helper
+at `apps/web/lib/auth-broadcast.ts` because `@supabase/ssr` stores the session
+in cookies rather than localStorage — no localStorage write happens on sign-in,
+so no `storage` event fires cross-tab through supabase-js. The helper writes the
+marker explicitly. Two-tab propagation covered by
+`apps/web/tests/e2e/cross-tab-auth-sync.spec.ts` (54/54 across the three browser
+projects in T066). Stopwatch-verified ≤2s on T063 manual validation.
 **Observed**: smoke test ST-1 of feature 001
-**Description**: User has signup tab open showing "Check your email." User clicks the
-confirmation link in a new tab. Original tab does not update to reflect the now-authed
-state — user must refresh manually.
-**Fix scope**: medium — wire `supabase.auth.onAuthStateChange` listener at the auth-shell
-level; on SIGNED_IN transition, redirect to `/app`. Test with two browser tabs in a
-Playwright spec. No security issue (same user, same session).
-**Address by**: feature 003+ when the UX overhead matters more.
+**Description**: User had a signup tab open showing "Check your email." User
+clicked the confirmation link in a new tab. Original tab did not update to reflect
+the now-authed state — user had to refresh manually. Resolution above covers this
+plus the symmetric sign-out propagation (sign out in one tab → sibling tabs
+navigate to /login).
 
 ### Supabase default email templates include unused 6-digit OTP block
 **Status**: polish
