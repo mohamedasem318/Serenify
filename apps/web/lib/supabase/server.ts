@@ -24,6 +24,16 @@ export async function createClient() {
           }
         },
       },
+      cookieOptions: {
+        // Slice 2 Finding 2: add Secure on sb-* session cookies in production.
+        // httpOnly and sameSite are intentionally left at the @supabase/ssr
+        // defaults (httpOnly: false, sameSite: "lax") — the browser client is
+        // constructed without a cookie adapter and reads document.cookie to
+        // hydrate the session, so httpOnly: true would BREAK auth. See
+        // docs/security/02-auth-cookies-broadcast.md Finding 2 and the
+        // DECISIONS.md 2026-05-25 cookie-Secure policy entry.
+        secure: process.env.NODE_ENV === "production",
+      },
     },
   );
 }

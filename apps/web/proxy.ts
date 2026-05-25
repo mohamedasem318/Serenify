@@ -48,6 +48,14 @@ export async function proxy(request: NextRequest) {
           );
         },
       },
+      cookieOptions: {
+        // Slice 2 Finding 2: add Secure on sb-* session cookies in production.
+        // httpOnly/sameSite intentionally left at @supabase/ssr defaults
+        // (httpOnly: false, sameSite: "lax") — httpOnly: true would break the
+        // browser client. See docs/security/02-auth-cookies-broadcast.md
+        // Finding 2 and the DECISIONS.md 2026-05-25 cookie-Secure policy entry.
+        secure: process.env.NODE_ENV === "production",
+      },
     },
   );
 

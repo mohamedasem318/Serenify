@@ -60,6 +60,14 @@ export async function GET(request: NextRequest) {
           );
         },
       },
+      cookieOptions: {
+        // Slice 2 Finding 2: add Secure on sb-* session cookies in production.
+        // httpOnly/sameSite intentionally left at @supabase/ssr defaults
+        // (httpOnly: false, sameSite: "lax") — httpOnly: true would break the
+        // browser client. See docs/security/02-auth-cookies-broadcast.md
+        // Finding 2 and the DECISIONS.md 2026-05-25 cookie-Secure policy entry.
+        secure: process.env.NODE_ENV === "production",
+      },
     },
   );
 
@@ -86,6 +94,11 @@ export async function GET(request: NextRequest) {
       maxAge: 60,
       httpOnly: false,
       sameSite: "lax",
+      // Slice 2 Finding 3: add Secure in production. httpOnly stays false —
+      // CrossTabAuth reads this marker from document.cookie. The value is the
+      // non-sensitive literal "1". See docs/security/02-auth-cookies-broadcast.md
+      // Finding 3.
+      secure: process.env.NODE_ENV === "production",
     });
   }
 
