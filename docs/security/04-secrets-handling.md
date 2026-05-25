@@ -53,6 +53,24 @@ The residual is **three `low` items**, all hygiene / documentation / ops-resilie
 | 2 | Five test/infrastructure env vars are read by code but undocumented in `.env.local.example` | low |
 | 3 | The seed CLI prints the shared demo-account password + synthetic demo emails to stdout/stderr (CI-log capture is the only residual; by-design for a local fixture tool) | low |
 
+### Adjudication (2026-05-25 — Mohamed)
+
+All three findings are **approved for the fix pass** on this branch. (No fix code
+is in the commit that introduces this doc; a fresh Claude Code session applies
+them. Severities are unchanged — all `low` — and the fixes harden posture rather
+than close a reachable exploit.)
+
+1. **F1 — apply now, not deferred.** The `NEXT_PUBLIC_`-prefix-discipline
+   guarantee was verified *by hand* this slice; a single validated env module
+   makes it **regression-proof** — a real ongoing benefit that justifies touching
+   the 7 read sites now rather than waiting for a config-touching feature.
+2. **F2 — document them.** Contributors find `.env.local.example` before they
+   find the code that reads each var; "fallbacks are documentation" holds in
+   theory, but the example file is where people actually look. Trivial cost.
+3. **F3 — gate the banner.** Wrap `passwordBanner()` in a `process.stdout.isTTY`
+   check; the check is essentially free and the CI-log residual stops mattering
+   immediately.
+
 ---
 
 ## Env-var inventory
@@ -90,7 +108,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are each read with TypeScript's `!` non-null assertion and no `??` fallback or runtime presence check in the app code. Each read site re-reads `process.env` directly; there is no single validated env module. (Contrast `scripts/lib/env.ts:105-111` `requireEnv`, which throws a clear `Required env var X is missing or empty` — the app code has no equivalent.)
 - **Why it's a risk**: This is misconfiguration-resilience / fail-fast hygiene (OWASP A05), **not** a secret-leak. A missing/empty var yields `undefined`, which the Supabase client constructor accepts and fails on later with an opaque deep-stack error rather than a clear "env var X is required" message at boot. The deeper point is the *absence of a natural home for shape/prefix invariants*: a validated env module is exactly where you would assert "`SUPABASE_SERVICE_ROLE_KEY` must be present, must be a well-formed JWT, and must **not** be `NEXT_PUBLIC_`-prefixed" — turning the prefix-discipline guarantee this slice verified by hand into an enforced, regression-proof check. No security exposure today; this is the most *actionable* of the three findings.
 - **Suggested fix** (fix pass, not this slice): introduce one server-side env module (e.g. a small Zod schema parsed once at startup) that presence-checks all three vars, URL-parses `NEXT_PUBLIC_SUPABASE_URL`, and length/prefix-checks the keys; export the typed values and consume them at the seven read sites instead of re-reading `process.env`. Note: this touches 7 app read sites (wider blast radius than a typical `low` fix) — see Open questions.
-- **Status**: `open` (audit-only this pass).
+- **Status**: `open` — **approved for fix pass** (2026-05-25: apply now, not deferred; the validated env module makes the prefix-discipline guard regression-proof). No fix code in this commit.
 
 ## Finding 2: Five test/infrastructure env vars are read by code but undocumented in `.env.local.example`
 
@@ -99,7 +117,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: Five env vars are read by web/test code but absent from the `.env.local.example` template. All are infrastructure/test-only; all have a fallback or are populated in-process (the `TEST_ADMIN_*` pair is seeded from hardcoded constants in `global-setup.ts:20-21` before any spec reads it).
 - **Why it's a risk**: documentation completeness only — none carries a secret, none is required for the production app to run. A new contributor reading `.env.local.example` does not learn these knobs exist, but the fallbacks mean nothing breaks. Lowest-priority of the three.
 - **Suggested fix** (fix pass): optionally add a commented "test-only (defaults shown)" block to `.env.local.example`, or leave as-is since each is documented implicitly by its fallback and the `globalSetup` flow. See Open questions.
-- **Status**: `open` (audit-only this pass).
+- **Status**: `open` — **approved for fix pass** (2026-05-25: document the five test/infra vars in `.env.local.example` — contributors read the example before the code). No fix code in this commit.
 
 ## Finding 3: The seed CLI prints the shared demo-account password + synthetic demo emails to stdout/stderr
 
@@ -108,7 +126,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: The seed CLI prints the shared demo-account password (`SHARED_PASSWORD`, a hardcoded **non-production** constant) and the synthetic demo emails (`@demo.serenify.local`) to stdout, and writes Supabase `error.message` from `deleteUser`/`createUser`/`upsert` to stderr.
 - **Why it's a risk**: low and arguably by-design. This is a local developer CLI; the password is a fixed demo constant (not a real credential), the emails are synthetic, and the banner deliberately omits UUIDs and real secrets (the file's own comment cites Principle IX). The only residual is **CI-log capture**: if the seed step ever runs in CI with captured output, the demo password lands in a build log. It never touches the app-runtime log surface. The service-role key is **never** printed (verified — `scripts/lib/supabase-admin.ts` has zero log statements).
 - **Suggested fix** (fix pass): if the seed ever runs in CI, gate `passwordBanner()` behind an interactive-TTY check (`process.stdout.isTTY`); otherwise no change. See Open questions.
-- **Status**: `open` (audit-only this pass).
+- **Status**: `open` — **approved for fix pass** (2026-05-25: gate `passwordBanner()` behind `process.stdout.isTTY`). No fix code in this commit.
 
 ---
 
