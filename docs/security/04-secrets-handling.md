@@ -99,6 +99,67 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 
 ---
 
+## Fix-pass summary
+
+**Date**: 2026-05-25. **Branch**: `security/04-secrets-handling`. **PR**: #9.
+
+All three findings are **fixed** across three commits. The severity rollup is
+unchanged before/after — every finding was `low` (hygiene / documentation /
+ops-resilience), so the rollup stays `critical 0 · high 0 · med 0 · low 3`; the
+fixes harden posture rather than close a reachable exploit.
+
+**Approach** — one fix commit per finding:
+
+- `94a14d6` — **F1**: a single Zod-validated env module
+  (`apps/web/lib/env/{schema,client,server}.ts`). The Supabase credential vars
+  (`NEXT_PUBLIC_SUPABASE_URL`/`ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) and
+  `SITE_URL` now route through it; the eight scattered `process.env.X!` reads are
+  replaced, and a missing/malformed value throws a clear, field-listed error at
+  boot. `serverEnv` carries `import "server-only"`, so the service-role key is
+  structurally unreachable from the client bundle. The pure `schema.ts` is
+  unit-tested; the `server-only` binding is never imported by a test (the
+  `server-only` package's default export throws outside Next's `react-server`
+  condition — i.e. in Vitest), so `tests/unit/setup.ts` seeds schema-valid
+  placeholder env. `NODE_ENV` checks stay inline (framework-managed, not a
+  fail-late `!` read).
+- `f61a26c` — **F2**: `.env.local.example` documents the five test/infra vars
+  + `SUPABASE_PROJECT_REF` under a commented "Test-only / infrastructure" block.
+- `9dcb70a` — **F3**: `scripts/seed-demo.ts` gates `passwordBanner()` behind
+  `process.stdout.isTTY`.
+
+**Re-verification (the highest-value check) — verbatim, identical to the audit
+baseline.** Post-refactor production build (`next build`, Turbopack), then the
+slice-4 value-extraction grep against `.next/static` (key values read from
+`.env.local` at search time, never printed):
+
+```
+[SECRET]  service-role key value in .next/static : 0 files   (MUST be 0)   PASS
+[CONTROL] anon key value in .next/static          : 1 file    (MUST be >=1) PASS
+literal 'service_role'                             : 0
+literal 'SUPABASE_SERVICE_ROLE_KEY'                : 0
+literal 'supabase/admin'                           : 0
+```
+
+The refactor moved *where* `process.env.SUPABASE_SERVICE_ROLE_KEY` is read (now
+the `server-only` `serverEnv`), not *whether* it leaks — the empirical check
+confirms the prefix discipline still holds.
+
+**Tests**: typecheck clean (`tsc --noEmit`). Vitest unit **227 passed** (24 files;
+includes the 7-case `lib/env/schema` suite). Root seed unit **20 passed / 12
+skipped**; seed **integration 32 passed** (4 files, against live local Supabase —
+exercises the F3 seed flow; the non-TTY run printed the summary table with **no**
+password banner, confirming the gate). Playwright e2e **57 passed** (chromium /
+firefox / webkit, 19 each) — full matrix green on the first run, no flakes.
+
+**Decisions**: `docs/DECISIONS.md` (2026-05-25 — Security slice 4) records the
+three policy choices: validated env module as the single boot-time gate for
+Supabase credentials, complete `.env.local.example`, and TTY gating for sensitive
+CLI output. **Cloud-dashboard parity: n/a** — env values still live in the
+platform panels; this slice changes how the app *reads* them locally and adds
+boot-time validation.
+
+---
+
 ## Findings
 
 ## Finding 1: No single validated env-access module — core Supabase vars read via `!` at 7 sites with no presence/shape/prefix guard
@@ -108,7 +169,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` are each read with TypeScript's `!` non-null assertion and no `??` fallback or runtime presence check in the app code. Each read site re-reads `process.env` directly; there is no single validated env module. (Contrast `scripts/lib/env.ts:105-111` `requireEnv`, which throws a clear `Required env var X is missing or empty` — the app code has no equivalent.)
 - **Why it's a risk**: This is misconfiguration-resilience / fail-fast hygiene (OWASP A05), **not** a secret-leak. A missing/empty var yields `undefined`, which the Supabase client constructor accepts and fails on later with an opaque deep-stack error rather than a clear "env var X is required" message at boot. The deeper point is the *absence of a natural home for shape/prefix invariants*: a validated env module is exactly where you would assert "`SUPABASE_SERVICE_ROLE_KEY` must be present, must be a well-formed JWT, and must **not** be `NEXT_PUBLIC_`-prefixed" — turning the prefix-discipline guarantee this slice verified by hand into an enforced, regression-proof check. No security exposure today; this is the most *actionable* of the three findings.
 - **Suggested fix** (fix pass, not this slice): introduce one server-side env module (e.g. a small Zod schema parsed once at startup) that presence-checks all three vars, URL-parses `NEXT_PUBLIC_SUPABASE_URL`, and length/prefix-checks the keys; export the typed values and consume them at the seven read sites instead of re-reading `process.env`. Note: this touches 7 app read sites (wider blast radius than a typical `low` fix) — see Open questions.
-- **Status**: `open` — **approved for fix pass** (2026-05-25: apply now, not deferred; the validated env module makes the prefix-discipline guard regression-proof). No fix code in this commit.
+- **Status**: `fixed in 94a14d6`. A single Zod-validated env module (`apps/web/lib/env/{schema,client,server}.ts`) now gates the Supabase credential vars + `SITE_URL`; the eight `process.env.X!` reads are replaced, and `serverEnv` carries `import "server-only"` so the service-role key is structurally unreachable from the client bundle. Re-verified empirically — service-role key value still **absent** from `.next/static` (0 matches), anon key still **present** (1, positive control). (Adjudicated 2026-05-25 → apply now, not deferred; severity held at `low` — informational, the fix is the same.) See DECISIONS.md (2026-05-25 — Security slice 4, choice 1).
 
 ## Finding 2: Five test/infrastructure env vars are read by code but undocumented in `.env.local.example`
 
@@ -117,7 +178,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: Five env vars are read by web/test code but absent from the `.env.local.example` template. All are infrastructure/test-only; all have a fallback or are populated in-process (the `TEST_ADMIN_*` pair is seeded from hardcoded constants in `global-setup.ts:20-21` before any spec reads it).
 - **Why it's a risk**: documentation completeness only — none carries a secret, none is required for the production app to run. A new contributor reading `.env.local.example` does not learn these knobs exist, but the fallbacks mean nothing breaks. Lowest-priority of the three.
 - **Suggested fix** (fix pass): optionally add a commented "test-only (defaults shown)" block to `.env.local.example`, or leave as-is since each is documented implicitly by its fallback and the `globalSetup` flow. See Open questions.
-- **Status**: `open` — **approved for fix pass** (2026-05-25: document the five test/infra vars in `.env.local.example` — contributors read the example before the code). No fix code in this commit.
+- **Status**: `fixed in f61a26c`. `.env.local.example` now lists `PLAYWRIGHT_PORT`, `CI`, `MAILPIT_URL`, `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`, and `SUPABASE_PROJECT_REF` under a commented "Test-only / infrastructure (defaults shown)" block. See DECISIONS.md (2026-05-25 — Security slice 4, choice 2).
 
 ## Finding 3: The seed CLI prints the shared demo-account password + synthetic demo emails to stdout/stderr
 
@@ -126,7 +187,7 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 - **What**: The seed CLI prints the shared demo-account password (`SHARED_PASSWORD`, a hardcoded **non-production** constant) and the synthetic demo emails (`@demo.serenify.local`) to stdout, and writes Supabase `error.message` from `deleteUser`/`createUser`/`upsert` to stderr.
 - **Why it's a risk**: low and arguably by-design. This is a local developer CLI; the password is a fixed demo constant (not a real credential), the emails are synthetic, and the banner deliberately omits UUIDs and real secrets (the file's own comment cites Principle IX). The only residual is **CI-log capture**: if the seed step ever runs in CI with captured output, the demo password lands in a build log. It never touches the app-runtime log surface. The service-role key is **never** printed (verified — `scripts/lib/supabase-admin.ts` has zero log statements).
 - **Suggested fix** (fix pass): if the seed ever runs in CI, gate `passwordBanner()` behind an interactive-TTY check (`process.stdout.isTTY`); otherwise no change. See Open questions.
-- **Status**: `open` — **approved for fix pass** (2026-05-25: gate `passwordBanner()` behind `process.stdout.isTTY`). No fix code in this commit.
+- **Status**: `fixed in 9dcb70a`. `scripts/seed-demo.ts` now prints `passwordBanner()` only when `process.stdout.isTTY`. Verified empirically — a non-interactive (piped) seed run prints the summary table with **no** password banner following it; diagnostic `stderr` writes are unchanged. See DECISIONS.md (2026-05-25 — Security slice 4, choice 3).
 
 ---
 
