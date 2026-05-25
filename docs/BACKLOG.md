@@ -532,3 +532,103 @@ occurrence is observed. Pair with whoever next touches the CI
 workflow (currently empty per repo structure, so this may also
 be the first CI workflow file — in which case scope grows to
 "medium" to include the workflow scaffolding itself).
+
+### Dynamic welcome banner subtitle variants
+**Status**: deferred-feature
+**Observed**: feature 003 plan (Decision M) and FR-009 deferral
+**Description**: The welcome banner on `/app` for employees renders
+a locked static subtitle ("A space to check in with yourself.")
+beneath the adaptive greeting per Decision M. FR-009 originally
+contemplated context-aware variants (signal-driven, time-of-week-
+driven, post-checkin-driven) that swap into the single `<p>` slot.
+The markup in `apps/web/components/home/welcome-banner.tsx`
+already accommodates the swap — the slot is a single sibling
+element under the greeting, and the SUBTITLE constant is the only
+edit needed once variants exist. Re-logged here so a future
+contributor doesn't re-derive FR-009's deferral.
+**Fix scope**: medium — needs signal/calibration data (features
+005/006) before the variants have anything to key on. Decision M
+locks the current copy as the all-contexts fallback; variants
+layer on top.
+**Address by**: post-feature-006 (calibration shipped, signal
+data exists). NOT before — variants without signal would just be
+random copy churn.
+
+### Notifications-section live controls on /app/account
+**Status**: deferred-feature
+**Observed**: feature 003 plan (FR-021 placeholder)
+**Description**: The Notifications section on `/app/account` is a
+placeholder card today (`apps/web/components/account/notifications-placeholder.tsx`) —
+muted body text describing that notification preferences land in a
+later feature, no live controls. The component shape matches the
+Privacy placeholder so a future swap is symmetric. The notification
+*surface* (`apps/web/components/notification.tsx`) shipped in
+feature 003 but is not mounted by any production code per FR-033;
+features 007/008/010 will mount it. The user-facing **preferences**
+(channels, quiet hours, digest cadence) belong in this placeholder
+when there's a notifications system to configure.
+**Fix scope**: medium — schema + Server Action + form, paired with
+whichever feature first generates user-controllable notifications.
+**Address by**: with the first feature that emits notifications to
+users (likely feature 008 / chatbot interrupts, or feature 010 /
+privacy controls if those reuse the notification surface).
+
+### Welcome banner timezone awareness (server-rendered greeting)
+**Status**: deferred-bug
+**Observed**: feature 003 T040 (welcome-banner.tsx implementation)
+**Description**: `apps/web/components/home/welcome-banner.tsx`
+renders the adaptive greeting (Good morning/afternoon/evening) on
+the server using `new Date()` — i.e., the server's local time
+(Vercel deployment region). Users outside that timezone may see
+the wrong band: a user in `Asia/Tokyo` reading at their local
+8pm would be greeted "Good morning" if the server is in
+`America/Los_Angeles` (8pm Tokyo = 4am LA). The component
+comment names this trade-off and points here.
+**Fix scope**: small — two viable paths:
+  - (a) Defer the greeting to a `useEffect` that reads
+    `Intl.DateTimeFormat().resolvedOptions().timeZone` and re-
+    computes client-side. Costs a brief flash of the server-
+    rendered greeting before hydration. Acceptable for the
+    home page.
+  - (b) Pass the IANA zone in a cookie (set on sign-in or via
+    a one-time client-side write) and pass to the Server
+    Component as a prop. No flash, more wiring.
+**Address by**: a later polish pass, or whichever feature first
+needs per-user timezone awareness (signal aggregation in
+feature 005 may need this anyway).
+
+### Playwright local matrix run: pipe-buffering deadlock with `tail`
+**Status**: deferred-tooling
+**Observed**: feature 003 T066 (full Playwright matrix run on
+chromium + firefox + webkit)
+**Description**: Running the full Playwright matrix locally via
+`npx playwright test 2>&1 | tail -80` hangs for tens of minutes
+with an empty output buffer, even though each per-project run
+(`--project=chromium`, `--project=firefox`, `--project=webkit`)
+completes in 1-7 minutes individually. Diagnosed as pipe-
+buffering deadlock: `tail` only flushes its buffer when stdin
+closes, so Playwright's reporter chunks never reach a visible
+buffer while the dev server's stdin chain stays open. The
+test runner *appears* to make no progress; processes accumulate
+in the background; output file stays at 0 bytes.
+
+Workaround: run each project sequentially with
+`--reporter=list` and pipe through a line-buffered filter
+(`grep --line-buffered -E "^\s+(ok|x|\d+ (ok|failed|passed))"`)
+or skip pipe filtering entirely.
+
+This isn't a Playwright bug — it's a shell-pipeline interaction
+with how Node's stdout buffers under non-TTY conditions. But
+the symptom is misleading enough that the first occurrence
+cost ~30 minutes of "is it hung?" diagnosis. Worth a small
+helper script (`scripts/run-e2e-matrix.sh`) that wraps the
+per-project sequential invocation with the streaming filter
+so future contributors hit the working path by default.
+
+**Fix scope**: small — ~20 lines of bash plus a `package.json`
+npm-script entry (`"test:e2e:matrix": "scripts/run-e2e-matrix.sh"`).
+The full T066 commit body (7dec3c9) has the diagnosis details
+and the working invocation pattern.
+**Address by**: anyone next running the full matrix locally, or
+whoever first sets up CI (the streaming filter is also the right
+pattern for CI logs that may be captured non-interactively).
