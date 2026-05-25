@@ -683,3 +683,29 @@ Cloud-dashboard parity: **n/a this slice** — all changes are in-repo (handler
 code, Server Action, Zod schema, and migration SQL); no `config.toml` `[auth]` or
 other Cloud-dashboard-effective setting changed (the slice-2 dashboard-parity
 requirement still stands for any future config-touching slice).
+
+## 2026-05-25 — Security slice 4: secrets handling
+
+Fix pass for the slice-4 audit (`docs/security/04-secrets-handling.md`);
+decisions recorded in `docs/DECISIONS.md` (2026-05-25 — Security slice 4).
+
+- Environment variables for the Supabase connection (`NEXT_PUBLIC_SUPABASE_URL`,
+  `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) and `SITE_URL` now
+  route through a single Zod-validated module
+  (`apps/web/lib/env/{schema,client,server}.ts`). A missing or malformed value
+  fails fast with a clear, field-listed error at boot instead of failing deep
+  inside the Supabase client at first use (previously eight `process.env.X!`
+  non-null assertions). The service-role key is read only through the
+  `server-only` `serverEnv`, which keeps it structurally out of the client bundle.
+- `.env.local.example` now documents every env var the codebase reads, including
+  test-only and infrastructure vars (`PLAYWRIGHT_PORT`, `CI`, `MAILPIT_URL`,
+  `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`, `SUPABASE_PROJECT_REF`) under a
+  commented "Test-only / infrastructure (defaults shown)" block.
+- The local seed CLI (`npm run seed`) only prints the shared demo-account
+  password when stdout is an interactive TTY — non-interactive runs (CI,
+  redirected/piped output) skip the credential banner. Diagnostic errors still
+  always print.
+
+No Cloud-dashboard parity items this slice — env values still live in the
+platform dashboards; this slice changes how the app *reads* them locally and adds
+boot-time validation, not what they are in prod.

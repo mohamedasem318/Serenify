@@ -1180,3 +1180,82 @@ single `SITE_URL`); a CSP lands (slice 5) adding a second XSS layer that changes
 the character-class calculus (choice 4); or a future field needs a stricter
 positive grammar than minimal-reject can express (choice 4 — at which point the
 whitelist's non-Latin breakage must be weighed explicitly).
+
+---
+
+## 2026-05-25 — Security slice 4: secrets handling
+
+**Status**: Accepted.
+
+**Context**: The slice-4 audit (`docs/security/04-secrets-handling.md`) found a
+clean secrets posture — the service-role key is read in three places, all
+env-sourced, none client-reachable; a production build carried 0 service-role
+matches in `.next/static`; git history was clean. The residual was three `low`
+hygiene / documentation / ops-resilience findings, all approved for fix. The fix
+pass landed them across three commits (`94a14d6` validated env module, `f61a26c`
+`.env.local.example` docs, `9dcb70a` seed TTY gate). These are the policy choices
+it codifies.
+
+**Decision**:
+
+1. **Validated env module as the single boot-time gate for Supabase credentials.**
+   `NEXT_PUBLIC_*` env vars and server-secret env vars route through
+   `apps/web/lib/env/*`. Framework-managed vars (`NODE_ENV`) stay inline — they're
+   never missing, are type-safe via TypeScript's narrowing, and don't benefit from
+   the module's fail-fast goal. Future env vars added in either category extend the
+   corresponding schema; ad-hoc `process.env.X!` reads in app code are disallowed
+   for the routed categories. Mechanically: a Zod schema (`lib/env/schema.ts`),
+   bound by `client.ts` (public) and the `server-only` `server.ts` (server-secret
+   + the `SITE_URL` server config), is parsed once at module load and throws a
+   clear, field-listed error if a value is missing/malformed — replacing 8
+   scattered `process.env.X!` non-null assertions that failed late (an opaque
+   deep-stack error at the first Supabase call) with fail-fast at boot. The prefix-discipline invariant — the service-role key never
+   reaches the client bundle — is enforced **structurally**: `serverEnv` lives in
+   a `server-only` module, so any client-component import path fails the build,
+   and the secret is only ever read through `serverEnv`. (Verified: post-refactor
+   production build still shows 0 service-role-key matches in `.next/static`, anon
+   key = 1.)
+   - **Schema split, not one module.** `clientEnvSchema` (URL + anon key) is
+     side-effect-free with NO `server-only` import; `serverEnvSchema` extends it
+     with the service-role key + `SITE_URL`. The pure schema file is unit-tested
+     directly; the `server-only` binding (`server.ts`) is never imported by a test
+     because the `server-only` package's default export THROWS outside Next's
+     `react-server` condition (i.e. in Vitest) — a test importing it would fail at
+     import. This separation is deliberate. Unit tests seed schema-valid
+     placeholder env in `tests/unit/setup.ts` so the eager parse succeeds without
+     a real `.env`.
+   - **Scope.** `NODE_ENV` checks (`=== "production"` for the cookie `Secure`
+     flag) stay inline — `NODE_ENV` is framework-managed, type-safe via
+     `@types/node`, always present, and not a fail-late `!` read; routing it would
+     couple `server.ts`/`proxy.ts` to the server-only module for no safety gain.
+     The audit's Finding 1 surface (the Supabase credential reads) is fully
+     covered; `SITE_URL` was folded in because it shares the fail-late pattern and
+     its `?? "http://localhost:3000"` default was duplicated at four sites (now
+     the schema's single `.default(...)`).
+
+2. **Complete `.env.local.example`.** Every env var read by repo code is listed in
+   `.env.local.example`, even when commented and even when it has a runtime
+   fallback. Test-only / infrastructure vars (`PLAYWRIGHT_PORT`, `CI`,
+   `MAILPIT_URL`, `TEST_ADMIN_EMAIL`, `TEST_ADMIN_PASSWORD`, `SUPABASE_PROJECT_REF`)
+   live under a clearly-labelled "Test-only / infrastructure (defaults shown)"
+   block so they are discoverable without being mistaken for required production
+   vars. Rationale: contributors find the example file before they find the code
+   that reads a var.
+
+3. **TTY gating for sensitive CLI output.** Local-only dev tooling that prints a
+   credential (today: `scripts/seed-demo.ts`'s shared demo password) gates the
+   print behind `process.stdout.isTTY`, so a non-interactive run (CI, redirected
+   output) skips it and the value cannot land in a build log. The demo password is
+   a non-prod constant, so this is defense-in-depth. It does NOT apply to
+   diagnostic `stderr` / `console.error` writes — those must always print so
+   failures aren't silently swallowed.
+
+**Cloud-dashboard parity**: n/a — env *values* still live in the Vercel /
+DigitalOcean / Supabase panels (Principle IX); this slice changes how the app
+*reads* them locally and adds boot-time validation, not what they are in prod.
+
+**Revisit if**: a server-secret env var is ever legitimately needed in a Client
+Component (it cannot be — that is exactly the bug the `server-only` boundary would
+catch at build time); a future env var needs cross-environment defaults beyond
+`SITE_URL`'s localhost default (choice 1); or the seed tooling moves into CI where
+even the summary table's synthetic emails warrant suppression (choice 3).

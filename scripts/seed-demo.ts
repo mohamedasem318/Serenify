@@ -111,7 +111,14 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
   }
 
   process.stdout.write(summaryTable(users) + "\n");
-  process.stdout.write(passwordBanner() + "\n");
+  // Slice 4 Finding 3: only print the shared demo password when stdout is an
+  // interactive TTY. A non-interactive run (CI, redirected/piped output) skips
+  // the credential banner so it can't land in a build log. The password is a
+  // non-prod constant — this is defense-in-depth. See
+  // docs/security/04-secrets-handling.md and DECISIONS.md (2026-05-25 — slice 4).
+  if (process.stdout.isTTY) {
+    process.stdout.write(passwordBanner() + "\n");
+  }
   return { exitCode: 0 };
 }
 

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { adminInviteSchema } from "@/lib/auth/schemas";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { serverEnv } from "@/lib/env/server";
 
 /**
  * POST /api/admin/invite — implements contracts/routes.md.
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
   // Allow an absent Origin (server-to-server / non-CORS callers); reject only
   // a present, mismatched Origin.
   const origin = request.headers.get("origin");
-  const allowed = process.env.SITE_URL ?? "http://localhost:3000";
+  const allowed = serverEnv.siteUrl;
   if (origin !== null && origin !== allowed) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
+  const siteUrl = serverEnv.siteUrl;
 
   // Step 1: invite.
   const { data: invited, error: inviteErr } =

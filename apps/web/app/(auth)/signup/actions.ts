@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signUpSchema, verifyOtpSchema } from "@/lib/auth/schemas";
+import { serverEnv } from "@/lib/env/server";
 
 export type SignUpResult =
   | { status: "ok" }
@@ -31,7 +32,7 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
     };
   }
 
-  const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
+  const siteUrl = serverEnv.siteUrl;
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signUp({
