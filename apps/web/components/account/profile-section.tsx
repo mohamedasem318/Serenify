@@ -13,6 +13,7 @@ import {
   updateProfile,
   type UpdateProfileResult,
 } from "@/app/(authed)/app/account/actions";
+import { fullNameSchema } from "@/lib/auth/schemas";
 import { deriveInitials } from "@/lib/initials";
 
 type ProfileSectionProps = {
@@ -20,13 +21,9 @@ type ProfileSectionProps = {
   email: string;
 };
 
-const profileSchema = z.object({
-  full_name: z
-    .string()
-    .trim()
-    .min(1, "Name can't be empty")
-    .max(60, "Keep it under 60 characters"),
-});
+// Client-side mirror of the server's updateProfileSchema — both derive from
+// the single authoritative fullNameSchema (slice 3 Finding 5).
+const profileSchema = z.object({ full_name: fullNameSchema });
 type ProfileInput = z.infer<typeof profileSchema>;
 
 export function ProfileSection({
@@ -126,7 +123,7 @@ export function ProfileSection({
           label="Full name"
           type="text"
           autoComplete="name"
-          maxLength={60}
+          maxLength={120}
           {...register("full_name")}
           error={errors.full_name?.message}
         />

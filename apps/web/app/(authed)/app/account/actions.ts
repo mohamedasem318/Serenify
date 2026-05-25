@@ -4,15 +4,14 @@ import { revalidatePath } from "next/cache";
 import { createClient as createAnonClient } from "@supabase/supabase-js";
 import { z } from "zod";
 
-import { changePasswordSchema } from "@/lib/auth/schemas";
+import { changePasswordSchema, fullNameSchema } from "@/lib/auth/schemas";
 import { createClient } from "@/lib/supabase/server";
 
+// full_name is validated by the single authoritative fullNameSchema (slice 3
+// Finding 5 — was a divergent local max(60); see docs/DECISIONS.md
+// 2026-05-25 — Security slice 3).
 const updateProfileSchema = z.object({
-  full_name: z
-    .string()
-    .trim()
-    .min(1, "Name can't be empty")
-    .max(60, "Keep it under 60 characters"),
+  full_name: fullNameSchema,
 });
 
 export type UpdateProfileResult =
