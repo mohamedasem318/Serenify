@@ -16,6 +16,20 @@ next-env.d.ts
 !.env.example
 !.env.local.example
 
+# SSH / private keys — never commit. Real keys live in ~/.ssh (off-repo);
+# this is defense-in-depth so a stray copy can't be `git add`-ed by accident.
+*.pem
+*.key
+*.p12
+*.pfx
+id_ed25519
+id_rsa
+id_ecdsa
+id_dsa
+*_rsa
+*_ed25519
+.ssh/
+
 # Python (feature 005 onward — FastAPI lands then)
 __pycache__/
 *.py[cod]
