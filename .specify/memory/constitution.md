@@ -40,6 +40,26 @@ Template alignment audit:
      visual or voice guidance during the next /speckit-plan cycle.
 
 Deferred TODOs: none. All placeholders concretely filled.
+
+Amendment 1: 1.0.0 → 1.1.0 (2026-05-20, MINOR)
+Bump rationale: Principle V palette addition (`--color-crimson`) +
+scope clarification on the "red is forbidden anywhere" rule. Red
+remains forbidden on affective and ambient surfaces; it is now
+permitted on destructive action surfaces using the Mist & Meadow
+`crimson` token. Triggered by feature 003 implementation — the
+shadcn button primitive's `destructive` variant requires a
+foreground color that achieves WCAG AA contrast on the variant's
+background in both modes; amber failed dark-mode AA at 1.4:1,
+crimson + bg-as-foreground passes at ~5–6:1.
+
+Affected templates: none. The amendment refines an existing rule and
+adds one palette token; no template references the rule literally.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-05-20
+- docs/CHANGELOG.md entry 2026-05-20
+- specs/003-employee-dashboard-shell/plan.md Decision B
+- specs/003-employee-dashboard-shell/contracts/shadcn-mapping.md
 -->
 
 # Serenify Constitution
@@ -180,15 +200,22 @@ non-negotiable rules:
 
 **Palette — "Mist & Meadow"** (locked; no additions without amendment):
 - Light: bg `#ECEEE9`, surface `#F5F6F2`, ink `#1F2522`, muted `#6E7572`,
-  meadow accent `#7A9275`, foggy accent `#8AA9B6`, amber `#DCB587`, border
-  `#D6D7D1`.
+  meadow accent `#7A9275`, foggy accent `#8AA9B6`, amber `#DCB587`,
+  crimson `#7B4244`, border `#D6D7D1`.
 - Dark: bg `#161917`, surface `#20231F`, text `#DCDED5`, muted `#8B928F`,
-  meadow accent `#97AE91`, foggy accent `#9CBBC7`, amber `#DCB587`, border
-  `#2D3130`.
-- **Red is forbidden anywhere in the UI.** Stress signals use amber
-  (`#DCB587`) in both modes. The colors `red`, `#FF0000` family, and any
-  hue in the 340–20° red sector MUST NOT appear in stress states, errors,
-  charts, or icons.
+  meadow accent `#97AE91`, foggy accent `#9CBBC7`, amber `#DCB587`,
+  crimson `#C17F81`, border `#2D3130`.
+- **Red is forbidden on affective and ambient surfaces** — stress
+  detection states, physiological indicators, charts, status badges,
+  notifications, and any in-product affective copy or imagery. Stress
+  signals use amber (`#DCB587`) in both modes. Red IS permitted on
+  **destructive action surfaces** (delete-account, leave-team,
+  revoke-session, inline destructive text links) using the Mist &
+  Meadow `crimson` token, because hiding visual urgency on
+  irreversible user actions is hostile design. The `red`, `#FF0000`
+  family, and any hue in the 340–20° red sector MUST NOT appear on
+  affective or ambient surfaces; only the documented `crimson` token
+  may appear on destructive action surfaces.
 
 **Visual finish**:
 - Flat base. Optional 3–5% paper-noise texture on the page background ONLY,
@@ -469,4 +496,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.0.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-16
+**Version**: 1.1.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-20

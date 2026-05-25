@@ -99,10 +99,16 @@ test("password requirements checklist lights up rule by rule as the user types",
   ).toHaveCount(0);
 
   // Letters only — letter rule flips to met, others still unmet.
+  // The data-met="true" flip rides the fill → RHF onChange → useWatch →
+  // PasswordRequirements re-render chain. When this spec runs last in the
+  // full suite, webkit executes ~2× slower under sustained `npm run dev`
+  // load (observed 7.6s peak vs ~3.5s isolated), so the rule-satisfied
+  // assertions get a 10s budget — comfortably above the default 5s — to
+  // absorb that lag without masking a genuine failure.
   await newField.fill("abc");
   await expect(
     list.locator('li[data-met="true"]', { hasText: "Contains a letter" }),
-  ).toHaveCount(1);
+  ).toHaveCount(1, { timeout: 10_000 });
   await expect(
     list.locator('li[data-met="false"]', {
       hasText: "Contains a number",
@@ -112,8 +118,9 @@ test("password requirements checklist lights up rule by rule as the user types",
   // Add a digit; still under 8 chars so the length rule remains unmet.
   await newField.fill("abc1");
   await expect(
+    // Same 10s webkit-load budget as the letter-rule flip above.
     list.locator('li[data-met="true"]', { hasText: "Contains a number" }),
-  ).toHaveCount(1);
+  ).toHaveCount(1, { timeout: 10_000 });
   await expect(
     list.locator('li[data-met="false"]', {
       hasText: "At least 8 characters",

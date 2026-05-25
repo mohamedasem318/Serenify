@@ -9,6 +9,7 @@ Status values:
 - `tech-debt` — structural cleanup, address before it grows
 - `watch` — monitor; act if condition changes
 - `deferred-feature` — intentional scope cut, future work
+- `deferred-tooling` — blocked on a tooling or harness capability that does not yet exist
 
 ---
 
@@ -32,27 +33,43 @@ the error param matches a known value. Add to the (auth) shell's error-alert com
 one exists.
 **Address by**: feature 003 start or sooner.
 
-### Auth form components inlined in page files, not extracted
-**Status**: tech-debt
+### ~~Auth form components inlined in page files, not extracted~~ — resolved
+**Status**: resolved
+**Resolved**: 2026-05-20 on `003-employee-dashboard-shell` Phase 2 (T004–T010 +
+commits surrounding the auth-primitive extraction sweep). `PasswordInput`,
+`PasswordRequirements`, `OtpPanel`, and a new `Field` wrapper now live under
+`apps/web/components/ui/auth/`; the four (auth) page forms (`login-form.tsx`,
+`signup-form.tsx`, `forgot-form.tsx`, `reset-form.tsx`) and `security-section.tsx`
+import them by path. The (auth) pages render byte-equivalent to `main` per FR-040;
+verified by feature 001's auth Playwright suite passing unchanged. The shadcn
+install in feature 003 Phase 4 landed primitives flat in `components/ui/` per the
+three-tier convention in DECISIONS.md 2026-05-25 (DECISION-4).
 **Observed**: during feature 001 polish
-**Description**: `apps/web/components/ui/` does not exist. The bespoke form primitives
-(`PasswordInput`, the requirements checklist, the field/label wrappers) live inside the
-(auth) page files. When shadcn/ui is introduced in feature 003, retrofitting will require
-touching every page rather than swapping primitives in one location.
-**Fix scope**: medium — extract `PasswordInput`, `Field`, `Label`, `ErrorText` to
-`components/ui/` as the first commit on the feature-003 branch, before shadcn lands.
-**Address by**: feature 003, first commit.
+**Description**: `apps/web/components/ui/` did not exist. The bespoke form
+primitives (`PasswordInput`, the requirements checklist, the field/label
+wrappers) lived inside the (auth) page files. When shadcn/ui was introduced in
+feature 003, retrofitting would have required touching every page rather than
+swapping primitives in one location — hence the Phase 2 extraction.
 
-### Cross-tab auth state sync
-**Status**: deferred-feature
+### ~~Cross-tab auth state sync~~ — resolved
+**Status**: resolved
+**Resolved**: 2026-05-22 on `003-employee-dashboard-shell` Phase 11 (T059–T063 +
+the Decision N amendment in commit 0e4637f). `CrossTabAuth` listener mounts at
+the root layout (DECISIONS.md 2026-05-25 / DECISION-8) and navigates sibling tabs
+per FR-046's pathname rules. The Decision N amendment replaced the plan-time
+`supabase.auth.onAuthStateChange` mechanism with an explicit broadcast helper
+at `apps/web/lib/auth-broadcast.ts` because `@supabase/ssr` stores the session
+in cookies rather than localStorage — no localStorage write happens on sign-in,
+so no `storage` event fires cross-tab through supabase-js. The helper writes the
+marker explicitly. Two-tab propagation covered by
+`apps/web/tests/e2e/cross-tab-auth-sync.spec.ts` (54/54 across the three browser
+projects in T066). Stopwatch-verified ≤2s on T063 manual validation.
 **Observed**: smoke test ST-1 of feature 001
-**Description**: User has signup tab open showing "Check your email." User clicks the
-confirmation link in a new tab. Original tab does not update to reflect the now-authed
-state — user must refresh manually.
-**Fix scope**: medium — wire `supabase.auth.onAuthStateChange` listener at the auth-shell
-level; on SIGNED_IN transition, redirect to `/app`. Test with two browser tabs in a
-Playwright spec. No security issue (same user, same session).
-**Address by**: feature 003+ when the UX overhead matters more.
+**Description**: User had a signup tab open showing "Check your email." User
+clicked the confirmation link in a new tab. Original tab did not update to reflect
+the now-authed state — user had to refresh manually. Resolution above covers this
+plus the symmetric sign-out propagation (sign out in one tab → sibling tabs
+navigate to /login).
 
 ### Supabase default email templates include unused 6-digit OTP block
 **Status**: polish
@@ -185,3 +202,581 @@ orchestrator with a try/catch that detects fetch / ECONNREFUSED
 errors and substitutes a friendly message. Probably 20 lines.
 **Address by**: any polish pass, or whoever next touches the seed
 script (e.g. the signal-event seeding follow-up before feature 011).
+
+---
+
+## From feature 003 (employee-dashboard-shell) — in progress
+
+### Onboarding visual regression untestable on completed accounts
+**Status**: deferred-tooling
+**Observed**: ST-1 / T014 of feature 003
+**Description**: ST-1's visual matrix includes `/onboarding`, but the
+(authed) route guard redirects any account with a non-null
+`profiles.full_name` to `/app` — so onboarding can only be reached by
+a never-onboarded user. The 30 demo cohort users seeded by feature 002
+all complete onboarding, leaving zero eligible accounts to drive the
+`/onboarding` cell of the visual diff. Future visual gates (any ST-1
+rerun on this branch, and equivalent regressions in features 004+)
+hit the same wall.
+**Fix scope**: small. Either (a) extend `scripts/seed-demo.ts` with a
+"reset onboarding state" option that nulls `profiles.full_name` for a
+named user, OR (b) reserve one demo slot as the
+"onboarding-pristine" probe — never assigned a `full_name`, never
+asserted against in role-trio specs.
+**Address by**: when the demo-seed harness gains a "reset onboarding
+state" option — natural pairing with the CI integration work logged
+above against feature 006.
+
+### Avatar disc reads "out of character" in dark mode
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
+**Description**: After the 515984c contrast fix the AvatarFallback
+uses `bg-surface text-foreground border border-border`, which lands
+WCAG AAA contrast in both modes (light 14.4:1, dark 11.7:1). The
+disc itself, however, reads as a slightly washed grey blob in
+dark mode — surface (#20231F) on bg (#161917) is only ~1.2:1
+self-vs-bg, and the border (#2D3130) is also subtle. The fix is
+correct for accessibility but the disc feels visually weaker than
+the meadow / amber accents elsewhere in the surface. May want a
+circle-specific design token (e.g. `--color-avatar-bg`) tuned for
+identity rather than reusing the generic surface stack.
+**Fix scope**: small if just a token swap, medium if it widens
+into a "calm identity accents" pass (avatars, badges, status
+chips). Eyeball-driven, not WCAG-driven — current state PASSES
+all contrast thresholds.
+**Address by**: token-tuning pass alongside the muted-on-bg item
+above; not blocking any feature.
+
+### Mobile / tablet typography bump
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
+**Description**: At 360px and tablet widths (~600–900px) the body
+text and labels feel small. text-sm (14px) is heavily used across
+the header, the (authed) layout's nav, and the placeholder body;
+text-xs (12px) shows up on form labels. On a phone held at arm's
+length these read as cramped. A broader responsive-typography
+pass — likely a viewport-stepped fluid-type scale (e.g. `clamp()`
+for headings, larger base for narrow viewports) — would help.
+Avoid one-off `sm:text-base` patches that ratchet up complexity
+without solving the system.
+**Fix scope**: medium. Audit usage of text-xs / text-sm / text-base
+across (auth) and (authed) surfaces, propose a fluid scale, eyeball
+on every page at 360px / 600px / 900px / desktop. May involve
+adding tokens to the M&M `@theme` block.
+**Address by**: alongside the M&M token-tuning pass — typography
+and color rhythm belong in the same review.
+
+### Token tune — `--color-muted` underweight on light bg (WCAG AA)
+**Status**: bug
+**Observed**: 2026-05-20, feature 003 T020 visual sweep
+**Description**: M&M `--color-muted` at `#6E7572` against light bg
+`#ECEEE9` gives ~3.8:1 contrast — under WCAG AA body-text minimum
+(4.5:1) by ~15%. Affects every `text-muted` site in light mode: auth
+field labels, password-requirements rule rows, page intros, footer
+links, helper text. Dark mode is fine (~5.6:1, comfortably over AA).
+Not caused by the sidecar fix in 2b0c2b3 — that fix correctly
+restored `--color-muted` to its M&M value (it had been clobbered by
+an `@theme inline` remap). The underlying issue is the M&M palette
+value itself.
+**Fix scope**: medium — dedicated design-token pass. Likely darken
+the light value from `#6E7572` to ~`#5A615F` (target 4.6:1+), with
+eyeball verification across every authed surface. NOT to be embedded
+in feature implementation work; deserves its own task.
+**Address by**: secondary-text contrast, not blocking — primary text
+reads fine and WCAG AA-large threshold (3:1) is satisfied. Belongs
+in a deliberate token-tuning pass, not in active feature work.
+
+### Button-system character pass — semantic-weight differentiation + variant cleanup
+**Status**: polish
+**Observed**: 2026-05-21, feature 003 Phase 6 polish re-eyeball
+**Description**: Post-Phase-6, `button.tsx` ships three production
+variants — `default` (bg-ink + bg-color text, AAA in both modes),
+`secondary` (bg-surface + ink text + meadow border + meadow/10
+hover, AAA in both modes), `destructive` (FR-042 crimson, AAA).
+Contrast is solved. Character is not. Mohamed's re-eyeball
+flagged that the variants feel under-differentiated — they
+"match the theme" but lack distinct identity, and `Sign out`
+specifically reads as **perceptually destructive** even though
+it isn't data-destructive: it ends the session and requires
+re-auth to come back. Currently `Sign out` and `Save password`
+share `variant="secondary"`, which the visual hierarchy doesn't
+distinguish from each other or signal Sign out's session-boundary
+weight.
+
+Calm-first (Constitution V) intentionally restrains the palette;
+FR-042 scopes amber and crimson to specific use cases. Richer
+character requires either (a) variant tweaks within the existing
+palette (e.g. `Sign out` → `ghost` for "peripheral exit" framing,
+or a distinct sign-out-specific treatment that acknowledges
+perceptual weight without invoking crimson), or (b) a
+constitution-level amendment introducing a fourth scoped color
+(e.g. session-boundary actions). Either decision belongs in a
+dedicated design-system pass, not a piecemeal Phase 6 patch.
+
+Also outstanding (bundled into the same pass for coherence):
+  - `variant="ghost"` and `variant="outline"` hover state in
+    dark mode currently resolves to bg-accent (foggy) +
+    text-accent-foreground (ink-light) = ~1.49:1 — hard fail
+    WCAG AA. No production surface uses them yet, so deferred
+    rather than patched.
+  - `variant="link"` uses `text-primary` (= meadow) which gives
+    ~3:1 contrast against light bg-bg — fails AA for normal
+    text. No production surface uses it yet.
+  - `variant="secondary"` hover wash `bg-meadow/10` computed
+    ratio wasn't fully verified in the Phase 6 probe (the 10%
+    overlay didn't parse cleanly via regex). Visual inspection
+    is fine; the math deserves a proper measurement.
+
+**Fix scope**: medium. Bundle with the existing M&M token-tuning
+queue (avatar disc dark-mode greyness, muted-on-bg light-mode
+contrast under AA, mobile/tablet typography bump) so the four
+items land as ONE coherent design-tokens revision instead of
+four sequential patches that each touch overlapping surfaces.
+
+Specifics the future pass should evaluate:
+  - Sign out variant choice: does it warrant its own visual
+    treatment distinct from both primary action AND `Save
+    password`? Mohamed's "perceptually destructive" framing is
+    the conversation starter here.
+  - Fix ghost/outline dark-mode hover contrast.
+  - Fix link variant light-mode contrast.
+  - Measure secondary hover wash in computed ratio terms.
+  - Decide whether to amend FR-042 with a fourth scoped color
+    or hold the line at three (meadow / amber / crimson).
+
+**Address by**: design-system pass — same workstream as the
+three existing token-tuning entries above. Not blocking any
+in-progress feature; deferred polish.
+
+### Card heading typography — fresh design read needed
+**Status**: polish
+**Observed**: 2026-05-22, feature 003 Phase 7 eyeball (T045 re-look)
+**Description**: The three home cards ship with their headings in
+`font-display` (DM Serif Display) — `text-2xl` on TodaysCheckinCard
+and `text-xl` on ThingsThatMightHelpCard / RecentChatsCard. Mohamed
+flagged that this treatment "doesn't resonate" without articulating
+which axis is off — family, weight, or scale all candidates.
+The visual hierarchy in question pairs:
+
+  - `<h1>` welcome-banner heading: font-display text-3xl /
+    sm:text-4xl ("Good morning, Jane")
+  - `<h2>` card headings: font-display text-2xl /
+    text-xl
+
+Both currently use the same display family (DM Serif Display)
+which may be over-using the "one display moment" Constitution V
+intended for the wordmark and the highest-level page heading.
+Cards may want Inter — possibly at a heavier weight or a
+distinct scale — to read as informational headings rather than
+editorial moments. The shadcn `<CardTitle>` default
+(`text-2xl font-semibold leading-none tracking-tight`) was
+explicitly overridden in 533e8ba's commit body's spirit — that
+override may have gone too far in the editorial direction.
+
+**Fix scope**: small-to-medium. Recoverable className swap across
+three card components (todays-checkin-card.tsx,
+things-that-might-help-card.tsx, recent-chats-card.tsx) plus
+any sibling section headings that share the treatment (the five
+account-section headings in `components/account/*` currently
+also use font-display text-2xl — they're hierarchical peers and
+should move together). Future passes that ship more cards
+(welcome-banner is structurally a card-shaped header; T054's
+role-placeholder; features 004-009's eventual content surfaces)
+will inherit whatever the design pass settles on.
+
+Specifics the future pass should evaluate:
+  - Should card headings shift family from DM Serif Display
+    (editorial) to Inter (informational)?
+  - Re-weighting within the chosen family — Inter at 500 / 600
+    vs DM Serif Display default 400?
+  - Re-sizing — is the text-2xl / text-xl split between primary
+    and secondary cards the right hierarchy, or should they all
+    match?
+  - Whether a new heading scale token belongs in the M&M
+    `@theme` block (e.g. `--font-card-heading`) to lock the
+    decision and prevent drift.
+  - Whether the welcome banner `<h1>` (font-display) and the
+    card `<h2>` (under review) read as the right hierarchical
+    pair — moving cards to Inter would create a clearer
+    family-driven hierarchy with DM Serif reserved for the page
+    title.
+
+No tests assert on font family / weight / size — the calm-voice
+text-content assertions in T045 are agnostic. No structural risk.
+
+**Refinement (2026-05-25, feature 003 smoke review)**: at smoke
+sign-off Mohamed re-confirmed the current card heading font on the
+employee dashboard "doesn't feel right." Direction for the pass: do
+NOT tweak the current treatment in place — explore 2-3 typographic
+alternatives (different weights, sizes, or font choices within the
+Mist & Meadow token system) and pick one from a side-by-side
+comparison rather than nudging what's there now.
+
+**Address by**: design-system pass — same workstream as the four
+existing entries above (button-system character, mobile/tablet
+typography bump, avatar disc dark-mode tint, muted-on-bg
+contrast). Card heading typography belongs in the same revision
+because it touches the same family/weight/scale decisions the
+mobile-typography-bump entry already names.
+
+### Cursor pointer on Link-wrapped anchors and other clickable surfaces
+**Status**: polish
+**Observed**: 2026-05-22, feature 003 Phase 8 eyeball (T048 re-look)
+**Description**: Mohamed confirmed the cursor-pointer treatment
+on the shadcn Button base (9cdfb6b) and the ChatPill (81cdb39)
+feels right - hovering a button shows the pointing-finger cursor
+as expected. Wants the same affordance extended to other
+clickable elements that currently fall back to the default arrow
+cursor under Tailwind v4's preflight:
+
+  - `<Link>` (Next.js) wrapped anchors throughout the (authed)
+    surface - the "Account" row in the profile dropdown (which
+    uses `<DropdownMenuItem asChild><Link>...`), CenterNav's
+    "Home" link, the MobileMenu's sheet links, the Serenify
+    wordmark link in the header, the forthcoming employee-shell
+    spec's Account / Sign out / theme-toggle navigation paths.
+  - Any future clickable non-Button surface (radio cards,
+    sortable list items, expandable rows in features 010+).
+
+Tailwind v4's preflight removes the native `cursor: pointer`
+from anchors AND buttons (the button case was the source of
+9cdfb6b's fix). Anchors carrying interactive behaviour through
+`<Link>` or onClick handlers should restore the cursor so the
+affordance reads as clickable.
+
+Restoring it is a single globals.css rule under `@layer base`
+covering the broad class of clickable elements without forcing
+every call-site to add `cursor-pointer`:
+
+```css
+@layer base {
+  a[href], button:not(:disabled), [role="button"]:not([aria-disabled="true"]) {
+    cursor: pointer;
+  }
+}
+```
+
+The `button:not(:disabled)` half is redundant with shadcn
+Button's `cursor-pointer disabled:cursor-not-allowed` (9cdfb6b),
+but having a base rule means future bespoke `<button>` elements
+(if any) also inherit the affordance without needing to
+remember the className. Decision belongs in the design-system
+pass: bare CSS rule vs. per-component className vs. a Tailwind
+plugin that injects the class. Probably option A (bare CSS) is
+simplest.
+
+**Fix scope**: small. One `@layer base` block in
+`apps/web/app/globals.css`. No structural impact; no tests
+break (no spec asserts on `cursor:` properties).
+
+**Address by**: design-system pass — bundle with the five
+existing entries above (button-system character, mobile/tablet
+typography bump, avatar disc dark-mode tint, muted-on-bg
+contrast, card heading typography). Cursor affordance is part
+of the same UX-polish revision. Not blocking any in-progress
+phase.
+
+### CI guard for speckit skills + gitignore rule
+**Status**: tech-debt
+**Observed**: 2026-05-22, feature 003 — second regression of
+`.claude/skills/speckit-*/SKILL.md` going missing on disk,
+mirroring the PR #3 incident (7a7beff restore) only days
+earlier. DECISIONS.md @ 512c1d6 already documents the rule;
+documentation alone has not been sufficient.
+**Description**: Two structural failure modes have now each
+caused the spec-kit slash commands (`/speckit.implement` et al)
+to silently stop dispatching:
+
+  - **Mode A — `.gitignore` broadening.** The original `.claude/`
+    rule from d4621fe (feat 001 auth) was inherited into 003's
+    branch base, then never narrowed. PR #3 narrowed it on main
+    to `.claude/settings.local.json` but the change did not
+    propagate to 003 because 003 forked before the PR merged.
+  - **Mode B — branch ancestry drift.** 003 was forked from
+    8dc822b — before the PR #3 merge at 68b7d47 — and was never
+    rebased onto main. The 14 SKILL.md blobs that exist on main
+    (tracked from 7a7beff) are simply absent from 003's tree.
+
+Both modes produce the identical user-facing symptom: typing
+`/speckit.implement` returns no schema; Mohamed has to diagnose
+and Claude has to restore. The cost per occurrence is ~15-20 min
+plus a context reset (CC must restart to register the skills).
+
+A trivial CI check would catch both modes pre-merge:
+
+```js
+// scripts/check-speckit-skills.mjs (sketch)
+import fs from "node:fs";
+const REQUIRED = [
+  "speckit-analyze", "speckit-checklist", "speckit-clarify",
+  "speckit-constitution", "speckit-git-commit", "speckit-git-feature",
+  "speckit-git-initialize", "speckit-git-remote", "speckit-git-validate",
+  "speckit-implement", "speckit-plan", "speckit-specify",
+  "speckit-tasks", "speckit-taskstoissues",
+];
+const missing = REQUIRED.filter(
+  (s) => !fs.existsSync(`.claude/skills/${s}/SKILL.md`),
+);
+if (missing.length) {
+  console.error("Missing speckit skill files:", missing);
+  console.error("See DECISIONS.md @ 512c1d6 and commit 7a7beff.");
+  process.exit(1);
+}
+const gitignore = fs.readFileSync(".gitignore", "utf8");
+if (/^\.claude\/?\s*$/m.test(gitignore)) {
+  console.error(
+    "Broad `.claude/` rule found in .gitignore — narrow to " +
+    "`.claude/settings.local.json` per 7a7beff.",
+  );
+  process.exit(1);
+}
+```
+
+Wire into `package.json` as `"check:speckit-skills": "node
+scripts/check-speckit-skills.mjs"` and add to the CI workflow
+ahead of the test step. Optionally add a husky pre-commit hook
+for the local layer.
+
+**Why this is worth doing despite the existing DECISIONS.md
+entry**: 512c1d6 documents the rule; this guard *enforces* it.
+The first regression happened because a feature commit (d4621fe)
+swept the skills as collateral damage. The second happened
+because a branch was forked before the documenting fix merged.
+Neither failure mode is detectable by reading DECISIONS.md.
+Both are trivially caught by file-existence + regex on
+`.gitignore`. The maintenance surface is near-zero (the rule
+itself does not change unless spec-kit's skill set changes,
+which is a deliberate spec-kit version bump).
+
+**Fix scope**: small — ~25 lines of script, 3 lines of
+`package.json`, 2 lines of CI workflow YAML. ~15 min total.
+
+**Address by**: before feature 004 begins, or sooner if a third
+occurrence is observed. Pair with whoever next touches the CI
+workflow (currently empty per repo structure, so this may also
+be the first CI workflow file — in which case scope grows to
+"medium" to include the workflow scaffolding itself).
+
+### Dynamic welcome banner subtitle variants
+**Status**: deferred-feature
+**Observed**: feature 003 plan (Decision M) and FR-009 deferral
+**Description**: The welcome banner on `/app` for employees renders
+a locked static subtitle ("A space to check in with yourself.")
+beneath the adaptive greeting per Decision M. FR-009 originally
+contemplated context-aware variants (signal-driven, time-of-week-
+driven, post-checkin-driven) that swap into the single `<p>` slot.
+The markup in `apps/web/components/home/welcome-banner.tsx`
+already accommodates the swap — the slot is a single sibling
+element under the greeting, and the SUBTITLE constant is the only
+edit needed once variants exist. Re-logged here so a future
+contributor doesn't re-derive FR-009's deferral.
+**Fix scope**: medium — needs signal/calibration data (features
+005/006) before the variants have anything to key on. Decision M
+locks the current copy as the all-contexts fallback; variants
+layer on top.
+**Address by**: post-feature-006 (calibration shipped, signal
+data exists). NOT before — variants without signal would just be
+random copy churn.
+
+### Notifications-section live controls on /app/account
+**Status**: deferred-feature
+**Observed**: feature 003 plan (FR-021 placeholder)
+**Description**: The Notifications section on `/app/account` is a
+placeholder card today (`apps/web/components/account/notifications-placeholder.tsx`) —
+muted body text describing that notification preferences land in a
+later feature, no live controls. The component shape matches the
+Privacy placeholder so a future swap is symmetric. The notification
+*surface* (`apps/web/components/notification.tsx`) shipped in
+feature 003 but is not mounted by any production code per FR-033;
+features 007/008/010 will mount it. The user-facing **preferences**
+(channels, quiet hours, digest cadence) belong in this placeholder
+when there's a notifications system to configure.
+**Fix scope**: medium — schema + Server Action + form, paired with
+whichever feature first generates user-controllable notifications.
+**Address by**: with the first feature that emits notifications to
+users (likely feature 008 / chatbot interrupts, or feature 010 /
+privacy controls if those reuse the notification surface).
+
+### Welcome banner timezone awareness (server-rendered greeting)
+**Status**: deferred-bug
+**Observed**: feature 003 T040 (welcome-banner.tsx implementation)
+**Description**: `apps/web/components/home/welcome-banner.tsx`
+renders the adaptive greeting (Good morning/afternoon/evening) on
+the server using `new Date()` — i.e., the server's local time
+(Vercel deployment region). Users outside that timezone may see
+the wrong band: a user in `Asia/Tokyo` reading at their local
+8pm would be greeted "Good morning" if the server is in
+`America/Los_Angeles` (8pm Tokyo = 4am LA). The component
+comment names this trade-off and points here.
+**Fix scope**: small — two viable paths:
+  - (a) Defer the greeting to a `useEffect` that reads
+    `Intl.DateTimeFormat().resolvedOptions().timeZone` and re-
+    computes client-side. Costs a brief flash of the server-
+    rendered greeting before hydration. Acceptable for the
+    home page.
+  - (b) Pass the IANA zone in a cookie (set on sign-in or via
+    a one-time client-side write) and pass to the Server
+    Component as a prop. No flash, more wiring.
+**Address by**: a later polish pass, or whichever feature first
+needs per-user timezone awareness (signal aggregation in
+feature 005 may need this anyway).
+
+### Playwright local matrix run: pipe-buffering deadlock with `tail`
+**Status**: deferred-tooling
+**Observed**: feature 003 T066 (full Playwright matrix run on
+chromium + firefox + webkit)
+**Description**: Running the full Playwright matrix locally via
+`npx playwright test 2>&1 | tail -80` hangs for tens of minutes
+with an empty output buffer, even though each per-project run
+(`--project=chromium`, `--project=firefox`, `--project=webkit`)
+completes in 1-7 minutes individually. Diagnosed as pipe-
+buffering deadlock: `tail` only flushes its buffer when stdin
+closes, so Playwright's reporter chunks never reach a visible
+buffer while the dev server's stdin chain stays open. The
+test runner *appears* to make no progress; processes accumulate
+in the background; output file stays at 0 bytes.
+
+Workaround: run each project sequentially with
+`--reporter=list` and pipe through a line-buffered filter
+(`grep --line-buffered -E "^\s+(ok|x|\d+ (ok|failed|passed))"`)
+or skip pipe filtering entirely.
+
+This isn't a Playwright bug — it's a shell-pipeline interaction
+with how Node's stdout buffers under non-TTY conditions. But
+the symptom is misleading enough that the first occurrence
+cost ~30 minutes of "is it hung?" diagnosis. Worth a small
+helper script (`scripts/run-e2e-matrix.sh`) that wraps the
+per-project sequential invocation with the streaming filter
+so future contributors hit the working path by default.
+
+**Fix scope**: small — ~20 lines of bash plus a `package.json`
+npm-script entry (`"test:e2e:matrix": "scripts/run-e2e-matrix.sh"`).
+The full T066 commit body (7dec3c9) has the diagnosis details
+and the working invocation pattern.
+**Address by**: anyone next running the full matrix locally, or
+whoever first sets up CI (the streaming filter is also the right
+pattern for CI logs that may be captured non-interactively).
+
+### Dev-server memory bloat + monotonic slowdown across stacked full-suite runs
+**Status**: tech-debt
+**Observed**: 2026-05-25, feature 003 smoke verification (the webkit
+timeout-flake fix on `reset-password.spec.ts:87`). Three consecutive full
+Playwright matrix runs (`npx playwright test`, 54 tests ×
+chromium/firefox/webkit) against a single long-lived `npm run dev` server.
+**Description**: Wall-clock grew **monotonically across the stacked runs —
+3.0m → 5.7m → 11.2m** — while the reused `next dev` process on :3000 sat at
+**~4.1 GB** resident. Run 3 degraded enough that a firefox worker wedged and
+was force-killed after the 300s stop timeout (`worker process did not exit
+within 300000ms`), and the shared `signInAs` helper
+(`tests/e2e/helpers.ts:13`) timed out waiting for the post-sign-in redirect
+(`toHaveURL(/\/(app|onboarding)$/)` stuck on `/login`), failing
+`admin-seeded.spec.ts` on firefox. Runs 1 and 2 were clean 54/54; the
+failure was purely load-induced and unrelated to the code under test.
+**Why it matters**: the leak manufactures *unrelated* flakes during smoke
+verification — here it surfaced an admin-seeded firefox failure with nothing
+to do with the change being verified, costing investigation time and risking
+a wrong fix being chased. Any future multi-run smoke or local-matrix session
+hits the same wall as the suite grows.
+**Investigate** (before feature 004) — candidate root causes:
+  - Next.js dev compiler / HMR memory retention across a long session (the
+    `.next/dev` postcss workers and module graph held warm).
+  - Supabase client connection pooling under the e2e harness (each spec's
+    `createAdminClient` / sign-in path; possible un-closed clients).
+  - Playwright `reuseExistingServer: true` interacting with hot reload — the
+    server is never torn down between runs, so nothing reclaims the heap.
+**Workaround until investigated**: restart the dev server between full-suite
+runs (or every 2 runs); for the smoke gate, run the matrix once against a
+freshly-started server rather than stacking runs.
+**Fix scope**: small-to-medium — an investigation spike to attribute the leak
+(heap-snapshot the `next dev` process across runs) first, then either a
+harness change (let Playwright own the webServer lifecycle per run instead of
+reusing) or an upstream Next/Supabase mitigation.
+**Address by**: before feature 004 begins. Pairs with the "Playwright local
+matrix run: pipe-buffering deadlock" tooling entry above — both are about
+making the local matrix run reliably.
+
+### Non-dismissible confirmation notifications (stress-detection prompts)
+**Status**: deferred-feature
+**Observed**: 2026-05-25, feature 003 ST-2 review (Notification component)
+**Description**: A stress-detection confirmation notification — e.g.
+"we noticed you might be stressed — are you okay?" — should NOT be
+dismissible by click-outside or Escape. The whole reason that prompt
+fires is that the user may be distracted or overwhelmed; a stray click
+or keypress dismissing a time-sensitive check-in is exactly the
+accidental loss we want to prevent. Informational notifications keep
+the current dismiss-anywhere behaviour (explicit Dismiss button, Escape,
+click-outside); only confirmation-of-detection prompts lock down to the
+explicit Dismiss control.
+
+Deferred because feature 003's Notification is built-don't-mount per
+FR-033 — the component exists but nothing in 003 mounts it. The
+dismissibility decision belongs to the consumer features that actually
+mount confirmation flows: 007 (stress detection), 008 (chat), 010
+(talk). Whichever ships the first non-dismissible notification owns the
+implementation.
+**Fix scope**: small — 5-10 lines plus a small Vitest addition. Add a
+`dismissible?: boolean` prop (default `true`) to `Notification`
+(`apps/web/components/notification.tsx`). When `false`, wire Radix
+Dialog's `onPointerDownOutside` and `onEscapeKeyDown` on
+`DialogPrimitive.Content` to call `event.preventDefault()`, so the
+surface can only be dismissed via its explicit Dismiss button
+(`DialogPrimitive.Close` → `onOpenChange(false)`). Pass
+`dismissible={false}` for confirmation-of-detection notifications;
+leave the default for informational ones. Vitest: assert that with
+`dismissible={false}` an Escape keypress and an outside pointerdown do
+NOT fire `onOpenChange(false)` while the Dismiss button still does, and
+that the default (`dismissible` unset) path keeps all three dismiss
+routes.
+**Address by**: whichever consumer feature (007 / 008 / 010) builds the
+first non-dismissible confirmation notification.
+
+### Auth-broadcast audit needs a forward-looking guard, not a one-time snapshot
+**Status**: tech-debt
+**Observed**: 2026-05-25, feature 003 — the ST-8 fix (commit c8c182c) and
+the OTP follow-up (commit bdf1463)
+**Description**: ST-8 and the OTP follow-up surfaced that the
+auth-broadcast pattern (`broadcastSignIn` / `AUTH_SIGNIN_COOKIE`) was
+applied ad-hoc at each auth-completing code path. Three rounds of "we
+found another path that doesn't broadcast" happened before commit
+bdf1463's audit closed the gaps:
+  1. Phase 11 originally — only the form sign-in Server Action broadcast.
+  2. ST-8 fix (c8c182c) — `/auth/callback` added to the bridge.
+  3. OTP follow-up (bdf1463) — `OtpPanel` (signup OTP verify) added.
+The audit table in bdf1463 is a one-time snapshot, not a forward-looking
+guard — a future PR adding a new auth flow could regress this silently
+(no broadcast → sibling tabs don't propagate after that flow completes).
+**Action when picked up**: implement a contract test, lint rule, or
+runtime assertion that detects when a new code path establishes a
+Supabase session and redirects to an authed surface WITHOUT calling
+`broadcastSignIn()` (client) or setting `AUTH_SIGNIN_COOKIE` (server).
+Possible approaches:
+  - Static grep check in CI: any module calling `supabase.auth.verifyOtp`
+    / `exchangeCodeForSession` / `signInWithPassword` must also reference
+    `broadcastSignIn` or `AUTH_SIGNIN_COOKIE`. (Note: would need an
+    allowlist for `account/actions.ts`, whose `signInWithPassword` on a
+    throwaway anon client is a re-auth verification, not a sign-in nav.)
+  - Integration test that drives every documented auth flow and asserts
+    the broadcast fires.
+  - Code-review checklist update: PRs adding auth flows must update the
+    audit table from commit bdf1463.
+**Fix scope**: medium. Belongs in a future security / quality hardening
+pass, not mid-feature work.
+**Address by**: a future security / quality hardening pass.
+
+### "Send a new confirmation" link contrast underweight in light mode
+**Status**: polish
+**Observed**: 2026-05-25, feature 003 smoke review (sign-in screen)
+**Description**: On the sign-in screen, the "send a new confirmation"
+link — surfaced when a user attempts to sign into an as-yet-unverified
+email — has insufficient contrast in light mode. It is visible, but the
+foreground/background ratio falls short of what's expected for an action
+affordance. Dark mode reads fine. Thematically this sits with the other
+light-mode contrast / token entries (muted-on-bg under AA, button-system
+character) rather than being a standalone treatment.
+**Fix scope**: small — single-color-token review. WCAG-probe the link's
+computed foreground/background ratio against the Mist & Meadow tokens and
+adjust to ≥4.5:1 (AA) or 7:1 (AAA) for the affordance. Verify dark mode
+stays clean after the change.
+**Address by**: design-system pass — bundle with the existing light-mode
+contrast entries above (muted-on-bg under AA, button-system character).
+Same workstream; not blocking any in-progress feature.

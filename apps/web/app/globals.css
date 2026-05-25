@@ -1,11 +1,17 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 
 /*
  * Mist & Meadow palette — locked by Constitution Principle V.
- * Light mode is the default; dark mode swaps tokens via data-theme="dark"
- * on the <html> element (next-themes attribute="data-theme").
+ * Light mode is the default; dark mode swaps tokens via the `.dark`
+ * class on the <html> element (next-themes attribute="class") —
+ * shadcn's expected selector convention.
  *
- * Red is forbidden in any state. Stress signals use --color-amber.
+ * Red is forbidden on affective and ambient surfaces. Stress signals
+ * use --color-amber. Red IS permitted on destructive action surfaces
+ * (delete-account, leave-team, revoke-session, inline destructive
+ * text links) via --color-crimson — see CHANGELOG 2026-05-20 for
+ * the FR-042 scope clarification.
  */
 @theme {
   /* Light mode (default) */
@@ -16,6 +22,7 @@
   --color-meadow:   #7A9275;
   --color-foggy:    #8AA9B6;
   --color-amber:    #DCB587;
+  --color-crimson:  #7B4244;
   --color-border:   #D6D7D1;
 
   --radius-card:    12px;
@@ -26,9 +33,84 @@
   --font-display:   "DM Serif Display", serif;
 }
 
+/*
+ * shadcn primitive variables, mapped onto Mist & Meadow tokens per
+ * contracts/shadcn-mapping.md (plan.md Decision B). Two load-bearing
+ * choices:
+ *   --color-destructive       → crimson + --color-destructive-foreground
+ *                         → bg (FR-042 scope-clarified per CHANGELOG
+ *                         2026-05-20; supersedes the earlier amber
+ *                         mapping that failed dark-mode WCAG AA at
+ *                         1.4:1)
+ *   --color-primary-foreground→ bg, symmetric across modes (WCAG AA)
+ *
+ * NAME COLLISION NOTE: `--color-muted` is intentionally NOT remapped
+ * here. The Mist & Meadow `--color-muted` token (the muted-gray TEXT
+ * color, #6E7572 / #8B928F) is consumed across (auth) and (authed)
+ * surfaces via the `text-muted` utility. Reassigning it to
+ * `var(--color-surface)` washes out every `text-muted` site because
+ * Tailwind v4's `@theme inline` resolves and INLINES the value into
+ * the `.text-muted` utility at compile time — so the runtime
+ * `:root.dark { --color-muted: ... }` override no longer participates
+ * for that utility. `--color-muted-foreground: var(--color-muted)`
+ * below still resolves through the M&M token, giving shadcn's
+ * `text-muted-foreground` the muted-gray it wants. `bg-muted`
+ * (consumed by the DropdownMenuSeparator) then renders as M&M muted
+ * gray rather than surface — a visible 1px divider rather than the
+ * surface-on-surface line that was effectively invisible. (Earlier
+ * iteration mapped muted→surface; see CHANGELOG 2026-05-20 backlog.)
+ *
+ * The `--color-*` prefix is load-bearing — Tailwind v4 generates
+ * color utility classes (bg-destructive, text-foreground, etc.)
+ * only from tokens that match the `--color-*` naming convention in
+ * @theme blocks. The earlier unprefixed shape (`--destructive: ...`)
+ * registered the variables to :root but did NOT produce any Tailwind
+ * utility classes, leaving shadcn primitives unstyled. See research.md
+ * R-2.1 and CHANGELOG 2026-05-20 for the discovery.
+ *
+ * Dark-mode flips happen automatically via the :root.dark block
+ * below (Mist & Meadow tokens swap; the shadcn variables track them
+ * through the var() chain). Sits BELOW the Mist & Meadow @theme
+ * block so any conflict resolves in favor of the explicit mapping.
+ */
+@theme inline {
+  --color-background:         var(--color-bg);
+  --color-foreground:         var(--color-ink);
+  --color-card:               var(--color-surface);
+  --color-card-foreground:    var(--color-ink);
+  --color-popover:            var(--color-surface);
+  --color-popover-foreground: var(--color-ink);
+  --color-primary:            var(--color-meadow);
+  --color-primary-foreground: var(--color-bg);
+  --color-secondary:          var(--color-foggy);
+  --color-secondary-foreground: var(--color-ink);
+  --color-muted-foreground:   var(--color-muted);
+  --color-accent:             var(--color-foggy);
+  --color-accent-foreground:  var(--color-ink);
+  --color-destructive:        var(--color-crimson);
+  --color-destructive-foreground: var(--color-bg);
+  --color-border:             var(--color-border);
+  --color-input:              var(--color-border);
+  --color-ring:               var(--color-meadow);
+
+  /* Radius ladder — anchored to Mist & Meadow's --radius-control (8px,
+     buttons/inputs/dropdowns) and --radius-card (12px, cards). The
+     ladder gives shadcn primitives the rounded-{sm,md,lg,xl,2xl,3xl,4xl}
+     utility classes they may reference; sm/md/lg/xl mapped to known
+     Mist & Meadow values, 2xl+ extrapolated for larger surfaces. */
+  --radius:     var(--radius-control);
+  --radius-sm:  6px;
+  --radius-md:  var(--radius-control);
+  --radius-lg:  var(--radius-card);
+  --radius-xl:  16px;
+  --radius-2xl: 20px;
+  --radius-3xl: 24px;
+  --radius-4xl: 28px;
+}
+
 @layer base {
   /* Dark mode override — equal-priority per Constitution Principle VI. */
-  :root[data-theme="dark"] {
+  :root.dark {
     --color-bg:      #161917;
     --color-surface: #20231F;
     --color-ink:     #DCDED5;
@@ -36,6 +118,7 @@
     --color-meadow:  #97AE91;
     --color-foggy:   #9CBBC7;
     --color-amber:   #DCB587;
+    --color-crimson: #C17F81;
     --color-border:  #2D3130;
   }
 

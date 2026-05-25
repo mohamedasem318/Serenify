@@ -10,8 +10,8 @@ import {
   resetPasswordSchema,
   type ResetPasswordInput,
 } from "@/lib/auth/schemas";
-import { PasswordInput } from "@/components/ui/password-input";
-import { PasswordRequirements } from "@/components/ui/password-requirements";
+import { Field } from "@/components/ui/auth/field";
+import { PasswordRequirements } from "@/components/ui/auth/password-requirements";
 import { updatePassword, updatePasswordFromForm } from "./actions";
 
 type Props = {
@@ -137,55 +137,3 @@ export function ResetForm({ authenticated }: Props) {
     </section>
   );
 }
-
-type FieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
-  id: string;
-  label: string;
-  helper?: string;
-  error?: string;
-};
-
-const Field = (props: FieldProps) => {
-  const { id, label, helper, error, type, ...inputProps } = props;
-  const helperId = helper ? `${id}-helper` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
-  const describedBy =
-    [helperId, errorId].filter(Boolean).join(" ") || undefined;
-  return (
-    <div className="space-y-1.5">
-      <label
-        htmlFor={id}
-        className="block text-xs font-medium uppercase tracking-wide text-muted"
-      >
-        {label}
-      </label>
-      {type === "password" ? (
-        <PasswordInput
-          id={id}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          {...inputProps}
-        />
-      ) : (
-        <input
-          id={id}
-          type={type}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy}
-          {...inputProps}
-          className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-meadow"
-        />
-      )}
-      {helper && !error && (
-        <p id={helperId} className="text-xs text-muted">
-          {helper}
-        </p>
-      )}
-      {error && (
-        <p id={errorId} className="text-xs text-ink">
-          {error}
-        </p>
-      )}
-    </div>
-  );
-};

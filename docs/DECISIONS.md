@@ -274,6 +274,30 @@ collides with `demo.serenify.local` (currently impossible per RFC 6762).
 
 ---
 
+## 2026-05-20 — FR-042 scope clarification: red permitted on destructive action surfaces only
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.0.0 → 1.1.0`).
+
+**Decision**: Added `crimson` token to Mist & Meadow (`#7B4244` light,
+`#C17F81` dark). Replaces the earlier amber mapping for
+`--destructive` that originated from a contract pre-authorized fix
+later proven WCAG-noncompliant in dark mode (`#DCB587` amber +
+`#DCDED5` dark-ink = 1.4:1, fails AA). Crimson + bg-as-foreground
+passes AA in both modes (6.08:1 light, 5.02:1 dark). Constitution
+Principle V amended in same commit; CHANGELOG records the
+amendment.
+
+**Source tasks**: T017 (mapping), T019 (button emission triggered the
+contrast discovery).
+
+**Revisit if**: a future palette overhaul re-tones amber such that
+amber + ink achieves AA in both modes — at which point the crimson
+token may be folded back if destructive-action urgency can be
+adequately signalled by amber without ambiguity against stress
+indicators.
+
+---
+
 ## 2026-05-18 — Windows npm CLI flag passthrough fallback
 
 **Status**: Accepted.
@@ -305,3 +329,591 @@ consistent across both flags.
 `--`-separated flags, OR a future contributor adds a new CLI flag to
 `scripts/seed-demo.ts` — the same env-var fallback must be wired for
 that flag.
+
+---
+
+## 2026-05-21 — `.claude/` tooling tracked in git; per-user files ignored individually
+
+**Status**: Accepted (rule correction from earlier `d4621fe`).
+
+**Context**: spec-kit v0.8.12's Claude integration installs the
+`/speckit.<command>` surface as **Claude Code Skills**, not as slash-
+command files. Specifically, its `SkillsIntegration` writer uses
+`commands_subdir="skills"` and emits 14 files at
+`.claude/skills/speckit-<command>/SKILL.md` (one per command:
+`speckit-analyze`, `speckit-checklist`, `speckit-clarify`,
+`speckit-constitution`, `speckit-git-commit`,
+`speckit-git-feature`, `speckit-git-initialize`,
+`speckit-git-remote`, `speckit-git-validate`, `speckit-implement`,
+`speckit-plan`, `speckit-specify`, `speckit-tasks`,
+`speckit-taskstoissues`). These files MUST be tracked in git —
+without them, none of the `/speckit.<command>` invocations dispatch
+through the Skill tool inside a Claude Code session and the
+spec-driven workflow silently degrades to plain LLM responses.
+
+**How it broke**: `d4621fe` (feat 001 auth) added `.claude/` to
+`.gitignore` under the heuristic "Claude Code local settings — per-
+user, never commit". That broad rule retroactively swept the 14
+`SKILL.md` files installed by `f2102c8` (chore: initialize
+spec-kit) into being untracked, then they were never recommitted.
+For multiple weeks across features 001, 002, and the early phases of
+003, the four spec-kit slash commands appeared to "work" inside a
+single session (the model has the speckit prompts in its head and
+can fake the output) but no skill machinery actually ran — no
+Skill-tool dispatch, no skill-specific permissioning, no
+checkpointed sub-invocation. The degradation surfaced during
+feature 003 Phase 5 when `/speckit.implement` did not produce the
+expected skill announcement and skill-tool call in the transcript.
+
+**Fix**: chore branch `chore/speckit-command-registration` (commit
+`7a7beff`, merged to `main` via PR #3 at commit `68b7d47`).
+
+- Restored the 14 `.claude/skills/speckit-*/SKILL.md` files from
+  `f2102c8` byte-for-byte (the spec-kit installer had not changed
+  the file contents in the v0.8.12 → v0.8.12 timeframe, so the
+  restoration was a clean revert of the unintended sweep, not a
+  re-install).
+- Narrowed `.gitignore`: removed the broad `.claude/` entry,
+  replaced with `.claude/settings.local.json` (the one file
+  legitimately classified as per-user — it holds permission
+  decisions that vary by developer).
+
+Verification: post-merge, a fresh Claude Code session in this repo
+sees all 14 speckit Skills in the user-invocable list; typing
+`/speckit.implement` triggers the Skill tool and dispatches the
+`speckit-implement` skill body. Confirmed during the Phase 5
+resume that produced commits `c51ee67` through `309e78d`.
+
+**Rule going forward**:
+
+- `.claude/` is **not** broadly gitignored. The default state for
+  any file under `.claude/` is **tracked**.
+- Per-user files inside `.claude/` are ignored **individually** by
+  full path. Today that list is one entry:
+  `.claude/settings.local.json`. Future additions (if Claude Code
+  ever ships a second per-user file under that tree) are added by
+  their exact path, not by a folder wildcard.
+- Tooling installed under `.claude/` by integrations (skills today;
+  potentially commands/agents in future spec-kit or Claude Code
+  releases) is treated as **repo-shared infrastructure** and stays
+  tracked. The "this is local-only" instinct is wrong for anything
+  that affects how teammates interact with the codebase.
+- Any future PR that proposes broadening `.claude/` exclusion in
+  `.gitignore` MUST first enumerate which tracked files would be
+  swept and justify each exclusion individually.
+
+**Revisit when**: spec-kit (or any other Claude Code integration)
+adds a file under `.claude/` that genuinely IS per-user and
+shouldn't be shared. Add that file by its exact path to
+`.gitignore`; don't reach for a broader pattern. If the
+per-user files start to outnumber the tracked ones, revisit
+whether the integration should be writing to a `.claude/local/`
+sub-directory by convention instead.
+
+---
+
+## 2026-05-25 — feature 003 architecture decisions (collected; 📌 DECISION-1 through DECISION-11 + FR-020 amendment)
+
+This block collects the architectural decisions that shaped feature
+003 (employee-dashboard-shell). Source tasks are named per entry;
+each is traceable to a 📌 marker in
+`specs/003-employee-dashboard-shell/tasks.md`. Where the as-built
+state diverges from the plan-time intent, an **Amendment** subhead
+records the divergence and points at the relevant CHANGELOG entry.
+
+---
+
+## 2026-05-25 — shadcn/ui on Tailwind v4 path; manual init substituted (📌 DECISION-1)
+
+**Status**: Accepted (plan amendment recorded in CHANGELOG
+2026-05-20).
+
+**Decision**: `apps/web/` adopts shadcn/ui on the Tailwind v4 path:
+CSS-vars mode, baseColor `neutral` (overridden by the Decision B
+mapping), shadcn primitives vendor-pasted into
+`apps/web/components/ui/`. Seven primitives in scope: `button`,
+`card`, `dropdown-menu`, `sheet`, `dialog`, `avatar`, `separator`.
+
+**Amendment — manual init substituted for `shadcn@latest init`**:
+shadcn CLI 4.7.0's `--preset=base-nova` default bundles changes
+that violate Constitution V (Inter→Geist font swap), FR-042 (red
+`--destructive`), and Decision B's mapping intent (an oklch
+palette overriding Mist & Meadow). For this feature and any future
+re-init, the workflow is **manual**: hand-author `components.json`
+(Decision E shape) + `lib/utils.ts`, `npm i -D` the dep list
+(`class-variance-authority`, `clsx`, `tailwind-merge`,
+`tw-animate-css`, `@radix-ui/react-slot`), then use
+`npx shadcn@latest add <primitive>` per primitive. `shadcn add`
+reads `components.json` for paths and writes to `components/ui/`
+without touching `layout.tsx` or palette CSS.
+
+**Rationale**: shadcn primitives give the dashboard a standardized
+control library while preserving Mist & Meadow tokens, calm-voice
+copy, and FR-042 scope. The manual init bypass keeps the calm
+direction protected from upstream preset drift without sacrificing
+the per-primitive `shadcn add` workflow.
+
+**Source tasks**: T015 (init), T016 (components.json), T019 (add
+primitives).
+
+**Revisit when**: shadcn defaults realign with Decision A/B/E
+target shape — at which point the `init` step can be restored.
+Until then, manual init binds.
+
+---
+
+## 2026-05-25 — shadcn variable names mapped to Mist & Meadow tokens (📌 DECISION-2)
+
+**Status**: Accepted (with two CHANGELOG amendments —
+2026-05-20 prefix correction and 2026-05-20 FR-042 scope
+clarification).
+
+**Decision**: shadcn primitives consume Mist & Meadow tokens via
+an `@theme inline` mapping block in `apps/web/app/globals.css`.
+19-row mapping table from
+`specs/003-employee-dashboard-shell/contracts/shadcn-mapping.md`
+is the contract. The `--color-*` and `--radius-*` prefixes are
+**load-bearing** — Tailwind v4 generates utility classes (e.g.
+`bg-primary`, `rounded-md`) only from tokens with these prefixes.
+
+| shadcn variable | Mist & Meadow token (light) | (dark) |
+|---|---|---|
+| `--color-background` | `--color-bg` (`#ECEEE9`) | `--color-bg` (`#161917`) |
+| `--color-foreground` | `--color-ink` (`#1F2522`) | `--color-ink` (`#DCDED5`) |
+| `--color-card` | `--color-surface` (`#F5F6F2`) | `--color-surface` (`#20231F`) |
+| `--color-card-foreground` | `--color-ink` | `--color-ink` |
+| `--color-popover` | `--color-surface` | `--color-surface` |
+| `--color-popover-foreground` | `--color-ink` | `--color-ink` |
+| `--color-primary` | `--color-meadow` (`#7A9275`) | `--color-meadow` (`#97AE91`) |
+| `--color-primary-foreground` | `--color-bg` | `--color-bg` |
+| `--color-secondary` | `--color-foggy` (`#8AA9B6`) | `--color-foggy` (`#9CBBC7`) |
+| `--color-secondary-foreground` | `--color-ink` | `--color-ink` |
+| `--color-muted` | *(not remapped — inherits M&M `#6E7572`)* | *(inherits `#8B928F`)* |
+| `--color-muted-foreground` | `--color-muted` | `--color-muted` |
+| `--color-accent` | `--color-foggy` | `--color-foggy` |
+| `--color-accent-foreground` | `--color-ink` | `--color-ink` |
+| `--color-destructive` | `--color-crimson` (`#7B4244`) | `--color-crimson` (`#C17F81`) |
+| `--color-destructive-foreground` | `--color-bg` | `--color-bg` |
+| `--color-border` | `--color-border` | `--color-border` |
+| `--color-input` | `--color-border` | `--color-border` |
+| `--color-ring` | `--color-meadow` | `--color-meadow` |
+
+Plus the 7-step radius ladder (per CHANGELOG 2026-05-20 prefix
+correction): `--radius-sm` 6px, `--radius-md`
+`var(--radius-control)` 8px, `--radius-lg` `var(--radius-card)`
+12px, `--radius-xl` 16px, `--radius-2xl` 20px, `--radius-3xl`
+24px, `--radius-4xl` 28px. The single `--radius` line
+declared in T017 had to grow to a 7-step ladder because Tailwind
+v4 generates `rounded-{sm,md,lg,xl,2xl,3xl,4xl}` only from
+`--radius-*`-prefixed tokens.
+
+**Three load-bearing choices**:
+
+- `--color-destructive → --color-crimson` + `--color-destructive-foreground → --color-bg`. FR-042 scope-clarified
+  per CHANGELOG 2026-05-20 and DECISIONS 2026-05-20 (crimson
+  permitted on destructive action surfaces only). The earlier
+  amber mapping failed dark-mode WCAG AA at 1.4:1.
+- `--color-muted` intentionally NOT remapped. The original draft
+  `--muted → --color-surface` collided with M&M's own
+  `--color-muted` (the gray-text token consumed by `text-muted`)
+  and washed out every auth-page muted-text site because Tailwind
+  v4's `@theme inline` inlines the resolved value into the
+  `.text-muted` utility at compile time.
+- `--color-primary-foreground → --color-bg` symmetric across both
+  modes. The originally-asymmetric `--color-ink` in dark mode
+  failed WCAG AA at ~3.1:1 against meadow; the symmetric mapping
+  is the only AA-compliant choice. Same WCAG-AA pattern as
+  `--color-destructive-foreground`.
+
+**Amendment — `--color-*` prefix correction (CHANGELOG
+2026-05-20)**: an earlier unprefixed shape (`--background`,
+`--destructive`, …) registered the variables to `:root` but
+produced NO utility classes, leaving shadcn primitives unstyled.
+All 19 mapping rows renamed to `--color-*`; 7-step radius ladder
+added in the same commit. Authoritative reference: shadcn
+4.7.0's own `init` emission used the same `--color-*` shape
+before the rollback in 89995aa.
+
+**Source tasks**: T017 (mapping block), T020 (computed-style
+verification probes).
+
+**Revisit if**: a future palette overhaul re-tones amber such
+that amber + ink achieves AA in both modes (folding crimson
+back becomes possible), OR shadcn ships a primitive that
+references a CSS variable not in the 19-row table.
+
+---
+
+## 2026-05-25 — Dark-mode attribute: `data-theme` → `class` + `serenify-theme` storage key (📌 DECISION-3)
+
+**Status**: Accepted.
+
+**Decision**: `next-themes` is reconfigured from
+`attribute="data-theme"` to `attribute="class"` so the
+`.dark` selector matches shadcn primitives' contract. The
+localStorage key is namespaced from `theme` to
+`serenify-theme` so origin-shared localStorage with unrelated
+apps doesn't collide.
+
+  - `apps/web/app/providers.tsx`: `attribute="class"`,
+    `storageKey="serenify-theme"`. Other props
+    (`defaultTheme="system"`, `enableSystem`,
+    `disableTransitionOnChange`) unchanged.
+  - `apps/web/app/globals.css`: dark-mode override block selector
+    changed from `:root[data-theme="dark"]` to `:root.dark`.
+    Block contents (color overrides) unchanged. Mist & Meadow
+    tokens stay verbatim.
+
+A migration shim runs at `<head>` of the root layout to
+populate `serenify-theme` from a legacy `theme` key on first
+load (see T014 entry in
+`specs/003-employee-dashboard-shell/smoke-tests.md` for the
+discovery + four-scenario verification matrix). Without the
+shim, users with a stored `theme: "dark"` preference flashed to
+light on first load after the migration.
+
+**Source tasks**: T011 (providers.tsx), T012 (globals.css),
+T014 (manual verification + migration shim resolution at
+`a5d89b3` + `073bdaf`).
+
+**Revisit if**: next-themes ever exposes a single API for
+namespaced storage that supplants the manual shim.
+
+---
+
+## 2026-05-25 — Component folder convention: bespoke under `components/ui/auth/`, shadcn flat in `components/ui/`, composite outside `ui/` (📌 DECISION-4)
+
+**Status**: Accepted.
+
+**Decision**: Three tiers of component organization:
+
+  - `apps/web/components/ui/` — shadcn primitives only. shadcn's
+    `add` command writes here. Files: button.tsx, card.tsx,
+    dropdown-menu.tsx, sheet.tsx, dialog.tsx, avatar.tsx,
+    separator.tsx.
+  - `apps/web/components/ui/auth/` — bespoke auth primitives
+    (`Field`, `PasswordInput`, `PasswordRequirements`,
+    `OtpPanel`). shadcn does NOT touch this subfolder. FR-040
+    contract: the (auth) page files render byte-equivalent to
+    `main` after the extraction sweep.
+  - `apps/web/components/<feature>/` — composite/feature-scoped
+    components (header/, account/, home/, role-placeholder/).
+    Not under `ui/` because they consume primitives rather
+    than being primitives themselves.
+
+Cross-tab listener at `apps/web/components/cross-tab-auth.tsx`
+sits under `components/` (not `app/`) so `app/` stays
+route-only (medium-fix-14 from plan-review).
+
+**Source tasks**: T004–T009 (extraction sweep), T019 (shadcn
+add primitives flat into `components/ui/`).
+
+**Revisit if**: a future feature blurs the
+primitive-vs-composite line in a way the three-tier
+convention can't accommodate.
+
+---
+
+## 2026-05-25 — Notification component built on Radix Dialog + Framer Motion (NOT Sonner) (📌 DECISION-5)
+
+**Status**: Accepted.
+
+**Decision**: `apps/web/components/notification.tsx` composes
+Radix Dialog (already added via `shadcn add dialog`) + Framer
+Motion + `useMediaQuery`. Two layout variants driven by
+viewport:
+
+  - Desktop (≥768px): bottom-right slide-in card positioned at
+    `bottom: calc(1rem + var(--chat-pill-offset, 0px) + 1rem); right: 1rem;`
+    per Decision H stacking convention.
+  - Mobile (≤768px): full-width bottom sheet.
+
+Framer Motion's `useReducedMotion()` hook is the **React-state
+gate** that collapses both variants to opacity-only on OS-level
+`prefers-reduced-motion: reduce`. The CSS rule in `globals.css`
+lines 49-54 (`animation-duration: 0.01ms`) is the OS-backstop;
+both paths must agree.
+
+**Rationale for rejecting Sonner**: Sonner's toast paradigm
+doesn't fit the desktop-slide-in / mobile-bottom-sheet
+bifurcation FR-029 mandates. Radix Dialog + Framer gives both
+variants from a shared composition without forcing a toast-style
+overlay queue. The `useReducedMotion` hook is the canonical
+reduced-motion gate for Framer because CSS-only animation
+suppression doesn't reach Framer's React-state-driven variants.
+
+**Source tasks**: T051 (component), T052 (three-config Vitest
+suite), T053 (verify no production mount).
+
+**Revisit if**: a future feature needs a toast-queue paradigm
+(multiple stackable notifications) — Sonner becomes worth
+revisiting at that point.
+
+---
+
+## 2026-05-25 — Notification component: explicit-dismiss only; no auto-dismiss (📌 DECISION-6)
+
+**Status**: Accepted.
+
+**Decision**: The notification component renders an explicit
+dismiss control (close icon button) as its only close path. No
+`autoHideDuration`, no `delay`, no timer-driven close. Consuming
+features (007/008/010) MAY layer auto-dismiss on top by setting
+their own `setTimeout` around the `open` state — the
+notification component itself stays explicit-only.
+
+**Rationale**: Affective surfaces should not vanish under a user
+who is reading them. Calm-voice (Constitution Principle V) and
+no-alarmism (FR-013, FR-052) imply notifications convey
+information the user might dwell on. Auto-dismiss optimizes for
+"clear the chrome" — which is the opposite UX value here. Future
+consumers that need transient acknowledgement (e.g., "Saved.")
+can opt into auto-dismiss explicitly; the default stays manual.
+
+**Source tasks**: T051.
+
+**Revisit if**: a consuming feature accumulates so many manual
+dismissals that auto-dismiss becomes the de-facto pattern at the
+call sites — at which point auto-dismiss may belong in the
+component rather than per-caller.
+
+---
+
+## 2026-05-25 — Welcome banner subtitle: "A space to check in with yourself." (📌 DECISION-7)
+
+**Status**: Accepted.
+
+**Decision**: The static subtitle beneath the adaptive greeting
+on `/app` for employees is locked to:
+
+> A space to check in with yourself.
+
+Mohamed-chosen from three candidates in the plan-review pass.
+The single `<p>` slot beneath the greeting is the binding
+surface; dynamic per-context subtitles are deferred to BACKLOG
+(re-logged here against feature 003).
+
+**Rationale**: Reflective framing pairs with every adaptive
+greeting (morning/afternoon/evening) without context-switching
+the user. Primes the eventual passive-detection + questionnaire
+loop (features 005/007) — "checking in with yourself" is the
+through-line the rest of the product builds on. Constitution
+Principle V calm-voice: no exclamation marks, no clinical or
+alarmist phrasing, supportive.
+
+**Source tasks**: T040 (welcome-banner.tsx), T045 (test
+coverage).
+
+**Revisit if**: signal data (post-feature 005/006) supports
+context-aware subtitle variants. The markup already
+accommodates a future swap.
+
+---
+
+## 2026-05-25 — Cross-tab auth listener mount point: root layout, not (authed) layout (📌 DECISION-8)
+
+**Status**: Accepted.
+
+**Decision**: `CrossTabAuth` listener is mounted at
+`apps/web/app/layout.tsx` (root layout) as a sibling of
+`<Providers>`, NOT at `apps/web/app/(authed)/layout.tsx`. The
+listener file itself lives at
+`apps/web/components/cross-tab-auth.tsx` so `app/` stays
+route-only (medium-fix-14).
+
+**Rationale**: US 6 AS-1 contract — propagation must fire when
+both tabs sit at `/login` (sign-in propagation) or `/signup`
+(post-confirmation propagation). Both pathnames are OUTSIDE the
+(authed) tree. Mounting under (authed) would only fire when at
+least one tab is already inside the protected surface, breaking
+the contract by half.
+
+**Source tasks**: T059 (component), T060 (root-layout mount),
+T061 (Vitest event×pathname matrix).
+
+**Revisit if**: the root layout becomes a hot path for
+something that conflicts with always-on subscription mounting
+— at which point a pathname-conditional mount might be worth
+the complexity.
+
+---
+
+## 2026-05-25 — Playwright cross-tab spec pattern: single context, two pages — driven by explicit broadcast helper (📌 DECISION-9, amended)
+
+**Status**: Accepted (with CHANGELOG 2026-05-22 amendment — see
+"Decision N amendment" below).
+
+**Decision**: `apps/web/tests/e2e/cross-tab-auth-sync.spec.ts`
+uses `browser.newContext()` + two `context.newPage()` instances
+so localStorage is shared between the tabs. Sign-in driven via
+the real `/login` form in pageA; sign-out driven via the
+profile dropdown UI in pageA. NOT
+`page.evaluate(client.auth.signOut())` — that would bypass the
+broadcast call and the spec would silently miss the cross-tab
+path.
+
+`browser.newContext()` × 2 would NOT share localStorage and
+the cross-tab path would never fire — locking the
+single-context pattern as a contract.
+
+**Amendment — explicit broadcast helper (CHANGELOG
+2026-05-22)**: Decision N's plan-time mechanism assumed
+`supabase.auth.onAuthStateChange`'s built-in cross-tab firing,
+which relies on the session living in localStorage so the
+`storage` event fires in sibling same-origin tabs. The actual
+implementation uses `@supabase/ssr`'s `createBrowserClient`,
+which stores the session in **cookies**, not localStorage —
+no localStorage write happens on sign-in/sign-out, so no
+`storage` event fires cross-tab.
+
+Resolution: a tiny explicit broadcast helper at
+`apps/web/lib/auth-broadcast.ts` (exports `broadcastSignIn`,
+`broadcastSignOut`, `parseAuthBroadcast`, `AUTH_BROADCAST_KEY
+= "serenify-auth-broadcast"`). Sign-in / sign-out callers
+write a marker value to localStorage; sibling tabs receive
+the `storage` event on that key and the `CrossTabAuth` listener
+navigates per FR-046's pathname rules. The listener subscription
+target shifts from `supabase.auth.onAuthStateChange` to
+`window.addEventListener("storage", ...)`. Original Decision N
+intent (single-context, real-UI-driven) is preserved; only the
+underlying event source changes.
+
+**Source tasks**: T062 (Playwright spec), 0e4637f
+(refactor: Decision N amendment — explicit broadcast helper).
+
+**Revisit if**: `@supabase/ssr` ever changes storage mode (or
+ships a same-origin BroadcastChannel as a first-class API) —
+at which point the explicit helper may collapse back to
+listening on supabase-js events.
+
+---
+
+## 2026-05-25 — `framer-motion` added; `tw-animate-css` replaces `tailwindcss-animate` on Tailwind v4 (📌 DECISION-10)
+
+**Status**: Accepted.
+
+**Decision**: Two dependency deltas land with the shadcn install:
+
+  - `framer-motion` added as a runtime dependency (caret pin) —
+    drives the notification component's entrance/exit motion
+    and respects `prefers-reduced-motion` via Framer's
+    `useReducedMotion` hook (Decision G / DECISION-5 above).
+  - `tw-animate-css` replaces `tailwindcss-animate` on the v4
+    path. The shadcn Tailwind v4 doc names this swap explicitly:
+    the older animation lib is deprecated on the v4 path.
+
+**Source tasks**: T015 (shadcn init — adds
+`tw-animate-css` + `class-variance-authority` + `clsx` +
+`tailwind-merge`), T049 (`framer-motion` install).
+
+**Revisit if**: an upstream Framer change breaks the
+`useReducedMotion` contract, OR `tw-animate-css` gains a
+deprecation notice in a future Tailwind release.
+
+---
+
+## 2026-05-25 — Chat-pill / notification stacking via `--chat-pill-offset` CSS variable (📌 DECISION-11)
+
+**Status**: Accepted.
+
+**Decision**: The chat pill writes its rendered height to
+`<html>` on mount:
+
+```js
+document.documentElement.style.setProperty("--chat-pill-offset", "48px");
+// on unmount: removeProperty("--chat-pill-offset")
+```
+
+The notification component reads it:
+
+```css
+bottom: calc(1rem + var(--chat-pill-offset, 0px) + 1rem);
+```
+
+On employee pages with the pill mounted, the math resolves to
+`1rem + 48px + 1rem = 80px` — a 16px gap above the pill. On
+manager pages (FR-035: no pill for team_lead/admin) the variable
+is unset, the fallback `0px` kicks in, and the math collapses
+to `2rem` — a 16px-from-edge fallback.
+
+`apps/web/components/chat-pill.tsx` exports
+`CHAT_PILL_HEIGHT = 48` so future surfaces auditing the math
+can reference the canonical value. The runtime contract is
+the CSS variable on `<html>` — consumers MUST read
+`var(--chat-pill-offset, 0px)`, not import the constant.
+
+**Source tasks**: T046 (chat-pill writes), T051 (notification
+reads).
+
+**Revisit if**: a future feature needs to stack a third
+floating surface (e.g., recording indicator, screen-share
+banner). At that point the single offset variable may want
+to grow into a stacking convention with multiple named offsets
+(e.g., `--surface-offset-bottom-1`, `--surface-offset-bottom-2`)
+so consumers can compose more than two stacked items
+deterministically.
+
+---
+
+## 2026-05-25 — FR-020 amendment: inline change-password form on /app/account (CHANGELOG 2026-05-21)
+
+**Status**: Accepted (spec amendment via CHANGELOG; supersedes
+T034's original link-to-/forgot-password design).
+
+**Decision**: The Security section of `/app/account` is an
+**inline change-password form**, not a link out to
+`/forgot-password`. Three fields (current password, new
+password, confirm new password) submit to a new
+`changePassword` Server Action that:
+
+  1. Verifies current password by calling
+     `supabase.auth.signInWithPassword({ email, password })`
+     against a **throwaway anon client** (no session rotation
+     for the user's existing cookies).
+  2. Updates new password via
+     `supabase.auth.updateUser({ password: newPassword })` on
+     the SSR client.
+  3. Returns `{ status: "ok" } | { status: "invalid"; message: string }`.
+
+Validation: Zod schema mirrors feature 001's
+`signUpSchema` rules (min 8, contains a letter, contains a
+number) on the new password field plus a `refine()` asserting
+`confirm === new_password`. Calm-voice messages, no Zod regex
+sources surfaced to the UI. Live `<PasswordRequirements>`
+checklist reused from `@/components/ui/auth`.
+
+**Why the original design failed**: T034's "Change password →
+/forgot-password" link bounced the user back to `/app` —
+feature 001's (auth) route guard in `proxy.ts` correctly
+redirects already-signed-in users off the /forgot-password
+page (signed-in users can't request a reset they don't need).
+Routing an authenticated user through a signed-out reset flow
+is self-contradictory by design. Phase 6 manual smoke (T039)
+surfaced this; the amendment narrows the **authenticated**
+change-password path to its own surface, leaving
+/forgot-password intact for signed-out password recovery.
+
+**Affected artifacts** (per CHANGELOG 2026-05-21 + commit
+3121721):
+
+  - `apps/web/app/(authed)/app/account/actions.ts` — adds
+    `changePassword` Server Action alongside `updateProfile`.
+  - `apps/web/components/account/security-section.tsx` —
+    rewritten from server component (Link) to client component
+    (inline form with react-hook-form + zodResolver +
+    useTransition, matching ProfileSection's pattern).
+  - `apps/web/components/account/security-section.test.tsx`
+    — test shape rewritten; coverage added for changePassword
+    failure modes.
+  - `apps/web/lib/auth/schemas.ts` — `changePasswordSchema`
+    added.
+
+**Source task**: T034 original; 3121721 amendment commit. The
+T034 description in `tasks.md` is preserved in its original
+form (per Constitution Principle VIII: spec amendments live in
+CHANGELOG, not in retroactive edits to the spec/task file).
+
+**Revisit if**: Supabase ever exposes a session-preserving
+`verifyPassword(currentPassword)` RPC — at which point the
+throwaway-anon-client verification step can collapse into a
+direct check.

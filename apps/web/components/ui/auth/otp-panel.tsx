@@ -3,6 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 
+import {
+  broadcastSignIn,
+  destinationBroadcastsSignIn,
+} from "@/lib/auth-broadcast";
+
 // Shared shape of the verify Server Action result — matches both
 // verifySignupOtp and verifyResetOtp in their respective action
 // modules. Defined as a structural type here so each caller can pass
@@ -59,6 +64,18 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
       form.set("token", codeValue);
       const result = await action(form);
       if (result.status === "ok") {
+        // 📌 OTP cross-tab fix (2026-05-25): OTP verify is an
+        // auth-completing path. Unlike /auth/callback (a server-only
+        // Route Handler that needs the AUTH_SIGNIN_COOKIE bridge), this
+        // is client-driven — like login-form.tsx, we can write the
+        // localStorage broadcast marker directly so sibling tabs
+        // propagate. Gated by successHref so the recovery flow
+        // (verifyResetOtp → /reset-password) doesn't broadcast a
+        // spurious sign-in (preserves smoke ST-9); only the signup
+        // confirmation path (→ /app) does.
+        if (destinationBroadcastsSignIn(successHref)) {
+          broadcastSignIn();
+        }
         router.replace(successHref);
         router.refresh();
         return;

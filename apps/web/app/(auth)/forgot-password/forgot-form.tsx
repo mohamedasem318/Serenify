@@ -9,7 +9,7 @@ import {
   forgotPasswordSchema,
   type ForgotPasswordInput,
 } from "@/lib/auth/schemas";
-import { OtpPanel } from "../otp-panel";
+import { OtpPanel } from "@/components/ui/auth/otp-panel";
 import { verifyResetOtp } from "../reset-password/actions";
 import {
   requestPasswordReset,
