@@ -526,10 +526,12 @@ to enforcing and run the full matrix `npx playwright test --workers=1`.
 
 ## Open questions for review
 
+> **→ Resolved 2026-05-26 by Mohamed. See [Adjudication](#adjudication-2026-05-26--mohamed) below.**
+
 1. **`img-src 'self'` vs `'self' data:`** — the two reviewers diverged. There are
    zero images today, so strict `'self'` is least-privilege and the Report-Only
    pass will surface any `data:` need (e.g. a future blur-placeholder). Recommend
-   `'self'`; trivial to add `data:` if a violation appears. **Decision needed.**
+   `'self'`; trivial to add `data:` if a violation appears.
 2. **`default-src 'self'` vs `'none'`** — `'self'` (chosen, per the slice brief)
    is the forgiving fallback for unenumerated directives; `'none'` is stricter but
    requires enumerating `worker-src`/`manifest-src`/`media-src` etc. Recommend
@@ -539,4 +541,37 @@ to enforcing and run the full matrix `npx playwright test --workers=1`.
 4. **Header placement** — static aux headers in `next.config.ts` `headers()` (so
    `/_next/static` assets also get `nosniff`), CSP nonce in `proxy.ts`. Confirm
    this split vs. all-in-middleware.
-```
+
+---
+
+## Adjudication (2026-05-26 — Mohamed)
+
+All design decisions **approved**; the policy below is locked for the fix pass.
+(No fix code is in the commit that records this adjudication; a follow-up session
+applies the Report-Only → capture → enforce rollout.)
+
+1. **`script-src` nonce-based** — **Accepted (settled).** Streamed `__next_f`
+   flight scripts cannot be hashed; Next auto-stamps the nonce. No hash-based
+   path.
+2. **`style-src 'self' 'unsafe-inline'` (no nonce)** — **Accepted.** The
+   load-bearing finding is the empirical CSP3 proof that a nonce on `style-src`
+   makes the browser *ignore* `'unsafe-inline'`, which would break Radix's
+   `react-remove-scroll` runtime `<style>` (un-nonced under Turbopack/SWC). CSS
+   cannot execute JS, so `'unsafe-inline'` here is materially lower-risk than on
+   `script-src`. The future `setNonce()` hardening path is documented and may be
+   **deferred**.
+3. **`img-src 'self'` (not `'self' data:`)** — **Accepted.** Least-privilege on
+   Day 1; the Report-Only pass surfaces any `data:` need; one-line addition if a
+   violation appears.
+4. **`default-src 'self'` (not `'none'`)** — **Accepted.** Forgiving fallback is
+   fine for Day 1 — unenumerated directives resolve to same-origin (Serenify
+   assets); minimal threat surface. May tighten to `'none'` in a future hardening
+   pass if the inventory shows unused directive surface.
+5. **HSTS without `preload`** — **Accepted (deferral confirmed).** `preload` is a
+   near-irreversible commitment that would break any future non-HTTPS-ready
+   `serenify.tech` subdomain for users who received the preloaded entry. Adding
+   `preload` is a conscious later decision, after every planned subdomain is
+   audited HTTPS-ready.
+
+Header-placement split (static → `next.config.ts headers()`, per-request nonce
+CSP → `proxy.ts`) stands as designed.
