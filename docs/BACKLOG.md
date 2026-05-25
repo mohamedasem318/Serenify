@@ -721,3 +721,36 @@ that the default (`dismissible` unset) path keeps all three dismiss
 routes.
 **Address by**: whichever consumer feature (007 / 008 / 010) builds the
 first non-dismissible confirmation notification.
+
+### Auth-broadcast audit needs a forward-looking guard, not a one-time snapshot
+**Status**: tech-debt
+**Observed**: 2026-05-25, feature 003 — the ST-8 fix (commit c8c182c) and
+the OTP follow-up (commit bdf1463)
+**Description**: ST-8 and the OTP follow-up surfaced that the
+auth-broadcast pattern (`broadcastSignIn` / `AUTH_SIGNIN_COOKIE`) was
+applied ad-hoc at each auth-completing code path. Three rounds of "we
+found another path that doesn't broadcast" happened before commit
+bdf1463's audit closed the gaps:
+  1. Phase 11 originally — only the form sign-in Server Action broadcast.
+  2. ST-8 fix (c8c182c) — `/auth/callback` added to the bridge.
+  3. OTP follow-up (bdf1463) — `OtpPanel` (signup OTP verify) added.
+The audit table in bdf1463 is a one-time snapshot, not a forward-looking
+guard — a future PR adding a new auth flow could regress this silently
+(no broadcast → sibling tabs don't propagate after that flow completes).
+**Action when picked up**: implement a contract test, lint rule, or
+runtime assertion that detects when a new code path establishes a
+Supabase session and redirects to an authed surface WITHOUT calling
+`broadcastSignIn()` (client) or setting `AUTH_SIGNIN_COOKIE` (server).
+Possible approaches:
+  - Static grep check in CI: any module calling `supabase.auth.verifyOtp`
+    / `exchangeCodeForSession` / `signInWithPassword` must also reference
+    `broadcastSignIn` or `AUTH_SIGNIN_COOKIE`. (Note: would need an
+    allowlist for `account/actions.ts`, whose `signInWithPassword` on a
+    throwaway anon client is a re-auth verification, not a sign-in nav.)
+  - Integration test that drives every documented auth flow and asserts
+    the broadcast fires.
+  - Code-review checklist update: PRs adding auth flows must update the
+    audit table from commit bdf1463.
+**Fix scope**: medium. Belongs in a future security / quality hardening
+pass, not mid-feature work.
+**Address by**: a future security / quality hardening pass.
