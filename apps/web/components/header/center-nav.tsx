@@ -8,10 +8,17 @@ import { cn } from "@/lib/utils";
 type Destination = {
   href: string;
   label: string;
+  /**
+   * When true, the pill is active only on an exact pathname match. Home sets
+   * this because it is the root of the /app namespace — a startsWith match
+   * would light it up on every descendant (e.g. /app/account). Descendant
+   * destinations (Insights etc.) omit this and keep the prefix match below.
+   */
+  exact?: boolean;
 };
 
 const DESTINATIONS: ReadonlyArray<Destination> = [
-  { href: "/app", label: "Home" },
+  { href: "/app", label: "Home", exact: true },
 ];
 
 export function CenterNav() {
@@ -19,8 +26,10 @@ export function CenterNav() {
 
   return (
     <nav aria-label="Workflow destinations" className="flex items-center gap-1">
-      {DESTINATIONS.map(({ href, label }) => {
-        const active = pathname === href || pathname.startsWith(`${href}/`);
+      {DESTINATIONS.map(({ href, label, exact }) => {
+        const active = exact
+          ? pathname === href
+          : pathname === href || pathname.startsWith(`${href}/`);
         return (
           <Link
             key={href}
