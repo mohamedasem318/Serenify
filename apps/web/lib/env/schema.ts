@@ -1,11 +1,13 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 /**
  * Zod schemas for the application's environment variables.
  *
- * Kept side-effect-free and free of any `server-only` import so they can be
- * unit-tested directly and reused by both the client and server binding
- * modules (`./client.ts`, `./server.ts`).
+ * Free of any `server-only` import and of env-binding side effects so they can
+ * be unit-tested directly and reused by both the client and server binding
+ * modules (`./client.ts`, `./server.ts`). The `z` here comes from the
+ * `@/lib/zod` barrel, whose only side effect is the benign `jitless` config
+ * (CSP; see docs/security/05-csp-header.md) — not a server-only or env binding.
  *
  * The keys are validated by length only (Supabase anon/service-role keys are
  * JWTs that share the same shape and differ only in payload/signature). The

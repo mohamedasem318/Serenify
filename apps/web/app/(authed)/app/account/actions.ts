@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient as createAnonClient } from "@supabase/supabase-js";
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 import { changePasswordSchema, fullNameSchema } from "@/lib/auth/schemas";
 import { createClient } from "@/lib/supabase/server";
