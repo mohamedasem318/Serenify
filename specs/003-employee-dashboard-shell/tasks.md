@@ -337,7 +337,7 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
 
   Verified at `/speckit.tasks` time (`2026-05-20`): `docs/BACKLOG.md` does not currently contain a `timezone` entry; this is a new addition.
 - [x] T069 [P] Reclassify the **`/login` page does not render the `?error=expired_link` notice** entry in `docs/BACKLOG.md` (currently under "From feature 001 (auth-and-roles)") from `bug` to `merged` (or remove and add a "Merged hotfixes" section if cleaner). Reference commit `8dc822b` (PR #2) as the resolving merge. The CHANGELOG.md note in plan-commit `e5b11cf` already records the spec-side supersession; this task is the BACKLOG-side hygiene.
-- [ ] T070 [P] Append a feature-003 entry to `docs/PROGRESS.md`: branch merged, smoke-test pass status, deviations resolved, gates passed, total commit count.
+- [x] T070 [P] Append a feature-003 entry to `docs/PROGRESS.md`: branch merged, smoke-test pass status, deviations resolved, gates passed, total commit count.
 - [ ] T071 Mohamed runs `specs/003-employee-dashboard-shell/smoke-tests.md` manually; records ✅/❌/⚠ inline on ST-1 through ST-7. **The branch may not merge to `main` until every row is ✅** (or ⚠ with a documented deferral). This is the Constitution Principle VII human-validated gate; not a code task.
 
 **Checkpoint**: Step 13 complete. All gates green. Branch is ready to merge to `main` pending Mohamed's PR review.
