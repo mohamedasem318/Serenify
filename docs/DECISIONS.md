@@ -1199,15 +1199,17 @@ it codifies.
 **Decision**:
 
 1. **Validated env module as the single boot-time gate for Supabase credentials.**
-   The Supabase connection vars (`NEXT_PUBLIC_SUPABASE_URL`,
-   `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) and `SITE_URL`
-   are read ONLY through `apps/web/lib/env/{client,server}.ts`, which parse a Zod
-   schema (`lib/env/schema.ts`) once at module load and throw a clear,
-   field-listed error if a value is missing/malformed. Runtime `process.env.X!`
-   reads of these vars in app code are disallowed; a new credential var extends
-   the schema. This replaces 8 scattered `process.env.X!` non-null assertions that
-   failed late (an opaque deep-stack error at the first Supabase call) with
-   fail-fast at boot. The prefix-discipline invariant — the service-role key never
+   `NEXT_PUBLIC_*` env vars and server-secret env vars route through
+   `apps/web/lib/env/*`. Framework-managed vars (`NODE_ENV`) stay inline — they're
+   never missing, are type-safe via TypeScript's narrowing, and don't benefit from
+   the module's fail-fast goal. Future env vars added in either category extend the
+   corresponding schema; ad-hoc `process.env.X!` reads in app code are disallowed
+   for the routed categories. Mechanically: a Zod schema (`lib/env/schema.ts`),
+   bound by `client.ts` (public) and the `server-only` `server.ts` (server-secret
+   + the `SITE_URL` server config), is parsed once at module load and throws a
+   clear, field-listed error if a value is missing/malformed — replacing 8
+   scattered `process.env.X!` non-null assertions that failed late (an opaque
+   deep-stack error at the first Supabase call) with fail-fast at boot. The prefix-discipline invariant — the service-role key never
    reaches the client bundle — is enforced **structurally**: `serverEnv` lives in
    a `server-only` module, so any client-component import path fails the build,
    and the secret is only ever read through `serverEnv`. (Verified: post-refactor
