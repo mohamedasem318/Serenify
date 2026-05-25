@@ -635,3 +635,51 @@ redirect URLs) must be applied separately in the production Supabase Cloud
 dashboard — Mohamed applies these manually (checklist in PR #7). From this
 slice forward, every security slice gets a CHANGELOG entry; slice 1's was
 backfilled here because it ships alongside slice 2 in the same PR.
+
+## 2026-05-25 — security: slice 3 — privileged endpoints + input validation
+
+Fix pass for the slice-3 audit
+(`docs/security/03-privileged-endpoints-and-input-validation.md`), landed across
+commits `0ce67d4` (invite handler) / `cbf26bd` (completeOnboarding) / `0f0bdc2`
+(shared `fullNameSchema` + DB CHECK) and merged via PR #8. Observable behavior
+changes:
+
+- `POST /api/admin/invite` now checks authentication and authorization **before**
+  parsing the request body. An unauthenticated caller receives `401` with no
+  schema details regardless of body shape (previously a bad/empty body returned
+  `400` with the full Zod `issues`, including the email regex source); a
+  non-admin receives `403`; only a verified admin reaches body validation.
+- `POST /api/admin/invite` now validates the request `Origin` against `SITE_URL`.
+  A cross-site, browser-issued request carrying a session cookie with a
+  mismatched `Origin` is rejected with `403` — defense-in-depth on top of the
+  `SameSite=Lax` session cookie (Route Handlers, unlike Next.js Server Actions,
+  get no automatic same-origin check). An absent `Origin` (server-to-server /
+  non-CORS) is allowed.
+- `POST /api/admin/invite` error responses no longer forward raw Supabase / RPC
+  error text or Zod `issues` to the client. Validation failures return a fixed
+  `{"error":"validation_failed","message":"Invalid invite payload."}`; the `500`
+  branches (`invite_failed`, `role_update_failed`, `manager_update_failed`) carry
+  an error code only, with full detail logged server-side.
+- `completeOnboarding` Server Action now returns a fixed generic message
+  (`"We couldn't save that — try again."`) on a database failure instead of the
+  raw Supabase `error.message`, logging the error server-side — matching the
+  existing `updateProfile` behavior on the same `full_name` column.
+- `full_name` validation is centralized in a single authoritative
+  `fullNameSchema`. The character cap is a consistent **120** across signup,
+  onboarding, account update, and the client form (the account path previously
+  diverged at `60`, locking out users whose existing name ran 61–120 chars). A
+  new database `CHECK (full_name IS NULL OR char_length(full_name) <= 120)`
+  (migration `20260525000100_full_name_length_cap.sql`) backstops the cap for any
+  non-form writer that bypasses the Zod gate.
+- `full_name` now rejects control and format characters (`\p{Cc}\p{Cf}`,
+  including the RTL override `U+202E`) at write time with a friendly message
+  (reject, not silent-sanitize). The validator stays permissive across all
+  scripts — non-Latin names, diacritics, and unusual-but-valid punctuation are
+  accepted. React render-escaping remains the primary XSS control; this is
+  defense-in-depth + display integrity (closes slice-1 Finding 7).
+
+Decisions recorded in `docs/DECISIONS.md` (2026-05-25 — Security slice 3).
+Cloud-dashboard parity: **n/a this slice** — all changes are in-repo (handler
+code, Server Action, Zod schema, and migration SQL); no `config.toml` `[auth]` or
+other Cloud-dashboard-effective setting changed (the slice-2 dashboard-parity
+requirement still stands for any future config-touching slice).
