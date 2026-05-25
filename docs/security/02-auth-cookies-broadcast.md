@@ -51,6 +51,42 @@ hardening.
 
 ---
 
+## Fix-pass summary
+
+- **Date**: 2026-05-25 (same branch, follow-up session to the audit commit).
+- **Outcome**: all 8 findings fixed. Severity rollup before → after:
+  `med 1 · low 7` → `med 0 · low 0` (0 open).
+- **Approach**: landed across three commits on
+  `security/02-auth-cookies-broadcast` —
+  - `68c41d3` — Finding 1: centralized `isSafeNextPath` validator
+    (`apps/web/lib/auth/safe-next.ts`, 24 vitest cases) + `/auth/callback`
+    integration.
+  - `188de88` — Findings 2/3 (cookie `Secure` via `cookieOptions` on the three
+    `createServerClient` sites + `AUTH_SIGNIN_COOKIE`; `httpOnly` deliberately
+    untouched) and config Findings 4/6/7 (`max_frequency=60s`,
+    `minimum_password_length=8`, `password_requirements=letters_digits`,
+    `secure_password_change=true`).
+  - `ede11d2` — Findings 5 (Zod-validate `resendConfirmation`) and 8 (generic
+    client error + server-side log at the three fallback branches).
+- **Finding 7 path**: shipped as the **config change** (not the app-layer
+  guard). E2E-gated and empirically cleared — a recovery-scoped session can
+  `updateUser({password})` with no reauth nonce under
+  `secure_password_change=true` (recovery counts as recent auth), so the
+  recovery UX and the account-page change-password flow both survive.
+- **Tests**: Vitest **200 passed** (23 files; +24 from the new
+  `safe-next.test.ts`); Playwright full matrix **48 passed / 9
+  baseline-skipped / 0 failed** (chromium + firefox + webkit) after applying
+  config via `supabase stop && supabase start`.
+- **Cloud-dashboard parity**: **deferred to Mohamed** — production-effective
+  auth config lives in the Supabase Cloud dashboard, not the repo. The PR
+  description carries the manual checklist (`max_frequency`, password
+  requirements, secure password change, allowed redirect URLs).
+- **Decisions**: see `docs/DECISIONS.md` entry dated **2026-05-25 — Security
+  slice 2: auth flows + cookies + open-redirect + config hardening** (4 policy
+  choices).
+
+---
+
 ## Findings
 
 ## Finding 1: Open redirect via `?next=` host/userinfo break-out in `/auth/callback`
@@ -85,7 +121,16 @@ hardening.
   audited helper is not. (Note: `destinationBroadcastsSignIn()` in
   `auth-broadcast.ts` already prefix-matches `next` for the broadcast gate but is
   **not** a redirect-safety validator — don't conflate them.)
-- **Status**: `open — audit only`
+- **Status**: `fixed in 68c41d3`. Centralized `isSafeNextPath` validator added at
+  `apps/web/lib/auth/safe-next.ts` and wired into `/auth/callback`'s `next`
+  consumer — validated once at the top, covering both the success redirect and
+  the `setAll`-closure redirect interpolation sites. 24 vitest cases
+  (`safe-next.test.ts`) lock the legitimate paths, the empirically-verified
+  attack vectors (`@evil.com`, `.evil.com`, `//evil.com`, `https://…`,
+  `javascript:`, backslash traversal), and the empty/coerced edge cases. The
+  integration keeps the `${origin}${next}` concatenation but only ever
+  concatenates a validated single-leading-slash path. Codified as the **sole**
+  `next`-validator — see DECISIONS.md 2026-05-25 (slice 2) choice 1.
 
 ## Finding 2: `sb-*` session cookies set without `Secure` (and `HttpOnly:false` — by design)
 
@@ -97,7 +142,21 @@ hardening.
   - **`Secure` absence is the genuine (low) gap.** Over HTTPS-only production (Vercel forces `http→https` + HSTS) the cookies are never actually transmitted in clear, so live exploitability is minimal. But absence of `Secure` is still a best-practice miss, and unlike `httpOnly`, adding `secure` is **safe** (does not break the browser client).
 - **Suggested fix** (fix pass): pass an explicit `cookieOptions` to all three `createServerClient` constructions adding only `secure: process.env.NODE_ENV === "production"` (leave `httpOnly:false`, `sameSite:"lax"`, `path:"/"` as the library sets them). Do **not** set `httpOnly:true`.
 - **Verification caveat**: attributes were confirmed from library source + the verbatim-forwarding call sites (authoritative for what the *app* sets). The one thing not auditable from the repo: a production reverse-proxy/CDN could rewrite `Set-Cookie` to add `Secure`. Recommend a one-time live-cookie-jar check (see Verification approach) to confirm prod reality.
-- **Status**: `open — audit only`
+- **PRESERVED LESSON (do not "fix" this)**: the rejected HIGH "fix" of setting
+  `httpOnly: true` on the `sb-*` cookies is recorded above intentionally. It
+  would break the browser client, which reads `document.cookie` to hydrate the
+  session. The fix pass implements **only** the `Secure` flag and deliberately
+  leaves `httpOnly:false`. A future reviewer must not regress this.
+- **Status**: `fixed in 188de88` (Secure flag only). `cookieOptions: { secure:
+  process.env.NODE_ENV === "production" }` added to all three
+  `createServerClient` sites (`server.ts`, `proxy.ts`, `callback/route.ts`).
+  Empirically confirmed the `@supabase/ssr` merge
+  (`{ ...DEFAULT_COOKIE_OPTIONS, ...cookieOptions }`) preserves
+  `httpOnly:false`/`sameSite:lax`/`path:/` while adding `secure`. The full e2e
+  matrix runs over `http://localhost` in dev (where the conditional yields
+  `secure:false`) and stays green — proving dev auth is unaffected; production
+  `Secure` is then carried by `NODE_ENV=production`. `httpOnly` left untouched
+  per the preserved lesson. See DECISIONS.md 2026-05-25 (slice 2) choice 2.
 
 ## Finding 3: `AUTH_SIGNIN_COOKIE` set without `Secure`
 
@@ -106,7 +165,11 @@ hardening.
 - **What**: The `serenify-auth-signin` cross-tab bridge cookie is set with `{ path:"/", maxAge:60, httpOnly:false, sameSite:"lax" }` — no `Secure`.
 - **Why it's a risk**: minimal. **The value is the non-sensitive literal `"1"`** — not session data or PII; it is purely a one-shot "a sign-in just completed, emit the broadcast" trigger (confirmed by reading the set site and `consumePendingSignIn`). `httpOnly:false` is *required* here (CrossTabAuth reads it from `document.cookie`) and is appropriate given the value carries no secret. The residual is a privacy/timing side-channel over HTTP (a network observer could see the marker appear). The set/clear attribute pair was checked and is **consistent** (`Path=/`, `SameSite=Lax` match) — there is no undeletable-cookie mismatch.
 - **Suggested fix** (fix pass): add `secure: process.env.NODE_ENV === "production"` to the set options; no change to the clear string (Secure isn't part of deletion matching).
-- **Status**: `open — audit only`
+- **Status**: `fixed in 188de88`. `secure: process.env.NODE_ENV === "production"`
+  added to the `AUTH_SIGNIN_COOKIE` set options in `callback/route.ts`;
+  `httpOnly:false` retained (CrossTabAuth reads the marker from
+  `document.cookie`) and the `auth-broadcast.ts:154` clear string left
+  unchanged. See DECISIONS.md 2026-05-25 (slice 2) choice 2.
 
 ## Finding 4: `auth.email.max_frequency = "1s"` permits email flooding
 
@@ -115,7 +178,11 @@ hardening.
 - **What**: The minimum interval between auth emails (confirmation resend, password-reset link) to one address is 1 second — effectively no per-account cooldown.
 - **Why it's a risk**: an attacker who knows a victim's address can drive `requestPasswordReset` / `resendConfirmation` in a loop to flood the victim's inbox (email-bombing / harassment). It is not an account-compromise vector. It pairs with Finding 5 (the unvalidated `resendConfirmation`) to widen the abuse window. **Scope caveat**: this is the **local CLI config**; production email rate limits are governed by the Supabase Cloud dashboard + the Resend provider and are not auditable from the repo. This file is, however, the reference operators copy from.
 - **Suggested fix** (fix pass): raise to `"60s"` (industry norm) or at minimum `"30s"`; confirm the Cloud dashboard matches. Full rate-limit posture is a slice-7 deep-dive; this is the in-scope config sanity item.
-- **Status**: `open — audit only`
+- **Status**: `fixed in 188de88`. `auth.email.max_frequency = "60s"` in
+  `config.toml` (gotrue env verified as `GOTRUE_SMTP_MAX_FREQUENCY=1m0s` after
+  `supabase stop && supabase start` — a `db reset` alone does NOT re-apply
+  `[auth]` config). Cloud-dashboard parity deferred to Mohamed (PR checklist).
+  See DECISIONS.md 2026-05-25 (slice 2) choices 3 & 4.
 
 ## Finding 5: `resendConfirmation` Server Action accepts an unvalidated email argument
 
@@ -124,7 +191,10 @@ hardening.
 - **What**: `export async function resendConfirmation(email: string)` takes a bare string (not `FormData`) and passes it straight to `supabase.auth.resend({ type:"signup", email })` with **no Zod/format validation** — the only Server Action in the auth surface that skips the validation every sibling action performs. As an exported `"use server"` function it is a callable POST endpoint.
 - **Why it's a risk**: an attacker scripting calls with arbitrary addresses can ask Supabase to (re)send signup-confirmation emails — an email-abuse/spam vector (amplified by Finding 4's `1s` frequency). Two mitigants keep it `low`: Next.js Server Actions verify the `Origin` header, so casual cross-site invocation is blocked (an attacker must script same-origin POSTs); and `resend({type:"signup"})` only dispatches for an address with a genuinely pending unconfirmed signup (Supabase no-ops/errors otherwise — the error is swallowed). No account-existence oracle is returned to the caller (the action returns `void`).
 - **Suggested fix** (fix pass): validate before calling Supabase, mirroring the codebase pattern — e.g. `if (!signInSchema.shape.email.safeParse(email).success) return;` — and rely on the Finding 4 frequency tightening for rate control.
-- **Status**: `open — audit only`
+- **Status**: `fixed in ede11d2`. `resendConfirmation` now runs
+  `signInSchema.shape.email.safeParse(email)` and returns `void` on failure
+  before any Supabase call (no enumeration oracle). Rate control leans on
+  Finding 4's `60s` `max_frequency`.
 
 ## Finding 6: Password floor mismatch — Supabase `min=6`/no-requirements vs app Zod `min=8`+letter+digit
 
@@ -133,7 +203,13 @@ hardening.
 - **What**: The server-side (Supabase) password floor is **weaker** than the app-layer (Zod) floor. Supabase alone would accept a 6-character, letters-only password.
 - **Why it's a risk**: defense-in-depth only — **not exploitable today**. Every password-setting path in the app (`signUp`, `updatePassword`, `changePassword`) runs the Zod schema server-side in the Server Action before calling Supabase, so the stricter rule is always enforced. The gap is latent: a future Server Action that calls `updateUser({password})` without re-running Zod (cf. Finding 7's `/reset-password` already calls `updateUser` directly) would silently accept a weak password, with no DB-level backstop. This is the same class as slice-1 Finding 7 ("app validates, DB doesn't").
 - **Suggested fix** (fix pass): set `minimum_password_length = 8` and `password_requirements = "letters_digits"` in `config.toml` (and the Cloud dashboard) to align the server floor with the app policy.
-- **Status**: `open — audit only`
+- **Status**: `fixed in 188de88`. `minimum_password_length = 8` and
+  `password_requirements = "letters_digits"` in `config.toml` (gotrue env
+  verified: `GOTRUE_PASSWORD_MIN_LENGTH=8`,
+  `GOTRUE_PASSWORD_REQUIRED_CHARACTERS=<letters>:<digits>`). All e2e fixtures
+  already use compliant passwords, so no test regressed. Cloud-dashboard parity
+  deferred to Mohamed (PR checklist). See DECISIONS.md 2026-05-25 (slice 2)
+  choices 3 & 4.
 
 ## Finding 7: `secure_password_change=false` + `/reset-password` changes password with no re-auth backstop
 
@@ -142,7 +218,22 @@ hardening.
 - **What**: There are two password-change paths with **asymmetric** protection. The account-page inline form (`changePassword`) verifies the current password before `updateUser` — correct. The `/reset-password` form (`updatePassword`) calls `updateUser` with **no** re-auth, relying entirely on the caller holding a recovery-scoped session. Because `proxy.ts` intentionally does **not** bounce signed-in users off `/reset-password` (it's excluded from `AUTH_PAGES`, lines 19-26), a *normally*-authenticated user can navigate there and change their password without the current-password challenge the account page enforces. With `secure_password_change=false`, Supabase applies no recent-auth requirement either.
 - **Why it's a risk**: account-takeover hardening, not a remote exploit — it requires an already-authenticated session (e.g. an unlocked/borrowed device, or a session-stealing follow-on). The recovery flow itself is *correctly* re-auth-free (the email link proved ownership). The gap is that the same endpoint also serves a stale normal session. Realistic exploitability is low; recovery sessions are short-lived.
 - **Suggested fix** (fix pass): set `secure_password_change = true` — in a recovery flow the user just authenticated (so `updateUser` is allowed), while a stale normal session is forced to re-authenticate, closing the bypass for both paths at the Supabase layer at no cost to the legitimate recovery UX. Re-verify the recovery flow still completes after enabling (FLAG FOR EMPIRICAL VERIFICATION — recovery-session "recently authenticated" window).
-- **Status**: `open — audit only`
+- **EMPIRICAL VERIFICATION (resolved positive)**: under
+  `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION=true`, a
+  recovery-scoped session (established via the recovery OTP, the same session
+  class the `/auth/callback` recovery link produces) successfully called
+  `updateUser({password})` with **no reauth nonce** — recovery counts as recent
+  authentication. A freshly-signed-in normal session also succeeded, and the
+  account-page change-password e2e (`employee-dashboard-shell.spec.ts`, which
+  calls `updateUser` on a recent SSR session) passed on all three browsers. So
+  the config change does not break recovery or the account flow; it tightens
+  only the stale-session case the bypass depended on.
+- **Status**: `fixed in 188de88` (config change shipped; app-layer guard NOT
+  needed — the e2e gate cleared per the empirical verification above).
+  `secure_password_change = true` in `config.toml` (gotrue env verified:
+  `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION=true`).
+  Cloud-dashboard parity deferred to Mohamed (PR checklist). See DECISIONS.md
+  2026-05-25 (slice 2) choice 3.
 
 ## Finding 8: Raw Supabase `error.message` forwarded to the client in fallback branches
 
@@ -151,7 +242,12 @@ hardening.
 - **What**: When a Supabase auth error does not match the guarded patterns (`/invalid.*credentials/i`, `/email.*not.*confirmed/i`, `/already|registered|exists/i`), the raw vendor `error.message` is returned and rendered verbatim (login renders it at `login-form.tsx:131`).
 - **Why it's a risk**: error-hygiene, **not an enumeration leak today**. The two credential outcomes that *would* enable enumeration ("no such user" vs "wrong password") are both normalized by Supabase to `"Invalid login credentials"` and caught by the regex *before* the raw fallback, so they map to the same generic `{status:"invalid"}` UI ("Those details didn't match an account…"). The fallback only surfaces non-credential errors (e.g. rate-limit text like "For security purposes, you can only request this after N seconds"). The concern is fragility: the enumeration safety depends on regex-matching a third-party's error strings, which a Supabase wording change could silently break, and leaking raw internal messages is poor hygiene.
 - **Suggested fix** (fix pass): return a fixed generic message (e.g. "Something went wrong — please try again.") from all three fallbacks and log the raw `error` server-side only. (The `changePassword` action already does this correctly.)
-- **Status**: `open — audit only`
+- **Status**: `fixed in ede11d2`. All three fallback branches (`signIn`,
+  `signUp`, `updatePassword`) now `console.error` the raw error server-side and
+  return the fixed generic message "Something went wrong — please try again."
+  The regex-matched specific outcomes (`invalid credentials`, `email not
+  confirmed`, `already registered`) are preserved — only the raw fallback
+  changed.
 
 ### Minor notes (documented, not numbered findings)
 
