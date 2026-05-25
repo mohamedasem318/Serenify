@@ -686,3 +686,38 @@ reusing) or an upstream Next/Supabase mitigation.
 **Address by**: before feature 004 begins. Pairs with the "Playwright local
 matrix run: pipe-buffering deadlock" tooling entry above — both are about
 making the local matrix run reliably.
+
+### Non-dismissible confirmation notifications (stress-detection prompts)
+**Status**: deferred-feature
+**Observed**: 2026-05-25, feature 003 ST-2 review (Notification component)
+**Description**: A stress-detection confirmation notification — e.g.
+"we noticed you might be stressed — are you okay?" — should NOT be
+dismissible by click-outside or Escape. The whole reason that prompt
+fires is that the user may be distracted or overwhelmed; a stray click
+or keypress dismissing a time-sensitive check-in is exactly the
+accidental loss we want to prevent. Informational notifications keep
+the current dismiss-anywhere behaviour (explicit Dismiss button, Escape,
+click-outside); only confirmation-of-detection prompts lock down to the
+explicit Dismiss control.
+
+Deferred because feature 003's Notification is built-don't-mount per
+FR-033 — the component exists but nothing in 003 mounts it. The
+dismissibility decision belongs to the consumer features that actually
+mount confirmation flows: 007 (stress detection), 008 (chat), 010
+(talk). Whichever ships the first non-dismissible notification owns the
+implementation.
+**Fix scope**: small — 5-10 lines plus a small Vitest addition. Add a
+`dismissible?: boolean` prop (default `true`) to `Notification`
+(`apps/web/components/notification.tsx`). When `false`, wire Radix
+Dialog's `onPointerDownOutside` and `onEscapeKeyDown` on
+`DialogPrimitive.Content` to call `event.preventDefault()`, so the
+surface can only be dismissed via its explicit Dismiss button
+(`DialogPrimitive.Close` → `onOpenChange(false)`). Pass
+`dismissible={false}` for confirmation-of-detection notifications;
+leave the default for informational ones. Vitest: assert that with
+`dismissible={false}` an Escape keypress and an outside pointerdown do
+NOT fire `onOpenChange(false)` while the Dismiss button still does, and
+that the default (`dismissible` unset) path keeps all three dismiss
+routes.
+**Address by**: whichever consumer feature (007 / 008 / 010) builds the
+first non-dismissible confirmation notification.
