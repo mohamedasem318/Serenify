@@ -404,6 +404,14 @@ Specifics the future pass should evaluate:
 No tests assert on font family / weight / size — the calm-voice
 text-content assertions in T045 are agnostic. No structural risk.
 
+**Refinement (2026-05-25, feature 003 smoke review)**: at smoke
+sign-off Mohamed re-confirmed the current card heading font on the
+employee dashboard "doesn't feel right." Direction for the pass: do
+NOT tweak the current treatment in place — explore 2-3 typographic
+alternatives (different weights, sizes, or font choices within the
+Mist & Meadow token system) and pick one from a side-by-side
+comparison rather than nudging what's there now.
+
 **Address by**: design-system pass — same workstream as the four
 existing entries above (button-system character, mobile/tablet
 typography bump, avatar disc dark-mode tint, muted-on-bg
@@ -754,3 +762,21 @@ Possible approaches:
 **Fix scope**: medium. Belongs in a future security / quality hardening
 pass, not mid-feature work.
 **Address by**: a future security / quality hardening pass.
+
+### "Send a new confirmation" link contrast underweight in light mode
+**Status**: polish
+**Observed**: 2026-05-25, feature 003 smoke review (sign-in screen)
+**Description**: On the sign-in screen, the "send a new confirmation"
+link — surfaced when a user attempts to sign into an as-yet-unverified
+email — has insufficient contrast in light mode. It is visible, but the
+foreground/background ratio falls short of what's expected for an action
+affordance. Dark mode reads fine. Thematically this sits with the other
+light-mode contrast / token entries (muted-on-bg under AA, button-system
+character) rather than being a standalone treatment.
+**Fix scope**: small — single-color-token review. WCAG-probe the link's
+computed foreground/background ratio against the Mist & Meadow tokens and
+adjust to ≥4.5:1 (AA) or 7:1 (AAA) for the affordance. Verify dark mode
+stays clean after the change.
+**Address by**: design-system pass — bundle with the existing light-mode
+contrast entries above (muted-on-bg under AA, button-system character).
+Same workstream; not blocking any in-progress feature.

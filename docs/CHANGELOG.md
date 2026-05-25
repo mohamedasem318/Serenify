@@ -527,3 +527,41 @@ recovery panel (`/reset-password`) stays silent — preserving ST-9.
     no PKCE `code_verifier` blocker, the code comes from Mailpit via the
     existing `fetchLatestOtp` helper. E2E count: 54 → 57 (one test × 3
     browsers).
+
+## 2026-05-25 — feat(003-employee-dashboard-shell) — feature complete (smoke pass 10/10)
+
+Feature 003 reaches its human-validated gate (Constitution Principle
+VII): all ten smoke rows in
+`specs/003-employee-dashboard-shell/smoke-tests.md` are ✅. What
+shipped:
+
+- **Dashboard shell** — persistent header (wordmark, theme toggle,
+  profile avatar), centered nav, and a profile dropdown; mobile sheet
+  menu at narrow widths.
+- **Account page** (`/app/account`) — Profile section (full-name edit
+  that updates header initials + dropdown name on the same render
+  cycle, FR-017) and an inline change-password form (FR-020 amendment),
+  plus Privacy/Notifications placeholder cards and Sign out.
+- **Three role-specific home bodies** — employee welcome banner + 60/40
+  skeleton cards + chat pill; team_lead and admin centered placeholders
+  (no banner/cards/pill).
+- **Notification surface** — built but not mounted by production code
+  (FR-033); consumer features 007/008/010 will mount it.
+- **Cross-tab auth sync** — `broadcastSignIn`/`broadcastSignOut` over a
+  shared-localStorage marker, plus the `AUTH_SIGNIN_COOKIE` bridge for
+  the server-only `/auth/callback` path; every auth-completing path
+  audited (form, email link, sign-up OTP) so sibling tabs propagate
+  within 2s, recovery paths excluded.
+- **Reduced-motion respect** — Framer Motion `useReducedMotion` primary
+  + a `globals.css` OS backstop; instant (no slide/translate) appearance
+  under `prefers-reduced-motion`, the WCAG SC 2.3.3-correct behavior.
+
+Amendments folded in during implementation (all recorded above):
+Decisions I–N (notably **Decision N** → explicit broadcast helper +
+cookie bridge replacing supabase-js storage propagation, and **Decision
+L** admin-subtitle copy), **FR-020** → inline change-password form on
+`/app/account`, and **FR-042** → crimson scoped to destructive surfaces.
+Known follow-ups deferred to `docs/BACKLOG.md` (non-dismissible
+confirmation-notification API, auth-broadcast forward-looking guard,
+sign-in confirmation-link contrast, card-heading typography read, and
+the dev-server resource leak from `642fa09`).
