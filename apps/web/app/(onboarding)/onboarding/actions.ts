@@ -36,7 +36,12 @@ export async function completeOnboarding(
     .eq("id", user.id);
 
   if (error) {
-    return { status: "error", message: error.message };
+    // Mirror updateProfile's error hygiene (account/actions.ts): log the raw
+    // Supabase error server-side, return a fixed generic message. Slice 3
+    // Finding 4 — both write the same full_name column; both branches now
+    // handle failure identically. See docs/DECISIONS.md (2026-05-25 — slice 3).
+    console.error("[completeOnboarding] supabase error:", error);
+    return { status: "error", message: "We couldn't save that — try again." };
   }
 
   redirect("/app");
