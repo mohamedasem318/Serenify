@@ -6,6 +6,7 @@ import { z } from "zod";
 
 import { changePasswordSchema, fullNameSchema } from "@/lib/auth/schemas";
 import { createClient } from "@/lib/supabase/server";
+import { clientEnv } from "@/lib/env/client";
 
 // full_name is validated by the single authoritative fullNameSchema (slice 3
 // Finding 5 — was a divergent local max(60); see docs/DECISIONS.md
@@ -108,8 +109,8 @@ export async function changePassword(
   // functional benefit. The anon client has no persistence and no
   // cookie writes — it's pure verification.
   const verifier = createAnonClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    clientEnv.supabaseUrl,
+    clientEnv.supabaseAnonKey,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
   const { error: verifyError } = await verifier.auth.signInWithPassword({

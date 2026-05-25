@@ -1,6 +1,8 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import { clientEnv } from "@/lib/env/client";
+
 /**
  * Next 16 renamed `middleware.ts` to `proxy.ts` and the exported function to
  * `proxy` (the old names are deprecated, see Next 16 docs §
@@ -31,8 +33,8 @@ export async function proxy(request: NextRequest) {
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    clientEnv.supabaseUrl,
+    clientEnv.supabaseAnonKey,
     {
       cookies: {
         getAll() {

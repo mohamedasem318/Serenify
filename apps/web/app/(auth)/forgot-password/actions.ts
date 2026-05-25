@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { forgotPasswordSchema } from "@/lib/auth/schemas";
+import { serverEnv } from "@/lib/env/server";
 
 export type ForgotResult = { status: "ok" } | { status: "validation" };
 
@@ -16,7 +17,7 @@ export async function requestPasswordReset(
     return { status: "validation" };
   }
 
-  const siteUrl = process.env.SITE_URL ?? "http://localhost:3000";
+  const siteUrl = serverEnv.siteUrl;
   const supabase = await createClient();
 
   // Always respond ok regardless of whether the email exists — FR-007.

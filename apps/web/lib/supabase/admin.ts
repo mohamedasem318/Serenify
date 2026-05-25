@@ -2,6 +2,8 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 
+import { serverEnv } from "@/lib/env/server";
+
 /**
  * Service-role Supabase client. Bypasses RLS — NEVER import from a client
  * component. The `server-only` import above causes the build to fail if any
@@ -12,8 +14,8 @@ import { createClient } from "@supabase/supabase-js";
  */
 export function createAdminClient() {
   return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    serverEnv.supabaseUrl,
+    serverEnv.supabaseServiceRoleKey,
     {
       auth: {
         autoRefreshToken: false,
