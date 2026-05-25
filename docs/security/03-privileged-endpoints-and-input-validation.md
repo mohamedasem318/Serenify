@@ -62,6 +62,53 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
 
 ---
 
+## Fix-pass summary
+
+**Date**: 2026-05-25. **Branch**: `security/03-privileged-endpoints-and-input-validation`. **PR**: #8.
+
+All six findings are **fixed**. Severity rollup is unchanged before/after — every
+finding was `low` (defense-in-depth / hygiene / consistency), so the rollup stays
+`critical 0 · high 0 · med 0 · low 6`; the fixes harden posture rather than close
+a reachable exploit.
+
+**Approach** — three fix commits, grouped by cohesion:
+
+- `0ce67d4` — `POST /api/admin/invite` handler refactor (F1 + F2 + F3): auth-first
+  ordering, Origin allowlist against `SITE_URL`, and generic error shapes (no raw
+  Supabase/RPC/Zod text to the client; full detail logged server-side).
+- `cbf26bd` — `completeOnboarding` generic error on DB failure (F4), mirroring
+  `updateProfile`.
+- `0f0bdc2` — single authoritative `fullNameSchema` consumed by signup,
+  onboarding, account update, and the client form (F5), with control/format-char
+  rejection (`\p{Cc}\p{Cf}`) and a DB length CHECK
+  (`supabase/migrations/20260525000100_full_name_length_cap.sql`) (F6).
+
+**Migration**: `supabase/migrations/20260525000100_full_name_length_cap.sql` —
+`ALTER TABLE public.profiles ADD CONSTRAINT profiles_full_name_length_check
+CHECK (full_name IS NULL OR char_length(full_name) <= 120)`. Applies cleanly from
+scratch via `supabase db reset`; empirically a 121-char write raises
+`check_violation` while 120-char and `NULL` write cleanly. No `[auth]` config
+touched, so the slice-2 `supabase stop && supabase start` gotcha did not apply —
+`db reset` alone was sufficient (no Cloud-dashboard parity item this slice).
+
+**Tests**: Vitest **220 passed** (23 files; includes the new `fullNameSchema`
+suite — accepts Latin/diacritic/CJK/Arabic/punctuation/edge-of-cap names, rejects
+empty / >120 / NUL / BELL / RTL-override / zero-width-space). Playwright e2e **57
+tests across chromium + firefox + webkit**: chromium 19/19 green; two specs
+(`firefox › admin-seeded`, `webkit › employee-dashboard-shell`) failed in the
+single-worker stacked matrix run on load-timing (the documented dev-server-bloat
+flake — see `docs/BACKLOG.md`) and **passed 6/6 on an isolated fresh-server
+re-run** (incl. both on firefox and webkit). The invite-handler transitions were
+re-verified empirically against the running dev server (throwaway spec, not
+committed — same approach as the audit; verbatim matrix in the PR description).
+
+**Decisions**: `docs/DECISIONS.md` (2026-05-25 — Security slice 3) records the
+four policy choices: Origin allowlist on privileged Route Handlers, auth-first
+ordering, single-source-of-truth schemas for cross-cutting fields, and
+reject-don't-sanitize for character-class restrictions (+ length DB backstop).
+
+---
+
 ## Findings
 
 ## Finding 1: `/api/admin/invite` performs no Origin/Referer check (Route Handler CSRF defense-in-depth)
@@ -84,7 +131,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
   ```
 
   (Allow a `null`/absent Origin so same-origin server-to-server and non-CORS clients are not broken; reject only a *present, mismatched* Origin. Pair with Finding 3's auth-first reordering so the Origin check sits alongside the authN gate.)
-- **Status**: `adjudicated 2026-05-25 → fix at low`. Severity **held at `low`** — severity is informational and the patch happens regardless; raising to `med` would inflate the rating without changing the fix. The Origin allowlist **is** added (cheap defense-in-depth on a privileged endpoint that gets a browser UI in feature 011; no live exploit today because `SameSite=Lax` already blocks the browser path).
+- **Status**: `fixed in 0ce67d4`. (Adjudicated 2026-05-25 → fix at low; severity **held at `low`** — severity is informational and the patch happens regardless; raising to `med` would inflate the rating without changing the fix.) The Origin allowlist was added at the top of the handler alongside the auth gate: a *present, mismatched* Origin returns 403, an absent Origin is allowed. Re-verified empirically — `Origin: https://evil.com` → **403** (was 201), matching `Origin: http://localhost:3000` → **201**. Cheap defense-in-depth on a privileged endpoint that gets a browser UI in feature 011; no live exploit today because `SameSite=Lax` already blocks the browser path. See DECISIONS.md (2026-05-25 — Security slice 3, choices 1 & 2).
 
 ## Finding 2: Raw Supabase/RPC `error.message` + Zod `issues` forwarded to the client in `/api/admin/invite`
 
@@ -96,7 +143,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
   - **Raw GoTrue error** (`:67-77`) — empirically, two *concurrent* invites for the same email return one `201` and one `500 {"error":"invite_failed","detail":"Database error saving new user"}`. The `/already/i` 409 branch only catches the *sequential* duplicate; the concurrent race falls through to the 500 fallback and surfaces the raw GoTrue string.
 - **Why it's a risk**: error-hygiene, **not remotely exploitable** — only an authenticated admin reaches the 500 paths, and the leaked strings (constraint/RPC text, "Database error saving new user") are low-value schema hints rather than secrets. But it is the exact pattern slice 2 Finding 8 fixed for the auth actions (raw `error.message` → fixed generic message + server-side log), and consistency matters: a privileged endpoint should not widen its blast radius by handing internal error text to its callers, and the regex/issues leak to *unauthenticated* callers (via Finding 3) is gratuitous.
 - **Suggested fix** (fix pass): for the 500 branches, `console.error` the raw `roleErr`/`mgrErr`/`inviteErr` server-side and return `{ user_id?, error: "<code>" }` with no `detail`. For the 400 branch, drop `issues` (or reduce to the offending `path`s) and return a fixed message. Mirror slice-2 Finding 8's resolution.
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`.
+- **Status**: `fixed in 0ce67d4`. The 400 validation branch now returns `{"error":"validation_failed","message":"Invalid invite payload."}` (no `issues`); the `invite_failed` / `role_update_failed` / `manager_update_failed` 500 branches return an error code only with no `detail`, logging the raw error server-side. Re-verified empirically — bad-email → `400` with no `issues`; bad-manager → `500 {"…","error":"manager_update_failed"}` with no `detail`; concurrent dupe → `201` + `500 {"error":"invite_failed"}` with no `detail`. See DECISIONS.md (2026-05-25 — Security slice 3).
 
 ## Finding 3: `/api/admin/invite` validates the body before authN/authZ
 
@@ -105,7 +152,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
 - **What**: The handler parses and validates the request body before it checks authentication or authorization. Verified empirically: an **unauthenticated** caller with a bad/empty body gets **400 `validation_failed`** with full Zod `issues` (including the email regex), while an unauthenticated caller with a *valid* body gets **401**.
 - **Why it's a risk**: an unauthenticated attacker can fingerprint the exact request schema (field names, types, the email regex, the `role` enum values) by toggling the body and reading 400-vs-401 — free reconnaissance with zero credentials, and the endpoint does parsing/validation work for unauthenticated callers. Low in practice (the schema is also in the public source tree, and the work is a cheap in-memory parse), but "authenticate before doing work / before emitting detailed errors" is the correct posture for a privileged endpoint, and the fix also closes the Finding-2 issues leak to anonymous callers.
 - **Suggested fix** (fix pass): move the `getUser()` + admin-role gate to the top; parse/validate the body only after the caller is confirmed to be an admin. Then unauthenticated → 401, non-admin → 403, and only verified admins ever see a 400 with validation detail. (Combine with Finding 1's Origin check at the same point.)
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`.
+- **Status**: `fixed in 0ce67d4`. The handler now runs `getUser()` → admin-role gate → Origin allowlist *before* the body parse. Re-verified empirically — an unauthenticated caller now gets **401 regardless of body shape** (a bad/empty body returns `401 {"error":"unauthenticated"}`, no longer `400` with Zod `issues`). See DECISIONS.md (2026-05-25 — Security slice 3, choice 2).
 
 ## Finding 4: `completeOnboarding` forwards raw Supabase `error.message` to the client
 
@@ -114,7 +161,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
 - **What**: On a DB-update failure, `completeOnboarding` returns the raw Supabase/Postgres `error.message` to the client. Its sibling `updateProfile` (`account/actions.ts:53-57`) — which writes the *same* `full_name` column — correctly returns a fixed generic string (`"We couldn't save that — try again."`). The two write paths to one column handle the error branch differently.
 - **Why it's a risk**: same class as slice-2 Finding 8 and Finding 2 above — error hygiene, **not** an active leak. The write here is a plain `full_name` text update scoped to `user.id`; a DB error is unusual, and the caller is already authenticated. But a raw Postgres string (e.g. an unexpected RLS/constraint message) could surface internal names, and the inconsistency with `updateProfile` is a latent footgun.
 - **Suggested fix** (fix pass): mirror `updateProfile` — `console.error(error)` server-side and return a fixed generic message. (Folds naturally into a shared error-hygiene convention with Findings 2 and slice-2 Finding 8.)
-- **Status**: `open (fix pass pending — Mohamed adjudicates)`.
+- **Status**: `fixed in cbf26bd`. `completeOnboarding` now logs the raw Supabase error server-side and returns `{ status: "error", message: "We couldn't save that — try again." }` — identical to `updateProfile`'s branch on the same `full_name` column. See DECISIONS.md (2026-05-25 — Security slice 3).
 
 ## Finding 5: `full_name` length cap inconsistent across write paths + no single source of truth
 
@@ -123,7 +170,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
 - **What**: Three independently-defined `full_name` constraints disagree on the maximum length: signup and onboarding allow **120**; the account update path allows **60**. The DB column is unbounded `text` (no `CHECK`). There is no shared `full_name` schema — the rule is written in four places.
 - **Why it's a risk**: **not a security exploit** (OWASP A04 insecure-design / data-integrity). Reachable deterministically with no attacker: a user who sets a 61–120-char name at signup or onboarding (allowed) later lands on `/app/account` where the form's `max(60)` rejects their *existing* name — they cannot save any profile edit until they shorten it. Verified empirically: an 80-char `full_name` persists to `profiles` via the signup/onboarding-equivalent path; the account schema's `max(60)` would reject the same value. The deeper issue is the absent single source of truth — a future change to the rule must be made in four spots or they drift again.
 - **Suggested fix** (fix pass): pick one authoritative cap (120 is the less-breaking choice given data may already be stored at that length), export a single `fullNameSchema` from `lib/auth/schemas.ts`, and consume it in `updateProfileSchema`, `profile-section.tsx` (schema + `maxLength`), and the onboarding/signup schemas. Optionally add a DB `CHECK (char_length(full_name) <= 120)` as the backstop (ties to Finding 6).
-- **Status**: `adjudicated 2026-05-25 → standardize at max(120)`. Chosen over 60 as the **less-breaking** option: existing data may already exceed 60, compound/cultural names legitimately run >60, and the anti-DoS goal is met by any sub-1KB cap. Fix pass: export a single `fullNameSchema` (cap 120) from `lib/auth/schemas.ts` and consume it in `updateProfileSchema`, `profile-section.tsx` (schema **and** the `maxLength` attribute), and the signup/onboarding schemas. Closes the length half of slice-1 Finding 7.
+- **Status**: `fixed in 0f0bdc2`. (Adjudicated 2026-05-25 → standardize at max(120), chosen over 60 as the **less-breaking** option: existing data may already exceed 60, compound/cultural names legitimately run >60, and the anti-DoS goal is met by any sub-1KB cap.) A single `fullNameSchema` (cap 120) now lives in `lib/auth/schemas.ts` and is consumed by `updateProfileSchema`, `profile-section.tsx` (schema **and** the `maxLength` attribute, raised 60 → 120), and the signup/onboarding schemas. Closes the length half of slice-1 Finding 7. See DECISIONS.md (2026-05-25 — Security slice 3, choice 3).
 
 ## Finding 6: `full_name` accepts arbitrary character classes / control chars / RTL-override and has no hard upper cap
 
@@ -139,7 +186,7 @@ Origin validation* — defense-in-depth, `low`, not a reachable exploit (Finding
   - **Control chars / null bytes** stored in a display field are an integrity smell.
   - **No hard upper cap** at the DB layer: the app schemas cap length, but a non-form writer (a future Server Action, a job, or a direct trigger path) without the Zod gate could persist an arbitrarily large string into an unbounded `text` column.
 - **Suggested fix** (fix pass): tighten the shared `fullNameSchema` (Finding 5) — keep it permissive enough for real names (letters incl. diacritics, spaces, hyphens, apostrophes, periods) but strip/reject C0/C1 control chars and bidi-override codepoints, and add a DB `CHECK (char_length(full_name) <= 120)` as the layer-independent backstop. Render escaping stays the primary XSS control; this is defense-in-depth + integrity.
-- **Status**: `adjudicated 2026-05-25 → DB CHECK + reject (not sanitize), \p{Cc}\p{Cf} only`. Fix pass:
+- **Status**: `fixed in 0f0bdc2`. (Adjudicated 2026-05-25 → DB CHECK + reject (not sanitize), `\p{Cc}\p{Cf}` only.) Shipped exactly as adjudicated — `fullNameSchema` carries `.refine((s) => !/[\p{Cc}\p{Cf}]/u.test(s), …)` with a friendly message, and migration `20260525000100_full_name_length_cap.sql` adds `CHECK (full_name IS NULL OR char_length(full_name) <= 120)`. The CHECK was verified empirically against the reset DB: a 121-char value raises `check_violation`, while 120-char and `NULL` values insert cleanly. See DECISIONS.md (2026-05-25 — Security slice 3, choice 4). Adjudication detail:
   - **(a) Add a DB `CHECK (char_length(full_name) <= 120)`** — the unbounded `text` column is an integrity smell independent of app-layer correctness; a future Server Action, scheduled job, or direct write could persist arbitrarily large data without the Zod gate. (This deliberately *diverges* from slice-1 Finding 7's "trust the app layer for character class" routing: **length and character class are different calculus** — length matters even when render-escape holds.)
   - **(b) Reject, don't sanitize** — silent sanitization is surprising; reject with a friendly message (e.g. "Name can't contain hidden control characters — please remove and try again.").
   - **(c) Reject only `\p{Cc}\p{Cf}`** (control chars + format chars incl. bidi overrides) via `z.string().refine((s) => !/[\p{Cc}\p{Cf}]/u.test(s), "…")` — **not** a positive whitelist like `[\p{L}\p{M}\p{N} '\-.,]`, which would break legitimate non-Latin names and unusual-but-valid punctuation (e.g. the Catalan middle dot). The minimal-reject approach allows all scripts, marks, punctuation, and symbols, blocking only the never-legitimate-in-a-display-name categories.
