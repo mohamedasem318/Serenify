@@ -780,3 +780,82 @@ stays clean after the change.
 **Address by**: design-system pass — bundle with the existing light-mode
 contrast entries above (muted-on-bg under AA, button-system character).
 Same workstream; not blocking any in-progress feature.
+
+### Extend ST-9 to assert recovery flow submits password update end-to-end
+**Status**: tech-debt
+**Category**: testing / e2e quality
+**Observed**: 2026-05-25, security slice 2 (Finding 7 verification)
+**Description**: Smoke ST-9 currently verifies the password-recovery flow's
+*navigation* (recovery link / OTP → `/reset-password`, and that sibling tabs do
+NOT spuriously propagate a sign-in) but does NOT actually submit the new
+password and assert the update succeeds end-to-end. The gap surfaced during the
+slice-2 Finding 7 fix: enabling `secure_password_change=true` needed proof that a
+recovery-scoped session can still call `updateUser({password})` without a reauth
+nonce. With no e2e covering the password-submission step, that verification had
+to be done with a throwaway Node script driving gotrue directly (recorded in
+`docs/security/02-auth-cookies-broadcast.md` Finding 7 "EMPIRICAL VERIFICATION").
+Because the recovery-submit path is untested, a future `config.toml` `[auth]`
+change (e.g. a stricter reauthentication window, an MFA requirement on password
+change, or a gotrue version bump that changes recovery-session semantics) could
+silently break real password recovery and the suite would stay green.
+**Fix scope**: small-to-medium. Extend `apps/web/tests/e2e/reset-password.spec.ts`
+(or add a sibling spec) to: trigger a reset for a fixture user, consume the
+recovery OTP via the existing `fetchLatestOtp` Mailpit helper (the OTP path is
+fully Playwright-testable — no PKCE `code_verifier` blocker), land on
+`/reset-password`, submit a valid new password, assert the success state, then
+assert the user can sign in with the *new* password and not the old one. This
+turns the slice-2 throwaway-Node verification into a permanent regression gate.
+**Address by**: a future testing / e2e-quality pass, or whoever next touches
+`config.toml` `[auth]` settings affecting the recovery flow. Pairs naturally with
+the "auth-broadcast forward-looking guard" entry above — both harden the auth
+suite against silent regressions.
+
+---
+
+## From security slice 3 (privileged-endpoints-and-input-validation) — in progress
+
+### Invite audit log — record who invited whom
+**Status**: deferred-feature
+**Category**: observability / admin
+**Observed**: 2026-05-25, security slice 3 (Out-of-scope note + Finding 2 review)
+**Description**: `POST /api/admin/invite` records nothing about *who invited
+whom*. The handler has both identifiers in hand at success — the caller's
+verified `user.id` (from `getUser()`) and the invitee's `user_id` (from
+`inviteUserByEmail`) — but writes no audit trail. There is no way after the fact
+to answer "which admin invited this user, and when." For an admin dashboard
+(feature 011) this is table-stakes provenance.
+**Fix scope**: small-to-medium. Two viable shapes:
+  - (a) Structured server-side log line at the 201 branch
+    (`console.info("[invite] issued", { by: user.id, invited: invitedId, role })`)
+    — cheap, immediate, but not queryable from the product.
+  - (b) A dedicated `public.invite_audit` table (`id`, `invited_by`,
+    `invited_user_id`, `role`, `manager_id`, `created_at`) written in the same
+    request — queryable, surfaces invite history in the admin dashboard. Needs a
+    migration + RLS (admin-read-only) and a write from the handler after step 2
+    succeeds.
+**Address by**: feature 011 (admin-dashboard), which is the first consumer that
+needs invite history. Decide (a) vs (b) there; (b) is the durable answer if the
+dashboard surfaces invite provenance.
+
+### Concurrent-duplicate-invite idempotency
+**Status**: tech-debt
+**Category**: handler design / correctness
+**Observed**: 2026-05-25, security slice 3 (Finding 2 empirical — concurrent race)
+**Description**: Two parallel invites for the *same* email produce one `201` and
+one `500`. The handler's `/already/i` → `409` branch only catches the
+**sequential** duplicate (the second request sees GoTrue's "already registered"
+error); two *concurrent* requests both pass the pre-check and the loser falls
+through to the generic `500 invite_failed` (GoTrue raises "Database error saving
+new user" on the unique-constraint collision). The slice-3 fix pass made that 500
+body generic (no raw detail), but the underlying non-idempotent behavior remains:
+a concurrent dupe is a 500, not a clean 409/200.
+**Fix scope**: medium. Introduce an idempotency key — either caller-supplied
+(an `Idempotency-Key` header the admin UI generates per submit) or derived from
+`(admin_id, normalized_email)` — and deduplicate at the handler so a concurrent
+or retried dupe collapses to a single deterministic outcome (200 with the
+existing `user_id`, or a clean 409) instead of a 500. The partial-success /
+transactional-rollback item from slice 1's Out-of-scope note benefits from the
+same plumbing — both want the invite to be a single idempotent unit of work.
+**Address by**: when `/api/admin/invite` gets a real browser client (feature 011
+admin dashboard) and concurrent submits become reachable in practice; pair with
+the invite partial-success / transactional-semantics handler-design item.

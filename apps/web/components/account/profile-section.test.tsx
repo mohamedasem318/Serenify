@@ -78,7 +78,7 @@ describe("ProfileSection", () => {
     await user.clear(input);
     await user.click(screen.getByRole("button", { name: /Save changes/ }));
     await waitFor(() => {
-      expect(screen.getByText("Name can't be empty")).toBeInTheDocument();
+      expect(screen.getByText("Please enter your name.")).toBeInTheDocument();
     });
     expect(updateProfileMock).not.toHaveBeenCalled();
   });
@@ -147,7 +147,7 @@ describe("ProfileSection", () => {
   it("surfaces an alert with the server's invalid message and skips router.refresh", async () => {
     updateProfileMock.mockResolvedValue({
       status: "invalid",
-      message: "Keep it under 60 characters",
+      message: "Name must be 120 characters or fewer.",
     });
     const user = userEvent.setup();
     render(
@@ -163,7 +163,7 @@ describe("ProfileSection", () => {
 
     await waitFor(() => {
       expect(screen.getByRole("alert")).toHaveTextContent(
-        "Keep it under 60 characters",
+        "Name must be 120 characters or fewer.",
       );
     });
     expect(routerRefreshMock).not.toHaveBeenCalled();

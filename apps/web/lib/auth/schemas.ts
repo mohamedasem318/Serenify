@@ -9,6 +9,35 @@ const passwordMinMessage = "Password must be at least 8 characters.";
 const passwordLetterMessage = "Password must contain a letter.";
 const passwordNumberMessage = "Password must contain a number.";
 
+/**
+ * Authoritative full_name validation. Used by signup, onboarding, account
+ * update, and any future write path. See
+ * docs/security/03-privileged-endpoints-and-input-validation.md Findings 5+6
+ * and docs/DECISIONS.md (2026-05-25 — Security slice 3).
+ *
+ * Constraints:
+ * - 1..120 characters (trimmed)
+ * - No control chars (\p{Cc}) or format chars (\p{Cf}, includes RTL override)
+ * - Otherwise permissive: all letters/marks/digits/punctuation/symbols across
+ *   all scripts. Reject — not sanitize — so the user sees a clear error rather
+ *   than a silently-mangled value. NOT a positive whitelist: a whitelist would
+ *   break legitimate non-Latin names and unusual-but-valid punctuation.
+ *
+ * DB-layer backstop: profiles.full_name CHECK (char_length(full_name) <= 120)
+ * — see migration 20260525000100_full_name_length_cap.sql. Length and
+ * character class are different calculus: the CHECK guards length even for a
+ * non-form writer that bypasses this Zod gate.
+ */
+export const fullNameSchema = z
+  .string()
+  .trim()
+  .min(1, "Please enter your name.")
+  .max(120, "Name must be 120 characters or fewer.")
+  .refine(
+    (s) => !/[\p{Cc}\p{Cf}]/u.test(s),
+    "Name can't contain hidden control or formatting characters — please remove them and try again.",
+  );
+
 export const signUpSchema = z.object({
   email: z.string().email(),
   password: z
@@ -16,7 +45,7 @@ export const signUpSchema = z.object({
     .min(8, passwordMinMessage)
     .regex(/[A-Za-z]/, passwordLetterMessage)
     .regex(/[0-9]/, passwordNumberMessage),
-  full_name: z.string().trim().min(1).max(120),
+  full_name: fullNameSchema,
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
@@ -68,7 +97,7 @@ export const changePasswordSchema = z
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export const onboardingSchema = z.object({
-  full_name: z.string().trim().min(1).max(120),
+  full_name: fullNameSchema,
 });
 export type OnboardingInput = z.infer<typeof onboardingSchema>;
 
