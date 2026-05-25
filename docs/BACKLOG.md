@@ -780,3 +780,32 @@ stays clean after the change.
 **Address by**: design-system pass — bundle with the existing light-mode
 contrast entries above (muted-on-bg under AA, button-system character).
 Same workstream; not blocking any in-progress feature.
+
+### Extend ST-9 to assert recovery flow submits password update end-to-end
+**Status**: tech-debt
+**Category**: testing / e2e quality
+**Observed**: 2026-05-25, security slice 2 (Finding 7 verification)
+**Description**: Smoke ST-9 currently verifies the password-recovery flow's
+*navigation* (recovery link / OTP → `/reset-password`, and that sibling tabs do
+NOT spuriously propagate a sign-in) but does NOT actually submit the new
+password and assert the update succeeds end-to-end. The gap surfaced during the
+slice-2 Finding 7 fix: enabling `secure_password_change=true` needed proof that a
+recovery-scoped session can still call `updateUser({password})` without a reauth
+nonce. With no e2e covering the password-submission step, that verification had
+to be done with a throwaway Node script driving gotrue directly (recorded in
+`docs/security/02-auth-cookies-broadcast.md` Finding 7 "EMPIRICAL VERIFICATION").
+Because the recovery-submit path is untested, a future `config.toml` `[auth]`
+change (e.g. a stricter reauthentication window, an MFA requirement on password
+change, or a gotrue version bump that changes recovery-session semantics) could
+silently break real password recovery and the suite would stay green.
+**Fix scope**: small-to-medium. Extend `apps/web/tests/e2e/reset-password.spec.ts`
+(or add a sibling spec) to: trigger a reset for a fixture user, consume the
+recovery OTP via the existing `fetchLatestOtp` Mailpit helper (the OTP path is
+fully Playwright-testable — no PKCE `code_verifier` blocker), land on
+`/reset-password`, submit a valid new password, assert the success state, then
+assert the user can sign in with the *new* password and not the old one. This
+turns the slice-2 throwaway-Node verification into a permanent regression gate.
+**Address by**: a future testing / e2e-quality pass, or whoever next touches
+`config.toml` `[auth]` settings affecting the recovery flow. Pairs naturally with
+the "auth-broadcast forward-looking guard" entry above — both harden the auth
+suite against silent regressions.
