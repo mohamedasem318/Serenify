@@ -1102,3 +1102,81 @@ risk calculus (choice 2); Supabase changes gotrue's reauthentication-window
 semantics such that recovery sessions stop counting as recent auth (choice 3);
 or the Cloud project's config is ever moved into the repo (choice 4 becomes
 moot).
+
+---
+
+## 2026-05-25 — Security slice 3: privileged endpoints + input validation
+
+**Status**: Accepted.
+
+**Context**: The slice-3 audit
+(`docs/security/03-privileged-endpoints-and-input-validation.md`) surfaced 6 low
+defense-in-depth / hygiene / consistency findings across the
+`POST /api/admin/invite` Route Handler, the non-auth Server Actions, the
+form-surface XSS sweep, and `full_name` end-to-end. No exploitable hole was
+found; the privilege-relevant controls were verified empirically. The fix pass
+landed the six approved fixes across three commits (`0ce67d4` invite handler,
+`cbf26bd` completeOnboarding, `0f0bdc2` shared `fullNameSchema` + DB CHECK).
+These are the policy choices that fix pass codifies.
+
+**Decision**:
+
+1. **Origin allowlist on privileged Route Handlers.** Next.js Server Actions get
+   an automatic same-origin check from the framework (slice-2 relied on this for
+   every auth mutation); **Route Handlers do not**. Every privileged Route
+   Handler (`POST /api/admin/invite` today; any future admin-only API) MUST read
+   `request.headers.get("origin")`, compare it against `process.env.SITE_URL`
+   (falling back to `http://localhost:3000`), and reject a *present, mismatched*
+   Origin with 403. An absent/`null` Origin is allowed so legitimate
+   server-to-server / non-CORS callers are not broken. This is
+   defense-in-depth on top of the `SameSite=Lax` session-cookie behavior — **not**
+   a primary CSRF control. Slice-3 Finding 1 has the empirical analysis: a forged
+   `Origin: https://evil.com` returned 201 via Playwright's `APIRequestContext`
+   (which is not a browser and ignores `SameSite`), which proves only that the
+   handler did no Origin validation — a real cross-site browser `fetch` would not
+   attach the `SameSite=Lax` cookie to a cross-site POST, so `SameSite=Lax`
+   already blocks the browser path. The allowlist is cheap insurance for the
+   feature-011 admin UI and against a future dev relaxing `SameSite`.
+
+2. **Auth-first ordering on privileged endpoints.** Authentication and
+   authorization MUST run BEFORE body parsing. Unauthenticated callers get 401
+   with no schema disclosure; non-admins get 403; only a verified admin reaches
+   Zod validation and ever sees a 400 with validation detail. The reverse order
+   (validate-then-auth) leaks the endpoint shape — field names, the email regex
+   source, the `role` enum — to anonymous reconnaissance via 400-vs-401 toggling,
+   and does parsing work for unauthenticated callers. The Origin check (choice 1)
+   sits alongside the authN gate, before the body parse.
+
+3. **Single-source-of-truth schemas for cross-cutting fields.** A field written
+   from more than one path (today: `full_name` from signup, onboarding, and
+   account update; future: any column written by 2+ Server Actions) MUST export a
+   single schema from `apps/web/lib/auth/schemas.ts` and be consumed everywhere —
+   server parses, the client-side react-hook-form resolver, and (where it maps to
+   a UI control) the `maxLength` attribute all derive from that one declaration.
+   This prevents the slice-3 Finding 5 drift pattern, where the account path had
+   diverged to `max(60)` while signup/onboarding allowed 120, locking a user with
+   a 61–120-char name out of editing their own profile.
+
+4. **Reject, don't sanitize, for user-input character-class restrictions.** When
+   a validator rejects categories of input (control chars, format chars), it
+   returns a clear error rather than silently stripping. Silent transformation is
+   surprising and harder to debug; explicit rejection is the user-friendlier
+   policy. `fullNameSchema` rejects only `\p{Cc}\p{Cf}` (control + format chars,
+   including the RTL override `U+202E`) — a **minimal-reject**, NOT a positive
+   whitelist like `[\p{L}\p{M}\p{N} '\-.,]`, which would break legitimate
+   non-Latin names and unusual-but-valid punctuation (e.g. the Catalan middle
+   dot). Future cross-cutting field restrictions inherit this pattern. This pairs
+   with a **layer-independent DB backstop** on *length only* (migration
+   `20260525000100_full_name_length_cap.sql`: `CHECK (full_name IS NULL OR
+   char_length(full_name) <= 120)`): length and character class are different
+   calculus — the CHECK guards length even for a non-form writer that bypasses the
+   Zod gate, while the character-class restriction stays at the app layer per
+   slice-1 Finding 7's routing (render-escaping is the primary XSS control; this
+   is defense-in-depth + integrity).
+
+**Revisit if**: a future privileged Route Handler needs CORS for a legitimate
+cross-origin browser client (choice 1 would need an allowlist of origins, not a
+single `SITE_URL`); a CSP lands (slice 5) adding a second XSS layer that changes
+the character-class calculus (choice 4); or a future field needs a stricter
+positive grammar than minimal-reject can express (choice 4 — at which point the
+whitelist's non-Latin breakage must be weighed explicitly).
