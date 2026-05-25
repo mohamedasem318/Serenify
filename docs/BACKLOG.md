@@ -648,3 +648,41 @@ and the working invocation pattern.
 **Address by**: anyone next running the full matrix locally, or
 whoever first sets up CI (the streaming filter is also the right
 pattern for CI logs that may be captured non-interactively).
+
+### Dev-server memory bloat + monotonic slowdown across stacked full-suite runs
+**Status**: tech-debt
+**Observed**: 2026-05-25, feature 003 smoke verification (the webkit
+timeout-flake fix on `reset-password.spec.ts:87`). Three consecutive full
+Playwright matrix runs (`npx playwright test`, 54 tests ×
+chromium/firefox/webkit) against a single long-lived `npm run dev` server.
+**Description**: Wall-clock grew **monotonically across the stacked runs —
+3.0m → 5.7m → 11.2m** — while the reused `next dev` process on :3000 sat at
+**~4.1 GB** resident. Run 3 degraded enough that a firefox worker wedged and
+was force-killed after the 300s stop timeout (`worker process did not exit
+within 300000ms`), and the shared `signInAs` helper
+(`tests/e2e/helpers.ts:13`) timed out waiting for the post-sign-in redirect
+(`toHaveURL(/\/(app|onboarding)$/)` stuck on `/login`), failing
+`admin-seeded.spec.ts` on firefox. Runs 1 and 2 were clean 54/54; the
+failure was purely load-induced and unrelated to the code under test.
+**Why it matters**: the leak manufactures *unrelated* flakes during smoke
+verification — here it surfaced an admin-seeded firefox failure with nothing
+to do with the change being verified, costing investigation time and risking
+a wrong fix being chased. Any future multi-run smoke or local-matrix session
+hits the same wall as the suite grows.
+**Investigate** (before feature 004) — candidate root causes:
+  - Next.js dev compiler / HMR memory retention across a long session (the
+    `.next/dev` postcss workers and module graph held warm).
+  - Supabase client connection pooling under the e2e harness (each spec's
+    `createAdminClient` / sign-in path; possible un-closed clients).
+  - Playwright `reuseExistingServer: true` interacting with hot reload — the
+    server is never torn down between runs, so nothing reclaims the heap.
+**Workaround until investigated**: restart the dev server between full-suite
+runs (or every 2 runs); for the smoke gate, run the matrix once against a
+freshly-started server rather than stacking runs.
+**Fix scope**: small-to-medium — an investigation spike to attribute the leak
+(heap-snapshot the `next dev` process across runs) first, then either a
+harness change (let Playwright own the webServer lifecycle per run instead of
+reusing) or an upstream Next/Supabase mitigation.
+**Address by**: before feature 004 begins. Pairs with the "Playwright local
+matrix run: pipe-buffering deadlock" tooling entry above — both are about
+making the local matrix run reliably.
