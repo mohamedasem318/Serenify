@@ -2,23 +2,18 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-const { useMediaQueryMock, useReducedMotionMock } = vi.hoisted(() => ({
+const { useMediaQueryMock } = vi.hoisted(() => ({
   useMediaQueryMock: vi.fn<(query: string) => boolean>(),
-  useReducedMotionMock: vi.fn<() => boolean>(),
 }));
 
+// The component reads BOTH the viewport branch and the reduced-motion
+// preference through useMediaQuery (the latter replaced framer-motion's
+// useReducedMotion, which only snapshotted the value at mount). The mock
+// is therefore query-aware so the two reads can be controlled
+// independently.
 vi.mock("@/hooks/use-media-query", () => ({
   useMediaQuery: useMediaQueryMock,
 }));
-
-vi.mock("framer-motion", async () => {
-  const actual =
-    await vi.importActual<typeof import("framer-motion")>("framer-motion");
-  return {
-    ...actual,
-    useReducedMotion: useReducedMotionMock,
-  };
-});
 
 import { Notification, CHAT_PILL_HEIGHT } from "@/components/notification";
 
@@ -26,14 +21,14 @@ function setup({
   mobile = false,
   reduceMotion = false,
 }: { mobile?: boolean; reduceMotion?: boolean } = {}) {
-  useMediaQueryMock.mockReturnValue(mobile);
-  useReducedMotionMock.mockReturnValue(reduceMotion);
+  useMediaQueryMock.mockImplementation((query: string) =>
+    query === "(prefers-reduced-motion: reduce)" ? reduceMotion : mobile,
+  );
 }
 
 describe("Notification — closed state", () => {
   beforeEach(() => {
     useMediaQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
     document.documentElement.style.removeProperty("--chat-pill-offset");
   });
 
@@ -50,7 +45,6 @@ describe("Notification — closed state", () => {
 describe("Notification — desktop slide-in variant", () => {
   beforeEach(() => {
     useMediaQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
     document.documentElement.style.removeProperty("--chat-pill-offset");
   });
 
@@ -133,7 +127,6 @@ describe("Notification — desktop slide-in variant", () => {
 describe("Notification — mobile bottom-sheet variant", () => {
   beforeEach(() => {
     useMediaQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
     document.documentElement.style.removeProperty("--chat-pill-offset");
   });
 
@@ -176,7 +169,6 @@ describe("Notification — mobile bottom-sheet variant", () => {
 describe("Notification — reduced-motion variant", () => {
   beforeEach(() => {
     useMediaQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
     document.documentElement.style.removeProperty("--chat-pill-offset");
   });
 
@@ -215,7 +207,6 @@ describe("Notification — reduced-motion variant", () => {
 describe("Notification — dismiss control", () => {
   beforeEach(() => {
     useMediaQueryMock.mockReset();
-    useReducedMotionMock.mockReset();
     document.documentElement.style.removeProperty("--chat-pill-offset");
   });
 

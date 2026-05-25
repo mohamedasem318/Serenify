@@ -1,7 +1,7 @@
 "use client";
 
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import type { ReactNode } from "react";
 
 import { CHAT_PILL_HEIGHT } from "@/components/chat-pill";
@@ -42,11 +42,22 @@ export type NotificationProps = {
  *     dismiss, and a11y semantics.
  *   - framer-motion for entrance/exit transitions; `forceMount` +
  *     `AnimatePresence` so the exit transition runs before unmount.
- *   - useReducedMotion (framer-motion) collapses transitions to
- *     opacity-only.
+ *   - reduced-motion is read through our own useMediaQuery, NOT
+ *     framer-motion's useReducedMotion. framer's hook snapshots the
+ *     preference once at mount via `useState(prefersReducedMotion.current)`
+ *     and never re-subscribes (see its source — it carries a literal
+ *     "TODO See if people miss automatically updating" note), so a
+ *     preference change after mount (DevTools emulation, or an OS
+ *     toggle while the tab is open) leaves the animation stale: the
+ *     slide variant keeps running when it should be fade-only. Our
+ *     useMediaQuery is a useSyncExternalStore subscription to the
+ *     matchMedia `change` event, so it re-renders live. When it flips,
+ *     opacity-only variants are selected below.
  *   - useMediaQuery to branch desktop vs mobile variant — SSR returns
  *     false (= desktop variant), which matches the server's "no
- *     viewport knowledge" default and prevents hydration mismatch.
+ *     viewport knowledge" default and prevents hydration mismatch. The
+ *     reduced-motion read defaults to false under SSR for the same
+ *     reason (full motion until the client confirms the preference).
  *
  * Layout:
  *   - Desktop (≥768px): fixed bottom-right card, max-width ≈ 320px.
@@ -90,7 +101,7 @@ export function Notification({
   dismissLabel = "Dismiss",
 }: NotificationProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
-  const reduceMotion = useReducedMotion();
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   const motionVariants = reduceMotion
     ? {
