@@ -74,6 +74,97 @@ verified there is no live XSS — React-escaping holds).
 
 ---
 
+## Fix-pass summary
+
+**Status**: **implemented and enforcing** on branch `security/05-csp-header`
+(commits: `77afca0` aux headers, `8cc031c` nonce CSP middleware + wiring,
+`d301391` Zod jitless barrel, `16cbd0d` DECISIONS, `b190a0f` CHANGELOG, + this
+doc). **Date**: 2026-05-26.
+
+**Rollout executed**: implemented as `Content-Security-Policy-Report-Only`, drove
+all 8 routes against a **production build** via Playwright (capturing
+`securitypolicyviolation` events + console, including opening the Radix profile
+dropdown to trigger `react-remove-scroll`'s runtime `<style>`), resolved the
+findings, flipped to the enforcing `Content-Security-Policy`, and re-verified the
+full e2e matrix. Two empirical findings surfaced — exactly the kind source-reading
+misses:
+
+1. **Zod 4's JIT compiler used `new Function(...)` in the browser** (~2
+   `script-src` `blocked=eval` violations per page in the Report-Only capture).
+   Resolved by routing every schema module through a new `@/lib/zod` barrel that
+   sets `z.config({ jitless: true })` as an import side effect (the flag is read
+   at schema **build** time, so it must precede every `z.object(...)`). This
+   keeps `script-src` free of `'unsafe-eval'` in production — chosen over the
+   weaker alternative of allowlisting `eval`. (Commit `d301391`; DECISIONS choice
+   2.)
+2. **`upgrade-insecure-requests` broke WebKit in dev.** The first full e2e matrix
+   showed 12 WebKit failures; a WebKit diagnostic revealed every `/_next/static`
+   chunk failing with `SSL connect error` because WebKit honors
+   `upgrade-insecure-requests` by upgrading even `http://localhost` subresource
+   requests to `https` (Chromium and Firefox exempt loopback). Fixed by making
+   `upgrade-insecure-requests` **production-only** (it is a no-op in dev anyway).
+   This is why a chromium-only capture is insufficient — the directive must be
+   exercised in WebKit. (Commit `8cc031c`.)
+
+**Final enforcing CSP (production)** — verbatim:
+
+```
+default-src 'self'; script-src 'self' 'nonce-<128-bit base64>' 'strict-dynamic'; style-src 'self' 'unsafe-inline'; img-src 'self'; font-src 'self'; connect-src 'self' https://<ref>.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+```
+
+**Dev delta** (verified live): `script-src` additionally carries `'unsafe-eval'`;
+`connect-src` adds `http://127.0.0.1:54321 ws://127.0.0.1:54321`;
+`upgrade-insecure-requests` is **omitted**; HSTS is not set. The 128-bit nonce is
+`crypto.getRandomValues(new Uint8Array(16))` base64 (Edge-runtime-safe), set on
+both the forwarded request headers (so Next stamps its inline scripts) and the
+response. The middleware matcher skips RSC prefetch requests.
+
+**Auxiliary headers (verified live on `next.config.ts` `headers()`)**:
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy:
+strict-origin-when-cross-origin`, `Permissions-Policy: camera=(), microphone=(),
+geolocation=(), payment=(), usb=(), interest-cohort=()`, `X-XSS-Protection: 0`,
+`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Resource-Policy:
+same-origin`, and prod-only `Strict-Transport-Security: max-age=63072000;
+includeSubDomains` (no `preload`). COEP intentionally unset.
+
+**Empirical violation capture** (production build, Report-Only → resolved):
+
+| Stage | script-src | style-src | connect-src | other |
+|---|---|---|---|---|
+| Initial Report-Only capture | **16** (`eval`, Zod JIT) | 0 | 0 | 9 benign "uir ignored in report-only" notices |
+| After `jitless` barrel | 0 | 0 | 0 | 9 benign notices (disappear when enforcing) |
+| Enforcing re-capture (all 8 routes + Radix dropdown) | **0** | **0** | **0** | **0** |
+
+**Tests**:
+- **Vitest**: 227 passed (24 files) — unchanged from the slice-4 baseline.
+- **Playwright e2e (enforcing CSP)**: Chromium **19/19**. WebKit **19/19** after
+  the `upgrade-insecure-requests` dev fix (the one full-suite failure,
+  `reset-password.spec.ts:87`, is the BACKLOG-documented load-timing flake —
+  passed in isolation, 8.4s). Firefox **19/19** (the one full-suite failure,
+  `employee-dashboard-shell.spec.ts:48` password-change, is the documented
+  load-timing flake — passed in isolation, 21.9s). No CSP-attributable failure on
+  any browser.
+- **Manual prod-build smoke**: covered by the enforcing Playwright capture, which
+  signs in, opens the Radix dropdown, and exercises account/onboarding under the
+  enforcing policy with zero violations.
+
+**Deviations from the audit plan**:
+- The audit's `crypto.randomUUID()` nonce was replaced with
+  `crypto.getRandomValues(new Uint8Array(16))` (128-bit per the CSP3 floor;
+  Mohamed's adjudication) — and the `node:crypto` `randomBytes` import from the
+  fix-pass sketch was avoided because it is unavailable in the Edge runtime the
+  middleware runs in.
+- The audit assumed prod needs no `'unsafe-eval'` and that
+  `upgrade-insecure-requests` is a dev no-op. Both were corrected empirically (the
+  two findings above). `'unsafe-eval'` is still absent from prod (Zod jitless made
+  that hold); `upgrade-insecure-requests` is now prod-only.
+- Capture browser was chromium (per the audit playbook), but the **enforcing**
+  re-verification ran the full chromium/firefox/webkit matrix — which is what
+  caught the WebKit `upgrade-insecure-requests` issue. Lesson logged: a
+  WebKit pass is mandatory before flipping to enforcing.
+
+---
+
 ## Inventory tables
 
 The headline artifact of this slice (analogous to slice-2's cookie table and
@@ -210,7 +301,7 @@ Per-directive rationale:
 | `form-action` | `'self'` | All forms post to same-origin Server Actions; no third-party form targets. |
 | `frame-src` | `'none'` | App embeds no iframes (grep confirmed). |
 | `frame-ancestors` | `'none'` | Clickjacking-proof; nobody may frame Serenify. The CSP equivalent of `X-Frame-Options: DENY`. |
-| `upgrade-insecure-requests` | (flag) | Upgrades any stray `http:` subresource to `https:` in prod; no-op in dev (http origin, no mixed content). |
+| `upgrade-insecure-requests` | (flag) | Upgrades any stray `http:` subresource to `https:`. **Production-only** — see the fix-pass finding below: in dev WebKit upgrades even `http://localhost` subresources and breaks every chunk, so dev omits it. |
 
 ### Development delta
 
@@ -223,7 +314,8 @@ required for production"):
 script-src  … add  'unsafe-eval'        # React dev eval (stack reconstruction). NOT in prod.
 connect-src 'self' http://127.0.0.1:54321 ws://127.0.0.1:54321   # local Supabase
 # HSTS: NOT set in dev (would poison localhost → forced https)
-# upgrade-insecure-requests: harmless no-op over http
+# upgrade-insecure-requests: OMITTED in dev (prod-only) — WebKit upgrades even
+#   http://localhost subresources to https → SSL error on every chunk (fix-pass finding)
 ```
 
 The implementation gates these on `process.env.NODE_ENV !== 'production'`,
