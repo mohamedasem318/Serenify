@@ -182,10 +182,12 @@ enable_anonymous_sign_ins = false
 # Allow/disallow testing manual linking of accounts
 enable_manual_linking = false
 # Passwords shorter than this value will be rejected as weak. Minimum 6, recommended 8 or more.
-minimum_password_length = 6
+# Slice 2 Finding 6: aligned to the app-layer Zod floor (min 8 + letter + digit).
+minimum_password_length = 8
 # Passwords that do not meet the following requirements will be rejected as weak. Supported values
 # are: `letters_digits`, `lower_upper_letters_digits`, `lower_upper_letters_digits_symbols`
-password_requirements = ""
+# Slice 2 Finding 6: require letters + digits to match the app Zod schema.
+password_requirements = "letters_digits"
 
 # Configure passkey sign-ins.
 # [auth.passkey]
@@ -228,9 +230,14 @@ double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
-secure_password_change = false
+# Slice 2 Finding 7: a recovery-flow user just authenticated (so updateUser is
+# allowed), while a stale normal session navigating to /reset-password is forced
+# to re-authenticate — closing the no-re-auth bypass at the Supabase layer.
+secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
-max_frequency = "1s"
+# Slice 2 Finding 4: raised from "1s" to the industry-norm "60s" to blunt
+# email-flooding / inbox-harassment via resend / password-reset loops.
+max_frequency = "60s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).

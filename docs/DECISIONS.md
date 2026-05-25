@@ -1015,3 +1015,90 @@ them in one migration
 posture here (choice 2); or Supabase changes its default-privilege grant
 model such that `REVOKE … FROM PUBLIC` becomes sufficient on its own
 (choices 5/6).
+
+---
+
+## 2026-05-25 — Security slice 2: auth flows + cookies + open-redirect + config hardening
+
+**Status**: Accepted.
+
+**Context**: The slice-2 audit
+(`docs/security/02-auth-cookies-broadcast.md`) surfaced 1 med + 7 low findings
+across the application-layer auth surfaces (auth-completing Server Actions and
+Route Handlers, the cross-tab broadcast plumbing, every app-set cookie, the
+`?next=` open-redirect surface, and the `[auth]` sections of `config.toml`).
+The fix pass landed them across three commits (`68c41d3` open-redirect,
+`188de88` cookies + config, `ede11d2` action hardening). These are the policy
+choices that fix pass codifies.
+
+**Decision**:
+
+1. **`isSafeNextPath()` is the sole `next`-validator.** Any new auth-flow
+   `next` consumer — additional `/auth/callback` variants, a future
+   non-PKCE `token_hash` callback, magic-link paths, or any
+   redirect-after-action pattern — MUST route the untrusted value through
+   `apps/web/lib/auth/safe-next.ts` before constructing the redirect URL.
+   *Rationale*: `NextResponse.redirect(`${origin}${next}`)` string
+   concatenation is provably NOT same-origin-safe (slice-2 Finding 1: a
+   bare `origin` with no trailing slash lets `next=@evil.com` break out via
+   userinfo and `next=.evil.com` via subdomain extension). The current
+   near-miss safety is *accidental* — the idiomatic refactor
+   `new URL(next, origin)` would silently turn it into an
+   immediately-exploitable open redirect. A single audited helper removes
+   the per-entry-point regression surface that ad-hoc checks create.
+
+2. **Cookie `Secure` policy — `secure: NODE_ENV === "production"` on all
+   app-set cookies; `httpOnly: true` intentionally NOT applied.** The three
+   `createServerClient` sites (`server.ts`, `proxy.ts`, `callback/route.ts`)
+   pass `cookieOptions: { secure }`, and `AUTH_SIGNIN_COOKIE` carries the same
+   flag. `httpOnly` is left at the `@supabase/ssr` default (`false`) on the
+   `sb-*` session cookies and the signin marker because the browser client is
+   constructed without a cookie adapter and reads `document.cookie` directly
+   to hydrate the session — `httpOnly: true` would BREAK the browser client
+   and all client-side auth calls. The XSS-token-theft exposure this leaves is
+   mitigated by React auto-escaping (in force), short access-token TTL
+   (`jwt_expiry=3600`), refresh-token rotation (on), and a future CSP (slice 5
+   scope). A future reader MUST NOT "harden" these cookies to `httpOnly:true`.
+   *Rationale*: empirically verified — the `@supabase/ssr` merge is
+   `{ ...DEFAULT_COOKIE_OPTIONS, ...cookieOptions }`, so adding `secure` keeps
+   `httpOnly:false`/`sameSite:lax`/`path:/`; and the full e2e matrix (which
+   runs over `http://localhost` in dev, where the conditional yields
+   `secure:false`) stays green, confirming the dev path is unaffected.
+
+3. **Supabase `config.toml` posture aligned to production-grade defaults.**
+   `max_frequency=60s` (Finding 4), `minimum_password_length=8` +
+   `password_requirements=letters_digits` (Finding 6, matches the app Zod
+   floor), and `secure_password_change=true` (Finding 7). Finding 7 was
+   e2e-gated: it shipped as the **config change** (not an app-layer guard)
+   because an empirical check proved a recovery-scoped session can
+   `updateUser({password})` with no reauth nonce under
+   `GOTRUE_SECURITY_UPDATE_PASSWORD_REQUIRE_REAUTHENTICATION=true` (recovery
+   counts as recent authentication), and the account-page change-password e2e
+   passes on all three browsers. So `secure_password_change=true` closes the
+   stale-normal-session `/reset-password` bypass at the Supabase layer without
+   breaking the recovery UX or the account-page flow.
+   *Rationale*: `config.toml` is the reference operators copy from; leaving it
+   lax creates intent drift even though the local dev environment alone is
+   low-risk. **Applying `config.toml` `[auth]` changes requires
+   `supabase stop && supabase start`** — `supabase db reset` re-runs
+   migrations/seed but does NOT regenerate the auth container's env from
+   `config.toml` (verified by `docker inspect` of the gotrue container env
+   before/after). Future config-change verification must restart, not just
+   reset.
+
+4. **Cloud-dashboard parity for `config.toml` security changes (process
+   note).** Production-effective Supabase config lives in the Cloud dashboard,
+   not in the repo. Any security-relevant change to `supabase/config.toml`
+   therefore requires a matching change applied manually in the dashboard. The
+   slice-2 PR description carries the dashboard checklist (`max_frequency`,
+   password requirements, secure password change, allowed redirect URLs);
+   Mohamed applies it. Future security-relevant config changes MUST include the
+   equivalent checklist in their PR.
+
+**Revisit if**: a non-PKCE / unauthenticated `next` consumer is added (re-audit
+choice 1 — it would escalate Finding 1 from med to high if it bypassed the
+PKCE precondition); a CSP lands (slice 5) and changes the `httpOnly:false`
+risk calculus (choice 2); Supabase changes gotrue's reauthentication-window
+semantics such that recovery sessions stop counting as recent auth (choice 3);
+or the Cloud project's config is ever moved into the repo (choice 4 becomes
+moot).

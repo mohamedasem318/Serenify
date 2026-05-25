@@ -49,7 +49,10 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
     if (/already|registered|exists/i.test(error.message)) {
       return { status: "exists" };
     }
-    return { status: "error", message: error.message };
+    // Slice 2 Finding 8: log server-side, return a fixed generic message
+    // instead of the raw vendor error.message.
+    console.error("[signUp] supabase error:", error);
+    return { status: "error", message: "Something went wrong — please try again." };
   }
 
   // If Supabase returns a user with no identities, the email exists but

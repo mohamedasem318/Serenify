@@ -31,7 +31,10 @@ export async function updatePassword(formData: FormData): Promise<ResetResult> {
     password: parsed.data.new_password,
   });
   if (error) {
-    return { status: "error", message: error.message };
+    // Slice 2 Finding 8: log server-side, return a fixed generic message
+    // instead of the raw vendor error.message.
+    console.error("[updatePassword] supabase error:", error);
+    return { status: "error", message: "Something went wrong — please try again." };
   }
 
   // After updating the password we sign the user out so they re-enter

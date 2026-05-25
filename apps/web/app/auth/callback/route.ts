@@ -5,6 +5,7 @@ import {
   AUTH_SIGNIN_COOKIE,
   destinationBroadcastsSignIn,
 } from "@/lib/auth-broadcast";
+import { isSafeNextPath } from "@/lib/auth/safe-next";
 
 /**
  * Supabase email-confirmation / invite-acceptance landing per
@@ -27,7 +28,13 @@ import {
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/app";
+  // `next` is interpolated into the redirect URL below as `${origin}${next}`,
+  // which is NOT same-origin-safe for arbitrary input (Finding 1). Validate it
+  // through the single audited helper; fall back to /app on anything unsafe.
+  // This `next` flows into BOTH the success redirect and the setAll closure's
+  // redirect, so validating once here covers every interpolation site.
+  const rawNext = searchParams.get("next") ?? "/app";
+  const next = isSafeNextPath(rawNext) ? rawNext : "/app";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=expired_link`);
@@ -52,6 +59,14 @@ export async function GET(request: NextRequest) {
             response.cookies.set(name, value, options),
           );
         },
+      },
+      cookieOptions: {
+        // Slice 2 Finding 2: add Secure on sb-* session cookies in production.
+        // httpOnly/sameSite intentionally left at @supabase/ssr defaults
+        // (httpOnly: false, sameSite: "lax") — httpOnly: true would break the
+        // browser client. See docs/security/02-auth-cookies-broadcast.md
+        // Finding 2 and the DECISIONS.md 2026-05-25 cookie-Secure policy entry.
+        secure: process.env.NODE_ENV === "production",
       },
     },
   );
@@ -79,6 +94,11 @@ export async function GET(request: NextRequest) {
       maxAge: 60,
       httpOnly: false,
       sameSite: "lax",
+      // Slice 2 Finding 3: add Secure in production. httpOnly stays false —
+      // CrossTabAuth reads this marker from document.cookie. The value is the
+      // non-sensitive literal "1". See docs/security/02-auth-cookies-broadcast.md
+      // Finding 3.
+      secure: process.env.NODE_ENV === "production",
     });
   }
 
