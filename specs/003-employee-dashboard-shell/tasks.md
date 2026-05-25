@@ -318,7 +318,7 @@ Paths are repo-relative. All new code lives under `apps/web/`. The cross-tab lis
 
 ### Implementation for Step 13
 
-- [ ] T067 [P] Append **11 entries** to `docs/DECISIONS.md` per plan.md "DECISIONS.md entries this plan implies". Each entry is dated `2026-05-20` (current date at `/speckit.tasks` time; if `/speckit.implement` lands across multiple days, use the actual date of each entry's commit). Append-only; existing decisions are not edited.
+- [x] T067 [P] Append **11 entries** to `docs/DECISIONS.md` per plan.md "DECISIONS.md entries this plan implies". Each entry is dated `2026-05-20` (current date at `/speckit.tasks` time; if `/speckit.implement` lands across multiple days, use the actual date of each entry's commit). Append-only; existing decisions are not edited.
   1. **shadcn/ui adopted on the Tailwind v4 path** — install command, `components.json` shape, baseColor `neutral`-overridden, CSS-vars mode. Sources: T015, T016. (DECISION-1)
   2. **shadcn variable names mapped to Mist & Meadow tokens** — reproduces the 19-row mapping table from `contracts/shadcn-mapping.md`. Names the three load-bearing choices: `--destructive → crimson` + `--destructive-foreground → --color-bg` (FR-042 scope-clarified per CHANGELOG 2026-05-20; supersedes the earlier amber mapping that failed dark-mode WCAG AA at 1.4:1); `--muted → --color-surface` (not border, per research.md R-2); `--primary-foreground → --color-bg` symmetric across both modes (WCAG AA per research.md R-2). Also the `--radius → --radius-control` mapping. Source: T017. (DECISION-2)
   3. **Dark-mode attribute: `data-theme` → `class`** — names the breaking selector change in `globals.css` and the `attribute` prop change in `providers.tsx`. Source: T011, T012. (DECISION-3)
