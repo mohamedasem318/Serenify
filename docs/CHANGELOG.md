@@ -480,3 +480,50 @@ the existing `cross-tab-auth-sync.spec.ts` proves the
 storage-event → navigation half; the seam between them is the cookie,
 verified on both sides. Mohamed re-runs ST-8 manually to validate the
 end-to-end email path.
+
+## 2026-05-25 — impl(003-employee-dashboard-shell) — cross-tab signin broadcast on the OTP-verify path (+ full auth-path audit)
+
+Follow-up to the ST-8 fix. Manual smoke found the **6-digit OTP
+fallback** (FR-020 — user types the code into `OtpPanel` instead of
+clicking the email link) did not propagate cross-tab. Third instance of
+the "auth completes but the broadcast doesn't fire" class (1: Phase-11
+form-only; 2: `/auth/callback`; 3: this).
+
+Rather than patch one path, audited every auth-completing path:
+
+| Path | Mechanism | Status |
+|------|-----------|--------|
+| Form sign-in (`login-form.tsx` → `signInWithPassword`) | client `broadcastSignIn()` | already correct |
+| Email link / invite (`/auth/callback` → `exchangeCodeForSession`) | server `AUTH_SIGNIN_COOKIE` bridge | fixed in c8c182c |
+| **Sign-up OTP** (`OtpPanel` → `verifySignupOtp`, `successHref=/app`) | client `broadcastSignIn()` | **fixed here** |
+| Recovery OTP (`OtpPanel` → `verifyResetOtp`, `successHref=/reset-password`) | gate excludes | correct (no change) |
+| Recovery email link (`/auth/callback?next=/reset-password`) | gate excludes | correct (c8c182c) |
+| Account re-auth (`account/actions.ts`) | throwaway anon client, no cookie writes, no navigation | not a sign-in path |
+| `signInWithOtp` / magic-link / passwordless | none exist in the repo | — |
+
+**Fix**: `OtpPanel` (the shared client component behind both the
+sign-up and recovery code panels) calls `broadcastSignIn()` in its
+`status === "ok"` branch, gated by
+`destinationBroadcastsSignIn(successHref)`. Because `OtpPanel` is
+client-driven (it does `router.replace(successHref)` itself, exactly
+like `login-form.tsx`), it writes the localStorage marker **directly** —
+the `AUTH_SIGNIN_COOKIE` bridge is reserved for the genuinely
+server-only `/auth/callback` Route Handler, which has no client context.
+A single change in the shared component covers both callers, and the
+`successHref` gate makes the sign-up panel (`/app`) broadcast while the
+recovery panel (`/reset-password`) stays silent — preserving ST-9.
+
+**Affected artifacts**:
+
+  - `apps/web/components/ui/auth/otp-panel.tsx` — gated
+    `broadcastSignIn()` in the success branch (the only runtime change).
+  - `apps/web/components/ui/auth/otp-panel.test.tsx` (new) — Vitest:
+    broadcasts to `/app`, silent to `/reset-password`, silent on a
+    failed verify.
+  - `apps/web/tests/e2e/cross-tab-auth-sync.spec.ts` — new spec driving
+    the real OTP flow (fresh sign-up → Mailpit code → `OtpPanel` verify)
+    and asserting a sibling `/login` tab follows. Unlike the
+    email-verification path, the OTP path is fully Playwright-testable —
+    no PKCE `code_verifier` blocker, the code comes from Mailpit via the
+    existing `fetchLatestOtp` helper. E2E count: 54 → 57 (one test × 3
+    browsers).

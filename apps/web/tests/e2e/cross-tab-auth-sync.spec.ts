@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createAdminClient } from "./setup/admin-client";
+import { fetchLatestOtp, randomEmail } from "./helpers";
 
 /**
  * Cross-tab auth state propagation (US-6 / FR-046 / 📌 DECISION-9).
@@ -116,6 +117,50 @@ test("cross-tab: sign-out on tab A propagates tab B from /app to /login", async 
     // pageB navigates within 2s. CrossTabAuth at pathname=/app
     // catches the signout broadcast and pushes /login.
     await expect(pageB).toHaveURL(/\/login$/, { timeout: 2_000 });
+  } finally {
+    await context.close();
+  }
+});
+
+test("cross-tab: OTP signup verify on tab B propagates tab A from /login to /app", async ({
+  browser,
+}) => {
+  // Regression guard for the OTP arm of the "auth completes but the
+  // broadcast doesn't fire" bug class. The 6-digit OTP fallback
+  // (OtpPanel) completes sign-up WITHOUT going through /auth/callback,
+  // so it can't lean on that route's AUTH_SIGNIN_COOKIE bridge; OtpPanel
+  // writes the broadcast marker directly (gated by successHref). A fresh
+  // sign-up is required — the demo cohort is pre-verified and can't
+  // exercise the confirmation OTP.
+  const email = randomEmail("otp-xtab");
+
+  const context = await browser.newContext();
+  try {
+    const pageA = await context.newPage();
+    const pageB = await context.newPage();
+
+    await pageA.goto("/login");
+    await expect(pageA).toHaveURL(/\/login$/);
+
+    await pageB.goto("/signup");
+    await pageB.getByLabel("Full name").fill("OTP Crosstab");
+    await pageB.getByLabel("Email").fill(email);
+    await pageB.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
+    await pageB.getByRole("button", { name: "Create account" }).click();
+    await expect(
+      pageB.getByRole("heading", { name: "Enter the code instead" }),
+    ).toBeVisible();
+
+    // Pull the 6-digit code from Mailpit and verify via the inline panel
+    // (not the email link) so this exercises the OtpPanel completion path.
+    const otp = await fetchLatestOtp(email);
+    await pageB.getByLabel("6-digit code").fill(otp);
+    await pageB.getByRole("button", { name: "Verify code" }).click();
+    await expect(pageB).toHaveURL(/\/(app|onboarding)$/, { timeout: 5_000 });
+
+    // Contract: pageA (still at /login) catches the signin broadcast that
+    // OtpPanel wrote and navigates within 2s.
+    await expect(pageA).toHaveURL(/\/(app|onboarding)$/, { timeout: 2_000 });
   } finally {
     await context.close();
   }
