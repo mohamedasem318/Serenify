@@ -49,6 +49,19 @@ hardening items.
 
 ---
 
+## Fix-pass summary
+
+- **Date**: 2026-05-25
+- **Migration**: `supabase/migrations/20260525000000_security_hardening_slice_1.sql` (commit `b4e5e70`)
+- **Decisions**: `docs/DECISIONS.md` 2026-05-25 — "Security slice 1: RLS + SECURITY DEFINER hardening decisions" (6 policy choices)
+- **Findings landed**: 1, 2, 3, 4, 5, 6 → `fixed in b4e5e70`; 7 → routed to slice 3.
+- **Two deviations from the approved SQL**, both rooted in the same systemic cause: Supabase grants EXECUTE/UPDATE *explicitly per role* (`anon`/`authenticated`/`service_role`) via `ALTER DEFAULT PRIVILEGES`, not only via PUBLIC / table-level. So the literal approved REVOKEs were no-ops, caught only by empirical `has_column_privilege` / `pg_proc.proacl` checks — not derivable from the migration source. F4(a) corrected to a column whitelist; F3/F6 corrected to enumerate the explicit per-role revokes. See the annotations on those findings and DECISIONS.md choices 4–6.
+- **Tests**:
+  - Vitest unit (`apps/web`): **176 passed**.
+  - Vitest scripts (non-integration): **20 passed, 8 skipped** (the env-gated integration block).
+  - Vitest integration (`SUPABASE_INTEGRATION=1`, full suite): **32 passed across 4 files** — includes 4 new behavioral tests in `scripts/__tests__/security-hardening.integration.test.ts` (multi-node cycle rejection + cycle-free re-parent; last-admin rejection + self-demotion with a second admin).
+  - Playwright e2e (chromium + firefox + webkit): **57 passed**. (The trailing `npm` exit-1 is the known worker force-kill after teardown, not a test failure.) The `employee-dashboard-shell` account-edit spec exercises the row-owner `full_name` UPDATE and passed on all three browsers — confirming the F4 column-grant change did not break profile edits.
+
 ## Findings
 
 ## Finding 1: Missing multi-node manager-cycle detection in `admin_update_manager`
@@ -85,7 +98,7 @@ hardening items.
   clause (Postgres 14+) or a depth cap to `reports_under` so a stray cycle
   surfaces as a clear error rather than silently wrong data. Migration file
   pattern: `supabase/migrations/<N>_<slug>.sql`.
-- **Status**: `open`
+- **Status**: `fixed in b4e5e70`. Cycle guard added to `admin_update_manager` *before* the UPDATE, using the audit's `new_manager_id ∈ reports_under(target_user_id)` direction. The deliberately-rejected `CYCLE` clause on `reports_under` stays out (its `UNION` already guarantees termination; the guard is the right layer). Behavioral test: A→B then B→A rejected with `23514`; cycle-free re-parent (B→C) succeeds.
 
 ## Finding 2: Last-admin / self-demotion → zero-admin lockout in `admin_update_role`
 
@@ -113,7 +126,7 @@ hardening items.
   last-admin case (the two checks are independent; the last-admin check alone
   prevents the lockout while still allowing one admin to demote another when a
   second admin exists).
-- **Status**: `open`
+- **Status**: `fixed in b4e5e70`. Implemented as **last-admin-only** (not a blanket self-demotion block) per DECISIONS.md 2026-05-25 choice 1: the check runs *after* the UPDATE and rolls back only when zero admins would remain. Behavioral test: sole-admin self-demotion rejected with `23514`; self-demotion succeeds when a second admin remains.
 
 ## Finding 3: SECURITY DEFINER functions retain default `PUBLIC` EXECUTE
 
@@ -127,7 +140,21 @@ hardening items.
   REVOKE EXECUTE ON FUNCTION public.admin_update_role(uuid, public.user_role) FROM PUBLIC;
   GRANT  EXECUTE ON FUNCTION public.admin_update_role(uuid, public.user_role) TO authenticated;
   ```
-- **Status**: `open`
+
+  > **⚠ `REVOKE … FROM PUBLIC` is PARTIAL on Supabase — preserved as a lesson.** Supabase grants EXECUTE *explicitly* to `anon`/`authenticated`/`service_role` via `ALTER DEFAULT PRIVILEGES`, in addition to the PUBLIC pseudo-grant. Revoking PUBLIC leaves the explicit `anon` grant intact (verified via `pg_proc.proacl`), so `admin_update_*` would stay anon-executable. **Strengthened form applied in `b4e5e70`:**
+  >
+  > ```sql
+  > -- admin_update_*: not referenced by any RLS policy — strip PUBLIC and the explicit anon grant.
+  > REVOKE EXECUTE ON FUNCTION public.admin_update_role(uuid, public.user_role)  FROM PUBLIC, anon;
+  > REVOKE EXECUTE ON FUNCTION public.admin_update_manager(uuid, uuid)           FROM PUBLIC, anon;
+  > -- is_admin: revoke PUBLIC ONLY — the anon grant is load-bearing for the
+  > --   profiles_select_admin RLS policy (revoking it → permission_denied on
+  > --   unauthenticated profile queries, not empty result sets).
+  > REVOKE EXECUTE ON FUNCTION public.is_admin() FROM PUBLIC;
+  > ```
+  >
+  > Verified post-migration `pg_proc.proacl`: `admin_update_*` = `{postgres, authenticated, service_role}` (no `anon`); `is_admin` = `{postgres, anon, authenticated, service_role}`. See DECISIONS.md 2026-05-25 choices 5 ("Supabase grant semantics") and 6 ("is_admin anon-grant invariant").
+- **Status**: `fixed in b4e5e70`
 
 ## Finding 4: Supabase default table grants not tightened (`role`/`manager_id`, `anon`)
 
@@ -145,7 +172,17 @@ hardening items.
   ```
 
   The SECURITY DEFINER functions (owned by `postgres`) still write `role`/`manager_id`; the trigger still inserts; only the `authenticated`/`anon` roles lose the latent capability.
-- **Status**: `open`
+
+  > **⚠ The `authenticated` line above is a NO-OP — preserved deliberately as a lesson** (documenting that empirical testing catches what a static SQL audit misses). A column-level `REVOKE UPDATE (role, manager_id)` has no effect while the role holds *table-level* `UPDATE` (Supabase's baseline grant); the table grant covers all columns. Empirically verified: after the revoke, `has_column_privilege('authenticated','public.profiles','role','UPDATE')` still returned `true`. **Corrected form applied in `b4e5e70`** — whitelist the row-owner-editable columns instead of blacklisting the privileged ones:
+  >
+  > ```sql
+  > REVOKE UPDATE             ON public.profiles FROM authenticated;
+  > GRANT  UPDATE (full_name) ON public.profiles TO   authenticated;
+  > REVOKE INSERT, UPDATE, DELETE ON public.profiles FROM anon;  -- whole-privilege, effective as-is
+  > ```
+  >
+  > Verified post-migration: `has_column_privilege('authenticated', …, 'role'/'manager_id', 'UPDATE')` = `false`, `'full_name'` = `true`. The `touch_updated_at` BEFORE trigger still sets `updated_at` (a BEFORE trigger's `NEW` assignment is not column-privilege-checked against the invoking role — verified with a role holding only `UPDATE(full_name)`; the e2e account-edit spec confirms it end-to-end). See DECISIONS.md 2026-05-25 choices 4 ("column-grant whitelist") and 5 ("Supabase grant semantics").
+- **Status**: `fixed in b4e5e70`
 
 ## Finding 5: Inconsistent function `OWNER` pinning across SECURITY DEFINER objects
 
@@ -154,7 +191,7 @@ hardening items.
 - **What**: Both `admin_update_*` functions explicitly `ALTER FUNCTION … OWNER TO postgres`. The two other SECURITY DEFINER objects — `is_admin()` and `handle_new_user()` — do not, so they inherit ownership from whichever role runs the migration.
 - **Why it's a risk**: **Low / latent operational hazard.** In every real Serenify environment (local `supabase start`, Supabase Cloud) the migration runner is `postgres`, so the effective owner matches the pinned functions and the behavior is correct. The risk is that a SECURITY DEFINER function's privilege level *is* its owner's; an unpinned owner makes that privilege implicit and environment-dependent, and the inconsistency with the explicitly-pinned siblings is itself a review smell suggesting it was unintentional. `is_admin()` in particular is called from inside RLS policies, where getting the execution identity wrong would be high-impact.
 - **Suggested fix** (fix pass, not this slice): add `ALTER FUNCTION public.is_admin() OWNER TO postgres;` and `ALTER FUNCTION public.handle_new_user() OWNER TO postgres;` for parity. (`reports_under` and `touch_updated_at` are INVOKER, so owner matters far less; pin for consistency only.)
-- **Status**: `open`
+- **Status**: `fixed in b4e5e70`. `ALTER FUNCTION … OWNER TO postgres` added for `is_admin`, `handle_new_user`, `reports_under`, `touch_updated_at` (the `admin_update_*` pair was already pinned and is re-affirmed). Verified post-migration: all six functions report `owner = postgres`.
 
 ## Finding 6: `reports_under()` — INVOKER + unpinned `search_path` + PostgREST-exposed, zero consumers
 
@@ -166,7 +203,16 @@ hardening items.
   - **Future-correctness footgun**: the INVOKER + RLS interaction means `reports_under(me)` returns an **empty** set for a `team_lead` whose own SELECT visibility is self + direct-reports — the recursive self-join is RLS-filtered. A future developer writing a signal-aggregate RLS policy on top of this will get surprising empties unless the function is deliberately made SECURITY DEFINER (with a `search_path` pin and an internal `auth.uid()`/`is_admin()` scope guard) at that time.
   - `search_path` is unpinned; immaterial for an INVOKER function under PostgREST (which resets `search_path` per request) and because the body schema-qualifies `public.profiles`, but it should be pinned if/when the function becomes DEFINER.
 - **Suggested fix** (fix pass, not this slice): minimally `REVOKE EXECUTE … FROM PUBLIC` (Finding 3) and consider `REVOKE … FROM authenticated` until a real consumer lands (re-grant when 005/010/011 adopt it). When adopted, make the DEFINER-vs-INVOKER decision deliberately, pin `search_path = ''` (or `public, pg_temp`), and add a scope guard so a caller can only traverse their own subtree (or require `is_admin()`). Document the chosen posture in `docs/DECISIONS.md`.
-- **Status**: `open`
+
+  > **⚠ "Exposure zero" requires revoking all four grantees, not just PUBLIC + `authenticated`.** As with Finding 3, Supabase's explicit `anon`/`service_role` grants survive `REVOKE … FROM PUBLIC`; revoking only PUBLIC + `authenticated` would leave `reports_under` anon- and service_role-executable — *not* zero. **Strengthened form applied in `b4e5e70`:**
+  >
+  > ```sql
+  > REVOKE EXECUTE ON FUNCTION public.reports_under(uuid)
+  >   FROM PUBLIC, anon, authenticated, service_role;
+  > ```
+  >
+  > Verified post-migration `pg_proc.proacl` = `{postgres}` — exposure is now *genuinely* zero. Only the owner (`postgres`, pinned in Finding 5) retains EXECUTE, which is exactly why the Finding 1 cycle check still works: `admin_update_manager` runs as `postgres` and calls `reports_under` internally. See DECISIONS.md 2026-05-25 choices 2 ("reports_under deferred design") and 5.
+- **Status**: `fixed in b4e5e70`
 
 ## Finding 7: `handle_new_user()` persists unvalidated user-controlled `full_name`
 
@@ -179,7 +225,7 @@ hardening items.
 
   The only residual is **stored XSS at render time** — an unsanitized `full_name` (e.g. `<img src=x onerror=…>`) surfaced later in a manager/admin view. That is a render-layer concern and is **routed out of this slice** (see Out of scope). It is recorded here as the explicit answer to the audit's "does the trigger trust metadata for any field?" question.
 - **Suggested fix**: none at the trigger. Enforce `full_name` validation at the signup Server Action / form (slice 3) and rely on framework auto-escaping at render (React escapes by default; flag any `dangerouslySetInnerHTML`). Optionally add a light DB-level `CHECK (char_length(full_name) <= 200)` as defense-in-depth if the fix pass wants a backstop.
-- **Status**: `open`
+- **Status**: `routed to slice 3 — full_name validation at signup Server Action`. No DB `CHECK` added in this migration (deliberately, per the fix-pass scope); the DB layer is clean (no escalation, no SQLi). Validation + stored-XSS mitigation land in slice 3 / the app layer.
 
 ---
 
