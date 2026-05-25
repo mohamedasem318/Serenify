@@ -565,3 +565,73 @@ Known follow-ups deferred to `docs/BACKLOG.md` (non-dismissible
 confirmation-notification API, auth-broadcast forward-looking guard,
 sign-in confirmation-link contrast, card-heading typography read, and
 the dev-server resource leak from `642fa09`).
+
+## 2026-05-25 — security: slice 1 — RLS + SECURITY DEFINER hardening
+
+Fix pass for the slice-1 audit
+(`docs/security/01-rls-and-security-definer.md`), landed in migration
+`20260525000000_security_hardening_slice_1.sql` (commit `b4e5e70`) and merged
+via PR #6. Observable behavior changes on the `public.profiles` authorization
+model:
+
+- `admin_update_manager` now rejects manager-cycle assignments — setting a
+  user's manager to a transitive report of that same user raises `23514`
+  (check_violation) and rolls the change back.
+- `admin_update_role` now rejects any role change that would leave zero admins
+  globally, raising `23514` (last-admin lockout guard). Self-demotion is still
+  permitted while at least one other admin remains.
+- SECURITY DEFINER functions no longer carry the default `PUBLIC` EXECUTE
+  grant; EXECUTE is tightened to the specific roles that need it. `is_admin()`
+  retains its `anon`/`authenticated` grant because it is evaluated inside an
+  RLS policy.
+- Column-level UPDATE on `public.profiles` is whitelisted to `full_name` for
+  the `authenticated` role; `role` and `manager_id` are writable only through
+  the SECURITY DEFINER admin functions (which run as `postgres`).
+- The `anon` role's write access on `public.profiles` is revoked.
+- `reports_under()` EXECUTE is revoked from every role (callable only by its
+  owner) until the first real consumer lands and explicitly picks its
+  DEFINER/scope posture.
+
+Finding 7 (`handle_new_user` persists an unvalidated `full_name`) was routed to
+slice 3. Decisions recorded in `docs/DECISIONS.md` (2026-05-25 — Security
+slice 1). Cloud-dashboard parity: n/a — all changes are in-repo migration SQL.
+
+## 2026-05-25 — security: slice 2 — auth hardening (cookies, open redirect, config)
+
+Fix pass for the slice-2 audit
+(`docs/security/02-auth-cookies-broadcast.md`), landed across commits
+`68c41d3` / `188de88` / `ede11d2` and merged via PR #7. Observable behavior
+changes on the application-layer auth surfaces:
+
+- The open redirect on `/auth/callback` (a `?next=` userinfo / subdomain
+  break-out in the `${origin}${next}` concatenation — e.g. `next=@evil.com`
+  resolving to `evil.com`) is fixed. `next` is validated through a single
+  `isSafeNextPath()` helper and falls back to `/app` on anything that is not a
+  safe same-origin relative path.
+- Supabase session cookies (`sb-*`) and the `serenify-auth-signin` cross-tab
+  bridge cookie now carry the `Secure` flag in production. `httpOnly` is
+  intentionally left `false` — the browser client reads `document.cookie` to
+  hydrate the session, so `httpOnly:true` would break auth.
+- The Supabase-layer password floor is raised to 8 characters with a letter +
+  digit requirement (was min 6, no requirements), matching the app's existing
+  Zod policy so the server floor can no longer accept a weaker password than
+  the UI enforces.
+- `secure_password_change` is enabled: a stale, non-recently-authenticated
+  session can no longer change the password at `/reset-password` without
+  re-authenticating. Recovery flows are unaffected — a recovery session counts
+  as recent authentication, so the legitimate reset path still completes.
+- The auth email rate limit (`max_frequency`) is raised from 1s to 60s to blunt
+  inbox-flooding via resend / password-reset loops.
+- The `resendConfirmation` Server Action now validates the email format before
+  dispatching and returns silently on bad input (no enumeration oracle).
+- Auth fallback error branches (`signIn`, `signUp`, `updatePassword`) no longer
+  forward raw Supabase error text to the client — they log the error
+  server-side and return a fixed generic message.
+
+Decisions recorded in `docs/DECISIONS.md` (2026-05-25 — Security slice 2).
+Cloud-dashboard parity **required**: the `config.toml` changes
+(`max_frequency`, password requirements, secure password change, allowed
+redirect URLs) must be applied separately in the production Supabase Cloud
+dashboard — Mohamed applies these manually (checklist in PR #7). From this
+slice forward, every security slice gets a CHANGELOG entry; slice 1's was
+backfilled here because it ships alongside slice 2 in the same PR.
