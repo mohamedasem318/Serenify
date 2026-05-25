@@ -917,3 +917,101 @@ CHANGELOG, not in retroactive edits to the spec/task file).
 `verifyPassword(currentPassword)` RPC — at which point the
 throwaway-anon-client verification step can collapse into a
 direct check.
+
+---
+
+## 2026-05-25 — Security slice 1: RLS + SECURITY DEFINER hardening decisions
+
+**Status**: Accepted.
+
+**Context**: The slice-1 audit
+(`docs/security/01-rls-and-security-definer.md`) surfaced 2 med + 5 low
+findings on the `public.profiles` authorization model. The fix pass landed
+them in one migration
+(`supabase/migrations/20260525000000_security_hardening_slice_1.sql`, commit
+`b4e5e70`). These are the policy choices that fix pass codifies.
+
+**Decision**:
+
+1. **Last-admin guard scope — last-admin-only, not a blanket
+   self-demotion block.** `admin_update_role` rejects a role change only
+   when it would leave *zero* admins globally (checked after the UPDATE; the
+   RAISE rolls it back). An admin demoting *themselves* is allowed as long as
+   another admin remains.
+   *Rationale*: a multi-admin org legitimately may have admin A step down
+   while B continues. Only the zero-admin lockout is the actual hazard
+   (no in-app recovery path — every admin gate evaluates false), so that is
+   the only case worth blocking. Blocking all self-demotion would forbid a
+   legitimate, recoverable operation.
+
+2. **`reports_under()` deferred design — EXECUTE revoked from every role
+   until the first consumer lands.** The function stays defined (forward
+   contract for features 005/010/011) but is callable only by its owner
+   (`postgres`). The migration that introduces the first consumer MUST,
+   deliberately and in that migration: (a) choose SECURITY DEFINER vs
+   INVOKER, (b) pin `search_path`, (c) add a scope guard (`is_admin()` or an
+   own-subtree check), and (d) re-grant EXECUTE to the intended role(s), and
+   document the chosen posture.
+   *Rationale*: today's INVOKER + RLS-filtered behavior is a future-correctness
+   footgun (`reports_under(me)` returns empty for a team_lead under RLS).
+   Forcing the adopting feature to make the DEFINER/scope decision explicitly,
+   at the point a real consumer exists, is safer than shipping a
+   PostgREST-callable function with no consumer and an ambiguous posture.
+
+3. **REVOKE the unauthenticated audience as the default posture for
+   SECURITY DEFINER functions in `public`.** Privileged DEFINER entry points
+   should not be executable by anonymous callers. Future privileged RPCs
+   inherit this: revoke PUBLIC *and* the explicit `anon` grant unless the
+   function is referenced by an RLS policy (see 6).
+   *Rationale*: defense-in-depth / attack-surface reduction — a future
+   refactor that reorders a guard or flips DEFINER↔INVOKER should not silently
+   inherit a broader audience than intended.
+
+4. **Column-grant whitelist on `public.profiles` — whitelist, not
+   blacklist.** Row-owner UPDATE is granted to specific columns
+   (`full_name` today) via `REVOKE UPDATE … FROM authenticated; GRANT UPDATE
+   (full_name) … TO authenticated`. Future migrations adding a
+   row-owner-editable column MUST explicitly `GRANT UPDATE (col) ON
+   public.profiles TO authenticated`. Trigger-managed columns (`updated_at`)
+   need no grant — a BEFORE-UPDATE trigger's assignment to `NEW` is not
+   column-privilege-checked against the invoking role (empirically verified
+   with a role holding only `UPDATE(full_name)`). Admin-managed columns
+   (`role`, `manager_id`) need no grant — they are written only by the
+   SECURITY DEFINER RPCs running as `postgres`.
+   *Rationale*: explicit > implicit. The whitelist failure mode (forgot to
+   grant → a user can't edit their own field → fix forward) is far safer than
+   the symmetric blacklist failure mode (forgot to revoke → security gap).
+   This replaces the audit's first-proposed `REVOKE UPDATE (role,
+   manager_id) … FROM authenticated`, which is a no-op while the role holds
+   table-level UPDATE.
+
+5. **Supabase grant semantics — `REVOKE … FROM PUBLIC` alone is
+   insufficient.** Supabase grants EXECUTE (and table DML) explicitly per
+   role (`anon`, `authenticated`, `service_role`) via `ALTER DEFAULT
+   PRIVILEGES`, in addition to the built-in PUBLIC grant. A bare `REVOKE …
+   FROM PUBLIC` removes only the pseudo-grant and leaves the explicit `anon`
+   grant intact. Future grant-tightening migrations MUST enumerate the
+   explicit per-role revokes and verify the post-state with `pg_proc.proacl`
+   (functions) / `has_column_privilege` (columns) rather than reasoning from
+   the migration source.
+   *Rationale*: this slice surfaced a systemic gap — static SQL audits that
+   reason from migration text miss Supabase-specific grant semantics. Both
+   F3/F6 (function EXECUTE) and F4 (column UPDATE) approved SQL were no-ops
+   for this reason; only empirical verification caught it.
+
+6. **`is_admin()` anon-grant invariant.** Functions referenced by an RLS
+   policy expression MUST remain executable by the role that evaluates the
+   query — `anon` for unauthenticated requests, `authenticated` for
+   signed-in. `is_admin()` is called from the `profiles_select_admin` policy,
+   so its `anon`/`authenticated` EXECUTE grants are RETAINED; only PUBLIC is
+   revoked.
+   *Rationale*: revoking either grant on `is_admin()` would surface as
+   `permission_denied` *during RLS evaluation* (a hard error on every
+   affected query) rather than as empty result sets. Treat as load-bearing
+   for any future migration that touches `is_admin` grants.
+
+**Revisit if**: a future feature needs an admin-set floor other than ≥1
+(choice 1); a consumer adopts `reports_under()` and must record its chosen
+posture here (choice 2); or Supabase changes its default-privilege grant
+model such that `REVOKE … FROM PUBLIC` becomes sufficient on its own
+(choices 5/6).
