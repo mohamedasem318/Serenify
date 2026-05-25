@@ -1,6 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
+import {
+  AUTH_SIGNIN_COOKIE,
+  destinationBroadcastsSignIn,
+} from "@/lib/auth-broadcast";
+
 /**
  * Supabase email-confirmation / invite-acceptance landing per
  * contracts/routes.md § GET /auth/callback.
@@ -54,6 +59,27 @@ export async function GET(request: NextRequest) {
   const { error } = await supabase.auth.exchangeCodeForSession(code);
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=expired_link`);
+  }
+
+  // 📌 ST-8 fix (2026-05-25): the form sign-in path writes a localStorage
+  // marker from the client so sibling tabs propagate (login-form.tsx →
+  // broadcastSignIn). This route runs server-side and can't touch
+  // localStorage, so the email-verification / invite path never
+  // propagated cross-tab. Bridge it: drop a short-lived marker cookie on
+  // the redirect that the landing tab's CrossTabAuth consumes on mount
+  // (consumePendingSignIn) to emit the same broadcast. Gated to authed
+  // destinations so the recovery flow (next=/reset-password) doesn't
+  // broadcast a spurious sign-in. The cookie is set on the post-exchange
+  // `response` so it rides the same Set-Cookie batch as the session
+  // cookies; it survives proxy.ts's /app → /onboarding search-stripping
+  // bounce because cookies aren't part of `url.search`.
+  if (destinationBroadcastsSignIn(next)) {
+    response.cookies.set(AUTH_SIGNIN_COOKIE, "1", {
+      path: "/",
+      maxAge: 60,
+      httpOnly: false,
+      sameSite: "lax",
+    });
   }
 
   return response;

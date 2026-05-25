@@ -28,6 +28,22 @@
 
 export const AUTH_BROADCAST_KEY = "serenify-auth-broadcast";
 
+/**
+ * Transient marker cookie the GET /auth/callback route sets after a
+ * successful code exchange whose destination is an authed surface
+ * (📌 ST-8 fix 2026-05-25). It bridges the email-verification path into
+ * the same cross-tab broadcast the form path uses.
+ *
+ * Why a cookie and not a redirect query param: proxy.ts strips the
+ * search string (`url.search = ""`) on its /app → /onboarding bounce —
+ * the exact path a fresh null-profile sign-up / admin invite takes — so
+ * a query param would be destroyed before any client could read it.
+ * Cookies are untouched by that redirect, so the marker survives to
+ * whichever authed surface the proxy lands on. Non-httpOnly by design:
+ * CrossTabAuth reads it from document.cookie on mount.
+ */
+export const AUTH_SIGNIN_COOKIE = "serenify-auth-signin";
+
 export type AuthBroadcastEvent = "signin" | "signout";
 
 /**
@@ -84,4 +100,56 @@ export function parseAuthBroadcast(
   if (newValue.startsWith("signin:")) return "signin";
   if (newValue.startsWith("signout:")) return "signout";
   return null;
+}
+
+/**
+ * Server-side gate (📌 ST-8 fix): should /auth/callback set the
+ * signin-broadcast cookie for this post-exchange destination?
+ *
+ * Only authed landings — /app and /onboarding (the proxy may bounce
+ * /app → /onboarding for a null-profile user; both are sign-in
+ * completions). NOT the recovery flow, which arrives with
+ * `next=/reset-password`: that user is mid-password-reset, not signing
+ * in to use the app, so broadcasting `signin` there would wrongly pull
+ * sibling tabs to /app (and would regress smoke ST-9). The signup
+ * confirmation and admin-invite links both arrive with no `next`
+ * (defaulting to /app), so this returns true for them.
+ *
+ * Pure function — no window/document access — so it is importable from
+ * the server Route Handler.
+ */
+export function destinationBroadcastsSignIn(next: string): boolean {
+  return (
+    next === "/app" ||
+    next.startsWith("/app/") ||
+    next === "/onboarding" ||
+    next.startsWith("/onboarding/")
+  );
+}
+
+/**
+ * Client-side (📌 ST-8 fix): if the signin-broadcast cookie is present,
+ * emit the cross-tab signin broadcast and clear the cookie. Called once
+ * from CrossTabAuth on mount — the first tab to mount on the authed
+ * landing after a callback redirect consumes it.
+ *
+ * The clear makes it idempotent: a later remount (or a sibling tab that
+ * happens to re-read document.cookie before the clear lands) re-emitting
+ * `signin` would be harmless anyway, but clearing keeps the marker
+ * one-shot. No-op under SSR or when the cookie is absent.
+ */
+export function consumePendingSignIn(): void {
+  if (typeof document === "undefined") return;
+  // Read the marker's VALUE, not just the key: clearing a cookie with
+  // Max-Age=0 deletes it outright in a real browser, but some
+  // environments (e.g. happy-dom under test) leave a lingering empty
+  // `name=` entry. Treating an empty value as absent keeps this
+  // idempotent everywhere — a second mount won't re-broadcast.
+  const value = document.cookie
+    .split("; ")
+    .find((entry) => entry.startsWith(`${AUTH_SIGNIN_COOKIE}=`))
+    ?.slice(AUTH_SIGNIN_COOKIE.length + 1);
+  if (!value) return;
+  broadcastSignIn();
+  document.cookie = `${AUTH_SIGNIN_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
 }

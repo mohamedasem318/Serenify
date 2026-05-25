@@ -1,7 +1,11 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
-import { AUTH_BROADCAST_KEY } from "@/lib/auth-broadcast";
+import {
+  AUTH_BROADCAST_KEY,
+  AUTH_SIGNIN_COOKIE,
+  parseAuthBroadcast,
+} from "@/lib/auth-broadcast";
 
 const { pushMock, pathnameHolder, signOutMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
@@ -37,11 +41,22 @@ function fireStorage({
   window.dispatchEvent(event);
 }
 
+function clearAllCookies() {
+  for (const entry of document.cookie.split("; ")) {
+    const name = entry.split("=")[0];
+    if (name) {
+      document.cookie = `${name}=; Max-Age=0; Path=/`;
+    }
+  }
+}
+
 beforeEach(() => {
   pushMock.mockReset();
   signOutMock.mockReset();
   signOutMock.mockResolvedValue({ error: null });
   pathnameHolder.value = "/login";
+  localStorage.clear();
+  clearAllCookies();
 });
 
 describe("CrossTabAuth — signin broadcast navigation gate (FR-046)", () => {
@@ -142,6 +157,38 @@ describe("CrossTabAuth — non-broadcast storage events", () => {
     render(<CrossTabAuth />);
     fireStorage({ key: AUTH_BROADCAST_KEY, newValue: null });
     expect(pushMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("CrossTabAuth — callback signin cookie bridge (📌 ST-8)", () => {
+  it.each(["/app", "/onboarding"])(
+    "emits a signin broadcast on mount at %s when the callback cookie is present",
+    (pathname) => {
+      pathnameHolder.value = pathname;
+      document.cookie = `${AUTH_SIGNIN_COOKIE}=1; Path=/`;
+
+      const { unmount } = render(<CrossTabAuth />);
+
+      // The mount effect wrote the cross-tab marker that sibling tabs
+      // react to — the same marker the form path writes.
+      const written = localStorage.getItem(AUTH_BROADCAST_KEY);
+      expect(parseAuthBroadcast(written)).toBe("signin");
+      // The consuming tab navigates via its own callback redirect, not
+      // via the storage listener — no self-push here.
+      expect(pushMock).not.toHaveBeenCalled();
+
+      // One-shot: a fresh mount consumes nothing further (cookie cleared).
+      unmount();
+      localStorage.clear();
+      render(<CrossTabAuth />);
+      expect(localStorage.getItem(AUTH_BROADCAST_KEY)).toBeNull();
+    },
+  );
+
+  it("does not emit on mount when the callback cookie is absent (form path)", () => {
+    pathnameHolder.value = "/app";
+    render(<CrossTabAuth />);
+    expect(localStorage.getItem(AUTH_BROADCAST_KEY)).toBeNull();
   });
 });
 

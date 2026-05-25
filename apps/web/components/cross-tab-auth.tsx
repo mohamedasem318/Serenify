@@ -5,6 +5,7 @@ import { useEffect } from "react";
 
 import {
   AUTH_BROADCAST_KEY,
+  consumePendingSignIn,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 import { createClient } from "@/lib/supabase/client";
@@ -78,6 +79,20 @@ function pathMatches(
 export function CrossTabAuth(): null {
   const router = useRouter();
   const pathname = usePathname();
+
+  // 📌 ST-8 fix (2026-05-25): the email-verification / invite path
+  // establishes the session in the server-only /auth/callback route,
+  // which can't write the localStorage broadcast marker the way the
+  // client-side form path does. That route instead drops a short-lived
+  // AUTH_SIGNIN_COOKIE on its redirect; this mount-once effect — running
+  // on whichever authed surface the user lands on (/app or /onboarding,
+  // both under this root-layout component) — consumes the cookie and
+  // emits the same `signin` broadcast, so sibling tabs propagate exactly
+  // as they do for the form path. No-op on every other mount (cookie
+  // absent), including the form path which broadcasts itself.
+  useEffect(() => {
+    consumePendingSignIn();
+  }, []);
 
   useEffect(() => {
     function onStorage(event: StorageEvent) {

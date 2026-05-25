@@ -419,3 +419,64 @@ concrete locator — admins reading it know exactly where to look.
 No layout change. No new tokens. No new components. The
 amendment is one sentence of copy + the test coverage that
 locks it.
+
+## 2026-05-25 — impl(003-employee-dashboard-shell) — cross-tab signin broadcast on the auth-callback path (smoke ST-8)
+
+Smoke ST-8 (cross-tab propagation on **email verification**) failed:
+clicking a sign-up confirmation link signed the landing tab in, but
+sibling tabs on `/login` / `/signup` did not follow. The form path
+broadcasts cross-tab because `login-form.tsx` writes the
+`serenify-auth-broadcast` localStorage marker client-side after the
+sign-in Server Action returns; the email-verification path establishes
+the session inside the **server-only** `GET /auth/callback` Route
+Handler, which has no client context and so never wrote the marker.
+The Phase-11 `cross-tab-auth-sync.spec.ts` covers the form path only,
+so the gap shipped unnoticed.
+
+**Fix**: the callback sets a short-lived, client-readable
+`serenify-auth-signin` cookie on its redirect response — but only when
+the post-exchange destination is an authed surface (`/app` /
+`/onboarding`), gated by `destinationBroadcastsSignIn(next)`. The new
+mount-once effect in `CrossTabAuth` (`consumePendingSignIn`) reads the
+cookie on whichever authed surface the user lands on, emits the
+existing `broadcastSignIn()`, and clears the cookie. Sibling tabs then
+propagate through the unchanged storage-event → navigation path.
+
+**Why a cookie, not a redirect query param**: `proxy.ts` strips
+`url.search` (`url.search = ""`) on its `/app` → `/onboarding` bounce —
+the exact path a fresh null-profile sign-up or admin invite takes — so
+a query param would be destroyed before any client could read it.
+Cookies survive that redirect untouched.
+
+**Why not `onAuthStateChange`**: `@supabase/ssr` reads the session
+from cookies on load and emits `INITIAL_SESSION`, not `SIGNED_IN`,
+after a server-side code exchange — so a `SIGNED_IN`-gated broadcast
+would not fire reliably in the post-redirect tab, and broadcasting on
+`INITIAL_SESSION` would fire on every authed page load.
+
+The recovery flow (`next=/reset-password`) is intentionally excluded
+so it does not broadcast a spurious sign-in (preserves smoke ST-9).
+
+**Affected artifacts**:
+
+  - `apps/web/app/auth/callback/route.ts` — sets the marker cookie on
+    authed-destination redirects after a successful exchange.
+  - `apps/web/lib/auth-broadcast.ts` — adds `AUTH_SIGNIN_COOKIE`, the
+    pure `destinationBroadcastsSignIn(next)` gate, and the client-side
+    `consumePendingSignIn()`.
+  - `apps/web/components/cross-tab-auth.tsx` — mount-once effect
+    consuming the cookie.
+  - `apps/web/lib/auth-broadcast.test.ts` (new) +
+    `apps/web/components/cross-tab-auth.test.tsx` — Vitest covering the
+    gate and both sides of the cookie seam.
+
+**Test coverage note**: a full email-verification Playwright spec is
+deferred — the real path needs a PKCE `?code=` link whose
+`code_verifier` is set client-side during `signUp`, which the e2e
+suite already sidesteps by bypassing confirmation
+(`admin.auth.admin.updateUserById(..., { email_confirm: true })` +
+form sign-in). The Vitest pair tests both sides of the cookie seam and
+the existing `cross-tab-auth-sync.spec.ts` proves the
+storage-event → navigation half; the seam between them is the cookie,
+verified on both sides. Mohamed re-runs ST-8 manually to validate the
+end-to-end email path.
