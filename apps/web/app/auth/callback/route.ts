@@ -5,6 +5,7 @@ import {
   AUTH_SIGNIN_COOKIE,
   destinationBroadcastsSignIn,
 } from "@/lib/auth-broadcast";
+import { isSafeNextPath } from "@/lib/auth/safe-next";
 
 /**
  * Supabase email-confirmation / invite-acceptance landing per
@@ -27,7 +28,13 @@ import {
 export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
-  const next = searchParams.get("next") ?? "/app";
+  // `next` is interpolated into the redirect URL below as `${origin}${next}`,
+  // which is NOT same-origin-safe for arbitrary input (Finding 1). Validate it
+  // through the single audited helper; fall back to /app on anything unsafe.
+  // This `next` flows into BOTH the success redirect and the setAll closure's
+  // redirect, so validating once here covers every interpolation site.
+  const rawNext = searchParams.get("next") ?? "/app";
+  const next = isSafeNextPath(rawNext) ? rawNext : "/app";
 
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=expired_link`);
