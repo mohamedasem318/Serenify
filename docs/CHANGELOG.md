@@ -709,3 +709,49 @@ decisions recorded in `docs/DECISIONS.md` (2026-05-25 — Security slice 4).
 No Cloud-dashboard parity items this slice — env values still live in the
 platform dashboards; this slice changes how the app *reads* them locally and adds
 boot-time validation, not what they are in prod.
+
+## 2026-05-26 — security: slice 5 — Content Security Policy + auxiliary security headers
+
+Fix pass for the slice-5 audit (`docs/security/05-csp-header.md`); decisions
+recorded in `docs/DECISIONS.md` (2026-05-26 — Security slice 5). The policy was
+rolled out Report-Only → empirical capture (Playwright, production build, all 8
+routes + Radix overlay interactions) → enforcing, then re-verified across the
+full chromium/firefox/webkit e2e matrix.
+
+- A **nonce-based Content-Security-Policy** is now enforced on every HTML
+  response, emitted per-request from `apps/web/proxy.ts`. `script-src` is
+  `'self' 'nonce-<128-bit>' 'strict-dynamic'` (dev adds `'unsafe-eval'` for
+  Turbopack's React dev build); Next.js auto-stamps the nonce onto its framework
+  inline scripts, and the two app-authored inline scripts (the `layout.tsx`
+  theme-migration IIFE and the next-themes FOUC script) carry it manually.
+  Cross-origin script execution — including any future XSS attempting to read the
+  `httpOnly:false` session cookie (slice-2 Finding 2) — is blocked. `style-src`
+  is `'self' 'unsafe-inline'` (Radix scroll-lock injects an un-nonced runtime
+  `<style>`; a nonce there would disable `'unsafe-inline'`). `connect-src` is
+  restricted to the app origin + the configured Supabase project; `img-src`,
+  `font-src` are `'self'`; `object-src`/`frame-src`/`frame-ancestors` lock down
+  plugins, embedding, and clickjacking.
+- **Auxiliary security headers** are now set on every response (static set via
+  `next.config.ts` `headers()`, so `/_next/static` assets are covered too):
+  `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy:
+  strict-origin-when-cross-origin`, a restrictive `Permissions-Policy`
+  (camera/microphone/geolocation/payment/usb/FLoC all denied),
+  `X-XSS-Protection: 0`, `Cross-Origin-Opener-Policy`/`Cross-Origin-Resource-Policy:
+  same-origin`, and **production-only** HSTS (`max-age=63072000;
+  includeSubDomains`, no `preload`). COEP is intentionally not set (would break
+  Supabase cross-origin).
+- Zod 4's JIT validator compiler is disabled app-wide via a `@/lib/zod` jitless
+  barrel — empirically it used `new Function(...)` in the browser, which would
+  have forced `'unsafe-eval'` into `script-src`; `jitless: true` keeps the policy
+  strong with no functional change (interpreted validation, identical results).
+- `upgrade-insecure-requests` is **production-only**: in dev (`http://localhost`)
+  WebKit upgrades even loopback subresource requests to https and breaks every
+  chunk; Chromium/Firefox exempt localhost. (camera/microphone in
+  `Permissions-Policy` will be relaxed, scoped to their routes, when features 004
+  (webcam) and 013 (audio) land.)
+
+One forward-looking note recorded in DECISIONS: when Sentry/PostHog telemetry is
+adopted, the `connect-src` ingest origins and a PII-scrubbing review are required
+before it ships. No Cloud-dashboard parity items this slice — all changes are
+in-repo (`next.config.ts`, `proxy.ts`, `layout.tsx`, `providers.tsx`,
+`lib/zod.ts`).

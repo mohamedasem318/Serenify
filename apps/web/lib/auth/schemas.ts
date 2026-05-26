@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/zod";
 
 // Friendly error copy for the password strength rules. Zod's regex
 // default messages leak the regex source ("Invalid string: must match

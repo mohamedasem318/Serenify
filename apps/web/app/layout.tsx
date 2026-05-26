@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { Inter, DM_Serif_Display } from "next/font/google";
 import { CrossTabAuth } from "@/components/cross-tab-auth";
 import { Providers } from "./providers";
@@ -20,9 +21,14 @@ export const metadata: Metadata = {
   description: "Workplace stress, gently noticed.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Per-request CSP nonce set by proxy.ts on the forwarded request headers.
+  // `?? undefined` (not null) so React omits the attribute when absent rather
+  // than rendering nonce="null". See docs/security/05-csp-header.md.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="en"
@@ -38,8 +44,10 @@ export default function RootLayout({
          * own FOUT-prevention script reads storage — so users carrying
          * the pre-migration key see no flash on first load.
          * Idempotent: re-runs on every load but no-ops once migrated.
+         * Carries the CSP nonce (script-src 'nonce-…').
          */}
         <script
+          nonce={nonce}
           dangerouslySetInnerHTML={{
             __html:
               "(function(){try{var l=localStorage.getItem('theme');if(l){localStorage.setItem('serenify-theme',l);localStorage.removeItem('theme');}}catch(e){}})();",
@@ -48,7 +56,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <CrossTabAuth />
-        <Providers>{children}</Providers>
+        <Providers nonce={nonce}>{children}</Providers>
       </body>
     </html>
   );
