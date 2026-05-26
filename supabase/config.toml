@@ -201,6 +201,10 @@ password_requirements = "letters_digits"
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
+# Slice 7 F3: re-tune at SMTP-wiring time (currently inert — SMTP disabled below;
+# 2/hr/IP is too aggressive once production SMTP is configured behind shared NAT).
+# Hold at default 2 until the production provider quota is known. See
+# docs/security/07-rate-limits-and-parity.md F3.
 email_sent = 2
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
