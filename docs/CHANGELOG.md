@@ -834,3 +834,54 @@ reminder comments and documentation.
 No Cloud-dashboard parity items are *introduced* this slice — it consolidates the
 existing checklist rather than adding any new in-repo config change. All edits
 are in-repo (two inline comments + `docs/`).
+
+## 2026-05-27 — constitution(II) — video pipeline window + baseline + drop rPPG
+
+The video modality switched from rPPG to LBP-TOP + Motion features with
+per-user delta calibration. The rPPG notebook was retired after a
+subject-leakage bug surfaced late in feature 004 prep; the replacement is the
+LBP-TOP + Motion pipeline, served as model
+`serenify-video-lbptop-motion-rf-calibrated` v2.0.0. The new model's contract
+specifies timing parameters that contradicted Principle II
+(Subject-Disjoint ML Evaluation), so Principle II is amended to match it.
+
+Two sentences in Principle II change, and the rPPG naming is dropped from the
+principle body:
+
+- **Inference window**: rolling **30s → 60s** (10s stride unchanged). The old
+  rPPG-specific justification ("30s is the physiological minimum for meaningful
+  HRV from rPPG") is removed; the window is now set by the model contract in
+  `docs/MODELS.md`. Empirically, the 30s window collapsed stress-class recall
+  from **0.83 (at 60s) to 0.61 (at 30s)** on subject-disjoint LOSO — 60s is the
+  locked production mode.
+- **Calibration baseline**: per-user calm baseline on first login changed from
+  **~90s → ~60s**.
+- **Terminology**: "video (rPPG) pipeline" / "from rPPG" become modality-agnostic
+  "video pipeline" wording. The principle generalizes cleanly without naming a
+  specific feature family. rPPG is intentionally retained as historical context
+  in Principle I (`rPPG-derived` raw-signal clause) and Principle III
+  (`webcam + rPPG pipeline` package description) — out of scope for this
+  amendment.
+
+All other Principle II clauses (subject-disjoint LOSO/GroupKFold splits,
+per-subject baseline normalization on physiological features, the
+`docs/MODELS.md` requirement for model artifacts) are unchanged.
+
+Constitution version bumped `1.1.0 → 1.2.0` (MINOR per Governance: refinement
+of an existing rule — timing parameters + terminology; no new principles, no
+removed principles, no structural change). Sync Impact Report Amendment 2 entry
+appended.
+
+Affected artifacts, all updated in this commit:
+
+- `.specify/memory/constitution.md` Principle II — two amended sentences, rPPG
+  dropped from the body, version line `1.2.0`, Last Amended `2026-05-27`, Sync
+  Impact Report Amendment 2 + template-audit note.
+- `docs/DECISIONS.md` — formal architectural decision entry (2026-05-27),
+  including the "may amend again if a currently-running trial surfaces a better
+  model" note.
+
+Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
+Principle II by number, not by literal timing text — zero matches for the
+touched values; no template edit required. No Cloud-dashboard parity items —
+all edits are in-repo (constitution + `docs/`).
