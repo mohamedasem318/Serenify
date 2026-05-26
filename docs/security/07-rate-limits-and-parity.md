@@ -1,12 +1,15 @@
 # Security Slice 7 — Rate-Limit Verification + Cloud-Dashboard Parity Consolidation
 
 > **Audit-only.** This document records findings; it applies no fixes and changes
-> no application or config code. Mohamed reviews these with claude.ai, decides
-> which to apply, and a follow-up Claude Code session lands the approved changes
-> on this same branch (`security/07-rate-limits-and-parity`). The most likely
-> fix-pass actions are a small `config.toml` tweak (if any threat-model-relevant
-> default is adjusted) and Mohamed mirroring the consolidated parity checklist
-> into the Supabase Cloud dashboard.
+> no application or config code. Mohamed reviewed these with claude.ai; the
+> decisions are recorded in [Adjudication (2026-05-26)](#adjudication-2026-05-26),
+> and a follow-up Claude Code session lands them on this same branch
+> (`security/07-rate-limits-and-parity`). Per that adjudication, **no functional
+> config or code change is owed** — the fix-pass outcomes are documentation only:
+> a binding deploy-blocker invariant + policy notes in `docs/DECISIONS.md`,
+> reminder comments in `route.ts` and `config.toml`, the slices-0–7
+> `PROJECT_SYSTEM_PROMPT.md` wrap-up, and Mohamed mirroring the consolidated parity
+> checklist into the Supabase Cloud dashboard manually.
 
 ## Summary
 
@@ -57,6 +60,53 @@ bucket) and the parity checklist (process) are recorded separately.
 | 5 | No CAPTCHA + per-IP-only buckets ⇒ distributed credential-stuffing against a single account is not bounded per-account | informational |
 
 > ¹ **Finding 1 severity is dual-lens** (see [`/signup` posture](#signup-posture--open-vs-invite-only)). It is **Low–Med under the thesis / pre-prod lens that applies today** and rises to **High before any real-tenant production launch**. Tabled as `med` (the bridge value) to signal a product decision is owed before prod, without crying wolf at the current stage. Per the DECISIONS "severity is informational" principle, the rating drives *prioritization* here because the fix is **deferred to feature backlog**, not applied this pass.
+
+---
+
+## Adjudication (2026-05-26)
+
+Mohamed reviewed these findings with claude.ai. A follow-up CC session lands the
+outcomes on this branch — but **no finding produced an immediate functional code
+or config change.** Every outcome is a deliberate deferral, a deploy-blocker
+invariant, or a policy codification. The decisions below are the binding record
+the fix pass implements.
+
+1. **Finding 1 (`/signup` OPEN) — keep open for thesis/demo; lock as a
+   Pre-Production Deploy Blocker.** Routing to the feature backlog is correct —
+   closing `/signup` is non-trivial feature work (invite-token model, token field
+   + UI, expiry handling). What this adds beyond a backlog item is an **explicit,
+   binding gate**: a production launch with real user signals **MUST NOT** happen
+   while `/signup` is open. The fix pass codifies this in `docs/DECISIONS.md` as a
+   binding invariant, and the slices-0–7 `PROJECT_SYSTEM_PROMPT.md` wrap-up
+   surfaces it as a **Pre-Production Deploy Blocker** (not merely deferred work).
+   This deploy gate is the mechanism that enforces the High-at-production
+   re-rating of the dual-lens severity — the thesis-lens Low–Med holds only
+   *because* the gate guarantees the posture cannot reach a real-tenant launch
+   unaddressed.
+
+2. **Finding 2 (`/api/admin/invite` per-admin throttle) — hold for feature 011.**
+   Calibrating a per-admin / per-IP limit without a real UI is arbitrary: today's
+   exposure requires a valid admin session, and feature 011 (admin-dashboard) will
+   define the legitimate invite-usage patterns the limit should be sized against.
+   The fix pass adds a short **inline comment in `route.ts`** noting the future
+   throttle so anyone touching the handler is reminded. The BACKLOG entry stays,
+   addressed-by feature 011.
+
+3. **Finding 3 (`email_sent` value) — defer to SMTP-wiring.** Locking a value
+   without the production provider's quota is arbitrary, and the setting is inert
+   locally (SMTP disabled). The fix pass adds an explicit
+   `# Re-tune at SMTP-wiring per slice 7 F3` **comment at `config.toml`'s
+   `email_sent` line** so the deferral is not lost; the value stays `2` until
+   custom SMTP is configured, at which point it is re-tuned against the chosen
+   provider's quota (and mirrored to the dashboard).
+
+4. **Inert rate-limit mirroring (parity checklist) — yes, mirror.** Mirroring the
+   currently-inert settings (`anonymous_users`, `sms_sent`, and the rest of the
+   `[auth.rate_limit]` block) into the Cloud dashboard is cheap insurance against a
+   future feature-enable (anon sign-ins, SMS) accidentally landing on an unset or
+   over-permissive limit. The [parity checklist](#cloud-dashboard-parity-checklist)
+   already lists them; the fix pass codifies "**mirror the full `[auth.rate_limit]`
+   block, including inert settings**" as a policy in `docs/DECISIONS.md`.
 
 ---
 
@@ -209,6 +259,12 @@ gates are solid), trending **med** given it creates accounts + assigns roles wit
 no other layer capping it. **Routed to the backlog** (it is the single most
 defensible rate-limit addition surfaced here) rather than treated as a live hole.
 
+> **Adjudication (2026-05-26):** **hold for feature 011** — calibrating a
+> per-admin/per-IP limit without a real admin UI is arbitrary, and today's
+> exposure requires a valid admin session. The fix pass adds a reminder comment in
+> `route.ts`; the BACKLOG entry is addressed-by feature 011. See
+> [Adjudication](#adjudication-2026-05-26) #2.
+
 ---
 
 ## Custom rate-limiting recommendation
@@ -293,6 +349,12 @@ any production deploy.** Each item is annotated with its originating slice and t
 > so the dashboard may already match — the action is **confirm**, not necessarily
 > change (except `email_sent`, which Finding 3 flags for a value re-evaluation at
 > production-SMTP time).
+>
+> **Adjudication (2026-05-26):** mirror the **full block including the inert
+> settings** (`anonymous_users`, `sms_sent`, web3) — cheap insurance against a
+> future feature-enable accidentally landing on an unset/over-permissive limit.
+> The fix pass codifies "mirror the full `[auth.rate_limit]` block" as a policy in
+> `docs/DECISIONS.md`. See [Adjudication](#adjudication-2026-05-26) #4.
 
 ### Auth → Policies (password)
 - [ ] **Minimum password length = 8** *(slice 2, Finding 6 — `config.toml:186`)*
@@ -405,6 +467,12 @@ whether `/signup` should exist at all vs. funneling everyone through
 fix-pass. The audit's job is to surface and characterize, which this does. Routed
 to **`docs/BACKLOG.md` → security slice 7** (added with this doc).
 
+> **Adjudication (2026-05-26):** keep `/signup` open for the thesis/demo stage, but
+> **lock it as a Pre-Production Deploy Blocker** — a real-tenant production launch
+> MUST NOT proceed while signup is open. Codified as a binding invariant in
+> `docs/DECISIONS.md` + surfaced in the `PROJECT_SYSTEM_PROMPT.md` wrap-up. See
+> [Adjudication](#adjudication-2026-05-26) #1.
+
 ---
 
 ## Audited and clean
@@ -445,15 +513,19 @@ Affirmative record — each surface examined and returned no finding.
 Routed elsewhere; recorded so nothing is silently dropped.
 
 - **Closing `/signup` to invite-only** (Finding 1) → **feature backlog** (added to
-  `docs/BACKLOG.md` → security slice 7). Non-trivial feature work, not a security
-  fix-pass change.
+  `docs/BACKLOG.md` → security slice 7), and (adjudicated) **a binding
+  Pre-Production Deploy Blocker** codified in `docs/DECISIONS.md` +
+  `PROJECT_SYSTEM_PROMPT.md`. Non-trivial feature work, not a security fix-pass
+  change.
 - **App-layer rate limiter** (Finding 2 invite throttle + the durable
-  Supabase-table limiter for the unthrottled DB-write actions) → **backlog quality
-  slice** (added to `docs/BACKLOG.md` → security slice 7). No Vercel KV / Upstash
-  this slice.
-- **Production `email_sent` value re-tune** (Finding 3) → a `config.toml` +
-  Cloud-dashboard tweak at the time custom SMTP is wired; carried in the parity
-  checklist. Not actioned now (inert locally).
+  Supabase-table limiter for the unthrottled DB-write actions) → **backlog**
+  (added to `docs/BACKLOG.md` → security slice 7). The invite throttle is
+  (adjudicated) **held for feature 011** with a reminder comment in `route.ts`. No
+  Vercel KV / Upstash this slice.
+- **Production `email_sent` value re-tune** (Finding 3) → (adjudicated)
+  **deferred to SMTP-wiring**; the fix pass adds a `# Re-tune at SMTP-wiring per
+  slice 7 F3` comment at the `config.toml` `email_sent` line. Not actioned now
+  (inert locally); carried in the parity checklist for the dashboard.
 - **Bot detection / CAPTCHA (Turnstile/hCaptcha)** — out of the current
   threat-model scope; flagged as a future option for `/signup` (Finding 5).
 - **Production Supabase Cloud-dashboard application** — Mohamed applies the

@@ -864,9 +864,15 @@ the invite partial-success / transactional-semantics handler-design item.
 
 ## From security slice 7 (rate-limits-and-parity) — in progress
 
-### `/signup` is open self-serve — gate to invite-only (posture)
+### `/signup` is open self-serve — gate to invite-only (posture) — ⛔ PRE-PRODUCTION DEPLOY BLOCKER
 **Status**: deferred-feature
 **Category**: auth posture / tenancy
+**⛔ Deploy-blocker** (adjudicated 2026-05-26): a real-tenant production launch with
+real user signals **MUST NOT** proceed while `/signup` is open. This is a binding
+gate, not merely deferred work — codified as an invariant in `docs/DECISIONS.md`
+and surfaced in `PROJECT_SYSTEM_PROMPT.md`. The thesis/demo stage keeps open signup
+as-is; the gate is what holds the Low–Med thesis severity in place by guaranteeing
+the High-at-production posture cannot ship unaddressed.
 **Observed**: 2026-05-26, security slice 7 (Finding 1 — `/signup` posture)
 **Description**: `/signup` is **OPEN**. Any anonymous visitor can submit the form
 and self-serve an email-confirmed `employee` account via `supabase.auth.signUp`
@@ -901,6 +907,11 @@ owns the invite UX.
 ### App-layer rate limiting (durable limiter for invite + profile writes)
 **Status**: tech-debt
 **Category**: hardening / abuse-resistance
+**Adjudicated 2026-05-26**: the `/api/admin/invite` per-admin throttle is **held for
+feature 011** — calibrating a limit without a real admin UI is arbitrary, and
+today's exposure requires a valid admin session. The slice-7 fix pass leaves an
+inline reminder comment in `apps/web/app/api/admin/invite/route.ts` so anyone
+touching the handler is reminded. No limiter is built this slice.
 **Observed**: 2026-05-26, security slice 7 (Findings 2 + 4, custom rate-limiting recommendation)
 **Description**: There is **no** application-layer rate limiter anywhere
 (`proxy.ts`, Server Actions, route handlers) — verified by repo-wide grep. The app
