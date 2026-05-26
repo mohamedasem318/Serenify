@@ -49,6 +49,11 @@ pin-documentation). Plus the two npm advisories, each presented with a recommend
 action (one has a clean non-breaking fix; one is a documented accept). **Zero**
 runtime-reachable advisories.
 
+> **Adjudicated 2026-05-26 (Mohamed).** A1 → bump `tsx` to 4.22.3; F1 → reclassify
+> the four to `dependencies` + document; A2 → accept (carry forward); routine
+> patch/minor bumps → batch into one hygiene commit. A fresh session applies them
+> on this branch. See [Adjudication](#adjudication-2026-05-26--mohamed).
+
 | # | Title | Severity |
 |---|-------|----------|
 | F1 | Four bundle-/build-required packages (`clsx`, `tailwind-merge`, `class-variance-authority`, `server-only`) are declared under `apps/web` `devDependencies` — a production-scoped audit (`npm audit --omit=dev`) silently excludes them, and a `--omit=dev` install breaks `next build` | low |
@@ -143,6 +148,14 @@ the major that decision guards against, so the bump is compatible with the state
 rationale. Alternatively, **defer with a documented justification** (the path is
 unreachable) — equally defensible. Either way: not a production exposure.
 
+> **Adjudicated 2026-05-26 (Mohamed) → bump.** The fix pass moves the exact pin
+> `tsx 4.19.2 → 4.22.3` and re-runs `npm audit` to confirm the esbuild line clears.
+> A clean `npm audit` baseline is operationally worth more than the frozen version
+> — devs and Mohamed shouldn't have to remember "ignore esbuild, it's just tsx."
+> The exact-pin rationale (DECISIONS 2026-05-18) targets *silent* updates, not
+> freezing the version forever; moving the pin forward *with intent* is the
+> expected behavior. See [Adjudication](#adjudication-2026-05-26--mohamed).
+
 ### A2 — PostCSS `</style>` stringify XSS (GHSA-qx2v-qp2m-jg93)
 
 | Field | Value |
@@ -176,6 +189,12 @@ a bumped bundled postcss — re-run `npm audit` and re-triage at that point.
 *(Incidental note: 8.4.31 is also the postcss version that patched the earlier
 line-return ReDoS GHSA-7fh5-64p2-3v2j, so Next's pin sits on a safe floor for that
 separate issue.)*
+
+> **Adjudicated 2026-05-26 (Mohamed) → accept (carry forward).** Nothing is
+> actionable until a Next release ships a bundled postcss ≥ 8.5.10. The fix-pass
+> summary must record the carry-forward **explicitly** so the accept stays visible
+> and is not silently dropped. Do not run `audit fix --force`. See
+> [Adjudication](#adjudication-2026-05-26--mohamed).
 
 ### Severity rollup
 
@@ -453,7 +472,14 @@ Affirmative record — surfaces examined that returned no finding.
   `devDependencies` to `dependencies` in `apps/web/package.json` (and reconcile
   DECISIONS DECISION-1's dep list, which lists them under the `-D` set). No code
   change; lockfile regenerates with the same resolved versions.
-- **Status**: open — awaiting adjudication.
+- **Status**: **approved for fix pass** (2026-05-26 — Mohamed). Move `clsx`,
+  `tailwind-merge`, `class-variance-authority`, `server-only` from `devDependencies`
+  to `dependencies` in `apps/web/package.json`, **and** add a DECISIONS entry
+  documenting the override so a future maintainer doesn't "tidy" them back under
+  `-D`. The classification is wrong regardless of current symptom, and Vercel may
+  use `--omit=dev` at build time. (`@radix-ui/react-slot` is already correctly
+  placed — no change.) Severity held at `low`. See
+  [Adjudication](#adjudication-2026-05-26--mohamed).
 
 ### Finding 2: Two correct-but-undocumented exact pins (`react`/`react-dom`, `@faker-js/faker`)
 
@@ -473,7 +499,10 @@ Affirmative record — surfaces examined that returned no finding.
 - **Suggested fix** (fix pass): add two short DECISIONS entries documenting the
   rationale for the `react`/`react-dom` and `@faker-js/faker` exact pins. Optional:
   normalize dev-dep short-form carets to full triplets (pure clarity).
-- **Status**: open — awaiting adjudication.
+- **Status**: open — **not separately adjudicated in the 2026-05-26 round**. The
+  fix is uncontroversial (DECISIONS entries only) and is recommended to ride along
+  with the F1 DECISIONS-documentation work in the fix pass; pending Mohamed's
+  explicit go/no-go on whether to include it.
 
 ---
 
@@ -573,6 +602,8 @@ the registry; the tree, install-script, and artifact scans are local.
 
 ## Open questions for review
 
+> **→ Resolved 2026-05-26 by Mohamed. See [Adjudication](#adjudication-2026-05-26--mohamed) below.**
+
 1. **F1 — reclassify the four, and reconcile DECISION-1?** Moving `clsx`,
    `tailwind-merge`, `class-variance-authority`, `server-only` to `dependencies` is
    the correct fix, but DECISIONS DECISION-1 documents them under the shadcn `-D`
@@ -590,3 +621,61 @@ the registry; the tree, install-script, and artifact scans are local.
    (`@supabase/supabase-js` → 2.106.2, `@hookform/resolvers` → 5.4.0, `react-hook-form`
    → 7.76.1, `@types/react` → 19.2.15, `vitest` → 4.1.7) as one hygiene commit, or
    leave until a feature touches them? None is security-driven.
+
+---
+
+## Adjudication (2026-05-26 — Mohamed)
+
+All four open questions resolved. The fix pass — a **fresh Claude Code session on
+this same branch** — applies the following. No fix code is in the commit that
+records this adjudication; this pass remains audit-only.
+
+1. **A1 — bump `tsx` 4.19.2 → 4.22.3 (apply).** Clean non-breaking minor that clears
+   the `esbuild` audit line. A clean `npm audit` baseline is operationally valuable —
+   devs and Mohamed shouldn't have to remember "ignore esbuild, it's just tsx." The
+   exact-pin rationale (DECISIONS 2026-05-18) is about avoiding *silent* updates, not
+   freezing the version forever; moving the pin forward *with intent* is the expected
+   behavior. The fix pass updates the exact pin and re-runs `npm audit` to confirm the
+   esbuild advisory is gone.
+
+2. **F1 — reclassify the four to `dependencies` (apply + document).** The shadcn `-D`
+   convention is wrong for production-shipping deps. Move `clsx`, `tailwind-merge`,
+   `class-variance-authority`, `server-only` from `devDependencies` to `dependencies`
+   in `apps/web/package.json`, **and** add a DECISIONS entry documenting the override
+   so a future maintainer doesn't "tidy" them back under `-D`. Risk today is low (the
+   team doesn't run `--omit=dev` locally), but the classification is wrong regardless
+   of current symptom, and Vercel may use `--omit=dev` at build time.
+   (`@radix-ui/react-slot` is already correctly placed — no change.)
+
+3. **A2 — confirm the postcss accept carries forward.** Nothing is actionable until
+   Next ships a bumped bundled postcss (≥ 8.5.10). Record the carry-forward
+   **explicitly in the fix-pass summary** so the accept stays visible and isn't
+   silently dropped. Do not run `audit fix --force`.
+
+4. **Routine bumps — batch as one hygiene commit (apply).** The five range-satisfiable
+   (within existing carets), non-security patch/minor bumps land together in this fix
+   pass: `@supabase/supabase-js` → 2.106.2, `@hookform/resolvers` → 5.4.0,
+   `react-hook-form` → 7.76.1, `@types/react` → 19.2.15, `vitest` → 4.1.7. Reduces
+   drift, keeps later diffs smaller, and gives the lockfile a deliberate refresh.
+
+**Not adjudicated this round:** F2 (documenting the `react`/`react-dom` and
+`@faker-js/faker` exact pins) was not separately called out. Its fix is
+uncontroversial (DECISIONS entries only) and naturally bundles with the F1
+documentation work; left to the fix pass pending Mohamed's explicit go/no-go.
+
+### Fix-pass scope (for the fresh session on this branch)
+
+The follow-up session applies, in this order, then re-runs the full test matrix
+(Vitest + Playwright chromium/firefox/webkit, `workers:1`) and re-runs `npm audit`
+to confirm the esbuild line clears and no new advisory appears:
+
+| Item | Action | Files |
+|---|---|---|
+| A1 | `tsx` exact pin `4.19.2 → 4.22.3` | root `package.json`, `package-lock.json` |
+| F1 | move `clsx`, `tailwind-merge`, `class-variance-authority`, `server-only` → `dependencies`; document override | `apps/web/package.json`, `package-lock.json`, `docs/DECISIONS.md` |
+| Routine | `@supabase/supabase-js` 2.106.2, `@hookform/resolvers` 5.4.0, `react-hook-form` 7.76.1, `@types/react` 19.2.15, `vitest` 4.1.7 (one hygiene commit) | both manifests, `package-lock.json` |
+| A2 | no change; record carry-forward in the fix-pass summary | this doc |
+| F2 *(if confirmed)* | DECISIONS entries for the `react`/`react-dom` + `@faker-js/faker` exact pins | `docs/DECISIONS.md` |
+
+A DECISIONS entry (2026-05-26 — Security slice 6) should record the A1 pin-forward,
+the F1 classification override, and the A2 carry-forward.
