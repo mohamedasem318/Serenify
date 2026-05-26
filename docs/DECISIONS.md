@@ -1375,3 +1375,97 @@ not repo config, and does not conflict.)
 `setNonce()` (choice 3); all `serenify.tech` subdomains become HTTPS-ready and
 `preload` is wanted (choice 4); feature 004's WASM path lands (choices 5 + the
 `'wasm-unsafe-eval'` note); or Sentry/PostHog are adopted (choice 6).
+
+---
+
+## 2026-05-26 — Security slice 6: dependency hygiene (classification, exact pins, audit triage)
+
+**Status**: Accepted.
+
+**Context**: The slice-6 audit (`docs/security/06-dependency-audit.md`,
+adjudicated 2026-05-26) found a clean runtime posture — zero runtime-reachable
+advisories — with two `low` hygiene findings (F1 dependency-classification, F2
+pin-documentation) and two non-reachable dev/build-only npm advisories (A1
+esbuild-via-`tsx`, A2 postcss-in-Next). The fix pass landed A1 (`tsx`
+4.19.2 → 4.22.3), F1 (reclassify four utils), a batch of five range-satisfiable
+routine bumps, and these decisions. No migration / no Cloud-dashboard parity item
+this slice — all changes are in `package.json` / `package-lock.json` / docs.
+
+**Decision**:
+
+1. **devDependency classification — the test is "does its code execute at
+   runtime", and the shadcn-CLI `-D` default is overridden for four packages.**
+   `clsx`, `tailwind-merge`, `class-variance-authority`, and `server-only` move
+   from `devDependencies` to `dependencies` in `apps/web/package.json` (versions
+   unchanged). The shadcn manual-init workflow (DECISIONS 2026-05-25 DECISION-1)
+   installed them with `npm i -D`; that is wrong for these four.
+
+   The classification test is: **a dependency is a runtime dependency if its own
+   code executes when the deployed app serves a request — i.e. its code ships into
+   the runtime bundle.** The test is NOT "is it imported from `apps/web/` source."
+   These four ship their actual code into the bundle: `clsx` + `tailwind-merge`
+   back the `cn()` helper (`lib/utils.ts`) called by every UI primitive,
+   `class-variance-authority` backs `button`/`sheet` variants, and `server-only`
+   is the RSC build-guard side-effect import in `lib/env/server.ts` and
+   `lib/supabase/admin.ts`. (`@radix-ui/react-slot`, from the same shadcn `-D`
+   install list, was already correctly in `dependencies` — no change.)
+
+   **Corollary — build-time tooling stays in `devDependencies`, even though it is
+   imported from build configs.** TypeScript, the Tailwind compiler
+   (`tailwindcss`), PostCSS plugins (`@tailwindcss/postcss`), `tw-animate-css`,
+   and lint tooling are referenced from `postcss.config.mjs` / `next.config.ts` /
+   `globals.css` `@import`s, but their **output** ships, not their **code** — so
+   they are correctly `devDependencies`. This corrects the looser rule the audit
+   first proposed ("any dep referenced from a non-`*.test.*` `apps/web/` source
+   file is a runtime dep"): being imported from source/config does not make a dep
+   a runtime dep; *shipping its code into the served bundle* does.
+
+   **`--omit=dev` is a runtime install profile, not a build profile.** You do not
+   build with `--omit=dev` — the production build runs a full install (Vercel runs
+   a full `npm install`, then `next build`); only the runtime serving layer needs
+   the prod-only set. Empirically, `npm ci --omit=dev` resolves all four
+   reclassified utils (the load-bearing F1 proof), while `npm ci --omit=dev &&
+   next build` fails compiling `globals.css` on the build-only `@tailwindcss/postcss`
+   — which is **expected and correct**, not a misclassification. The full-install
+   `next build` is green. The F1 fix closes the real risks: the
+   `npm audit --omit=dev` blind spot on these four, and bundle-correctness.
+
+2. **Exact-pin rationale catalog (F2 backfill).** The following exact pins are
+   deliberate and load-bearing; a future maintainer MUST NOT loosen them to carets
+   without a paired DECISIONS revision:
+   - **`next` + `react` + `react-dom` (`apps/web`)** — framework core triple. The
+     React pair moves atomically with `next` per `create-next-app` convention;
+     the React versions Next ships against are the tested ones. Bump only when
+     Next bumps.
+   - **`tsx` (root)** — already recorded (DECISIONS 2026-05-18); the pin is moved
+     forward to `4.22.3` in this slice (security-driven, clears the esbuild
+     advisory; see choice 3 / A1). The exact pin guards against *silent* updates,
+     not against deliberate forward moves.
+   - **`@faker-js/faker` (root)** — **demo-seed cohort determinism.** A faker
+     version change can shift generated names and silently break the DECISIONS
+     2026-05-18 demo-email-format reproducibility guarantee. An un-pin would be a
+     regression, not a tidy-up.
+
+3. **`npm audit` triage policy — categorize by runtime reachability, not severity
+   alone.**
+   - **Runtime-reachable + fix available** → apply.
+   - **Runtime-reachable + no clean fix** → escalate to a feature-level decision
+     (block / accept / replace).
+   - **Build-/dev-only + clean fix** → apply (a clean audit baseline is
+     operationally valuable — nobody should have to remember "ignore that line").
+     Slice-6 A1 is the model: `tsx` 4.19.2 → 4.22.3 cleared the dev-only esbuild
+     advisory (GHSA-67mh-4wv8-2f99) even though it was never runtime-reachable.
+   - **Build-/dev-only + no clean fix** → accept with documented rationale, and
+     identify the specific re-evaluation trigger. Slice-6 A2 is the model: the
+     postcss-`</style>` advisory (GHSA-qx2v-qp2m-jg93) is reachable only at build
+     time on first-party CSS (no untrusted-CSS precondition), and the only offered
+     fix is a non-viable Next downgrade — so it is **accepted, carried forward**
+     from DECISIONS 2026-05-17, with the trigger being "Next ships a bundled
+     postcss ≥ 8.5.10." Any new accept MUST reference this policy and name its
+     re-evaluation trigger.
+
+**Revisit if**: a future `apps/web/` dependency's code ships into the runtime
+bundle but sits in `devDependencies` (apply the choice-1 test); Next bumps and the
+`react`/`react-dom` pins must move with it, or a faker version is genuinely needed
+(choice 2); or a new audit advisory needs triage / the accepted postcss line clears
+on a Next bundled-postcss bump (choice 3).
