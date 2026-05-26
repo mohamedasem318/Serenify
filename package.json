@@ -16,7 +16,7 @@
     "@supabase/supabase-js": "^2.105.4",
     "cross-env": "^7.0.3",
     "dotenv": "^17.4.2",
-    "tsx": "4.19.2",
+    "tsx": "4.22.3",
     "vitest": "^4.1.6"
   }
 }
