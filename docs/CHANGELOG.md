@@ -791,3 +791,46 @@ dependency-posture slice — no application-code or runtime-behavior change.
 
 No Cloud-dashboard parity items this slice — all changes are in-repo
 (`apps/web/package.json`, root `package.json`, `package-lock.json`, docs).
+
+## 2026-05-26 — security: slice 7 — rate-limit verification + Cloud-dashboard parity consolidation
+
+Fix pass for the slice-7 audit (`docs/security/07-rate-limits-and-parity.md`,
+adjudicated 2026-05-26); decisions recorded in `docs/DECISIONS.md` (2026-05-26 —
+Security slice 7). This is an audit-consolidation slice — **no application-code,
+config-value, or runtime-behavior change**. The only edits are two inline
+reminder comments and documentation.
+
+- The rate-limit posture was audited end-to-end. All six `[auth.rate_limit]`
+  numeric buckets match GoTrue defaults (sane for the current threat model —
+  e.g. a 6-digit OTP under `token_verifications=30/5min/IP` + `otp_expiry=3600`
+  is infeasible to brute-force online), and `max_frequency=60s` (slice 2)
+  continues to gate the per-account email cooldown. No exploitable,
+  unauthenticated rate-limit hole was found.
+- The `/signup` posture is documented as **open self-serve**: any anonymous
+  visitor can mint an email-confirmed `employee` account. The blast radius is
+  bounded — a self-signup **cannot** escalate to `admin`/`team_lead` via
+  metadata, because `handle_new_user` hard-codes `role='employee'` and ignores
+  client-supplied `role`/`manager_id`. Closing `/signup` to invite-only is
+  non-trivial feature work, routed to BACKLOG (security slice 7); a production
+  deploy is **blocked** until it is gated, per the binding invariant in the new
+  DECISIONS entry.
+- The Cloud-dashboard parity checklist is **consolidated across slices 1–7** in
+  the audit doc. The one new flag this consolidation adds is the
+  **Auth → Rate Limits** block (six values), because `[auth.rate_limit]` is
+  local-only and was never affirmatively confirmed against the hosted project.
+  Mohamed applies + verifies the full checklist (rate limits, email cooldown,
+  password floor + requirements, secure password change, redirect allowlist)
+  manually before any production deploy — it cannot be read from the repo.
+- Two deferrals are codified with inline pointers so they are not lost: the
+  per-admin throttle on `/api/admin/invite` is **held for feature 011** (reminder
+  comment at `apps/web/app/api/admin/invite/route.ts:37`), and the `email_sent`
+  value re-tune is **deferred to SMTP-wiring time** (reminder comment at
+  `supabase/config.toml:204`). The `email_sent` limit is inert locally (SMTP
+  disabled) and stays at the default `2` until the production provider quota is
+  known. CAPTCHA stays deferred (trigger: sustained credential-stuffing OR
+  production-launch review); the `[auth.captcha]` template stays commented out so
+  the future enable is one line.
+
+No Cloud-dashboard parity items are *introduced* this slice — it consolidates the
+existing checklist rather than adding any new in-repo config change. All edits
+are in-repo (two inline comments + `docs/`).
