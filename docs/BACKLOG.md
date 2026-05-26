@@ -859,3 +859,84 @@ same plumbing — both want the invite to be a single idempotent unit of work.
 **Address by**: when `/api/admin/invite` gets a real browser client (feature 011
 admin dashboard) and concurrent submits become reachable in practice; pair with
 the invite partial-success / transactional-semantics handler-design item.
+
+---
+
+## From security slice 7 (rate-limits-and-parity) — in progress
+
+### `/signup` is open self-serve — gate to invite-only (posture) — ⛔ PRE-PRODUCTION DEPLOY BLOCKER
+**Status**: deferred-feature
+**Category**: auth posture / tenancy
+**⛔ Deploy-blocker** (adjudicated 2026-05-26): a real-tenant production launch with
+real user signals **MUST NOT** proceed while `/signup` is open. This is a binding
+gate, not merely deferred work — codified as an invariant in `docs/DECISIONS.md`
+and surfaced in `PROJECT_SYSTEM_PROMPT.md`. The thesis/demo stage keeps open signup
+as-is; the gate is what holds the Low–Med thesis severity in place by guaranteeing
+the High-at-production posture cannot ship unaddressed.
+**Observed**: 2026-05-26, security slice 7 (Finding 1 — `/signup` posture)
+**Description**: `/signup` is **OPEN**. Any anonymous visitor can submit the form
+and self-serve an email-confirmed `employee` account via `supabase.auth.signUp`
+(`apps/web/app/(auth)/signup/actions.ts:38`). There is **no** invite-token gate,
+**no** `invites` table, and **no** profiles-pre-existence check; `enable_signup =
+true` at the Supabase layer (`config.toml`) and `proxy.ts` does not block
+anonymous access to `/signup`. `handle_new_user` hard-codes `role='employee'`
+(`supabase/migrations/20260517000030_profile_trigger.sql:20`), so a self-signup
+**cannot** escalate to `team_lead`/`admin` (that control is sound) — but it still
+yields a logged-in, RLS-scoped employee account inside a tool intended for invited
+staff. The admin-invite email link (`/api/admin/invite`) is a *parallel*
+privileged path, not the only way in. Mandatory email confirmation
+(`enable_confirmations = true`) gates *email ownership*, not *authorization to
+join the org*. **Severity is dual-lens: Low–Med under the thesis/pre-prod lens
+that applies today; High before any real-tenant production launch** — a B2B
+employee tool with open signup is a Day-1 tenancy/trust violation.
+**Fix scope**: medium-to-large (FEATURE work, not a security fix-pass tweak).
+Either gate `/signup` behind invite-token validation — an `invites` table (token,
+email, role, expiry, consumed_at), a token field + UI on `/signup`, server-side
+validation matching the token to the email, expiry handling, and
+"invalid/expired invite" error states — OR make a product decision to remove
+`/signup` entirely and funnel all entry through `/api/admin/invite`. Either path
+needs schema + UI + tests. Optionally pair with CAPTCHA (the commented-out
+`[auth.captcha]` block in `config.toml` is ready to wire) if open signup is kept
+for any tier. See `docs/security/07-rate-limits-and-parity.md` → "`/signup`
+posture".
+**Address by**: a product/auth decision **before any real-tenant production
+launch** — this MUST be re-rated to High and resolved at that gate. Not blocking
+the thesis/demo stage. Likely pairs with feature 011 (admin-dashboard), which
+owns the invite UX.
+
+### App-layer rate limiting (durable limiter for invite + profile writes)
+**Status**: tech-debt
+**Category**: hardening / abuse-resistance
+**Adjudicated 2026-05-26**: the `/api/admin/invite` per-admin throttle is **held for
+feature 011** — calibrating a limit without a real admin UI is arbitrary, and
+today's exposure requires a valid admin session. The slice-7 fix pass leaves an
+inline reminder comment in `apps/web/app/api/admin/invite/route.ts` so anyone
+touching the handler is reminded. No limiter is built this slice.
+**Observed**: 2026-05-26, security slice 7 (Findings 2 + 4, custom rate-limiting recommendation)
+**Description**: There is **no** application-layer rate limiter anywhere
+(`proxy.ts`, Server Actions, route handlers) — verified by repo-wide grep. The app
+relies entirely on GoTrue's per-IP `[auth.rate_limit]` buckets, which (a) **do not
+cover** `/api/admin/invite` (service-role admin calls bypass the per-IP user
+buckets; only email rate loosely caps it, and `inviteUserByEmail` may create the
+`auth.users` row even when the email send is throttled — a compromised admin could
+mass-provision accounts and promote them to any role), and (b) **do not cover** the
+DB-write Server Actions `updateProfile` / `completeOnboarding` (they make no
+rate-limited auth *mutation*; the writes are self-scoped under RLS, so the abuse
+ceiling is self-directed write spam — low risk, but unthrottled at the app layer).
+Neither is a reachable critical exploit today (invite is admin-gated; profile
+writes are self-scoped), so this is hardening, not a live hole.
+**Fix scope**: medium. Recommended approach: a **durable Supabase DB table + RLS**
+(a `rate_limit_events` table or an atomic `SECURITY DEFINER` increment RPC) —
+matches the existing "Postgres is source of truth" architecture, survives across
+serverless instances (an in-memory `Map` does not), and is correctly sized for
+these coarse, low-frequency endpoints. Start with `/api/admin/invite` keyed by
+**admin user-id** (e.g. 20/min + 100/hour, IP as secondary key) — the single most
+defensible addition, since service-role invites get zero coverage from GoTrue's
+per-IP buckets. **Do NOT introduce Vercel KV / Upstash** (premature external
+dependency for a pre-prod thesis app); revisit that only if a per-keystroke /
+high-frequency surface emerges. See
+`docs/security/07-rate-limits-and-parity.md` → "Custom rate-limiting
+recommendation".
+**Address by**: a quality / hardening slice; the invite throttle pairs naturally
+with feature 011 (admin-dashboard), when `/api/admin/invite` gets a real browser
+client and abuse becomes reachable in practice.

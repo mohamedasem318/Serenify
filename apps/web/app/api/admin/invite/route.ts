@@ -34,6 +34,12 @@ import { serverEnv } from "@/lib/env/server";
  * error code (and, for validation, a fixed friendly message) only.
  */
 export async function POST(request: NextRequest) {
+  // Per-admin invite throttle (≈20/min + 100/hr): deferred to feature 011 when
+  // the browser admin UI defines legitimate usage patterns. Today's exposure
+  // requires a valid admin session cookie; service-role invites bypass GoTrue's
+  // per-IP buckets, so a custom durable limiter is the right shape (Supabase
+  // table backed). See docs/security/07-rate-limits-and-parity.md F2.
+
   // Step 0a: authenticate the caller before doing any other work.
   const supabase = await createClient();
   const {

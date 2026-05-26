@@ -1469,3 +1469,126 @@ bundle but sits in `devDependencies` (apply the choice-1 test); Next bumps and t
 `react`/`react-dom` pins must move with it, or a faker version is genuinely needed
 (choice 2); or a new audit advisory needs triage / the accepted postcss line clears
 on a Next bundled-postcss bump (choice 3).
+
+---
+
+## 2026-05-26 — Security slice 7: rate-limit posture + Cloud-dashboard parity
+
+**Status**: Accepted.
+
+**Context**: The slice-7 audit
+(`docs/security/07-rate-limits-and-parity.md`, adjudicated 2026-05-26) verified
+the rate-limit surface end-to-end and consolidated the Cloud-dashboard parity
+checklist carried across slices 1–6. Headline posture: the GoTrue
+`[auth.rate_limit]` configuration is sound and matches defaults; there is **no
+exploitable unauthenticated rate-limit hole**. The findings were 1 med (the
+`/signup` open posture), 3 low (`/api/admin/invite` app-layer throttle,
+`email_sent` production re-tune, unthrottled self-scoped DB-write Server
+Actions), and 1 informational (no CAPTCHA / per-IP-only buckets). **No finding
+produced an immediate functional code or config change** — every outcome is a
+deferral, a deploy-blocker invariant, or a policy codification. The fix pass
+landed inline reminder comments (`route.ts`, `config.toml`), the BACKLOG entries,
+and these decisions. This is the lightest slice of the phase: docs + comments
+only, no behavior or config-value change.
+
+**Decision**:
+
+1. **`/signup` open self-serve posture is conditionally accepted as a binding
+   Pre-Production Deploy Blocker.** Open self-serve signup is acceptable through
+   the thesis/demo lifecycle stage. It becomes a **hard production-deploy
+   blocker**: a production launch with real user signals **MUST NOT** proceed
+   while `/signup` is open. The deploy-blocker is satisfied only when **both**
+   hold: **(a)** `/signup` returns 404 OR requires a valid invite token, **AND
+   (b)** the invite-token flow is gated by a server-side check against an
+   `invites` table (or equivalent server-side allowlist) matching the token to
+   the email. The BACKLOG entry (security slice 7, ⛔-tagged) tracks the feature
+   work; this entry establishes the **binding gate**. Severity stays `med` today
+   via the dual-lens framing (choice 2); it rises to `high` immediately on the
+   day a production deploy is contemplated. This deploy gate is the mechanism
+   that holds the thesis-lens Low–Med rating in place — the lower rating is
+   honest only *because* the gate guarantees the posture cannot reach a
+   real-tenant launch unaddressed. The slices-0–7 `PROJECT_SYSTEM_PROMPT.md`
+   wrap-up surfaces this as a Pre-Production Deploy Blocker, not merely deferred
+   work.
+
+2. **Dual-lens severity for lifecycle-dependent findings (general pattern).**
+   When a finding's severity legitimately differs between the current lifecycle
+   stage and a later one (typically pre-prod vs prod), the audit documents **both
+   ratings + the trigger event** for re-evaluation, and tables the finding at the
+   **bridge value** — the lower lifecycle's rating plus a "rises to `<higher>` at
+   `<trigger>`" note. This signals "a product decision is owed before X" without
+   crying wolf at the current stage. The `/signup` finding (F1: Low–Med thesis /
+   High production, trigger = real-tenant launch) is the model. This pairs with
+   the "severity is informational" principle already in the log — the rating
+   drives *prioritization*, and a deferred-to-feature-work fix is rated by its
+   reachable risk *today*, with the future re-rating recorded so the deferral
+   does not bury the production-blocker nature. Future audits inherit this
+   pattern.
+
+3. **`/api/admin/invite` per-admin throttle is deferred to feature 011.**
+   Calibrating a throttle without a real admin UI is arbitrary, and today's
+   exposure requires a valid admin session cookie (no anonymous attack path).
+   Feature 011 (admin-dashboard) will define the legitimate invite-usage patterns
+   the limit should be sized against; the throttle implementation lands then,
+   using a **durable Supabase-table-backed limiter** (per the slice-7 audit's
+   production recommendation — service-role admin calls bypass GoTrue's per-IP
+   buckets, so the endpoint has zero coverage from them and an in-memory `Map`
+   would not survive across serverless instances). An inline reminder comment is
+   added at `apps/web/app/api/admin/invite/route.ts:37` so a future maintainer
+   touching the handler sees the deferral.
+
+4. **Self-scoped Server Actions inherit RLS as their throttle ceiling — no
+   app-layer limiter is owed.** For a Server Action whose only side effect is a
+   self-scoped DB write under RLS (`updateProfile`, `completeOnboarding`, and the
+   effective row reads behind `signOut`), no application-layer rate limit is
+   added. RLS narrows the blast radius of any spray attack to the attacker's
+   **own** row (`.eq("id", user.id)`), and database write-rate is the
+   platform-level ceiling; the impact is self-directed write spam, not a
+   cross-tenant hazard. Add throttling only when a Server Action's side effect is
+   **not** RLS-narrowed — e.g. outbound notifications, cross-row writes, or
+   expensive computations. This is recorded to prevent future "should we add
+   throttling here?" cycles on the self-scoped write paths.
+
+5. **CAPTCHA / bot mitigation is deferred, trigger-gated.** Today's per-IP GoTrue
+   buckets are appropriate for the current threat model (single-tenant pre-prod).
+   They do **not** bound distributed credential-stuffing per-account (a
+   rotating-IP attacker gets a fresh per-IP budget each source) — that is the
+   limit, and the trigger to revisit. CAPTCHA is deferred to whichever fires
+   first: **(a)** sustained credential-stuffing patterns observed in production
+   logs, or **(b)** the production-launch readiness review. The `[auth.captcha]`
+   template stays commented out in `config.toml` so the future enable is one
+   line.
+
+**Parity-mirroring policy (process note).** When `supabase/config.toml`
+documents a security-relevant setting — **even for a feature that is currently
+disabled** — the Cloud-dashboard parity checklist mirrors that setting too, as
+cheap defense-in-depth: if the feature is later enabled (anon sign-ins, SMS,
+web3), the rate limit is already in place rather than landing on an unset or
+over-permissive value. Slice 7 surfaces `anonymous_users` and `sms_sent` as the
+concrete examples (both inert today — `enable_anonymous_sign_ins=false`, SMS
+disabled — but mirrored anyway). The `email_sent` value is the one exception that
+needs a *value* re-evaluation before mirroring (choice-3-adjacent: re-tune at
+SMTP-wiring time per F3); the rest are confirm-not-change. The full
+`[auth.rate_limit]` block, including the inert settings, is mirrored. This
+extends the slice-2 "Cloud-dashboard parity for `config.toml` security changes"
+process note to cover inert/disabled-feature settings, not just active ones.
+
+**`email_sent` re-tune deferral.** Locking a value without the production
+provider's quota is arbitrary, and the setting is inert locally (SMTP disabled).
+The value stays `2` until custom SMTP is configured, at which point it is
+re-tuned against the chosen provider's quota and mirrored to the dashboard. An
+inline reminder comment is added at `supabase/config.toml:204`.
+
+**Cloud-dashboard parity**: this slice **consolidates** the parity checklist
+across slices 1–7 (it adds no new in-repo config change of its own). The one new
+flag this consolidation adds is the **Auth → Rate Limits** block (six values),
+because `[auth.rate_limit]` is local-only and was never affirmatively confirmed
+against the hosted project. Mohamed applies + verifies the full checklist
+manually before any production deploy; it cannot be read from the repo.
+
+**Revisit if**: a product/auth decision closes `/signup` to invite-only or
+removes it (choice 1 — the deploy blocker clears at that point); feature 011
+lands and sizes the invite throttle (choice 3); a Server Action gains a
+non-RLS-narrowed side effect (choice 4); sustained credential-stuffing is
+observed or the production-launch review opens (choice 5 — CAPTCHA trigger); or
+production SMTP is wired (the `email_sent` re-tune trigger).
