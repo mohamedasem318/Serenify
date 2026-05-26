@@ -60,6 +60,37 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-05-20
 - specs/003-employee-dashboard-shell/plan.md Decision B
 - specs/003-employee-dashboard-shell/contracts/shadcn-mapping.md
+
+Amendment 2: 1.1.0 → 1.2.0 (2026-05-27, MINOR)
+Bump rationale: Video modality switched from rPPG to LBP-TOP + Motion
+features with per-user delta calibration. The new model
+(`serenify-video-lbptop-motion-rf-calibrated` v2.0.0) requires 60s
+inference windows (was 30s) and 60s calibration baseline (was ~90s).
+The 30s configuration was empirically shown to collapse stress-class
+recall from 0.83 to 0.61 on subject-disjoint LOSO; 60s is the locked
+production mode. Triggered by retirement of the rPPG notebook due to a
+subject-leakage bug discovered late in feature 004 prep; replacement is
+the LBP-TOP + Motion pipeline. The "rPPG" language is also dropped from
+Principle II in favor of modality-agnostic "video pipeline" wording —
+the principle generalizes cleanly without naming a specific feature
+family. MINOR bump: refinement of an existing rule (timing parameters +
+terminology); no new principles, no removed principles, no structural
+change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-
+template.md for the touched values (`rPPG`, `30-second`, `90-second`,
+`60-second`, window/baseline/calibration language) — zero matches; the
+templates reference Principle II by number, not by literal timing text,
+so no template edit is required.
+
+Scope note: "rPPG" is dropped from Principle II's body only. It is
+intentionally retained as historical/architectural context in Principle I
+(`rPPG-derived` raw-signal clause) and Principle III (`webcam + rPPG
+pipeline` package description); those are out of scope for this amendment.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-05-27
+- docs/CHANGELOG.md entry 2026-05-27
 -->
 
 # Serenify Constitution
@@ -125,12 +156,13 @@ Additional ML rules:
   every subject's feature vectors MUST be centered against that subject's
   Baseline/Relax recording before training or evaluation.
 - Per-user calibration is REQUIRED at runtime. Every user completes a
-  ~90-second calm baseline on first login. All predictions delivered to the
+  ~60-second calm baseline on first login. All predictions delivered to the
   app MUST be deltas from that baseline, not absolute thresholds. Calibration
   data lives in the user's Supabase row.
-- Inference at deployment time MUST use rolling 30-second windows with a
-  10-second stride for the video (rPPG) pipeline. 30s is the physiological
-  minimum for meaningful HRV from rPPG; shorter windows are unreliable.
+- Inference at deployment time MUST use rolling 60-second windows with a
+  10-second stride for the video pipeline. Shorter windows degrade recall on
+  the stress class for the production model; the window duration is set by the
+  model contract documented in `docs/MODELS.md`.
 - Pre-trained model artifacts MUST live in `packages/ml-*/models/` and MUST
   have a versioned entry in `docs/MODELS.md` recording: model name, training
   date, evaluation method, macro-F1, per-class recall, confusion matrix
@@ -496,4 +528,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.1.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-20
+**Version**: 1.2.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-27

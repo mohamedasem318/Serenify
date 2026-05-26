@@ -1592,3 +1592,61 @@ lands and sizes the invite throttle (choice 3); a Server Action gains a
 non-RLS-narrowed side effect (choice 4); sustained credential-stuffing is
 observed or the production-launch review opens (choice 5 — CAPTCHA trigger); or
 production SMTP is wired (the `email_sent` re-tune trigger).
+
+---
+
+## 2026-05-27 — constitution(II) amendment: video pipeline window + baseline + drop rPPG language
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.1.0 → 1.2.0`).
+
+**Context**: The video modality switched from rPPG to LBP-TOP + Motion
+features with per-user delta calibration. The rPPG notebook was retired
+after a subject-leakage bug was discovered late in feature 004 prep; the
+replacement is the LBP-TOP + Motion pipeline served as model
+`serenify-video-lbptop-motion-rf-calibrated` v2.0.0. The new model's
+contract specifies timing parameters that contradicted what Principle II
+(Subject-Disjoint ML Evaluation) stated.
+
+**Decision**: Principle II is amended to match the model contract:
+
+- Deployment-time inference window changed from rolling **30s** to rolling
+  **60s** (10s stride unchanged). The "30s is the physiological minimum for
+  meaningful HRV from rPPG" justification — which was rPPG-specific — is
+  removed; the window duration is now set by the model contract documented in
+  `docs/MODELS.md`.
+- Per-user calibration baseline changed from **~90s** to **~60s** on first
+  login.
+- The "rPPG" naming is dropped from Principle II in favor of modality-agnostic
+  "video pipeline" wording. (rPPG is intentionally retained as historical /
+  architectural context in Principle I and Principle III — out of scope here.)
+
+All other Principle II clauses (subject-disjoint LOSO/GroupKFold splits,
+per-subject baseline normalization on physiological features, the
+`docs/MODELS.md` requirement for model artifacts) are unchanged.
+
+**Empirical justification**: On subject-disjoint LOSO evaluation, the 30s
+window configuration collapsed **stress-class recall from 0.83 (at 60s) to
+0.61 (at 30s)**. 60s is therefore the locked production mode for the current
+model; shorter windows degrade recall on the class the product exists to
+detect.
+
+**Affected artifacts** (all in the same commit as this entry):
+
+- `.specify/memory/constitution.md` Principle II — two sentences amended
+  (inference window + calibration baseline), rPPG dropped from the principle
+  body, version bumped `1.1.0 → 1.2.0` (MINOR per Governance: refinement of an
+  existing rule — timing parameters + terminology; no new/removed principles,
+  no structural change). Sync Impact Report appended with the Amendment 2
+  record and the template-audit note.
+- `docs/CHANGELOG.md` — `constitution(II)` amendment entry dated 2026-05-27.
+
+Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
+Principle II by number, not by literal timing text — zero matches for the
+touched values, so no template edit is required.
+
+**Revisit if**: a currently-running model trial surfaces a better video model
+whose contract specifies a different window or baseline — the constitution MAY
+be amended again to match the winning model's contract (the timing parameters
+are bound to the production model contract in `docs/MODELS.md`, not to a fixed
+physiological constant). Any such change follows the same Governance amendment
+path and is logged here and in `docs/CHANGELOG.md`.
