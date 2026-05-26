@@ -6,6 +6,12 @@
 > decides which updates to apply (and in what order), and a follow-up Claude Code
 > session lands the approved changes on this same branch
 > (`security/06-dependency-audit`).
+>
+> **Fix pass landed 2026-05-26** — see [Fix-pass
+> summary](#fix-pass-summary-2026-05-26) for finding resolutions, the post-fix
+> `npm audit`, the `--omit=dev` build verification, and the full test matrix. The
+> audit-only banner above describes this doc's *original* commit; the fix-pass
+> summary and the per-finding `Status` lines were appended in a later commit.
 
 ## Summary
 
@@ -60,6 +66,93 @@ runtime-reachable advisories.
 | F2 | Two correct-but-undocumented exact pins (`react`/`react-dom`, `@faker-js/faker`) have no DECISIONS entry — a future maintainer could "helpfully" un-pin them (faker un-pin shifts the demo-seed cohort) | low |
 | A1 | `esbuild` dev-server advisory (GHSA-67mh-4wv8-2f99) reached via `tsx` — **not runtime-reachable**; clean non-breaking fix available (`tsx@4.22.3`) | moderate (advisory) · not reachable |
 | A2 | `postcss` `</style>` XSS advisory (GHSA-qx2v-qp2m-jg93) reached via `next` — **not runtime-reachable**; only offered fix is a non-viable Next downgrade | moderate (advisory) · not reachable |
+
+---
+
+## Fix-pass summary (2026-05-26)
+
+> The fix pass landed on this branch after the 2026-05-26 adjudication. Commits:
+> `7ccfda2` (A1 — `tsx` → 4.22.3), `0cb6139` (F1 — reclassify four utils),
+> `b6fd60c` (routine bumps), `d9bf62a` (DECISIONS — F2 catalog + slice-6 policy),
+> `e9ac8e6` (CHANGELOG), plus the commit carrying this summary. Decisions:
+> `docs/DECISIONS.md` 2026-05-26 — Security slice 6.
+
+**Finding resolutions:** F1 → fixed in `0cb6139`. F2 → fixed in `d9bf62a`
+(DECISIONS exact-pin rationale catalog). A1 → fixed in `7ccfda2` (`tsx`
+4.19.2 → 4.22.3; bundled esbuild 0.23.1 → 0.28.0). A2 → **accepted, carried
+forward** from DECISIONS 2026-05-17; re-evaluate when Next ships a bundled
+postcss ≥ 8.5.10.
+
+**Post-fix `npm audit` (verbatim) — only the accepted postcss advisory remains:**
+
+```
+# npm audit report
+
+postcss  <8.5.10
+Severity: moderate
+PostCSS has XSS via Unescaped </style> in its CSS Stringify Output - https://github.com/advisories/GHSA-qx2v-qp2m-jg93
+fix available via `npm audit fix --force`
+Will install next@9.3.3, which is a breaking change
+node_modules/next/node_modules/postcss
+  next  9.3.4-canary.0 - 16.3.0-canary.5
+  Depends on vulnerable versions of postcss
+  node_modules/next
+
+2 moderate severity vulnerabilities
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force
+```
+
+The esbuild advisory (A1) is gone. The 2 moderate are the **single** accepted
+postcss advisory, npm-double-counted on the `next` and bundled-`postcss` nodes. 0
+critical / 0 high / 0 low. (`npm audit` exits 1 whenever any advisory remains —
+that exit code is expected, not a failure.)
+
+**Empirical `--omit=dev` build verification (F1) — and the build-vs-runtime
+correction it surfaced.** The audit's recommended recipe (`npm ci --omit=dev &&
+next build`) was run verbatim. Result:
+
+- `npm ci --omit=dev` **resolves all four reclassified utils** (`clsx`,
+  `tailwind-merge`, `class-variance-authority`, `server-only`) — the load-bearing
+  F1 proof. A control check confirms `typescript` (a devDep) is **absent**, so the
+  prod-only profile genuinely took effect; pre-F1 the four would not be installed.
+- `npm ci --omit=dev && next build` then **fails compiling `globals.css`** with
+  `Error: Cannot find module '@tailwindcss/postcss'` — **not** on any F1 util. This
+  is **expected and correct**: `@tailwindcss/postcss` / `tailwindcss` /
+  `tw-animate-css` are build-only tooling whose *output* ships, not whose *code*
+  ships, so they are correctly `devDependencies`. `--omit=dev` is a runtime install
+  profile, not a build profile — the production build runs a full install (Vercel
+  does), then serves with the prod-only set.
+- The **full-install `next build` is green**: `✓ Compiled successfully in 5.7s`,
+  `Finished TypeScript`, `✓ Generating static pages (9/9)`, all 11 routes emitted.
+  F1 changed nothing about the build output.
+
+This **corrects the audit's F1 verification framing** (Finding 1 risk #2): the
+"`--omit=dev` install breaks `next build`" claim conflated the runtime install
+profile with the build profile. The real, proven F1 value stands — closing the
+`npm audit --omit=dev` blind spot on the four runtime-shipped utils, and
+bundle-classification correctness. The test for `dependencies` vs `devDependencies`
+is "does the dep's code execute when the deployed app serves a request" (does its
+code ship into the runtime bundle), not "is it imported from source/config."
+Adjudicated by Mohamed 2026-05-26; see DECISIONS 2026-05-26 (Security slice 6),
+choice 1.
+
+**Test matrix (all green):**
+
+| Suite | Result |
+|---|---|
+| `apps/web` Vitest unit | 227 passed (24 files), vitest 4.1.7 |
+| root seed Vitest unit | 20 passed, 12 skipped (4 files) |
+| seed integration (`SUPABASE_INTEGRATION=1`) | 32 passed (4 files) — demo cohort deterministic (faker pin held) |
+| Playwright e2e (chromium + firefox + webkit, `workers:1`) | 57 passed (3.9m) |
+| `supabase db reset` | clean — 8 migrations applied, containers restarted, exit 0 |
+
+No new e2e flake appeared; the documented load-timing flakes (firefox
+`cross-tab-auth-sync`, webkit `reset-password`) did not fire this run.
+
+**Cross-references:** DECISIONS `docs/DECISIONS.md` — 2026-05-26 — Security slice 6;
+CHANGELOG `docs/CHANGELOG.md` — 2026-05-26 — security: slice 6.
 
 ---
 
@@ -156,6 +249,11 @@ unreachable) — equally defensible. Either way: not a production exposure.
 > freezing the version forever; moving the pin forward *with intent* is the
 > expected behavior. See [Adjudication](#adjudication-2026-05-26--mohamed).
 
+**Status**: **fixed in `7ccfda2`** (2026-05-26 fix pass). `tsx` 4.19.2 → 4.22.3
+(exact pin moved forward with intent); the bundled esbuild went 0.23.1 → 0.28.0,
+and `npm audit` confirms the GHSA-67mh-4wv8-2f99 line is gone (see [Fix-pass
+summary](#fix-pass-summary-2026-05-26)).
+
 ### A2 — PostCSS `</style>` stringify XSS (GHSA-qx2v-qp2m-jg93)
 
 | Field | Value |
@@ -195,6 +293,14 @@ separate issue.)*
 > summary must record the carry-forward **explicitly** so the accept stays visible
 > and is not silently dropped. Do not run `audit fix --force`. See
 > [Adjudication](#adjudication-2026-05-26--mohamed).
+
+**Status**: **accepted — carried forward** from DECISIONS 2026-05-17 (2026-05-26
+fix pass). No code/lockfile/manifest change; `audit fix --force` was **not** run.
+Reachable only at build time on first-party CSS (no untrusted-CSS precondition);
+the only offered fix is a non-viable Next 16 → 9 downgrade. Re-evaluation trigger:
+a Next release that ships a bundled postcss ≥ 8.5.10 — re-run `npm audit` and
+re-triage then. Categorized per the DECISIONS 2026-05-26 audit-triage policy
+(choice 3: build-/dev-only + no clean fix → accept with a documented trigger).
 
 ### Severity rollup
 
@@ -472,14 +578,15 @@ Affirmative record — surfaces examined that returned no finding.
   `devDependencies` to `dependencies` in `apps/web/package.json` (and reconcile
   DECISIONS DECISION-1's dep list, which lists them under the `-D` set). No code
   change; lockfile regenerates with the same resolved versions.
-- **Status**: **approved for fix pass** (2026-05-26 — Mohamed). Move `clsx`,
-  `tailwind-merge`, `class-variance-authority`, `server-only` from `devDependencies`
-  to `dependencies` in `apps/web/package.json`, **and** add a DECISIONS entry
-  documenting the override so a future maintainer doesn't "tidy" them back under
-  `-D`. The classification is wrong regardless of current symptom, and Vercel may
-  use `--omit=dev` at build time. (`@radix-ui/react-slot` is already correctly
-  placed — no change.) Severity held at `low`. See
-  [Adjudication](#adjudication-2026-05-26--mohamed).
+- **Status**: **fixed in `0cb6139`** (2026-05-26 fix pass). The four moved from
+  `devDependencies` to `dependencies` in `apps/web/package.json` (versions
+  unchanged); `@radix-ui/react-slot` was already correctly placed (no change). The
+  override is documented in DECISIONS 2026-05-26 (Security slice 6, choice 1) so a
+  future maintainer doesn't "tidy" them back under `-D`. Empirically verified: a
+  `npm ci --omit=dev` install resolves all four (see [Fix-pass
+  summary](#fix-pass-summary-2026-05-26)). The summary also records the
+  build-vs-runtime correction to this finding's risk #2 framing. Severity held at
+  `low`.
 
 ### Finding 2: Two correct-but-undocumented exact pins (`react`/`react-dom`, `@faker-js/faker`)
 
@@ -499,10 +606,12 @@ Affirmative record — surfaces examined that returned no finding.
 - **Suggested fix** (fix pass): add two short DECISIONS entries documenting the
   rationale for the `react`/`react-dom` and `@faker-js/faker` exact pins. Optional:
   normalize dev-dep short-form carets to full triplets (pure clarity).
-- **Status**: open — **not separately adjudicated in the 2026-05-26 round**. The
-  fix is uncontroversial (DECISIONS entries only) and is recommended to ride along
-  with the F1 DECISIONS-documentation work in the fix pass; pending Mohamed's
-  explicit go/no-go on whether to include it.
+- **Status**: **fixed in `d9bf62a`** (2026-05-26 fix pass). The exact-pin rationale
+  catalog in DECISIONS 2026-05-26 (Security slice 6, choice 2) documents the
+  `react`/`react-dom` (framework-core triple, moves with `next`) and
+  `@faker-js/faker` (demo-seed cohort determinism) pins, alongside the already-logged
+  `tsx` pin (now moved forward to 4.22.3 — see A1). Documentation only; no manifest
+  change for F2.
 
 ---
 
