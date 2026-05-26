@@ -755,3 +755,39 @@ adopted, the `connect-src` ingest origins and a PII-scrubbing review are require
 before it ships. No Cloud-dashboard parity items this slice — all changes are
 in-repo (`next.config.ts`, `proxy.ts`, `layout.tsx`, `providers.tsx`,
 `lib/zod.ts`).
+
+## 2026-05-26 — security: slice 6 — dependency hygiene (classification, pins, audit baseline)
+
+Fix pass for the slice-6 audit (`docs/security/06-dependency-audit.md`); decisions
+recorded in `docs/DECISIONS.md` (2026-05-26 — Security slice 6). This is a
+dependency-posture slice — no application-code or runtime-behavior change.
+
+- The runtime-shipped utilities `clsx`, `tailwind-merge`, `class-variance-authority`,
+  and `server-only` are reclassified from `devDependencies` to `dependencies` in
+  `apps/web/package.json` (versions unchanged). Their code ships into the served
+  bundle (the `cn()` helper, `cva` variants, the RSC `server-only` guard), so a
+  production-mode `npm ci --omit=dev` install now resolves them and
+  `npm audit --omit=dev` no longer has a blind spot on them. No runtime behavior
+  change — a packaging-correctness fix. (The build-only Tailwind/PostCSS toolchain
+  — `tailwindcss`, `@tailwindcss/postcss`, `tw-animate-css` — correctly stays in
+  `devDependencies`: its output ships, not its code, and the production build runs
+  a full install, not `--omit=dev`.)
+- `tsx` is upgraded from 4.19.2 to 4.22.3 (exact pin preserved, moved forward with
+  intent) to clear the bundled-esbuild dev-server advisory (`GHSA-67mh-4wv8-2f99`):
+  tsx 4.22.3 bundles esbuild 0.28.0 (was 0.23.1). Not a runtime-reachable issue
+  (`tsx` transforms TypeScript for the local seed CLI; it never runs esbuild's dev
+  server) — the bump keeps the `npm audit` baseline clean.
+- Routine range-satisfiable updates (lockfile-only, no manifest change), none
+  security-driven, no behavior change: `@supabase/supabase-js` 2.106.2 (opt-in
+  OTel + OAuth/RN fixes; no cookie/session/SSR-auth change), `@hookform/resolvers`
+  5.4.0, `react-hook-form` 7.76.1, `@types/react` 19.2.15, `vitest` 4.1.7.
+- The `npm audit` baseline is now **0 critical / 0 high / 0 low**, with the only
+  remaining advisory being the postcss-inside-Next `</style>` XSS line
+  (`GHSA-qx2v-qp2m-jg93`, npm-counted as 2 moderate on the `next` + bundled-postcss
+  nodes), which is **accepted** (reachable only at build time on first-party CSS;
+  no untrusted-CSS precondition; the only offered fix is a non-viable Next
+  downgrade) and carried forward from DECISIONS 2026-05-17. Re-evaluate when Next
+  ships a bundled postcss ≥ 8.5.10.
+
+No Cloud-dashboard parity items this slice — all changes are in-repo
+(`apps/web/package.json`, root `package.json`, `package-lock.json`, docs).
