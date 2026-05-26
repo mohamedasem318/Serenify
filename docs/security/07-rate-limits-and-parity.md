@@ -63,6 +63,80 @@ bucket) and the parity checklist (process) are recorded separately.
 
 ---
 
+## Fix-pass summary (2026-05-26)
+
+The follow-up Claude Code session landed the adjudicated outcomes on this branch.
+**No finding produced a functional code or config-value change** — the slice is
+documentation plus two inline reminder comments. Per-finding routing:
+
+- **F1** (`/signup` open self-serve) → **routed to BACKLOG**
+  (`docs/BACKLOG.md` → "`/signup` is open self-serve — gate to invite-only",
+  ⛔-tagged); **production deploy-blocker** per DECISIONS 2026-05-26 (Security
+  slice 7, choice 1). Stays `med` today under the dual-lens framing; rises to
+  `high` the day a production deploy is contemplated.
+- **F2** (`/api/admin/invite` app-layer throttle) → **deferred to feature 011**
+  per DECISIONS 2026-05-26 (choice 3); inline pointer added at
+  `apps/web/app/api/admin/invite/route.ts:37`. Durable Supabase-table limiter is
+  the recommended shape; BACKLOG "App-layer rate limiting" entry tracks it.
+- **F3** (`email_sent` production value) → **deferred to SMTP-wiring** per
+  DECISIONS 2026-05-26; inline pointer added at `supabase/config.toml:204`. Held
+  at default `2` (inert locally — SMTP disabled) until the provider quota is known.
+- **F4** (unthrottled self-scoped DB-write Server Actions) → **accepted as
+  designed** per DECISIONS 2026-05-26 (choice 4): RLS is the throttle ceiling for
+  self-scoped DB writes (`updateProfile`, `completeOnboarding`, `signOut`).
+- **F5** (no CAPTCHA / per-IP-only buckets) → **deferred** per DECISIONS
+  2026-05-26 (choice 5); trigger to revisit: sustained credential-stuffing in
+  production logs OR the production-launch readiness review, whichever fires
+  first. `[auth.captcha]` stays commented out in `config.toml`.
+
+**Parity:** the Cloud-dashboard parity checklist is consolidated across slices
+1–7 above; Mohamed applies + verifies it manually before any production deploy
+(it cannot be read from the repo). The parity-mirroring policy (mirror the full
+`[auth.rate_limit]` block including inert settings) is codified in DECISIONS
+2026-05-26.
+
+**References:** DECISIONS entry **2026-05-26 — Security slice 7: rate-limit
+posture + Cloud-dashboard parity**; CHANGELOG entry **2026-05-26 — security:
+slice 7 — rate-limit verification + Cloud-dashboard parity consolidation**.
+
+### Test results (2026-05-26)
+
+A docs-and-comments slice should not regress tests, and it did not. The change
+is provably comment-only — `git diff` shows `route.ts` gained five `//` comment
+lines (executable code byte-identical) and `config.toml` gained four `#` comment
+lines (`email_sent = 2` value unchanged) — so it cannot alter any runtime or auth
+behavior.
+
+- **`supabase db reset`** — all 8 migrations apply cleanly (the first two
+  attempts hit a transient storage-container health flake; the third was clean —
+  infra, not migrations).
+- **Vitest (`apps/web`)** — **227 passed** (24 files). The trailing "failed to
+  terminate forks worker (EPERM)" line is the known Windows worker force-kill, not
+  a test failure.
+- **Vitest seed suite (`SUPABASE_INTEGRATION=1`)** — **32 passed** (4 files).
+- **`npm audit`** — only the accepted postcss `</style>` line (2 moderate,
+  DECISIONS 2026-05-17 / slice 6), as expected.
+- **Playwright e2e matrix (chromium + firefox + webkit)** — **50 passed / 7
+  failed of 57** (the 57 total matches the slice-6 baseline). The 7 failures are
+  **non-deterministic environmental flakes**, confirmed:
+  - The failing specs **differed across runs** — `reset-password.spec.ts:66`
+    and `:87` *failed* in the matrix but *passed* on isolated re-run, while `:45`
+    did the reverse. A real regression is deterministic; this is not.
+  - All failures are timeouts in the documented flaky set (`admin-seeded`,
+    `cross-tab-auth-sync`, `reset-password` — the timing-sensitive auth/checklist
+    specs), and the matrix took **22 min vs the ~3-min baseline**, the signature of
+    the `next dev` memory-bloat / monotonic-slowdown issue (`docs/BACKLOG.md`)
+    compounded by Docker-container churn from the `supabase db reset` retries.
+  - The Vitest unit + integration suites, which exercise the actual schemas and
+    logic directly, are fully green.
+
+  **No e2e behavior changed** (the diff is comment-only). Mohamed can re-confirm
+  the clean matrix count by running it once against a freshly-restarted Supabase
+  stack + dev server per the BACKLOG workaround; the failures are not introduced
+  by this slice.
+
+---
+
 ## Adjudication (2026-05-26)
 
 Mohamed reviewed these findings with claude.ai. A follow-up CC session lands the
