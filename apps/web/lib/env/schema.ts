@@ -24,6 +24,11 @@ const supabaseKey = z
 export const clientEnvSchema = z.object({
   supabaseUrl: z.url(),
   supabaseAnonKey: supabaseKey,
+  // FastAPI anchor service origin (feature 004). Public by design — the browser
+  // posts the recorded clip here and reads /healthz. Defaults to the local dev
+  // origin; production sets NEXT_PUBLIC_API_URL. The CSP `connect-src` in
+  // proxy.ts is derived from this value.
+  apiUrl: z.url().default("http://127.0.0.1:8000"),
 });
 
 export const serverEnvSchema = clientEnvSchema.extend({

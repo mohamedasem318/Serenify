@@ -54,6 +54,10 @@ const CSP_HEADER = "content-security-policy";
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV !== "production";
   const supabaseOrigin = new URL(clientEnv.supabaseUrl).origin;
+  // FastAPI anchor service (feature 004) — the first non-Supabase, non-same-origin
+  // connect-src entry. Dev default http://127.0.0.1:8000; prod the configured
+  // NEXT_PUBLIC_API_URL origin. The recorder POSTs the clip + GETs /healthz here.
+  const apiOrigin = new URL(clientEnv.apiUrl).origin;
   const directives = [
     "default-src 'self'",
     // Nonce covers the 2 app inline scripts (theme-migration IIFE, next-themes
@@ -70,7 +74,7 @@ function buildCsp(nonce: string): string {
     "font-src 'self'",
     // Supabase REST/Auth/Storage. No wss: (no realtime .channel() today). Dev
     // adds the local Supabase origin.
-    `connect-src 'self' ${supabaseOrigin}${isDev ? " http://127.0.0.1:54321 ws://127.0.0.1:54321" : ""}`,
+    `connect-src 'self' ${supabaseOrigin} ${apiOrigin}${isDev ? " http://127.0.0.1:54321 ws://127.0.0.1:54321" : ""}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
