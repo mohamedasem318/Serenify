@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { checkHealth, postAnchor } from "@/lib/api/anchor-client";
+import { broadcastAnchorCaptured } from "@/lib/auth-broadcast";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 
@@ -164,7 +165,8 @@ export function AnchorRecorder({
       }
 
       dispatch({ type: "UPLOAD_SUCCESS" });
-      // Step 9 (US7): broadcastAnchorCaptured() is wired here to refresh sibling tabs.
+      // US7: refresh sibling tabs on the onboarding step / /app/calibrate (FR-034).
+      broadcastAnchorCaptured();
       onComplete();
     },
     [dispatch, onComplete],

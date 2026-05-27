@@ -2,19 +2,21 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
 import {
+  ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 
-const { pushMock, pathnameHolder, signOutMock } = vi.hoisted(() => ({
+const { pushMock, refreshMock, pathnameHolder, signOutMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
+  refreshMock: vi.fn(),
   pathnameHolder: { value: "/login" as string },
   signOutMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
   usePathname: () => pathnameHolder.value,
 }));
 
@@ -52,6 +54,7 @@ function clearAllCookies() {
 
 beforeEach(() => {
   pushMock.mockReset();
+  refreshMock.mockReset();
   signOutMock.mockReset();
   signOutMock.mockResolvedValue({ error: null });
   pathnameHolder.value = "/login";
@@ -134,6 +137,43 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/login");
     });
+  });
+});
+
+describe("CrossTabAuth — anchor capture broadcast (FR-034)", () => {
+  it.each(["/onboarding", "/app/calibrate"])(
+    "refreshes when an anchor-captured marker arrives on %s",
+    (pathname) => {
+      pathnameHolder.value = pathname;
+      render(<CrossTabAuth />);
+      fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "captured:123" });
+      expect(refreshMock).toHaveBeenCalledTimes(1);
+      expect(pushMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["/app", "/app/account", "/login"])(
+    "does NOT refresh for an anchor marker on %s",
+    (pathname) => {
+      pathnameHolder.value = pathname;
+      render(<CrossTabAuth />);
+      fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "captured:123" });
+      expect(refreshMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("ignores an anchor key with an unrecognised value", () => {
+    pathnameHolder.value = "/onboarding";
+    render(<CrossTabAuth />);
+    fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "garbage" });
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh on an auth broadcast", () => {
+    pathnameHolder.value = "/onboarding";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signin:123" });
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 });
 

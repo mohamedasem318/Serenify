@@ -153,3 +153,30 @@ export function consumePendingSignIn(): void {
   broadcastSignIn();
   document.cookie = `${AUTH_SIGNIN_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
 }
+
+// ── Anchor capture broadcast (feature 004, 📌 DECISION-15) ───────────────────
+// Sibling helpers to the auth broadcast above — NOT a parallel mechanism. When a
+// user captures their calibration anchor in one tab, sibling tabs sitting on the
+// onboarding step / /app/calibrate refresh so they fall through to /app (FR-034).
+
+export const ANCHOR_BROADCAST_KEY = "serenify-anchor-captured";
+
+/**
+ * Write an anchor-captured marker to localStorage. Called from the recorder's
+ * success path after the vector is persisted. The timestamp guarantees a
+ * `storage` event even on a repeat capture (browsers skip unchanged writes).
+ * No-op under SSR; best-effort (localStorage can throw in sandboxed contexts).
+ */
+export function broadcastAnchorCaptured(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ANCHOR_BROADCAST_KEY, `captured:${Date.now()}`);
+  } catch {
+    // see broadcastSignIn — best-effort; failure just means no sibling refresh.
+  }
+}
+
+/** True iff a storage-event newValue is an anchor-captured marker. */
+export function parseAnchorBroadcast(newValue: string | null): boolean {
+  return newValue != null && newValue.startsWith("captured:");
+}

@@ -1,10 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
+  broadcastAnchorCaptured,
   consumePendingSignIn,
   destinationBroadcastsSignIn,
+  parseAnchorBroadcast,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 
@@ -78,5 +81,26 @@ describe("consumePendingSignIn — client-side cookie bridge (📌 ST-8)", () =>
     document.cookie = "serenify-theme=dark; Path=/";
     consumePendingSignIn();
     expect(localStorage.getItem(AUTH_BROADCAST_KEY)).toBeNull();
+  });
+});
+
+describe("anchor capture broadcast (📌 DECISION-15, FR-034)", () => {
+  it("writes a captured marker that parseAnchorBroadcast recognizes", () => {
+    broadcastAnchorCaptured();
+    const written = localStorage.getItem(ANCHOR_BROADCAST_KEY);
+    expect(written).not.toBeNull();
+    expect(written?.startsWith("captured:")).toBe(true);
+    expect(parseAnchorBroadcast(written)).toBe(true);
+  });
+
+  it("uses its own key, distinct from the auth broadcast", () => {
+    broadcastAnchorCaptured();
+    expect(localStorage.getItem(AUTH_BROADCAST_KEY)).toBeNull();
+  });
+
+  it("rejects null, unrelated, and auth markers", () => {
+    expect(parseAnchorBroadcast(null)).toBe(false);
+    expect(parseAnchorBroadcast("signin:123")).toBe(false);
+    expect(parseAnchorBroadcast("garbage")).toBe(false);
   });
 });

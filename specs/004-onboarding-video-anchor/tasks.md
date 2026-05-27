@@ -223,9 +223,9 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 9
 
-- [ ] T048 [US7] Edit `apps/web/lib/auth-broadcast.ts`: add `AUTH_*`-style `ANCHOR_BROADCAST_KEY = "serenify-anchor-captured"`, `broadcastAnchorCaptured()` (writes `captured:${Date.now()}`), and `parseAnchorBroadcast(newValue)` — sibling helpers, not a parallel mechanism (📌 DECISION-15, FR-035). ⚠ Principle VII: covered by T050.
-- [ ] T049 [US7] Edit `apps/web/components/cross-tab-auth.tsx`: add a `storage`-event branch — on an anchor-captured marker, if the tab is on the onboarding step or `/app/calibrate`, call `router.refresh()` (server recomputes `has_anchor(auth.uid())` → falls through to `/app`) (📌 DECISION-15, FR-034). ⚠ Principle VII: covered by T050 + T054.
-- [ ] T050 [US7] Extend `apps/web/lib/auth-broadcast.test.ts` (or a sibling): `broadcastAnchorCaptured` writes the key; `parseAnchorBroadcast` recognizes it / rejects others; the listener branch calls `router.refresh()` on the marker and ignores unrelated keys.
+- [X] T048 [US7] Edit `apps/web/lib/auth-broadcast.ts`: add `AUTH_*`-style `ANCHOR_BROADCAST_KEY = "serenify-anchor-captured"`, `broadcastAnchorCaptured()` (writes `captured:${Date.now()}`), and `parseAnchorBroadcast(newValue)` — sibling helpers, not a parallel mechanism (📌 DECISION-15, FR-035). ⚠ Principle VII: covered by T050.
+- [X] T049 [US7] Edit `apps/web/components/cross-tab-auth.tsx`: add a `storage`-event branch — on an anchor-captured marker, if the tab is on the onboarding step or `/app/calibrate`, call `router.refresh()` (server recomputes `has_anchor(auth.uid())` → falls through to `/app`) (📌 DECISION-15, FR-034). ⚠ Principle VII: covered by T050 + T054.
+- [X] T050 [US7] Extend `apps/web/lib/auth-broadcast.test.ts` (or a sibling): `broadcastAnchorCaptured` writes the key; `parseAnchorBroadcast` recognizes it / rejects others; the listener branch calls `router.refresh()` on the marker and ignores unrelated keys.
 
 **Checkpoint**: cross-tab anchor completion propagates via the reused broadcast pattern.
 

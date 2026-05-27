@@ -4,8 +4,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import {
+  ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   consumePendingSignIn,
+  parseAnchorBroadcast,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 import { createClient } from "@/lib/supabase/client";
@@ -29,6 +31,14 @@ const SIGNED_IN_FROM_PATHS = [
  * — authed but outside the (authed) layout's reach.
  */
 const SIGNED_OUT_FROM_PATHS = ["/app", "/onboarding"] as const;
+
+/**
+ * Pathnames where a sibling tab's anchor capture should refresh this tab
+ * (📌 DECISION-15, FR-034). A refresh on /onboarding re-runs proxy.ts, which
+ * bounces a full_name-set user to /app; on /app/calibrate it re-renders with the
+ * now-captured anchor. Re-calibration from /app/calibrate stays available.
+ */
+const ANCHOR_REFRESH_FROM_PATHS = ["/onboarding", "/app/calibrate"] as const;
 
 function pathMatches(
   pathname: string,
@@ -96,6 +106,17 @@ export function CrossTabAuth(): null {
 
   useEffect(() => {
     function onStorage(event: StorageEvent) {
+      // Anchor capture in a sibling tab → refresh if we're on a surface that
+      // should fall through once the anchor exists (FR-034).
+      if (event.key === ANCHOR_BROADCAST_KEY) {
+        if (
+          parseAnchorBroadcast(event.newValue) &&
+          pathMatches(pathname, ANCHOR_REFRESH_FROM_PATHS)
+        ) {
+          router.refresh();
+        }
+        return;
+      }
       if (event.key !== AUTH_BROADCAST_KEY) return;
       const auth = parseAuthBroadcast(event.newValue);
       if (auth === "signin" && pathMatches(pathname, SIGNED_IN_FROM_PATHS)) {
