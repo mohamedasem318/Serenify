@@ -271,8 +271,8 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 **Goal**: All layers green together.
 
-- [ ] T057 Run `cd apps/api && uv run pytest` and `cd packages/ml-video && uv run pytest` — green; coverage ≥70% on backend business logic (router handlers + pipeline transforms) per Principle VII.
-- [ ] T058 Run `npm run test --workspace=apps/web` (Vitest) + `npm run test:e2e --workspace=apps/web` (Playwright, incl. the existing feature-001/003 suites — no regressions) + `npm run lint` + `npm run typecheck` — all green.
+- [X] T057 Run `cd apps/api && uv run pytest` and `cd packages/ml-video && uv run pytest` — green; coverage ≥70% on backend business logic (router handlers + pipeline transforms) per Principle VII.
+- [X] T058 Run `npm run test --workspace=apps/web` (Vitest) + `npm run test:e2e --workspace=apps/web` (Playwright, incl. the existing feature-001/003 suites — no regressions) + `npm run lint` + `npm run typecheck` — all green.
 
 **Checkpoint**: every test layer passes; no regressions in prior features.
 
