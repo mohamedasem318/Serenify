@@ -107,6 +107,17 @@ export function AnchorRecorder({
     return () => observer.disconnect();
   }, [dispatch]);
 
+  // Attaching the stream has to wait for the <video> to actually mount. The
+  // element is only rendered once status reaches permission-granted/recording —
+  // a render that happens AFTER getUserMedia resolves — so assigning srcObject
+  // inside startCapture hits a still-null ref and the preview stays black. A
+  // callback ref sets srcObject the moment React attaches the node (and again on
+  // retry, when the node re-mounts).
+  const attachVideo = useCallback((node: HTMLVideoElement | null) => {
+    videoRef.current = node;
+    if (node && streamRef.current) node.srcObject = streamRef.current;
+  }, []);
+
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -220,8 +231,7 @@ export function AnchorRecorder({
         audio: false, // mic stays off — audio is feature 013
       });
       streamRef.current = stream;
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      dispatch({ type: "PERMISSION_GRANTED" });
+      dispatch({ type: "PERMISSION_GRANTED" }); // mounts <video>; attachVideo wires srcObject
       beginRecording(stream);
     } catch {
       dispatch({ type: "PERMISSION_DENIED" });
@@ -265,7 +275,7 @@ export function AnchorRecorder({
       {isRecording && (
         <div className="space-y-4">
           <video
-            ref={videoRef}
+            ref={attachVideo}
             autoPlay
             muted
             playsInline
