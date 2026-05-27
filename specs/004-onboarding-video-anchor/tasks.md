@@ -241,9 +241,9 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 10
 
-- [ ] T051 [US6] Create `scripts/lib/synthetic-anchor.ts`: `mulberry32(42)` PRNG → 2958 `float32` → `Buffer` of 11832 LE bytes → `\x…` hex literal. Deterministic, re-runnable (FR-031/032). ⚠ Principle VII: covered by T053.
-- [ ] T052 [US6] Edit `scripts/seed-demo.ts`: after demo profiles exist, write `anchor_vector` (the synthetic blob), `anchor_captured_at = now()`, `anchor_model_version = "serenify-video-lbptop-motion-rf-calibrated@2.0.0"` for every `@demo.serenify.local` profile via the existing service-role admin client (`scripts/lib/supabase-admin.ts`) — service_role bypasses RLS + the `authenticated` whitelist. Non-demo users untouched (📌 DECISION-17, FR-031/033). ⚠ Principle VII: covered by T053.
-- [ ] T053 [US6] Add a scripts test (alongside `scripts/__tests__/`): `synthetic-anchor` produces identical bytes across two calls (determinism, FR-032); the seed writes the anchor only for the demo cohort (scope, FR-033).
+- [X] T051 [US6] Create `scripts/lib/synthetic-anchor.ts`: `mulberry32(42)` PRNG → 2958 `float32` → `Buffer` of 11832 LE bytes → `\x…` hex literal. Deterministic, re-runnable (FR-031/032). ⚠ Principle VII: covered by T053.
+- [X] T052 [US6] Edit `scripts/seed-demo.ts`: after demo profiles exist, write `anchor_vector` (the synthetic blob), `anchor_captured_at = now()`, `anchor_model_version = "serenify-video-lbptop-motion-rf-calibrated@2.0.0"` for every `@demo.serenify.local` profile via the existing service-role admin client (`scripts/lib/supabase-admin.ts`) — service_role bypasses RLS + the `authenticated` whitelist. Non-demo users untouched (📌 DECISION-17, FR-031/033). ⚠ Principle VII: covered by T053.
+- [X] T053 [US6] Add a scripts test (alongside `scripts/__tests__/`): `synthetic-anchor` produces identical bytes across two calls (determinism, FR-032); the seed writes the anchor only for the demo cohort (scope, FR-033).
 
 **Checkpoint**: demo cohort lands on a clean `/app`; real users unaffected.
 
