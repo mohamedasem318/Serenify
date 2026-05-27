@@ -164,9 +164,12 @@ row-level-security policies.
 4. **Given** an employee's stored anchor, **When** a team lead or admin
    attempts to read it through any available query path, **Then** no anchor
    vector belonging to another user is returned.
-5. **Given** the backend service, **When** it authenticates to the database,
-   **Then** it reads its credentials only from environment variables and no
-   secret appears in any committed file (Constitution Principle IX).
+5. **Given** an unauthenticated request to the `/anchor` endpoint (missing or
+   invalid session JWT), **When** the request is processed, **Then** it is
+   rejected with a 401 and no extraction is performed. The backend trusts only
+   the `user_id` it verifies from the JWT — never a client-supplied user id —
+   and reads its `SUPABASE_JWT_SECRET` only from environment variables
+   (Constitution Principle IX).
 
 ---
 
@@ -322,13 +325,14 @@ reusing the cross-tab broadcast pattern from feature 003.
   "Skip for now". No alarm, no dead-end.
 - **No camera device available**: when no video input device is present, the
   step explains this calmly and offers "Skip for now" rather than blocking.
-- **Remembered camera no longer present**: if a previously chosen camera is
-  unplugged or unavailable, the picker falls back to an available device
-  without error.
-- **Backend unreachable before recording**: the recording step fails fast if
-  the backend is unavailable, rather than letting the user record 60 seconds
-  and only then discovering the upload target is down. (See Open Questions —
-  health pre-check.)
+- **Remembered camera no longer present**: if the camera remembered in
+  `localStorage` (FR-005) is unplugged or unavailable at next visit, the picker
+  falls back to the default camera without error.
+- **Backend unreachable before recording**: the web app pings `GET /healthz`
+  (FR-048) before showing the recording step; if the backend is unavailable the
+  step shows calm "calibration is temporarily unavailable, please try again
+  later" copy rather than letting the employee record 60 seconds into an
+  unreachable backend.
 - **Upload target unreachable after recording**: if the upload fails after a
   completed recording, the employee sees calm retry copy and the recording can
   be retried; a failed upload (transport error) does NOT count toward the
@@ -360,6 +364,10 @@ reusing the cross-tab broadcast pattern from feature 003.
 - **Extraction yields a malformed vector**: if the backend produces anything
   other than a valid 2958-dimensional vector, it is treated as an extraction
   failure (US5 path), never persisted as a valid anchor.
+- **Backend authentication failure**: an `/anchor` request with a missing or
+  invalid JWT is rejected at the endpoint (FR-046, 401); the web app surfaces a
+  calm "something went wrong, try signing out and back in" message and does not
+  retry automatically.
 
 ## Requirements *(mandatory)*
 
@@ -380,20 +388,28 @@ reusing the cross-tab broadcast pattern from feature 003.
   that person), framed supportively and without alarm.
 - **FR-003**: On successful anchor capture during onboarding, the employee MUST
   be advanced to `/app`.
-- **FR-004**: The anchor step MUST present a "Skip for now" affordance that, at
-  any sub-state of the step, takes the employee to `/app` immediately without
-  recording or uploading.
+- **FR-004**: The anchor step MUST provide a "Skip for now" affordance that
+  navigates the employee to `/app` immediately — from any sub-state, without
+  recording or uploading. The affordance MUST be hidden on initial entry and
+  revealed only after the employee has either (a) had one extraction failure,
+  or (b) scrolled past the explanation copy. This is a calm-first nudge toward
+  completion, not a hard gate: once revealed it remains genuinely available.
 
 ### Functional Requirements — Camera selection, permission & recording
 
 - **FR-005**: The anchor step MUST present a camera device picker listing the
   available video input devices and allowing the employee to choose the
-  recording source.
+  recording source. The chosen device MUST be remembered in `localStorage` and
+  pre-selected on the next visit; if the remembered device is no longer present,
+  the picker MUST fall back to the default camera without error.
 - **FR-006**: The anchor step MUST request camera permission and MUST show a
   live self-preview once permission is granted.
 - **FR-007**: When camera permission is denied or no camera is available, the
-  step MUST show calm copy explaining the situation and MUST offer a retry
-  and/or "Skip for now" path — it MUST NOT dead-end.
+  step MUST show calm copy explaining the situation and MUST offer a retry path
+  — it MUST NOT dead-end. The "Skip for now" affordance follows FR-004's reveal
+  rule; because reaching a permission prompt means the employee has already
+  moved past the explanation copy, the skip is available in this state, so the
+  employee always has a way out.
 - **FR-008**: Recording MUST run for 60 seconds with a visible countdown of
   remaining time, and MUST stop automatically when the countdown completes. The
   60-second duration is fixed per the model contract (Constitution Principle II
@@ -425,9 +441,31 @@ reusing the cross-tab broadcast pattern from feature 003.
   `packages/ml-video/models/` as part of this feature, and the backend MUST
   load them from that location (Constitution Principle II: artifacts live in
   `packages/ml-*/models/`).
-- **FR-015**: The backend MUST read all of its credentials (including any
-  Supabase credentials) only from environment variables; no secret may appear
-  in any committed file (Constitution Principle IX).
+- **FR-015**: The backend MUST read every credential it uses (e.g.,
+  `SUPABASE_JWT_SECRET`) only from environment variables; no secret may appear
+  in any committed file (Constitution Principle IX). In the chosen architecture,
+  the backend does NOT have any Supabase database credentials — see FR-018 /
+  FR-019 for the database write path (the web app writes the vector via the
+  user's session-scoped client).
+
+- **FR-046**: The `/anchor` endpoint MUST verify the caller's Supabase session
+  JWT from the `Authorization: Bearer <token>` header on every request, using a
+  `SUPABASE_JWT_SECRET` read from environment variables (Constitution Principle
+  IX). Requests with a missing or invalid token MUST be rejected with a 401 and
+  no extraction performed. The verified `user_id` from the JWT is the only
+  identity context the backend uses — a client-supplied user id MUST NOT be
+  trusted.
+- **FR-047**: The `/anchor` endpoint MUST accept video uploads in MP4 (H.264)
+  or WebM (VP8/VP9) format (both decode transparently via `cv2.VideoCapture`
+  with the FFmpeg backend; no server-side transcoding step). Other formats MAY
+  return a 415 (Unsupported Media Type). Browser `MediaRecorder` defaults
+  satisfy this — Safari produces MP4, Chrome/Firefox produce WebM.
+- **FR-048**: The backend MUST expose a `GET /healthz` (or equivalent) endpoint
+  that returns 200 only when the model artifacts are loaded and the service is
+  ready. The web app MUST call this before showing the recording step; if it is
+  unreachable or not ready, the step MUST show calm "calibration is temporarily
+  unavailable, please try again later" copy instead of letting the employee
+  record 60 seconds into an unreachable backend.
 
 ### Functional Requirements — Privacy, storage & access control
 
@@ -440,11 +478,14 @@ reusing the cross-tab broadcast pattern from feature 003.
 - **FR-017**: Only the anchor vector, a capture timestamp, and a model-version
   string MUST be stored — no raw frames, no intermediate image data, no video
   path.
-- **FR-018**: `public.profiles` MUST gain three columns: an anchor vector
-  field (2958-dimensional float vector; storage shape is a planning decision —
-  see Open Questions), `anchor_captured_at` (timestamp with time zone), and
-  `anchor_model_version` (text, matching the model name + version recorded in
-  `docs/MODELS.md`, e.g. `serenify-video-lbptop-motion-rf-calibrated@2.0.0`).
+- **FR-018**: `public.profiles` MUST gain three columns: `anchor_vector`
+  (`bytea`, the 2958-dimensional vector stored as float32-encoded bytes — an
+  11832-byte blob, 2958 × 4; no SQL queryability is required, only whole-vector
+  reads; encode/decode is the application layer's responsibility — `apps/web/`
+  on write, feature 005 on read at inference time), `anchor_captured_at`
+  (timestamp with time zone), and `anchor_model_version` (text, matching the
+  model name + version recorded in `docs/MODELS.md`, e.g.
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`).
 - **FR-019**: Row-level security MUST permit a user to read and update only
   their own anchor fields. No RLS path may expose one user's anchor vector to a
   team lead, admin, or any other user (Constitution Principle I). Existing
@@ -459,9 +500,10 @@ reusing the cross-tab broadcast pattern from feature 003.
 - **FR-021**: For an employee with no stored anchor, `/app` MUST render a calm
   calibration banner explaining that stress detection is unavailable until they
   calibrate, with a clearly labeled control that opens the anchor recording UI.
-- **FR-022**: The banner's re-open control MUST open the anchor recording UI on
-  the dashboard route (the only in-feature path to recalibrate; the account-
-  settings recalibration entry point is out of scope — feature 005).
+- **FR-022**: The banner's calibrate-now control MUST navigate to
+  `/app/calibrate`, a dedicated route that hosts the anchor recording UI (the
+  same core component as the onboarding step, wrapped in its own page). The
+  account-settings recalibration entry point remains out of scope — feature 005.
 - **FR-023**: The banner MUST be dismissible for the current session. After
   dismissal it MUST stay hidden for the remainder of that session.
 - **FR-024**: The banner MUST reappear in future sessions while the employee
@@ -494,9 +536,11 @@ reusing the cross-tab broadcast pattern from feature 003.
 ### Functional Requirements — Demo seed
 
 - **FR-031**: The demo seed script (`scripts/seed-demo.ts`) MUST inject a
-  deterministic synthetic anchor vector (fixed-seed generation, 2958-d) into
-  every `*@demo.serenify.local` profile, along with a capture timestamp and the
-  model-version string, so demo users bypass the calibration banner.
+  deterministic synthetic anchor into every `*@demo.serenify.local` profile,
+  along with a capture timestamp and the model-version string, so demo users
+  bypass the calibration banner. The synthetic anchor MUST match the FR-018
+  storage shape: an 11832-byte float32 blob (2958 floats) generated with a
+  fixed RNG seed (seed value `42`) so it is reproducible across re-runs.
 - **FR-032**: Synthetic anchor injection MUST be deterministic and re-runnable
   — repeated seeding produces the same vector values.
 - **FR-033**: Synthetic anchor injection MUST apply only to the demo cohort.
@@ -556,7 +600,8 @@ reusing the cross-tab broadcast pattern from feature 003.
   baseline, computed once from a ~60-second recording. It is the per-user
   calibration reference from which all future video stress predictions are
   computed as deltas (Constitution Principle II). Stored on the user's own
-  `public.profiles` row; private to that user. ~12 KB at float32.
+  `public.profiles` row as an 11832-byte float32 `bytea` blob (FR-018); private
+  to that user.
 - **Anchor Capture Metadata**: The capture timestamp (`anchor_captured_at`) and
   the model-version string (`anchor_model_version`, e.g.
   `serenify-video-lbptop-motion-rf-calibrated@2.0.0`) stored alongside the
@@ -569,8 +614,8 @@ reusing the cross-tab broadcast pattern from feature 003.
   stored anchor. Dismissible per session, reappears across sessions until an
   anchor is captured, and carries the control to open the recording UI.
 - **Camera Device Selection**: The chosen video input device for recording,
-  surfaced via the device picker. (Whether the choice is remembered for next
-  time is an Open Question.)
+  surfaced via the device picker and remembered in `localStorage` across visits
+  (falls back to the default camera if the remembered device is gone).
 - **Anchor Extraction Endpoint**: The single FastAPI endpoint in `apps/api/`
   that decodes the uploaded clip, runs the LBP-TOP + motion feature-extraction
   pipeline, returns the anchor vector, and deletes the raw bytes immediately.
@@ -649,36 +694,71 @@ The following are explicitly excluded from this feature:
   `/speckit.plan` / `/speckit.tasks` against the Constitution Principle V
   calm-voice rubric.
 
-### Open Questions (resolved with informed defaults; flagged for `/speckit.clarify` and `/speckit.plan`)
+### Resolved Decisions
 
-These have working defaults so the spec is buildable; each is flagged for
-explicit confirmation in `/speckit.clarify` or decision in `/speckit.plan`:
+All open questions raised during specification and chat review have been
+resolved (clarification completed externally — this is not a `/speckit.clarify`
+output). The audit trail below records what was open and how it resolved.
 
-- **Anchor vector column shape** (`jsonb` / `float[]` / `bytea`): deferred to
-  `/speckit.plan`; trade-offs (query ergonomics, storage size, float precision,
-  future rolling-window compatibility) to be surfaced there. The model contract
-  suggests `bytea` or a JSON-encoded array. No spec default — a pure planning
-  decision.
-- **Who writes the anchor to Supabase**: default leans to the privacy-cleaner
-  option — `apps/web/` writes the vector using the user's session-scoped client
-  after receiving it in the backend response, avoiding a service-role key in
-  the backend. The alternative (FastAPI writes directly with a service-role
-  key) is simpler ergonomically. This touches Principle I data flow and the
-  Principle IX secrets posture; to be confirmed in `/speckit.clarify` and
-  decided in `/speckit.plan` with a `docs/DECISIONS.md` entry.
-- **"Skip for now" placement**: default is a low-emphasis affordance available
-  throughout the step (not a single bottom-only link), consistent with
-  calm-first non-coercion. To be confirmed at `/speckit.clarify`.
-- **Banner dismissal persistence**: default per the primary journey — dismissal
-  is per-session and the banner reappears each new session until calibration is
-  completed (FR-023/FR-024). To be confirmed at `/speckit.clarify` (the
-  alternative is persisting a dismissal in `localStorage` until completion).
-- **Device-picker memory**: default is to remember the user's chosen camera
-  (e.g., in `localStorage`) for next time. To be confirmed at `/speckit.clarify`.
-- **Backend health pre-check**: default is yes — the web app pings a backend
-  health endpoint before showing the recording step so it fails fast if the
-  backend is down, rather than letting the user record 60 seconds first. To be
-  confirmed at `/speckit.clarify`.
+1. **Anchor vector column shape** — decided: `bytea`, the 2958-d vector stored
+   as float32-encoded bytes (an 11832-byte blob). No SQL queryability is needed
+   (whole-vector reads only); decode via numpy on the Python side and
+   `Float32Array` on the JS side. A small debug helper under `packages/ml-video/`
+   decodes and inspects a stored row. (FR-018.)
+
+2. **Who writes the anchor to Supabase** — decided: the web app writes. The
+   FastAPI service returns the vector in its response and `apps/web/` writes it
+   to `public.profiles` via the user's session-scoped Supabase client (not
+   service-role); the backend holds no Supabase database credentials. The
+   "browser closes between receive and write" race is acceptable — the backend
+   deletes the raw bytes regardless, so there is no leak risk, just a re-record
+   next session. (FR-015, FR-018, FR-019.)
+
+3. **"Skip for now" placement** — decided: hidden on initial entry, revealed
+   only after (a) one extraction failure or (b) the employee scrolls past the
+   explanation copy. A calm-first nudge toward completion, not a hard gate — the
+   skip stays genuinely available once shown and navigates to `/app` immediately
+   when invoked. (FR-004, FR-007.)
+
+4. **Banner dismissal persistence** — decided: session-only. Closing the
+   browser, signing out, or starting a new browser session brings the banner
+   back; it goes away permanently only when calibration completes. (FR-023,
+   FR-024.)
+
+5. **Device-picker memory** — decided: yes. Remember the chosen camera in
+   `localStorage`; if the remembered device is absent at the next visit, fall
+   back to the default camera without error. (FR-005.)
+
+6. **Backend health pre-check** — decided: yes. The web app pings `GET /healthz`
+   on the FastAPI service before showing the recording step; if unreachable, the
+   step shows calm "calibration is temporarily unavailable, please try again
+   later" copy instead of letting the employee record 60 seconds into a black
+   hole. (FR-048.)
+
+7. **Backend–DB authentication tension (US3 AS5 + FR-015)** — decided: resolved
+   by decision 2. The backend has no database credentials and no DB write path.
+   FR-015 and US3 acceptance scenario 5 were reworded to drop the "backend
+   authenticates to the database" language; the backend reads only env-var
+   credentials (e.g., `SUPABASE_JWT_SECRET` for verifying inbound JWTs). (FR-015,
+   US3 AS5.)
+
+8. **Banner "calibrate now" UX** — decided: a dedicated route at
+   `/app/calibrate`, not a modal/sheet on `/app` and not a redirect to
+   `/onboarding`. The page reuses the same core recording component as the
+   onboarding step, wrapped in its own page. (FR-022.)
+
+9. **FastAPI endpoint authentication** — decided: required. `/anchor` verifies
+   the user's Supabase session JWT from the `Authorization: Bearer <token>`
+   header on every request, using a `SUPABASE_JWT_SECRET` from environment
+   variables (Principle IX). Unauthenticated requests get a 401; the verified
+   `user_id` from the JWT is the only identity context — no client-supplied user
+   id is trusted. (FR-046, US3 AS5.)
+
+10. **Video format** — decided: accept both MP4 (H.264) and WebM (VP8/VP9)
+    uploads, decoded transparently by `cv2.VideoCapture` (FFmpeg backend), with
+    no server-side transcoding. Other formats MAY return 415. Browser
+    `MediaRecorder` defaults work — Safari emits MP4, Chrome/Firefox emit WebM.
+    (FR-047.)
 
 ## Success Criteria *(mandatory)*
 
