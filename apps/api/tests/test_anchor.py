@@ -9,7 +9,7 @@ import ml_video
 import numpy as np
 from ml_video import pipeline
 
-from tests.conftest import FakeFaceMesh, NoFaceMesh, make_token
+from tests.conftest import FakeFaceMesh, NoFaceMesh, make_es256_token, make_token
 
 FEATURE_DIM = 2958
 
@@ -57,6 +57,57 @@ def test_anchor_invalid_token_returns_401(client, mp4_clip_bytes):
 def test_anchor_expired_token_returns_401(client, mp4_clip_bytes):
     expired = make_token(exp_delta=-10)
     assert _post(client, expired, mp4_clip_bytes).status_code == 401
+
+
+def test_anchor_accepts_es256_token_via_jwks(client, mp4_clip_bytes, monkeypatch, es256_keypair):
+    """A Supabase-style ES256 token verifies against the JWKS public key (FR-046).
+
+    The current Supabase signing default is asymmetric; the JWK client is stubbed
+    to return our test public key (no network), proving the asymmetric branch.
+    """
+    from app import auth
+
+    private_key, public_key = es256_keypair
+
+    class _FakeSigningKey:
+        key = public_key
+
+    class _FakeJWKClient:
+        def get_signing_key_from_jwt(self, _token):
+            return _FakeSigningKey()
+
+    monkeypatch.setattr(auth, "_jwk_client", lambda _url: _FakeJWKClient())
+    monkeypatch.setattr(pipeline, "_build_face_mesh", FakeFaceMesh)
+
+    resp = _post(client, make_es256_token(private_key), mp4_clip_bytes)
+
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["dim"] == FEATURE_DIM
+
+
+def test_anchor_rejects_es256_signed_by_wrong_key(
+    client, mp4_clip_bytes, monkeypatch, es256_keypair
+):
+    """A real signature check: a token signed by a key other than the JWKS key 401s."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    from app import auth
+
+    private_key, _ = es256_keypair
+    foreign_public_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+
+    class _FakeSigningKey:
+        key = foreign_public_key
+
+    class _FakeJWKClient:
+        def get_signing_key_from_jwt(self, _token):
+            return _FakeSigningKey()
+
+    monkeypatch.setattr(auth, "_jwk_client", lambda _url: _FakeJWKClient())
+
+    resp = _post(client, make_es256_token(private_key), mp4_clip_bytes)
+
+    assert resp.status_code == 401
 
 
 def test_anchor_wrong_media_type_returns_415(client, valid_token):

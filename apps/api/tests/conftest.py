@@ -12,6 +12,9 @@ import time
 # Seed env before any app import (settings are required, no defaults).
 os.environ.setdefault("SUPABASE_JWT_SECRET", "test-secret-please-change-0123456789abcdef")
 os.environ.setdefault("ALLOWED_ORIGIN", "http://127.0.0.1:3000")
+# A JWKS source so the asymmetric (ES256) branch is exercised; the tests stub the
+# JWK client so no network is touched. HS256 tokens ignore this and use the secret.
+os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
 
 import cv2  # noqa: E402
 import jwt  # noqa: E402
@@ -119,3 +122,29 @@ def make_token(
 @pytest.fixture
 def valid_token() -> str:
     return make_token()
+
+
+@pytest.fixture(scope="session")
+def es256_keypair():
+    """An EC P-256 keypair standing in for a Supabase JWKS signing key."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    private_key = ec.generate_private_key(ec.SECP256R1())
+    return private_key, private_key.public_key()
+
+
+def make_es256_token(
+    private_key,
+    *,
+    kid: str = "test-kid",
+    sub: str = "22222222-2222-2222-2222-222222222222",
+    aud: str = "authenticated",
+    exp_delta: int = 3600,
+) -> str:
+    """Mint a Supabase-style asymmetric (ES256) access token with a ``kid``."""
+    return jwt.encode(
+        {"sub": sub, "aud": aud, "exp": int(time.time()) + exp_delta},
+        private_key,
+        algorithm="ES256",
+        headers={"kid": kid},
+    )

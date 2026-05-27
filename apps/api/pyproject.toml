@@ -10,7 +10,9 @@ dependencies = [
     "fastapi>=0.115",
     "uvicorn[standard]>=0.30",
     "python-multipart>=0.0.9",
-    "pyjwt>=2.9",
+    # [crypto] pulls `cryptography`, required to verify Supabase's asymmetric
+    # ES256 access tokens (JWKS); PyJWT cannot do EC verification without it.
+    "pyjwt[crypto]>=2.9",
     "pydantic-settings>=2.4",
     "ml-video",
 ]

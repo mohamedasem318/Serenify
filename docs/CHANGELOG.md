@@ -957,3 +957,39 @@ whitelist + `has_anchor()` function + verification queries),
 `data-model.md` (column readability + calibration-status derivation),
 `research.md` (R-5 rationale + headline table), and `docs/DECISIONS.md`
 (architectural decision entry 2026-05-27).
+
+## 2026-05-28 — fix(004-onboarding-video-anchor) — anchor service auth-mode amendment: verify Supabase ES256 via JWKS (HS256 fallback)
+
+DECISION-9 / FR-046 specified the anchor service verify the Supabase access
+token "HS256 with the shared secret". Smoke testing surfaced that the current
+Supabase CLI (and Supabase cloud) sign user access tokens with ASYMMETRIC
+ES256 signing keys by default — a `kid` header + a JWKS at
+`<supabase_url>/auth/v1/.well-known/jwks.json` — not the legacy HS256 shared
+secret. The HS256-only verifier rejected every real token (`401`), which the
+recorder surfaced as the generic "calibration temporarily unavailable" copy
+after a full 60s recording; `/healthz` (no auth) still passed, so the failure
+only appeared at upload time.
+
+- `verify_jwt` now verifies asymmetric tokens (ES256/RS256/EdDSA) against
+  Supabase's published JWKS public keys (a cached `PyJWKClient`), matched by the
+  token `kid`. The HS256 shared-secret path is retained as a fallback for legacy
+  projects and the unit tests. The algorithm allow-list is pinned per branch
+  (never read from the token) to avoid algorithm confusion.
+- New optional setting `SUPABASE_URL` (the JWKS source). When unset the verifier
+  is HS256-only. Verifying public keys needs no secret, so DECISION-9's
+  no-DB-credentials posture is preserved.
+- Dependency: `pyjwt` -> `pyjwt[crypto]` (PyJWT needs `cryptography` for EC
+  verification).
+
+Rationale: production reality (Supabase's asymmetric signing-key default)
+overrides DECISION-9's original HS256-only spec. JWKS verification is the
+prod-correct approach for both local and cloud; the HS256 fallback keeps
+backward compatibility and the existing test suite. Verified end-to-end: a real
+local ES256 access token verifies through the actual `verify_jwt` against the
+live JWKS, and a forged/garbage token still 401s.
+
+Affected artifacts (this commit): `apps/api/app/auth.py` (JWKS + HS256
+fallback), `apps/api/app/config.py` (`supabase_url`), `apps/api/.env.example`
+(`SUPABASE_URL`), `apps/api/pyproject.toml` + `uv.lock` (`pyjwt[crypto]` ->
+`cryptography`), and `apps/api/tests/` (ES256 accept + wrong-key reject tests).
+The separate black-preview fix shipped in `e43f33f`.
