@@ -73,8 +73,9 @@ from-scratch design).
 **Decision**: `anchor_vector BYTEA`, `anchor_captured_at TIMESTAMPTZ`,
 `anchor_model_version TEXT` on `public.profiles`, all nullable, no CHECK. Convert
 `authenticated`'s table-level SELECT into an explicit **column whitelist that
-excludes `anchor_vector`**; widen the UPDATE whitelist to the three anchor
-columns; leave the RLS policies untouched.
+excludes all three anchor columns**; expose calibration status only through a
+scope-guarded `has_anchor()` SECURITY DEFINER function; widen the UPDATE
+whitelist to the three anchor columns; leave the RLS policies untouched.
 
 **Rationale**: This is the load-bearing Principle I decision. Postgres RLS is
 **row**-scoped; the existing `profiles_select_admin` and
@@ -85,21 +86,26 @@ while `authenticated` holds the table-level SELECT grant — exactly the gotcha
 security-slice-1 documented for column UPDATE (verified there with
 `has_column_privilege`; see `docs/DECISIONS.md` 2026-05-25 and the
 pg-column-revoke memory). The only mechanism that actually blocks the column is
-to drop the table SELECT and re-grant a whitelist. Excluding `anchor_vector` from
-that whitelist makes it unreadable by *every* client role (owner, team_lead,
-admin) — the vector becomes write-only from PostgREST in 004, and Principle I
+to drop the table SELECT and re-grant a whitelist. Excluding all three anchor
+columns from that whitelist makes them unreadable by *every* client role (owner,
+team_lead, admin) — they become write-only from PostgREST in 004, and Principle I
 holds structurally rather than by policy convention. `BYTEA` (float32) is the
 compact, lossless representation the model contract suggests (`MODEL_HANDOFF.md`
 §4, ~12 KB/user); it decodes to a `(2958,)` array for the 005 rolling-window
 loop without issue.
 
-**Why the two metadata columns stay readable**: the owner needs
-`anchor_captured_at` on their own row to drive banner visibility. Exposing a
-calibration *timestamp* + *model-version string* (not the vector) to a direct
-manager is low reachable risk, and FR-019 scopes the invariant to the *vector*.
-A stricter posture (a self-scoped `has_anchor()` SECURITY DEFINER boolean +
-excluding the metadata columns too) is available and noted for Mohamed; it is
-not the default because it adds a function for marginal privacy gain.
+**Why all three columns are excluded (stricter posture, chosen 2026-05-27)**:
+an earlier draft left `anchor_captured_at` + `anchor_model_version` readable,
+reasoning FR-019 scopes the invariant to the *vector*. Mohamed elected the
+stricter posture — a manager knowing whether/when a report calibrated could be
+used to pressure them ("why haven't you set up the app yet?"), undercutting the
+Principle I "managers see aggregates, not individuals" trust story. The owner
+therefore cannot read `anchor_captured_at` directly either; banner visibility
+comes from a self-scoped `has_anchor(target_user)` SECURITY DEFINER function
+(`search_path = ''`, `OWNER TO postgres`, scope guard raising if
+`target_user <> auth.uid()`, EXECUTE granted only to `authenticated`). One added
+SECURITY DEFINER construct for a real, bounded privacy gain. See
+`docs/CHANGELOG.md` / `docs/DECISIONS.md` 2026-05-27.
 
 **Alternatives**:
 - *Separate `anchor_calibrations` table with owner-only RLS* — cleanest privacy
@@ -187,8 +193,8 @@ surface than the in-page approach, and skip-state isn't DB-derivable).
 the single source of truth for cross-tab markers and the listener already
 subscribes to `window "storage"`; a sibling helper + one listener branch is
 strictly additive. `router.refresh()` (not hard navigate) lets the server
-components recompute `anchor_captured_at` and naturally fall through to `/app`
-without the step/banner — matching how 003 handled propagation.
+components recompute `has_anchor(auth.uid())` and naturally fall through to
+`/app` without the step/banner — matching how 003 handled propagation.
 
 **Alternatives**: a parallel `BroadcastChannel` (rejected — FR-035 says reuse;
 two mechanisms invite drift); hard `router.push("/app")` (rejected — bypasses the
@@ -262,7 +268,7 @@ shorten-duration env var under test (rejected — changes behavior under test);
 | ml-video install | editable package (`import ml_video`) | Stable import, Docker-clean, own deps/tests. |
 | Deploy | local-only in 004; Dockerfile forward artifact | Spec needs only a local service; deploy is a separate ops task. |
 | Anchor storage | `BYTEA` float32, nullable, no CHECK | Compact/lossless; app-layer validation; 005-compatible. |
-| **Vector privacy** | **SELECT column-whitelist excludes `anchor_vector`** | Column REVOKE is a no-op under a table grant; whitelist is the only mechanism that blocks the manager/admin row-SELECT (Principle I). |
+| **Anchor privacy** | **SELECT column-whitelist excludes all three anchor columns; `has_anchor()` boolean for status** | Column REVOKE is a no-op under a table grant; whitelist is the only mechanism that blocks the manager/admin row-SELECT; status via a scope-guarded SECURITY DEFINER fn keeps even the timestamp from managers (Principle I). |
 | Endpoint | `POST /anchor` multipart → base64 float32 | One-shot; typed POST, no WebSocket; ~16 KB payload. |
 | Auth | JWT (`SUPABASE_JWT_SECRET`, HS256), 401 | No DB round-trip → backend holds zero DB credentials. |
 | Health | `GET /healthz` gated on model-loaded | Fail fast before a 60s recording (FR-048). |

@@ -75,8 +75,9 @@ default; collapses to a plain numeric tick under `prefers-reduced-motion`
 
 `components/anchor/calibration-banner.tsx`.
 
-- Rendered by `/app` **only** for an employee whose `anchor_captured_at IS NULL`
-  (the Server Component decides; managers never reach this branch, FR-029).
+- Rendered by `/app` **only** for an employee with no stored anchor — the
+  Server Component calls `has_anchor(auth.uid())` and shows the banner when it
+  returns `false` (managers never reach this branch, FR-029).
 - Calm copy: stress detection is unavailable until calibration; "Calibrate now"
   → `/app/calibrate`.
 - Dismissal is **session-only** via `sessionStorage["serenify-anchor-banner-dismissed"]`
@@ -106,7 +107,8 @@ component code (transport rule). Attaches `Authorization: Bearer <token>` and
   `AnchorRecorder`) for employees; managers complete at the name step (their
   `completeOnboarding` still server-redirects to `/app`, FR-029).
 - `app/(authed)/app/page.tsx` — employee branch renders `CalibrationBanner` when
-  `anchor_captured_at IS NULL`; managers see their role placeholder (unchanged).
+  `has_anchor(auth.uid())` returns `false`; managers see their role placeholder
+  (unchanged).
 - `app/(authed)/app/calibrate/page.tsx` — **employee-only** (redirect
   team_lead/admin → `/app`); renders `AnchorRecorder` with `context="calibrate"`.
 
@@ -116,5 +118,5 @@ component code (transport rule). Attaches `Authorization: Bearer <token>` and
   `captured:${Date.now()}`; `parseAnchorBroadcast(newValue)` recognizes it.
 - The listener `router.refresh()`es a sibling tab sitting on the onboarding step
   / `/app/calibrate` when an anchor-captured event arrives (FR-034). Refresh →
-  server recomputes `anchor_captured_at` → falls through to `/app` without the
-  step/banner.
+  server recomputes `has_anchor(auth.uid())` → falls through to `/app` without
+  the step/banner.

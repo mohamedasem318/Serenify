@@ -1715,3 +1715,75 @@ template edit is required.
 technique), or the provisional 005/006 slots are renamed when their planning
 starts — each follows the same Governance amendment path and is logged here and
 in `docs/CHANGELOG.md`.
+
+---
+
+## 2026-05-27 — feature 004 DECISION-12 amended: all anchor columns private; `has_anchor()` helper
+
+**Status**: Accepted (plan amendment; recorded in `docs/CHANGELOG.md`
+2026-05-27 per Principle VIII).
+
+**Context**: Feature 004 adds `anchor_vector`, `anchor_captured_at`, and
+`anchor_model_version` to `public.profiles`. Postgres RLS is row-scoped, so the
+existing `profiles_select_admin` (admins see all rows) and
+`profiles_select_direct_reports` (a team_lead sees reports' rows) policies expose
+every column of an admitted row. The plan's original DECISION-12 blocked only
+`anchor_vector` (via a SELECT column whitelist) and left the two metadata columns
+readable by managers/admins, on the reasoning that FR-019 scopes the privacy
+invariant to the *vector*.
+
+**Decision**: Adopt the stricter posture. **All three** anchor columns are
+excluded from the `authenticated` SELECT column whitelist — none is readable by
+any client role through table grants. Calibration status is exposed only via a
+new scope-guarded SECURITY DEFINER function:
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_anchor(target_user uuid)
+RETURNS boolean LANGUAGE plpgsql STABLE
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  IF target_user <> auth.uid() THEN
+    RAISE EXCEPTION 'forbidden: may only query own anchor state'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM public.profiles
+                 WHERE id = target_user AND anchor_vector IS NOT NULL);
+END;
+$$;
+ALTER FUNCTION public.has_anchor(uuid) OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.has_anchor(uuid) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.has_anchor(uuid) TO authenticated;
+```
+
+- `SECURITY DEFINER` + `search_path = ''` (fully-qualified names) + `OWNER TO
+  postgres`, matching the slice-1 hardening posture for DEFINER helpers.
+- **Scope guard**: raises `42501` when `target_user <> auth.uid()`, so a caller
+  can only ask about themselves — a manager cannot probe a report's calibration
+  state.
+- `EXECUTE` revoked from `PUBLIC`/`anon`, granted only to `authenticated` (not
+  referenced by any RLS policy, so no anon grant needed — slice-1 default).
+- The web app calls `has_anchor(auth.uid())` to drive the `/app` calibration
+  banner, replacing the prior plan-time read of `anchor_captured_at IS NULL`.
+
+**Rationale**: A manager knowing whether — or when — a direct report calibrated
+is a lever for pressure ("why haven't you set up your wellness app yet?"), which
+undercuts the Principle I trust story that managers see aggregates, not
+individuals. The cost is one SECURITY DEFINER construct; the privacy gain is real
+and bounded. The owner losing direct read of `anchor_captured_at` is acceptable
+because 004's only consumer of that fact is banner visibility, which the boolean
+serves exactly.
+
+**Scope note**: feature 005's inference read path for `anchor_vector`
+(server-side service-role read, or a self-scoped SECURITY DEFINER function) is
+still 005's decision and is **unaffected** by this change.
+
+**Affected artifacts** (plan-amendment commit): `specs/004-onboarding-video-anchor/`
+`plan.md` (DECISION-12 + DECISION-13/14/15 banner-read refs), `contracts/migration.md`,
+`data-model.md`, `research.md`; `docs/CHANGELOG.md` 2026-05-27. The migration that
+implements `has_anchor()` + the tightened grants lands during `/speckit.implement`.
+
+**Revisit if**: a later manager-facing feature (011/012) needs an
+aggregate "team calibration coverage" metric — that would be served by a
+separate admin-scoped aggregate function, never by relaxing per-individual
+`has_anchor` scope.

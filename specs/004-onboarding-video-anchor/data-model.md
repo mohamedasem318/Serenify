@@ -10,12 +10,15 @@ whitelist) is the load-bearing privacy mechanism — see 📌 DECISION-12 and
 | Column | Type | Null | Default | Written by | Readable by |
 |--------|------|------|---------|-----------|-------------|
 | `anchor_vector` | `bytea` | YES | NULL | Owner (own row, session client) or `service_role` (seed) | **No client role** — excluded from the SELECT whitelist (Principle I). `service_role` only. |
-| `anchor_captured_at` | `timestamptz` | YES | NULL | Owner (own row) or `service_role` | Owner (own row), and managers/admins via existing row policies (metadata, not the vector). |
-| `anchor_model_version` | `text` | YES | NULL | Owner (own row) or `service_role` | Same as `anchor_captured_at`. |
+| `anchor_captured_at` | `timestamptz` | YES | NULL | Owner (own row) or `service_role` | **No client role** — excluded from the SELECT whitelist. `service_role` only. |
+| `anchor_model_version` | `text` | YES | NULL | Owner (own row) or `service_role` | **No client role** — excluded from the SELECT whitelist. `service_role` only. |
 
 - **Nullability**: all three are nullable. A profile with no anchor (every new
   employee before calibration; every manager forever) is valid. "Has the user
-  calibrated?" ≡ `anchor_captured_at IS NOT NULL`.
+  calibrated?" is exposed **only** via the scope-guarded SECURITY DEFINER
+  function `has_anchor(auth.uid())` (returns `anchor_vector IS NOT NULL` for the
+  caller's own row; raises if asked about anyone else). No client role can read
+  `anchor_captured_at` directly — see `contracts/migration.md`.
 - **No CHECK constraint** on `octet_length(anchor_vector)`. The web app only ever
   writes a vector it received from the backend (`dim: 2958` in the response);
   the encoding contract (11832 = 2958 × 4 LE float32 bytes) is enforced in the
@@ -63,5 +66,7 @@ float32**, 4 bytes per element = **11832 bytes**.
   (FR-029). `full_name` IS NULL still drives the proxy onboarding gate.
 - RLS policies `profiles_select_self`, `profiles_select_admin`,
   `profiles_select_direct_reports`, `profiles_update_self_safe_fields` — **left
-  unchanged**. The privacy guarantee for `anchor_vector` comes from the column
-  GRANT change, not a policy change (see `contracts/migration.md`).
+  unchanged**. The privacy guarantee for the anchor columns comes from the
+  column GRANT change (all three excluded from the `authenticated` SELECT
+  whitelist) plus the scope-guarded `has_anchor()` SECURITY DEFINER function —
+  not a policy change (see `contracts/migration.md`).

@@ -924,3 +924,36 @@ Affected artifacts, all in this commit:
 Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
 principles by number, not by the literal strings `rPPG`, `webcam`,
 `004-webcam-and-rppg`, or `ml-video` — zero matches; no template edit required.
+
+## 2026-05-27 — plan(004-onboarding-video-anchor) — tighten DECISION-12: block all anchor metadata from managers
+
+The original plan.md DECISION-12 left anchor_captured_at and
+anchor_model_version readable by managers and admins through the existing
+row-level SELECT policies (profiles_select_admin,
+profiles_select_direct_reports). Mohamed elected the stricter alternative
+DECISION-12 originally flagged for review:
+
+- anchor_captured_at and anchor_model_version are ALSO excluded from the
+  `authenticated` SELECT column whitelist. None of the three anchor columns
+  are readable by any client role via table grants.
+- A new SECURITY DEFINER function `has_anchor(target_user uuid) returns
+  boolean` is added (search_path pinned, scope-guarded so callers can only
+  query themselves; EXECUTE grant scoped to `authenticated`, slice-1 default
+  posture for SECURITY DEFINER functions).
+- The web app uses `has_anchor(auth.uid())` to drive banner visibility,
+  replacing the prior plan-time read of `anchor_captured_at IS NULL` on the
+  owner's profile row.
+
+Rationale: a manager seeing whether or when a direct report calibrated
+could be used to pressure them ("why haven't you set up your wellness
+app yet?"), undercutting the Principle I trust story (managers see
+aggregates, not individuals). The function adds one SECURITY DEFINER
+construct; privacy gain is real and bounded.
+
+Affected artifacts (this commit): `specs/004-onboarding-video-anchor/plan.md`
+(DECISION-12 rewritten as the chosen posture; DECISION-13/14/15 banner-read
+references updated to `has_anchor()`), `contracts/migration.md` (tighter
+whitelist + `has_anchor()` function + verification queries),
+`data-model.md` (column readability + calibration-status derivation),
+`research.md` (R-5 rationale + headline table), and `docs/DECISIONS.md`
+(architectural decision entry 2026-05-27).

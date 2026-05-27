@@ -26,19 +26,54 @@ All nullable, no defaults, no CHECK (app-layer validates the 11832-byte encoding
 `authenticated` currently holds Supabase's table-level SELECT grant. A
 column-level `REVOKE SELECT (anchor_vector)` would be a **no-op** under that
 table grant (the slice-1 finding, verified there with `has_column_privilege`).
-So drop the table SELECT and re-grant an explicit whitelist that **omits
-`anchor_vector`**:
+So drop the table SELECT and re-grant an explicit whitelist that **omits all
+three anchor columns**:
 
 ```sql
 REVOKE SELECT ON public.profiles FROM authenticated;
-GRANT  SELECT (id, full_name, role, manager_id, created_at, updated_at,
-               anchor_captured_at, anchor_model_version)
+GRANT  SELECT (id, full_name, role, manager_id, created_at, updated_at)
   ON public.profiles TO authenticated;
 ```
 
-After this, **no client role can SELECT `anchor_vector`** — the manager/admin
-row-level SELECT policies remain but cannot reach the column. `service_role`
-(seed, future 005 server-side read) is untouched and retains full access.
+After this, **no client role can SELECT any anchor column** — the manager/admin
+row-level SELECT policies remain but cannot reach `anchor_vector`,
+`anchor_captured_at`, or `anchor_model_version`. `service_role` (seed, future
+005 server-side read) is untouched and retains full access.
+
+## `has_anchor()` — calibration status without exposing the columns
+
+Because the owner can no longer SELECT `anchor_captured_at`, banner visibility is
+derived from a scope-guarded SECURITY DEFINER function (slice-1 hardening
+pattern: `search_path = ''`, `OWNER TO postgres`, EXECUTE scoped to
+`authenticated`):
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_anchor(target_user uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  IF target_user <> auth.uid() THEN
+    RAISE EXCEPTION 'forbidden: may only query own anchor state'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = target_user AND anchor_vector IS NOT NULL
+  );
+END;
+$$;
+
+ALTER FUNCTION public.has_anchor(uuid) OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.has_anchor(uuid) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.has_anchor(uuid) TO authenticated;
+```
+
+The scope guard means a manager cannot call `has_anchor(<a report's id>)` — it
+raises. The web app calls `has_anchor(auth.uid())` to decide the banner.
 
 > The whitelist MUST list **every** column any existing query reads. Blast-radius
 > audit (in `/speckit.tasks`): `proxy.ts`, header, account page, `role-gate.ts`
@@ -60,19 +95,26 @@ SECURITY DEFINER RPCs.
 ## Verification (run in `/speckit.tasks` / smoke)
 
 ```sql
--- vector unreadable by authenticated; metadata readable
-select has_column_privilege('authenticated','public.profiles','anchor_vector','SELECT');        -- false
-select has_column_privilege('authenticated','public.profiles','anchor_captured_at','SELECT');   -- true
+-- ALL three anchor columns unreadable by authenticated
+select has_column_privilege('authenticated','public.profiles','anchor_vector','SELECT');         -- false
+select has_column_privilege('authenticated','public.profiles','anchor_captured_at','SELECT');    -- false
+select has_column_privilege('authenticated','public.profiles','anchor_model_version','SELECT');  -- false
 select has_column_privilege('authenticated','public.profiles','full_name','SELECT');             -- true (unchanged)
 -- owner can write the three anchor columns
 select has_column_privilege('authenticated','public.profiles','anchor_vector','UPDATE');         -- true
+-- has_anchor: authenticated may EXECUTE; anon may not
+select has_function_privilege('authenticated','public.has_anchor(uuid)','EXECUTE');              -- true
+select has_function_privilege('anon','public.has_anchor(uuid)','EXECUTE');                       -- false
 ```
 
-Behavioral check: a `team_lead`/`admin` selecting a report's row gets the row but
-a `select=anchor_vector` is denied/empty (0 cross-user vector reads — SC-005).
+Behavioral checks: a `team_lead`/`admin` selecting a report's row gets the row
+but cannot read `anchor_vector` / `anchor_captured_at` / `anchor_model_version`
+(0 cross-user anchor reads — SC-005); and `has_anchor(<another user's id>)`
+raises `42501` (scope guard).
 
 ## Rollback note
 
 Dropping the three columns also requires restoring the prior table-level SELECT
-grant (`GRANT SELECT ON public.profiles TO authenticated;`) if this migration is
-ever reverted, so existing reads keep working. Documented here for the reverter.
+grant (`GRANT SELECT ON public.profiles TO authenticated;`) and
+`DROP FUNCTION public.has_anchor(uuid);` if this migration is ever reverted, so
+existing reads keep working. Documented here for the reverter.

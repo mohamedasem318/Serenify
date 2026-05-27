@@ -24,10 +24,12 @@ The work falls in five streams:
    video bytes are deleted immediately after extraction (Principle I).
 2. **Database** — three nullable columns on `public.profiles` (`anchor_vector
    BYTEA`, `anchor_captured_at TIMESTAMPTZ`, `anchor_model_version TEXT`), a
-   column-grant change that makes `anchor_vector` unreadable by ANY client role
-   (so the existing manager/admin row-level SELECT policies cannot expose it —
-   the load-bearing Principle I decision, 📌 DECISION-12), and a widened
-   UPDATE whitelist so a user can write their own anchor.
+   column-grant change that makes all three anchor columns unreadable by ANY
+   client role (so the existing manager/admin row-level SELECT policies cannot
+   expose them), plus a scope-guarded `has_anchor()` function that exposes only a
+   self-calibration boolean — the load-bearing Principle I decision,
+   📌 DECISION-12 — and a widened UPDATE whitelist so a user can write their own
+   anchor.
 3. **Web app** — a client recording component (device picker → permission →
    60-second countdown → upload → extract → success/fail) driven by an explicit
    state machine, surfaced inline as the onboarding second step and at a new
@@ -127,7 +129,7 @@ not engaged (no LLM). VIII is engaged structurally (this is the plan artifact).
 
 | Principle | Status | How this plan honours it |
 |-----------|--------|--------------------------|
-| I. Privacy by Architecture (NON-NEG) | ✅ | Raw video bytes are deleted server-side immediately after extraction, on success or failure, and never written to durable storage (📌 DECISION-8); the upload is held in a temp file deleted in a `finally`. The 2958-d vector is the only capture artifact stored. **`anchor_vector` is unreadable by every client role** — the SELECT column-whitelist (📌 DECISION-12) excludes it, so the pre-existing `profiles_select_admin` / `profiles_select_direct_reports` row-level policies (which would otherwise expose it to managers, since Postgres RLS is row- not column-scoped) cannot reach it. No manager-facing surface renders anchor data. The backend holds **no Supabase DB credentials** (📌 DECISION-9 / resolved decision 2); it returns the vector and the *web app* writes it via the user's session-scoped client. |
+| I. Privacy by Architecture (NON-NEG) | ✅ | Raw video bytes are deleted server-side immediately after extraction, on success or failure, and never written to durable storage (📌 DECISION-8); the upload is held in a temp file deleted in a `finally`. The 2958-d vector is the only capture artifact stored. **No anchor column is readable by any client role** — the SELECT column-whitelist (📌 DECISION-12) excludes all three (`anchor_vector`, `anchor_captured_at`, `anchor_model_version`), so the pre-existing `profiles_select_admin` / `profiles_select_direct_reports` row-level policies (which would otherwise expose them to managers, since Postgres RLS is row- not column-scoped) cannot reach them; calibration status is exposed only through the scope-guarded `has_anchor()` SECURITY DEFINER function (a caller may ask only about themselves). No manager-facing surface renders anchor data. The backend holds **no Supabase DB credentials** (📌 DECISION-9 / resolved decision 2); it returns the vector and the *web app* writes it via the user's session-scoped client. |
 | II. Subject-Disjoint ML Evaluation (NON-NEG) | ✅ | 60-second baseline is fixed (FR-008). The model artifact has a `docs/MODELS.md` entry (`serenify-video-lbptop-motion-rf-calibrated@2.0.0`, created in the feature's first commit) and artifacts live in `packages/ml-video/models/` per the principle. The anchor is the per-user calibration reference the principle mandates. Storage is `BYTEA` (📌 DECISION-12), which does not preclude the feature-005 rolling-window loop (the bytes decode to a `(2958,)` float32 array either way). No metrics are computed here. |
 | III. Modality Isolation | ✅ | The LBP-TOP + motion pipeline and model loader live in `packages/ml-video/` (per the Principle III description as amended to "video stress pipeline (LBP-TOP + motion features, per-user delta calibration)"). `apps/api/` imports from it (📌 DECISION-4/5); the extraction logic is **not** inlined in route handlers. No audio/physio coupling; the package exposes a clean `compute_anchor(video_path) -> np.ndarray` plus a model-loader the predict path (005) will consume. |
 | V. Calm-First Design Language | ✅ | Every copy string in the anchor flow and banner uses calm voice (📌 DECISION-14, copy drafted in research.md, finalized at `/speckit.tasks`): explanation ("we need a moment to learn what calm looks like for you"), permission-denied, failure/retry ("we couldn't read your face clearly — try again with better lighting or facing the camera"), the temporarily-unavailable health-fail copy, and the banner — no exclamation marks, no "REQUIRED"/"MANDATORY", no clinical jargon. Mist & Meadow tokens + shadcn primitives from 003; amber (never red) for any callout. |
@@ -346,32 +348,73 @@ rows) policies therefore expose **every column** of those rows — including a n
 Supabase gotcha slice-1 hit for UPDATE — verified there via
 `has_column_privilege`). So, mirroring the slice-1 UPDATE-whitelist precedent,
 this migration converts `authenticated`'s table SELECT into an explicit column
-whitelist that **excludes `anchor_vector`**:
+whitelist that **excludes all three anchor columns**:
 
 ```sql
 REVOKE SELECT ON public.profiles FROM authenticated;
-GRANT  SELECT (id, full_name, role, manager_id, created_at, updated_at,
-               anchor_captured_at, anchor_model_version)
+GRANT  SELECT (id, full_name, role, manager_id, created_at, updated_at)
   ON public.profiles TO authenticated;
 ```
 
-Result: **no client role can SELECT `anchor_vector`** — not the owner, not a
-team_lead, not an admin. The vector is *write-only* from any browser/PostgREST
-path in 004; the manager/admin row policies stay intact but structurally cannot
-reach the biometric column. (Feature 005's inference read path will be decided
-in 005 — server-side service-role read, or a self-scoped SECURITY DEFINER
-function; out of scope here.)
+Result: **no client role can SELECT any anchor column** — not `anchor_vector`,
+`anchor_captured_at`, or `anchor_model_version`, for the owner or a team_lead or
+an admin. The three columns are *write-only* from any browser/PostgREST path in
+004; the manager/admin row policies stay intact but structurally cannot reach
+the anchor data. (Feature 005's inference read path will be decided in 005 —
+server-side service-role read, or a self-scoped SECURITY DEFINER function; out
+of scope here and **unaffected** by this change.)
 
-`anchor_captured_at` and `anchor_model_version` **remain readable** by
-`authenticated`: the owner reads `anchor_captured_at` on their own row
-(`profiles_select_self`) to drive banner visibility. A manager/admin reading a
-report's row sees these two metadata fields (a calibration *timestamp* and a
-model-version string) but **never the vector** — FR-019's privacy invariant is
-specifically the *vector*, and metadata exposure to a direct manager is low
-reachable risk. *(If zero metadata exposure is wanted, the lighter alternative
-is a self-scoped `has_anchor()` SECURITY DEFINER boolean and excluding the two
-metadata columns from the whitelist too — flagged for Mohamed's review; not
-chosen by default because it adds a function for marginal gain.)*
+**Banner visibility via `has_anchor()`.** Because the owner can no longer read
+`anchor_captured_at` directly, calibration status is exposed through a
+scope-guarded SECURITY DEFINER function (slice-1 hardening pattern):
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_anchor(target_user uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+BEGIN
+  -- scope guard: a caller may only ask about themselves, so a manager cannot
+  -- probe a report's calibration state.
+  IF target_user <> auth.uid() THEN
+    RAISE EXCEPTION 'forbidden: may only query own anchor state'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = target_user AND anchor_vector IS NOT NULL
+  );
+END;
+$$;
+
+ALTER FUNCTION public.has_anchor(uuid) OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.has_anchor(uuid) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.has_anchor(uuid) TO authenticated;
+```
+
+- `SECURITY DEFINER` + `SET search_path = ''` (all object names fully-qualified
+  inside — `public.profiles`, `auth.uid()`), per the slice-1 hardening posture;
+  `OWNER TO postgres` pinned for parity with the other DEFINER helpers.
+- **Scope guard** raises `42501` when `target_user <> auth.uid()`, so a caller
+  can only ask about themselves — a manager cannot probe a report.
+- `EXECUTE` revoked from `PUBLIC`/`anon`, granted only to `authenticated`
+  (slice-1 default posture for SECURITY DEFINER functions; not referenced by any
+  RLS policy, so no `anon` grant is needed).
+- The web app calls `has_anchor(auth.uid())` via the user's session-scoped
+  client to drive banner visibility (📌 DECISION-13/14), replacing the prior
+  plan-time read of `anchor_captured_at IS NULL`.
+
+*(Audit note: an earlier draft of this decision left `anchor_captured_at` and
+`anchor_model_version` in the SELECT whitelist — readable by managers/admins via
+the row-level policies — reasoning that FR-019 scopes the invariant to the
+vector. Mohamed elected the stricter posture: a manager knowing whether or when
+a report calibrated could be used to pressure them, undercutting the Principle I
+"managers see aggregates, not individuals" trust story. The function adds one
+SECURITY DEFINER construct for a real, bounded privacy gain. See
+`docs/CHANGELOG.md` and `docs/DECISIONS.md` 2026-05-27.)*
 
 **UPDATE whitelist widened** (extends slice-1's `full_name`-only grant):
 
@@ -453,9 +496,10 @@ a plain numeric tick (FR-009).
 ### 📌 DECISION-14 — Calibration banner + `/app/calibrate` route + onboarding integration
 
 - **Banner** (`components/anchor/calibration-banner.tsx`) renders on `/app` for
-  an **employee whose own `anchor_captured_at IS NULL`** (read in the `/app`
-  Server Component via the session client; managers never reach this branch,
-  FR-029). Calm copy + a "Calibrate now" control linking to `/app/calibrate`.
+  an **employee with no stored anchor** — the `/app` Server Component calls
+  `has_anchor(auth.uid())` via the session client and shows the banner when it
+  returns `false` (managers never reach this branch, FR-029). Calm copy + a
+  "Calibrate now" control linking to `/app/calibrate`.
   Dismissal is **session-only**: a `sessionStorage` key
   `serenify-anchor-banner-dismissed` hides it for the tab session; it reappears
   next session until calibrated (FR-023/024). (`sessionStorage`, not
@@ -489,8 +533,8 @@ markers) with a sibling helper rather than a parallel mechanism (FR-035):
 - The existing `components/cross-tab-auth.tsx` listener (already subscribed to
   `window "storage"`) gains a branch: on an anchor-captured event, if the tab is
   on the onboarding anchor step or `/app/calibrate`, it **refreshes**
-  (`router.refresh()` → the now-non-null `anchor_captured_at` re-renders to
-  `/app` without the step/banner). Refresh, not hard navigate, matches the 003
+  (`router.refresh()` → `has_anchor(auth.uid())` now returns true and re-renders
+  to `/app` without the step/banner). Refresh, not hard navigate, matches the 003
   pattern and lets the server components recompute state (FR-034).
 
 ### 📌 DECISION-16 — Security headers: per-route `camera=(self)` + CSP `connect-src`
@@ -602,7 +646,7 @@ serenify/
 │       │   │   ├── onboarding-form.tsx        # MODIFIED — 2-step: name → anchor recorder
 │       │   │   └── page.tsx                    # MODIFIED — render step state
 │       │   └── (authed)/app/
-│       │       ├── page.tsx                    # MODIFIED — employee branch renders calibration banner when anchor_captured_at IS NULL
+│       │       ├── page.tsx                    # MODIFIED — employee branch renders calibration banner when has_anchor(auth.uid()) is false
 │       │       └── calibrate/page.tsx          # NEW — employee-only recorder wrapper (📌 DECISION-14)
 │       ├── components/anchor/                   # NEW
 │       │   ├── anchor-recorder.tsx             # the client recorder (device→perm→record→upload→extract)
@@ -709,9 +753,10 @@ feature 004):
    forward artifact). 📌 DECISION-7.
 5. **`POST /anchor` + JWT-only auth; backend has no DB credentials** — the web
    app writes the vector with the user's session client. 📌 DECISION-8/9.
-6. **`anchor_vector` is unreadable by every client role** via a SELECT
-   column-whitelist (Principle I; column-REVOKE-is-a-no-op under a table grant —
-   slice-1 precedent). Metadata columns readable; UPDATE whitelist widened.
+6. **No anchor column is readable by any client role** via a SELECT
+   column-whitelist that excludes all three (Principle I; column-REVOKE-is-a-no-op
+   under a table grant — slice-1 precedent), plus a scope-guarded `has_anchor()`
+   SECURITY DEFINER boolean for banner status. UPDATE whitelist widened.
    📌 DECISION-12.
 7. **Web recorder state machine + device-label-after-grant quirk + codec probe
    + multipart upload + typed client.** 📌 DECISION-13.
