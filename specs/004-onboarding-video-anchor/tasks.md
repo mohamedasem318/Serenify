@@ -259,9 +259,9 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 11
 
-- [ ] T054 [US1] [US7] Create `apps/web/tests/e2e/anchor-onboarding.spec.ts`: a test shim stubs `navigator.mediaDevices.getUserMedia` / `MediaRecorder` (canned blob) and Playwright route-intercepts `/anchor` (canned `vector_b64`) and `/healthz` (200). Sign up → name → recorder shown → "recording" → success → `/app` with NO banner (FR-043). Include the cross-tab assertion (two pages, complete in A, B refreshes to `/app`, SC-008).
-- [ ] T055 [US2] [US4] Create `apps/web/tests/e2e/anchor-skip.spec.ts`: employee → name → skip (revealed after scroll/first failure) → `/app` WITH banner → "Calibrate now" → `/app/calibrate` → mocked success → `/app` no banner. Plus: a team_lead and an admin complete onboarding with NO anchor step and see NO banner on `/app` (FR-029, SC-007).
-- [ ] T056 [US6] Add a demo-cohort assertion (extend an existing demo spec or T055): a `*@demo.serenify.local` employee lands on `/app` with no banner (synthetic anchor present, SC-007).
+- [X] T054 [US1] [US7] Create `apps/web/tests/e2e/anchor-onboarding.spec.ts`: a test shim stubs `navigator.mediaDevices.getUserMedia` / `MediaRecorder` (canned blob) and Playwright route-intercepts `/anchor` (canned `vector_b64`) and `/healthz` (200). Sign up → name → recorder shown → "recording" → success → `/app` with NO banner (FR-043). Include the cross-tab assertion (two pages, complete in A, B refreshes to `/app`, SC-008).
+- [X] T055 [US2] [US4] Create `apps/web/tests/e2e/anchor-skip.spec.ts`: employee → name → skip (revealed after scroll/first failure) → `/app` WITH banner → "Calibrate now" → `/app/calibrate` → mocked success → `/app` no banner. Plus: a team_lead and an admin complete onboarding with NO anchor step and see NO banner on `/app` (FR-029, SC-007).
+- [X] T056 [US6] Add a demo-cohort assertion (extend an existing demo spec or T055): a `*@demo.serenify.local` employee lands on `/app` with no banner (synthetic anchor present, SC-007).
 
 **Checkpoint**: e2e specs green; manager + demo paths asserted.
 

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
@@ -12,8 +11,16 @@ import {
 } from "@/lib/auth/schemas";
 import { completeOnboarding, type OnboardingResult } from "./actions";
 
+// Hard navigation to /app, NOT router.replace: at sign-in the proxy bounced
+// /app → /onboarding (full_name was null) and Next cached that redirect in the
+// client Router Cache. A soft router.replace("/app") would resolve against that
+// stale entry and no-op back to /onboarding. A full document navigation re-runs
+// the proxy server-side with the now-complete profile. See DECISIONS 2026-05-27.
+function goToApp() {
+  window.location.replace("/app");
+}
+
 export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }) {
-  const router = useRouter();
   const [step, setStep] = useState<"name" | "anchor">("name");
   const [pending, startTransition] = useTransition();
   const [submitState, setSubmitState] = useState<OnboardingResult | null>(null);
@@ -47,11 +54,7 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
 
   if (step === "anchor") {
     return (
-      <AnchorRecorder
-        context="onboarding"
-        onComplete={() => router.replace("/app")}
-        onSkip={() => router.replace("/app")}
-      />
+      <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
     );
   }
 
