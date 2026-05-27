@@ -148,8 +148,8 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 5
 
-- [ ] T033 [US1] Create `apps/web/lib/api/anchor-client.ts`: `postAnchor(clip: Blob, accessToken: string): Promise<AnchorResult>` (FormData multipart, `Authorization: Bearer`, typed `{ok:true,...} | {ok:false,kind}` union) and `checkHealth(): Promise<boolean>` (GET `/healthz`). Reads the origin from `clientEnv.apiUrl`. No untyped `fetch` leaks out of this module (Architecture Constraints transport rule). ⚠ Principle VII: covered by T034.
-- [ ] T034 [US1] Create `apps/web/lib/api/anchor-client.test.ts` (Vitest): mock `fetch`; assert multipart body + Authorization header on `postAnchor`; assert the 200/401/415/422 → union mapping; assert `checkHealth` true/false on reachable/unreachable.
+- [X] T033 [US1] Create `apps/web/lib/api/anchor-client.ts`: `postAnchor(clip: Blob, accessToken: string): Promise<AnchorResult>` (FormData multipart, `Authorization: Bearer`, typed `{ok:true,...} | {ok:false,kind}` union) and `checkHealth(): Promise<boolean>` (GET `/healthz`). Reads the origin from `clientEnv.apiUrl`. No untyped `fetch` leaks out of this module (Architecture Constraints transport rule). ⚠ Principle VII: covered by T034.
+- [X] T034 [US1] Create `apps/web/lib/api/anchor-client.test.ts` (Vitest): mock `fetch`; assert multipart body + Authorization header on `postAnchor`; assert the 200/401/415/422 → union mapping; assert `checkHealth` true/false on reachable/unreachable.
 
 **Checkpoint**: a typed, tested client exists; CSP already permits its origin (Step 4).
 
