@@ -1,9 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { AnchorRecorder } from "@/components/anchor/anchor-recorder";
 import {
   onboardingSchema,
   type OnboardingInput,
@@ -11,6 +13,8 @@ import {
 import { completeOnboarding, type OnboardingResult } from "./actions";
 
 export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }) {
+  const router = useRouter();
+  const [step, setStep] = useState<"name" | "anchor">("name");
   const [pending, startTransition] = useTransition();
   const [submitState, setSubmitState] = useState<OnboardingResult | null>(null);
 
@@ -29,11 +33,26 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
       const form = new FormData();
       form.set("full_name", values.full_name);
       const result = await completeOnboarding(form);
-      // Success path redirects on the server; only error paths return here.
-      if (result && result.status !== "ok") {
+      // Managers redirect server-side (no result reaches here). Employees get
+      // { status: "ok" } and advance in-page to the anchor step — proxy.ts
+      // bounces a full /onboarding reload to /app once full_name is set, so the
+      // step must live in client state (📌 DECISION-14).
+      if (result?.status === "ok") {
+        setStep("anchor");
+      } else if (result) {
         setSubmitState(result);
       }
     });
+  }
+
+  if (step === "anchor") {
+    return (
+      <AnchorRecorder
+        context="onboarding"
+        onComplete={() => router.replace("/app")}
+        onSkip={() => router.replace("/app")}
+      />
+    );
   }
 
   return (

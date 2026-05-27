@@ -186,9 +186,9 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 7
 
-- [ ] T041 [US1] [US4] Edit `apps/web/app/(onboarding)/onboarding/actions.ts`: `completeOnboarding` sets `full_name`, then for an **employee** returns `{status:"ok"}` (no server redirect) so the client advances to the anchor step; for **team_lead/admin** keeps the existing server redirect to `/app` (📌 DECISION-14, FR-001/029, Principle I product-coherence). ⚠ Principle VII: covered by T043 + T054.
-- [ ] T042 [US1] Edit `apps/web/app/(onboarding)/onboarding/onboarding-form.tsx` + `page.tsx`: 2-step client state — step 1 name (unchanged), on employee `ok` advance to `<AnchorRecorder context="onboarding" onComplete={→ /app} onSkip={→ /app} />` (FR-001/003). ⚠ Principle VII: covered by T043 + T054.
-- [ ] T043 [US1] Create `apps/web/app/(onboarding)/onboarding/onboarding-form.test.tsx` (Vitest + RTL): name save → employee sees recorder (no navigation); manager path does not render the recorder.
+- [X] T041 [US1] [US4] Edit `apps/web/app/(onboarding)/onboarding/actions.ts`: `completeOnboarding` sets `full_name`, then for an **employee** returns `{status:"ok"}` (no server redirect) so the client advances to the anchor step; for **team_lead/admin** keeps the existing server redirect to `/app` (📌 DECISION-14, FR-001/029, Principle I product-coherence). ⚠ Principle VII: covered by T043 + T054.
+- [X] T042 [US1] Edit `apps/web/app/(onboarding)/onboarding/onboarding-form.tsx` + `page.tsx`: 2-step client state — step 1 name (unchanged), on employee `ok` advance to `<AnchorRecorder context="onboarding" onComplete={→ /app} onSkip={→ /app} />` (FR-001/003). ⚠ Principle VII: covered by T043 + T054.
+- [X] T043 [US1] Create `apps/web/app/(onboarding)/onboarding/onboarding-form.test.tsx` (placed at `tests/unit/onboarding-form.test.tsx` per project convention + vitest include) (Vitest + RTL): name save → employee sees recorder (no navigation); manager path does not render the recorder.
 
 **Checkpoint**: onboarding shows the anchor step to employees only; managers unaffected.
 
