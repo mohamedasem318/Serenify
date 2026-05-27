@@ -204,10 +204,10 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 ### Implementation for Step 8
 
-- [ ] T044 [US2] Create `apps/web/components/anchor/calibration-banner.tsx`: calm copy (stress detection unavailable until calibration) + "Calibrate now" → `/app/calibrate`; dismiss via `sessionStorage["serenify-anchor-banner-dismissed"]` (session-only; reappears next session, FR-023/024); amber, never red (Principle V). 🙋 NEEDS MOHAMED: lock banner copy. ⚠ Principle VII: covered by T047 + T055.
-- [ ] T045 [US2] [US4] Edit `apps/web/app/(authed)/app/page.tsx`: employee branch calls `has_anchor(auth.uid())` via the session client; renders `<CalibrationBanner />` when it returns `false`; managers see their existing role placeholder (no banner) (📌 DECISION-14, FR-021/029, Principle I — banner status via `has_anchor`, never a direct column read). ⚠ Principle VII: covered by T055.
-- [ ] T046 [US2] [US4] Create `apps/web/app/(authed)/app/calibrate/page.tsx` — Server Component that role-gates to **employees** (redirect team_lead/admin → `/app`) and renders `<AnchorRecorder context="calibrate" onComplete={→ /app} onSkip={→ /app} />` (📌 DECISION-14, FR-022/029). ⚠ Principle VII: covered by T055.
-- [ ] T047 [US2] Create `apps/web/components/anchor/calibration-banner.test.tsx` (Vitest + RTL): renders for uncalibrated employee; dismiss hides for session; the "Calibrate now" control links to `/app/calibrate`.
+- [X] T044 [US2] Create `apps/web/components/anchor/calibration-banner.tsx`: calm copy (stress detection unavailable until calibration) + "Calibrate now" → `/app/calibrate`; dismiss via `sessionStorage["serenify-anchor-banner-dismissed"]` (session-only; reappears next session, FR-023/024); amber, never red (Principle V). 🙋 NEEDS MOHAMED: lock banner copy. ⚠ Principle VII: covered by T047 + T055.
+- [X] T045 [US2] [US4] Edit `apps/web/app/(authed)/app/page.tsx`: employee branch calls `has_anchor(auth.uid())` via the session client; renders `<CalibrationBanner />` when it returns `false`; managers see their existing role placeholder (no banner) (📌 DECISION-14, FR-021/029, Principle I — banner status via `has_anchor`, never a direct column read). ⚠ Principle VII: covered by T055.
+- [X] T046 [US2] [US4] Create `apps/web/app/(authed)/app/calibrate/page.tsx` — Server Component that role-gates to **employees** (redirect team_lead/admin → `/app`) and renders `<AnchorRecorder context="calibrate" onComplete={→ /app} onSkip={→ /app} />` (📌 DECISION-14, FR-022/029). ⚠ Principle VII: covered by T055.
+- [X] T047 [US2] Create `apps/web/components/anchor/calibration-banner.test.tsx` (Vitest + RTL): renders for uncalibrated employee; dismiss hides for session; the "Calibrate now" control links to `/app/calibrate`.
 
 **Checkpoint**: banner + recalibration route work; managers excluded; status read only via `has_anchor`.
 
