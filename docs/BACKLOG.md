@@ -940,3 +940,43 @@ recommendation".
 **Address by**: a quality / hardening slice; the invite throttle pairs naturally
 with feature 011 (admin-dashboard), when `/api/admin/invite` gets a real browser
 client and abuse becomes reachable in practice.
+
+---
+
+## From feature 004 (onboarding-video-anchor) — planning
+
+### Onboarding name step is redundant with signup full_name collection
+**Status**: deferred-bug
+**Observed**: 2026-05-27, feature 004 planning
+**Description**: The signup form at `apps/web/app/(auth)/signup/` collects
+`full_name` and stores it via the `handle_new_user` trigger
+(`supabase/migrations/20260517000030_profile_trigger.sql`). The
+`/onboarding` flow then re-asks for the name as its only step. This is
+redundant — by the time a user reaches `/onboarding`, the profile already
+has a `full_name`.
+
+The middleware (`apps/web/proxy.ts`) routes to `/onboarding` when
+`full_name IS NULL`, so the redirect itself is defensible (it catches the
+edge case where signup metadata didn't propagate). But the page UI asking
+the user to type their name again is the UX bug — it should either:
+
+- (a) detect the existing `full_name` and skip the step entirely (let the
+  middleware fall through to `/app`), OR
+- (b) pre-fill the form with the existing value as a confirmation step
+  rather than a blank field, OR
+- (c) signup stops collecting `full_name` and onboarding becomes the
+  canonical place — but this contradicts the current UX where signup
+  feels incomplete without it.
+
+Option (a) is the cleanest. Option (b) is the least disruptive.
+
+**Fix scope**: small — single page edit in `apps/web/app/onboarding/` plus
+a Server Action / middleware tweak. Pair with whichever feature next
+touches the onboarding flow; do not branch standalone unless other
+onboarding work converges.
+
+**Address by**: bundle with the post-004 user-profile-and-preferences
+feature (currently planned to slot between feature 007 and feature 008
+per the 2026-05-27 chat decision), since that feature redesigns
+onboarding for demographics + preferences anyway and will rebuild the
+flow from scratch.
