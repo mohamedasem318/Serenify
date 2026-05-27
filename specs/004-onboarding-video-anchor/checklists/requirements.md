@@ -45,14 +45,11 @@
   rather than as incidental tech choices. A house-style note at the top of the
   Requirements section records this intentional deviation. User stories and
   success criteria remain outcome-focused and technology-agnostic.
-- **Zero `[NEEDS CLARIFICATION]` markers.** Six open product/design questions
-  exist (anchor column shape, who writes to Supabase, skip-affordance
-  placement, banner-dismissal persistence, device-picker memory, backend
-  health pre-check). Each has either a reasonable informed default or is an
-  explicit `/speckit.plan` decision, so they are documented in an "Open
-  Questions" subsection (with defaults) for `/speckit.clarify` to surface,
-  rather than as blocking markers — consistent with the SpecKit max-3-markers
-  guidance and the project's "set during /speckit.plan" convention.
+- **Zero `[NEEDS CLARIFICATION]` markers.** All open product/design questions
+  were resolved during the spec-clarify pass (clarification completed
+  externally); see the **Resolved Decisions** section in `spec.md` for the
+  10 settled items and their rationale. The build-time architecture for each is
+  closed in `plan.md` (📌 DECISION-1 … 📌 DECISION-18).
 - **Testability.** Every FR maps to at least one acceptance scenario and/or
   success criterion; the privacy invariants (FR-016/FR-019) and the
   three-failure escape (FR-027) have explicit measurable checks (SC-004,
