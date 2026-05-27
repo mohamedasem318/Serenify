@@ -282,8 +282,8 @@ Paths are repo-relative. This is the first feature to span `apps/web/` (frontend
 
 **Goal**: Author the human smoke matrix and (during implement) record the architectural decisions.
 
-- [ ] T059 `specs/004-onboarding-video-anchor/smoke-tests.md` is authored **with this tasks.md commit** (categorized ST-NN human checks incl. the Chrome/Firefox/Safari × mobile/desktop webcam matrix, FR-045, Principle VII). Mohamed runs it after `/speckit.implement` and records results inline.
-- [ ] T060 During `/speckit.implement`, append the 12 architectural entries from plan.md's "DECISIONS.md entries this plan implies" to `docs/DECISIONS.md` (Principle VIII). The 📌 DECISION-n markers on the tasks above name each source. Note: the DECISION-12 (stricter `has_anchor`) entry already landed in the plan-amendment commit — confirm it is not duplicated.
+- [X] T059 `specs/004-onboarding-video-anchor/smoke-tests.md` is authored **with this tasks.md commit** (categorized ST-NN human checks incl. the Chrome/Firefox/Safari × mobile/desktop webcam matrix, FR-045, Principle VII). Mohamed runs it after `/speckit.implement` and records results inline.
+- [X] T060 During `/speckit.implement`, append the 12 architectural entries from plan.md's "DECISIONS.md entries this plan implies" to `docs/DECISIONS.md` (Principle VIII). The 📌 DECISION-n markers on the tasks above name each source. Note: the DECISION-12 (stricter `has_anchor`) entry already landed in the plan-amendment commit — confirm it is not duplicated.
 - [ ] T061 🙋 NEEDS MOHAMED: smoke-test sign-off gate (Principle VII / governance). Mohamed runs `smoke-tests.md`, records pass/fail inline, and approves the merge to `main`. NOT a code task.
 
 **Checkpoint**: smoke-tests.md present; decision entries planned; awaiting Mohamed's smoke sign-off.

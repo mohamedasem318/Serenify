@@ -1787,3 +1787,153 @@ implements `has_anchor()` + the tightened grants lands during `/speckit.implemen
 aggregate "team calibration coverage" metric — that would be served by a
 separate admin-scoped aggregate function, never by relaxing per-individual
 `has_anchor` scope.
+
+---
+
+## 2026-05-27 — feature 004 architecture decisions (collected; 📌 DECISION-1 through DECISION-18)
+
+**Status**: Accepted.
+
+**Context**: Feature 004 (onboarding video anchor flow) adds a Python ML video
+pipeline (`packages/ml-video/`), a FastAPI extraction service (`apps/api/`), the
+three anchor columns + `has_anchor()` on `public.profiles`, the in-browser
+recorder + calibration banner, a cross-tab broadcast, and a deterministic demo
+anchor. The architectural choices were made during `/speckit.plan` and
+`/speckit.tasks`; each is tagged in `tasks.md` with a 📌 DECISION-n marker naming
+its source task so the entry can be audited against the diff. Recorded here on
+completion of `/speckit.implement`. **DECISION-12** (all anchor columns private +
+scope-guarded `has_anchor()`) already landed in the plan-amendment commit — see
+the `2026-05-27 — feature 004 DECISION-12 amended` entry above — and is **not**
+duplicated here. Entries 12–13 below record two findings surfaced *during*
+implementation that were not in the original plan.
+
+**Decision**:
+
+1. **FastAPI service + Python 3.12 + exact ML pins** (📌 DECISION-1/2/3/4).
+   `apps/api/` is a `uv`-managed FastAPI app; `requires-python = ">=3.10,<3.13"`
+   because `mediapipe==0.10.13` has no 3.13 wheel. ML deps are pinned exactly from
+   `models/metadata.json` — `scikit-learn==1.6.1` is load-bearing (a joblib
+   unpickle under a different sklearn silently yields a wrong model);
+   `opencv-python` is `4.13.0.92` (the 4-part PyPI package for the `4.13.0` cv2
+   library version the metadata records).
+   *Rationale*: the model artifact was trained against a frozen dependency set;
+   reproducing it faithfully is a correctness requirement, not a preference.
+
+2. **`packages/ml-video/` as a real editable package** (📌 DECISION-5), not a
+   PYTHONPATH directory; `apps/api` consumes it via `[tool.uv.sources] … editable
+   = true`. The predict/loader path is present and unit-tested but exposed by no
+   004 endpoint (it is feature 005's inference read path).
+   *Rationale*: a packaged `src/ml_video` gives a clean import contract and lets
+   the loader resolve committed artifacts source-relative; PYTHONPATH hacks do not
+   survive into the Docker image.
+
+3. **Model artifacts at `packages/ml-video/models/`; `tmp/` gitignored**
+   (📌 DECISION-6). Committed artifacts live at the package-root `models/` per
+   Constitution Principle II; the staging drop dir `tmp/` is ignored.
+   *Rationale*: Principle II mandates `packages/ml-*/models/` as the artifact
+   home; keeping the import package free of large binaries keeps the wheel clean.
+
+4. **Backend is local-only in 004; production deploy deferred** (📌 DECISION-7).
+   A `Dockerfile` (`python:3.12-slim`) is committed as a forward artifact, but
+   there is no hosted deployment and T020's production origin is left
+   `[TBD by deployment]`.
+   *Rationale*: 004 delivers the onboarding flow against a locally-run service;
+   standing up hosting is a separate operational decision, out of feature scope.
+
+5. **`POST /anchor` is JWT-only; the backend holds no DB credentials**
+   (📌 DECISION-8/9). The service verifies the Supabase JWT (HS256,
+   `aud=authenticated`), extracts the vector, and returns it; the **web app**
+   writes the vector to `profiles` with the user's own session client. Raw upload
+   bytes are deleted in a `finally` block (Principle I).
+   *Rationale*: keeping the DB write on the authenticated browser session means
+   the extraction service never needs a service-role key — smaller blast radius —
+   and the privacy-sensitive bytes never persist server-side. (📌 DECISION-12,
+   anchor-column privacy + `has_anchor()`, is recorded separately above and not
+   repeated.)
+
+6. **Web recorder state machine + post-grant device labels + codec probe +
+   multipart upload + typed client** (📌 DECISION-13). The recorder is an explicit
+   state machine (idle → permission → countdown → recording → extracting →
+   done/error); device labels are read only *after* the `getUserMedia` grant
+   (browsers withhold them beforehand); the codec probe tries
+   `vp9 → vp8 → mp4 → default`; the vector is sent as multipart and surfaced as a
+   typed `AnchorResult` union.
+   *Rationale*: the extraction round-trip is ~10–15s, so a distinct `extracting`
+   state with calm copy (R-1) avoids a frozen-looking app; the codec order
+   maximizes cross-browser capture quality with a graceful fallback.
+
+7. **Banner session-only dismissal + dedicated `/app/calibrate` route +
+   onboarding inline step** (📌 DECISION-14). The calibration banner dismisses for
+   the session via `sessionStorage`; calibration is reachable inline during
+   onboarding and from a standalone `/app/calibrate` route.
+   *Rationale*: a permanent dismissal would hide a not-yet-functional state
+   indefinitely — a session dismissal nudges without nagging; the dedicated route
+   lets the banner CTA deep-link cleanly.
+
+8. **Cross-tab anchor-captured broadcast extends `auth-broadcast.ts`**
+   (📌 DECISION-15). Completing the anchor writes a `localStorage` marker; sibling
+   tabs listening on the storage event call `router.refresh()` to drop the banner.
+   *Rationale*: reuses the established feature-003 cross-tab auth-sync channel
+   rather than inventing a second one.
+
+9. **Per-route `camera=(self)` + CSP `connect-src` += FastAPI origin; rollout
+   order** (📌 DECISION-16). `next.config.ts` grants `camera=(self)` only on the
+   capture routes (`/onboarding`, `/app/calibrate`) via a negative-lookahead
+   source so each path matches exactly one Permissions-Policy rule; `proxy.ts`
+   adds the FastAPI origin to CSP `connect-src`; COEP is left unset. The
+   `connect-src` edit must land **before** the recorder's first call (R-5).
+   *Rationale*: camera access is scoped to exactly the surfaces that need it;
+   without the `connect-src` entry the recorder's upload is CSP-blocked, so the
+   commit ordering is load-bearing.
+
+10. **One deterministic synthetic demo anchor (seed 42) via service-role**
+    (📌 DECISION-17). The seed writes a single reproducible synthetic anchor
+    (`mulberry32(42)`) for the demo cohort using the service-role client.
+    *Rationale*: the demo dashboard must show a calibrated, banner-free state
+    without a real webcam recording; determinism keeps the seed idempotent and
+    reviewable.
+
+11. **Testing: mocked MediaPipe + synthetic no-face clip (pytest); mocked
+    MediaRecorder + route-intercept (Playwright)** (📌 DECISION-18). Python tests
+    use a `FakeFaceMesh` + synthetic MJPG clip (happy) and a no-face clip
+    (extraction failure); e2e mocks `getUserMedia`/`MediaRecorder` and intercepts
+    the anchor API.
+    *Rationale*: the real pipeline needs a webcam and a heavier runtime;
+    structural mocks exercise the contract deterministically in CI, and real
+    capture is covered by the manual smoke matrix.
+
+12. **Router Cache hard-navigation fix** (implementation discovery, commit
+    `5f6d87e`). Next's App Router client-side Router Cache caches the proxy's
+    `/app → /onboarding` 307 redirect; a soft `router.replace("/app")` after
+    completing onboarding/calibration can no-op against the stale cached redirect
+    and strand the user on `/onboarding`. The fix navigates with
+    `window.location.replace("/app")` (a hard navigation) from
+    `onboarding-form.tsx` and `calibrate-recorder.tsx`.
+    *Rationale*: this is a **real product bug** for invited employees, surfaced by
+    the e2e — not a test artifact. A hard navigation bypasses the Router Cache so
+    the now-complete profile re-evaluates the proxy guard freshly. Recorded so a
+    future dev does not "simplify" it back to `router.replace` and silently
+    reintroduce the trap (both files' code comments point here as "DECISIONS
+    2026-05-27").
+
+13. **webkit-on-Windows worker-teardown limitation** (test-infra finding). Local
+    headless webkit on Windows wedges on Playwright **worker teardown** due to an
+    unreaped `WebKitNetworkProcess` handle per worker; it manifests as either
+    assertion flakes or a full-suite hang once several worker teardowns
+    accumulate. Verified **harmless to product correctness**: the two specs that
+    flaked/hung in the full run (`employee-dashboard-shell`, `reset-password`)
+    pass cleanly on webkit **in isolation** with traces showing zero logic/render
+    issues, and both pass on chromium + firefox. Safari coverage therefore relies
+    on smoke checks **ST-21/ST-24** (real iOS + macOS Safari) and CI (clean Linux
+    webkit, `retries: 2`).
+    *Rationale*: recorded so a future dev does not re-investigate a suite that is
+    green on the merits but exits non-zero on this OS; the failure is a browser
+    process-lifecycle quirk, not a 004 regression.
+
+**Revisit if**: the backend moves to hosted deployment (entries 4/5 gain a
+production origin, and feature 005 may add a service-role or self-scoped read path
+for `anchor_vector`); a future feature needs manager-visible aggregate calibration
+coverage (would be a separate admin-scoped function, never a relaxation of
+`has_anchor` scope); the Router Cache redirect-caching behavior changes upstream
+(entry 12); or the webkit teardown leak is fixed and the isolated-run signal
+diverges from CI's webkit signal (entry 13).

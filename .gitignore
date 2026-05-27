@@ -38,6 +38,10 @@ __pycache__/
 venv/
 .python-version
 *.egg-info/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
 
 # Editors / OS
 .vscode/
