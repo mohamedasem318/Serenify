@@ -1650,3 +1650,68 @@ be amended again to match the winning model's contract (the timing parameters
 are bound to the production model contract in `docs/MODELS.md`, not to a fixed
 physiological constant). Any such change follows the same Governance amendment
 path and is logged here and in `docs/CHANGELOG.md`.
+
+---
+
+## 2026-05-27 — constitution(III, VIII) amendment — video pipeline description + 004 slot rename
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.2.0 → 1.3.0`).
+
+**Context**: Feature 004 (onboarding video anchor flow) is the first feature to
+create `packages/ml-video/`, and it does so around the post-rPPG model
+`serenify-video-lbptop-motion-rf-calibrated@2.0.0` — LBP-TOP + motion features
+with per-user delta calibration. Two pieces of constitution text still
+described the abandoned rPPG approach and the pre-rename feature slug. This
+amendment brings the constitution into alignment with what 004 actually builds,
+landing as a ride-along in the first commit of the feature (before any feature
+code), so the rest of 004 builds against a clean constitution.
+
+**Decision**: Two surgical edits to `.specify/memory/constitution.md`:
+
+1. **Principle III (Modality Isolation) package description.** The
+   `packages/ml-video/` bullet changed from
+   `webcam + rPPG pipeline` to
+   `video stress pipeline (LBP-TOP + motion features, per-user delta calibration)`.
+   The earlier rPPG language survived Amendment 2 (which scoped its rPPG removal
+   to Principle II's body only and explicitly retained the Principle III
+   `webcam + rPPG pipeline` description as out-of-scope at the time); this
+   amendment now retires it from Principle III as well, since the real pipeline
+   exists as of feature 004.
+
+2. **Principle VIII (Spec-Driven Workflow) provisional feature ordering.** The
+   slot `004-webcam-and-rppg` is renamed to `004-onboarding-video-anchor` to
+   match the actual feature spec slug. Slots 005 (`005-per-user-calibration`),
+   006 (`006-stress-inference-service`), and all others are unchanged — they are
+   reconsidered when their own planning starts.
+
+**Why MINOR (not MAJOR/PATCH)**: Per Governance, MINOR covers materially
+expanded or refined guidance on an existing rule. This is a refinement of an
+existing principle's wording (a package description) plus a provisional
+ordering-slug rename — no new principles, no removed principles, no structural
+change, no backward-incompatible redefinition.
+
+**Affected artifacts** (all in the same commit as this entry):
+
+- `.specify/memory/constitution.md` — Principle III bullet, Principle VIII slot,
+  version line `1.2.0 → 1.3.0`, Sync Impact Report Amendment 3 entry. `Last
+  Amended` stays `2026-05-27` (Amendment 2 already set it earlier today).
+- `docs/MODELS.md` — created in this commit with the
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0` registry entry (the model
+  referenced by the new Principle III description).
+- `docs/MODEL_HANDOFF.md` — the model's full integration contract, included in
+  this commit.
+- `docs/models/serenify-video-lbptop-motion-rf-calibrated-v2.0.0-results.png` —
+  the LOSO results figure (confusion matrix / ROC / score distribution).
+- `docs/CHANGELOG.md` — `constitution(III, VIII)` amendment entry dated
+  2026-05-27.
+
+**Template audit**: `.specify/templates/{plan,spec,tasks}-template.md` reference
+principles by number, not by the literal strings `rPPG`, `webcam`,
+`004-webcam-and-rppg`, or `ml-video` — zero matches for the touched text, so no
+template edit is required.
+
+**Revisit if**: a future video-model bump changes the pipeline family again
+(the Principle III description is bound to the production pipeline, not a fixed
+technique), or the provisional 005/006 slots are renamed when their planning
+starts — each follows the same Governance amendment path and is logged here and
+in `docs/CHANGELOG.md`.

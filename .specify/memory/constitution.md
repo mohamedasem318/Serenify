@@ -91,6 +91,28 @@ pipeline` package description); those are out of scope for this amendment.
 Cross-references:
 - docs/DECISIONS.md entry 2026-05-27
 - docs/CHANGELOG.md entry 2026-05-27
+
+Amendment 3: 1.2.0 → 1.3.0 (2026-05-27, MINOR)
+Bump rationale: Principle III's `packages/ml-video/` description updated from
+"webcam + rPPG pipeline" to "video stress pipeline (LBP-TOP + motion features,
+per-user delta calibration)" to reflect the actual implementation that feature
+004 creates. Principle VIII's provisional feature ordering slot for 004 is
+renamed from `004-webcam-and-rppg` to `004-onboarding-video-anchor` to match
+the actual spec slug. Triggered by feature 004 (onboarding video anchor flow)
+— the post-rPPG model is LBP-TOP + Motion with per-user delta calibration,
+documented in `docs/MODEL_HANDOFF.md` and `docs/MODELS.md`. Ride-along
+amendment with the first commit of feature 004. MINOR bump: refinement of an
+existing rule (package description + slug rename); no new principles, no
+removed principles, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-
+template.md for the touched strings (`rPPG`, `webcam`, `004-webcam-and-rppg`,
+`ml-video`); the templates reference principles by number, not by these
+literal strings, so no template edit is required.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-05-27
+- docs/CHANGELOG.md entry 2026-05-27
 -->
 
 # Serenify Constitution
@@ -179,7 +201,7 @@ variance and let the system generalize beyond the dataset.
 Each input modality is isolated into its own package, behind a common
 inference interface:
 
-- `packages/ml-video/` — webcam + rPPG pipeline
+- `packages/ml-video/` — video stress pipeline (LBP-TOP + motion features, per-user delta calibration)
 - `packages/ml-audio/` — vocal stress features
 - `packages/ml-physio/` — direct sensor signals (HR, EDA, etc.)
 
@@ -345,7 +367,7 @@ implement, in that order. Implementation without a spec is forbidden.
 - Provisional feature ordering (subject to change; record changes in
   `docs/CHANGELOG.md`):
   `001-auth-and-roles`, `002-demo-seed-data`,
-  `003-employee-dashboard-shell`, `004-webcam-and-rppg`,
+  `003-employee-dashboard-shell`, `004-onboarding-video-anchor`,
   `005-per-user-calibration`, `006-stress-inference-service`,
   `007-questionnaire`, `008-llm-client-and-chatbot`,
   `009-recommendations`, `010-privacy-controls-and-transparency`,
@@ -528,4 +550,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.2.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-27
+**Version**: 1.3.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-27

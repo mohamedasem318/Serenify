@@ -885,3 +885,42 @@ Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
 Principle II by number, not by literal timing text — zero matches for the
 touched values; no template edit required. No Cloud-dashboard parity items —
 all edits are in-repo (constitution + `docs/`).
+
+## 2026-05-27 — constitution(III, VIII) — video pipeline description + 004 slot rename
+
+Ride-along amendment with the first commit of feature 004 (onboarding video
+anchor flow), landing before any feature code so the rest of 004 builds against
+a clean constitution. Two surgical edits:
+
+- **Principle III (Modality Isolation)** — the `packages/ml-video/` package
+  description changed from `webcam + rPPG pipeline` to `video stress pipeline
+  (LBP-TOP + motion features, per-user delta calibration)`. This retires the
+  rPPG language that Amendment 2 had explicitly left in place in Principle III
+  (Amendment 2 scoped its rPPG removal to Principle II's body only). The real
+  pipeline now exists as of feature 004, served as model
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`.
+- **Principle VIII (Spec-Driven Workflow)** — the provisional feature-ordering
+  slot `004-webcam-and-rppg` is renamed to `004-onboarding-video-anchor` to
+  match the actual spec slug. Slots 005 (`005-per-user-calibration`), 006
+  (`006-stress-inference-service`), and all others are unchanged.
+
+Constitution version bumped `1.2.0 → 1.3.0` (MINOR per Governance: refinement
+of an existing rule — a package description plus a provisional ordering-slug
+rename; no new principles, no removed principles, no structural change). Sync
+Impact Report Amendment 3 entry appended. `Last Amended` stays `2026-05-27`
+(Amendment 2 set it earlier today).
+
+Affected artifacts, all in this commit:
+
+- `.specify/memory/constitution.md` — Principle III bullet, Principle VIII slot,
+  version line `1.3.0`, Sync Impact Report Amendment 3 entry.
+- `docs/MODELS.md` — created with the
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0` registry entry.
+- `docs/MODEL_HANDOFF.md` — model integration contract, included in this commit.
+- `docs/models/serenify-video-lbptop-motion-rf-calibrated-v2.0.0-results.png` —
+  LOSO results figure (confusion matrix / ROC / score distribution).
+- `docs/DECISIONS.md` — formal architectural decision entry (2026-05-27).
+
+Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
+principles by number, not by the literal strings `rPPG`, `webcam`,
+`004-webcam-and-rppg`, or `ml-video` — zero matches; no template edit required.
