@@ -18,6 +18,17 @@ cover). Demo cohort: `npm run seed` (`*@demo.serenify.local`, password
 sign-off line (`Result:` / `Date:` / `Notes:`). Calm-voice and palette rules
 (Constitution Principle V) apply to every visible string and surface.
 
+**Dev-only note (camera prompt)**: on a long-running `next dev` server, the
+camera prompt can intermittently fail to appear at the anchor step right after
+creating a new account (the recorder sits without prompting). **Restart the dev
+server** and it works. This is a local-dev transient, NOT a product/header bug:
+the `Permissions-Policy: camera=(self)` header is emitted correctly on
+`/app/calibrate` in both the broken and working states (verified), so it does not
+affect `next build`/production. If it recurs, capture whether clicking Start
+shows the amber "Camera access wasn't granted" notice vs nothing, and
+`navigator.permissions.query({ name: "camera" }).state` — that distinguishes a
+denied policy from a stuck recorder for further triage.
+
 ---
 
 ## A. Webcam permission flow (FR-006/007, Principle V/VI)
