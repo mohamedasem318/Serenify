@@ -25,6 +25,8 @@ const COPY = {
     "To detect stress accurately for you, we need to learn what your relaxed state looks like. We'll record about a minute of you looking at the camera. The video itself is never stored — only a small set of measurements derived from it.",
   permissionDenied:
     "Camera access wasn't granted. You can update your browser permissions and try again, or skip for now and come back from your dashboard later.",
+  permissionBlocked:
+    "Camera access is blocked in your browser. Enable it for this site in your settings, then try again.",
   extractionFailed:
     "We couldn't see your face clearly in that recording. Better lighting and facing the camera directly usually helps. Want to try again?",
   unavailable:
@@ -33,6 +35,26 @@ const COPY = {
   successBody:
     "Your calm baseline is saved and stress detection is active. The recording wasn't kept — only the measurements derived from it.",
 } as const;
+
+/**
+ * Best-effort permission probe (📌 ST-02 retry-flash fix). Chrome/Edge/Firefox
+ * and Safari 16+ return one of {granted, prompt, denied}; older Safari/WebKit
+ * either lacks the API or throws on the "camera" name. The probe is wrapped so
+ * a missing/throwing implementation collapses to "unsupported" — callers must
+ * treat that as "don't know; behave like prompt".
+ */
+async function probeCameraPermission(): Promise<"granted" | "denied" | "prompt" | "unsupported"> {
+  if (typeof navigator === "undefined" || !navigator.permissions?.query) return "unsupported";
+  try {
+    const status = await navigator.permissions.query({ name: "camera" as PermissionName });
+    if (status && (status.state === "granted" || status.state === "denied" || status.state === "prompt")) {
+      return status.state;
+    }
+    return "unsupported";
+  } catch {
+    return "unsupported";
+  }
+}
 
 /** Codec probe order (📌 DECISION-13 / T038); the backend accepts mp4 + webm (FR-047). */
 function pickMimeType(): string | undefined {
@@ -238,7 +260,41 @@ export function AnchorRecorder({
   );
 
   // --- Start (or retry): request the camera, then record immediately (ST-01).
+  // ST-02 anti-flash: on retry from permission-denied, the optimistic
+  // permission-requesting dispatch would briefly replace the denial notice with
+  // the start-recording form (idle/permission-requesting share that render
+  // branch). A hard-blocked camera makes getUserMedia reject synchronously, so
+  // the user sees a one-frame flicker before snapping back to denied. Avoid it
+  // by (1) probing permissions.query first and short-circuiting on "denied",
+  // and (2) when we DO call getUserMedia from the denied state, skipping the
+  // optimistic dispatch so the denial notice stays put until the stream
+  // actually resolves. The anti-flash holds even if the probe is unsupported.
   const startCapture = useCallback(async () => {
+    const isRetryFromDenied = state.status === "permission-denied";
+    if (isRetryFromDenied) {
+      const probed = await probeCameraPermission();
+      if (probed === "denied") {
+        dispatch({ type: "PERMISSION_DENIED", blocked: true });
+        return;
+      }
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: deviceIdRef.current ? { deviceId: { exact: deviceIdRef.current } } : true,
+          audio: false,
+        });
+        streamRef.current = stream;
+        dispatch({ type: "PERMISSION_GRANTED" });
+        beginRecording(stream);
+      } catch {
+        // Re-probe so a hard block surfaces the blocked-state copy on the
+        // next render (some browsers downgrade prompt → denied on the user's
+        // explicit "Block" click, which only the post-call probe reflects).
+        const after = await probeCameraPermission();
+        dispatch({ type: "PERMISSION_DENIED", blocked: after === "denied" });
+      }
+      return;
+    }
+
     dispatch({ type: "REQUEST_PERMISSION" });
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -249,9 +305,10 @@ export function AnchorRecorder({
       dispatch({ type: "PERMISSION_GRANTED" }); // mounts <video>; attachVideo wires srcObject
       beginRecording(stream);
     } catch {
-      dispatch({ type: "PERMISSION_DENIED" });
+      const after = await probeCameraPermission();
+      dispatch({ type: "PERMISSION_DENIED", blocked: after === "denied" });
     }
-  }, [dispatch, beginRecording]);
+  }, [dispatch, beginRecording, state.status]);
 
   // Stable identity so DevicePicker's enumerate effect doesn't re-run each render.
   const handleDeviceChange = useCallback((id: string | undefined) => {
@@ -301,7 +358,9 @@ export function AnchorRecorder({
         </>
       )}
 
-      {state.status === "permission-denied" && <Notice>{COPY.permissionDenied}</Notice>}
+      {state.status === "permission-denied" && (
+        <Notice>{state.permissionBlocked ? COPY.permissionBlocked : COPY.permissionDenied}</Notice>
+      )}
       {state.status === "extract-failed" && <Notice>{COPY.extractionFailed}</Notice>}
       {state.status === "upload-failed" && <Notice>{COPY.unavailable}</Notice>}
 

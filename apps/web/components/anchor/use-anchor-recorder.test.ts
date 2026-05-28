@@ -40,6 +40,26 @@ describe("recorderReducer", () => {
     expect(end.failureCount).toBe(0);
   });
 
+  it("leaves permissionBlocked false on a plain PERMISSION_DENIED (fresh deny, re-promptable)", () => {
+    const end = run([{ type: "REQUEST_PERMISSION" }, { type: "PERMISSION_DENIED" }]);
+    expect(end.permissionBlocked).toBe(false);
+  });
+
+  it("sets permissionBlocked when PERMISSION_DENIED carries blocked:true (hard block, browser will not re-prompt)", () => {
+    const end = run([{ type: "PERMISSION_DENIED", blocked: true }]);
+    expect(end.status).toBe("permission-denied");
+    expect(end.permissionBlocked).toBe(true);
+  });
+
+  it("clears permissionBlocked once permission is granted (user fixed it in browser settings)", () => {
+    const end = run(
+      [{ type: "PERMISSION_GRANTED" }],
+      { status: "permission-denied", failureCount: 0, scrolledPastExplanation: false, permissionBlocked: true },
+    );
+    expect(end.status).toBe("permission-granted");
+    expect(end.permissionBlocked).toBe(false);
+  });
+
   it("treats a transport failure as a retry, not a strike (FR-027)", () => {
     const end = run([{ type: "RECORDING_COMPLETE" }, { type: "UPLOAD_FAILED" }]);
     expect(end.status).toBe("upload-failed");

@@ -38,6 +38,13 @@ export interface RecorderState {
   scrolledPastExplanation: boolean;
   /** Practical-cause reason from the last 422, surfaced in the retry copy. */
   errorReason?: string;
+  /**
+   * True when the OS/browser has hard-blocked the camera for this origin
+   * (navigator.permissions.query → "denied"): the prompt will not reappear
+   * on retry, so copy must point the user to their browser settings.
+   * False/undefined for a fresh deny that can still be re-prompted.
+   */
+  permissionBlocked?: boolean;
 }
 
 export const initialRecorderState: RecorderState = {
@@ -49,7 +56,7 @@ export const initialRecorderState: RecorderState = {
 export type RecorderAction =
   | { type: "REQUEST_PERMISSION" }
   | { type: "PERMISSION_GRANTED" }
-  | { type: "PERMISSION_DENIED" }
+  | { type: "PERMISSION_DENIED"; blocked?: boolean }
   | { type: "START_RECORDING" }
   | { type: "RECORDING_COMPLETE" }
   | { type: "UPLOAD_SUCCESS" }
@@ -62,10 +69,10 @@ export function recorderReducer(state: RecorderState, action: RecorderAction): R
     case "REQUEST_PERMISSION":
       return { ...state, status: "permission-requesting", errorReason: undefined };
     case "PERMISSION_GRANTED":
-      return { ...state, status: "permission-granted" };
+      return { ...state, status: "permission-granted", permissionBlocked: false };
     case "PERMISSION_DENIED":
       // FR-027: a declined prompt is not a 3-fail strike — failureCount untouched.
-      return { ...state, status: "permission-denied" };
+      return { ...state, status: "permission-denied", permissionBlocked: action.blocked === true };
     case "START_RECORDING":
       return { ...state, status: "recording", errorReason: undefined };
     case "RECORDING_COMPLETE":
