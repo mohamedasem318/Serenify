@@ -168,9 +168,11 @@ export async function signInToOnboarding(
 }
 
 /**
- * Start a recording and confirm it began (the countdown is visible). The
- * recorder auto-stops at 60s, uploads (intercepted), writes the vector, and the
- * host navigates to /app — the caller asserts that with a generous timeout.
+ * Start a recording, confirm it began (the countdown is visible), then click
+ * through the sticky success view. The recorder auto-stops at 60s, uploads
+ * (intercepted), writes the vector, and shows a user-dismissible "You're all set"
+ * view; clicking "Continue to dashboard" navigates to /app — the caller asserts
+ * that with a generous timeout.
  *
  * Uses real time (the recorder's 60s setInterval), NOT page.clock: install()
  * freezes timers in a way that stalls the post-success Next router navigation,
@@ -189,6 +191,13 @@ export async function recordAnchor(page: Page) {
     }
     await expect(timer).toBeVisible({ timeout: 2_000 });
   }).toPass({ timeout: 20_000 });
+
+  // Success no longer auto-redirects (Mohamed 2026-05-28): the recorder shows a
+  // sticky "You're all set" view. Click through to /app; the broadcast that
+  // refreshes sibling tabs (SC-008) already fired when the vector was written.
+  const continueButton = page.getByRole("button", { name: "Continue to dashboard" });
+  await expect(continueButton).toBeVisible({ timeout: RECORD_AND_LAND_TIMEOUT });
+  await continueButton.click();
 }
 
 /** Wall-clock budget for a recording: 60s capture + upload + cold /app compile. */

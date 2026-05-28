@@ -14,11 +14,11 @@ import { useAnchorRecorder } from "./use-anchor-recorder";
 const RECORDING_SECONDS = 60;
 
 /**
- * Calm-voice copy (Principle V, locked with Mohamed 2026-05-27). Identical for
- * onboarding + calibrate. `uploadInterrupted` is intentionally the same message
- * as `unavailable`: a transport failure after the /healthz pre-check means the
- * service became unreachable mid-upload, which reads to the user as the same
- * "temporarily unavailable" condition.
+ * Calm-voice copy (Principle V). Explanation/failure strings locked with Mohamed
+ * 2026-05-27; success heading/body locked 2026-05-28. Identical for onboarding +
+ * calibrate. A transport failure after the /healthz pre-check (upload-failed)
+ * reuses `unavailable`: the service became unreachable mid-upload, which reads to
+ * the user as the same "temporarily unavailable" condition.
  */
 const COPY = {
   explanation:
@@ -29,6 +29,9 @@ const COPY = {
     "We couldn't see your face clearly in that recording. Better lighting and facing the camera directly usually helps. Want to try again?",
   unavailable:
     "Calibration is temporarily unavailable. We'll have it back shortly — please try again in a few minutes.",
+  successHeading: "You're all set",
+  successBody:
+    "Your calm baseline is saved and stress detection is active. The recording wasn't kept — only the measurements derived from it.",
 } as const;
 
 /** Codec probe order (📌 DECISION-13 / T038); the backend accepts mp4 + webm (FR-047). */
@@ -177,10 +180,12 @@ export function AnchorRecorder({
 
       dispatch({ type: "UPLOAD_SUCCESS" });
       // US7: refresh sibling tabs on the onboarding step / /app/calibrate (FR-034).
+      // Fires on success regardless of when THIS tab dismisses the success view.
       broadcastAnchorCaptured();
-      onComplete();
+      // No auto-redirect — the success view is user-dismissible (Mohamed 2026-05-28);
+      // its "Continue to dashboard" button calls onComplete().
     },
-    [dispatch, onComplete],
+    [dispatch],
   );
 
   const stopRecording = useCallback(() => {
@@ -258,9 +263,28 @@ export function AnchorRecorder({
     );
   }
 
+  // --- Success is sticky + user-dismissible (no auto-redirect): one confirmation,
+  // one action. The anchor is already written + broadcast by now, so leaving by
+  // any means keeps it; the button is the explicit path to /app (Mohamed 2026-05-28).
+  if (state.status === "success") {
+    return (
+      <section className="space-y-6">
+        <div className="space-y-2">
+          <p className="text-lg font-medium text-ink">
+            <span aria-hidden="true" className="text-meadow">✓</span> {COPY.successHeading}
+          </p>
+          <p className="text-sm leading-relaxed text-muted">{COPY.successBody}</p>
+        </div>
+        <Button className="h-12 w-full" onClick={onComplete}>
+          Continue to dashboard
+        </Button>
+      </section>
+    );
+  }
+
   return (
     <section className="space-y-6">
-      {!isRecording && state.status !== "uploading" && (
+      {(state.status === "idle" || state.status === "permission-requesting") && (
         <>
           <p className="text-sm leading-relaxed text-muted">{COPY.explanation}</p>
           <div ref={sentinelRef} aria-hidden="true" />
@@ -311,7 +335,7 @@ export function AnchorRecorder({
 
       {(state.status === "extract-failed" || state.status === "upload-failed") && (
         <Button className="h-12 w-full" variant="secondary" onClick={startCapture}>
-          Record again
+          Try again
         </Button>
       )}
 
