@@ -135,8 +135,18 @@ export function AnchorRecorder({
   }, []);
 
   // --- Release camera + timer on unmount (privacy + no leaked intervals).
+  // Detach the recorder handlers BEFORE stopping the tracks: stopping a live
+  // stream makes MediaRecorder fire a final `stop`, which would run submitClip and
+  // write an anchor for an ABANDONED recording (e.g. the user hits Back to abort
+  // mid-capture). An anchor must only be written on an intentional, completed
+  // recording — never as a side effect of navigating away.
   useEffect(() => () => {
     clearTimer();
+    const recorder = recorderRef.current;
+    if (recorder) {
+      recorder.ondataavailable = null;
+      recorder.onstop = null;
+    }
     stopStream();
   }, [clearTimer, stopStream]);
 
