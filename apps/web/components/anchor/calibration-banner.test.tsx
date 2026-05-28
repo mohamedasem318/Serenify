@@ -1,9 +1,9 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { CalibrationBanner } from "./calibration-banner";
+import { ANCHOR_BANNER_DISMISS_KEY } from "@/lib/auth-broadcast";
 
-const DISMISS_KEY = "serenify-anchor-banner-dismissed";
+import { CalibrationBanner } from "./calibration-banner";
 
 afterEach(() => sessionStorage.clear());
 
@@ -21,13 +21,28 @@ describe("CalibrationBanner", () => {
     render(<CalibrationBanner />);
     fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
     expect(screen.queryByRole("region", { name: "Calibration" })).toBeNull();
-    expect(sessionStorage.getItem(DISMISS_KEY)).toBe("1");
+    expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBe("1");
   });
 
   it("stays hidden when already dismissed this session", () => {
-    sessionStorage.setItem(DISMISS_KEY, "1");
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
     render(<CalibrationBanner />);
     expect(screen.queryByRole("region", { name: "Calibration" })).toBeNull();
+  });
+
+  it("re-shows after the dismissal key is cleared (sign-out reset path)", () => {
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+    const { rerender } = render(<CalibrationBanner />);
+    expect(screen.queryByRole("region", { name: "Calibration" })).toBeNull();
+
+    // What broadcastSignOut / cross-tab-auth do on a sign-out: wipe the key.
+    // A storage event then notifies the subscriber and the banner re-renders.
+    act(() => {
+      sessionStorage.removeItem(ANCHOR_BANNER_DISMISS_KEY);
+      window.dispatchEvent(new StorageEvent("storage"));
+    });
+    rerender(<CalibrationBanner />);
+    expect(screen.getByRole("region", { name: "Calibration" })).toBeVisible();
   });
 
   it("uses no exclamation marks or red accents (Principle V)", () => {

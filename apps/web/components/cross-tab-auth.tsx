@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import {
   ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
+  clearAnchorBannerDismissal,
   consumePendingSignIn,
   parseAnchorBroadcast,
   parseAuthBroadcast,
@@ -125,6 +126,11 @@ export function CrossTabAuth(): null {
         auth === "signout" &&
         pathMatches(pathname, SIGNED_OUT_FROM_PATHS)
       ) {
+        // Reset the calibration banner's session-dismissal so the next
+        // sign-in in this tab re-shows the banner (FR-023/024). The
+        // originating tab clears its own dismissal inside broadcastSignOut;
+        // this mirror keeps the sibling tab in sync.
+        clearAnchorBannerDismissal();
         // Race-condition guard: the originating tab's Server Action
         // clears session cookies via its HTTP response, which may
         // not have landed in the browser by the time the broadcast's

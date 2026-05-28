@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
 import {
+  ANCHOR_BANNER_DISMISS_KEY,
   ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
@@ -59,6 +60,7 @@ beforeEach(() => {
   signOutMock.mockResolvedValue({ error: null });
   pathnameHolder.value = "/login";
   localStorage.clear();
+  sessionStorage.clear();
   clearAllCookies();
 });
 
@@ -137,6 +139,30 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/login");
     });
+  });
+
+  it("clears the calibration-banner dismissal in this tab on signout (📌 ST-11)", async () => {
+    // Sibling-tab scenario: this tab dismissed the banner, then another tab
+    // signed out. The broadcast must wipe THIS tab's sessionStorage entry so
+    // when the user signs back in (in any tab), the banner re-appears.
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+    pathnameHolder.value = "/app";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:888" });
+    await waitFor(() => {
+      expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
+    });
+  });
+
+  it("does NOT clear the dismissal when signout arrives on a signed-out surface", () => {
+    // The handler is pathname-gated. /login isn't a SIGNED_OUT_FROM_PATHS,
+    // so a stray signout broadcast there must not touch sessionStorage —
+    // that would inadvertently reset a future sign-in's first-render state.
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+    pathnameHolder.value = "/login";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:888" });
+    expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBe("1");
   });
 });
 

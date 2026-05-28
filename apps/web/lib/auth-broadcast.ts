@@ -75,6 +75,11 @@ export function broadcastSignIn(): void {
  * clears cookies). Sibling tabs at /app / /onboarding receive the
  * storage event and navigate to /login.
  *
+ * Also clears any same-tab anchor-banner dismissal so the next
+ * sign-in shows the banner again (FR-023/024: dismissal is
+ * auth-session-scoped, not browser-tab-scoped — sessionStorage
+ * alone survives sign-out/sign-in within one tab).
+ *
  * No-op when window is undefined.
  */
 export function broadcastSignOut(): void {
@@ -84,6 +89,7 @@ export function broadcastSignOut(): void {
   } catch {
     // see broadcastSignIn — best-effort.
   }
+  clearAnchorBannerDismissal();
 }
 
 /**
@@ -179,4 +185,30 @@ export function broadcastAnchorCaptured(): void {
 /** True iff a storage-event newValue is an anchor-captured marker. */
 export function parseAnchorBroadcast(newValue: string | null): boolean {
   return newValue != null && newValue.startsWith("captured:");
+}
+
+// ── Calibration banner session-dismissal (FR-023/024) ────────────────────────
+// The banner's "dismiss" hides it for the current auth session: across
+// refreshes, but NOT across sign-out/sign-in. The storage layer is
+// sessionStorage (survives a same-tab refresh, scoped to one tab); the
+// auth-session reset is achieved by clearing the key as part of every
+// sign-out flow — both the initiating tab (broadcastSignOut, above) and any
+// sibling tab that handles the cross-tab signout broadcast (cross-tab-auth).
+
+export const ANCHOR_BANNER_DISMISS_KEY = "serenify-anchor-banner-dismissed";
+
+/**
+ * Remove the calibration-banner dismissal marker from sessionStorage so the
+ * next sign-in re-shows the banner (FR-023/024). Called from broadcastSignOut
+ * and from cross-tab-auth's signout branch. No-op under SSR; best-effort
+ * (sessionStorage can throw in sandboxed contexts).
+ */
+export function clearAnchorBannerDismissal(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ANCHOR_BANNER_DISMISS_KEY);
+  } catch {
+    // best-effort — failure here just means a fresh sign-in in the same tab
+    // re-sees the banner-already-dismissed state until the tab closes.
+  }
 }

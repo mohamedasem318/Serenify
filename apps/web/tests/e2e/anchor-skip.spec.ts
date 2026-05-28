@@ -12,6 +12,7 @@ import {
   recordAnchor,
   signInToOnboarding,
 } from "./anchor-helpers";
+import { signOut } from "./helpers";
 
 const NAME = "Anchor Employee";
 
@@ -97,6 +98,52 @@ for (const role of ["team_lead", "admin"] as const) {
     await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
   });
 }
+
+test("dismiss persists across refresh, resets on sign-out, reappears on sign-in (ST-11 / FR-023+024)", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName === "webkit", WEBKIT_SKIP_REASON);
+  test.setTimeout(90_000);
+  await installAnchorMocks(page);
+  // healthy=false surfaces Skip → lands on /app with the banner, no real
+  // recording needed (the test is about the banner's session lifecycle, not
+  // the recorder).
+  await interceptAnchorApi(page, { healthy: false });
+  const emp = await createOnboardingEmployee();
+
+  await signInToOnboarding(page, emp);
+  await page.getByLabel("Full name").fill(NAME);
+  await page.getByRole("button", { name: "Continue" }).click();
+  const skip = page.getByRole("button", { name: "Skip for now" });
+  await expect(skip).toBeVisible({ timeout: 15_000 });
+  await skip.click();
+  await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
+
+  const banner = page.getByRole("region", { name: "Calibration" });
+  await expect(banner).toBeVisible();
+
+  // 1. Dismiss → hidden for the session.
+  await page.getByRole("button", { name: "Dismiss" }).click();
+  await expect(banner).toHaveCount(0);
+
+  // 2. Refresh → still hidden (sessionStorage survives a same-session reload).
+  await page.reload();
+  await expect(page).toHaveURL(/\/app$/);
+  await expect(banner).toHaveCount(0);
+
+  // 3. Sign out + sign back in → banner REAPPEARS.
+  // This is the ST-11 regression: dismissal was tab-scoped via sessionStorage
+  // and survived sign-out/sign-in within one tab. broadcastSignOut now wipes
+  // the dismissal key as part of the sign-out flow.
+  await signOut(page);
+  await page.getByLabel("Email").fill(emp.email);
+  await page.getByLabel("Password", { exact: true }).fill(emp.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  // full_name is set now, so /app loads directly (no /onboarding bounce).
+  await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
+  await expect(banner).toBeVisible();
+});
 
 test("a demo employee lands on /app with no calibration banner (SC-007, FR-031)", async ({
   page,

@@ -3,12 +3,12 @@
 import { useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
-
-const DISMISS_KEY = "serenify-anchor-banner-dismissed";
+import { ANCHOR_BANNER_DISMISS_KEY } from "@/lib/auth-broadcast";
 
 // Same-tab subscribers (sessionStorage writes don't emit a `storage` event in
-// the writing tab) plus cross-tab `storage` propagation. useSyncExternalStore
-// keeps this hydration-safe (server snapshot = not dismissed) and lint-clean.
+// the writing tab). Cross-tab dismissal isn't a concern — sessionStorage is
+// per-tab — but the `storage` listener is harmless and keeps the contract
+// useSyncExternalStore expects.
 const listeners = new Set<() => void>();
 
 function subscribe(onChange: () => void): () => void {
@@ -21,11 +21,11 @@ function subscribe(onChange: () => void): () => void {
 }
 
 function getSnapshot(): boolean {
-  return sessionStorage.getItem(DISMISS_KEY) === "1";
+  return sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY) === "1";
 }
 
 function dismiss(): void {
-  sessionStorage.setItem(DISMISS_KEY, "1");
+  sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
   listeners.forEach((notify) => notify());
 }
 
@@ -33,12 +33,23 @@ function dismiss(): void {
  * Calibration prompt on /app for an employee with no stored anchor (FR-021).
  * Dismissal is session-only (FR-023) — it reappears next session until the
  * anchor is captured (FR-024). Amber, never red; calm voice (Principle V).
+ *
+ * The server snapshot pretends "dismissed" so SSR + initial hydration render
+ * nothing (📌 ST-11 fix 2026-05-28). Without this, a dismissed user refreshing
+ * the page sees the banner FLASH in (server renders it visible) and then
+ * vanish once the client reads sessionStorage. A small post-hydration pop-in
+ * for non-dismissed users is the accepted trade-off — the alternative is a
+ * visible flash that users notice on every refresh until they calibrate.
+ *
+ * Sign-out clears the dismissal (via auth-broadcast.ts → broadcastSignOut +
+ * cross-tab-auth's signout branch) so the next sign-in re-shows the banner —
+ * sessionStorage by itself would survive sign-out/sign-in within one tab.
  */
 export function CalibrationBanner() {
   const dismissed = useSyncExternalStore(
     subscribe,
     getSnapshot,
-    () => false, // server snapshot: render visible, reconcile on the client
+    () => true, // server snapshot: render nothing, reveal post-hydration
   );
 
   if (dismissed) return null;
