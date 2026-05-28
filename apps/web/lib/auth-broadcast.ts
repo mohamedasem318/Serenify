@@ -194,8 +194,47 @@ export function parseAnchorBroadcast(newValue: string | null): boolean {
 // auth-session reset is achieved by clearing the key as part of every
 // sign-out flow — both the initiating tab (broadcastSignOut, above) and any
 // sibling tab that handles the cross-tab signout broadcast (cross-tab-auth).
+//
+// Cross-tab dismissal sync (Mohamed 2026-05-28, ST-17): the literal spec says
+// "session-only", but the consistent UX expectation is "same user, same
+// session, same intent" — dismissing in one tab should hide the banner in
+// sibling tabs too. The dismissal travels via a SEPARATE localStorage
+// broadcast key (storage events only fire across documents on localStorage,
+// and the sessionStorage key is intentionally per-tab); the cross-tab-auth
+// listener mirrors the dismissal into the receiving tab's own sessionStorage
+// so the hidden state survives that tab's later refreshes too.
 
 export const ANCHOR_BANNER_DISMISS_KEY = "serenify-anchor-banner-dismissed";
+export const ANCHOR_BANNER_DISMISS_BROADCAST_KEY =
+  "serenify-anchor-banner-dismissed-broadcast";
+
+/**
+ * Notify sibling tabs that the calibration banner was dismissed in this tab.
+ * The originating tab still owns its own sessionStorage write (the banner
+ * does that as part of its dismiss handler); this helper exists so the
+ * cross-tab signal travels alongside but does not couple the storage
+ * mechanisms. Timestamped value so consecutive writes still fire a `storage`
+ * event in siblings. No-op under SSR; best-effort (localStorage can throw in
+ * sandboxed contexts).
+ */
+export function broadcastAnchorBannerDismissed(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      ANCHOR_BANNER_DISMISS_BROADCAST_KEY,
+      `dismissed:${Date.now()}`,
+    );
+  } catch {
+    // see broadcastSignIn — best-effort; failure just means no sibling sync.
+  }
+}
+
+/** True iff a storage-event newValue is an anchor-banner-dismissed marker. */
+export function parseAnchorBannerDismissBroadcast(
+  newValue: string | null,
+): boolean {
+  return newValue != null && newValue.startsWith("dismissed:");
+}
 
 /**
  * Remove the calibration-banner dismissal marker from sessionStorage so the

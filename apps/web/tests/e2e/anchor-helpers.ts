@@ -217,6 +217,36 @@ export async function createOnboardingEmployee() {
   return { email, password, id: data.user.id };
 }
 
+/**
+ * Confirmed employee with full_name set + no anchor — sign-in lands on /app
+ * with the calibration banner visible (skips /onboarding). Needed for the
+ * ST-17 cross-tab tests that need a sibling tab already on /app or
+ * /app/calibrate, not the /onboarding+proxy path the original SC-008 test
+ * happens to exercise.
+ */
+export async function createCalibratableEmployee(fullName = "Calibrate Test") {
+  const emp = await createOnboardingEmployee();
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("profiles")
+    .update({ full_name: fullName })
+    .eq("id", emp.id);
+  if (error) throw error;
+  return emp;
+}
+
+/** Sign in and land directly on /app (caller's user must have full_name set). */
+export async function signInToApp(
+  page: Page,
+  creds: { email: string; password: string },
+) {
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(creds.email);
+  await page.getByLabel("Password", { exact: true }).fill(creds.password);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
+}
+
 export const DEMO_SUFFIX = "@demo.serenify.local";
 export const DEMO_PASSWORD = "DemoUser123!";
 

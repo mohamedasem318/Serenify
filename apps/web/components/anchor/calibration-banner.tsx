@@ -3,12 +3,16 @@
 import { useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/button";
-import { ANCHOR_BANNER_DISMISS_KEY } from "@/lib/auth-broadcast";
+import {
+  ANCHOR_BANNER_DISMISS_KEY,
+  broadcastAnchorBannerDismissed,
+} from "@/lib/auth-broadcast";
 
 // Same-tab subscribers (sessionStorage writes don't emit a `storage` event in
-// the writing tab). Cross-tab dismissal isn't a concern — sessionStorage is
-// per-tab — but the `storage` listener is harmless and keeps the contract
-// useSyncExternalStore expects.
+// the writing tab). The `storage` listener is what picks up the cross-tab
+// dismissal mirror that cross-tab-auth performs (sessionStorage write +
+// synthetic StorageEvent), so the banner reacts in sibling tabs even though
+// each tab has its own sessionStorage.
 const listeners = new Set<() => void>();
 
 function subscribe(onChange: () => void): () => void {
@@ -27,6 +31,11 @@ function getSnapshot(): boolean {
 function dismiss(): void {
   sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
   listeners.forEach((notify) => notify());
+  // ST-17 fix 2026-05-28: propagate the dismissal to sibling tabs so the
+  // banner hides everywhere this user is signed in (Mohamed: same session,
+  // same intent — see auth-broadcast.ts). Same-tab effects are still owned
+  // by the sessionStorage write above; this only adds the cross-tab signal.
+  broadcastAnchorBannerDismissed();
 }
 
 /**

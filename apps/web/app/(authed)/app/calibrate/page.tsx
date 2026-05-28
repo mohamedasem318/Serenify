@@ -36,6 +36,22 @@ export default async function CalibratePage() {
     redirect("/app");
   }
 
+  // Falls through to /app when the anchor is already captured (FR-022). The
+  // ST-17 fix needs this: a sibling tab that was mid-record receives the
+  // cross-tab broadcast → router.refresh() re-runs this Server Component →
+  // has_anchor now returns true → redirect away from the now-stale recorder.
+  // Without this probe, refresh just re-rendered the recorder and the sibling
+  // appeared to hang. Manual visits with an anchor are likewise redirected —
+  // recalibration UI is feature 005, not 004. Conservative on null/error: any
+  // non-true result keeps the recorder available so a transient RPC failure
+  // doesn't strand a still-uncalibrated user.
+  const { data: hasAnchor } = await supabase.rpc("has_anchor", {
+    target_user: user.id,
+  });
+  if (hasAnchor === true) {
+    redirect("/app");
+  }
+
   return (
     <div className="mx-auto w-full max-w-2xl space-y-8 pb-12">
       <CalibrateRecorder />

@@ -39,7 +39,7 @@ test("employee records an anchor during onboarding and lands on /app with no ban
   await expect(page.getByRole("region", { name: "Calibration" })).toHaveCount(0);
 });
 
-test("completing the anchor in one tab refreshes a sibling tab to /app (SC-008)", async ({
+test("completing the anchor refreshes a sibling /onboarding tab to /app (SC-008, /onboarding+proxy path)", async ({
   context,
   browserName,
 }) => {
@@ -56,6 +56,12 @@ test("completing the anchor in one tab refreshes a sibling tab to /app (SC-008)"
   // null, so it sits on the name step. It only needs to BE on /onboarding when
   // the broadcast fires — the listener refreshes any /onboarding tab, and the
   // proxy then bounces it once full_name is set.
+  //
+  // This test exercises ONE of the three cross-tab surfaces — the one the
+  // proxy bounce makes easy. The /app/calibrate redirect and /app banner-hide
+  // paths live in anchor-cross-tab.spec.ts (ST-17). Until 2026-05-28 this was
+  // the only cross-tab test, which gave false confidence: it passed even
+  // though the /app and /app/calibrate sibling paths were silently broken.
   const tabB = await context.newPage();
   await tabB.goto("/onboarding");
   await expect(tabB.getByLabel("Full name")).toBeVisible();

@@ -1,15 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  ANCHOR_BANNER_DISMISS_BROADCAST_KEY,
   ANCHOR_BANNER_DISMISS_KEY,
   ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
+  broadcastAnchorBannerDismissed,
   broadcastAnchorCaptured,
   broadcastSignOut,
   clearAnchorBannerDismissal,
   consumePendingSignIn,
   destinationBroadcastsSignIn,
+  parseAnchorBannerDismissBroadcast,
   parseAnchorBroadcast,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
@@ -107,6 +110,33 @@ describe("anchor capture broadcast (📌 DECISION-15, FR-034)", () => {
     expect(parseAnchorBroadcast(null)).toBe(false);
     expect(parseAnchorBroadcast("signin:123")).toBe(false);
     expect(parseAnchorBroadcast("garbage")).toBe(false);
+  });
+});
+
+describe("anchor banner dismissal broadcast (ST-17 cross-tab sync, 2026-05-28)", () => {
+  it("writes a dismissed marker that parseAnchorBannerDismissBroadcast recognizes", () => {
+    broadcastAnchorBannerDismissed();
+    const written = localStorage.getItem(ANCHOR_BANNER_DISMISS_BROADCAST_KEY);
+    expect(written).not.toBeNull();
+    expect(written?.startsWith("dismissed:")).toBe(true);
+    expect(parseAnchorBannerDismissBroadcast(written)).toBe(true);
+  });
+
+  it("uses a key distinct from the per-tab sessionStorage dismissal key", () => {
+    // The sessionStorage key (per-tab, session-only) and the localStorage
+    // broadcast key (cross-tab signal) must NOT collide: storage events for
+    // sessionStorage don't propagate across tabs, so the cross-tab effect
+    // requires a separate localStorage write.
+    broadcastAnchorBannerDismissed();
+    expect(localStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
+    expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
+  });
+
+  it("rejects null, unrelated, and other broadcast markers", () => {
+    expect(parseAnchorBannerDismissBroadcast(null)).toBe(false);
+    expect(parseAnchorBannerDismissBroadcast("captured:123")).toBe(false);
+    expect(parseAnchorBannerDismissBroadcast("signin:1")).toBe(false);
+    expect(parseAnchorBannerDismissBroadcast("garbage")).toBe(false);
   });
 });
 
