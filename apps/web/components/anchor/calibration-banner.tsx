@@ -1,7 +1,6 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 
@@ -56,8 +55,15 @@ export function CalibrationBanner() {
           know what your calm looks like.
         </p>
         <div className="flex shrink-0 items-center gap-2">
+          {/* Plain <a> (NOT next/link) — a full document navigation is REQUIRED
+              so /app/calibrate loads with its own `camera=(self)` Permissions-
+              Policy. Next App Router's client-side <Link> navigation never
+              reloads the document, so the active PP stays /app's `camera=()`
+              and getUserMedia is rejected with "Permissions policy violation".
+              Same idiom as the Router Cache hard-nav fix (DECISIONS 2026-05-27).
+              See docs/CHANGELOG.md 2026-05-28. */}
           <Button asChild className="h-11">
-            <Link href="/app/calibrate">Take a minute to calibrate</Link>
+            <a href="/app/calibrate">Take a minute to calibrate</a>
           </Button>
           <Button variant="ghost" className="h-11" onClick={dismiss}>
             Dismiss

@@ -993,3 +993,43 @@ fallback), `apps/api/app/config.py` (`supabase_url`), `apps/api/.env.example`
 (`SUPABASE_URL`), `apps/api/pyproject.toml` + `uv.lock` (`pyjwt[crypto]` ->
 `cryptography`), and `apps/api/tests/` (ES256 accept + wrong-key reject tests).
 The separate black-preview fix shipped in `e43f33f`.
+
+## 2026-05-28 — fix(004-onboarding-video-anchor) — calibration banner must hard-navigate to /app/calibrate for the per-route Permissions-Policy to apply
+
+DECISION-16 grants `camera=(self)` only on `/onboarding` and `/app/calibrate`
+via `next.config.ts` `headers()`. That works for `/onboarding` (always reached
+via a full document navigation post-confirm) and for a direct URL hit to
+`/app/calibrate`, but smoke testing showed `getUserMedia` rejected with
+`[Violation] Permissions policy violation: camera is not allowed in this
+document` when the user reached `/app/calibrate` by clicking the calibration
+banner on `/app`.
+
+Root cause (real, not the earlier dev-only-transient misdiagnosis): Next App
+Router's client-side `<Link>` navigation never reloads the document — it only
+fetches the RSC payload and updates the React tree. `Permissions-Policy` is a
+per-document HTTP header set at document-load time; a client-side route change
+cannot re-evaluate it. So after a Link click from `/app` (whose document PP is
+`camera=()`) to `/app/calibrate` (whose page response carries `camera=(self)`),
+the **active document** is still `/app`'s, with `camera=()` enforced. `curl`
+on `/app/calibrate` correctly returned `camera=(self)` because that endpoint's
+*page response* is correct — but the browser never made that response the
+active document. A dev-server restart only "fixed" it when the user happened to
+follow with a URL-bar / hard navigation; that was the false positive that led
+to the earlier `e1971d0` "dev-only workaround" docs note, which is removed in
+this commit.
+
+- `components/anchor/calibration-banner.tsx`: the CTA is a plain `<a href="/app/
+  calibrate">` (not `next/link`), forcing a full document navigation so the
+  fresh `/app/calibrate` HTML response loads with its `camera=(self)` PP.
+  Identical idiom to the Router Cache hard-nav fix on the onboarding/calibrate
+  success path (DECISIONS 2026-05-27).
+- `specs/004-onboarding-video-anchor/smoke-tests.md`: the prior dev-only
+  "restart the dev server" note (e1971d0) is removed; the bug is a product
+  issue, not a local-dev transient.
+- DECISION-16 unchanged in spirit (camera tightly scoped to the two capture
+  routes); only the entry pattern is corrected — any code that links INTO a
+  capture route from a non-capture route MUST use a hard navigation, not a
+  client-side `<Link>`.
+
+Affected artifacts (this commit): `apps/web/components/anchor/calibration-banner.tsx`,
+`specs/004-onboarding-video-anchor/smoke-tests.md`.
