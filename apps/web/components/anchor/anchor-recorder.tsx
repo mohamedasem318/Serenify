@@ -120,10 +120,21 @@ export function AnchorRecorder({
   }, []);
 
   // --- Reveal "Skip for now" once the explanation is scrolled past (FR-004).
+  // IntersectionObserver delivers an initial entry synchronously after observe()
+  // with the element's current visibility. The sentinel sits right below a short
+  // paragraph, so on any normal viewport it is in view on mount — without the
+  // first-callback guard the initial entry would fire isIntersecting:true and
+  // reveal Skip before the user had done anything (📌 ST-10). Discard that
+  // first entry and react only to genuine transitions afterwards.
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el || typeof IntersectionObserver === "undefined") return;
+    let isInitial = true;
     const observer = new IntersectionObserver((entries) => {
+      if (isInitial) {
+        isInitial = false;
+        return;
+      }
       if (entries.some((entry) => entry.isIntersecting)) {
         dispatch({ type: "SCROLLED_PAST_EXPLANATION" });
       }

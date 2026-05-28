@@ -15,14 +15,14 @@ import {
 
 const NAME = "Anchor Employee";
 
-test("employee skips during onboarding, then calibrates from the banner (FR-004/021/022)", async ({
+test("Skip stays hidden on a fresh, healthy recorder mount (FR-004 regression)", async ({
   page,
   browserName,
 }) => {
   test.skip(browserName === "webkit", WEBKIT_SKIP_REASON);
-  test.setTimeout(120_000); // includes one real 60s recording on /app/calibrate
+  test.setTimeout(60_000);
   await installAnchorMocks(page);
-  await interceptAnchorApi(page);
+  await interceptAnchorApi(page); // healthy: true — recorder enters idle, not the down branch
   const emp = await createOnboardingEmployee();
 
   await signInToOnboarding(page, emp);
@@ -32,15 +32,43 @@ test("employee skips during onboarding, then calibrates from the banner (FR-004/
     timeout: 30_000,
   });
 
-  // "Skip for now" is revealed once the explanation sentinel scrolls into view
-  // (FR-004), then lands on /app WITH the calibration banner.
+  // FR-004: Skip is hidden on entry — only revealed by scroll-past, first
+  // extraction failure, or a permission deny (FR-007) / health down (FR-048).
+  // The IntersectionObserver delivers a synchronous initial entry on observe(),
+  // which would fire isIntersecting:true whenever the sentinel sits in the
+  // viewport on mount (any normal layout). That entry must be discarded — this
+  // assertion regresses the ST-10 bug where Skip flashed in within ~1s.
+  await page.waitForTimeout(500);
+  await expect(page.getByRole("button", { name: "Skip for now" })).toHaveCount(0);
+});
+
+test("Skip via health-down branch → /app banner → calibrate from banner (FR-021/022/048)", async ({
+  page,
+  browserName,
+}) => {
+  test.skip(browserName === "webkit", WEBKIT_SKIP_REASON);
+  test.setTimeout(120_000); // includes one real 60s recording on /app/calibrate
+  await installAnchorMocks(page);
+  // Phase 1: /healthz down — recorder surfaces "temporarily unavailable" + a
+  // permanent Skip button (FR-048, anchor-recorder.tsx). Replaces the previous
+  // reliance on the buggy observer-fires-on-mount path that ST-10 caught.
+  await interceptAnchorApi(page, { healthy: false });
+  const emp = await createOnboardingEmployee();
+
+  await signInToOnboarding(page, emp);
+  await page.getByLabel("Full name").fill(NAME);
+  await page.getByRole("button", { name: "Continue" }).click();
+
   const skip = page.getByRole("button", { name: "Skip for now" });
-  await expect(skip).toBeVisible({ timeout: 10_000 });
+  await expect(skip).toBeVisible({ timeout: 15_000 });
   await skip.click();
   await expect(page).toHaveURL(/\/app$/, { timeout: 30_000 });
   await expect(page.getByRole("region", { name: "Calibration" })).toBeVisible();
 
-  // Recalibrate from the banner → /app/calibrate → record → /app, banner gone.
+  // Phase 2: backend recovers — calibrate from the banner. Re-registering the
+  // route fulfills with healthy:true (Playwright runs route handlers in reverse
+  // registration order, so the newer one wins for subsequent requests).
+  await interceptAnchorApi(page, { healthy: true });
   await page.getByRole("link", { name: "Take a minute to calibrate" }).click();
   await expect(page).toHaveURL(/\/app\/calibrate$/, { timeout: 30_000 });
   await recordAnchor(page);
