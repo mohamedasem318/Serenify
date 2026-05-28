@@ -24,7 +24,7 @@ describe("SignOutButton", () => {
   it("forwards the variant prop onto the underlying Button", () => {
     render(<SignOutButton variant="ghost" />);
     const button = screen.getByRole("button", { name: "Sign out" });
-    expect(button.className).toMatch(/hover:bg-accent/);
+    expect(button.className).toMatch(/hover:bg-foggy\/15/);
   });
 
   it("accepts custom children to override the default label", () => {
