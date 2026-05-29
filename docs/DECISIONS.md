@@ -2039,3 +2039,45 @@ capture surface is reached by a client-side `<Link>` (item 2 — must hard-navig
 or cross-device (not just cross-tab) live banner updates are needed — tracked in
 `docs/BACKLOG.md` as a Supabase Realtime follow-up, since items 3/4 are
 same-browser-only by design.
+
+---
+
+## 2026-05-29 — hotfix(005 recon): LBP-TOP ROI resize must use the training interpolation (INTER_LINEAR)
+
+**Status**: Accepted.
+
+**Decision**: `packages/ml-video` `features._roi_crop` resizes each ROI to 64×64
+with cv2's default `INTER_LINEAR`. The extractor had overridden this with
+`cv2.INTER_AREA`; that override is removed.
+
+**Why it mattered**: the training notebook
+(`video-lbp-top-motion-per-subject-calibration.ipynb`, identical to the handoff's
+`refactored_v2` aside from Kaggle output cells) resizes ROIs with a bare
+`cv2.resize(roi, (64, 64))` — i.e. the `INTER_LINEAR` default. `INTER_AREA` is the
+textbook-better downscale filter, but it yields different 64×64 pixels → different
+LBP codes → a 90-d LBP-TOP block (`f0..f89`) that lives in a *different feature
+space* than the StandardScaler / RandomForest were fit on. The 2868 motion dims
+(landmark-coordinate derived) were unaffected; only the 90 LBP dims drifted.
+
+**Why it was silent**: the block still L1-normalizes per plane and still sums to
+9.0, so the existing `test_pipeline_fixtures.py` invariant stayed green. Calibration
+does NOT cancel the drift — the discrepancy is content-dependent, so
+`lbp_area(clip) − lbp_area(anchor) ≠ lbp_linear(clip) − lbp_linear(anchor)`.
+
+**Guard**: `tests/test_lbp_interpolation_fidelity.py` pins the 90-d LBP-TOP output to
+a notebook-derived golden (a verbatim port of the notebook's resize + LBP cells run
+on a deterministic synthetic clip — no dataset or MediaPipe needed). It fails if
+`INTER_AREA` or any non-default resize is reintroduced; the sum-to-9.0 invariant
+alone does not.
+
+**🔴 Anchor invalidation**: any anchor produced by the extraction pipeline before
+this fix was computed with `INTER_AREA` and is INVALID — its LBP block is out of the
+trained space; affected users must re-capture (recalibrate). `model_version` stays
+`2.0.0`, so this does NOT trip the handoff's model-version anchor-invalidation path —
+nothing auto-invalidates stored anchors. For the thesis/demo, manual re-calibration
+of any pre-fix extracted anchors suffices. (The demo seed's synthetic seed-42 anchor
+is not extraction-derived and is unaffected.)
+
+**Revisit if**: production gains a separate extraction/pipeline-version field — then
+feature-space changes like this should invalidate stored anchors via that field
+rather than by manual re-capture (backlog item; not addressed in this hotfix).
