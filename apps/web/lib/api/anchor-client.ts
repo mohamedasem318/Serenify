@@ -68,14 +68,21 @@ export async function postAnchor(clip: Blob, accessToken: string): Promise<Ancho
 
 /**
  * Readiness pre-check (FR-048): the recorder calls this before offering to
- * record so the user never records 60s into a dead backend. Any failure
- * (non-2xx or a thrown fetch) resolves to `false`.
+ * record, and again on the Start click (ST-18), so the user never records 60s
+ * into a dead backend. Any failure (non-2xx, a thrown fetch, or a `timeoutMs`
+ * abort) resolves to `false`. The timeout keeps a *hung* backend — one that
+ * accepts the connection but never responds — from stalling the Start click
+ * indefinitely; a killed backend already rejects fast (connection refused).
  */
-export async function checkHealth(): Promise<boolean> {
+export async function checkHealth(timeoutMs = 4000): Promise<boolean> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(HEALTH_ENDPOINT, { method: "GET" });
+    const res = await fetch(HEALTH_ENDPOINT, { method: "GET", signal: controller.signal });
     return res.ok;
   } catch {
     return false;
+  } finally {
+    clearTimeout(timer);
   }
 }

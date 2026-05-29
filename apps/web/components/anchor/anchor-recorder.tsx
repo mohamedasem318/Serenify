@@ -281,6 +281,20 @@ export function AnchorRecorder({
   // optimistic dispatch so the denial notice stays put until the stream
   // actually resolves. The anti-flash holds even if the probe is unsupported.
   const startCapture = useCallback(async () => {
+    // ST-18 / FR-048: the recording-state transition MUST be downstream of an
+    // awaited 200 from /healthz — never optimistic. Re-check on every Start and
+    // retry so a backend that died after the mount-time probe (or was still
+    // being probed when the user clicked) surfaces the unavailable gate instead
+    // of flashing the preview + countdown. Setting "checking" also disables the
+    // action button for the duration, so the Start click can't slip a capture
+    // through before we know the backend is reachable.
+    setHealth("checking");
+    if (!(await checkHealth())) {
+      setHealth("down");
+      return;
+    }
+    setHealth("up");
+
     const isRetryFromDenied = state.status === "permission-denied";
     if (isRetryFromDenied) {
       const probed = await probeCameraPermission();
@@ -406,21 +420,37 @@ export function AnchorRecorder({
         />
       )}
 
-      {/* Primary action. */}
+      {/* Primary action. Disabled until the readiness probe confirms the backend
+          is reachable, so the recording-state transition only ever runs after an
+          awaited 200 (ST-18) — no flash of preview + countdown into a dead backend. */}
       {(state.status === "idle" || state.status === "permission-requesting") && (
-        <Button className="h-12 w-full" onClick={startCapture} disabled={isBusy}>
-          {state.status === "permission-requesting" ? "Requesting camera…" : "Start recording"}
+        <Button className="h-12 w-full" onClick={startCapture} disabled={isBusy || health === "checking"}>
+          {state.status === "permission-requesting"
+            ? "Requesting camera…"
+            : health === "checking"
+              ? "Checking availability…"
+              : "Start recording"}
         </Button>
       )}
 
       {(state.status === "extract-failed" || state.status === "upload-failed") && (
-        <Button className="h-12 w-full" variant="secondary" onClick={startCapture}>
+        <Button
+          className="h-12 w-full"
+          variant="secondary"
+          onClick={startCapture}
+          disabled={health === "checking"}
+        >
           Try again
         </Button>
       )}
 
       {state.status === "permission-denied" && (
-        <Button className="h-12 w-full" variant="secondary" onClick={startCapture}>
+        <Button
+          className="h-12 w-full"
+          variant="secondary"
+          onClick={startCapture}
+          disabled={health === "checking"}
+        >
           Try again
         </Button>
       )}

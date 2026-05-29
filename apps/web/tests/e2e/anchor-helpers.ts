@@ -32,15 +32,23 @@ const CORS_HEADERS = {
  * Route-intercept the FastAPI origin so no real 60s video is ever recorded in CI
  * (📌 DECISION-18). `/healthz` → ready (or 503 when `healthy: false`), `/anchor`
  * → a canned vector (preflight answered).
+ *
+ * `healthy` may be a live-readable function so a test can flip readiness AFTER
+ * the recorder has mounted — e.g. the backend dying between the mount-time probe
+ * and the Start re-check (ST-18). The handler reads it on every request.
  */
-export async function interceptAnchorApi(page: Page, opts: { healthy?: boolean } = {}) {
-  const healthy = opts.healthy ?? true;
+export async function interceptAnchorApi(
+  page: Page,
+  opts: { healthy?: boolean | (() => boolean) } = {},
+) {
+  const healthyOpt = opts.healthy ?? true;
+  const isHealthy = () => (typeof healthyOpt === "function" ? healthyOpt() : healthyOpt);
   await page.route("**/healthz", (route) =>
     route.fulfill({
-      status: healthy ? 200 : 503,
+      status: isHealthy() ? 200 : 503,
       headers: { ...CORS_HEADERS, "content-type": "application/json" },
       body: JSON.stringify(
-        healthy ? { status: "ready", model_version: MODEL_VERSION } : { status: "down" },
+        isHealthy() ? { status: "ready", model_version: MODEL_VERSION } : { status: "down" },
       ),
     }),
   );
