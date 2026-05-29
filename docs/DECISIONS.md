@@ -1937,3 +1937,105 @@ coverage (would be a separate admin-scoped function, never a relaxation of
 `has_anchor` scope); the Router Cache redirect-caching behavior changes upstream
 (entry 12); or the webkit teardown leak is fixed and the isolated-run signal
 diverges from CI's webkit signal (entry 13).
+
+---
+
+## 2026-05-29 — feature 004 smoke-surfaced decisions + two planned decisions completed
+
+**Status**: Accepted.
+
+**Context**: Mohamed's manual smoke pass
+(`specs/004-onboarding-video-anchor/smoke-tests.md`, ST-01…ST-24, signed off
+2026-05-29) surfaced product bugs whose fixes carry architectural weight, and the
+ship audit found that the collected feature-004 entry above (titled "📌 DECISION-1
+through DECISION-18") silently skipped two **planned** decisions — DECISION-10 and
+DECISION-11. Both omissions and all smoke-driven amendments are recorded here so
+the DECISIONS log matches the shipped branch. No new DECISION-n numbers are
+invented: each smoke fix amends or refines an existing decision/FR, or is recorded
+as an implementation finding.
+
+**Planned decisions omitted from the collected entry (now recorded):**
+
+- **DECISION-10 — `/healthz` + boot-time model-load check.** `apps/api` loads the
+  model at startup and aborts boot on failure (Principle II — no half-loaded
+  service); `GET /healthz` (no auth) returns `200 {status:"ready", model_version}`.
+  Sourced at tasks T016/T018, FR-048. The web recorder consumes it as a pre-check
+  (see smoke amendment 7 below).
+- **DECISION-11 — backend accepts BOTH MP4 and WebM.** `POST /anchor` accepts the
+  `clip` field as MP4 or WebM and 415s anything else, so Safari (MP4) and
+  Chrome/Firefox (WebM) upload natively with no client-side transcoding (FR-047).
+  Sourced at task T019.
+
+**Smoke-surfaced amendments (each ties to an existing decision or FR):**
+
+1. **Anchor-service auth → ES256 via JWKS (DECISION-9 amendment).** The current
+   Supabase CLI/cloud signs access tokens with asymmetric ES256 (`kid` header +
+   JWKS), not the legacy HS256 shared secret DECISION-9 assumed; the HS256-only
+   verifier 401'd every real token, surfaced by the recorder as "calibration
+   temporarily unavailable" only at upload time. `verify_jwt` now verifies
+   ES256/RS256/EdDSA against the published JWKS (HS256 retained as a fallback), with
+   the algorithm allow-list pinned per branch (never read from the token). Full
+   detail in CHANGELOG 2026-05-28; commit `1d9274c`. Supersedes the "HS256"
+   parenthetical in item 5 of the collected entry.
+
+2. **Permissions-Policy entry pattern → hard-navigate INTO capture routes
+   (DECISION-16 refinement).** `Permissions-Policy` is a per-document header; Next
+   App Router's client-side `<Link>` never reloads the document, so a `<Link>` from
+   `/app` (`camera=()`) to `/app/calibrate` (`camera=(self)`) left the active
+   document's `camera=()` enforced and `getUserMedia` was rejected. The calibration
+   banner CTA is a plain `<a href>` (full navigation). Rule going forward: any link
+   from a non-capture route INTO a capture route must be a hard navigation — same
+   idiom as the Router Cache hard-nav (item 12 above). CHANGELOG 2026-05-28; commit
+   `8ed62f3` (which corrected the wrong dev-only note in `e1971d0`).
+
+3. **Cross-tab anchor + dismissal sync — concrete mechanism (DECISION-15
+   refinement, ST-17).** Completing a recording writes `serenify-anchor-captured`;
+   sibling tabs on `/app/calibrate` redirect to `/app`, and sibling tabs on `/app`
+   drop the banner via `router.refresh()`. Banner dismissal is mirrored into each
+   sibling tab's own `sessionStorage` so it both hides immediately and survives a
+   reload in that tab until sign-out. Commit `9567869`.
+
+4. **Anchor-marker refresh scoped to banner-bearing routes (ST-17 follow-up).**
+   The cross-tab anchor-captured `storage` handler calls `router.refresh()` only on
+   routes that actually render the banner, so a capture in one tab does not
+   spuriously refresh unrelated authed routes in sibling tabs. Commit `b368bbc`.
+
+5. **Banner dismissal resets on sign-out (ST-11).** Session-scoped dismissal is
+   cleared on sign-out (via the auth-broadcast sign-out path) so the next sign-in
+   re-shows the banner for a still-uncalibrated user; a banner refresh flash was
+   removed in the same fix. Commit `649c08e`.
+
+6. **Skip-for-now reveal: observer fires only when the explanation scrolls OUT of
+   view (FR-004, ST-10).** The explanation copy (missing from the recorder UI) was
+   added, and the IntersectionObserver that reveals "Skip for now" no longer fires
+   on mount against an absent/zero-height element — it reveals only after the user
+   scrolls past the explanation (or after the first extraction failure). Commit
+   `63e9532`.
+
+7. **Recorder runs the health pre-check before showing capture UI (ST-18, builds
+   on DECISION-10).** When `/healthz` fails on entry, the recorder shows the calm
+   "temporarily unavailable" copy and never flashes the recording form, so a user
+   cannot record 60s into a dead backend. Commit `bd7bbce`.
+
+8. **Recorder permission re-probe on retry (ST-02).** On the retry path the
+   recorder probes `navigator.permissions` before calling `getUserMedia`, so a
+   permanently-blocked camera shows the denied copy instead of flashing through the
+   start-recording form. Commit `ec924bc`.
+
+9. **Terminal recorder states are user-dismissible; no anchor on abort (Issue 3).**
+   Success and failure are explicit terminal states the user dismisses ("Continue
+   to dashboard" on success); the preview attaches the stream once the `<video>`
+   mounts (`e43f33f`); and unmount detaches the `MediaRecorder` handlers before
+   stopping tracks, so an aborted / navigated-away recording can never write a
+   partial anchor (`b1db57a` / `fd618bf`).
+
+10. **Ghost-button dark-mode hover contrast (design token).** The ghost variant's
+    hover changed from `bg-accent` / `text-accent-foreground` (~1.4:1 in dark mode)
+    to `hover:bg-foggy/15` with no text override, clearing WCAG AA; the
+    "Skip for now" control uses this variant. Commits `c167dba` / `37425b4`.
+
+**Revisit if**: Supabase changes its signing-key default again (item 1); a future
+capture surface is reached by a client-side `<Link>` (item 2 — must hard-navigate);
+or cross-device (not just cross-tab) live banner updates are needed — tracked in
+`docs/BACKLOG.md` as a Supabase Realtime follow-up, since items 3/4 are
+same-browser-only by design.

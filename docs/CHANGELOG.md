@@ -1033,3 +1033,65 @@ this commit.
 
 Affected artifacts (this commit): `apps/web/components/anchor/calibration-banner.tsx`,
 `specs/004-onboarding-video-anchor/smoke-tests.md`.
+
+## 2026-05-29 — feat(004-onboarding-video-anchor) — feature complete (smoke pass; PR open)
+
+Feature 004 reaches its human-validated gate (Constitution Principle VII): the
+smoke matrix in `specs/004-onboarding-video-anchor/smoke-tests.md` is signed off
+2026-05-29 (ST-01…ST-20 PASS; ST-21/ST-24 and the mobile *camera* portions of
+ST-22/ST-23 DEFERRED — see below). What shipped:
+
+- **Per-user baseline anchor capture.** An in-browser recorder
+  (`apps/web/components/anchor/`) captures a 60s clip and uploads it to a local
+  FastAPI extraction service (`apps/api`), which runs the `ml-video` LBP-TOP +
+  motion pipeline (`packages/ml-video`, model
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`) and returns a 2958-dim
+  vector; the **web app** writes the vector to `profiles` with the user's own
+  session client. Raw upload bytes are deleted server-side in a `finally`
+  (Principle I) — the service holds no DB credentials.
+- **Recorder UX.** Explicit state machine (idle → permission → 60s countdown →
+  extracting → success/failure), post-grant device picker, codec probe
+  (VP9 → VP8 → MP4 → default), calm failure copy with a three-failure escape, and a
+  reduced-motion countdown. Backend availability is health-pre-checked before any
+  capture UI is shown.
+- **Column-level anchor privacy (DECISION-12).** All three anchor columns
+  (`anchor_vector`, `anchor_captured_at`, `anchor_model_version`) are excluded from
+  the `authenticated` SELECT whitelist — no client role can read them. Calibration
+  status is exposed only through the scope-guarded SECURITY DEFINER
+  `has_anchor(auth.uid())`, so a manager cannot observe whether or when a report
+  calibrated.
+- **JWT verification via JWKS (DECISION-9 amendment).** The extraction service
+  verifies Supabase's asymmetric ES256 access tokens against the published JWKS
+  (HS256 retained as a fallback), the algorithm allow-list pinned per branch.
+- **Calibration banner.** Amber (never red), session-only dismissal, reappears next
+  session until calibrated, cleared on sign-out; its CTA hard-navigates to
+  `/app/calibrate` so the per-route `camera=(self)` Permissions-Policy applies.
+- **Cross-tab sync.** Completing calibration drops the banner / redirects sibling
+  tabs within ~2s over the feature-003 `storage`-event channel; dismissal mirrors
+  into sibling tabs.
+- **Demo-cohort synthetic anchor (DECISION-17).** The seed writes one deterministic
+  synthetic anchor (seed 42) via the service-role client so demo employees land on
+  a calibrated, banner-free `/app`.
+
+Smoke-driven fixes folded in during the gate are recorded at summary level in
+DECISIONS.md 2026-05-29 (with commit refs): JWKS auth, banner hard-navigation,
+cross-tab anchor/dismissal sync + banner-bearing-route refresh scoping,
+dismissal-reset-on-sign-out, skip-reveal observer semantics, recorder health
+pre-check, retry permission re-probe, user-dismissible terminal states +
+no-anchor-on-abort, and ghost-button dark-mode hover contrast.
+
+**Deferred** (tracked in `docs/BACKLOG.md`): the full mobile camera → upload →
+anchor flow over real-device HTTPS (including whether mobile-browser video codecs
+decode server-side) — the ST-22/ST-23 camera portions; Safari desktop (ST-21) +
+iOS Safari (ST-24) pending Apple hardware; the `localStorage` device write-back bug
+(ST-05); and an e2e test-hardening pass (several 004 smoke bugs slipped through
+green, mock-driven e2e). The non-camera mobile UI (layout/nav/banner/360px
+hamburger) was verified over a LAN-IP HTTP origin after adding `allowedDevOrigins`
+(`48cce3f`, dev-server only, zero production effect).
+
+**Pre-production blocker carried forward** (unchanged by 004): the invite-only
+`/signup` gate (security slice 7) must be resolved before any real-tenant launch.
+
+The video model is unchanged by 004 (`docs/MODELS.md` / `docs/MODEL_HANDOFF.md`
+were authored at the start of 004 and need no edit). The anchor read path for
+inference is feature 005's decision, not 004's.

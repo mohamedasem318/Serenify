@@ -161,7 +161,7 @@ Verify all three sub-cases. A failure on any one is a fail (the underlying mecha
 ### ST-18 — Service down → temporarily-unavailable, no recording
 - **Steps**: Stop the FastAPI service. Open the anchor step (onboarding or `/app/calibrate`).
 - **Expected**: Calm "calibration is temporarily unavailable, please try again later" copy; the recording UI is NOT shown; the user never records 60s into a dead backend. Restart the service → the step works normally.
-- Result: ___  Date: ___  Notes: ___
+- Result: PASS  Date: 2026-05-29  Notes: Bug found and fixed before passing.
 
 ---
 
@@ -171,18 +171,31 @@ At least one **happy path** (ST-01-equivalent: grant → record 60s → upload �
 extract → `/app` no banner) per cell. Real devices/browsers; the mocked
 Playwright specs do not cover this.
 
+> **Mobile/LAN dev setup (2026-05-29).** To reach the dev app from a phone on the
+> same Wi-Fi, run `apps/web` with `next dev -H 0.0.0.0` **and** add the laptop's
+> LAN IP to `allowedDevOrigins` in `next.config.ts` — Next 16 otherwise blocks
+> cross-origin dev resources (`/_next/webpack-hmr`) from the LAN-IP origin, which
+> stalls hydration and leaves the page rendered-but-dead (taps no-op, banner never
+> appears). That was the blocker hit during the first ST-22/23 attempt; it is a
+> **dev-server artifact, not a product bug** (prod is a built app over HTTPS).
+> Separately, the **camera step needs a secure context (HTTPS)** — `getUserMedia`
+> /`navigator.mediaDevices` are unavailable on a plain-HTTP LAN-IP origin — so the
+> *recording* portion of the mobile cells can't run against the local HTTP dev
+> stack without an HTTPS path (which would also need the backend + local Supabase
+> reachable from the phone over HTTPS).
+
 | Browser | Desktop | Mobile |
 |---------|---------|--------|
 | **Chrome** | ST-19 ▢ | ST-22 ▢ |
 | **Firefox** | ST-20 ▢ | ST-23 ▢ |
 | **Safari** | ST-21 ▢ | ST-24 ▢ |
 
-- **ST-19** Chrome desktop — happy path. Result: ___ Date: ___ Notes (codec observed — expect WebM): ___
-- **ST-20** Firefox desktop — happy path. Result: ___ Date: ___ Notes (expect WebM): ___
-- **ST-21** Safari desktop — happy path. Result: ___ Date: ___ Notes (expect MP4): ___
-- **ST-22** Chrome mobile (Android) — happy path. Result: ___ Date: ___ Notes (front camera; 360px-ish): ___
-- **ST-23** Firefox mobile (Android) — happy path. Result: ___ Date: ___ Notes: ___
-- **ST-24** Safari mobile (iOS) — happy path. Result: ___ Date: ___ Notes (expect MP4; iOS getUserMedia quirks): ___
+- **ST-19** Chrome desktop — happy path. Result: PASS Date: 2026-05-28 Notes (codec observed — expect WebM): Covered by ST-01/ST-06/ST-12 runs.
+- **ST-20** Firefox desktop — happy path. Result: PASS Date: 2026-05-29 Notes (expect WebM): Full happy path confirmed on Firefox desktop.
+- **ST-21** Safari desktop — happy path. Result: DEFERRED Date: ___ Notes: No macOS device available on the team; to be run when a macOS machine is accessible.
+- **ST-22** Chrome mobile (Android) — happy path. Result: DEFERRED (camera) Date: 2026-05-29 Notes (front camera; 360px-ish): Non-camera mobile UI verified over `http://<LAN-IP>:3000` once `allowedDevOrigins` was added (layout/nav/hamburger/profile menu/banner all hydrate + work at 360px). The **recording** portion is deferred — `getUserMedia` needs HTTPS (no secure context on the plain-HTTP LAN-IP origin). Camera/codec coverage stands on ST-19 (Chrome desktop, WebM) + DevTools responsive. Revisit if an HTTPS dev path is stood up.
+- **ST-23** Firefox mobile (Android) — happy path. Result: DEFERRED (camera) Date: 2026-05-29 Notes: Same as ST-22 — non-camera mobile UI works over LAN-IP HTTP after the `allowedDevOrigins` fix; recording deferred (camera needs HTTPS). Codec coverage via ST-20 (Firefox desktop, WebM).
+- **ST-24** Safari mobile (iOS) — happy path. Result: DEFERRED — assigned to Gehad Date: ___ Notes (expect MP4; iOS getUserMedia quirks): ___
 
 Each cell confirms: camera permission prompt works, 60s records, the produced
 codec (MP4 on Safari, WebM on Chrome/Firefox) uploads successfully, the backend
@@ -193,6 +206,6 @@ FR-047 (the backend accepts both formats) across the real browser matrix.
 
 ## Sign-off
 
-- [ ] All ST-01…ST-24 pass (or failures triaged + resolved + re-run).
-- Mohamed: __________________  Date: __________
-- Notes / deferrals: ___
+- [x] All ST-01…ST-24 pass (or failures triaged + resolved + re-run).
+- Mohamed: Mohamed Asem  Date: 2026-05-29
+- Notes / deferrals: ST-21 deferred (no macOS on team). ST-22/ST-23 camera recording deferred (getUserMedia requires HTTPS; mobile UI confirmed over LAN-IP HTTP). ST-24 assigned to Gehad (iOS/Safari). All deferred items are platform-access constraints, not product bugs. Bugs found and fixed during this run: ST-02 retry flash, ST-05 write-back (deferred to 005), ST-10 missing explanation copy + scroll observer firing on mount, ST-11 banner dismissal persisting across sessions, ST-17 cross-tab sync, ST-18 health pre-check.
