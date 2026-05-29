@@ -1152,3 +1152,30 @@ in the `authenticated` SELECT whitelist).
 **Address by**: before any real-tenant production launch, or the next time
 `packages/ml-video` extraction code changes — whichever comes first. Pairs with
 feature 005's anchor read-path decision and feature 006's live inference.
+
+### End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 006)
+**Status**: tech-debt
+**Category**: testing / fidelity verification
+**Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon — check #4)
+**Description**: The 005 recon verified each extraction step against the training
+notebook (`video-lbp-top-motion-per-subject-calibration.ipynb` == the handoff's
+`refactored_v2`) IN ISOLATION — decode / 5fps / `%2` frame alignment, ROI indices +
+crop math, LBP-TOP plane order + per-plane L1 normalization, motion mean/std/max
+order, and the 2958-d concat — and the interpolation hotfix added a value-level
+guard for the LBP-TOP block (`tests/test_lbp_interpolation_fidelity.py`). What has
+NEVER run is the FULL chain end-to-end on a REAL clip: a StressID video pushed
+through `packages/ml-video` (decode → 5fps → `%2` → MediaPipe FaceMesh → ROI →
+LBP-TOP → motion → 2958-d concat) compared against the notebook's output for the
+SAME clip within float tolerance. Recon check #4 was not run because it needs the
+StressID dataset + a real MediaPipe runtime (the isolated guards deliberately avoid
+both). The interpolation bug is exactly the class of defect an isolated check can
+miss and an end-to-end check catches — so this gap is load-bearing, not academic.
+**Fix scope**: medium — pick one StressID clip (e.g. the handoff's smoke subject
+`2ea4`, Stroop clip with Relax as the anchor), run `ml_video.compute_anchor` (and/or
+the full feature path) on it, run the notebook's `compute_anchor_from_video` /
+`extract_full_feature_vector` on the SAME clip, and assert the two 2958-d vectors
+match within float tolerance. Needs MediaPipe installed and the dataset available;
+the CI Supabase/ML setup is already a tracked feature-006 dependency (see the
+feature-002 "CI integration" entry) — pair them.
+**Address by**: before trusting any live prediction in feature 006 (live inference).
+Treat as a go/no-go gate on feature-space fidelity, not optional polish.
