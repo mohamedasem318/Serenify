@@ -1034,7 +1034,7 @@ this commit.
 Affected artifacts (this commit): `apps/web/components/anchor/calibration-banner.tsx`,
 `specs/004-onboarding-video-anchor/smoke-tests.md`.
 
-## 2026-05-29 — feat(004-onboarding-video-anchor) — feature complete (smoke pass; PR open)
+## 2026-05-29 — feat(004-onboarding-video-anchor) — feature complete (smoke pass; merged to main, PR #14)
 
 Feature 004 reaches its human-validated gate (Constitution Principle VII): the
 smoke matrix in `specs/004-onboarding-video-anchor/smoke-tests.md` is signed off

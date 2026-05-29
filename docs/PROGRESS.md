@@ -4,11 +4,11 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 004 — Onboarding Video Anchor Flow (implementation complete; PR open)
+## Feature 004 — Onboarding Video Anchor Flow (merged to main)
 
-**Branch**: `004-onboarding-video-anchor`
-**Status**: implementation complete; smoke pass signed off by Mohamed 2026-05-29;
-PR open to `main`, awaiting his merge.
+**Branch**: `004-onboarding-video-anchor` (squash-merged via PR #14, then deleted)
+**Status**: **merged to `main` 2026-05-29** (PR #14, squash `b75a6a9`); smoke pass
+signed off by Mohamed 2026-05-29.
 **Date**: 2026-05-29 (ship close; implementation spanned 2026-05-27 → 2026-05-29)
 
 **Scope shipped**:
