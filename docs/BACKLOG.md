@@ -940,3 +940,182 @@ recommendation".
 **Address by**: a quality / hardening slice; the invite throttle pairs naturally
 with feature 011 (admin-dashboard), when `/api/admin/invite` gets a real browser
 client and abuse becomes reachable in practice.
+
+---
+
+## From feature 004 (onboarding-video-anchor) — in progress
+
+### Onboarding name step is redundant with signup full_name collection
+**Status**: deferred-bug
+**Observed**: 2026-05-27, feature 004 planning
+**Description**: The signup form at `apps/web/app/(auth)/signup/` collects
+`full_name` and stores it via the `handle_new_user` trigger
+(`supabase/migrations/20260517000030_profile_trigger.sql`). The
+`/onboarding` flow then re-asks for the name as its only step. This is
+redundant — by the time a user reaches `/onboarding`, the profile already
+has a `full_name`.
+
+The middleware (`apps/web/proxy.ts`) routes to `/onboarding` when
+`full_name IS NULL`, so the redirect itself is defensible (it catches the
+edge case where signup metadata didn't propagate). But the page UI asking
+the user to type their name again is the UX bug — it should either:
+
+- (a) detect the existing `full_name` and skip the step entirely (let the
+  middleware fall through to `/app`), OR
+- (b) pre-fill the form with the existing value as a confirmation step
+  rather than a blank field, OR
+- (c) signup stops collecting `full_name` and onboarding becomes the
+  canonical place — but this contradicts the current UX where signup
+  feels incomplete without it.
+
+Option (a) is the cleanest. Option (b) is the least disruptive.
+
+**Fix scope**: small — single page edit in `apps/web/app/onboarding/` plus
+a Server Action / middleware tweak. Pair with whichever feature next
+touches the onboarding flow; do not branch standalone unless other
+onboarding work converges.
+
+**Address by**: bundle with the post-004 user-profile-and-preferences
+feature (currently planned to slot between feature 007 and feature 008
+per the 2026-05-27 chat decision), since that feature redesigns
+onboarding for demographics + preferences anyway and will rebuild the
+flow from scratch.
+
+### Cross-browser / cross-device anchor + auth sync (realtime push)
+**Status**: deferred-feature
+**Observed**: 2026-05-29, feature 004 manual check — calibrating in one browser
+left the banner up in another browser signed into the same account
+**Description**: All cross-tab propagation in the app — the calibration-banner
+hide on anchor capture (ST-17 / FR-034), the `/app/calibrate` sibling redirect,
+the banner-dismissal mirror, and the feature-001/003 sign-in/sign-out navigation
+— is built on `window` `storage` events over `localStorage` markers
+(`apps/web/lib/auth-broadcast.ts` + `apps/web/components/cross-tab-auth.tsx`).
+That mechanism is scoped to a single browser profile's storage area. So if a user
+is signed into the same account in two DIFFERENT browsers (or two devices) —
+e.g. Chrome on `/app` with the calibration banner showing, and Firefox finishing
+calibration — Firefox's `serenify-anchor-captured` write never reaches Chrome,
+and Chrome's banner stays up until its next refresh/navigation re-runs
+`has_anchor` server-side. Same limitation applies to sign-in/sign-out
+propagation and dismissal sync: all same-browser-only by design.
+
+This is a **stale render, not stale data** — the anchor is written to the DB the
+moment calibration completes, so Chrome is merely showing an out-of-date view;
+any refresh or navigation reflects the calibrated state. No correctness or
+privacy impact, and same-browser multi-tab sync (the ST-17 scope) works
+correctly. `localStorage`/`BroadcastChannel` are both per-browser, so neither can
+ever close this gap.
+
+**Fix scope**: medium-to-large (FEATURE work — a new transport, not a tweak).
+Cross-browser/device live updates need a **server-push channel**: most naturally
+a Supabase Realtime subscription on the user's own `profiles` row (or a derived
+`has_anchor`/anchor-captured event) that flips the banner / triggers a
+`router.refresh()` when the row changes from any client, with the existing
+`storage`-event path kept as the same-browser fast path. A polling fallback
+(re-probe `has_anchor` on `visibilitychange` / focus) is a cheaper partial
+mitigation that would at least clear the banner when the user returns to the
+Chrome tab, without standing up Realtime. Either path needs an RLS-safe
+subscription/probe scoped to `auth.uid()` only (Principle I — a user may only
+observe their own anchor state, mirroring the `has_anchor` scope guard).
+
+**Address by**: whichever feature first needs genuine cross-device live updates.
+Features 007/008 (stress detection / chat interrupts) may introduce Supabase
+Realtime for live notifications anyway — bundle the anchor/auth realtime sync
+into that workstream rather than standing up Realtime solely for the banner. Not
+blocking 004: the manual-refresh fallback is acceptable for the thesis/demo
+stage, and same-browser multi-tab sync already works.
+
+### Post-deploy mobile camera → upload → anchor verification (real devices, HTTPS)
+**Status**: deferred-feature (verification, post-deploy)
+**Observed**: 2026-05-29, feature 004 smoke matrix (ST-22 / ST-23 camera portions)
+**Description**: The full mobile capture path — camera permission prompt → 60s
+record → upload → server-side extraction → anchor write → `/app` with no banner —
+could NOT be exercised locally. `getUserMedia` / `navigator.mediaDevices` require a
+secure context (HTTPS); the local dev stack is plain-HTTP over a LAN IP, so the
+*recording* portion of ST-22 (Chrome/Android) and ST-23 (Firefox/Android) is
+deferred. The non-camera mobile UI (layout / nav / banner / 360px hamburger) WAS
+verified over `http://<LAN-IP>:3000` after adding `allowedDevOrigins`. **The one
+risk desktop + DevTools cannot catch**: whether a *mobile-browser-produced* video
+codec (Android Chrome WebM/VP8/VP9 profiles, iOS Safari MP4/H.264) actually
+**decodes server-side** in the `ml-video` OpenCV/MediaPipe path — a desktop capture
+exercises a different codec profile, so a green desktop run does not prove the
+mobile bytes extract. This must be confirmed on real devices once an HTTPS path
+exists.
+**Fix scope**: medium — stand up an HTTPS dev/staging path reachable from a phone
+(the backend + Supabase must also be reachable over HTTPS), then run ST-22/ST-23
+camera happy-paths end-to-end and assert the produced codec decodes server-side and
+the anchor row is written. ST-24 (iOS) pairs here once Apple hardware is available.
+**Address by**: first deploy to an HTTPS environment (staging or production), before
+relying on mobile capture in the field.
+
+### Safari desktop + iOS Safari smoke cells (ST-21 / ST-24) — pending Apple hardware
+**Status**: deferred-tooling (hardware access)
+**Observed**: 2026-05-29, feature 004 smoke matrix
+**Description**: ST-21 (Safari desktop, expect MP4) and ST-24 (iOS Safari mobile,
+expect MP4 + iOS `getUserMedia` quirks) could not be run — no macOS/iOS device on
+the team. These are the only WebKit cells in the cross-browser matrix; local
+headless webkit is unreliable on Windows (worker-teardown leak — DECISIONS
+2026-05-27 collected entry item 13) and does not substitute for real Safari camera
+behavior. ST-24 is assigned to Gehad (iOS access).
+**Fix scope**: small — run the two happy-path cells on real Apple hardware; confirm
+MP4 capture uploads and the backend extracts a valid vector (FR-047 dual-codec
+accept). Pairs with the post-deploy mobile HTTPS verification above for ST-24.
+**Address by**: when a macOS machine (ST-21) and an iOS device on an HTTPS path
+(ST-24) are accessible.
+
+### Camera device selection not always written back to localStorage (ST-05)
+**Status**: bug
+**Observed**: 2026-05-29, feature 004 smoke ST-05 (remembered device + fallback)
+**Description**: The recorder remembers the last camera in
+`localStorage["serenify-anchor-camera"]` and pre-selects it on return — that part
+works. But selecting a device in the picker does **not** reliably write the key:
+(a) after the key was deleted, the picker briefly showed the default then switched
+to a non-default device (possible ghost-selection), and (b) an explicit picker
+selection was not re-written to the key. Net: the "remembered device" can drift from
+what the user last picked. Low impact — the fallback to the default camera is clean
+and no error surfaces — but the write-back should be unconditional (every explicit
+selection writes the key).
+**Fix scope**: small — on every device-picker change, write the chosen `deviceId` to
+`localStorage["serenify-anchor-camera"]` (not only on certain paths), and audit the
+initial-selection effect so it doesn't transiently select a device the user didn't
+choose. Add a Vitest/e2e assertion that an explicit pick is persisted.
+**Address by**: feature 005 (the calibration UX revamp touches the recorder anyway)
+or whoever next touches `apps/web/components/anchor/` device handling.
+
+### e2e test-hardening pass — mock-driven coverage masked real 004 bugs
+**Status**: tech-debt
+**Category**: testing / e2e quality
+**Observed**: 2026-05-29, feature 004 smoke gate (multiple bugs slipped past green e2e)
+**Description**: Several 004 bugs shipped green through the e2e suite and were caught
+only in manual smoke, because the specs mock `getUserMedia` / `MediaRecorder` and
+intercept the anchor API (DECISION-18) — necessary for CI, but they mask
+real-environment behavior. Examples that passed e2e yet failed smoke: the camera
+Permissions-Policy violation on the banner → `/app/calibrate` navigation (mocks
+bypass real PP enforcement); the HS256-vs-ES256 JWT mismatch (an intercepted API
+never verifies a real token); the abort-write (no real unmount-during-record path);
+the health-precheck flash; and the cross-tab / dismissal sync timing. The mocks are
+the right call for CI — the gap is the *absence of a non-mocked tier* and of
+cross-tab / cross-session / timing coverage that exercises real behavior.
+**Fix scope**: medium — add a hardening tier that does NOT rely on mocks masking
+real behavior: e.g. a real-token integration test against the live local FastAPI +
+JWKS; cross-tab / cross-session specs asserting the storage-event timing and the
+dismissal-reset-on-sign-out invariant; and (where feasible) a guard for the
+Permissions-Policy entry rule (a non-capture → capture link must be a hard nav).
+**Address by**: a testing/quality slice; pairs with the feature-003 "auth-broadcast
+forward-looking guard" and "extend ST-9 recovery e2e" entries — all harden the suite
+against silent regressions.
+
+### Feature 005 scope pointer — calibration UX revamp + anchor read path + design pass
+**Status**: deferred-feature (pointer)
+**Observed**: 2026-05-29, feature 004 ship
+**Description**: Consolidation pointer so feature 005 planning pulls these together
+rather than re-deriving them. Feature 005 (per-user calibration) owns: (1) the
+inference **read path** for `anchor_vector` — a server-side service-role read or a
+self-scoped SECURITY DEFINER function, explicitly **NOT** decided in 004 (DECISIONS
+2026-05-27 collected entry "Revisit if"); (2) the **calibration UX revamp** + design
+refinements; and (3) the deferred **design-system token pass** carried since feature
+003 (button-system character, mobile/tablet typography, avatar disc dark-mode tint,
+muted-on-bg AA contrast, card-heading typography, cursor affordance — all in the
+feature-003 section above), plus the 004 recorder polish (countdown-ring light-mode
+cosmetics, ST-15).
+**Fix scope**: feature-sized — tracked here only as a pointer.
+**Address by**: feature 005 spec/plan.

@@ -28,7 +28,13 @@ const buttonVariants = cva(
         // is meadow at 10% — feedback without contrast collapse.
         secondary:
           "bg-surface text-ink border border-meadow hover:bg-meadow/10",
-        ghost: "hover:bg-accent hover:text-accent-foreground",
+        // Quiet tier. A low-opacity foggy wash on hover gives feedback in BOTH
+        // modes without overriding the text color (mirrors `secondary`'s
+        // hover:bg-meadow/10 idiom). The previous hover:bg-accent +
+        // hover:text-accent-foreground set the text to `ink`, which in dark mode
+        // is near-white on the light foggy `accent` bg → ~1.4:1, failing WCAG AA.
+        // Inherited `ink` text stays contrasty against the page in either mode.
+        ghost: "hover:bg-foggy/15",
         link: "text-primary underline-offset-4 hover:underline",
       },
       size: {

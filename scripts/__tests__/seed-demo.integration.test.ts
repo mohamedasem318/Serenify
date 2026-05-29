@@ -6,6 +6,7 @@ import { createClient } from "@supabase/supabase-js";
 
 import { main } from "../seed-demo.js";
 import { buildHierarchy } from "../lib/hierarchy.js";
+import { SYNTHETIC_ANCHOR_MODEL_VERSION } from "../lib/synthetic-anchor.js";
 
 const SEED = 1729;
 const DEMO_SUFFIX = "@demo.serenify.local";
@@ -103,6 +104,21 @@ describe.skipIf(!ENABLED)("seed-demo integration (real local Supabase)", () => {
     const counts = { admin: 0, team_lead: 0, employee: 0 };
     for (const row of profiles ?? []) counts[row.role as keyof typeof counts] += 1;
     expect(counts).toEqual({ admin: 2, team_lead: 5, employee: 23 });
+
+    // FR-031/033 (📌 DECISION-17): every demo profile carries the synthetic
+    // anchor (service_role bypasses the authenticated column whitelist, so it
+    // can read anchor_vector here). Only the 30 demo ids are ever upserted, so
+    // non-demo profiles are untouched.
+    const { data: anchorRows, error: anchorErr } = await admin
+      .from("profiles")
+      .select("anchor_vector, anchor_model_version")
+      .in("id", ids);
+    if (anchorErr) throw anchorErr;
+    expect(anchorRows).toHaveLength(30);
+    for (const row of anchorRows ?? []) {
+      expect(row.anchor_vector).not.toBeNull();
+      expect(row.anchor_model_version).toBe(SYNTHETIC_ANCHOR_MODEL_VERSION);
+    }
   }, 60_000);
 
   it("FR-006(a)-(e) hold against real profile rows (assertion 3)", async () => {

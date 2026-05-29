@@ -4,13 +4,24 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
+import { AnchorRecorder } from "@/components/anchor/anchor-recorder";
 import {
   onboardingSchema,
   type OnboardingInput,
 } from "@/lib/auth/schemas";
 import { completeOnboarding, type OnboardingResult } from "./actions";
 
+// Hard navigation to /app, NOT router.replace: at sign-in the proxy bounced
+// /app → /onboarding (full_name was null) and Next cached that redirect in the
+// client Router Cache. A soft router.replace("/app") would resolve against that
+// stale entry and no-op back to /onboarding. A full document navigation re-runs
+// the proxy server-side with the now-complete profile. See DECISIONS 2026-05-27.
+function goToApp() {
+  window.location.replace("/app");
+}
+
 export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }) {
+  const [step, setStep] = useState<"name" | "anchor">("name");
   const [pending, startTransition] = useTransition();
   const [submitState, setSubmitState] = useState<OnboardingResult | null>(null);
 
@@ -29,11 +40,22 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
       const form = new FormData();
       form.set("full_name", values.full_name);
       const result = await completeOnboarding(form);
-      // Success path redirects on the server; only error paths return here.
-      if (result && result.status !== "ok") {
+      // Managers redirect server-side (no result reaches here). Employees get
+      // { status: "ok" } and advance in-page to the anchor step — proxy.ts
+      // bounces a full /onboarding reload to /app once full_name is set, so the
+      // step must live in client state (📌 DECISION-14).
+      if (result?.status === "ok") {
+        setStep("anchor");
+      } else if (result) {
         setSubmitState(result);
       }
     });
+  }
+
+  if (step === "anchor") {
+    return (
+      <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
+    );
   }
 
   return (

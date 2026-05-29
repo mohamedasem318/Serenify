@@ -44,10 +44,16 @@ export default async function RootLayout({
          * own FOUT-prevention script reads storage — so users carrying
          * the pre-migration key see no flash on first load.
          * Idempotent: re-runs on every load but no-ops once migrated.
-         * Carries the CSP nonce (script-src 'nonce-…').
+         * Carries the CSP nonce (script-src 'nonce-…'). `suppressHydrationWarning`
+         * is required: per the CSP spec the browser strips a script's `nonce`
+         * content attribute once the policy is applied (anti-exfiltration), so
+         * the SSR'd `nonce="…"` reads back as `nonce=""` at hydration — an
+         * unavoidable, benign attribute mismatch React would otherwise warn on.
+         * next-themes does the same on its own nonced FOUC <script>.
          */}
         <script
           nonce={nonce}
+          suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html:
               "(function(){try{var l=localStorage.getItem('theme');if(l){localStorage.setItem('serenify-theme',l);localStorage.removeItem('theme');}}catch(e){}})();",

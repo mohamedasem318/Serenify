@@ -75,6 +75,11 @@ export function broadcastSignIn(): void {
  * clears cookies). Sibling tabs at /app / /onboarding receive the
  * storage event and navigate to /login.
  *
+ * Also clears any same-tab anchor-banner dismissal so the next
+ * sign-in shows the banner again (FR-023/024: dismissal is
+ * auth-session-scoped, not browser-tab-scoped — sessionStorage
+ * alone survives sign-out/sign-in within one tab).
+ *
  * No-op when window is undefined.
  */
 export function broadcastSignOut(): void {
@@ -84,6 +89,7 @@ export function broadcastSignOut(): void {
   } catch {
     // see broadcastSignIn — best-effort.
   }
+  clearAnchorBannerDismissal();
 }
 
 /**
@@ -152,4 +158,96 @@ export function consumePendingSignIn(): void {
   if (!value) return;
   broadcastSignIn();
   document.cookie = `${AUTH_SIGNIN_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
+
+// ── Anchor capture broadcast (feature 004, 📌 DECISION-15) ───────────────────
+// Sibling helpers to the auth broadcast above — NOT a parallel mechanism. When a
+// user captures their calibration anchor in one tab, sibling tabs sitting on the
+// onboarding step / /app/calibrate refresh so they fall through to /app (FR-034).
+
+export const ANCHOR_BROADCAST_KEY = "serenify-anchor-captured";
+
+/**
+ * Write an anchor-captured marker to localStorage. Called from the recorder's
+ * success path after the vector is persisted. The timestamp guarantees a
+ * `storage` event even on a repeat capture (browsers skip unchanged writes).
+ * No-op under SSR; best-effort (localStorage can throw in sandboxed contexts).
+ */
+export function broadcastAnchorCaptured(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(ANCHOR_BROADCAST_KEY, `captured:${Date.now()}`);
+  } catch {
+    // see broadcastSignIn — best-effort; failure just means no sibling refresh.
+  }
+}
+
+/** True iff a storage-event newValue is an anchor-captured marker. */
+export function parseAnchorBroadcast(newValue: string | null): boolean {
+  return newValue != null && newValue.startsWith("captured:");
+}
+
+// ── Calibration banner session-dismissal (FR-023/024) ────────────────────────
+// The banner's "dismiss" hides it for the current auth session: across
+// refreshes, but NOT across sign-out/sign-in. The storage layer is
+// sessionStorage (survives a same-tab refresh, scoped to one tab); the
+// auth-session reset is achieved by clearing the key as part of every
+// sign-out flow — both the initiating tab (broadcastSignOut, above) and any
+// sibling tab that handles the cross-tab signout broadcast (cross-tab-auth).
+//
+// Cross-tab dismissal sync (Mohamed 2026-05-28, ST-17): the literal spec says
+// "session-only", but the consistent UX expectation is "same user, same
+// session, same intent" — dismissing in one tab should hide the banner in
+// sibling tabs too. The dismissal travels via a SEPARATE localStorage
+// broadcast key (storage events only fire across documents on localStorage,
+// and the sessionStorage key is intentionally per-tab); the cross-tab-auth
+// listener mirrors the dismissal into the receiving tab's own sessionStorage
+// so the hidden state survives that tab's later refreshes too.
+
+export const ANCHOR_BANNER_DISMISS_KEY = "serenify-anchor-banner-dismissed";
+export const ANCHOR_BANNER_DISMISS_BROADCAST_KEY =
+  "serenify-anchor-banner-dismissed-broadcast";
+
+/**
+ * Notify sibling tabs that the calibration banner was dismissed in this tab.
+ * The originating tab still owns its own sessionStorage write (the banner
+ * does that as part of its dismiss handler); this helper exists so the
+ * cross-tab signal travels alongside but does not couple the storage
+ * mechanisms. Timestamped value so consecutive writes still fire a `storage`
+ * event in siblings. No-op under SSR; best-effort (localStorage can throw in
+ * sandboxed contexts).
+ */
+export function broadcastAnchorBannerDismissed(): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(
+      ANCHOR_BANNER_DISMISS_BROADCAST_KEY,
+      `dismissed:${Date.now()}`,
+    );
+  } catch {
+    // see broadcastSignIn — best-effort; failure just means no sibling sync.
+  }
+}
+
+/** True iff a storage-event newValue is an anchor-banner-dismissed marker. */
+export function parseAnchorBannerDismissBroadcast(
+  newValue: string | null,
+): boolean {
+  return newValue != null && newValue.startsWith("dismissed:");
+}
+
+/**
+ * Remove the calibration-banner dismissal marker from sessionStorage so the
+ * next sign-in re-shows the banner (FR-023/024). Called from broadcastSignOut
+ * and from cross-tab-auth's signout branch. No-op under SSR; best-effort
+ * (sessionStorage can throw in sandboxed contexts).
+ */
+export function clearAnchorBannerDismissal(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(ANCHOR_BANNER_DISMISS_KEY);
+  } catch {
+    // best-effort — failure here just means a fresh sign-in in the same tab
+    // re-sees the banner-already-dismissed state until the tab closes.
+  }
 }

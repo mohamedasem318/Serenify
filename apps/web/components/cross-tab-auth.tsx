@@ -4,8 +4,14 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
 
 import {
+  ANCHOR_BANNER_DISMISS_BROADCAST_KEY,
+  ANCHOR_BANNER_DISMISS_KEY,
+  ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
+  clearAnchorBannerDismissal,
   consumePendingSignIn,
+  parseAnchorBannerDismissBroadcast,
+  parseAnchorBroadcast,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +36,27 @@ const SIGNED_IN_FROM_PATHS = [
  */
 const SIGNED_OUT_FROM_PATHS = ["/app", "/onboarding"] as const;
 
+/**
+ * Pathnames where a sibling tab's anchor capture should refresh this tab
+ * (📌 DECISION-15, FR-034) — matched EXACTLY, not by prefix. Only surfaces whose
+ * server render is gated on `has_anchor` belong here, because elsewhere a refresh
+ * changes nothing:
+ *   - `/onboarding` — refresh re-runs proxy.ts, which bounces a full_name-set
+ *     user to `/app`.
+ *   - `/app` — the dashboard Server Component re-runs `has_anchor` and the
+ *     calibration banner conditional flips off (the banner renders ONLY here).
+ *   - `/app/calibrate` — the page re-runs `has_anchor` and redirects to `/app`,
+ *     so a sibling that was mid-record lands at the dashboard.
+ *
+ * Exact match is deliberate: a prefix on `/app` would also sweep in
+ * `/app/account` (and any future `/app/*` settings page), which carry no banner
+ * and no `has_anchor` gate — refreshing them on anchor capture is a wasted
+ * reload. A new banner-bearing route should be added here explicitly rather than
+ * relying on a broad prefix. ST-18 follow-up 2026-05-29 (the ST-17 fix used a
+ * `/app` prefix; this narrows it to the three has_anchor-gated surfaces).
+ */
+const ANCHOR_REFRESH_PATHS = ["/onboarding", "/app", "/app/calibrate"] as const;
+
 function pathMatches(
   pathname: string,
   prefixes: readonly string[],
@@ -37,6 +64,15 @@ function pathMatches(
   return prefixes.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+}
+
+/**
+ * Exact pathname membership. Unlike `pathMatches`, `/app` here does NOT match
+ * nested authed surfaces — used for the anchor refresh scope so account/settings
+ * pages don't reload on a sibling's anchor capture.
+ */
+function pathIsExactly(pathname: string, paths: readonly string[]): boolean {
+  return paths.includes(pathname);
 }
 
 /**
@@ -96,6 +132,42 @@ export function CrossTabAuth(): null {
 
   useEffect(() => {
     function onStorage(event: StorageEvent) {
+      // Anchor capture in a sibling tab → refresh if we're on a surface that
+      // should fall through once the anchor exists (FR-034).
+      if (event.key === ANCHOR_BROADCAST_KEY) {
+        if (
+          parseAnchorBroadcast(event.newValue) &&
+          pathIsExactly(pathname, ANCHOR_REFRESH_PATHS)
+        ) {
+          router.refresh();
+        }
+        return;
+      }
+      // Banner dismissal in a sibling tab → mirror the dismissal in THIS tab's
+      // sessionStorage and poke the banner's useSyncExternalStore subscriber so
+      // it re-reads and hides without a refresh. Persists across same-tab
+      // refreshes (sessionStorage survives reload) and is cleared by sign-out
+      // through the existing clearAnchorBannerDismissal path. Mohamed
+      // 2026-05-28: same session, same intent — dismissal should track tabs.
+      if (event.key === ANCHOR_BANNER_DISMISS_BROADCAST_KEY) {
+        if (parseAnchorBannerDismissBroadcast(event.newValue)) {
+          try {
+            sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+          } catch {
+            // sandboxed storage — sibling won't mirror, but the originating
+            // tab's broadcast still fired; degrade silently.
+          }
+          // Same-window subscribers (the banner's useSyncExternalStore) don't
+          // see our own sessionStorage write — `storage` events only fire in
+          // OTHER documents. A synthetic event re-notifies in-tab listeners
+          // so the snapshot re-reads. This mirrors the unit-test pattern in
+          // calibration-banner.test.tsx (`new StorageEvent("storage")`).
+          window.dispatchEvent(
+            new StorageEvent("storage", { key: ANCHOR_BANNER_DISMISS_KEY }),
+          );
+        }
+        return;
+      }
       if (event.key !== AUTH_BROADCAST_KEY) return;
       const auth = parseAuthBroadcast(event.newValue);
       if (auth === "signin" && pathMatches(pathname, SIGNED_IN_FROM_PATHS)) {
@@ -104,6 +176,11 @@ export function CrossTabAuth(): null {
         auth === "signout" &&
         pathMatches(pathname, SIGNED_OUT_FROM_PATHS)
       ) {
+        // Reset the calibration banner's session-dismissal so the next
+        // sign-in in this tab re-shows the banner (FR-023/024). The
+        // originating tab clears its own dismissal inside broadcastSignOut;
+        // this mirror keeps the sibling tab in sync.
+        clearAnchorBannerDismissal();
         // Race-condition guard: the originating tab's Server Action
         // clears session cookies via its HTTP response, which may
         // not have landed in the browser by the time the broadcast's

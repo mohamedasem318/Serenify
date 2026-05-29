@@ -30,7 +30,7 @@ id_dsa
 *_ed25519
 .ssh/
 
-# Python (feature 005 onward — FastAPI lands then)
+# Python (FastAPI service + ml-video package land in feature 004)
 __pycache__/
 *.py[cod]
 *$py.class
@@ -38,6 +38,10 @@ __pycache__/
 venv/
 .python-version
 *.egg-info/
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
 
 # Editors / OS
 .vscode/
@@ -70,6 +74,9 @@ pnpm-debug.log*
 
 # Project-specific
 specs/.staging/
+
+# Model-artifact staging drop (committed artifacts live in packages/ml-*/models/)
+tmp/
 
 # Local debug screenshots (root-level repro captures, not committed)
 bug-repro-no-notice.png

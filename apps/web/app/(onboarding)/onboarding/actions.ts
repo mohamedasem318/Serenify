@@ -44,5 +44,19 @@ export async function completeOnboarding(
     return { status: "error", message: "We couldn't save that — try again." };
   }
 
+  // Employees calibrate in a second, in-page onboarding step (📌 DECISION-14,
+  // FR-001): return { status: "ok" } WITHOUT a server redirect so the client
+  // advances to the anchor recorder. Managers (team_lead/admin) have no anchor
+  // step — keep the server redirect to /app (FR-029, Principle I).
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .maybeSingle<{ role: "employee" | "team_lead" | "admin" }>();
+
+  if (profile?.role === "employee") {
+    return { status: "ok" };
+  }
+
   redirect("/app");
 }

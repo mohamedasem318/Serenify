@@ -4,6 +4,90 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 004 — Onboarding Video Anchor Flow (implementation complete; PR open)
+
+**Branch**: `004-onboarding-video-anchor`
+**Status**: implementation complete; smoke pass signed off by Mohamed 2026-05-29;
+PR open to `main`, awaiting his merge.
+**Date**: 2026-05-29 (ship close; implementation spanned 2026-05-27 → 2026-05-29)
+
+**Scope shipped**:
+
+- **ML video package** (`packages/ml-video`) — `uv`-managed, Python 3.12-pinned
+  (mediapipe ceiling, DECISION-1) LBP-TOP + motion feature pipeline; exact ML pins
+  copied from `models/metadata.json`; loader/predict path present and unit-tested
+  but invoked by no 004 endpoint (that's feature 005's inference read path). Model
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`.
+- **FastAPI extraction service** (`apps/api`) — `POST /anchor` (JWT-verified) runs
+  extraction and returns a 2958-dim vector as base64 LE-float32; raw bytes deleted
+  in a `finally` (Principle I); `GET /healthz` (no auth) for the recorder
+  pre-check; service holds **no** DB credentials (DECISION-8/9). Accepts MP4 + WebM
+  (DECISION-11). JWT verified via Supabase JWKS / ES256 with an HS256 fallback
+  (DECISION-9 amendment, smoke-surfaced).
+- **Anchor columns + privacy** (migration `20260527000000_anchor_columns.sql`) —
+  three anchor columns on `public.profiles`, all excluded from the `authenticated`
+  SELECT whitelist; calibration status read only via the scope-guarded SECURITY
+  DEFINER `has_anchor(auth.uid())` (DECISION-12, plan amendment). The web app does
+  the privileged write with the user's own session client.
+- **Web recorder** (`apps/web/components/anchor/`) — explicit state machine
+  (idle → permission → 60s countdown → extracting → success/failure), post-grant
+  device picker, codec probe, calm failure copy with a three-failure escape,
+  reduced-motion countdown, health pre-check before any capture UI, and explicit
+  user-dismissible terminal states.
+- **Onboarding step + `/app/calibrate` route + calibration banner** — anchor step
+  inline in onboarding and at a standalone route; amber banner with session-only
+  dismissal (resets on sign-out), hard-navigating CTA so the per-route
+  `camera=(self)` Permissions-Policy applies (DECISION-14/16 + smoke refinement).
+- **Cross-tab sync** (extends `lib/auth-broadcast.ts`) — completing calibration
+  drops the banner / redirects sibling tabs within ~2s; dismissal mirrors into
+  sibling tabs; the anchor-captured refresh is scoped to banner-bearing routes
+  (DECISION-15 + smoke refinements).
+- **Demo synthetic anchor** (DECISION-17) — the seed writes one deterministic
+  synthetic anchor (seed 42) via service-role so demo employees land on a
+  calibrated, banner-free `/app`.
+
+**Test results** (pre-flight, 2026-05-29):
+
+- Web unit (vitest): **291/291 in 31 files**; the 2 previously-red
+  `cross-tab-auth.test.tsx` tests are green (file: **35/35**).
+- apps/api (pytest): **11/11** (incl. the ES256-via-JWKS accept + wrong-key reject
+  tests). ml-video (pytest): **4/4** (unchanged).
+- Anchor e2e: **chromium + firefox green — 26/26** (run with `--retries=2`, the CI
+  posture: 19 passed clean, 7 chromium tests flaked on the cold-compile *first*
+  attempt and passed warm on retry — the documented suite-wide load-timing flake,
+  not a product issue). webkit is excluded locally — the Windows worker-teardown
+  leak (DECISIONS 2026-05-27, collected entry item 13); Safari coverage falls to the
+  smoke matrix + CI's clean Linux webkit.
+- Typecheck: 0 errors. Lint: 0 warnings.
+
+**Smoke gate**: signed off by Mohamed 2026-05-29 —
+`specs/004-onboarding-video-anchor/smoke-tests.md`. ST-01…ST-20 PASS. **Deferred**:
+ST-21 (Safari desktop) + ST-24 (iOS Safari) pending Apple hardware; the mobile
+*camera* portions of ST-22/ST-23 to post-deploy HTTPS verification (non-camera
+mobile UI verified over a LAN-IP HTTP origin). Several smoke bugs were found and
+fixed during the gate (ST-02 retry flash, ST-10 explanation/observer, ST-11
+dismissal persistence, ST-17 cross-tab, ST-18 health pre-check, plus the JWKS auth
+and banner hard-nav fixes) — all recorded in DECISIONS.md 2026-05-29.
+
+**Decisions logged in DECISIONS.md**: the collected feature-004 entry
+(📌 DECISION-1 through DECISION-18, 2026-05-27), the DECISION-12 amendment
+(2026-05-27), and the 2026-05-29 smoke-surfaced entry (which also backfills the two
+planned decisions — DECISION-10 `/healthz`+startup check, DECISION-11 MP4+WebM —
+that the collected entry had skipped).
+
+**Deferred to BACKLOG.md (feature 004)**: post-deploy mobile camera → upload →
+anchor verification over HTTPS (incl. mobile-codec server-side decode); Safari/iOS
+smoke cells (ST-21/24); the `localStorage` device write-back bug (ST-05); an e2e
+test-hardening pass; cross-browser/cross-device anchor + auth realtime sync; and
+the redundant onboarding name step. The invite-only `/signup` gate (security slice
+7) remains a ⛔ pre-production deploy blocker, unchanged by 004.
+
+**Next**: feature 005 — per-user calibration (live inference read path for
+`anchor_vector` + calibration UX revamp / design refinements). 005 owns the anchor
+read path and the deferred design-system token pass.
+
+---
+
 ## Feature 003 — Employee Dashboard Shell (implementation complete)
 
 **Branch**: `003-employee-dashboard-shell`

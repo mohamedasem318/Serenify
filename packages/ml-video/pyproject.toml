@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ml-video"
+version = "2.0.0"
+description = "Serenify video stress modality: LBP-TOP + motion feature extraction and per-user anchor model loader."
+readme = "README.md"
+# Python 3.12 ceiling is load-bearing: mediapipe==0.10.13 has no 3.13 wheel (DECISION-1).
+requires-python = ">=3.10,<3.13"
+license = { text = "UNLICENSED" }
+
+# Pins are exact and copied verbatim from models/metadata.json["dependencies"]
+# (DECISION-3). scikit-learn==1.6.1 is load-bearing for joblib unpickling of the
+# fitted estimator/scaler — a mismatch unpickles to a silently-wrong model.
+# xgboost is research-log only (handoff §7) and is intentionally excluded.
+dependencies = [
+    "scikit-learn==1.6.1",
+    "numpy==2.0.2",
+    "pandas==2.3.3",
+    # metadata.json records cv2.__version__ "4.13.0" (the OpenCV LIBRARY version);
+    # PyPI packages it as the 4-part "4.13.0.92" — same OpenCV 4.13.0 core.
+    "opencv-python==4.13.0.92",
+    "scikit-image==0.25.2",
+    "mediapipe==0.10.13",
+    "joblib==1.5.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "ruff>=0.6",
+]
+
+# src layout: the import package is `ml_video`; the committed model artifacts live
+# at the package-root `models/` per Constitution Principle II (packages/ml-*/models/),
+# NOT inside the importable package, so they are resolved source-relative by loader.py.
+[tool.hatch.build.targets.wheel]
+packages = ["src/ml_video"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

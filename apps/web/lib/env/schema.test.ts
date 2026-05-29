@@ -30,6 +30,24 @@ describe("clientEnvSchema", () => {
       clientEnvSchema.parse({ supabaseUrl: validUrl, supabaseAnonKey: "short" }),
     ).toThrow();
   });
+
+  it("defaults apiUrl to the local dev origin when unset", () => {
+    const parsed = clientEnvSchema.parse({
+      supabaseUrl: validUrl,
+      supabaseAnonKey: fakeKey,
+    });
+    expect(parsed.apiUrl).toBe("http://127.0.0.1:8000");
+  });
+
+  it("rejects a malformed apiUrl", () => {
+    expect(() =>
+      clientEnvSchema.parse({
+        supabaseUrl: validUrl,
+        supabaseAnonKey: fakeKey,
+        apiUrl: "not-a-url",
+      }),
+    ).toThrow();
+  });
 });
 
 describe("serverEnvSchema", () => {

@@ -1650,3 +1650,392 @@ be amended again to match the winning model's contract (the timing parameters
 are bound to the production model contract in `docs/MODELS.md`, not to a fixed
 physiological constant). Any such change follows the same Governance amendment
 path and is logged here and in `docs/CHANGELOG.md`.
+
+---
+
+## 2026-05-27 — constitution(III, VIII) amendment — video pipeline description + 004 slot rename
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.2.0 → 1.3.0`).
+
+**Context**: Feature 004 (onboarding video anchor flow) is the first feature to
+create `packages/ml-video/`, and it does so around the post-rPPG model
+`serenify-video-lbptop-motion-rf-calibrated@2.0.0` — LBP-TOP + motion features
+with per-user delta calibration. Two pieces of constitution text still
+described the abandoned rPPG approach and the pre-rename feature slug. This
+amendment brings the constitution into alignment with what 004 actually builds,
+landing as a ride-along in the first commit of the feature (before any feature
+code), so the rest of 004 builds against a clean constitution.
+
+**Decision**: Two surgical edits to `.specify/memory/constitution.md`:
+
+1. **Principle III (Modality Isolation) package description.** The
+   `packages/ml-video/` bullet changed from
+   `webcam + rPPG pipeline` to
+   `video stress pipeline (LBP-TOP + motion features, per-user delta calibration)`.
+   The earlier rPPG language survived Amendment 2 (which scoped its rPPG removal
+   to Principle II's body only and explicitly retained the Principle III
+   `webcam + rPPG pipeline` description as out-of-scope at the time); this
+   amendment now retires it from Principle III as well, since the real pipeline
+   exists as of feature 004.
+
+2. **Principle VIII (Spec-Driven Workflow) provisional feature ordering.** The
+   slot `004-webcam-and-rppg` is renamed to `004-onboarding-video-anchor` to
+   match the actual feature spec slug. Slots 005 (`005-per-user-calibration`),
+   006 (`006-stress-inference-service`), and all others are unchanged — they are
+   reconsidered when their own planning starts.
+
+**Why MINOR (not MAJOR/PATCH)**: Per Governance, MINOR covers materially
+expanded or refined guidance on an existing rule. This is a refinement of an
+existing principle's wording (a package description) plus a provisional
+ordering-slug rename — no new principles, no removed principles, no structural
+change, no backward-incompatible redefinition.
+
+**Affected artifacts** (all in the same commit as this entry):
+
+- `.specify/memory/constitution.md` — Principle III bullet, Principle VIII slot,
+  version line `1.2.0 → 1.3.0`, Sync Impact Report Amendment 3 entry. `Last
+  Amended` stays `2026-05-27` (Amendment 2 already set it earlier today).
+- `docs/MODELS.md` — created in this commit with the
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0` registry entry (the model
+  referenced by the new Principle III description).
+- `docs/MODEL_HANDOFF.md` — the model's full integration contract, included in
+  this commit.
+- `docs/models/serenify-video-lbptop-motion-rf-calibrated-v2.0.0-results.png` —
+  the LOSO results figure (confusion matrix / ROC / score distribution).
+- `docs/CHANGELOG.md` — `constitution(III, VIII)` amendment entry dated
+  2026-05-27.
+
+**Template audit**: `.specify/templates/{plan,spec,tasks}-template.md` reference
+principles by number, not by the literal strings `rPPG`, `webcam`,
+`004-webcam-and-rppg`, or `ml-video` — zero matches for the touched text, so no
+template edit is required.
+
+**Revisit if**: a future video-model bump changes the pipeline family again
+(the Principle III description is bound to the production pipeline, not a fixed
+technique), or the provisional 005/006 slots are renamed when their planning
+starts — each follows the same Governance amendment path and is logged here and
+in `docs/CHANGELOG.md`.
+
+---
+
+## 2026-05-27 — feature 004 DECISION-12 amended: all anchor columns private; `has_anchor()` helper
+
+**Status**: Accepted (plan amendment; recorded in `docs/CHANGELOG.md`
+2026-05-27 per Principle VIII).
+
+**Context**: Feature 004 adds `anchor_vector`, `anchor_captured_at`, and
+`anchor_model_version` to `public.profiles`. Postgres RLS is row-scoped, so the
+existing `profiles_select_admin` (admins see all rows) and
+`profiles_select_direct_reports` (a team_lead sees reports' rows) policies expose
+every column of an admitted row. The plan's original DECISION-12 blocked only
+`anchor_vector` (via a SELECT column whitelist) and left the two metadata columns
+readable by managers/admins, on the reasoning that FR-019 scopes the privacy
+invariant to the *vector*.
+
+**Decision**: Adopt the stricter posture. **All three** anchor columns are
+excluded from the `authenticated` SELECT column whitelist — none is readable by
+any client role through table grants. Calibration status is exposed only via a
+new scope-guarded SECURITY DEFINER function:
+
+```sql
+CREATE OR REPLACE FUNCTION public.has_anchor(target_user uuid)
+RETURNS boolean LANGUAGE plpgsql STABLE
+SECURITY DEFINER SET search_path = ''
+AS $$
+BEGIN
+  IF target_user <> auth.uid() THEN
+    RAISE EXCEPTION 'forbidden: may only query own anchor state'
+      USING ERRCODE = '42501';
+  END IF;
+  RETURN EXISTS (SELECT 1 FROM public.profiles
+                 WHERE id = target_user AND anchor_vector IS NOT NULL);
+END;
+$$;
+ALTER FUNCTION public.has_anchor(uuid) OWNER TO postgres;
+REVOKE EXECUTE ON FUNCTION public.has_anchor(uuid) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.has_anchor(uuid) TO authenticated;
+```
+
+- `SECURITY DEFINER` + `search_path = ''` (fully-qualified names) + `OWNER TO
+  postgres`, matching the slice-1 hardening posture for DEFINER helpers.
+- **Scope guard**: raises `42501` when `target_user <> auth.uid()`, so a caller
+  can only ask about themselves — a manager cannot probe a report's calibration
+  state.
+- `EXECUTE` revoked from `PUBLIC`/`anon`, granted only to `authenticated` (not
+  referenced by any RLS policy, so no anon grant needed — slice-1 default).
+- The web app calls `has_anchor(auth.uid())` to drive the `/app` calibration
+  banner, replacing the prior plan-time read of `anchor_captured_at IS NULL`.
+
+**Rationale**: A manager knowing whether — or when — a direct report calibrated
+is a lever for pressure ("why haven't you set up your wellness app yet?"), which
+undercuts the Principle I trust story that managers see aggregates, not
+individuals. The cost is one SECURITY DEFINER construct; the privacy gain is real
+and bounded. The owner losing direct read of `anchor_captured_at` is acceptable
+because 004's only consumer of that fact is banner visibility, which the boolean
+serves exactly.
+
+**Scope note**: feature 005's inference read path for `anchor_vector`
+(server-side service-role read, or a self-scoped SECURITY DEFINER function) is
+still 005's decision and is **unaffected** by this change.
+
+**Affected artifacts** (plan-amendment commit): `specs/004-onboarding-video-anchor/`
+`plan.md` (DECISION-12 + DECISION-13/14/15 banner-read refs), `contracts/migration.md`,
+`data-model.md`, `research.md`; `docs/CHANGELOG.md` 2026-05-27. The migration that
+implements `has_anchor()` + the tightened grants lands during `/speckit.implement`.
+
+**Revisit if**: a later manager-facing feature (011/012) needs an
+aggregate "team calibration coverage" metric — that would be served by a
+separate admin-scoped aggregate function, never by relaxing per-individual
+`has_anchor` scope.
+
+---
+
+## 2026-05-27 — feature 004 architecture decisions (collected; 📌 DECISION-1 through DECISION-18)
+
+**Status**: Accepted.
+
+**Context**: Feature 004 (onboarding video anchor flow) adds a Python ML video
+pipeline (`packages/ml-video/`), a FastAPI extraction service (`apps/api/`), the
+three anchor columns + `has_anchor()` on `public.profiles`, the in-browser
+recorder + calibration banner, a cross-tab broadcast, and a deterministic demo
+anchor. The architectural choices were made during `/speckit.plan` and
+`/speckit.tasks`; each is tagged in `tasks.md` with a 📌 DECISION-n marker naming
+its source task so the entry can be audited against the diff. Recorded here on
+completion of `/speckit.implement`. **DECISION-12** (all anchor columns private +
+scope-guarded `has_anchor()`) already landed in the plan-amendment commit — see
+the `2026-05-27 — feature 004 DECISION-12 amended` entry above — and is **not**
+duplicated here. Entries 12–13 below record two findings surfaced *during*
+implementation that were not in the original plan.
+
+**Decision**:
+
+1. **FastAPI service + Python 3.12 + exact ML pins** (📌 DECISION-1/2/3/4).
+   `apps/api/` is a `uv`-managed FastAPI app; `requires-python = ">=3.10,<3.13"`
+   because `mediapipe==0.10.13` has no 3.13 wheel. ML deps are pinned exactly from
+   `models/metadata.json` — `scikit-learn==1.6.1` is load-bearing (a joblib
+   unpickle under a different sklearn silently yields a wrong model);
+   `opencv-python` is `4.13.0.92` (the 4-part PyPI package for the `4.13.0` cv2
+   library version the metadata records).
+   *Rationale*: the model artifact was trained against a frozen dependency set;
+   reproducing it faithfully is a correctness requirement, not a preference.
+
+2. **`packages/ml-video/` as a real editable package** (📌 DECISION-5), not a
+   PYTHONPATH directory; `apps/api` consumes it via `[tool.uv.sources] … editable
+   = true`. The predict/loader path is present and unit-tested but exposed by no
+   004 endpoint (it is feature 005's inference read path).
+   *Rationale*: a packaged `src/ml_video` gives a clean import contract and lets
+   the loader resolve committed artifacts source-relative; PYTHONPATH hacks do not
+   survive into the Docker image.
+
+3. **Model artifacts at `packages/ml-video/models/`; `tmp/` gitignored**
+   (📌 DECISION-6). Committed artifacts live at the package-root `models/` per
+   Constitution Principle II; the staging drop dir `tmp/` is ignored.
+   *Rationale*: Principle II mandates `packages/ml-*/models/` as the artifact
+   home; keeping the import package free of large binaries keeps the wheel clean.
+
+4. **Backend is local-only in 004; production deploy deferred** (📌 DECISION-7).
+   A `Dockerfile` (`python:3.12-slim`) is committed as a forward artifact, but
+   there is no hosted deployment and T020's production origin is left
+   `[TBD by deployment]`.
+   *Rationale*: 004 delivers the onboarding flow against a locally-run service;
+   standing up hosting is a separate operational decision, out of feature scope.
+
+5. **`POST /anchor` is JWT-only; the backend holds no DB credentials**
+   (📌 DECISION-8/9). The service verifies the Supabase JWT (HS256,
+   `aud=authenticated`), extracts the vector, and returns it; the **web app**
+   writes the vector to `profiles` with the user's own session client. Raw upload
+   bytes are deleted in a `finally` block (Principle I).
+   *Rationale*: keeping the DB write on the authenticated browser session means
+   the extraction service never needs a service-role key — smaller blast radius —
+   and the privacy-sensitive bytes never persist server-side. (📌 DECISION-12,
+   anchor-column privacy + `has_anchor()`, is recorded separately above and not
+   repeated.)
+
+6. **Web recorder state machine + post-grant device labels + codec probe +
+   multipart upload + typed client** (📌 DECISION-13). The recorder is an explicit
+   state machine (idle → permission → countdown → recording → extracting →
+   done/error); device labels are read only *after* the `getUserMedia` grant
+   (browsers withhold them beforehand); the codec probe tries
+   `vp9 → vp8 → mp4 → default`; the vector is sent as multipart and surfaced as a
+   typed `AnchorResult` union.
+   *Rationale*: the extraction round-trip is ~10–15s, so a distinct `extracting`
+   state with calm copy (R-1) avoids a frozen-looking app; the codec order
+   maximizes cross-browser capture quality with a graceful fallback.
+
+7. **Banner session-only dismissal + dedicated `/app/calibrate` route +
+   onboarding inline step** (📌 DECISION-14). The calibration banner dismisses for
+   the session via `sessionStorage`; calibration is reachable inline during
+   onboarding and from a standalone `/app/calibrate` route.
+   *Rationale*: a permanent dismissal would hide a not-yet-functional state
+   indefinitely — a session dismissal nudges without nagging; the dedicated route
+   lets the banner CTA deep-link cleanly.
+
+8. **Cross-tab anchor-captured broadcast extends `auth-broadcast.ts`**
+   (📌 DECISION-15). Completing the anchor writes a `localStorage` marker; sibling
+   tabs listening on the storage event call `router.refresh()` to drop the banner.
+   *Rationale*: reuses the established feature-003 cross-tab auth-sync channel
+   rather than inventing a second one.
+
+9. **Per-route `camera=(self)` + CSP `connect-src` += FastAPI origin; rollout
+   order** (📌 DECISION-16). `next.config.ts` grants `camera=(self)` only on the
+   capture routes (`/onboarding`, `/app/calibrate`) via a negative-lookahead
+   source so each path matches exactly one Permissions-Policy rule; `proxy.ts`
+   adds the FastAPI origin to CSP `connect-src`; COEP is left unset. The
+   `connect-src` edit must land **before** the recorder's first call (R-5).
+   *Rationale*: camera access is scoped to exactly the surfaces that need it;
+   without the `connect-src` entry the recorder's upload is CSP-blocked, so the
+   commit ordering is load-bearing.
+
+10. **One deterministic synthetic demo anchor (seed 42) via service-role**
+    (📌 DECISION-17). The seed writes a single reproducible synthetic anchor
+    (`mulberry32(42)`) for the demo cohort using the service-role client.
+    *Rationale*: the demo dashboard must show a calibrated, banner-free state
+    without a real webcam recording; determinism keeps the seed idempotent and
+    reviewable.
+
+11. **Testing: mocked MediaPipe + synthetic no-face clip (pytest); mocked
+    MediaRecorder + route-intercept (Playwright)** (📌 DECISION-18). Python tests
+    use a `FakeFaceMesh` + synthetic MJPG clip (happy) and a no-face clip
+    (extraction failure); e2e mocks `getUserMedia`/`MediaRecorder` and intercepts
+    the anchor API.
+    *Rationale*: the real pipeline needs a webcam and a heavier runtime;
+    structural mocks exercise the contract deterministically in CI, and real
+    capture is covered by the manual smoke matrix.
+
+12. **Router Cache hard-navigation fix** (implementation discovery, commit
+    `5f6d87e`). Next's App Router client-side Router Cache caches the proxy's
+    `/app → /onboarding` 307 redirect; a soft `router.replace("/app")` after
+    completing onboarding/calibration can no-op against the stale cached redirect
+    and strand the user on `/onboarding`. The fix navigates with
+    `window.location.replace("/app")` (a hard navigation) from
+    `onboarding-form.tsx` and `calibrate-recorder.tsx`.
+    *Rationale*: this is a **real product bug** for invited employees, surfaced by
+    the e2e — not a test artifact. A hard navigation bypasses the Router Cache so
+    the now-complete profile re-evaluates the proxy guard freshly. Recorded so a
+    future dev does not "simplify" it back to `router.replace` and silently
+    reintroduce the trap (both files' code comments point here as "DECISIONS
+    2026-05-27").
+
+13. **webkit-on-Windows worker-teardown limitation** (test-infra finding). Local
+    headless webkit on Windows wedges on Playwright **worker teardown** due to an
+    unreaped `WebKitNetworkProcess` handle per worker; it manifests as either
+    assertion flakes or a full-suite hang once several worker teardowns
+    accumulate. Verified **harmless to product correctness**: the two specs that
+    flaked/hung in the full run (`employee-dashboard-shell`, `reset-password`)
+    pass cleanly on webkit **in isolation** with traces showing zero logic/render
+    issues, and both pass on chromium + firefox. Safari coverage therefore relies
+    on smoke checks **ST-21/ST-24** (real iOS + macOS Safari) and CI (clean Linux
+    webkit, `retries: 2`).
+    *Rationale*: recorded so a future dev does not re-investigate a suite that is
+    green on the merits but exits non-zero on this OS; the failure is a browser
+    process-lifecycle quirk, not a 004 regression.
+
+**Revisit if**: the backend moves to hosted deployment (entries 4/5 gain a
+production origin, and feature 005 may add a service-role or self-scoped read path
+for `anchor_vector`); a future feature needs manager-visible aggregate calibration
+coverage (would be a separate admin-scoped function, never a relaxation of
+`has_anchor` scope); the Router Cache redirect-caching behavior changes upstream
+(entry 12); or the webkit teardown leak is fixed and the isolated-run signal
+diverges from CI's webkit signal (entry 13).
+
+---
+
+## 2026-05-29 — feature 004 smoke-surfaced decisions + two planned decisions completed
+
+**Status**: Accepted.
+
+**Context**: Mohamed's manual smoke pass
+(`specs/004-onboarding-video-anchor/smoke-tests.md`, ST-01…ST-24, signed off
+2026-05-29) surfaced product bugs whose fixes carry architectural weight, and the
+ship audit found that the collected feature-004 entry above (titled "📌 DECISION-1
+through DECISION-18") silently skipped two **planned** decisions — DECISION-10 and
+DECISION-11. Both omissions and all smoke-driven amendments are recorded here so
+the DECISIONS log matches the shipped branch. No new DECISION-n numbers are
+invented: each smoke fix amends or refines an existing decision/FR, or is recorded
+as an implementation finding.
+
+**Planned decisions omitted from the collected entry (now recorded):**
+
+- **DECISION-10 — `/healthz` + boot-time model-load check.** `apps/api` loads the
+  model at startup and aborts boot on failure (Principle II — no half-loaded
+  service); `GET /healthz` (no auth) returns `200 {status:"ready", model_version}`.
+  Sourced at tasks T016/T018, FR-048. The web recorder consumes it as a pre-check
+  (see smoke amendment 7 below).
+- **DECISION-11 — backend accepts BOTH MP4 and WebM.** `POST /anchor` accepts the
+  `clip` field as MP4 or WebM and 415s anything else, so Safari (MP4) and
+  Chrome/Firefox (WebM) upload natively with no client-side transcoding (FR-047).
+  Sourced at task T019.
+
+**Smoke-surfaced amendments (each ties to an existing decision or FR):**
+
+1. **Anchor-service auth → ES256 via JWKS (DECISION-9 amendment).** The current
+   Supabase CLI/cloud signs access tokens with asymmetric ES256 (`kid` header +
+   JWKS), not the legacy HS256 shared secret DECISION-9 assumed; the HS256-only
+   verifier 401'd every real token, surfaced by the recorder as "calibration
+   temporarily unavailable" only at upload time. `verify_jwt` now verifies
+   ES256/RS256/EdDSA against the published JWKS (HS256 retained as a fallback), with
+   the algorithm allow-list pinned per branch (never read from the token). Full
+   detail in CHANGELOG 2026-05-28; commit `1d9274c`. Supersedes the "HS256"
+   parenthetical in item 5 of the collected entry.
+
+2. **Permissions-Policy entry pattern → hard-navigate INTO capture routes
+   (DECISION-16 refinement).** `Permissions-Policy` is a per-document header; Next
+   App Router's client-side `<Link>` never reloads the document, so a `<Link>` from
+   `/app` (`camera=()`) to `/app/calibrate` (`camera=(self)`) left the active
+   document's `camera=()` enforced and `getUserMedia` was rejected. The calibration
+   banner CTA is a plain `<a href>` (full navigation). Rule going forward: any link
+   from a non-capture route INTO a capture route must be a hard navigation — same
+   idiom as the Router Cache hard-nav (item 12 above). CHANGELOG 2026-05-28; commit
+   `8ed62f3` (which corrected the wrong dev-only note in `e1971d0`).
+
+3. **Cross-tab anchor + dismissal sync — concrete mechanism (DECISION-15
+   refinement, ST-17).** Completing a recording writes `serenify-anchor-captured`;
+   sibling tabs on `/app/calibrate` redirect to `/app`, and sibling tabs on `/app`
+   drop the banner via `router.refresh()`. Banner dismissal is mirrored into each
+   sibling tab's own `sessionStorage` so it both hides immediately and survives a
+   reload in that tab until sign-out. Commit `9567869`.
+
+4. **Anchor-marker refresh scoped to banner-bearing routes (ST-17 follow-up).**
+   The cross-tab anchor-captured `storage` handler calls `router.refresh()` only on
+   routes that actually render the banner, so a capture in one tab does not
+   spuriously refresh unrelated authed routes in sibling tabs. Commit `b368bbc`.
+
+5. **Banner dismissal resets on sign-out (ST-11).** Session-scoped dismissal is
+   cleared on sign-out (via the auth-broadcast sign-out path) so the next sign-in
+   re-shows the banner for a still-uncalibrated user; a banner refresh flash was
+   removed in the same fix. Commit `649c08e`.
+
+6. **Skip-for-now reveal: observer fires only when the explanation scrolls OUT of
+   view (FR-004, ST-10).** The explanation copy (missing from the recorder UI) was
+   added, and the IntersectionObserver that reveals "Skip for now" no longer fires
+   on mount against an absent/zero-height element — it reveals only after the user
+   scrolls past the explanation (or after the first extraction failure). Commit
+   `63e9532`.
+
+7. **Recorder runs the health pre-check before showing capture UI (ST-18, builds
+   on DECISION-10).** When `/healthz` fails on entry, the recorder shows the calm
+   "temporarily unavailable" copy and never flashes the recording form, so a user
+   cannot record 60s into a dead backend. Commit `bd7bbce`.
+
+8. **Recorder permission re-probe on retry (ST-02).** On the retry path the
+   recorder probes `navigator.permissions` before calling `getUserMedia`, so a
+   permanently-blocked camera shows the denied copy instead of flashing through the
+   start-recording form. Commit `ec924bc`.
+
+9. **Terminal recorder states are user-dismissible; no anchor on abort (Issue 3).**
+   Success and failure are explicit terminal states the user dismisses ("Continue
+   to dashboard" on success); the preview attaches the stream once the `<video>`
+   mounts (`e43f33f`); and unmount detaches the `MediaRecorder` handlers before
+   stopping tracks, so an aborted / navigated-away recording can never write a
+   partial anchor (`b1db57a` / `fd618bf`).
+
+10. **Ghost-button dark-mode hover contrast (design token).** The ghost variant's
+    hover changed from `bg-accent` / `text-accent-foreground` (~1.4:1 in dark mode)
+    to `hover:bg-foggy/15` with no text override, clearing WCAG AA; the
+    "Skip for now" control uses this variant. Commits `c167dba` / `37425b4`.
+
+**Revisit if**: Supabase changes its signing-key default again (item 1); a future
+capture surface is reached by a client-side `<Link>` (item 2 — must hard-navigate);
+or cross-device (not just cross-tab) live banner updates are needed — tracked in
+`docs/BACKLOG.md` as a Supabase Realtime follow-up, since items 3/4 are
+same-browser-only by design.

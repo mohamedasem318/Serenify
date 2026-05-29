@@ -7,6 +7,10 @@ import { ConfigError, loadConfig, type SeedConfig } from "./lib/env.js";
 import { createAdminClient } from "./lib/supabase-admin.js";
 import { confirmProceed } from "./lib/confirm.js";
 import { environmentBanner, passwordBanner, summaryTable } from "./lib/banner.js";
+import {
+  SYNTHETIC_ANCHOR_MODEL_VERSION,
+  syntheticAnchorHex,
+} from "./lib/synthetic-anchor.js";
 
 const SEED = 1729;
 const SHARED_PASSWORD = "DemoUser123!";
@@ -94,11 +98,22 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
   // user; this upsert overwrites role, manager_id, and full_name in
   // a single round-trip per FR-018 + plan.md "single bulk profile
   // update statement".
+  //
+  // Feature 004 (📌 DECISION-17): write the one shared deterministic synthetic
+  // anchor to EVERY demo profile so the cohort bypasses the calibration banner
+  // (has_anchor → true). service_role bypasses RLS + the authenticated column
+  // whitelist, so it can write the anchor columns. Non-demo profiles are never
+  // in this row set (FR-033 — only the 30 demo ids are upserted).
+  const anchorVector = syntheticAnchorHex();
+  const anchorCapturedAt = new Date().toISOString();
   const profileRows = users.map((u) => ({
     id: slotToId.get(u.slot)!,
     full_name: u.full_name,
     role: u.role,
     manager_id: u.manager_slot === null ? null : (slotToId.get(u.manager_slot) ?? null),
+    anchor_vector: anchorVector,
+    anchor_captured_at: anchorCapturedAt,
+    anchor_model_version: SYNTHETIC_ANCHOR_MODEL_VERSION,
   }));
 
   const { error: upsertErr } = await admin

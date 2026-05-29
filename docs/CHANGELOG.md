@@ -885,3 +885,213 @@ Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
 Principle II by number, not by literal timing text — zero matches for the
 touched values; no template edit required. No Cloud-dashboard parity items —
 all edits are in-repo (constitution + `docs/`).
+
+## 2026-05-27 — constitution(III, VIII) — video pipeline description + 004 slot rename
+
+Ride-along amendment with the first commit of feature 004 (onboarding video
+anchor flow), landing before any feature code so the rest of 004 builds against
+a clean constitution. Two surgical edits:
+
+- **Principle III (Modality Isolation)** — the `packages/ml-video/` package
+  description changed from `webcam + rPPG pipeline` to `video stress pipeline
+  (LBP-TOP + motion features, per-user delta calibration)`. This retires the
+  rPPG language that Amendment 2 had explicitly left in place in Principle III
+  (Amendment 2 scoped its rPPG removal to Principle II's body only). The real
+  pipeline now exists as of feature 004, served as model
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`.
+- **Principle VIII (Spec-Driven Workflow)** — the provisional feature-ordering
+  slot `004-webcam-and-rppg` is renamed to `004-onboarding-video-anchor` to
+  match the actual spec slug. Slots 005 (`005-per-user-calibration`), 006
+  (`006-stress-inference-service`), and all others are unchanged.
+
+Constitution version bumped `1.2.0 → 1.3.0` (MINOR per Governance: refinement
+of an existing rule — a package description plus a provisional ordering-slug
+rename; no new principles, no removed principles, no structural change). Sync
+Impact Report Amendment 3 entry appended. `Last Amended` stays `2026-05-27`
+(Amendment 2 set it earlier today).
+
+Affected artifacts, all in this commit:
+
+- `.specify/memory/constitution.md` — Principle III bullet, Principle VIII slot,
+  version line `1.3.0`, Sync Impact Report Amendment 3 entry.
+- `docs/MODELS.md` — created with the
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0` registry entry.
+- `docs/MODEL_HANDOFF.md` — model integration contract, included in this commit.
+- `docs/models/serenify-video-lbptop-motion-rf-calibrated-v2.0.0-results.png` —
+  LOSO results figure (confusion matrix / ROC / score distribution).
+- `docs/DECISIONS.md` — formal architectural decision entry (2026-05-27).
+
+Template audit: `.specify/templates/{plan,spec,tasks}-template.md` reference
+principles by number, not by the literal strings `rPPG`, `webcam`,
+`004-webcam-and-rppg`, or `ml-video` — zero matches; no template edit required.
+
+## 2026-05-27 — plan(004-onboarding-video-anchor) — tighten DECISION-12: block all anchor metadata from managers
+
+The original plan.md DECISION-12 left anchor_captured_at and
+anchor_model_version readable by managers and admins through the existing
+row-level SELECT policies (profiles_select_admin,
+profiles_select_direct_reports). Mohamed elected the stricter alternative
+DECISION-12 originally flagged for review:
+
+- anchor_captured_at and anchor_model_version are ALSO excluded from the
+  `authenticated` SELECT column whitelist. None of the three anchor columns
+  are readable by any client role via table grants.
+- A new SECURITY DEFINER function `has_anchor(target_user uuid) returns
+  boolean` is added (search_path pinned, scope-guarded so callers can only
+  query themselves; EXECUTE grant scoped to `authenticated`, slice-1 default
+  posture for SECURITY DEFINER functions).
+- The web app uses `has_anchor(auth.uid())` to drive banner visibility,
+  replacing the prior plan-time read of `anchor_captured_at IS NULL` on the
+  owner's profile row.
+
+Rationale: a manager seeing whether or when a direct report calibrated
+could be used to pressure them ("why haven't you set up your wellness
+app yet?"), undercutting the Principle I trust story (managers see
+aggregates, not individuals). The function adds one SECURITY DEFINER
+construct; privacy gain is real and bounded.
+
+Affected artifacts (this commit): `specs/004-onboarding-video-anchor/plan.md`
+(DECISION-12 rewritten as the chosen posture; DECISION-13/14/15 banner-read
+references updated to `has_anchor()`), `contracts/migration.md` (tighter
+whitelist + `has_anchor()` function + verification queries),
+`data-model.md` (column readability + calibration-status derivation),
+`research.md` (R-5 rationale + headline table), and `docs/DECISIONS.md`
+(architectural decision entry 2026-05-27).
+
+## 2026-05-28 — fix(004-onboarding-video-anchor) — anchor service auth-mode amendment: verify Supabase ES256 via JWKS (HS256 fallback)
+
+DECISION-9 / FR-046 specified the anchor service verify the Supabase access
+token "HS256 with the shared secret". Smoke testing surfaced that the current
+Supabase CLI (and Supabase cloud) sign user access tokens with ASYMMETRIC
+ES256 signing keys by default — a `kid` header + a JWKS at
+`<supabase_url>/auth/v1/.well-known/jwks.json` — not the legacy HS256 shared
+secret. The HS256-only verifier rejected every real token (`401`), which the
+recorder surfaced as the generic "calibration temporarily unavailable" copy
+after a full 60s recording; `/healthz` (no auth) still passed, so the failure
+only appeared at upload time.
+
+- `verify_jwt` now verifies asymmetric tokens (ES256/RS256/EdDSA) against
+  Supabase's published JWKS public keys (a cached `PyJWKClient`), matched by the
+  token `kid`. The HS256 shared-secret path is retained as a fallback for legacy
+  projects and the unit tests. The algorithm allow-list is pinned per branch
+  (never read from the token) to avoid algorithm confusion.
+- New optional setting `SUPABASE_URL` (the JWKS source). When unset the verifier
+  is HS256-only. Verifying public keys needs no secret, so DECISION-9's
+  no-DB-credentials posture is preserved.
+- Dependency: `pyjwt` -> `pyjwt[crypto]` (PyJWT needs `cryptography` for EC
+  verification).
+
+Rationale: production reality (Supabase's asymmetric signing-key default)
+overrides DECISION-9's original HS256-only spec. JWKS verification is the
+prod-correct approach for both local and cloud; the HS256 fallback keeps
+backward compatibility and the existing test suite. Verified end-to-end: a real
+local ES256 access token verifies through the actual `verify_jwt` against the
+live JWKS, and a forged/garbage token still 401s.
+
+Affected artifacts (this commit): `apps/api/app/auth.py` (JWKS + HS256
+fallback), `apps/api/app/config.py` (`supabase_url`), `apps/api/.env.example`
+(`SUPABASE_URL`), `apps/api/pyproject.toml` + `uv.lock` (`pyjwt[crypto]` ->
+`cryptography`), and `apps/api/tests/` (ES256 accept + wrong-key reject tests).
+The separate black-preview fix shipped in `e43f33f`.
+
+## 2026-05-28 — fix(004-onboarding-video-anchor) — calibration banner must hard-navigate to /app/calibrate for the per-route Permissions-Policy to apply
+
+DECISION-16 grants `camera=(self)` only on `/onboarding` and `/app/calibrate`
+via `next.config.ts` `headers()`. That works for `/onboarding` (always reached
+via a full document navigation post-confirm) and for a direct URL hit to
+`/app/calibrate`, but smoke testing showed `getUserMedia` rejected with
+`[Violation] Permissions policy violation: camera is not allowed in this
+document` when the user reached `/app/calibrate` by clicking the calibration
+banner on `/app`.
+
+Root cause (real, not the earlier dev-only-transient misdiagnosis): Next App
+Router's client-side `<Link>` navigation never reloads the document — it only
+fetches the RSC payload and updates the React tree. `Permissions-Policy` is a
+per-document HTTP header set at document-load time; a client-side route change
+cannot re-evaluate it. So after a Link click from `/app` (whose document PP is
+`camera=()`) to `/app/calibrate` (whose page response carries `camera=(self)`),
+the **active document** is still `/app`'s, with `camera=()` enforced. `curl`
+on `/app/calibrate` correctly returned `camera=(self)` because that endpoint's
+*page response* is correct — but the browser never made that response the
+active document. A dev-server restart only "fixed" it when the user happened to
+follow with a URL-bar / hard navigation; that was the false positive that led
+to the earlier `e1971d0` "dev-only workaround" docs note, which is removed in
+this commit.
+
+- `components/anchor/calibration-banner.tsx`: the CTA is a plain `<a href="/app/
+  calibrate">` (not `next/link`), forcing a full document navigation so the
+  fresh `/app/calibrate` HTML response loads with its `camera=(self)` PP.
+  Identical idiom to the Router Cache hard-nav fix on the onboarding/calibrate
+  success path (DECISIONS 2026-05-27).
+- `specs/004-onboarding-video-anchor/smoke-tests.md`: the prior dev-only
+  "restart the dev server" note (e1971d0) is removed; the bug is a product
+  issue, not a local-dev transient.
+- DECISION-16 unchanged in spirit (camera tightly scoped to the two capture
+  routes); only the entry pattern is corrected — any code that links INTO a
+  capture route from a non-capture route MUST use a hard navigation, not a
+  client-side `<Link>`.
+
+Affected artifacts (this commit): `apps/web/components/anchor/calibration-banner.tsx`,
+`specs/004-onboarding-video-anchor/smoke-tests.md`.
+
+## 2026-05-29 — feat(004-onboarding-video-anchor) — feature complete (smoke pass; PR open)
+
+Feature 004 reaches its human-validated gate (Constitution Principle VII): the
+smoke matrix in `specs/004-onboarding-video-anchor/smoke-tests.md` is signed off
+2026-05-29 (ST-01…ST-20 PASS; ST-21/ST-24 and the mobile *camera* portions of
+ST-22/ST-23 DEFERRED — see below). What shipped:
+
+- **Per-user baseline anchor capture.** An in-browser recorder
+  (`apps/web/components/anchor/`) captures a 60s clip and uploads it to a local
+  FastAPI extraction service (`apps/api`), which runs the `ml-video` LBP-TOP +
+  motion pipeline (`packages/ml-video`, model
+  `serenify-video-lbptop-motion-rf-calibrated@2.0.0`) and returns a 2958-dim
+  vector; the **web app** writes the vector to `profiles` with the user's own
+  session client. Raw upload bytes are deleted server-side in a `finally`
+  (Principle I) — the service holds no DB credentials.
+- **Recorder UX.** Explicit state machine (idle → permission → 60s countdown →
+  extracting → success/failure), post-grant device picker, codec probe
+  (VP9 → VP8 → MP4 → default), calm failure copy with a three-failure escape, and a
+  reduced-motion countdown. Backend availability is health-pre-checked before any
+  capture UI is shown.
+- **Column-level anchor privacy (DECISION-12).** All three anchor columns
+  (`anchor_vector`, `anchor_captured_at`, `anchor_model_version`) are excluded from
+  the `authenticated` SELECT whitelist — no client role can read them. Calibration
+  status is exposed only through the scope-guarded SECURITY DEFINER
+  `has_anchor(auth.uid())`, so a manager cannot observe whether or when a report
+  calibrated.
+- **JWT verification via JWKS (DECISION-9 amendment).** The extraction service
+  verifies Supabase's asymmetric ES256 access tokens against the published JWKS
+  (HS256 retained as a fallback), the algorithm allow-list pinned per branch.
+- **Calibration banner.** Amber (never red), session-only dismissal, reappears next
+  session until calibrated, cleared on sign-out; its CTA hard-navigates to
+  `/app/calibrate` so the per-route `camera=(self)` Permissions-Policy applies.
+- **Cross-tab sync.** Completing calibration drops the banner / redirects sibling
+  tabs within ~2s over the feature-003 `storage`-event channel; dismissal mirrors
+  into sibling tabs.
+- **Demo-cohort synthetic anchor (DECISION-17).** The seed writes one deterministic
+  synthetic anchor (seed 42) via the service-role client so demo employees land on
+  a calibrated, banner-free `/app`.
+
+Smoke-driven fixes folded in during the gate are recorded at summary level in
+DECISIONS.md 2026-05-29 (with commit refs): JWKS auth, banner hard-navigation,
+cross-tab anchor/dismissal sync + banner-bearing-route refresh scoping,
+dismissal-reset-on-sign-out, skip-reveal observer semantics, recorder health
+pre-check, retry permission re-probe, user-dismissible terminal states +
+no-anchor-on-abort, and ghost-button dark-mode hover contrast.
+
+**Deferred** (tracked in `docs/BACKLOG.md`): the full mobile camera → upload →
+anchor flow over real-device HTTPS (including whether mobile-browser video codecs
+decode server-side) — the ST-22/ST-23 camera portions; Safari desktop (ST-21) +
+iOS Safari (ST-24) pending Apple hardware; the `localStorage` device write-back bug
+(ST-05); and an e2e test-hardening pass (several 004 smoke bugs slipped through
+green, mock-driven e2e). The non-camera mobile UI (layout/nav/banner/360px
+hamburger) was verified over a LAN-IP HTTP origin after adding `allowedDevOrigins`
+(`48cce3f`, dev-server only, zero production effect).
+
+**Pre-production blocker carried forward** (unchanged by 004): the invite-only
+`/signup` gate (security slice 7) must be resolved before any real-tenant launch.
+
+The video model is unchanged by 004 (`docs/MODELS.md` / `docs/MODEL_HANDOFF.md`
+were authored at the start of 004 and need no edit). The anchor read path for
+inference is feature 005's decision, not 004's.

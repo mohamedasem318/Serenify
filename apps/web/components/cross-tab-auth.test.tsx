@@ -2,19 +2,22 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, waitFor } from "@testing-library/react";
 
 import {
+  ANCHOR_BANNER_DISMISS_KEY,
+  ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
   parseAuthBroadcast,
 } from "@/lib/auth-broadcast";
 
-const { pushMock, pathnameHolder, signOutMock } = vi.hoisted(() => ({
+const { pushMock, refreshMock, pathnameHolder, signOutMock } = vi.hoisted(() => ({
   pushMock: vi.fn(),
+  refreshMock: vi.fn(),
   pathnameHolder: { value: "/login" as string },
   signOutMock: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushMock }),
+  useRouter: () => ({ push: pushMock, refresh: refreshMock }),
   usePathname: () => pathnameHolder.value,
 }));
 
@@ -52,10 +55,12 @@ function clearAllCookies() {
 
 beforeEach(() => {
   pushMock.mockReset();
+  refreshMock.mockReset();
   signOutMock.mockReset();
   signOutMock.mockResolvedValue({ error: null });
   pathnameHolder.value = "/login";
   localStorage.clear();
+  sessionStorage.clear();
   clearAllCookies();
 });
 
@@ -134,6 +139,73 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
     await waitFor(() => {
       expect(pushMock).toHaveBeenCalledWith("/login");
     });
+  });
+
+  it("clears the calibration-banner dismissal in this tab on signout (📌 ST-11)", async () => {
+    // Sibling-tab scenario: this tab dismissed the banner, then another tab
+    // signed out. The broadcast must wipe THIS tab's sessionStorage entry so
+    // when the user signs back in (in any tab), the banner re-appears.
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+    pathnameHolder.value = "/app";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:888" });
+    await waitFor(() => {
+      expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
+    });
+  });
+
+  it("does NOT clear the dismissal when signout arrives on a signed-out surface", () => {
+    // The handler is pathname-gated. /login isn't a SIGNED_OUT_FROM_PATHS,
+    // so a stray signout broadcast there must not touch sessionStorage —
+    // that would inadvertently reset a future sign-in's first-render state.
+    sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
+    pathnameHolder.value = "/login";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:888" });
+    expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBe("1");
+  });
+});
+
+describe("CrossTabAuth — anchor capture broadcast (FR-034)", () => {
+  // The has_anchor-gated surfaces: /onboarding (proxy bounce), /app (banner
+  // flips off — ST-17), /app/calibrate (page redirects to /app). Matched
+  // exactly, so a refresh only fires where it actually changes the render.
+  it.each(["/onboarding", "/app", "/app/calibrate"])(
+    "refreshes when an anchor-captured marker arrives on %s",
+    (pathname) => {
+      pathnameHolder.value = pathname;
+      render(<CrossTabAuth />);
+      fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "captured:123" });
+      expect(refreshMock).toHaveBeenCalledTimes(1);
+      expect(pushMock).not.toHaveBeenCalled();
+    },
+  );
+
+  // /app/account carries no banner and no has_anchor gate, so it must NOT be
+  // swept in by the /app match (ST-18 follow-up: exact match, not prefix);
+  // /login is not an authed surface at all.
+  it.each(["/app/account", "/login"])(
+    "does NOT refresh for an anchor marker on %s",
+    (pathname) => {
+      pathnameHolder.value = pathname;
+      render(<CrossTabAuth />);
+      fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "captured:123" });
+      expect(refreshMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it("ignores an anchor key with an unrecognised value", () => {
+    pathnameHolder.value = "/onboarding";
+    render(<CrossTabAuth />);
+    fireStorage({ key: ANCHOR_BROADCAST_KEY, newValue: "garbage" });
+    expect(refreshMock).not.toHaveBeenCalled();
+  });
+
+  it("does not refresh on an auth broadcast", () => {
+    pathnameHolder.value = "/onboarding";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signin:123" });
+    expect(refreshMock).not.toHaveBeenCalled();
   });
 });
 

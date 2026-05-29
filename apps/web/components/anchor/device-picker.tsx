@@ -1,0 +1,89 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+const STORAGE_KEY = "serenify-anchor-camera";
+
+/**
+ * Camera chooser (📌 DECISION-13, FR-005). Before the first getUserMedia grant
+ * browsers hide device labels, so a single "Default camera" placeholder is
+ * shown; after `permissionGranted` flips true the list re-enumerates with real
+ * labels. The chosen deviceId is persisted to localStorage (last-write-wins) and
+ * pre-selected on return; if the stored device is gone it falls back to the
+ * default with no error. A native <select> is used for built-in keyboard +
+ * mobile-picker accessibility.
+ */
+export function DevicePicker({
+  permissionGranted,
+  onChange,
+  disabled,
+}: {
+  permissionGranted: boolean;
+  onChange: (deviceId: string | undefined) => void;
+  disabled?: boolean;
+}) {
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [selected, setSelected] = useState("");
+
+  // Re-enumerates on mount and when permission flips (labels populate post-grant).
+  // `onChange` must be stable (the orchestrator wraps it in useCallback) so this
+  // does not re-run on every parent render.
+  useEffect(() => {
+    let cancelled = false;
+    async function enumerate() {
+      if (!navigator.mediaDevices?.enumerateDevices) return;
+      const all = await navigator.mediaDevices.enumerateDevices();
+      if (cancelled) return;
+      const cams = all.filter((d) => d.kind === "videoinput");
+      setDevices(cams);
+
+      const stored =
+        typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      const storedPresent = stored && cams.some((c) => c.deviceId === stored);
+      const next = storedPresent ? stored : (cams[0]?.deviceId ?? "");
+      setSelected(next);
+      onChange(next || undefined);
+    }
+    void enumerate();
+    return () => {
+      cancelled = true;
+    };
+  }, [permissionGranted, onChange]);
+
+  function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
+    const id = event.target.value;
+    setSelected(id);
+    if (id && typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, id);
+    onChange(id || undefined);
+  }
+
+  const hasLabels = devices.some((d) => d.label);
+
+  return (
+    <div className="space-y-1.5">
+      <label
+        htmlFor="anchor-camera"
+        className="block text-xs font-medium uppercase tracking-wide text-muted"
+      >
+        Camera
+      </label>
+      <select
+        id="anchor-camera"
+        value={selected}
+        onChange={handleChange}
+        disabled={disabled}
+        className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors focus:border-meadow disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {hasLabels ? (
+          devices.map((device, index) => (
+            <option key={device.deviceId} value={device.deviceId}>
+              {device.label || `Camera ${index + 1}`}
+            </option>
+          ))
+        ) : (
+          <option value="">Default camera</option>
+        )}
+      </select>
+    </div>
+  );
+}
