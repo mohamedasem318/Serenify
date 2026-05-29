@@ -97,7 +97,14 @@ def _roi_crop(
         return None
     crop = frame_bgr[y0:y1, x0:x1]
     gray = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
-    return cv2.resize(gray, ROI_SIZE, interpolation=cv2.INTER_AREA)
+    # Resize with cv2's DEFAULT interpolation (INTER_LINEAR): the training
+    # notebook's build_roi_video calls bare ``cv2.resize(roi, (64, 64))``. Do NOT
+    # pass interpolation=cv2.INTER_AREA here — although INTER_AREA is the
+    # textbook-better downscale filter, it yields different 64x64 pixels, hence
+    # different LBP codes, hence a 90-d LBP-TOP block outside the feature space
+    # the scaler/model were trained on. Pinned by
+    # tests/test_lbp_interpolation_fidelity.py.
+    return cv2.resize(gray, ROI_SIZE)
 
 
 def lbp_top_features(frames: list[np.ndarray], landmarks: np.ndarray) -> np.ndarray:
