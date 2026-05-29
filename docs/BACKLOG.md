@@ -1119,3 +1119,36 @@ feature-003 section above), plus the 004 recorder polish (countdown-ring light-m
 cosmetics, ST-15).
 **Fix scope**: feature-sized — tracked here only as a pointer.
 **Address by**: feature 005 spec/plan.
+
+---
+
+## From hotfix/lbp-roi-interpolation (feature 005 recon) — 2026-05-29
+
+### Store an extraction/pipeline-version alongside each anchor (auto-invalidation)
+**Status**: tech-debt
+**Category**: schema / anchor invalidation
+**Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon)
+**Description**: Anchors today store only `anchor_model_version` (the RF
+`model_version`, currently `2.0.0`; column added in
+`supabase/migrations/20260527000000_anchor_columns.sql`). The handoff's
+invalidation contract (MODEL_HANDOFF §8 red-flag 4) keys off model_version:
+bumping it is what flags all stored anchors as stale. But the LBP-TOP
+interpolation hotfix changed the *extraction* output (the feature space) WITHOUT
+touching the model — `model_version` stayed `2.0.0`, so nothing auto-flagged the
+now-invalid pre-fix anchors; their invalidation had to be reasoned about and
+handled manually (see DECISIONS.md 2026-05-29 "LBP-TOP ROI resize interpolation").
+The extraction pipeline is a distinct axis of the feature contract from the trained
+model and needs its own stored version so a future extraction change invalidates
+anchors on its own.
+**Fix scope**: medium — add a stored `anchor_extraction_version` (or
+`anchor_pipeline_version`) column on `public.profiles` alongside the existing anchor
+metadata, sourced from a constant in `packages/ml-video` that is bumped whenever
+decode / ROI / LBP / motion extraction changes in a way that moves the feature
+space. At inference (feature 006), treat an anchor as invalid when EITHER its
+model_version OR its extraction_version mismatches the running service, and surface
+the "recalibrate" prompt already contemplated in MODEL_HANDOFF §2.3. Keep the new
+column write-only / scope-guarded like the other anchor metadata (DECISION-12: not
+in the `authenticated` SELECT whitelist).
+**Address by**: before any real-tenant production launch, or the next time
+`packages/ml-video` extraction code changes — whichever comes first. Pairs with
+feature 005's anchor read-path decision and feature 006's live inference.
