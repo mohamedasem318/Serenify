@@ -60,6 +60,15 @@ function securityHeaders(permissionsPolicy: string) {
 const CAPTURE_ROUTES = ["/onboarding", "/app/calibrate"];
 
 const nextConfig: NextConfig = {
+  // DEV SERVER ONLY — ignored in production builds (`next build` does not read
+  // allowedDevOrigins). Lets a device on the same Wi-Fi (here the dev laptop's
+  // LAN IP) reach Next dev resources (/_next/webpack-hmr etc.) so a real phone
+  // can load and hydrate the app for the cross-browser smoke matrix. Next 16
+  // blocks cross-origin dev requests by default; without this the HMR client
+  // fails and the dev runtime thrashes in a reload loop (no hydration → dead
+  // taps). Teammates on a different network add their own LAN IP here — it has
+  // zero production effect. See investigation 2026-05-29.
+  allowedDevOrigins: ["192.168.100.11"],
   async headers() {
     return [
       // Capture routes: camera=(self). Listed first; the site-wide rule below
