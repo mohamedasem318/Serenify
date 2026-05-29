@@ -38,21 +38,24 @@ const SIGNED_OUT_FROM_PATHS = ["/app", "/onboarding"] as const;
 
 /**
  * Pathnames where a sibling tab's anchor capture should refresh this tab
- * (📌 DECISION-15, FR-034). A refresh on `/onboarding` re-runs proxy.ts, which
- * bounces a full_name-set user to `/app`; on `/app/calibrate` the page now also
- * runs `has_anchor` and redirects to `/app` (so a sibling that was mid-record
- * lands at the dashboard); on `/app` the Server Component re-runs `has_anchor`
- * and the calibration banner conditional flips off.
+ * (📌 DECISION-15, FR-034) — matched EXACTLY, not by prefix. Only surfaces whose
+ * server render is gated on `has_anchor` belong here, because elsewhere a refresh
+ * changes nothing:
+ *   - `/onboarding` — refresh re-runs proxy.ts, which bounces a full_name-set
+ *     user to `/app`.
+ *   - `/app` — the dashboard Server Component re-runs `has_anchor` and the
+ *     calibration banner conditional flips off (the banner renders ONLY here).
+ *   - `/app/calibrate` — the page re-runs `has_anchor` and redirects to `/app`,
+ *     so a sibling that was mid-record lands at the dashboard.
  *
- * `/app` matches the bare dashboard AND any nested authed surface
- * (`/app/account`, `/app/calibrate`, …), which is the intended scope — every
- * authed surface should refresh once the anchor exists so any future banner /
- * has_anchor-gated UI updates without a manual reload. ST-17 fix 2026-05-28
- * (previously `/app` was absent from this list, so a sibling on the dashboard
- * stayed banner-on until refresh; `/app/calibrate` refreshed but rendered the
- * same recorder because the page didn't probe `has_anchor`).
+ * Exact match is deliberate: a prefix on `/app` would also sweep in
+ * `/app/account` (and any future `/app/*` settings page), which carry no banner
+ * and no `has_anchor` gate — refreshing them on anchor capture is a wasted
+ * reload. A new banner-bearing route should be added here explicitly rather than
+ * relying on a broad prefix. ST-18 follow-up 2026-05-29 (the ST-17 fix used a
+ * `/app` prefix; this narrows it to the three has_anchor-gated surfaces).
  */
-const ANCHOR_REFRESH_FROM_PATHS = ["/onboarding", "/app"] as const;
+const ANCHOR_REFRESH_PATHS = ["/onboarding", "/app", "/app/calibrate"] as const;
 
 function pathMatches(
   pathname: string,
@@ -61,6 +64,15 @@ function pathMatches(
   return prefixes.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
+}
+
+/**
+ * Exact pathname membership. Unlike `pathMatches`, `/app` here does NOT match
+ * nested authed surfaces — used for the anchor refresh scope so account/settings
+ * pages don't reload on a sibling's anchor capture.
+ */
+function pathIsExactly(pathname: string, paths: readonly string[]): boolean {
+  return paths.includes(pathname);
 }
 
 /**
@@ -125,7 +137,7 @@ export function CrossTabAuth(): null {
       if (event.key === ANCHOR_BROADCAST_KEY) {
         if (
           parseAnchorBroadcast(event.newValue) &&
-          pathMatches(pathname, ANCHOR_REFRESH_FROM_PATHS)
+          pathIsExactly(pathname, ANCHOR_REFRESH_PATHS)
         ) {
           router.refresh();
         }

@@ -167,7 +167,10 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
 });
 
 describe("CrossTabAuth — anchor capture broadcast (FR-034)", () => {
-  it.each(["/onboarding", "/app/calibrate"])(
+  // The has_anchor-gated surfaces: /onboarding (proxy bounce), /app (banner
+  // flips off — ST-17), /app/calibrate (page redirects to /app). Matched
+  // exactly, so a refresh only fires where it actually changes the render.
+  it.each(["/onboarding", "/app", "/app/calibrate"])(
     "refreshes when an anchor-captured marker arrives on %s",
     (pathname) => {
       pathnameHolder.value = pathname;
@@ -178,7 +181,10 @@ describe("CrossTabAuth — anchor capture broadcast (FR-034)", () => {
     },
   );
 
-  it.each(["/app", "/app/account", "/login"])(
+  // /app/account carries no banner and no has_anchor gate, so it must NOT be
+  // swept in by the /app match (ST-18 follow-up: exact match, not prefix);
+  // /login is not an authed surface at all.
+  it.each(["/app/account", "/login"])(
     "does NOT refresh for an anchor marker on %s",
     (pathname) => {
       pathnameHolder.value = pathname;
