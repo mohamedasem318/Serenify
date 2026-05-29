@@ -943,7 +943,7 @@ client and abuse becomes reachable in practice.
 
 ---
 
-## From feature 004 (onboarding-video-anchor) — planning
+## From feature 004 (onboarding-video-anchor) — in progress
 
 ### Onboarding name step is redundant with signup full_name collection
 **Status**: deferred-bug
@@ -980,3 +980,46 @@ feature (currently planned to slot between feature 007 and feature 008
 per the 2026-05-27 chat decision), since that feature redesigns
 onboarding for demographics + preferences anyway and will rebuild the
 flow from scratch.
+
+### Cross-browser / cross-device anchor + auth sync (realtime push)
+**Status**: deferred-feature
+**Observed**: 2026-05-29, feature 004 manual check — calibrating in one browser
+left the banner up in another browser signed into the same account
+**Description**: All cross-tab propagation in the app — the calibration-banner
+hide on anchor capture (ST-17 / FR-034), the `/app/calibrate` sibling redirect,
+the banner-dismissal mirror, and the feature-001/003 sign-in/sign-out navigation
+— is built on `window` `storage` events over `localStorage` markers
+(`apps/web/lib/auth-broadcast.ts` + `apps/web/components/cross-tab-auth.tsx`).
+That mechanism is scoped to a single browser profile's storage area. So if a user
+is signed into the same account in two DIFFERENT browsers (or two devices) —
+e.g. Chrome on `/app` with the calibration banner showing, and Firefox finishing
+calibration — Firefox's `serenify-anchor-captured` write never reaches Chrome,
+and Chrome's banner stays up until its next refresh/navigation re-runs
+`has_anchor` server-side. Same limitation applies to sign-in/sign-out
+propagation and dismissal sync: all same-browser-only by design.
+
+This is a **stale render, not stale data** — the anchor is written to the DB the
+moment calibration completes, so Chrome is merely showing an out-of-date view;
+any refresh or navigation reflects the calibrated state. No correctness or
+privacy impact, and same-browser multi-tab sync (the ST-17 scope) works
+correctly. `localStorage`/`BroadcastChannel` are both per-browser, so neither can
+ever close this gap.
+
+**Fix scope**: medium-to-large (FEATURE work — a new transport, not a tweak).
+Cross-browser/device live updates need a **server-push channel**: most naturally
+a Supabase Realtime subscription on the user's own `profiles` row (or a derived
+`has_anchor`/anchor-captured event) that flips the banner / triggers a
+`router.refresh()` when the row changes from any client, with the existing
+`storage`-event path kept as the same-browser fast path. A polling fallback
+(re-probe `has_anchor` on `visibilitychange` / focus) is a cheaper partial
+mitigation that would at least clear the banner when the user returns to the
+Chrome tab, without standing up Realtime. Either path needs an RLS-safe
+subscription/probe scoped to `auth.uid()` only (Principle I — a user may only
+observe their own anchor state, mirroring the `has_anchor` scope guard).
+
+**Address by**: whichever feature first needs genuine cross-device live updates.
+Features 007/008 (stress detection / chat interrupts) may introduce Supabase
+Realtime for live notifications anyway — bundle the anchor/auth realtime sync
+into that workstream rather than standing up Realtime solely for the banner. Not
+blocking 004: the manual-refresh fallback is acceptable for the thesis/demo
+stage, and same-browser multi-tab sync already works.
