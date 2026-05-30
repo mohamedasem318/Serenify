@@ -4,16 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "predev": "node scripts/copy-face-detect-wasm.mjs",
     "build": "next build",
-    "prebuild": "node scripts/copy-face-detect-wasm.mjs",
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
-    "face-detect:wasm": "node scripts/copy-face-detect-wasm.mjs"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

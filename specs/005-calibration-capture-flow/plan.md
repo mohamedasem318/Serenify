@@ -190,11 +190,24 @@ The live framing guide, the soft gate, and the in-recording drift feedback are
 driven by an **in-browser, on-device** pipeline:
 
 - **Detector**: MediaPipe Tasks Vision `FaceDetector` (BlazeFace short-range),
-  **self-hosted** — the `.wasm` runtime and the model file are committed under
-  `apps/web/public/face-detect/` and served same-origin (no third-party CDN, so
-  `connect-src 'self'` covers asset fetch; this is the CSP-allowed-origin
-  constraint the brief sets). A bounding box (presence + position + size) is all
-  005 needs; **no landmark mesh**. Loaded **lazily, only on the capture routes**.
+  **self-hosted** — served from `apps/web/public/face-detect/` and given an
+  **explicit local path** in `lib/face-detect/detector.ts`
+  (`FilesetResolver.forVisionTasks("/face-detect/wasm")`,
+  `modelAssetPath: "/face-detect/blaze_face_short_range.tflite"`), so the runtime
+  is fetched **same-origin, never from a CDN** (the CDN is only MediaPipe's default
+  when no path is given); `connect-src 'self'` covers it. A bounding box (presence
+  + position + size) is all 005 needs; **no landmark mesh**. Loaded **lazily, only
+  on the capture routes**.
+  - *Asset-hosting / gitignore note*: the small `.tflite` model **is committed**;
+    the ~22 MB `@mediapipe/tasks-vision` WASM runtime is **gitignored** and
+    **reproduced from the lockfile-pinned dep** (`0.10.35`, exact + integrity in
+    `package-lock.json`) by a resilient copy in **`next.config.ts`** that runs at
+    the start of **every `next dev` / `next build`** (config load) — so a clean
+    checkout or deploy reliably has it regardless of whether the build is invoked
+    as `next build` or `npm run build` (no `vercel.json`/CI to guarantee npm-script
+    hooks fire). A copy failure degrades to the "no live guide" fallback (FR-011),
+    never breaks the build. This trades a 22 MB git binary for a deterministic
+    build-time copy; the runtime posture (same-origin, no CDN) is unchanged.
 - **Brightness** is computed independently from a downscaled `<canvas>` luma
   average over the target region — no model needed, robust even when the detector
   is unavailable.

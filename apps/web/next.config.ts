@@ -1,6 +1,41 @@
+import { cpSync, existsSync, mkdirSync } from "node:fs";
+import { createRequire } from "node:module";
+import { dirname, join } from "node:path";
+
 import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
+
+// --- Self-host the MediaPipe detector WASM (feature 005, 📌 DECISION-19/20) ---
+// Copy the runtime from the lockfile-pinned @mediapipe/tasks-vision into public/
+// so it is served SAME-ORIGIN (covered by the CSP `connect-src 'self'`; never a
+// CDN — the detector is given an explicit local path in lib/face-detect/detector
+// .ts). This runs at the start of every `next dev` / `next build` (config load),
+// so a clean checkout or deploy reliably has it regardless of whether the build
+// is invoked as `next build` or `npm run build`. The ~22 MB runtime is gitignored
+// and reproduced here from the pinned dep; only the small .tflite model is
+// committed (📌 DECISION-19 gitignore note). Resilient by design: a copy failure
+// degrades to the detector's "no live guide — you can still record" fallback
+// (FR-011) and never breaks the build. cwd is the app dir for `next dev|build`.
+(function copyFaceDetectWasm() {
+  try {
+    const require = createRequire(join(process.cwd(), "next.config.ts"));
+    const wasmSrc = join(dirname(require.resolve("@mediapipe/tasks-vision")), "wasm");
+    const dest = join(process.cwd(), "public", "face-detect", "wasm");
+    mkdirSync(dest, { recursive: true });
+    for (const file of [
+      "vision_wasm_internal.js",
+      "vision_wasm_internal.wasm",
+      "vision_wasm_nosimd_internal.js",
+      "vision_wasm_nosimd_internal.wasm",
+    ]) {
+      const src = join(wasmSrc, file);
+      if (existsSync(src)) cpSync(src, join(dest, file));
+    }
+  } catch (error) {
+    console.warn("[face-detect] WASM self-host copy skipped (detector will fall back):", error);
+  }
+})();
 
 // Deny-by-default Permissions-Policy. camera is relaxed to (self) on the two
 // capture routes only (feature 004, DECISION-16); microphone stays denied
@@ -29,9 +64,11 @@ function securityHeaders(permissionsPolicy: string) {
     // reset tokens out of third-party Referer.
     { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
     // Powerful-feature gate. camera=(self) only on the capture routes; mic
-    // denied everywhere. COEP is intentionally NOT set anywhere — no WASM is
-    // loaded in apps/web (extraction is server-side) and no cross-origin
-    // isolation is needed (FR-039).
+    // denied everywhere. COEP is intentionally NOT set anywhere: feature 005 DOES
+    // load WASM in apps/web (the on-device face detector, capture routes only),
+    // but it runs single-threaded, so no cross-origin isolation (COOP+COEP) is
+    // required. The detector's scoped wasm allowance lives in the proxy.ts CSP
+    // (📌 DECISION-20); the server-side extraction pipeline is unchanged.
     { key: "Permissions-Policy", value: permissionsPolicy },
     // Explicitly disable the legacy XSS auditor (removed from Chrome 2019; was
     // exploitable as a data-exfil oracle on old IE).
