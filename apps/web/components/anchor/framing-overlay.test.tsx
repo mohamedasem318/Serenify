@@ -46,4 +46,20 @@ describe("FramingOverlay (FR-017 — fixed target, calm drift nudge)", () => {
     render(<FramingOverlay drift="ease-back" showNudge={false} />);
     expect(screen.queryByRole("status")).toBeNull();
   });
+
+  it("affirms with meadow brackets + a calm check when the gate clears (FR-008)", () => {
+    mockMatchMedia(false);
+    const { container } = render(<FramingOverlay drift="centred" showNudge={false} gateReady />);
+    // brackets turn meadow (never amber/crimson); the affirmation reads "you're set"
+    expect(container.querySelector(".border-meadow")).not.toBeNull();
+    expect(screen.getByText(/you.re set/i)).toBeInTheDocument();
+    expect(container.innerHTML).not.toMatch(/amber|crimson/);
+  });
+
+  it("does not affirm while a drift nudge is showing (the nudge wins)", () => {
+    mockMatchMedia(false);
+    render(<FramingOverlay drift="ease-back" gateReady />);
+    expect(screen.queryByText(/you.re set/i)).toBeNull();
+    expect(screen.getByRole("status")).toHaveTextContent(/ease back to centre/i);
+  });
 });

@@ -28,6 +28,12 @@ const buttonVariants = cva(
         // is meadow at 10% — feedback without contrast collapse.
         secondary:
           "bg-surface text-ink border border-meadow hover:bg-meadow/10",
+        // Affirmative brand CTA (feature 005 calibration: "Turn on camera",
+        // "I'm ready", "Set baseline"). Solid meadow that reads unmistakably green,
+        // with DARK text in BOTH modes: `text-ink` is dark in light mode, and
+        // `dark:text-bg` keeps it dark on the lighter dark-mode meadow (ink/bg swap
+        // the wrong way alone). ~4.8:1 light / ~7.7:1 dark — both ≥ WCAG AA.
+        meadow: "bg-meadow text-ink hover:opacity-90 dark:text-bg",
         // Quiet tier. A low-opacity foggy wash on hover gives feedback in BOTH
         // modes without overriding the text color (mirrors `secondary`'s
         // hover:bg-meadow/10 idiom). The previous hover:bg-accent +

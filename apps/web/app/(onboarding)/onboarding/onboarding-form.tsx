@@ -53,8 +53,12 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
   }
 
   if (step === "anchor") {
+    // Fill the remaining height below the slim onboarding header and centre the
+    // capture vertically (the onboarding <main> is already a min-h-dvh flex col).
     return (
-      <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
+      <div className="flex flex-1 flex-col justify-center">
+        <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
+      </div>
     );
   }
 

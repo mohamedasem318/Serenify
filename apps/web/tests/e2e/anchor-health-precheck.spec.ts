@@ -11,6 +11,15 @@ import {
 const NAME = "Anchor Employee";
 const UNAVAILABLE = /temporarily unavailable/i;
 
+// SKIP-AND-TRACK (feature 005): these specs assert the REMOVED 004 flow — a
+// mount-time /healthz gate, a "Start recording" button, and "temporarily
+// unavailable" + "Skip for now" on mount. 005 moved the health gate to the green
+// room's "I'm ready" (FR-056) and replaced the flow (intro → green room → 3·2·1 →
+// recording). They cannot pass green; re-author under T031 (e2e consolidation).
+test.beforeEach(() => {
+  test.skip(true, "004 calibration flow replaced by 005; re-author under T031 (e2e consolidation)");
+});
+
 // ST-18 / FR-048 / 📌 DECISION-10: the recording-state transition (the one that
 // renders the live preview + countdown) must be downstream of an awaited 200 from
 // /healthz. No optimistic transition — the recorder must NEVER flash the preview

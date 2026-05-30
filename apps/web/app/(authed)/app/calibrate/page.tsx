@@ -53,7 +53,9 @@ export default async function CalibratePage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-8 pb-12">
+    // Centre the calm capture in the viewport below the header (FR — balanced,
+    // not crammed to the top). The header + main padding take ~7rem.
+    <div className="mx-auto flex min-h-[calc(100dvh-7rem)] w-full max-w-2xl flex-col justify-center pb-8">
       <CalibrateRecorder />
     </div>
   );

@@ -8,12 +8,12 @@ import { Button } from "@/components/ui/button";
 import type { GateVerdict } from "@/lib/face-detect/framing";
 import type { GuideState } from "@/lib/face-detect/use-framing-guide";
 
-import { FramingOverlay } from "./framing-overlay";
-
 /**
- * The green room (feature 005, FR-005–011): get situated before anything records.
- * Rendered as an overlay over the orchestrator's persistent <video> preview — the
- * fixed corner-bracket target (FramingOverlay) + a calm control panel.
+ * The green room control panel (feature 005, FR-005–011): get situated before
+ * anything records. Sits in a calm card BELOW the live preview — never over it, so
+ * it can't hide the framing brackets. The orchestrator owns the preview + the
+ * bracket overlay (incl. the meadow "you're set" affirmative); this panel carries
+ * the privacy line, the device picker, the gate helper, and the actions.
  *
  * Three guide states, and the user is NEVER locked out (this lives in the US1
  * slice, per analyze finding C1):
@@ -53,29 +53,25 @@ export function GreenRoom({
         : GATE_HELP[gate];
 
   return (
-    <div className="absolute inset-0 flex flex-col">
-      <FramingOverlay showNudge={false} />
+    <div className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-soft sm:p-5">
+      <p className="flex items-center justify-center gap-1.5 text-xs text-muted">
+        <Lock className="size-3.5" strokeWidth={1.75} aria-hidden />
+        Only you see this.
+      </p>
 
-      <div className="mt-auto space-y-3 rounded-t-card border-t border-border bg-surface/95 p-4 backdrop-blur-sm sm:p-5">
-        <p className="flex items-center justify-center gap-1.5 text-xs text-muted">
-          <Lock className="size-3.5" strokeWidth={1.75} aria-hidden />
-          Only you see this.
-        </p>
+      {devicePicker}
 
-        {devicePicker}
+      <p aria-live="polite" className="min-h-5 text-center text-sm text-muted">
+        {helper}
+      </p>
 
-        <p aria-live="polite" className="min-h-5 text-center text-sm text-muted">
-          {helper}
-        </p>
-
-        <div className="flex flex-col gap-2">
-          <Button onClick={onReady} disabled={!ready} className="h-12 w-full text-base">
-            I’m ready
-          </Button>
-          <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">
-            Not now
-          </Button>
-        </div>
+      <div className="flex flex-col gap-2">
+        <Button onClick={onReady} disabled={!ready} variant="meadow" className="h-12 w-full text-base">
+          I’m ready
+        </Button>
+        <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">
+          Not now
+        </Button>
       </div>
     </div>
   );

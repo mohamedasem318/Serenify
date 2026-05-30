@@ -10,6 +10,15 @@ import {
   signInToApp,
 } from "./anchor-helpers";
 
+// SKIP-AND-TRACK (feature 005): the cross-tab BROADCAST (FR-054) is unchanged 004
+// code and still works, but this spec DRIVES it through the removed 004 flow
+// (recordAnchor → "Start recording" / "Continue to dashboard"). Re-author the
+// driving under T031 (e2e consolidation); the banner cross-tab is also re-covered
+// by T028.
+test.beforeEach(() => {
+  test.skip(true, "004 calibration flow replaced by 005; re-author under T031 (e2e consolidation)");
+});
+
 /**
  * ST-17 cross-tab anchor sync (FR-034, SC-008).
  *

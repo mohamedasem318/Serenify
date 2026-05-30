@@ -12,6 +12,13 @@ import {
 
 const NAME = "Anchor Employee";
 
+// SKIP-AND-TRACK (feature 005): drives the REMOVED 004 flow via recordAnchor
+// ("Start recording" → "Continue to dashboard"). 005 replaced it (intro → green
+// room → 3·2·1 → recording → "Back to home"). Re-author under T031.
+test.beforeEach(() => {
+  test.skip(true, "004 calibration flow replaced by 005; re-author under T031 (e2e consolidation)");
+});
+
 test("employee records an anchor during onboarding and lands on /app with no banner (FR-043)", async ({
   page,
   browserName,

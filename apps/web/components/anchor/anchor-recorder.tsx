@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { CameraAccessState, type CameraAccessKind } from "./camera-access-state";
 import { DevicePicker } from "./device-picker";
 import { FailureState } from "./failure-state";
+import { FramingOverlay } from "./framing-overlay";
 import { GetReadyCountdown } from "./get-ready-countdown";
 import { GreenRoom } from "./green-room";
 import { Intro } from "./intro";
@@ -436,55 +437,77 @@ export function AnchorRecorder({
       )}
 
       {inStage && (
-        <div className="relative mx-auto aspect-[3/4] w-full max-w-md overflow-hidden rounded-card bg-ink/5">
-          <video
-            ref={attachVideo}
-            autoPlay
-            muted
-            playsInline
-            className={`absolute inset-0 h-full w-full object-cover transition-[filter] duration-700 motion-reduce:transition-none ${
-              softened ? "blur-[6px]" : "blur-0"
+        <div className="mx-auto w-full max-w-md">
+          {/* PREVIEW — the full live frame (16:9, NO portrait crop) in the green
+              room; the fixed portrait target + soft spotlight are an OVERLAY, never
+              a crop. Eases to a softened, taller frame once we focus
+              (get-ready → recording). */}
+          <div
+            className={`relative w-full overflow-hidden rounded-card bg-ink/5 transition-[aspect-ratio] duration-500 motion-reduce:transition-none ${
+              status === "green-room" ? "aspect-video" : "aspect-[3/4]"
             }`}
-          />
-
-          {status === "green-room" && (
-            <GreenRoom
-              guide={guide}
-              gate={gate}
-              ready={ready && healthGate !== "checking"}
-              devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
-              onReady={handleReady}
-              onNotNow={onSkip}
+          >
+            <video
+              ref={attachVideo}
+              autoPlay
+              muted
+              playsInline
+              className={`absolute inset-0 h-full w-full object-cover transition-[filter] duration-700 motion-reduce:transition-none ${
+                softened ? "blur-[6px]" : "blur-0"
+              }`}
             />
-          )}
 
-          {status === "get-ready" && (
-            <div className="absolute inset-0 grid place-items-center bg-ink/10 p-4">
-              <GetReadyCountdown onComplete={beginRecording} onCancel={handleCancelGetReady} />
-            </div>
-          )}
+            {/* fixed portrait target + spotlight, overlaid on the full preview. In
+                the green room the brackets turn meadow the moment the gate clears. */}
+            {status === "green-room" && (
+              <FramingOverlay drift="centred" showNudge={false} gateReady={ready} />
+            )}
 
-          {(status === "recording" || status === "stop-confirming") && (
-            <RecordingStage remaining={remaining} drift={drift} onStop={handleRequestStop} />
-          )}
-
-          {/* FR-056 health gate — calm, foggy, blocks the countdown, keeps the preview. */}
-          {status === "green-room" && healthGate === "down" && (
-            <div className="absolute inset-0 grid place-items-center bg-ink/45 p-4 backdrop-blur-sm">
-              <div className="w-full max-w-xs space-y-4 rounded-card border border-foggy/40 bg-surface p-5 text-center">
-                <div className="space-y-1.5">
-                  <h2 className="font-display text-xl text-ink">{COPY.unavailableHeading}</h2>
-                  <p className="text-sm leading-relaxed text-muted">{COPY.unavailableBody}</p>
+            {status === "get-ready" && (
+              <>
+                <FramingOverlay drift="centred" showNudge={false} />
+                <div className="absolute inset-0 grid place-items-center bg-ink/10 p-4">
+                  <GetReadyCountdown onComplete={beginRecording} onCancel={handleCancelGetReady} />
                 </div>
-                <div className="flex flex-col gap-2">
-                  <Button onClick={handleReady} className="h-11 w-full">
-                    Try again
-                  </Button>
-                  <Button variant="ghost" onClick={onSkip} className="h-11 w-full text-muted">
-                    Not now
-                  </Button>
+              </>
+            )}
+
+            {(status === "recording" || status === "stop-confirming") && (
+              <RecordingStage remaining={remaining} drift={drift} onStop={handleRequestStop} />
+            )}
+
+            {/* FR-056 health gate — calm, foggy, blocks the countdown, keeps the preview. */}
+            {status === "green-room" && healthGate === "down" && (
+              <div className="absolute inset-0 grid place-items-center bg-ink/45 p-4 backdrop-blur-sm">
+                <div className="w-full max-w-xs space-y-4 rounded-card border border-foggy/40 bg-surface p-5 text-center">
+                  <div className="space-y-1.5">
+                    <h2 className="font-display text-xl text-ink">{COPY.unavailableHeading}</h2>
+                    <p className="text-sm leading-relaxed text-muted">{COPY.unavailableBody}</p>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Button onClick={handleReady} className="h-11 w-full">
+                      Try again
+                    </Button>
+                    <Button variant="ghost" onClick={onSkip} className="h-11 w-full text-muted">
+                      Not now
+                    </Button>
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* CONTROLS — in a calm panel BELOW the preview, never over the brackets. */}
+          {status === "green-room" && (
+            <div className="mt-4">
+              <GreenRoom
+                guide={guide}
+                gate={gate}
+                ready={ready && healthGate !== "checking"}
+                devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
+                onReady={handleReady}
+                onNotNow={onSkip}
+              />
             </div>
           )}
         </div>

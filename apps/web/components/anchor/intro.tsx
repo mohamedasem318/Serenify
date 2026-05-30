@@ -47,13 +47,13 @@ export function Intro({
         ))}
       </ul>
 
-      <p className="mx-auto flex max-w-sm items-center justify-center gap-2 text-sm text-muted">
-        <ShieldCheck className="size-4 shrink-0" strokeWidth={1.75} aria-hidden />
-        Your video isn’t stored — only the calm reading it produces.
+      <p className="mx-auto flex max-w-md items-start justify-center gap-2 text-pretty text-sm text-muted">
+        <ShieldCheck className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+        <span>Your video isn’t stored — only the calm reading it produces.</span>
       </p>
 
       <div className="space-y-2">
-        <Button onClick={onTurnOnCamera} className="h-12 w-full gap-2 text-base">
+        <Button onClick={onTurnOnCamera} variant="meadow" className="h-12 w-full gap-2 text-base">
           <Camera className="size-5" strokeWidth={1.75} aria-hidden />
           Turn on camera
         </Button>

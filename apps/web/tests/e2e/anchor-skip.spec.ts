@@ -12,6 +12,13 @@ import {
   recordAnchor,
   signInToOnboarding,
 } from "./anchor-helpers";
+
+// SKIP-AND-TRACK (feature 005): drives the REMOVED 004 flow ("Start recording" /
+// "Skip for now"). 005 replaced it (intro → green room → 3·2·1 → recording; the
+// escape is now "Not now"). Re-author under T031 (e2e consolidation).
+test.beforeEach(() => {
+  test.skip(true, "004 calibration flow replaced by 005; re-author under T031 (e2e consolidation)");
+});
 import { signOut } from "./helpers";
 
 const NAME = "Anchor Employee";
