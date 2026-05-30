@@ -56,10 +56,10 @@ delta **before any detector call**.
   - **Acceptance**: no behaviour change; the ring↔tick still flips on the media query (DECISION-27, FR-048).
   - **Honest test**: existing `apps/web/components/anchor/countdown.test.tsx` passes; add an assertion it consumes the shared hook.
   - **Docs**: —
-- [ ] T002 Commit the self-hosted detector assets to `apps/web/public/face-detect/` (the WASM runtime + `blaze_face_short_range` model file).
+- [X] T002 Commit the self-hosted detector assets to `apps/web/public/face-detect/` (the WASM runtime + `blaze_face_short_range` model file). *(Impl note: `@mediapipe/tasks-vision@0.10.35` pinned; the .tflite model is committed; the ~22 MB WASM runtime is reproduced same-origin from the pinned dep by `scripts/copy-face-detect-wasm.mjs` at predev/prebuild and gitignored — avoids committing large binaries. Log in DECISIONS/CHANGELOG at T033.)*
   - **Acceptance**: assets resolve same-origin (covered by `connect-src 'self'`); no third-party origin; no new secret (DECISION-19/20, FR-050).
   - **Docs**: `docs/CHANGELOG.md` (asset addition).
-- [ ] T003 Add the scoped CSP delta **report-only** in `apps/web/proxy.ts`: change `buildCsp(nonce)` → `buildCsp(nonce, pathname)` and append `script-src 'wasm-unsafe-eval'` (+ provisional `worker-src 'self' blob:`) **only** on capture routes (`/onboarding`, `/app/calibrate`).
+- [X] T003 Add the scoped CSP delta **report-only** in `apps/web/proxy.ts`: change `buildCsp(nonce)` → `buildCsp(nonce, pathname)` and append `script-src 'wasm-unsafe-eval'` (+ provisional `worker-src 'self' blob:`) **only** on capture routes (`/onboarding`, `/app/calibrate`). *(Allowance added + scoped; minimal set validated/narrowed by the T004 sweep.)*
   - **Acceptance**: allowance present on capture routes, absent on all others; **no** `connect-src` host added; COEP stays unset (DECISION-20, FR-050).
   - **Honest test**: Playwright asserts the emitted CSP header differs correctly per route.
   - **Docs**: `docs/DECISIONS.md` entry 20 (draft).

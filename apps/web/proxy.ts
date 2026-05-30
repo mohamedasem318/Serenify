@@ -51,20 +51,29 @@ const CSP_HEADER = "content-security-policy";
  * `crypto.randomBytes` import is unavailable in the Edge runtime middleware runs
  * in); `Buffer` is polyfilled by Next in the Edge runtime.
  */
-function buildCsp(nonce: string): string {
+function buildCsp(nonce: string, pathname: string): string {
   const isDev = process.env.NODE_ENV !== "production";
   const supabaseOrigin = new URL(clientEnv.supabaseUrl).origin;
   // FastAPI anchor service (feature 004) — the first non-Supabase, non-same-origin
   // connect-src entry. Dev default http://127.0.0.1:8000; prod the configured
   // NEXT_PUBLIC_API_URL origin. The recorder POSTs the clip + GETs /healthz here.
   const apiOrigin = new URL(clientEnv.apiUrl).origin;
+  // Capture routes load the in-browser MediaPipe face detector (feature 005,
+  // 📌 DECISION-20). Compiling its WASM needs 'wasm-unsafe-eval' (a keyword source,
+  // honoured alongside 'strict-dynamic'); the runtime may spin a blob-URL worker
+  // → worker-src blob:. Both are SCOPED to the two capture routes only; everywhere
+  // else keeps the stricter policy unchanged. The minimal set is validated by the
+  // securitypolicyviolation sweep (T004) before this ships to users. The
+  // self-hosted wasm/model are same-origin, so connect-src 'self' already covers
+  // them — no new connect-src host. COEP stays unset.
+  const isCaptureRoute = pathname === "/onboarding" || pathname === "/app/calibrate";
   const directives = [
     "default-src 'self'",
     // Nonce covers the 2 app inline scripts (theme-migration IIFE, next-themes
     // FOUC) + the 9 framework inline scripts (auto-stamped). 'strict-dynamic'
     // propagates trust to the chunk scripts the nonced bootstrap loads. Dev
     // (Turbopack) needs 'unsafe-eval' (React debug eval); prod does not.
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isDev ? " 'unsafe-eval'" : ""}`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isCaptureRoute ? " 'wasm-unsafe-eval'" : ""}${isDev ? " 'unsafe-eval'" : ""}`,
     // 'unsafe-inline' (NOT a nonce): Radix react-remove-scroll injects a runtime
     // <style> that is un-nonced under Turbopack/SWC, and a nonce on style-src
     // would make the browser IGNORE 'unsafe-inline' and break scroll-lock.
@@ -81,6 +90,9 @@ function buildCsp(nonce: string): string {
     "frame-src 'none'",
     "frame-ancestors 'none'",
   ];
+  // Detector worker allowance, capture-routes only (provisional — narrowed/dropped
+  // by the T004 sweep if the runtime needs no blob worker).
+  if (isCaptureRoute) directives.push("worker-src 'self' blob:");
   // `upgrade-insecure-requests` is PRODUCTION-ONLY. In dev the app is served over
   // http://localhost and WebKit honors this directive by upgrading even loopback
   // subresource requests to https (Chromium/Firefox exempt localhost) — every
@@ -96,7 +108,7 @@ export async function proxy(request: NextRequest) {
   const nonce = Buffer.from(crypto.getRandomValues(new Uint8Array(16))).toString(
     "base64",
   );
-  const csp = buildCsp(nonce);
+  const csp = buildCsp(nonce, request.nextUrl.pathname);
 
   // The nonce + CSP must ride the forwarded REQUEST headers so Next stamps its
   // own inline scripts; `x-nonce` lets the root layout read the value cheaply.
