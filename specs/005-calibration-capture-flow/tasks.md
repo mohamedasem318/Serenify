@@ -76,7 +76,7 @@ delta **before any detector call**.
 **Purpose**: the detector lib and the extended state machine — every story consumes
 these. **No user-story surface may begin until Phase 2 is complete.**
 
-- [ ] T005 [P] Detector loader `apps/web/lib/face-detect/detector.ts` — capability probe (WebAssembly present) + lazy self-hosted load + **hard init timeout** → `Promise<DetectorHandle | null>`; `detect(video, ts)` on a downscaled frame returns a normalized `FaceBox | null`.
+- [X] T005 [P] Detector loader `apps/web/lib/face-detect/detector.ts` — capability probe (WebAssembly present) + lazy self-hosted load + **hard init timeout** → `Promise<DetectorHandle | null>`; `detect(video, ts)` on a downscaled frame returns a normalized `FaceBox | null`.
   - **Acceptance**: resolves within `initTimeoutMs` (~4.5 s) or returns `null`; never hangs (DECISION-19, contracts/face-detection.md §1, FR-011).
   - **Honest test**: Vitest fake-timers — the timeout path returns `null` deterministically; the loader is injectable.
   - **Docs**: `docs/DECISIONS.md` entry 19 (draft).
@@ -84,7 +84,7 @@ these. **No user-story surface may begin until Phase 2 is complete.**
   - **Acceptance**: forgiving gate (only no-face / badly-off-centre / too-dark hold it); a wobble `< DRIFT_GRACE_MS` produces no nudge; sustained `≥ grace` → `ease-back`/`absent`; never signals auto-stop (DECISION-19, FR-009/018/020).
   - **Honest test**: Vitest fake-clock over the **real** functions (gate forgiveness; wobble vs sustained drift; absence).
   - **Docs**: —
-- [ ] T007 Live loop hook `apps/web/lib/face-detect/use-framing-guide.ts` — throttled `requestVideoFrameCallback`/`rAF` (~6–8 fps green room, ~3–4 fps recording) on a downscaled frame + canvas luma; `loading | active | unavailable` lifecycle; **injectable `createDetector` seam**; telemetry sink.
+- [X] T007 Live loop hook `apps/web/lib/face-detect/use-framing-guide.ts` — throttled `requestVideoFrameCallback`/`rAF` (~6–8 fps green room, ~3–4 fps recording) on a downscaled frame + canvas luma; `loading | active | unavailable` lifecycle; **injectable `createDetector` seam**; telemetry sink.
   - **Acceptance**: `unavailable` ⇒ gate bypassed (`ready = true`) so the user is never locked out (DECISION-19, FR-010/011).
   - **Honest test**: inject a fake detector → drive synthetic signals through the **real** `framing.ts` → assert `guide`/`gate`/`drift`.
   - **Docs**: —
