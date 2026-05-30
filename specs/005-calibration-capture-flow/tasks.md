@@ -107,9 +107,9 @@ turn on camera, settle in the green room, "I'm ready", watch 3·2·1 with the bl
 easing to *softened*, complete the minute (breathing guide + timer), see the success
 moment, "Back to home" → `/app` with no banner.
 
-- [ ] T009 [P] [US1] `apps/web/components/anchor/intro.tsx` — heading "Set your calm baseline", three icon-led what-to-expect lines, the privacy line, primary "Turn on camera", and the permission-coming line. (FR-001–004)
+- [X] T009 [P] [US1] `apps/web/components/anchor/intro.tsx` — heading "Set your calm baseline", three icon-led what-to-expect lines, the privacy line, primary "Turn on camera", and the permission-coming line. (FR-001–004)
   - **Honest test**: RTL — copy present; `onTurnOnCamera` fires.
-- [ ] T010 [P] [US1] `apps/web/components/anchor/framing-overlay.tsx` — **fixed** centred corner brackets + dimmed spotlight (face area sharp) + the drift-nudge layer; motion-free variant. Reused by green room AND recording. (FR-005/006/017, DECISION-27)
+- [X] T010 [P] [US1] `apps/web/components/anchor/framing-overlay.tsx` — **fixed** centred corner brackets + dimmed spotlight (face area sharp) + the drift-nudge layer; motion-free variant. Reused by green room AND recording. (FR-005/006/017, DECISION-27)
   - **Honest test**: RTL — `drift` prop → nudge text/colour is **foggy** (no amber/crimson); reduced-motion ⇒ no transition.
 - [ ] T011 [US1] `apps/web/components/anchor/green-room.tsx` — live preview + `framing-overlay` + the device picker + gate-driven "I'm ready" (+ calm helper line) + "Not now"; **includes the `unavailable` fallback** ("no live guide — you can still record", soft gate **bypassed** so "I'm ready" is available). The **never-lock-out guarantee ships in this US1 slice**, not deferred to US2. (FR-005–011, esp. FR-010c/FR-011)
   - **Acceptance**: when `useFramingGuide` reports `unavailable`, the green room shows the "no live guide" note and "I'm ready" is enabled — a US1-only build is never locked out (FR-011).
