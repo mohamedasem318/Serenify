@@ -1095,3 +1095,21 @@ hamburger) was verified over a LAN-IP HTTP origin after adding `allowedDevOrigin
 The video model is unchanged by 004 (`docs/MODELS.md` / `docs/MODEL_HANDOFF.md`
 were authored at the start of 004 and need no edit). The anchor read path for
 inference is feature 005's decision, not 004's.
+
+## 2026-05-29 — fix(ml-video) — ROI resize interpolation aligned to training (LBP-TOP feature-space fidelity)
+
+- `features._roi_crop` now resizes each ROI with cv2's default `INTER_LINEAR`,
+  matching the training notebook; the prior `cv2.INTER_AREA` override is removed.
+- **Observable change**: the LBP-TOP feature values (`f0..f89`) change for every
+  vector the extractor produces. The 2868 motion dims are unchanged.
+- **Pre-fix anchors invalidated**: anchors captured before this fix were computed
+  under `INTER_AREA` and sit outside the model's trained feature space — affected
+  users must re-capture. `model_version` is unchanged (`2.0.0`), so stored anchors
+  are NOT auto-invalidated; re-calibration is manual until an extraction-version
+  field exists. (The demo seed's synthetic seed-42 anchor is not extraction-derived
+  and is unaffected.)
+- Added `tests/test_lbp_interpolation_fidelity.py`, pinning the 90-d LBP-TOP block to
+  a notebook-derived golden; it fails if `INTER_AREA` is reintroduced. The existing
+  sum-to-9.0 invariant in `test_pipeline_fixtures.py` did not catch the drift.
+
+Rationale: see DECISIONS.md 2026-05-29 (LBP-TOP ROI resize interpolation).

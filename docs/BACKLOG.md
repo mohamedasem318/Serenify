@@ -1119,3 +1119,63 @@ feature-003 section above), plus the 004 recorder polish (countdown-ring light-m
 cosmetics, ST-15).
 **Fix scope**: feature-sized — tracked here only as a pointer.
 **Address by**: feature 005 spec/plan.
+
+---
+
+## From hotfix/lbp-roi-interpolation (feature 005 recon) — 2026-05-29
+
+### Store an extraction/pipeline-version alongside each anchor (auto-invalidation)
+**Status**: tech-debt
+**Category**: schema / anchor invalidation
+**Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon)
+**Description**: Anchors today store only `anchor_model_version` (the RF
+`model_version`, currently `2.0.0`; column added in
+`supabase/migrations/20260527000000_anchor_columns.sql`). The handoff's
+invalidation contract (MODEL_HANDOFF §8 red-flag 4) keys off model_version:
+bumping it is what flags all stored anchors as stale. But the LBP-TOP
+interpolation hotfix changed the *extraction* output (the feature space) WITHOUT
+touching the model — `model_version` stayed `2.0.0`, so nothing auto-flagged the
+now-invalid pre-fix anchors; their invalidation had to be reasoned about and
+handled manually (see DECISIONS.md 2026-05-29 "LBP-TOP ROI resize interpolation").
+The extraction pipeline is a distinct axis of the feature contract from the trained
+model and needs its own stored version so a future extraction change invalidates
+anchors on its own.
+**Fix scope**: medium — add a stored `anchor_extraction_version` (or
+`anchor_pipeline_version`) column on `public.profiles` alongside the existing anchor
+metadata, sourced from a constant in `packages/ml-video` that is bumped whenever
+decode / ROI / LBP / motion extraction changes in a way that moves the feature
+space. At inference (feature 006), treat an anchor as invalid when EITHER its
+model_version OR its extraction_version mismatches the running service, and surface
+the "recalibrate" prompt already contemplated in MODEL_HANDOFF §2.3. Keep the new
+column write-only / scope-guarded like the other anchor metadata (DECISION-12: not
+in the `authenticated` SELECT whitelist).
+**Address by**: before any real-tenant production launch, or the next time
+`packages/ml-video` extraction code changes — whichever comes first. Pairs with
+feature 005's anchor read-path decision and feature 006's live inference.
+
+### End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 006)
+**Status**: tech-debt
+**Category**: testing / fidelity verification
+**Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon — check #4)
+**Description**: The 005 recon verified each extraction step against the training
+notebook (`video-lbp-top-motion-per-subject-calibration.ipynb` == the handoff's
+`refactored_v2`) IN ISOLATION — decode / 5fps / `%2` frame alignment, ROI indices +
+crop math, LBP-TOP plane order + per-plane L1 normalization, motion mean/std/max
+order, and the 2958-d concat — and the interpolation hotfix added a value-level
+guard for the LBP-TOP block (`tests/test_lbp_interpolation_fidelity.py`). What has
+NEVER run is the FULL chain end-to-end on a REAL clip: a StressID video pushed
+through `packages/ml-video` (decode → 5fps → `%2` → MediaPipe FaceMesh → ROI →
+LBP-TOP → motion → 2958-d concat) compared against the notebook's output for the
+SAME clip within float tolerance. Recon check #4 was not run because it needs the
+StressID dataset + a real MediaPipe runtime (the isolated guards deliberately avoid
+both). The interpolation bug is exactly the class of defect an isolated check can
+miss and an end-to-end check catches — so this gap is load-bearing, not academic.
+**Fix scope**: medium — pick one StressID clip (e.g. the handoff's smoke subject
+`2ea4`, Stroop clip with Relax as the anchor), run `ml_video.compute_anchor` (and/or
+the full feature path) on it, run the notebook's `compute_anchor_from_video` /
+`extract_full_feature_vector` on the SAME clip, and assert the two 2958-d vectors
+match within float tolerance. Needs MediaPipe installed and the dataset available;
+the CI Supabase/ML setup is already a tracked feature-006 dependency (see the
+feature-002 "CI integration" entry) — pair them.
+**Address by**: before trusting any live prediction in feature 006 (live inference).
+Treat as a go/no-go gate on feature-space fidelity, not optional polish.
