@@ -5,13 +5,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
 import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
 import { Button } from "@/components/ui/button";
+import {
+  accumulate,
+  dominantCause,
+  emptyTelemetry,
+  type CauseTelemetry,
+} from "@/lib/face-detect/cause-telemetry";
 import type { CreateDetectorOptions, DetectorHandle } from "@/lib/face-detect/detector";
+import type { FramingSignal } from "@/lib/face-detect/framing";
 import { useFramingGuide } from "@/lib/face-detect/use-framing-guide";
 import { createClient } from "@/lib/supabase/client";
 
 import { CameraAccessState, type CameraAccessKind } from "./camera-access-state";
 import { DevicePicker } from "./device-picker";
-import { FailureState } from "./failure-state";
+import { FailureState, type FailureCause } from "./failure-state";
 import { FramingOverlay } from "./framing-overlay";
 import { GetReadyCountdown } from "./get-ready-countdown";
 import { GreenRoom } from "./green-room";
@@ -191,6 +198,7 @@ export function AnchorRecorder({
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [remaining, setRemaining] = useState(RECORDING_SECONDS);
   const [healthGate, setHealthGate] = useState<"ok" | "checking" | "down">("ok");
+  const [failureCause, setFailureCause] = useState<FailureCause>("our-side");
 
   const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MinimalRecorder | null>(null);
@@ -200,6 +208,16 @@ export function AnchorRecorder({
   const remainingRef = useRef(RECORDING_SECONDS);
   const deviceIdRef = useRef<string | undefined>(undefined);
   const gatingRef = useRef(false);
+  // Client-observed adverse signal during the 60 s, collapsed to the failure chip
+  // cause on a processing failure (📌 DECISION-24). Stays empty when the detector
+  // is unavailable → dominantCause() returns "our-side".
+  const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
+
+  // Accumulate framing telemetry ONLY while actually recording (the guide also
+  // signals in the green room). Nothing leaves the device — this counts frames.
+  const handleSignal = useCallback((signal: FramingSignal) => {
+    if (recorderRef.current?.state === "recording") accumulate(telemetryRef.current, signal);
+  }, []);
 
   // The framing guide runs only while a live preview is on screen. The <video> is
   // PERSISTENT across green-room → get-ready → recording → stop-confirming (one
@@ -220,6 +238,7 @@ export function AnchorRecorder({
     // render-time value — undefined in production, where the hook uses the real
     // self-hosted loader; a fake in tests.
     createDetector: depsOverride?.createDetector,
+    onSignal: handleSignal,
   });
 
   // Wire srcObject the moment React attaches the node (and re-wire on any remount),
@@ -262,14 +281,19 @@ export function AnchorRecorder({
     async (blob: Blob) => {
       const session = await deps.getSession();
       if (!session) {
+        setFailureCause("our-side");
         dispatch({ type: "UPLOAD_FAILED" });
         return;
       }
       const result = await deps.postAnchor(blob, session.accessToken);
       if (!result.ok) {
         if (result.kind === "extraction_failed") {
+          // 422 — the chip reflects what we actually measured this minute
+          // (low-light / out-of-frame), or "our-side" when nothing dominated.
+          setFailureCause(dominantCause(telemetryRef.current));
           dispatch({ type: "EXTRACT_FAILED", reason: result.reason });
         } else {
+          setFailureCause("our-side"); // transport / 401 — our side
           dispatch({ type: "UPLOAD_FAILED" });
         }
         return;
@@ -282,6 +306,7 @@ export function AnchorRecorder({
         modelVersion: result.modelVersion,
       });
       if (!write.ok) {
+        setFailureCause("our-side"); // the write is our side
         dispatch({ type: "UPLOAD_FAILED" });
         return;
       }
@@ -315,6 +340,7 @@ export function AnchorRecorder({
     recorderRef.current = recorder;
     chunksRef.current = [];
     discardRef.current = false;
+    telemetryRef.current = emptyTelemetry(); // fresh cause telemetry for this minute
 
     recorder.ondataavailable = (event) => {
       if (event.data.size > 0) chunksRef.current.push(event.data);
@@ -437,7 +463,7 @@ export function AnchorRecorder({
       )}
 
       {inStage && (
-        <div className="mx-auto w-full max-w-md">
+        <div className={`mx-auto w-full ${status === "green-room" ? "max-w-lg" : "max-w-md"}`}>
           {/* PREVIEW — the full live frame (16:9, NO portrait crop) in the green
               room; the fixed portrait target + soft spotlight are an OVERLAY, never
               a crop. Eases to a softened, taller frame once we focus
@@ -460,7 +486,9 @@ export function AnchorRecorder({
             {/* fixed portrait target + spotlight, overlaid on the full preview. In
                 the green room the brackets turn meadow the moment the gate clears. */}
             {status === "green-room" && (
-              <FramingOverlay drift="centred" showNudge={false} gateReady={ready} />
+              // affirm only when the live detector actively confirms framing — not
+              // for the unavailable bypass (where `ready` is true to avoid lockout).
+              <FramingOverlay drift="centred" showNudge={false} gateReady={guide === "active" && ready} />
             )}
 
             {status === "get-ready" && (
@@ -526,12 +554,12 @@ export function AnchorRecorder({
       {status === "success" && <SuccessState mode={mode} onDone={onComplete} />}
 
       {(status === "upload-failed" || status === "extract-failed") && (
-        // The adaptive cause chip (low-light / out-of-frame) needs the recording
-        // cause-telemetry from T021/DECISION-24; until that lands we show the
-        // conservative our-side chip — we assert no user-side cause we haven't
-        // measured. "Try again" re-enters via the green room (FR-029).
+        // The adaptive cause chip reflects the recording cause-telemetry
+        // (T021/DECISION-24): low-light / out-of-frame when measured, else our-side
+        // (incl. transport + detector-unavailable). "Try again" re-enters via the
+        // green room (FR-029).
         <FailureState
-          cause="our-side"
+          cause={failureCause}
           escapeVisible={escapeVisible}
           onRetry={startCapture}
           onNotNow={onSkip}

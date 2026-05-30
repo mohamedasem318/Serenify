@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 
-import { Lock } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { GateVerdict } from "@/lib/face-detect/framing";
@@ -45,12 +45,15 @@ export function GreenRoom({
   onReady: () => void;
   onNotNow: () => void;
 }) {
-  const helper =
-    guide === "loading"
-      ? "Getting your live guide ready…"
-      : guide === "unavailable"
-        ? "No live guide — you can still record."
-        : GATE_HELP[gate];
+  const loading = guide === "loading";
+  // Affirmative only when the live detector actively confirms the framing — never
+  // for the unavailable bypass (we don't claim "set" for a frame we can't see).
+  const affirmed = guide === "active" && gate === "ready";
+  const helper = loading
+    ? "Getting your live guide ready…"
+    : guide === "unavailable"
+      ? "No live guide — you can still record."
+      : GATE_HELP[gate];
 
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-soft sm:p-5">
@@ -61,7 +64,18 @@ export function GreenRoom({
 
       {devicePicker}
 
-      <p aria-live="polite" className="min-h-5 text-center text-sm text-muted">
+      {/* The status line — the single home for the framing words, so the affirmative
+          ("you're all set") lives here and can never clip off the preview. */}
+      <p
+        aria-live="polite"
+        className={`flex min-h-5 items-center justify-center gap-1.5 text-center text-sm ${
+          affirmed ? "font-medium text-ink" : "text-muted"
+        }`}
+      >
+        {affirmed ? <Check className="size-4 shrink-0 text-meadow" strokeWidth={2.5} aria-hidden /> : null}
+        {loading ? (
+          <span aria-hidden className="size-1.5 shrink-0 animate-pulse rounded-full bg-foggy motion-reduce:animate-none" />
+        ) : null}
         {helper}
       </p>
 

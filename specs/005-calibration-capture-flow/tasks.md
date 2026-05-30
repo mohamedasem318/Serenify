@@ -147,11 +147,11 @@ drift feedback, with the "never lock the user out" fallback.
 with framing; drift briefly (no nudge) vs sustained (calm nudge) vs absent — the
 recording continuing throughout.
 
-- [ ] T019 [US2] Green-room **loading + active** guide-state polish in `green-room.tsx` — the brief `loading` affordance and the `active` gate-hold helper copy (no-face / badly-off-centre / too-dark), wired from `useFramingGuide`. (The `unavailable` fallback already ships in **T011/US1**; this task refines the other two states.) (FR-010a/b)
+- [X] T019 [US2] Green-room **loading + active** guide-state polish in `green-room.tsx` — the brief `loading` affordance and the `active` gate-hold helper copy (no-face / badly-off-centre / too-dark), wired from `useFramingGuide`. (The `unavailable` fallback already ships in **T011/US1**; this task refines the other two states.) (FR-010a/b)
   - **Honest test**: inject detector `loading` → brief loading affordance with "I'm ready" disabled; inject `active` gate verdicts → the correct forgiving helper copy per hold reason.
-- [ ] T020 [US2] In-recording drift feedback in `recording-stage.tsx`/`framing-overlay.tsx` — centred (quiet) / "ease back to centre" after the grace window / "we can't see you"; tune the grace constant; never auto-stop. (FR-017/018/020)
+- [X] T020 [US2] In-recording drift feedback in `recording-stage.tsx`/`framing-overlay.tsx` — centred (quiet) / "ease back to centre" after the grace window / "we can't see you"; tune the grace constant; never auto-stop. (FR-017/018/020)
   - **Honest test**: drive synthetic drift through the **real** `evaluateDrift` → overlay states; a wobble `< grace` produces nothing.
-- [ ] T021 [US2] Cause-telemetry accumulation during recording (`darkFrames` / `offTargetFrames` / `totalFrames` / `detectorAvailable` → `dominantCause()`), wired into the orchestrator's telemetry sink; feeds US5. (DECISION-24)
+- [X] T021 [US2] Cause-telemetry accumulation during recording (`darkFrames` / `offTargetFrames` / `totalFrames` / `detectorAvailable` → `dominantCause()`), wired into the orchestrator's telemetry sink; feeds US5. (DECISION-24)
   - **Honest test**: Vitest — `dominantCause()` mapping incl. the **our-side default** when the detector was unavailable.
 
 **Checkpoint**: US1 + US2 — the guide is resilient and never traps the user.

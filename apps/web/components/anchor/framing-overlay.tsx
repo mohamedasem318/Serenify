@@ -67,16 +67,17 @@ export function FramingOverlay({
         <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} bottom-0 left-0 rounded-bl-[28px] border-b-2 border-l-2`} />
         <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} bottom-0 right-0 rounded-br-[28px] border-b-2 border-r-2`} />
 
-        {/* affirmative — meadow check the moment the gate clears (visual; the panel
-            announces readiness, so this stays out of the a11y tree) */}
+        {/* affirmative — a quiet meadow check INSIDE the target the moment the gate
+            clears. Visual only (the control-card status line carries the words, so
+            it can't clip); kept inside the target box so it never overflows the
+            preview. */}
         {affirming ? (
-          <div
+          <span
             aria-hidden
-            className="absolute inset-x-0 -bottom-11 mx-auto flex w-fit items-center gap-1.5 rounded-control border border-meadow/50 bg-meadow/15 px-3 py-1.5 text-sm font-medium text-ink"
+            className="absolute left-1/2 top-2.5 grid size-7 -translate-x-1/2 place-items-center rounded-full bg-meadow text-bg shadow-soft"
           >
-            <Check className="size-4 text-meadow" strokeWidth={2} />
-            You’re set
-          </div>
+            <Check className="size-4" strokeWidth={2.5} />
+          </span>
         ) : null}
 
         {/* calm drift nudge — text + foggy, announced politely to screen readers */}

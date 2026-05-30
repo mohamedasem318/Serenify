@@ -47,19 +47,22 @@ describe("FramingOverlay (FR-017 — fixed target, calm drift nudge)", () => {
     expect(screen.queryByRole("status")).toBeNull();
   });
 
-  it("affirms with meadow brackets + a calm check when the gate clears (FR-008)", () => {
+  it("affirms with meadow brackets + a visual check (no status text) when the gate clears (FR-008)", () => {
     mockMatchMedia(false);
     const { container } = render(<FramingOverlay drift="centred" showNudge={false} gateReady />);
-    // brackets turn meadow (never amber/crimson); the affirmation reads "you're set"
+    // visual confirmation only — meadow brackets + a meadow check badge…
     expect(container.querySelector(".border-meadow")).not.toBeNull();
-    expect(screen.getByText(/you.re set/i)).toBeInTheDocument();
+    expect(container.querySelector(".bg-meadow")).not.toBeNull();
+    // …never amber/crimson, and NO status text on the video (it lives in the panel)
     expect(container.innerHTML).not.toMatch(/amber|crimson/);
+    expect(screen.queryByText(/you.re set/i)).toBeNull();
   });
 
   it("does not affirm while a drift nudge is showing (the nudge wins)", () => {
     mockMatchMedia(false);
-    render(<FramingOverlay drift="ease-back" gateReady />);
-    expect(screen.queryByText(/you.re set/i)).toBeNull();
+    const { container } = render(<FramingOverlay drift="ease-back" gateReady />);
+    expect(container.querySelector(".bg-meadow")).toBeNull(); // no affirmative check
+    expect(container.querySelector(".border-meadow")).toBeNull(); // brackets stay foggy
     expect(screen.getByRole("status")).toHaveTextContent(/ease back to centre/i);
   });
 });

@@ -48,6 +48,12 @@ describe("GreenRoom (FR-005–011)", () => {
     expect(onReady).toHaveBeenCalled();
   });
 
+  it("shows the affirmative in the status line (not on the video) when the live gate clears", () => {
+    render(<GreenRoom {...base} guide="active" ready gate="ready" />);
+    // the affirmative TEXT lives here, in the same slot as the hold/nudge copy
+    expect(screen.getByText(/you.re all set/i)).toBeInTheDocument();
+  });
+
   it("never locks the user out — the unavailable fallback still allows recording (FR-011)", () => {
     render(<GreenRoom {...base} guide="unavailable" ready gate="ready" />);
     expect(screen.getByText(/no live guide — you can still record/i)).toBeInTheDocument();
