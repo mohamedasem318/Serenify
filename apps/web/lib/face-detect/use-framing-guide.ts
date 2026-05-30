@@ -89,11 +89,14 @@ export function useFramingGuide({
   const [ready, setReady] = useState(false);
   const [drift, setDrift] = useState<DriftState>("centred");
 
-  // Keep callback + phase in refs so the loop effect does not restart each render.
+  // Keep callback + phase in refs so the loop effect does not restart each render;
+  // the throttled loop reads them asynchronously, so syncing after commit is enough.
   const onSignalRef = useRef(onSignal);
-  onSignalRef.current = onSignal;
   const phaseRef = useRef(phase);
-  phaseRef.current = phase;
+  useEffect(() => {
+    onSignalRef.current = onSignal;
+    phaseRef.current = phase;
+  });
 
   useEffect(() => {
     if (!video) return;
@@ -113,8 +116,13 @@ export function useFramingGuide({
     let gateDeb = initialGateDebounce;
     let driftDeb = initialDriftDebounce;
 
+    // Deliberate reset to `loading` whenever the source <video> or detector
+    // changes, until the (re)initialised detector resolves — runs once per effect
+    // setup, not in a render loop.
+    /* eslint-disable react-hooks/set-state-in-effect */
     setGuide("loading");
     setReady(false);
+    /* eslint-enable react-hooks/set-state-in-effect */
 
     function schedule() {
       if (cancelled) return;
@@ -172,9 +180,9 @@ export function useFramingGuide({
       if (rvfcId && rvfcVideo.cancelVideoFrameCallback) rvfcVideo.cancelVideoFrameCallback(rvfcId);
       handle?.close();
     };
-    // phase intentionally excluded — it is read through phaseRef so the loop does
-    // not tear down when the recorder moves green-room → recording.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // phase + onSignal are intentionally excluded — they are read through refs
+    // (synced in a separate effect) so the loop does not tear down when the
+    // recorder moves green-room → recording.
   }, [video, createDetector]);
 
   return { guide, gate, ready, drift };

@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored, gitignored MediaPipe WASM runtime (📌 DECISION-19) — copied
+    // same-origin from the pinned dep by next.config.ts. Generated third-party
+    // glue (emscripten/GL), never our code; do not lint it.
+    "public/face-detect/**",
   ]),
 ]);
 

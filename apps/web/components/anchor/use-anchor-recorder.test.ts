@@ -1,31 +1,32 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  initialRecorderState,
+  cameraErrorKind,
   isEscapeVisible,
-  isSkipVisible,
+  makeInitialState,
   recorderReducer,
   type RecorderAction,
   type RecorderState,
 } from "./use-anchor-recorder";
 
-function run(actions: RecorderAction[], from: RecorderState = initialRecorderState): RecorderState {
+function run(actions: RecorderAction[], from: RecorderState = makeInitialState()): RecorderState {
   return actions.reduce(recorderReducer, from);
 }
 
-describe("recorderReducer", () => {
-  it("starts idle with no failures", () => {
-    expect(initialRecorderState).toEqual({
-      status: "idle",
-      failureCount: 0,
-      scrolledPastExplanation: false,
-    });
+describe("recorderReducer (📌 DECISION-21)", () => {
+  it("starts at the intro, first-time, with no failures", () => {
+    expect(makeInitialState()).toEqual({ status: "intro", mode: "first-time", failureCount: 0 });
   });
 
-  it("walks the happy path idle → success", () => {
+  it("seeds the recalibrate mode when asked (FR-053)", () => {
+    expect(makeInitialState("recalibrate").mode).toBe("recalibrate");
+  });
+
+  it("walks the happy path intro → success", () => {
     const end = run([
-      { type: "REQUEST_PERMISSION" },
+      { type: "TURN_ON_CAMERA" },
       { type: "PERMISSION_GRANTED" },
+      { type: "READY" },
       { type: "START_RECORDING" },
       { type: "RECORDING_COMPLETE" },
       { type: "UPLOAD_SUCCESS" },
@@ -34,30 +35,40 @@ describe("recorderReducer", () => {
     expect(end.failureCount).toBe(0);
   });
 
-  it("treats a denied prompt as no strike", () => {
-    const end = run([{ type: "REQUEST_PERMISSION" }, { type: "PERMISSION_DENIED" }]);
-    expect(end.status).toBe("permission-denied");
+  it("settles into the green room on permission granted (not straight to recording)", () => {
+    const end = run([{ type: "TURN_ON_CAMERA" }, { type: "PERMISSION_GRANTED" }]);
+    expect(end.status).toBe("green-room");
+  });
+
+  it("returns to the green room when the get-ready countdown is cancelled", () => {
+    const end = run([
+      { type: "TURN_ON_CAMERA" },
+      { type: "PERMISSION_GRANTED" },
+      { type: "READY" },
+      { type: "CANCEL_GET_READY" },
+    ]);
+    expect(end.status).toBe("green-room");
+  });
+
+  it("stop → Keep going resumes the recording", () => {
+    const end = run([{ type: "START_RECORDING" }, { type: "REQUEST_STOP" }, { type: "KEEP_GOING" }]);
+    expect(end.status).toBe("recording");
+  });
+
+  it("stop → Start over returns to the green room with nothing saved (FR-021–024)", () => {
+    const end = run([{ type: "START_RECORDING" }, { type: "REQUEST_STOP" }, { type: "CONFIRM_STOP" }]);
+    expect(end.status).toBe("green-room");
     expect(end.failureCount).toBe(0);
   });
 
-  it("leaves permissionBlocked false on a plain PERMISSION_DENIED (fresh deny, re-promptable)", () => {
-    const end = run([{ type: "REQUEST_PERMISSION" }, { type: "PERMISSION_DENIED" }]);
-    expect(end.permissionBlocked).toBe(false);
-  });
-
-  it("sets permissionBlocked when PERMISSION_DENIED carries blocked:true (hard block, browser will not re-prompt)", () => {
-    const end = run([{ type: "PERMISSION_DENIED", blocked: true }]);
-    expect(end.status).toBe("permission-denied");
-    expect(end.permissionBlocked).toBe(true);
-  });
-
-  it("clears permissionBlocked once permission is granted (user fixed it in browser settings)", () => {
-    const end = run(
-      [{ type: "PERMISSION_GRANTED" }],
-      { status: "permission-denied", failureCount: 0, scrolledPastExplanation: false, permissionBlocked: true },
-    );
-    expect(end.status).toBe("permission-granted");
-    expect(end.permissionBlocked).toBe(false);
+  it.each([
+    ["camera-blocked" as const],
+    ["camera-busy" as const],
+    ["camera-no-device" as const],
+  ])("routes a camera error to %s without a strike (FR-031–035)", (kind) => {
+    const end = run([{ type: "TURN_ON_CAMERA" }, { type: "CAMERA_ERROR", kind }]);
+    expect(end.status).toBe(kind);
+    expect(end.failureCount).toBe(0);
   });
 
   it("treats a transport failure as a retry, not a strike (FR-027)", () => {
@@ -73,46 +84,55 @@ describe("recorderReducer", () => {
     expect(end.errorReason).toBe("no face");
   });
 
-  it("counts only 422s when failures are interleaved with transport/permission errors", () => {
+  it("counts only 422s when failures are interleaved with transport/camera errors", () => {
     const end = run([
       { type: "EXTRACT_FAILED" },
       { type: "UPLOAD_FAILED" },
-      { type: "PERMISSION_DENIED" },
+      { type: "CAMERA_ERROR", kind: "camera-busy" },
       { type: "EXTRACT_FAILED" },
     ]);
     expect(end.failureCount).toBe(2);
   });
 
-  it("clears the error reason when re-recording", () => {
+  it("clears the 422 reason when re-recording", () => {
     const end = run([{ type: "EXTRACT_FAILED", reason: "no face" }, { type: "START_RECORDING" }]);
     expect(end.status).toBe("recording");
     expect(end.errorReason).toBeUndefined();
   });
+
+  it("preserves the mode across the whole flow", () => {
+    const end = run(
+      [{ type: "TURN_ON_CAMERA" }, { type: "PERMISSION_GRANTED" }, { type: "READY" }],
+      makeInitialState("recalibrate"),
+    );
+    expect(end.mode).toBe("recalibrate");
+  });
 });
 
-describe("isSkipVisible (FR-004 / FR-007)", () => {
-  it("is hidden on a fresh idle state", () => {
-    expect(isSkipVisible(initialRecorderState)).toBe(false);
+describe("cameraErrorKind — getUserMedia error.name → the three states (contracts §1)", () => {
+  it.each([
+    ["NotAllowedError", "camera-blocked"],
+    ["SecurityError", "camera-blocked"],
+    ["NotReadableError", "camera-busy"],
+    ["TrackStartError", "camera-busy"],
+    ["AbortError", "camera-busy"],
+    ["NotFoundError", "camera-no-device"],
+    ["OverconstrainedError", "camera-no-device"],
+    ["DevicesNotFoundError", "camera-no-device"],
+  ] as const)("maps %s → %s", (name, expected) => {
+    expect(cameraErrorKind({ name })).toBe(expected);
   });
 
-  it("appears after scrolling past the explanation", () => {
-    expect(isSkipVisible(run([{ type: "SCROLLED_PAST_EXPLANATION" }]))).toBe(true);
-  });
-
-  it("appears after the first extraction failure", () => {
-    expect(isSkipVisible(run([{ type: "EXTRACT_FAILED" }]))).toBe(true);
-  });
-
-  it("is always available in the permission-denied state, even with no scroll/failure", () => {
-    const denied = run([{ type: "REQUEST_PERMISSION" }, { type: "PERMISSION_DENIED" }]);
-    expect(denied.scrolledPastExplanation).toBe(false);
-    expect(isSkipVisible(denied)).toBe(true);
+  it("defaults an unrecognised or shapeless error to blocked", () => {
+    expect(cameraErrorKind(new Error("boom"))).toBe("camera-blocked");
+    expect(cameraErrorKind(null)).toBe("camera-blocked");
+    expect(cameraErrorKind(undefined)).toBe("camera-blocked");
   });
 });
 
 describe("isEscapeVisible (FR-027/028)", () => {
-  it("appears at exactly the third consecutive 422, not before", () => {
-    let state = initialRecorderState;
+  it("appears at exactly the third backend 422, not before", () => {
+    let state = makeInitialState();
     expect(isEscapeVisible(state)).toBe(false);
     state = run([{ type: "EXTRACT_FAILED" }], state);
     expect(isEscapeVisible(state)).toBe(false);
