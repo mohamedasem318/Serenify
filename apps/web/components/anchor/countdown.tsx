@@ -1,21 +1,6 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
-const QUERY = "(prefers-reduced-motion: reduce)";
-
-/** Track `prefers-reduced-motion` reactively (Principle VI, FR-009). */
-function usePrefersReducedMotion(): boolean {
-  return useSyncExternalStore(
-    (onChange) => {
-      const mq = window.matchMedia(QUERY);
-      mq.addEventListener("change", onChange);
-      return () => mq.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(QUERY).matches,
-    () => false, // SSR snapshot: assume motion is allowed
-  );
-}
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 const SIZE = 96;
 const STROKE = 6;
@@ -28,7 +13,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
  * with no ring/sweep. Tabular figures keep the number from reflowing each tick.
  */
 export function Countdown({ remaining, total }: { remaining: number; total: number }) {
-  const reducedMotion = usePrefersReducedMotion();
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const fraction = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
   const label = `${remaining} second${remaining === 1 ? "" : "s"} remaining`;
 

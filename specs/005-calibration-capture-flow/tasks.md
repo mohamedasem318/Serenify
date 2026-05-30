@@ -52,7 +52,7 @@ each UI task MUST satisfy it at build time, not defer it.
 **Purpose**: reduced-motion/token groundwork, then the detector assets + the CSP
 delta **before any detector call**.
 
-- [ ] T001 [P] Standardise reduced-motion on the shared `useMediaQuery("(prefers-reduced-motion: reduce)")` (`apps/web/hooks/use-media-query.ts`) and refactor `apps/web/components/anchor/countdown.tsx` off its inline `usePrefersReducedMotion`.
+- [X] T001 [P] Standardise reduced-motion on the shared `useMediaQuery("(prefers-reduced-motion: reduce)")` (`apps/web/hooks/use-media-query.ts`) and refactor `apps/web/components/anchor/countdown.tsx` off its inline `usePrefersReducedMotion`.
   - **Acceptance**: no behaviour change; the ring↔tick still flips on the media query (DECISION-27, FR-048).
   - **Honest test**: existing `apps/web/components/anchor/countdown.test.tsx` passes; add an assertion it consumes the shared hook.
   - **Docs**: —
@@ -80,7 +80,7 @@ these. **No user-story surface may begin until Phase 2 is complete.**
   - **Acceptance**: resolves within `initTimeoutMs` (~4.5 s) or returns `null`; never hangs (DECISION-19, contracts/face-detection.md §1, FR-011).
   - **Honest test**: Vitest fake-timers — the timeout path returns `null` deterministically; the loader is injectable.
   - **Docs**: `docs/DECISIONS.md` entry 19 (draft).
-- [ ] T006 [P] Pure framing logic `apps/web/lib/face-detect/framing.ts` — `toFramingSignal`, `evaluateGate`, `evaluateDrift`, the named threshold constants (`CENTRE_MAX`, `LUMA_MIN`, `SET_DEBOUNCE_MS`, `DRIFT_GRACE_MS`, …), and the grace-window debounce.
+- [X] T006 [P] Pure framing logic `apps/web/lib/face-detect/framing.ts` — `toFramingSignal`, `evaluateGate`, `evaluateDrift`, the named threshold constants (`CENTRE_MAX`, `LUMA_MIN`, `SET_DEBOUNCE_MS`, `DRIFT_GRACE_MS`, …), and the grace-window debounce.
   - **Acceptance**: forgiving gate (only no-face / badly-off-centre / too-dark hold it); a wobble `< DRIFT_GRACE_MS` produces no nudge; sustained `≥ grace` → `ease-back`/`absent`; never signals auto-stop (DECISION-19, FR-009/018/020).
   - **Honest test**: Vitest fake-clock over the **real** functions (gate forgiveness; wobble vs sustained drift; absence).
   - **Docs**: —
