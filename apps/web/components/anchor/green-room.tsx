@@ -1,0 +1,82 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+import { Lock } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import type { GateVerdict } from "@/lib/face-detect/framing";
+import type { GuideState } from "@/lib/face-detect/use-framing-guide";
+
+import { FramingOverlay } from "./framing-overlay";
+
+/**
+ * The green room (feature 005, FR-005–011): get situated before anything records.
+ * Rendered as an overlay over the orchestrator's persistent <video> preview — the
+ * fixed corner-bracket target (FramingOverlay) + a calm control panel.
+ *
+ * Three guide states, and the user is NEVER locked out (this lives in the US1
+ * slice, per analyze finding C1):
+ *  - loading → a brief "getting ready" line, "I'm ready" disabled;
+ *  - active → the soft gate drives the helper line + enables "I'm ready";
+ *  - unavailable → "no live guide — you can still record", the gate is bypassed
+ *    (the hook passes `ready`), so "I'm ready" is available (FR-011).
+ */
+
+const GATE_HELP: Record<GateVerdict, string> = {
+  ready: "You’re all set — start when you’re ready.",
+  "no-face": "We can’t see your face yet — come into view.",
+  "off-centre": "Ease into the centre of the frame.",
+  "too-dark": "A little more light on your face would help.",
+};
+
+export function GreenRoom({
+  guide,
+  gate,
+  ready,
+  devicePicker,
+  onReady,
+  onNotNow,
+}: {
+  guide: GuideState;
+  gate: GateVerdict;
+  ready: boolean;
+  devicePicker?: ReactNode;
+  onReady: () => void;
+  onNotNow: () => void;
+}) {
+  const helper =
+    guide === "loading"
+      ? "Getting your live guide ready…"
+      : guide === "unavailable"
+        ? "No live guide — you can still record."
+        : GATE_HELP[gate];
+
+  return (
+    <div className="absolute inset-0 flex flex-col">
+      <FramingOverlay showNudge={false} />
+
+      <div className="mt-auto space-y-3 rounded-t-card border-t border-border bg-surface/95 p-4 backdrop-blur-sm sm:p-5">
+        <p className="flex items-center justify-center gap-1.5 text-xs text-muted">
+          <Lock className="size-3.5" strokeWidth={1.75} aria-hidden />
+          Only you see this.
+        </p>
+
+        {devicePicker}
+
+        <p aria-live="polite" className="min-h-5 text-center text-sm text-muted">
+          {helper}
+        </p>
+
+        <div className="flex flex-col gap-2">
+          <Button onClick={onReady} disabled={!ready} className="h-12 w-full text-base">
+            I’m ready
+          </Button>
+          <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">
+            Not now
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
