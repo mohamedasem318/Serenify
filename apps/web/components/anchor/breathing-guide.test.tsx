@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BreathingOrb, BreathingPacer } from "./breathing-guide";
+import { BreathingOrb } from "./breathing-guide";
 
 function mockMatchMedia(matches: boolean) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -18,28 +18,19 @@ function mockMatchMedia(matches: boolean) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("BreathingOrb (FR-015/016 — focal graphic, not progress)", () => {
-  it("is a graphic with no words and no progress role", () => {
+describe("BreathingOrb (FR-015/016/048 — focal graphic carrying the breath pacer)", () => {
+  it("carries the stepped Breathe in / Breathe out cue ON the orb, not a progress role", () => {
     mockMatchMedia(false);
-    const { container } = render(<BreathingOrb />);
+    render(<BreathingOrb />);
     expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(container.textContent).toBe(""); // no words on the video
-    expect(container.querySelector(".rounded-full")).not.toBeNull();
-  });
-});
-
-describe("BreathingPacer (FR-015/016/048 — words in the card below)", () => {
-  it("uses a stepped Breathe in / Breathe out cue with motion (starts on the inhale)", () => {
-    mockMatchMedia(false);
-    render(<BreathingPacer />);
-    expect(screen.getByText("Breathe in")).toBeInTheDocument();
-    // the old "with the light" line is gone — the orb carries that idea now
+    expect(screen.getByText("Breathe in")).toBeInTheDocument(); // starts on the inhale
+    // the old "with the light" line is gone — the orb itself carries the idea now
     expect(screen.queryByText(/with the light|in for four/i)).toBeNull();
   });
 
-  it("uses the same stepped cue under reduced motion", () => {
+  it("uses the same stepped cue under reduced motion (static orb, label still swaps)", () => {
     mockMatchMedia(true);
-    render(<BreathingPacer />);
+    render(<BreathingOrb />);
     expect(screen.getByText("Breathe in")).toBeInTheDocument();
   });
 });

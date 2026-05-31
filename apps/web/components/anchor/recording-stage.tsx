@@ -3,18 +3,17 @@
 import { Button } from "@/components/ui/button";
 import type { DriftState } from "@/lib/face-detect/framing";
 
-import { BreathingPacer } from "./breathing-guide";
 import { RecordingTimer } from "./recording-timer";
 
 /**
  * The recording controls card (feature 005, FR-015–020) — a sibling BELOW the
  * preview in normal flow, never absolutely positioned over it (so it can't overlap
- * the preview or clip the corner brackets). Every WORD of the recording screen
- * lives here, never on the video: the breathing pacer line, the grace-gated drift
- * nudge (text, role=status, foggy), the 60-second timer (the SOLE progress
- * indicator, horizontally centred), a soft "we've got you" reassurance, and a calm
- * way to stop. The breathing orb + corner brackets stay on the preview, owned by
- * the orchestrator. At 360px the preview and this card both fit, card below.
+ * the preview or clip the corner brackets). It carries the grace-gated drift nudge
+ * (text, role=status, foggy), the 60-second timer (the SOLE progress indicator,
+ * horizontally centred), a soft "we've got you" reassurance, and a calm way to stop.
+ * The breathing orb — now carrying the "Breathe in" / "Breathe out" pacer on itself —
+ * and the corner brackets stay on the preview, owned by the orchestrator. At 360px
+ * the preview and this card both fit, card below.
  */
 
 const DRIFT_NUDGE: Record<Exclude<DriftState, "centred">, string> = {
@@ -36,7 +35,6 @@ export function RecordingStage({
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-soft sm:p-5">
       <RecordingTimer remaining={remaining} total={60} />
-      <BreathingPacer />
 
       {/* calm drift nudge — the TEXT carries the meaning (a11y: color-not-only),
           foggy never amber/crimson, announced politely; the brackets on the preview

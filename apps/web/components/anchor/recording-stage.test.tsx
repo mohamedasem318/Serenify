@@ -20,10 +20,11 @@ beforeEach(() => mockMatchMedia(false));
 afterEach(() => vi.restoreAllMocks());
 
 describe("RecordingStage (FR-015–020)", () => {
-  it("shows the breathing guide, the 60s timer, the reassurance, and a calm Stop", () => {
+  it("shows the 60s timer, the reassurance, and a calm Stop (the breath pacer now lives on the orb)", () => {
     const onStop = vi.fn();
     render(<RecordingStage remaining={45} onStop={onStop} />);
-    expect(screen.getByText(/breathe in/i)).toBeInTheDocument(); // breathing pacer (stepped cue)
+    // the "Breathe in/out" pacer moved ONTO the orb (preview) — not in this card
+    expect(screen.queryByText(/breathe (in|out)/i)).toBeNull();
     expect(screen.getByText("0:45")).toBeInTheDocument(); // sole progress timer
     expect(screen.getByRole("timer")).toBeInTheDocument();
     expect(screen.getByText(/we.ve got you/i)).toBeInTheDocument();

@@ -1179,3 +1179,22 @@ vs **white 3.39:1** (fails AA for normal text; large-text only). `meadow` is sha
 by Constitution Principle V (amendment 1.1.0), so any global flip needs a DECISIONS.md
 entry + constitution check — not made here. The temporary `/dev/button-contrast`
 route is retained for that decision and MUST be deleted once it lands.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breath pacer moved onto the orb
+
+Visual/copy relocation, no state-machine/gate/detector logic touched.
+
+- The stepped "Breathe in" (4s) / "Breathe out" (6s) label moved from the controls
+  card BELOW the preview ONTO the breathing orb, centred over its core, so attention
+  stays in one place. The duplicate label is removed from the card (which keeps the
+  timer, drift nudge, reassurance, and Stop).
+- The label is a FIXED-size text layer above the orb graphic: the breath glow scales
+  behind it while the words never scale. The orb gains a STATIC luminous core (opaque
+  pale-meadow through the centre, feathered at the rim — not a hard disc) that fully
+  backs the words even at the breath's smallest (exhale) point, so the words never
+  spill onto raw camera content.
+- Reduced motion unchanged in spirit: static orb, the label still swaps on the 4s/6s
+  cadence (instant content swap).
+- Text-vs-core contrast (ink/bg over the opaque core centre, a known backing):
+  ≈ 7.3:1 light / ≈ 10.3:1 dark. Over a real feed the seating + glow soften it; final
+  legibility is a manual smoke check.
