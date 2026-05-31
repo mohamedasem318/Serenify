@@ -18,8 +18,16 @@ const buttonVariants = cva(
         default: "bg-ink text-bg hover:opacity-90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Outlined neutral (e.g. stop-confirm "Start over"). Resting text is the
+        // inherited `ink`, which is dark in light mode and light in dark mode — both
+        // contrasty against `bg-background`. The hover fills with `accent` (foggy,
+        // LIGHT in both modes); the prior `hover:text-accent-foreground` set the text
+        // to `ink`, which in DARK mode is light → light-on-light ~1.5:1 washout (the
+        // reported bug). Light mode never needed an override (inherited ink is dark),
+        // so we only force dark text on the dark-mode hover: `dark:hover:text-bg`
+        // (~6.3:1 light / ~8.8:1 dark on the foggy hover fill — both ≥ WCAG AA).
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-background hover:bg-accent dark:hover:text-bg",
         // Secondary action with character. Outlined meadow on a
         // surface tile carries the brand accent without competing
         // with the primary's solid ink. Yields AAA contrast in both

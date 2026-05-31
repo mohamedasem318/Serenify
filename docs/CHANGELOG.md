@@ -1149,3 +1149,33 @@ button-contrast investigation (root cause is the shared `outline` variant's hove
 not the `foggy` variant — see report) and a temporary `/dev/button-contrast`
 preview route for the pending meadow ink-vs-white decision (a DECISIONS.md entry +
 constitution check, not yet made).
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — outline button dark-mode hover contrast
+
+Applies the fix the investigation above scoped. Behaviour change, dark mode only.
+
+- **Root cause (confirmed, not the `foggy` variant):** the shared shadcn `outline`
+  variant set `hover:text-accent-foreground` (= `ink`) on `hover:bg-accent`
+  (= `foggy`, which is light-toned in BOTH modes). In dark mode `ink` is light
+  (`#DCDED5`), so hover rendered light-on-light foggy — measured **~1.5:1**, far
+  below AA. The `foggy` variant itself was never affected (its hover is opacity-only
+  with dark text in both modes; measured 6.26:1 light / 8.73:1 dark).
+- **Scope:** the only production surface using `variant="outline"` is the
+  stop-confirm "Start over" button; the rest are the temporary dev route.
+- **Fix:** `outline` →
+  `border border-input bg-background hover:bg-accent dark:hover:text-bg`. Light mode
+  never needed a hover text override (the inherited `ink` is already dark there), so
+  the prior `hover:text-accent-foreground` is dropped and dark text is forced only on
+  the dark-mode hover (`dark:hover:text-bg`). No competing `hover:text-*` rule remains,
+  so it applies regardless of variant ordering.
+- **Measured (live, getComputedStyle incl. real `:hover`):** dark-mode hover
+  **1.5:1 → 8.73:1** (`#161917` on foggy `#9cbbc7`); light-mode hover 6.3:1; resting
+  unchanged (~13:1 in both modes). AA is met in every state.
+
+Deferred (no behaviour change, reported only): the §5 meadow-foreground question.
+Light-mode meadow CTA measures **ink 4.6:1** (passes AA for normal text, marginally)
+vs **white 3.39:1** (fails AA for normal text; large-text only). `meadow` is shared
+(Turn on camera / I'm ready / Back to home / Keep going) and its foreground is fixed
+by Constitution Principle V (amendment 1.1.0), so any global flip needs a DECISIONS.md
+entry + constitution check — not made here. The temporary `/dev/button-contrast`
+route is retained for that decision and MUST be deleted once it lands.
