@@ -58,7 +58,7 @@ export function SuccessState({
         </p>
       </div>
 
-      <Button onClick={onDone} className="h-12 w-full max-w-xs text-base">
+      <Button onClick={onDone} variant="meadow" className="h-12 w-full max-w-xs text-base">
         {cta}
       </Button>
     </div>

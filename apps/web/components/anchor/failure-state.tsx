@@ -59,7 +59,7 @@ export function FailureState({
           <p className="text-sm text-muted">
             Let’s pause this for now — you can set your baseline later from your account.
           </p>
-          <Button onClick={onRetry} className="h-12 w-full text-base">
+          <Button onClick={onRetry} variant="meadow" className="h-12 w-full text-base">
             Try once more
           </Button>
           <Button variant="ghost" onClick={onPause} className="h-11 w-full text-muted">
@@ -68,7 +68,7 @@ export function FailureState({
         </div>
       ) : (
         <div className="flex w-full max-w-xs flex-col gap-2">
-          <Button onClick={onRetry} className="h-12 w-full text-base">
+          <Button onClick={onRetry} variant="meadow" className="h-12 w-full text-base">
             Try again
           </Button>
           <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">

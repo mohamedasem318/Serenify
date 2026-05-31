@@ -39,7 +39,7 @@ export function StopConfirm({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-col sm:space-x-0">
-          <Button onClick={onKeepGoing} className="h-11 w-full">
+          <Button onClick={onKeepGoing} variant="meadow" className="h-11 w-full">
             Keep going
           </Button>
           {/* non-destructive: outline, never the crimson destructive variant */}

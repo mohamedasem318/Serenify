@@ -1,6 +1,6 @@
 "use client";
 
-import { CameraOff, Video, VideoOff } from "lucide-react";
+import { CameraOff, CircleHelp, Lock } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -10,23 +10,27 @@ import { Button } from "@/components/ui/button";
  * replace the single generic "camera access denied". Each names the problem AND
  * the fix, all FOGGY — never red or amber. "Try again" re-requests; "Not now"
  * defers (the orchestrator routes it by mode). Calm voice, no alarm.
+ *
+ * Icons map to the cause: blocked → a lock (it's a permission, not a fault), busy →
+ * camera-off (something else holds it), no-camera → a question (we're unsure one is
+ * there). lucide has no camera-question, so the plain question reads "which camera?"
  */
 
 export type CameraAccessKind = "blocked" | "busy" | "no-device";
 
 const CONTENT: Record<CameraAccessKind, { Icon: LucideIcon; title: string; body: string }> = {
   blocked: {
-    Icon: VideoOff,
+    Icon: Lock,
     title: "Camera’s blocked",
     body: "Your browser is blocking the camera. Re-enable it from the camera icon in your address bar, then try again.",
   },
   busy: {
-    Icon: Video,
+    Icon: CameraOff,
     title: "Camera’s in use",
     body: "Another app — often a video call or screen recorder — has the camera. Closing it frees it up, then try again.",
   },
   "no-device": {
-    Icon: CameraOff,
+    Icon: CircleHelp,
     title: "No camera found",
     body: "We couldn’t find a camera. Connect or enable one, then pick it from the selector and try again.",
   },
@@ -53,7 +57,7 @@ export function CameraAccessState({
         <p className="text-pretty text-base leading-relaxed text-muted">{body}</p>
       </div>
       <div className="flex w-full max-w-xs flex-col gap-2">
-        <Button onClick={onRetry} className="h-12 w-full text-base">
+        <Button onClick={onRetry} variant="meadow" className="h-12 w-full text-base">
           Try again
         </Button>
         <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">

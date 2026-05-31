@@ -17,11 +17,19 @@ session client. Raw video is deleted server-side immediately (Principle I).
 
 ```sh
 cd apps/api
-cp .env.example .env          # set SUPABASE_JWT_SECRET + ALLOWED_ORIGIN
+cp .env.example .env          # SUPABASE_JWT_SECRET + ALLOWED_ORIGIN (dev: http://localhost:3000)
 uv sync
-uv run uvicorn app.main:app --port 8000
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl localhost:8000/healthz
 ```
+
+> **`--host 0.0.0.0` is load-bearing.** The bare `uvicorn … --port 8000` binds
+> **loopback only** (`127.0.0.1`), so the browser can only reach the API when
+> `NEXT_PUBLIC_API_URL` is also `127.0.0.1`/`localhost`. Point it at any other host
+> (e.g. a LAN IP for device testing) and the connection is refused → the
+> calibration readiness gate (`GET /healthz`, FR-048) reports "temporarily
+> unavailable" and **recording never starts**. Binding `0.0.0.0` is harmless for
+> localhost dev and required for LAN access.
 
 The service refuses to start unless the model artifacts load and pass the
 contract check (`scaler.n_features_in_ == 2958`, `model.classes_ == [0, 1]`).
