@@ -1246,3 +1246,25 @@ Visual/copy relocation, no state-machine/gate/detector logic touched.
   after a busy state reaches a working camera once freed.
 - Live-camera recovery (busy device freed, hot-unplug, all-cameras-busy) remains a
   manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing orb redesign (lighter, calmer)
+
+The orb read as a large, bright, hard opaque disc (too heavy). Redesigned so the
+readable backing is separated from the breath and the heavy/opaque part is small:
+
+- The opaque, readable **text backing** shrinks to a small fixed area sized to back
+  the longest label ("Breathe out") with padding, **feathered edges (no hard circle)**,
+  dimmed to a calm pale sage. It does NOT scale, so the words always sit fully on it,
+  never on raw camera content.
+- The **breath** is now a separate soft, dim, translucent, fully-feathered pool of
+  light (no coin edge) — the only animated layer, gently expanding on the 4s inhale /
+  contracting on the 6s exhale (eased to 0.7↔1, gentler than before).
+- **Footprint reduced** (orb container 144/176px, glow 128/160px vs the old
+  176/208px) so the glow leaves clear space to the framing brackets (no crowding).
+  The dark seating vignette is dropped — the small opaque backing carries text
+  legibility on its own.
+- Reduced motion: glow held at a fixed mid-size; the label still swaps "Breathe in" /
+  "Breathe out" on the 4s/6s cadence (instant content swap).
+- **Text-vs-backing contrast** (ink/bg over the opaque backing centre, a known fixed
+  surface): **7.04:1 light / 9.88:1 dark** — past AA (≥ AAA). Orb appearance over a
+  real feed is a manual smoke check.
