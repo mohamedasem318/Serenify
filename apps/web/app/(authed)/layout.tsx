@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 
 import { ChatPill } from "@/components/chat-pill";
-import { DevHistoryRefresh } from "@/components/dev-history-refresh";
 import { Header } from "@/components/header/header";
 import { createClient } from "@/lib/supabase/server";
 
@@ -32,10 +31,6 @@ export default async function AuthedLayout({
 
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      {/* DEV-ONLY: re-sync the stale server tree (e.g. the calibration banner) after a
-          browser Back that dev serves from disk cache. True no-op in prod, where
-          force-dynamic already emits no-store. See DevHistoryRefresh. */}
-      <DevHistoryRefresh />
       <Header fullName={fullName} email={email} role={role} />
       <main className="flex-1 px-4 pt-6 sm:px-6 sm:pt-8">{children}</main>
       {role === "employee" && <ChatPill />}

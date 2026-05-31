@@ -1393,3 +1393,17 @@ Fix (dev-only quality-of-life), replacing the removed `BfcacheRefresh`:
 - Honest test at the seams (inject the Next router + the Navigation Timing entry): dev
   back/forward refreshes, dev normal-nav does not, **prod is a no-op even on
   back/forward**. The live Back-in-dev re-sync remains a manual smoke check.
+
+## 2026-05-31 — revert(005-calibration-capture-flow) — remove the DevHistoryRefresh dev-only banner-refresh shim
+
+The `DevHistoryRefresh` client component (added in the entry above) is removed: it only
+papered over a cosmetic DEV-ONLY issue and correlated with new dev breakage. The authed
+layout returns to its pre-shim state (no import, no render, no leftover dev-gate wiring);
+the component and its test are deleted.
+
+The **explanation above STAYS** and is unchanged: the stale-banner-after-Back is a Next
+**DEV-ONLY** artifact — `next dev` hardcodes `Cache-Control: no-cache, must-revalidate`
+and discards `no-store`, whereas a production build's `force-dynamic` `/app` emits
+`private, no-cache, no-store, max-age=0, must-revalidate` and revalidates on Back on its
+own. **Production is unaffected; this is not a prod bug and should not be re-investigated
+as one.** We are removing only the code workaround, not that finding.
