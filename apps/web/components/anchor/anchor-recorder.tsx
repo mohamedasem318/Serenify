@@ -575,9 +575,9 @@ export function AnchorRecorder({
               playsInline
               className={`absolute inset-0 h-full w-full object-cover transition-[filter] duration-700 motion-reduce:transition-none ${
                 // a gentle softening to ease self-consciousness about appearance —
-                // NOT contrast work (the orb sits on its own seating now), so kept
-                // light: just enough, no more.
-                softened ? "blur-[3px]" : "blur-0"
+                // NOT contrast work (the orb backs its own words), so kept light:
+                // just enough to soften, never fully sharp.
+                softened ? "blur-[2px]" : "blur-0"
               }`}
             />
 

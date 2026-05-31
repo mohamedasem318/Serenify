@@ -1268,3 +1268,8 @@ readable backing is separated from the breath and the heavy/opaque part is small
 - **Text-vs-backing contrast** (ink/bg over the opaque backing centre, a known fixed
   surface): **7.04:1 light / 9.88:1 dark** — past AA (≥ AAA). Orb appearance over a
   real feed is a manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — preview blur 3px → 2px
+
+The get-ready / recording preview softening is reduced from 3px to 2px — still
+softened (not fully sharp), just a lighter veil over the self-view.
