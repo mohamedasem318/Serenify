@@ -21,7 +21,7 @@ export function RecordingTimer({ remaining, total = 60 }: { remaining: number; t
     <div
       role="timer"
       aria-label={`${safeRemaining} second${safeRemaining === 1 ? "" : "s"} remaining`}
-      className="flex w-full max-w-xs flex-col items-center gap-2"
+      className="mx-auto flex w-full max-w-xs flex-col items-center gap-2"
     >
       <span className="text-sm tabular-nums text-muted">
         {mm}:{ss}

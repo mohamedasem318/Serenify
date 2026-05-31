@@ -180,6 +180,29 @@ describe("AnchorRecorder — /healthz gate before the countdown (T016, FR-056)",
     expect(spies.writeAnchor).not.toHaveBeenCalled();
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
+
+  it("recovers when the backend returns — the modal 'Try again' re-probes and advances", async () => {
+    const checkHealth = vi
+      .fn()
+      .mockResolvedValueOnce(false) // first gate check → down (blocking modal)
+      .mockResolvedValue(true); //     re-probe → healthy → advance
+    const { deps } = buildDeps({ checkHealth: checkHealth as RecorderDeps["checkHealth"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    await reachGreenRoom();
+    fireEvent.click(screen.getByRole("button", { name: /ready/i }));
+    await flush(); // → down, the blocking modal is up
+    expect(screen.getByText(/quiet moment/i)).toBeInTheDocument();
+
+    // The modal's foggy "Try again" re-probes /healthz; on success it dismisses and
+    // the get-ready countdown begins (no dismiss path left "I'm ready" live).
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    for (let i = 0; i < 6 && !screen.queryByRole("button", { name: /stop/i }); i += 1) {
+      await flush(1000);
+    }
+    expect(checkHealth).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
 });
 
 describe("AnchorRecorder — overwrite-on-success-only (FR-053 / DECISION-22)", () => {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GetReadyCountdown } from "./get-ready-countdown";
@@ -16,7 +16,7 @@ function mockMatchMedia(matches: boolean) {
   }));
 }
 
-describe("GetReadyCountdown (FR-012/014)", () => {
+describe("GetReadyCountdown (FR-012/013/014)", () => {
   beforeEach(() => {
     mockMatchMedia(false);
     vi.useFakeTimers();
@@ -26,13 +26,12 @@ describe("GetReadyCountdown (FR-012/014)", () => {
     vi.restoreAllMocks();
   });
 
-  it("counts 3 → 2 → 1 then completes — numbers only, no draining ring", () => {
+  it("counts 3 → 2 → 1 then completes — numbers only, no ring, no words on the video", () => {
     const onComplete = vi.fn();
-    const { container } = render(
-      <GetReadyCountdown from={3} onComplete={onComplete} onCancel={() => {}} />,
-    );
+    const { container } = render(<GetReadyCountdown from={3} onComplete={onComplete} />);
     expect(screen.getByText("3")).toBeInTheDocument();
     expect(container.querySelector("svg")).toBeNull(); // no draining ring (FR-012)
+    expect(container.textContent).toBe("3"); // numbers only — the words live below
 
     act(() => vi.advanceTimersByTime(1000));
     expect(screen.getByText("2")).toBeInTheDocument();
@@ -43,12 +42,5 @@ describe("GetReadyCountdown (FR-012/014)", () => {
     act(() => vi.advanceTimersByTime(1000));
     expect(onComplete).toHaveBeenCalled();
     expect(screen.queryByText("0")).toBeNull(); // never shows 0
-  });
-
-  it("offers a quiet Cancel during the countdown", () => {
-    const onCancel = vi.fn();
-    render(<GetReadyCountdown onComplete={() => {}} onCancel={onCancel} />);
-    fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
-    expect(onCancel).toHaveBeenCalled();
   });
 });

@@ -34,6 +34,7 @@ export function GreenRoom({
   guide,
   gate,
   ready,
+  serviceUnavailable = false,
   devicePicker,
   onReady,
   onNotNow,
@@ -41,19 +42,28 @@ export function GreenRoom({
   guide: GuideState;
   gate: GateVerdict;
   ready: boolean;
+  /**
+   * The `/healthz` gate found the backend down (FR-056). "I'm ready" stays disabled
+   * and the status line must NOT affirm ("You're all set"); the blocking modal —
+   * rendered by the orchestrator over this card — carries the real message.
+   */
+  serviceUnavailable?: boolean;
   devicePicker?: ReactNode;
   onReady: () => void;
   onNotNow: () => void;
 }) {
   const loading = guide === "loading";
   // Affirmative only when the live detector actively confirms the framing — never
-  // for the unavailable bypass (we don't claim "set" for a frame we can't see).
-  const affirmed = guide === "active" && gate === "ready";
-  const helper = loading
-    ? "Getting your live guide ready…"
-    : guide === "unavailable"
-      ? "No live guide — you can still record."
-      : GATE_HELP[gate];
+  // for the unavailable bypass (we don't claim "set" for a frame we can't see), and
+  // never while the backend is down (nothing is "set" if we can't record).
+  const affirmed = !serviceUnavailable && guide === "active" && gate === "ready";
+  const helper = serviceUnavailable
+    ? "Hang on a moment — checking the connection."
+    : loading
+      ? "Getting your live guide ready…"
+      : guide === "unavailable"
+        ? "No live guide — you can still record."
+        : GATE_HELP[gate];
 
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-soft sm:p-5">
@@ -80,7 +90,12 @@ export function GreenRoom({
       </p>
 
       <div className="flex flex-col gap-2">
-        <Button onClick={onReady} disabled={!ready} variant="meadow" className="h-12 w-full text-base">
+        <Button
+          onClick={onReady}
+          disabled={!ready || serviceUnavailable}
+          variant="meadow"
+          className="h-12 w-full text-base"
+        >
           I’m ready
         </Button>
         <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">

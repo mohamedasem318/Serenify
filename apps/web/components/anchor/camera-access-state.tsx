@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 /**
  * The three calm, specific camera-access states (feature 005, FR-031–035) that
  * replace the single generic "camera access denied". Each names the problem AND
- * the fix, all FOGGY — never red or amber. "Try again" re-requests; "Not now"
- * defers (the orchestrator routes it by mode). Calm voice, no alarm.
+ * the fix, all FOGGY — never red or amber. The primary "Try again" matches the
+ * screen's foggy treatment (a FOGGY-filled CTA, per the colour rule); "Not now"
+ * stays a quiet text link. The orchestrator routes "Not now" by mode. No alarm.
  *
  * Icons map to the cause: blocked → a lock (it's a permission, not a fault), busy →
  * camera-off (something else holds it), no-camera → a question (we're unsure one is
@@ -57,7 +58,7 @@ export function CameraAccessState({
         <p className="text-pretty text-base leading-relaxed text-muted">{body}</p>
       </div>
       <div className="flex w-full max-w-xs flex-col gap-2">
-        <Button onClick={onRetry} variant="meadow" className="h-12 w-full text-base">
+        <Button onClick={onRetry} variant="foggy" className="h-12 w-full text-base">
           Try again
         </Button>
         <Button variant="ghost" onClick={onNotNow} className="h-11 w-full text-muted">

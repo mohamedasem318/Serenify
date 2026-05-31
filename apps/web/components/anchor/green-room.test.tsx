@@ -60,6 +60,14 @@ describe("GreenRoom (FR-005–011)", () => {
     expect(screen.getByRole("button", { name: /i.m ready/i })).toBeEnabled();
   });
 
+  it("blocks 'I'm ready' and drops the affirmative when the backend is unavailable (FR-056)", () => {
+    // Even with a cleared live gate, a down backend must keep the button disabled
+    // and must NOT say "you're all set" — the blocking modal carries the message.
+    render(<GreenRoom {...base} guide="active" ready gate="ready" serviceUnavailable />);
+    expect(screen.getByRole("button", { name: /i.m ready/i })).toBeDisabled();
+    expect(screen.queryByText(/you.re all set/i)).toBeNull();
+  });
+
   it("offers a calm 'Not now' exit and shows the device picker", () => {
     const onNotNow = vi.fn();
     render(
