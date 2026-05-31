@@ -1113,3 +1113,39 @@ inference is feature 005's decision, not 004's.
   sum-to-9.0 invariant in `test_pipeline_fixtures.py` did not catch the drift.
 
 Rationale: see DECISIONS.md 2026-05-29 (LBP-TOP ROI resize interpolation).
+
+## 2026-05-31 — polish(004-onboarding-video-anchor) — recording-overlay visibility pass
+
+Post-ship polish on the onboarding capture overlay (the redesigned 005 surfaces
+mounted at the onboarding first-time capture), surfaced during smoke review. No
+state-machine, gate, or detector logic changed — visual/copy only.
+
+- **Breathing orb seating**: the orb was composited onto the bare webcam feed, so
+  its visibility depended on what the camera saw (invisible on dark/busy frames).
+  It now sits on its own soft, feathered dark radial vignette (a local seating, not
+  a hard opaque disc) with a luminous pale-meadow glow. Measured orb-vs-seating
+  contrast ≈ 4:1 over a worst-case bright feed and ≈ 10:1 over a dark feed (WCAG
+  non-text bar is 3:1). Pale sage is an intentional calmer choice over a pure-white
+  core that would measure higher but read clinical.
+- **Preview blur** reduced 6px → 3px. It was never doing contrast work (the orb now
+  carries its own backing); kept only as a gentle softening of self-consciousness.
+- **Breathing pacer copy**: "Breathe with the light — in for four, out for six."
+  → plain stepped "Breathe in" (4s) / "Breathe out" (6s). The animated path now
+  uses the same stepped swap the reduced-motion path already used; the orb carries
+  the "with the light" idea visually.
+- **Framing brackets** made legible: centred shows STEADY meadow brackets (was
+  faint white); off-centre BLINKS in foggy (was a too-faint foggy). Two colours
+  only — no third alarm hue (red is constitution-forbidden on affective surfaces;
+  amber is wrong for a calming screen). Each bracket carries a soft dark edge halo
+  so the stroke survives on bright and dark feeds. No checkmark on the recording
+  screen — it stays exclusive to the green-room affirmative. Reduced motion drops
+  the blink, keeping the foggy hue (the card text below still carries the words).
+
+Live-feed appearance (orb seating over a real feed, bracket visibility, blur level)
+is a manual smoke check — it can't be asserted headless without a camera.
+
+Not in this entry (investigation/preview only, no behaviour change): a dark-mode
+button-contrast investigation (root cause is the shared `outline` variant's hover,
+not the `foggy` variant — see report) and a temporary `/dev/button-contrast`
+preview route for the pending meadow ink-vs-white decision (a DECISIONS.md entry +
+constitution check, not yet made).
