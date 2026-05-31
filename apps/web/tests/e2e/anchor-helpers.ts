@@ -85,10 +85,30 @@ export async function installAnchorMocks(page: Page) {
         const canvas = document.createElement("canvas");
         canvas.width = 64;
         canvas.height = 64;
-        canvas.getContext("2d");
+        const ctx = canvas.getContext("2d");
+        // Paint the fake feed bright so the on-device luma read clears the soft gate's
+        // too-dark floor (LUMA_MIN). With the injected detector reporting a centred
+        // face, the green-room gate resolves to "ready". A SINGLE fill isn't reliably
+        // carried into captureStream's frames, so repaint on every rAF — that keeps
+        // the captured frames non-black (and the breathing motion is irrelevant here).
+        const paint = () => {
+          if (ctx) {
+            ctx.fillStyle = "#9aa0a6";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }
+        };
+        paint();
         const capture = (canvas as HTMLCanvasElement & { captureStream?: (fps?: number) => MediaStream })
           .captureStream;
-        if (typeof capture === "function") return capture.call(canvas, 5);
+        if (typeof capture === "function") {
+          const stream = capture.call(canvas, 5);
+          const tick = () => {
+            paint();
+            requestAnimationFrame(tick);
+          };
+          requestAnimationFrame(tick);
+          return stream;
+        }
       } catch {
         /* fall through */
       }
@@ -161,6 +181,51 @@ export async function installAnchorMocks(page: Page) {
   });
 }
 
+/**
+ * Inject a deterministic on-device detector (📌 DECISION-26 e2e seam, read by
+ * `lib/face-detect/detector.ts`). `detect()` always reports a centred, well-sized,
+ * high-confidence face, so the REAL `useFramingGuide` loop + the REAL framing gate
+ * resolve to "ready" without a real face — the soft gate clears and "I'm ready"
+ * enables. The framing pipeline runs ACTIVE (frame reads, luma, gate/drift) yet
+ * transmits nothing, which is exactly what the egress proof asserts. Absent this,
+ * the real BlazeFace would see no face on the synthetic feed and hold the gate.
+ */
+export async function installActiveDetector(page: Page) {
+  await page.addInitScript(() => {
+    (window as unknown as { __anchorE2EDetector__?: unknown }).__anchorE2EDetector__ = async () => ({
+      // cx/cy = 0.5 → dead-centre (≤ CENTRE_MAX); h = 0.5 → within SIZE bounds;
+      // score 0.95 ≥ SCORE_MIN. Combined with the bright feed → gate "ready".
+      detect: () => ({ cx: 0.5, cy: 0.5, w: 0.4, h: 0.5, score: 0.95 }),
+      close: () => {},
+    });
+  });
+}
+
+/**
+ * Make getUserMedia reject with a specific DOMException-like `error.name`, so the
+ * orchestrator's real error→state mapping routes to one of the three calm
+ * camera-access states (FR-031–035). Installs AFTER `installAnchorMocks` (overrides
+ * its getUserMedia on the same fake mediaDevices). `enumerateDevices` still works so
+ * the device picker mounts.
+ */
+export async function installCameraError(page: Page, errorName: string) {
+  await page.addInitScript((name: string) => {
+    const reject = () => Promise.reject(Object.assign(new Error("camera error"), { name }));
+    const apply = () => {
+      try {
+        const md = navigator.mediaDevices as unknown as { getUserMedia?: unknown };
+        if (md) md.getUserMedia = reject;
+      } catch {
+        /* ignore */
+      }
+    };
+    apply();
+    // installAnchorMocks redefines navigator.mediaDevices via a getter that returns a
+    // fresh object; re-apply on the next tick so this override wins.
+    setTimeout(apply, 0);
+  }, errorName);
+}
+
 /** Sign in via the login form and land on the onboarding name step (null full_name). */
 export async function signInToOnboarding(
   page: Page,
@@ -176,36 +241,36 @@ export async function signInToOnboarding(
 }
 
 /**
- * Start a recording, confirm it began (the countdown is visible), then click
- * through the sticky success view. The recorder auto-stops at 60s, uploads
- * (intercepted), writes the vector, and shows a user-dismissible "You're all set"
- * view; clicking "Continue to dashboard" navigates to /app — the caller asserts
- * that with a generous timeout.
- *
- * Uses real time (the recorder's 60s setInterval), NOT page.clock: install()
- * freezes timers in a way that stalls the post-success Next router navigation,
- * and resume() doesn't reliably recover it. Real time is slower but correct.
+ * Drive the 005 capture flow from the intro through to success, then click its
+ * "Back to …" CTA, in REAL time (the recorder's own 60s setInterval — page.clock
+ * stalls the post-success Next navigation, the 004 finding). Assumes the recorder is
+ * mounted (intro visible) and `installActiveDetector` ran so the soft gate clears.
+ * The caller asserts the landing (first-time → /app, recalibrate → /app/account).
  */
 export async function recordAnchor(page: Page) {
-  const start = page.getByRole("button", { name: "Start recording" });
-  await expect(start).toBeVisible({ timeout: 30_000 });
-  const timer = page.getByRole("timer");
-  // The click can race React hydration on a freshly (hard-)loaded page — the
-  // button is in the DOM before its onClick attaches, so a single click is
-  // silently lost. Retry until the recording actually begins (countdown shows).
-  await expect(async () => {
-    if (!(await timer.isVisible())) {
-      await start.click({ timeout: 2_000 });
-    }
-    await expect(timer).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 20_000 });
+  // intro → green room
+  await page.getByRole("button", { name: "Turn on camera" }).click();
 
-  // Success no longer auto-redirects (Mohamed 2026-05-28): the recorder shows a
-  // sticky "You're all set" view. Click through to /app; the broadcast that
-  // refreshes sibling tabs (SC-008) already fired when the vector was written.
-  const continueButton = page.getByRole("button", { name: "Continue to dashboard" });
-  await expect(continueButton).toBeVisible({ timeout: RECORD_AND_LAND_TIMEOUT });
-  await continueButton.click();
+  // the soft gate clears once the injected detector reports a centred, lit face.
+  const ready = page.getByRole("button", { name: /ready/i });
+  await expect(ready).toBeEnabled({ timeout: 30_000 });
+
+  // a click can race React hydration on a freshly (hard-)loaded page — retry until
+  // the recording begins. "I'm ready" → /healthz ok → 3·2·1 (~3s) → the timer.
+  const timer = page.getByRole("timer");
+  await expect(async () => {
+    if (await timer.isVisible()) return;
+    if (await ready.isVisible().catch(() => false)) {
+      await ready.click({ timeout: 2_000 }).catch(() => {});
+    }
+    await expect(timer).toBeVisible({ timeout: 8_000 });
+  }).toPass({ timeout: 30_000 });
+
+  // auto-stops at 60s → uploads the single clip (intercepted) → writes → success.
+  await expect(
+    page.getByRole("heading", { name: /your baseline is (set|updated)/i }),
+  ).toBeVisible({ timeout: RECORD_AND_LAND_TIMEOUT });
+  await page.getByRole("button", { name: /back to (home|account)/i }).click();
 }
 
 /** Wall-clock budget for a recording: 60s capture + upload + cold /app compile. */
@@ -238,6 +303,29 @@ export async function createCalibratableEmployee(fullName = "Calibrate Test") {
   const { error } = await admin
     .from("profiles")
     .update({ full_name: fullName })
+    .eq("id", emp.id);
+  if (error) throw error;
+  return emp;
+}
+
+/**
+ * Confirmed employee WITH a stored baseline — the anchor columns are written via the
+ * service role (the same canned all-zero (2958,) vector the /anchor mock returns), so
+ * has_anchor is true: /app shows no banner, and /app/calibrate?mode=recalibrate enters
+ * recalibrate mode (copy "update", exit /app/account). Used by the recalibrate path
+ * without paying a second real 60s recording to seed the prior baseline.
+ */
+export async function createCalibratedEmployee(fullName = "Recalibrate Test") {
+  const emp = await createCalibratableEmployee(fullName);
+  const admin = createAdminClient();
+  const hex = Buffer.alloc(2958 * 4).toString("hex"); // bytea of zeros → non-null anchor
+  const { error } = await admin
+    .from("profiles")
+    .update({
+      anchor_vector: `\\x${hex}`,
+      anchor_captured_at: new Date().toISOString(),
+      anchor_model_version: MODEL_VERSION,
+    })
     .eq("id", emp.id);
   if (error) throw error;
   return emp;

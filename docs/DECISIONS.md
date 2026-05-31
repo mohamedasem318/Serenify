@@ -2202,3 +2202,34 @@ camera → the preference is null, expected the resolved id) and passes after; s
 cases assert the don't-clobber guard and that a still-present remembered device is
 left untouched. The prior "writes nothing" test was reconciled to assert the real
 invariant (a *selection* is never persisted; the mount default is).
+
+## 2026-05-31 — DECISION (005): e2e detector injection seam + the FR-050 egress proof (T031)
+
+**Status**: Accepted (feature 005, T031).
+
+**Decision**: `lib/face-detect/detector.ts::createFaceDetector` reads an optional
+`window.__anchorE2EDetector__` factory *first* and, when present, returns it instead
+of loading the real WASM. **No application code ever sets it** — it is written only by
+a Playwright `addInitScript` (`installActiveDetector`) — so it is inert in production
+and guarded by presence. This is the DECISION-26 "inject the detector" seam at the
+e2e layer: it lets the **real** `useFramingGuide` loop + the **real** framing gate run
+against a deterministic centred-face detector, so the soft gate clears without a real
+face (BlazeFace sees none in a headless browser) and the flow reaches the full
+recording. The fake feed is painted bright each rAF so the on-device luma read clears
+the too-dark floor.
+
+**Why it earns its keep**: it is what makes the **NON-NEGOTIABLE** FR-050/SC-014
+egress proof (`anchor-egress.spec.ts`) possible as an *active-pipeline* assertion —
+Playwright intercepts every request across BOTH the green room (framing loop running)
+and the full 60 s recording and proves **zero** video/frame bytes egress except the
+single final encoded clip POSTed to `/anchor` on success (verified passing on
+chromium). Without the seam, the only deterministic CI option is the
+detector-unavailable bypass, which would never exercise the framing pipeline active.
+
+**Scope**: the three stale 004 e2e specs (`anchor-onboarding`, `anchor-health-precheck`,
+`anchor-skip`), which were `test.skip(true, "…re-author under T031")`, are removed and
+re-authored into the 005 consolidation (`anchor-flow`, `anchor-camera-access`,
+`anchor-banner`, plus the re-authored `anchor-cross-tab`). Genuinely device/browser-
+dependent behaviour (real webcam, real OS prompts, the real detector clearing the gate
+on a real face, the weak-device unavailable fallback) is **deferred to smoke-tests.md**
+with an explicit note — not faked green. No backend/DB/seed change.

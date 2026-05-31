@@ -120,6 +120,18 @@ export async function createFaceDetector(
   opts: CreateDetectorOptions = {},
 ): Promise<DetectorHandle | null> {
   if (typeof window === "undefined" || typeof WebAssembly === "undefined") return null;
+  // e2e seam (📌 DECISION-26): a Playwright test may install a deterministic detector
+  // factory on the window so the REAL framing loop + gate/drift logic run against it
+  // (a real face never appears in a headless browser). NEVER set by any app code, so
+  // this is inert in production. It is what lets T031's egress proof run the framing
+  // pipeline ACTIVE across the green room and the full recording while asserting it
+  // transmits nothing.
+  const injected = (
+    window as unknown as {
+      __anchorE2EDetector__?: (o?: CreateDetectorOptions) => Promise<DetectorHandle | null>;
+    }
+  ).__anchorE2EDetector__;
+  if (typeof injected === "function") return injected(opts);
   const initTimeoutMs = opts.initTimeoutMs ?? DEFAULT_INIT_TIMEOUT_MS;
   try {
     const detector = await Promise.race([createUnderlying(), rejectAfter(initTimeoutMs, opts.signal)]);

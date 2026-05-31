@@ -10,6 +10,26 @@ are pre-anchored and skip the flow).
 **How to record**: mark each row Pass / Fail / N-A with the date, tester, device,
 browser, and a note on any failure. Mohamed signs off the table before merge.
 
+**What the automated e2e already covers vs. what these checks defer (T031).** The
+Playwright suite (`anchor-egress`, `anchor-flow`, `anchor-camera-access`,
+`anchor-banner`, `anchor-cross-tab`) runs the CI-runnable paths with boundary seams —
+including the **NON-NEGOTIABLE FR-050 egress proof** (`anchor-egress.spec.ts`:
+zero video bytes leave the device across the green room *and* the full 60 s recording;
+the only video egress is the single final `/anchor` clip POST), the happy +
+recalibrate paths, the three camera-access states (via injected `getUserMedia`
+rejections), and the banner + cross-tab lifecycle. These manual checks deliberately
+cover only what CI **cannot honestly run** and are **deferred here, not mocked green**:
+
+- **Real WASM detector clearing the soft gate on a real face (§1).** The e2e clears
+  the gate via an *injected* deterministic detector (real BlazeFace sees no face in a
+  headless browser); a real camera + real face clearing the real gate is §1.
+- **Real OS camera-permission prompts and real device states (§2).** The e2e drives
+  `error.name` rejections to assert the *mapping*; the real Blocked/Busy/No-camera
+  conditions with actual prompts/hardware are §2.
+- **The detector-unavailable fallback on real/weak hardware (§3)**, **real
+  cross-browser `MediaRecorder`/webcam (§1)**, and **reduced-motion / light-dark
+  perception (§5, §6)** — none are honestly runnable in CI.
+
 Setup: backend `uv run uvicorn app.main:app --port 8000` (so `/healthz` is up);
 web `npm run dev`. Force the detector-unavailable fallback by temporarily renaming
 `apps/web/public/face-detect/` (or the dev `?noguide=1` override if wired).
