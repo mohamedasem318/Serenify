@@ -1198,3 +1198,24 @@ Visual/copy relocation, no state-machine/gate/detector logic touched.
 - Text-vs-core contrast (ink/bg over the opaque core centre, a known backing):
   ≈ 7.3:1 light / ≈ 10.3:1 dark. Over a real feed the seating + glow soften it; final
   legibility is a manual smoke check.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — green-room camera switch re-acquires the preview (Bug 1)
+
+- **Root cause:** the device picker's `onChange` only stored the chosen `deviceId` in
+  a ref that was consumed on the NEXT `getUserMedia` (e.g. "Try again"). Switching the
+  camera in the green room never re-acquired the live stream, so the preview kept the
+  old device — and the camera-busy / no-camera states were unreachable by picking a
+  bad device.
+- **Fix:** on a device change while a preview is live, acquire the new stream first,
+  stop the old tracks, and re-point the SAME persistent `<video>` at it (the framing
+  guide/gate key on the node, not the stream, so they re-bind to the new feed on the
+  next frame — no remount). The picker's initial echo of the already-active camera is
+  a no-op (guarded by comparing the selection to the live track's `deviceId`, so no
+  flicker). A busy/disconnected/blocked pick is routed to the matching camera-failure
+  state, making those cases reachable for manual testing.
+- **Honest test (seam = `getUserMedia` + `enumerateDevices`):** switching to a second
+  enumerated camera re-calls `getUserMedia` with `{ deviceId: { exact } }` for the new
+  device; a newly-picked busy device surfaces the camera-in-use state. The real
+  re-acquire/guard logic runs.
+- Live-feed outcomes (the preview actually showing the new camera, the busy/no-camera
+  states over a real device) remain manual smoke checks.

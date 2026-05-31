@@ -205,6 +205,9 @@ export function AnchorRecorder({
   const [failureCause, setFailureCause] = useState<FailureCause>("our-side");
 
   const streamRef = useRef<MediaStream | null>(null);
+  // The live <video> node, mirrored in a ref so the device-switch path can re-point
+  // it at a new stream without depending on render-state (keeps callbacks stable).
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MinimalRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const discardRef = useRef(false);
@@ -249,6 +252,7 @@ export function AnchorRecorder({
   // and surface the element as state so the framing-guide effect re-runs when the
   // preview mounts/unmounts.
   const attachVideo = useCallback((node: HTMLVideoElement | null) => {
+    videoElRef.current = node;
     if (node && streamRef.current) node.srcObject = streamRef.current;
     setVideoEl(node);
   }, []);
@@ -457,12 +461,49 @@ export function AnchorRecorder({
     dispatch({ type: "CONFIRM_STOP" });
   }, [clearTimer, dispatch]);
 
-  // Stable identity so DevicePicker's enumerate effect does not re-run each render.
-  // (Live camera-swap in the green room + the FR-045 default-persistence fix are
-  // T029; here the chosen device applies to the next acquisition.)
-  const handleDeviceChange = useCallback((id: string | undefined) => {
-    deviceIdRef.current = id;
-  }, []);
+  // Re-acquire the camera for a newly chosen device WITHOUT leaving the green room:
+  // acquire the new stream FIRST, then stop the old tracks, then point the SAME
+  // persistent <video> at it. The framing guide/gate read that element (its effect
+  // keys on the node, not the stream), so they re-bind to the new feed on the next
+  // frame — no remount, no flicker. A busy/disconnected/blocked pick is routed to the
+  // matching camera-failure state, so those cases are reachable for testing (Bug 1).
+  const reacquire = useCallback(
+    async (id: string | undefined) => {
+      let next: MediaStream;
+      try {
+        next = await deps.getUserMedia({
+          video: id ? { deviceId: { exact: id } } : true,
+          audio: false,
+        });
+      } catch (error) {
+        stopStream(); // the picked device is unavailable — drop the feed, surface the state
+        const after = await deps.probeCameraPermission();
+        const kind: CameraErrorStatus = after === "denied" ? "camera-blocked" : cameraErrorKind(error);
+        dispatch({ type: "CAMERA_ERROR", kind });
+        return;
+      }
+      stopStream(); // success — release the OLD device, then swap in the new stream
+      streamRef.current = next;
+      if (videoElRef.current) videoElRef.current.srcObject = next;
+    },
+    [deps, stopStream, dispatch],
+  );
+
+  // Stable identity (reads refs + stable callbacks) so DevicePicker's enumerate effect
+  // does not re-run each render. The selection also seeds the next acquisition (e.g.
+  // "Try again"); when a live preview is already up it re-acquires immediately so the
+  // preview follows the choice — skipping the picker's initial echo of the active
+  // camera (which would only flicker).
+  const handleDeviceChange = useCallback(
+    (id: string | undefined) => {
+      deviceIdRef.current = id;
+      if (!id || !streamRef.current) return;
+      const current = streamRef.current.getVideoTracks()[0]?.getSettings().deviceId;
+      if (id === current) return; // already streaming this device — no-op
+      void reacquire(id);
+    },
+    [reacquire],
+  );
 
   // Sharp only in the green room; eases to a deliberate softened (never fully
   // sharp, never fully blurred) for get-ready + recording (FR-013).

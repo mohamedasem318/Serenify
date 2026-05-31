@@ -26,6 +26,45 @@ function makeFakeStream(): MediaStream {
   return stream;
 }
 
+// A fake stream that reports which device it came from (via getVideoTracks +
+// getSettings), so the orchestrator's "already on this device?" guard can compare
+// the live stream against the picker selection (Bug 1).
+function makeFakeStreamWithDevice(deviceId: string): MediaStream {
+  const track = { stop: () => {}, getSettings: () => ({ deviceId }) } as unknown as MediaStreamTrack;
+  const RealMediaStream = (globalThis as { MediaStream?: typeof MediaStream }).MediaStream;
+  const stream: MediaStream = RealMediaStream ? new RealMediaStream() : ({} as MediaStream);
+  const api = stream as unknown as {
+    getTracks: () => MediaStreamTrack[];
+    getVideoTracks: () => MediaStreamTrack[];
+  };
+  api.getTracks = () => [track];
+  api.getVideoTracks = () => [track];
+  return stream;
+}
+
+const TWO_CAMERAS = [
+  { deviceId: "cam-A", kind: "videoinput", label: "Front", groupId: "g", toJSON: () => ({}) },
+  { deviceId: "cam-B", kind: "videoinput", label: "Back", groupId: "g", toJSON: () => ({}) },
+] as unknown as MediaDeviceInfo[];
+
+/** Mock the device-enumeration I/O seam, run `body`, and always restore navigator. */
+async function withCameras(
+  enumerate: () => Promise<MediaDeviceInfo[]>,
+  body: () => Promise<void>,
+): Promise<void> {
+  const original = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { enumerateDevices: enumerate },
+  });
+  try {
+    await body();
+  } finally {
+    if (original) Object.defineProperty(navigator, "mediaDevices", original);
+    else Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "mediaDevices");
+  }
+}
+
 // A MediaRecorder that succeeds: stop() emits one chunk, then fires onstop.
 class FakeRecorder {
   state = "inactive";
@@ -235,5 +274,69 @@ describe("AnchorRecorder — getUserMedia error → the three calm states (FR-03
 
     expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
     expect(spies.writeAnchor).not.toHaveBeenCalled();
+  });
+});
+
+describe("AnchorRecorder — switching camera re-acquires the live preview (Bug 1)", () => {
+  it("stops the old tracks and re-calls getUserMedia with the new deviceId", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        // getUserMedia returns a stream tagged with the device it was asked for
+        // (video:true → the default, cam-A), so the live-device guard can compare.
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) =>
+          Promise.resolve(
+            makeFakeStreamWithDevice(
+              (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact ?? "cam-A",
+            ),
+          ),
+        );
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+        await reachGreenRoom();
+        // initial acquire only — the picker's echo of the ACTIVE camera is a no-op
+        expect(getUserMedia).toHaveBeenCalledTimes(1);
+
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
+
+        // the preview follows the choice: re-acquired with the NEW deviceId
+        expect(getUserMedia).toHaveBeenCalledTimes(2);
+        expect(getUserMedia.mock.calls[1]?.[0]).toMatchObject({
+          video: { deviceId: { exact: "cam-B" } },
+        });
+      },
+    );
+  });
+
+  it("surfaces the camera-in-use state when the newly picked device is busy", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+          const id = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+          if (id === "cam-B") {
+            return Promise.reject(Object.assign(new Error("busy"), { name: "NotReadableError" }));
+          }
+          return Promise.resolve(makeFakeStreamWithDevice(id ?? "cam-A"));
+        });
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+        await reachGreenRoom();
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
+
+        // picking a busy device makes the busy state reachable (Bug 1 secondary goal)
+        expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+      },
+    );
   });
 });
