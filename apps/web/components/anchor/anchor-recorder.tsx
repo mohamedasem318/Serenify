@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BackendDownModal } from "./backend-down-modal";
 import { BreathingOrb } from "./breathing-guide";
 import { CameraAccessState, type CameraAccessKind } from "./camera-access-state";
+import { readRememberedCamera, rememberCamera } from "./device-memory";
 import { DevicePicker } from "./device-picker";
 import { FailureState, type FailureCause } from "./failure-state";
 import { FramingOverlay } from "./framing-overlay";
@@ -373,6 +374,12 @@ export function AnchorRecorder({
   // --- Turn on camera (and "Try again" everywhere): acquire the stream, settle in
   // the green room. Never auto-records — the user starts the minute from the green
   // room. A camera error routes to one of the three calm states (not a strike).
+  //
+  // The remembered / last-chosen camera is PREFERRED, but never a dead-end: if it's
+  // unavailable (busy / unplugged), we fall back to the system default so a working
+  // camera is always reachable from any entry — and only a device that actually
+  // starts is remembered, which repairs a remembered-but-dead key. This is what
+  // breaks the busy-camera lockout (a busy device can no longer trap every entry).
   const startCapture = useCallback(async () => {
     setHealthGate("ok");
     dispatch({ type: "TURN_ON_CAMERA" });
@@ -381,20 +388,40 @@ export function AnchorRecorder({
       dispatch({ type: "CAMERA_ERROR", kind: "camera-blocked" });
       return;
     }
-    try {
-      const stream = await deps.getUserMedia({
-        video: deviceIdRef.current ? { deviceId: { exact: deviceIdRef.current } } : true,
-        audio: false, // mic stays off — audio is feature 013
-      });
-      streamRef.current = stream;
-      dispatch({ type: "PERMISSION_GRANTED" }); // → green-room; attachVideo wires srcObject on mount
-    } catch (error) {
-      // Re-probe so a hard block (browser downgrades prompt → denied on "Block")
-      // surfaces as camera-blocked rather than the raw error name.
-      const after = await deps.probeCameraPermission();
-      const kind: CameraErrorStatus = after === "denied" ? "camera-blocked" : cameraErrorKind(error);
-      dispatch({ type: "CAMERA_ERROR", kind });
+
+    const preferred = deviceIdRef.current ?? readRememberedCamera();
+    // Try the preferred device first (the user may have freed it), then fall back to
+    // the default. With no preference, just the default.
+    const attempts: MediaStreamConstraints["video"][] = preferred
+      ? [{ deviceId: { exact: preferred } }, true]
+      : [true];
+
+    let stream: MediaStream | null = null;
+    let lastError: unknown;
+    for (const video of attempts) {
+      try {
+        stream = await deps.getUserMedia({ video, audio: false }); // mic off — audio is feature 013
+        break;
+      } catch (error) {
+        lastError = error;
+      }
     }
+
+    if (!stream) {
+      // Every available camera failed (incl. the default). Re-probe so a hard block
+      // (browser downgrades prompt → denied on "Block") surfaces as camera-blocked
+      // rather than the raw error name; otherwise it's a genuine busy / no-device.
+      const after = await deps.probeCameraPermission();
+      const kind: CameraErrorStatus = after === "denied" ? "camera-blocked" : cameraErrorKind(lastError);
+      dispatch({ type: "CAMERA_ERROR", kind });
+      return;
+    }
+
+    streamRef.current = stream;
+    const acquiredId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+    deviceIdRef.current = acquiredId ?? undefined;
+    rememberCamera(acquiredId); // persist ONLY a device that actually started (repairs a dead key)
+    dispatch({ type: "PERMISSION_GRANTED" }); // → green-room; attachVideo wires srcObject on mount
   }, [deps, dispatch]);
 
   // --- The /healthz gate (T016 / FR-056): pressing "I'm ready" checks the backend
@@ -484,6 +511,9 @@ export function AnchorRecorder({
       }
       stopStream(); // success — release the OLD device, then swap in the new stream
       streamRef.current = next;
+      const acquiredId = next.getVideoTracks()[0]?.getSettings().deviceId ?? id;
+      deviceIdRef.current = acquiredId;
+      rememberCamera(acquiredId); // the user successfully switched here — remember it
       if (videoElRef.current) videoElRef.current.srcObject = next;
     },
     [deps, stopStream, dispatch],

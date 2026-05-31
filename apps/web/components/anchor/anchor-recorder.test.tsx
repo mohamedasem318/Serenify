@@ -22,7 +22,12 @@ function makeFakeStream(): MediaStream {
   const stream: MediaStream = RealMediaStream
     ? new RealMediaStream()
     : ({ getTracks: () => [] } as unknown as MediaStream);
-  (stream as unknown as { getTracks?: () => MediaStreamTrack[] }).getTracks = () => [];
+  const api = stream as unknown as {
+    getTracks: () => MediaStreamTrack[];
+    getVideoTracks: () => MediaStreamTrack[];
+  };
+  api.getTracks = () => [];
+  api.getVideoTracks = () => []; // no tagged device → orchestrator remembers nothing
   return stream;
 }
 
@@ -338,5 +343,89 @@ describe("AnchorRecorder — switching camera re-acquires the live preview (Bug 
         expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
       },
     );
+  });
+});
+
+describe("AnchorRecorder — busy/dead camera never locks the user out (Task 1)", () => {
+  const CAMERA_KEY = "serenify-anchor-camera";
+
+  it("falls back to the default when the remembered camera is busy on entry — no lockout", async () => {
+    localStorage.setItem(CAMERA_KEY, "cam-A"); // remembered from a prior session, now busy
+    const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });
+    const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+      const exact = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      if (exact === "cam-A") return Promise.reject(busy); // the remembered device is busy
+      return Promise.resolve(makeFakeStreamWithDevice(exact ?? "cam-default")); // default works
+    });
+    const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+    await flush();
+    await flush();
+    await flush();
+
+    // recovered into the green room on the default — NOT stuck on the busy screen
+    expect(screen.queryByRole("heading", { name: /camera.s in use/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /ready/i })).toBeInTheDocument();
+    // tried the remembered device, then fell back to the default
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    // the dead key is repaired to the device that actually started
+    expect(localStorage.getItem(CAMERA_KEY)).not.toBe("cam-A");
+  });
+
+  it("never remembers a device that failed to acquire (a busy pick keeps the prior good camera)", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+          const exact = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+          if (exact === "cam-B") {
+            return Promise.reject(Object.assign(new Error("busy"), { name: "NotReadableError" }));
+          }
+          return Promise.resolve(makeFakeStreamWithDevice(exact ?? "cam-A"));
+        });
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+        await reachGreenRoom(); // acquires the default (cam-A) → cam-A remembered
+        expect(localStorage.getItem(CAMERA_KEY)).toBe("cam-A");
+
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
+
+        // cam-B failed → it must NOT be remembered; cam-A (the last good one) stays
+        expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+        expect(localStorage.getItem(CAMERA_KEY)).toBe("cam-A");
+      },
+    );
+  });
+
+  it("'Try again' after a busy state reaches a working camera once it's freed (not re-trapped)", async () => {
+    const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });
+    let freed = false;
+    const getUserMedia = vi.fn().mockImplementation(() =>
+      freed ? Promise.resolve(makeFakeStreamWithDevice("cam-A")) : Promise.reject(busy),
+    );
+    const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+    await flush();
+    await flush();
+    expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+
+    // the user frees the camera, then taps Try again → reaches the green room
+    freed = true;
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    await flush();
+    await flush();
+    await flush();
+
+    expect(screen.queryByRole("heading", { name: /camera.s in use/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /ready/i })).toBeInTheDocument();
   });
 });

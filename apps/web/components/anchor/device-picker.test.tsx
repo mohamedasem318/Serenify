@@ -60,14 +60,18 @@ describe("DevicePicker", () => {
     await waitFor(() => expect(onChange).toHaveBeenCalledWith("cam1"));
   });
 
-  it("persists the chosen device to localStorage", async () => {
+  it("does NOT persist on selection — only a successfully-started device is remembered", async () => {
     mockDevices([
       { deviceId: "cam1", kind: "videoinput", label: "FaceTime HD" },
       { deviceId: "cam2", kind: "videoinput", label: "USB Cam" },
     ]);
-    render(<DevicePicker permissionGranted onChange={() => {}} />);
+    const onChange = vi.fn();
+    render(<DevicePicker permissionGranted onChange={onChange} />);
     await waitFor(() => screen.getByRole("option", { name: "USB Cam" }));
     fireEvent.change(screen.getByLabelText("Camera"), { target: { value: "cam2" } });
-    expect(localStorage.getItem(STORAGE_KEY)).toBe("cam2");
+    // the picker reports the choice but writes nothing — a busy/dead pick must never
+    // be remembered, so persistence happens only after getUserMedia succeeds (orchestrator)
+    expect(onChange).toHaveBeenCalledWith("cam2");
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull();
   });
 });

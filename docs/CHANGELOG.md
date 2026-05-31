@@ -1219,3 +1219,30 @@ Visual/copy relocation, no state-machine/gate/detector logic touched.
   re-acquire/guard logic runs.
 - Live-feed outcomes (the preview actually showing the new camera, the busy/no-camera
   states over a real device) remain manual smoke checks.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — busy/dead camera no longer locks the user out (Task 1)
+
+- **Root cause (three compounding):** (1) the device picker wrote the chosen
+  `deviceId` to localStorage on *selection*, before it was known to acquire — so a
+  busy/unplugged pick got remembered; (2) entry acquired the remembered device with
+  `{ deviceId: { exact } }` and **no fallback**, dead-ending on the camera-busy state;
+  (3) "Try again" re-acquired the same remembered device. Net effect: once a camera
+  was busy, every subsequent entry landed on (and was trapped on) the camera-in-use
+  screen.
+- **Fix — device memory now means "last camera that SUCCESSFULLY started":**
+  - Persistence moved out of the picker (`device-memory.ts`); the picker only reports
+    the selection. A device is remembered **only after `getUserMedia` succeeds**, so a
+    failed pick is never stored.
+  - Entry/"Try again" prefer the remembered device but **fall back to the system
+    default** when it's unavailable (busy/unplugged), then persist whatever actually
+    started — which **repairs a remembered-but-dead key**. A working camera is always
+    reachable; from the green room the picker lets the user switch.
+  - Only when *every* available camera (incl. the default) fails does it show the
+    genuine busy/no-device state, where "Try again" still recovers once the camera is
+    freed.
+- **Honest tests (seam = `getUserMedia` + `enumerateDevices`; real recovery logic):**
+  remembered-busy-on-entry recovers to the green room (no dead-end) and repairs the
+  key; a busy pick is never remembered (the prior good camera stays); "Try again"
+  after a busy state reaches a working camera once freed.
+- Live-camera recovery (busy device freed, hot-unplug, all-cameras-busy) remains a
+  manual smoke check.
