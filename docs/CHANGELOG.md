@@ -1298,3 +1298,35 @@ softened (not fully sharp), just a lighter veil over the self-view.
   a fresh load does not; the listener is removed on unmount. Real-browser Back-restore
   behaviour (and whether the toggle needs a scoped `location.reload()` escalation if
   it proves genuinely de-hydrated rather than stale) is a manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing-pool contrast: light frost seat
+
+The prior orb redesign dropped the orb's seating, leaving the animated breathing
+**pool** (a dim, translucent pale-meadow fill) with nothing to contrast against — over
+real webcam content it washed out and the breath motion was barely visible. The fixed
+text backing was unaffected (it's opaque); only the animated pool was invisible.
+
+- **Re-introduced a backing for the pool as a localized "light frost"** behind the orb
+  — NOT the old dark-vignette seating (which read heavy/clinical), and not a hard
+  opaque disc. A `backdrop-filter` (stronger LOCAL `blur(8px)` on top of the preview's
+  2px, plus `saturate(0.85)` + `brightness(1.04)`) flattens whatever the camera sees
+  into a smooth, low-detail, gently-lit surface, so the dim pool reads on ANY feed
+  (bright / dark / busy). A faint flat white veil (`rgba(255,255,255,0.1)`) is a
+  guaranteed light floor over a dark feed — and the graceful fallback if
+  `backdrop-filter` is unavailable on the live `<video>`. A radial `mask`
+  (`#000 0%→42%`, fading to `transparent 84%`) feathers blur + veil **together to
+  nothing at the rim — no disc edge anywhere** — and keeps the frost LOCAL to the orb;
+  the rest of the preview stays at 2px.
+- **Footprint kept modest** (frost matches the pool box, 128/160px) so it doesn't crowd
+  the framing brackets. The frost is **static** — only the pool still breathes (4s
+  inhale / 6s exhale).
+- **Reduced motion** (repo `useMediaQuery`, not framer): unchanged — pool held at a
+  fixed mid-size, the label still swaps "Breathe in" / "Breathe out" on the 4s/6s
+  cadence (instant content swap). The frost is static in both paths.
+- Text-vs-backing contrast is unchanged (the opaque text backing was untouched):
+  ≈ 7.04:1 light / 9.88:1 dark.
+- **De-risked headless** via a static harness reproducing the exact layers over busy /
+  colour / dark-room / flat-bright synthetic feeds (Chromium screenshot): confirmed the
+  rim feathers with no hard edge, the frost flattens busy detail, and the pool reads
+  over varied backgrounds. The orb's appearance and tuning **over a real camera feed**
+  (lighting, skin tones, motion perceptibility) remains a **manual smoke check**.

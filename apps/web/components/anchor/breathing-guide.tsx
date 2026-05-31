@@ -16,6 +16,16 @@ import { useMediaQuery } from "@/hooks/use-media-query";
  * The readable backing is kept SEPARATE from the breath so the heavy/opaque part
  * stays small and calm (the earlier single opaque core read as a large, bright,
  * hard disc). Layers, back to front:
+ *  - FROST — a localized "light frost" SEAT for the pool, so the dim pool never
+ *    depends on what the camera sees (bright face, dark room, busy background). A
+ *    stronger LOCAL backdrop blur (on top of the preview's 2px) flattens the feed
+ *    into a smooth, low-detail surface; a gentle desaturate + slight lift keep it a
+ *    calm NEUTRAL light — deliberately NOT a dark vignette (the earlier dark seating
+ *    read heavy/clinical). A faint flat white veil is a guaranteed light floor over a
+ *    dark feed (and the light-scrim fallback if backdrop-filter is unavailable). A
+ *    radial MASK feathers the whole thing to nothing at the rim — no disc edge — and
+ *    keeps it LOCAL to the orb; the rest of the preview stays at 2px. Static (only
+ *    the pool breathes).
  *  - ORB_GLOW — a soft, dim, translucent, feathered pool of light (no hard edge, no
  *    "coin"): the ONLY animated layer, gently expanding on the 4s inhale and
  *    contracting on the 6s exhale. Kept small so it leaves clear space to the framing
@@ -32,6 +42,17 @@ import { useMediaQuery } from "@/hooks/use-media-query";
  */
 
 const PHASE_LABEL = { in: "Breathe in", out: "Breathe out" } as const;
+
+// FROST — the pool's light seat. A stronger LOCAL blur flattens the live feed into a
+// smooth, low-detail surface so the dim pool reads on ANY feed (bright/dark/busy);
+// saturate↓ mutes a colourful background so it doesn't fight the meadow; brightness↑
+// is a gentle neutral lift (a frost lightens — never a dark vignette). The flat white
+// VEIL is a guaranteed light floor over a dark feed AND the graceful fallback if
+// backdrop-filter is unavailable. The MASK feathers blur + veil together to nothing
+// at the rim (no disc edge) and keeps it local to the orb.
+const FROST_FILTER = "blur(8px) saturate(0.85) brightness(1.04)";
+const FROST_VEIL = "rgba(255, 255, 255, 0.1)"; // flat; the mask shapes & feathers it
+const FROST_MASK = "radial-gradient(circle, #000 0%, #000 42%, transparent 84%)";
 
 // Soft, dim, translucent pool — feathered fully to transparent at the rim (no edge).
 const ORB_GLOW =
@@ -81,6 +102,22 @@ export function BreathingOrb() {
 
   return (
     <div className="relative grid size-36 place-items-center sm:size-44">
+      {/* frost seat — a localized, fully-feathered light frost (stronger LOCAL blur +
+          gentle neutral lift) so the dim pool has a consistent low-detail surface to
+          read against on ANY feed. Static (only the pool breathes); no hard edge; the
+          rest of the preview stays at 2px. */}
+      <div
+        aria-hidden
+        className="absolute size-32 rounded-full sm:size-40"
+        style={{
+          background: FROST_VEIL,
+          backdropFilter: FROST_FILTER,
+          WebkitBackdropFilter: FROST_FILTER,
+          maskImage: FROST_MASK,
+          WebkitMaskImage: FROST_MASK,
+        }}
+      />
+
       {/* the breath — a soft, dim pool that gently expands (inhale) / contracts
           (exhale); the only animated layer. Held at a fixed mid-size under reduced
           motion. Kept small so it leaves clear space to the framing brackets. */}
