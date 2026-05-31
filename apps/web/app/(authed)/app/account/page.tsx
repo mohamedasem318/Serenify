@@ -6,6 +6,7 @@ import { PrivacyPlaceholder } from "@/components/account/privacy-placeholder";
 import { ProfileSection } from "@/components/account/profile-section";
 import { SecuritySection } from "@/components/account/security-section";
 import { SignOutSection } from "@/components/account/sign-out-section";
+import { BaselineSection } from "@/components/anchor/baseline-section";
 import { Separator } from "@/components/ui/separator";
 import { createClient } from "@/lib/supabase/server";
 
@@ -23,12 +24,24 @@ export default async function AccountPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name")
+    .select("full_name, role")
     .eq("id", user.id)
-    .maybeSingle<{ full_name: string | null }>();
+    .maybeSingle<{ full_name: string | null; role: "employee" | "team_lead" | "admin" }>();
 
   const initialFullName = profile?.full_name ?? "";
   const email = user.email ?? "";
+
+  // The calm-baseline section is an employee-only concept (only employees have an
+  // anchor flow — Principle I). team_lead / admin have no baseline, so the section
+  // is omitted entirely rather than shown empty. Whether-set comes from the
+  // scope-guarded has_anchor(auth.uid()) boolean — never a date (📌 DECISION-23 /
+  // FR-041). Conservative on null/error: treat as not-set (the safe, additive copy).
+  const isEmployee = profile?.role === "employee";
+  let hasAnchor = false;
+  if (isEmployee) {
+    const { data } = await supabase.rpc("has_anchor", { target_user: user.id });
+    hasAnchor = data === true;
+  }
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-10 py-8 sm:py-12">
@@ -44,6 +57,12 @@ export default async function AccountPage() {
       <ProfileSection initialFullName={initialFullName} email={email} />
       <Separator />
       <SecuritySection />
+      {isEmployee && (
+        <>
+          <Separator />
+          <BaselineSection hasAnchor={hasAnchor} />
+        </>
+      )}
       <Separator />
       <PrivacyPlaceholder />
       <Separator />
