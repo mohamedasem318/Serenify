@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
 import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
-import { Button } from "@/components/ui/button";
 import {
   accumulate,
   dominantCause,
@@ -16,6 +15,8 @@ import type { FramingSignal } from "@/lib/face-detect/framing";
 import { useFramingGuide } from "@/lib/face-detect/use-framing-guide";
 import { createClient } from "@/lib/supabase/client";
 
+import { BackendDownModal } from "./backend-down-modal";
+import { BreathingOrb } from "./breathing-guide";
 import { CameraAccessState, type CameraAccessKind } from "./camera-access-state";
 import { DevicePicker } from "./device-picker";
 import { FailureState, type FailureCause } from "./failure-state";
@@ -198,6 +199,9 @@ export function AnchorRecorder({
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
   const [remaining, setRemaining] = useState(RECORDING_SECONDS);
   const [healthGate, setHealthGate] = useState<"ok" | "checking" | "down">("ok");
+  // A re-probe from the blocking modal: keep `healthGate` at "down" (so the modal
+  // stays up, not flickering closed) and track the in-flight probe separately.
+  const [rechecking, setRechecking] = useState(false);
   const [failureCause, setFailureCause] = useState<FailureCause>("our-side");
 
   const streamRef = useRef<MediaStream | null>(null);
@@ -390,24 +394,38 @@ export function AnchorRecorder({
   }, [deps, dispatch]);
 
   // --- The /healthz gate (T016 / FR-056): pressing "I'm ready" checks the backend
-  // and only a healthy one advances to the countdown. A down backend shows the calm
-  // gate copy and blocks — never a full minute recorded into a dead backend.
-  const handleReady = useCallback(async () => {
-    if (gatingRef.current) return;
-    gatingRef.current = true;
-    setHealthGate("checking");
-    try {
-      const ok = await deps.checkHealth();
-      if (!ok) {
-        setHealthGate("down");
-        return;
+  // and only a healthy one advances to the countdown. A down backend raises the
+  // blocking modal and never starts the countdown — never a full minute recorded
+  // into a dead backend. `fromModal` re-probes without closing the modal.
+  const runHealthCheck = useCallback(
+    async (fromModal: boolean) => {
+      if (gatingRef.current) return;
+      gatingRef.current = true;
+      if (fromModal) setRechecking(true);
+      else setHealthGate("checking");
+      try {
+        const ok = await deps.checkHealth();
+        if (!ok) {
+          setHealthGate("down"); // raise / hold the blocking modal
+          return;
+        }
+        setHealthGate("ok");
+        dispatch({ type: "READY" }); // → get-ready (3·2·1)
+      } finally {
+        gatingRef.current = false;
+        setRechecking(false);
       }
-      setHealthGate("ok");
-      dispatch({ type: "READY" }); // → get-ready (3·2·1)
-    } finally {
-      gatingRef.current = false;
-    }
-  }, [deps, dispatch]);
+    },
+    [deps, dispatch],
+  );
+
+  const handleReady = useCallback(() => {
+    void runHealthCheck(false);
+  }, [runHealthCheck]);
+
+  const handleModalRetry = useCallback(() => {
+    void runHealthCheck(true);
+  }, [runHealthCheck]);
 
   const handleCancelGetReady = useCallback(() => {
     dispatch({ type: "CANCEL_GET_READY" });
@@ -450,6 +468,13 @@ export function AnchorRecorder({
   // sharp, never fully blurred) for get-ready + recording (FR-013).
   const softened = inStage && status !== "green-room";
 
+  // The green-room affirmative: ONE signal drives both the on-preview halo (meadow
+  // brackets + glow + check) and the enabled "I'm ready", so they always coexist
+  // (FR-008 — the enabled state can't clobber the halo). It stays off on the
+  // detector-unavailable bypass (we don't confirm a frame we can't see) and while
+  // the backend is down — both intentional, not a hidden halo.
+  const affirmed = guide === "active" && ready && healthGate !== "down";
+
   return (
     <section className="space-y-6">
       {status === "intro" && <Intro mode={mode} onTurnOnCamera={startCapture} />}
@@ -463,80 +488,109 @@ export function AnchorRecorder({
       )}
 
       {inStage && (
-        <div className={`mx-auto w-full ${status === "green-room" ? "max-w-lg" : "max-w-md"}`}>
-          {/* PREVIEW — the full live frame (16:9, NO portrait crop) in the green
-              room; the fixed portrait target + soft spotlight are an OVERLAY, never
-              a crop. Eases to a softened, taller frame once we focus
-              (get-ready → recording). */}
-          <div
-            className={`relative w-full overflow-hidden rounded-card bg-ink/5 transition-[aspect-ratio] duration-500 motion-reduce:transition-none ${
-              status === "green-room" ? "aspect-video" : "aspect-[3/4]"
-            }`}
-          >
+        <div className="mx-auto w-full max-w-lg">
+          {/* PREVIEW — ONE element, ONE shape (natural 16:9) across green room →
+              get-ready → recording (it never changes shape or size between stages).
+              The portrait framing is the corner brackets + the dimming OUTSIDE them,
+              never a crop or a nested video. GRAPHICS ONLY sit on the video — the
+              brackets, the countdown numeral, the breathing orb, the "you're set"
+              check/glow; every WORD lives in the card below. Sharp in the green
+              room, eased to softened for get-ready + recording (FR-013). */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-card bg-ink/5">
             <video
               ref={attachVideo}
               autoPlay
               muted
               playsInline
               className={`absolute inset-0 h-full w-full object-cover transition-[filter] duration-700 motion-reduce:transition-none ${
-                softened ? "blur-[6px]" : "blur-0"
+                // a gentle softening to ease self-consciousness about appearance —
+                // NOT contrast work (the orb sits on its own seating now), so kept
+                // light: just enough, no more.
+                softened ? "blur-[3px]" : "blur-0"
               }`}
             />
 
-            {/* fixed portrait target + spotlight, overlaid on the full preview. In
-                the green room the brackets turn meadow the moment the gate clears. */}
+            {/* green room — fixed target + spotlight; brackets turn meadow + the
+                check/glow appears the moment the gate clears (coexists with the
+                enabled "I'm ready" — both driven by `affirmed`). */}
             {status === "green-room" && (
-              // affirm only when the live detector actively confirms framing — not
-              // for the unavailable bypass (where `ready` is true to avoid lockout).
-              <FramingOverlay drift="centred" showNudge={false} gateReady={guide === "active" && ready} />
+              <FramingOverlay drift="centred" showNudge={false} gateReady={affirmed} />
             )}
 
+            {/* get-ready — the same fixed target + the numbers-only countdown as a
+                focal graphic over the blurred preview. No words on the video. */}
             {status === "get-ready" && (
               <>
                 <FramingOverlay drift="centred" showNudge={false} />
-                <div className="absolute inset-0 grid place-items-center bg-ink/10 p-4">
-                  <GetReadyCountdown onComplete={beginRecording} onCancel={handleCancelGetReady} />
+                <div className="absolute inset-0 grid place-items-center bg-ink/10">
+                  <GetReadyCountdown onComplete={beginRecording} />
                 </div>
               </>
+            )}
+
+            {/* recording — the persistent brackets (with the grace-gated drift
+                bracket treatment) + the breathing orb as the focal graphic. The
+                words (timer, pacer, nudge text, reassurance, Stop) are in the card
+                below, never over the video. */}
+            {(status === "recording" || status === "stop-confirming") && (
+              <>
+                <FramingOverlay drift={drift} />
+                <div className="absolute inset-0 grid place-items-center">
+                  <BreathingOrb />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* CONTROLS / WORDS — a calm region BELOW the preview for every stage,
+              never absolutely positioned over it (so it can't clip the brackets). */}
+          <div className="mt-4">
+            {status === "green-room" && (
+              <GreenRoom
+                guide={guide}
+                gate={gate}
+                // disabled while down (modal blocks) or mid-check; enabled only when
+                // the soft gate has cleared AND the backend is reachable.
+                ready={healthGate === "down" ? false : ready && healthGate !== "checking"}
+                serviceUnavailable={healthGate === "down"}
+                devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
+                onReady={handleReady}
+                onNotNow={onSkip}
+              />
+            )}
+
+            {status === "get-ready" && (
+              // the single calm line + the quiet Cancel — below the preview, off the
+              // video. Cancel returns to the green room (CANCEL_GET_READY).
+              <div className="flex flex-col items-center gap-3 text-center">
+                <p className="text-sm text-muted">Beginning now — settle in.</p>
+                <button
+                  type="button"
+                  onClick={handleCancelGetReady}
+                  className="inline-flex min-h-11 items-center rounded-control px-4 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+                >
+                  Cancel
+                </button>
+              </div>
             )}
 
             {(status === "recording" || status === "stop-confirming") && (
               <RecordingStage remaining={remaining} drift={drift} onStop={handleRequestStop} />
             )}
-
-            {/* FR-056 health gate — calm, foggy, blocks the countdown, keeps the preview. */}
-            {status === "green-room" && healthGate === "down" && (
-              <div className="absolute inset-0 grid place-items-center bg-ink/45 p-4 backdrop-blur-sm">
-                <div className="w-full max-w-xs space-y-4 rounded-card border border-foggy/40 bg-surface p-5 text-center">
-                  <div className="space-y-1.5">
-                    <h2 className="font-display text-xl text-ink">{COPY.unavailableHeading}</h2>
-                    <p className="text-sm leading-relaxed text-muted">{COPY.unavailableBody}</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button onClick={handleReady} className="h-11 w-full">
-                      Try again
-                    </Button>
-                    <Button variant="ghost" onClick={onSkip} className="h-11 w-full text-muted">
-                      Not now
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* CONTROLS — in a calm panel BELOW the preview, never over the brackets. */}
+          {/* FR-056 health gate — a TRUE blocking modal (backdrop, focus-trapped,
+              controls beneath inert, no dismiss path) holding the user in the green
+              room. "Try again" re-probes; "Not now" exits per mode. */}
           {status === "green-room" && (
-            <div className="mt-4">
-              <GreenRoom
-                guide={guide}
-                gate={gate}
-                ready={ready && healthGate !== "checking"}
-                devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
-                onReady={handleReady}
-                onNotNow={onSkip}
-              />
-            </div>
+            <BackendDownModal
+              open={healthGate === "down"}
+              heading={COPY.unavailableHeading}
+              body={COPY.unavailableBody}
+              checking={rechecking}
+              onRetry={handleModalRetry}
+              onNotNow={onSkip}
+            />
           )}
         </div>
       )}
