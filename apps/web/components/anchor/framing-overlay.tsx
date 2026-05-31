@@ -9,22 +9,26 @@ import type { DriftState } from "@/lib/face-detect/framing";
  * The fixed, centred portrait target (feature 005, FR-005/006/017). A steady guide
  * the user settles INTO — NOT a box that tracks or hugs the face. The area outside
  * the target is gently dimmed (a soft spotlight) so the brackets stay legible over
- * any background and the eye is drawn to centre; the face area stays sharp. Reused
- * by the green room and the recording stage.
+ * any background and the eye is drawn to centre. Reused by the green room and the
+ * recording stage; GRAPHICS ONLY — no words on the video.
  *
- * Calm discipline (Principle V): brackets are quiet/receding when centred and shift
- * to FOGGY (never amber/crimson) for a drift nudge — and the nudge always carries
- * TEXT, never colour alone (a11y: color-not-only). Reduced motion (FR-048) removes
- * the transition/pulse, conveying the same state instantly.
+ * Two-colour signal, kept obvious (no third alarm colour — red/amber are wrong for a
+ * calming screen; foggy reads as a gentle "needs attention"):
+ *  - Recording (showNudge): centred → STEADY meadow brackets (good); off-centre →
+ *    BLINKING foggy brackets (ease back). No checkmark here — the check is exclusive
+ *    to the green-room affirmative.
+ *  - Green room / get-ready (showNudge=false): quiet white brackets, turning to the
+ *    meadow affirmative (brackets + glow + check) the moment the soft gate clears.
+ *
+ * The brackets are thin lines over arbitrary video, so each carries a soft dark edge
+ * halo (`drop-shadow`) — a legibility treatment, not surface elevation — so the
+ * coloured stroke survives on both a bright and a dark feed. Reduced motion (FR-048)
+ * drops the blink, conveying the off-centre state by hue alone (the card text below
+ * still carries the words, so meaning is never colour-only).
  */
 
-const NUDGE: Record<Exclude<DriftState, "centred">, string> = {
-  "ease-back": "Ease back to centre",
-  absent: "We can’t see you — ease back into view",
-};
-
 const BRACKET_BASE =
-  "pointer-events-none absolute h-7 w-7 transition-colors duration-300 motion-reduce:transition-none";
+  "pointer-events-none absolute h-7 w-7 transition-colors duration-300 motion-reduce:transition-none drop-shadow-[0_0_2px_rgba(0,0,0,0.7)]";
 
 export function FramingOverlay({
   drift = "centred",
@@ -36,24 +40,36 @@ export function FramingOverlay({
   showNudge?: boolean;
   /**
    * Green-room affirmative (FR-008): face present + centred + lit. The fixed target
-   * turns MEADOW with a gentle glow + a quiet check, so the user gets positive
-   * feedback before "I'm ready". Visual only — the control panel announces it.
+   * turns MEADOW with a gentle glow + a quiet check. Visual only — the control panel
+   * announces it. Ignored in recording (drift-feedback) mode.
    */
   gateReady?: boolean;
 }) {
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
-  const nudging = showNudge && drift !== "centred";
-  const message = nudging ? NUDGE[drift as Exclude<DriftState, "centred">] : null;
-  const affirming = gateReady && !nudging;
 
-  // quiet/receding when centred; foggy when nudging; meadow when the gate clears.
-  const bracketColor = nudging ? "border-foggy" : affirming ? "border-meadow" : "border-white/70";
-  const pulse = nudging && !reducedMotion ? "animate-pulse" : "";
+  // Recording uses the brackets to signal framing; the green room / get-ready keep
+  // them quiet (showNudge=false) and lean on the gate affirmative instead.
+  const driftFeedback = showNudge;
+  const off = driftFeedback && drift !== "centred";
+  const centredGood = driftFeedback && drift === "centred";
+  const affirming = !driftFeedback && gateReady;
 
-  // The big spread box-shadow dims everything OUTSIDE the target (sharp face); a
-  // soft meadow halo is layered on once the user is set — calm, not loud.
+  // foggy = come back; meadow = good (centred while recording, or gate cleared in the
+  // green room); white = quiet/neutral before any signal.
+  const bracketColor = off
+    ? "border-foggy"
+    : centredGood || affirming
+      ? "border-meadow"
+      : "border-white/70";
+  const blink = off && !reducedMotion ? "animate-pulse" : "";
+
+  // The green-room affirmative layers a meadow halo (outer + inset, so it survives
+  // the preview's overflow-hidden). Recording-centred keeps just the steady meadow
+  // brackets — no halo competing with the breathing orb.
   const spotlight = "0 0 0 100vmax rgba(20, 24, 22, 0.46)";
-  const boxShadow = affirming ? `${spotlight}, 0 0 26px 1px var(--color-meadow)` : spotlight;
+  const boxShadow = affirming
+    ? `${spotlight}, 0 0 26px 1px var(--color-meadow), inset 0 0 22px 0 var(--color-meadow)`
+    : spotlight;
 
   return (
     <div className="pointer-events-none absolute inset-0 grid place-items-center">
@@ -61,16 +77,14 @@ export function FramingOverlay({
         className="relative aspect-[3/4] h-[78%] max-h-full rounded-[28px] transition-shadow duration-500 motion-reduce:transition-none"
         style={{ boxShadow }}
       >
-        {/* four corner brackets */}
-        <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} left-0 top-0 rounded-tl-[28px] border-l-2 border-t-2`} />
-        <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} right-0 top-0 rounded-tr-[28px] border-r-2 border-t-2`} />
-        <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} bottom-0 left-0 rounded-bl-[28px] border-b-2 border-l-2`} />
-        <span className={`${BRACKET_BASE} ${bracketColor} ${pulse} bottom-0 right-0 rounded-br-[28px] border-b-2 border-r-2`} />
+        {/* four corner brackets — hue carries the state, the dark edge halo keeps the
+            stroke visible on any feed */}
+        <span className={`${BRACKET_BASE} ${bracketColor} ${blink} left-0 top-0 rounded-tl-[28px] border-l-2 border-t-2`} />
+        <span className={`${BRACKET_BASE} ${bracketColor} ${blink} right-0 top-0 rounded-tr-[28px] border-r-2 border-t-2`} />
+        <span className={`${BRACKET_BASE} ${bracketColor} ${blink} bottom-0 left-0 rounded-bl-[28px] border-b-2 border-l-2`} />
+        <span className={`${BRACKET_BASE} ${bracketColor} ${blink} bottom-0 right-0 rounded-br-[28px] border-b-2 border-r-2`} />
 
-        {/* affirmative — a quiet meadow check INSIDE the target the moment the gate
-            clears. Visual only (the control-card status line carries the words, so
-            it can't clip); kept inside the target box so it never overflows the
-            preview. */}
+        {/* affirmative check — green room ONLY (never on the recording screen) */}
         {affirming ? (
           <span
             aria-hidden
@@ -78,17 +92,6 @@ export function FramingOverlay({
           >
             <Check className="size-4" strokeWidth={2.5} />
           </span>
-        ) : null}
-
-        {/* calm drift nudge — text + foggy, announced politely to screen readers */}
-        {message ? (
-          <div
-            role="status"
-            aria-live="polite"
-            className="absolute inset-x-0 -bottom-12 mx-auto flex w-fit items-center gap-2 rounded-control border border-foggy/40 bg-foggy/15 px-3 py-1.5 text-sm text-ink backdrop-blur-0 motion-safe:transition-opacity"
-          >
-            {message}
-          </div>
         ) : null}
       </div>
     </div>
