@@ -2081,3 +2081,59 @@ is not extraction-derived and is unaffected.)
 **Revisit if**: production gains a separate extraction/pipeline-version field — then
 feature-space changes like this should invalidate stored anchors via that field
 rather than by manual re-capture (backlog item; not addressed in this hotfix).
+
+## 2026-05-31 — DECISION-22 (005 draft): recalibrate via `?mode=recalibrate`; overwrite-on-success-only; no DB change
+
+**Status**: Draft (feature 005 — consolidated with entries 19–28 at T033).
+
+**Decision**: The account "Set a new baseline" entry launches the *same* capture
+flow in recalibrate mode through a **full-document navigation** —
+`<a href="/app/calibrate?mode=recalibrate">`, never a `<Link>`/router transition —
+so the per-route `camera=(self)` Permissions-Policy applies (DECISION-16, FR-055).
+`calibrate/page.tsx` reads `searchParams.mode` and, in recalibrate, **suppresses the
+`has_anchor`→`/app` redirect** (the ST-17 guard) so a calibrated user is not bounced
+out of their own replacement. The recorder runs with `mode="recalibrate"`: copy
+nudges "set"→"update" (success: "Your baseline is updated") and both exits
+hard-navigate to **`/app/account`** (first-time exits stay `/app`). The reconciliation
+and the exit map are a pure module (`lib/anchor/calibrate-mode.ts` —
+`resolveCalibrateMode`/`calibrateExit`) so the decision is unit-tested directly.
+
+**Clarification #3 (hardening)**: `mode` is reconciled against the *real*
+`has_anchor`. A stray `?mode=recalibrate` for a user with **no** baseline falls back
+to first-time semantics (copy "set", exit `/app`) — the URL alone never manufactures
+a recalibration. Conservative on a null/error `has_anchor`: treated as
+not-calibrated, so a transient RPC failure neither redirects nor spuriously
+recalibrates.
+
+**Overwrite-on-success-only**: the existing client write path (decode `vector_b64` →
+bytea → `UPDATE` the owner's `profiles` row) already runs **only** after a successful
+extraction, so stop / processing-failure / "Not now" / "Maybe later" naturally leave
+the prior baseline untouched. The write is the same single in-place `UPDATE` for both
+first-time and recalibrate — **no baseline history, no new table, no migration** (the
+DECISION-12 UPDATE whitelist already permits the owner to overwrite their anchor
+columns). An honest test injects the Supabase client and asserts `.update()` fires
+exactly once on success and **never** on any abort/defer
+(`anchor-recorder.write-gating.test.tsx`).
+
+## 2026-05-31 — DECISION-23 (005 draft): account "Your calm baseline" is whether-set-only; capture date NOT surfaced
+
+**Status**: Draft (feature 005 — consolidated with entries 19–28 at T033).
+
+**Decision**: The account "Your calm baseline" section surfaces **only whether** a
+baseline is set (from the scope-guarded `has_anchor(auth.uid())` boolean) plus the
+"Set a new baseline" action. It does **not** surface the capture date or any
+timestamp (FR-041), and it renders only for **employees** (team_lead/admin have no
+anchor flow — Principle I).
+
+**Why**: the date column was deliberately hidden from everyone — including the
+owner's own read — in DECISION-12, to deny managers a calibration-timing pressure
+signal. Surfacing even the owner's own date would need a new self-scoped
+SECURITY DEFINER read, a DB surface this redesign does not require; the spec defaults
+to whether-set-only (FR-041). A self-scoped date read is a clean future addition when
+feature 006's inference read path lands. The section never exposes another user's
+state or date.
+
+**Voice (FR-040)**: the copy talks about the baseline itself and must not imply that
+live stress monitoring or check-ins are already running; calm, no exclamation marks.
+Enforced by an RTL assertion over the rendered section text
+(`baseline-section.test.tsx`).
