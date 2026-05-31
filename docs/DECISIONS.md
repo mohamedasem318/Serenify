@@ -2171,3 +2171,34 @@ constitution amendment. Spec FR-043 and the T028 task line are aligned to read f
 (`text-ink` ~6.8:1 light, `dark:text-bg` ~9:1 dark on the foggy fill); a white/ink
 fill on the foggy wash would not, which is the practical reason the shared
 `variant="foggy"` exists rather than a hand-rolled fill.
+
+## 2026-05-31 — DECISION-25 (005 draft): device-memory — re-persist the resolved default on a cleared store
+
+**Status**: Draft (feature 005, T029 — consolidated with entries 19–28 at T033).
+
+**Decision**: `device-picker.tsx`'s mount effect now (re-)writes the remembered-camera
+preference when the store is **empty/cleared** and a real default camera resolves
+(`if (!stored && next) rememberCamera(next)`), so a cleared preference recovers for
+the session rather than silently staying empty (FR-045). The write is guarded on
+`!stored`, so a **stored-but-temporarily-absent** device is never clobbered — its
+memory is kept and it is re-preferred when it reconnects (preserving FR-005).
+
+**What the earlier busy-camera fix already covered (the bulk of DECISION-25)**: the
+inescapable-lockout fix had already moved all *selection-time* persistence out of the
+picker into the orchestrator, which writes **only a device that getUserMedia actually
+started** and **repairs a dead key** by falling back to the system default and
+persisting whatever started. Those two invariants (only-write-what-started,
+repair-on-failure) are untouched. The picker still does **not** persist a user
+*selection* — a busy/dead pick is never remembered until it starts.
+
+**The remainder this task implemented**: only the mount-effect's auto-resolved
+default was never persisted, so a *cleared* store never re-seeded for the session —
+the one resolution the orchestrator can miss (a started track may expose no
+`deviceId`). Persisting it does not re-introduce the lockout: it fires only when
+nothing is stored (never over a known-good device), and a busy persisted default is
+still repaired on the next entry by the orchestrator's fallback. An honest Vitest
+(`device-picker.test.tsx`) **fails against the pre-fix code** (cleared store + one
+camera → the preference is null, expected the resolved id) and passes after; sibling
+cases assert the don't-clobber guard and that a still-present remembered device is
+left untouched. The prior "writes nothing" test was reconciled to assert the real
+invariant (a *selection* is never persisted; the mount default is).

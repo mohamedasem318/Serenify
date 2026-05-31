@@ -244,7 +244,7 @@ dismiss (session) → reappears next session → disappears on calibrate; cross-
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T029 [P] Device-memory fix `apps/web/components/anchor/device-picker.tsx` (FR-045, DECISION-25) — when the stored value is absent/cleared and a real default camera is resolved in the mount effect, **persist it** to `localStorage`, **without** clobbering a stored-but-temporarily-absent device.
+- [X] T029 [P] Device-memory fix `apps/web/components/anchor/device-picker.tsx` (FR-045, DECISION-25) — when the stored value is absent/cleared and a real default camera is resolved in the mount effect, **persist it** to `localStorage`, **without** clobbering a stored-but-temporarily-absent device.
   - **Honest test**: Vitest — clear `localStorage`, mount with one camera → the preference is (re-)written (**this test fails against the pre-fix code**); a stored-but-absent device is not overwritten.
   - **Docs**: `docs/DECISIONS.md` entry 25 (draft).
 - [X] T030 [P] Static guardrail tests over the 005 surfaces — **zero** `amber`/`crimson` token usage on calibration/error surfaces; **zero** exclamation marks or blocklist terms ("detected", "REQUIRED", "MANDATORY", "alert", "abnormal", "elevated risk"). (FR-046/047, SC-009/010)
