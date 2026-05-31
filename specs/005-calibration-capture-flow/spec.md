@@ -707,8 +707,11 @@ immediately and never returns, with no "you're calibrated" banner replacing it.
   has not calibrated yet and MUST disappear the moment they do; there MUST be no
   persistent "you're calibrated" banner anywhere.
 - **FR-043**: The banner MUST use a **foggy** treatment (a "needs your attention,
-  not stress" state) — NOT amber — with a **meadow** primary button labelled "Set
-  baseline" (correcting feature 004's amber banner per Constitution Principle V).
+  not stress" state) — NOT amber — with a **foggy-filled** primary button (dark/ink
+  text, the same foggy CTA treatment as the failure-state and camera-access screens)
+  labelled "Set baseline" (correcting feature 004's amber banner per Constitution
+  Principle V; the CTA is foggy, not meadow, because the prompt is attention rather
+  than affirmative confirmation — see DECISIONS 2026-05-31).
 - **FR-044**: The banner MUST be dismissible for the session and MUST reappear in
   a new session while the employee remains un-calibrated, until calibration is
   complete.

@@ -227,15 +227,15 @@ old baseline; a stray `?mode=recalibrate` with no baseline behaves first-time.
 
 ## Phase 9: User Story 7 — Home banner refresh (Priority: P3)
 
-**Goal**: the banner restyled amber→foggy with a meadow "Set baseline", lifecycle +
-cross-tab preserved.
+**Goal**: the banner restyled amber→foggy with a **foggy-filled** "Set baseline" CTA,
+lifecycle + cross-tab preserved.
 
-**Independent Test**: un-calibrated → foggy banner with meadow button, no amber;
+**Independent Test**: un-calibrated → foggy banner with a foggy-filled button, no amber;
 dismiss (session) → reappears next session → disappears on calibrate; cross-tab mirror.
 
-- [ ] T028 [US7] Restyle `apps/web/components/anchor/calibration-banner.tsx` — `border-amber/* bg-amber/*` → **foggy** equivalents; relabel the button "Set baseline" (meadow default `Button`); update the "Amber, never red" docstring; **preserve** the `useSyncExternalStore`/dismiss/`broadcastAnchorBannerDismissed` lifecycle and cross-tab mirror. (FR-042/043/044/054)
+- [X] T028 [US7] Restyle `apps/web/components/anchor/calibration-banner.tsx` — `border-amber/* bg-amber/*` → **foggy** equivalents; relabel the button "Set baseline" using the **foggy-filled `Button` variant** (the same `variant="foggy"` shipped on the failure-state / camera-access screens — dark/ink text, NOT meadow, NOT the default ink-fill); update the "Amber, never red" docstring to foggy; **preserve** the `useSyncExternalStore`/dismiss/`broadcastAnchorBannerDismissed` lifecycle and cross-tab mirror. Render-site (/app) employee-gating already exists — do not duplicate it. (FR-042/043/044/054)
   - **Acceptance**: the "Set baseline" CTA stays a **full-document navigation** into `/app/calibrate` — a plain `<a href="/app/calibrate">` (Button `asChild`), **not** a client-side `<Link>`/`router.push` — so the per-route `camera=(self)` Permissions-Policy still applies; the restyle MUST NOT regress this (FR-055; DECISION-16).
-  - **Honest test**: RTL — foggy classes, no `amber`; meadow button; the CTA renders as an `<a href="/app/calibrate">` (not a `<Link>`); appear/dismiss-session/reappear via real `sessionStorage`; Playwright cross-tab mirror unchanged.
+  - **Honest test**: RTL — foggy classes, no `amber`; the CTA is the foggy-filled variant with dark text (not meadow); the CTA renders as an `<a href="/app/calibrate">` (not a `<Link>`, guarded statically against the source); appear/dismiss-session/reappear via real `sessionStorage`; Playwright cross-tab mirror unchanged.
   - **Docs**: `docs/CHANGELOG.md` (banner amber→foggy).
 
 **Checkpoint**: all user stories functional.

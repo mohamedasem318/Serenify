@@ -77,7 +77,7 @@ test("Skip via health-down branch → /app banner → calibrate from banner (FR-
   // route fulfills with healthy:true (Playwright runs route handlers in reverse
   // registration order, so the newer one wins for subsequent requests).
   await interceptAnchorApi(page, { healthy: true });
-  await page.getByRole("link", { name: "Take a minute to calibrate" }).click();
+  await page.getByRole("link", { name: "Set baseline" }).click();
   await expect(page).toHaveURL(/\/app\/calibrate$/, { timeout: 30_000 });
   await recordAnchor(page);
   await expect(page).toHaveURL(/\/app$/, { timeout: RECORD_AND_LAND_TIMEOUT });

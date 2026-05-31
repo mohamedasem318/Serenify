@@ -2137,3 +2137,37 @@ state or date.
 live stress monitoring or check-ins are already running; calm, no exclamation marks.
 Enforced by an RTL assertion over the rendered section text
 (`baseline-section.test.tsx`).
+
+## 2026-05-31 — DECISION (005): home calibration banner CTA meadow → foggy
+
+**Status**: Accepted (feature 005, T028).
+
+**Decision**: The `/app` calibration banner is restyled amber → **foggy** (surface
+border + bg), and its primary CTA — relabelled "Set baseline" — uses the
+**foggy-filled** `Button` variant (`variant="foggy"`: `bg-foggy` with `text-ink` /
+`dark:text-bg`), the *same* CTA treatment already shipped this cycle on the
+failure-state and the three camera-access screens. The CTA is **foggy, not meadow**.
+The lifecycle is untouched: `useSyncExternalStore` + session-dismiss +
+`broadcastAnchorBannerDismissed` + the cross-tab mirror are preserved verbatim, and
+the `aria-label="Calibration"` region (which the Playwright cross-tab spec keys off)
+is unchanged. The CTA remains a full-document `<a href="/app/calibrate">` (Button
+`asChild`), guarded by a source-level test, so the per-route `camera=(self)`
+Permissions-Policy still applies (FR-055 / DECISION-16). Render-site employee-gating
+already existed on `/app` (`profile.role === "employee"`, the same determination the
+account baseline section uses) — not duplicated.
+
+**Why this is an application of Principle V, not an amendment to it**: Principle V's
+palette roles are unchanged — amber stays reserved for stress/affective signals,
+crimson for destructive surfaces, meadow for affirmative confirmation, foggy for the
+calm "needs your attention, not stress" state. The original task text said *meadow*
+for the banner button; that was reconsidered because the banner is an **attention
+prompt**, not an **affirmative confirmation** — so foggy (attention) is the correct
+role, and meadow (reserved for "you did it" moments like the success state) would be
+a misapplication. This refines *which* calm colour the CTA-colour rule selects for an
+attention CTA; it does not alter any principle, so it is logged here rather than as a
+constitution amendment. Spec FR-043 and the T028 task line are aligned to read foggy.
+
+**AA note**: foggy fill + ink text clears WCAG AA in both themes
+(`text-ink` ~6.8:1 light, `dark:text-bg` ~9:1 dark on the foggy fill); a white/ink
+fill on the foggy wash would not, which is the practical reason the shared
+`variant="foggy"` exists rather than a hand-rolled fill.

@@ -1407,3 +1407,19 @@ and discards `no-store`, whereas a production build's `force-dynamic` `/app` emi
 `private, no-cache, no-store, max-age=0, must-revalidate` and revalidates on Back on its
 own. **Production is unaffected; this is not a prod bug and should not be re-investigated
 as one.** We are removing only the code workaround, not that finding.
+
+## 2026-05-31 - spec(005-calibration-capture-flow) amendment: banner CTA meadow → foggy
+
+- FR-043 amended: the home calibration banner's primary CTA is now the
+  **foggy-filled** button treatment (dark/ink text), **not meadow**. The banner
+  surface was already specified foggy; only the button colour changed.
+
+Rationale: the banner is an **attention prompt** ("needs your attention, not
+stress"), not an **affirmative confirmation** — so the CTA takes foggy (the
+attention role), reusing the same `variant="foggy"` already shipped on the
+failure-state and camera-access screens, rather than meadow (reserved for "you did
+it" moments like the success state). This is an application of Constitution
+Principle V's existing palette roles, not an amendment to them — recorded in full at
+DECISIONS.md 2026-05-31 (banner CTA meadow → foggy). The T028 task line and the
+Phase 9 goal/independent-test are aligned to match. Lifecycle, cross-tab mirror, and
+the full-document `<a href>` navigation are unchanged.
