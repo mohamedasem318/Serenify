@@ -1354,3 +1354,42 @@ contrast over a light frost, and its size change alone was imperceptible.
   modes): clearly a soft green pool, feathered, not glaring, with a visible
   inhale/exhale delta. The **live-feed appearance and the pulse tuning remain a manual
   smoke check** (saturation/dimness judged by eye over a real camera).
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — stale banner after browser Back is a Next DEV-ONLY artifact (not a prod bug)
+
+Supersedes the bfcache handler from `563441d`. A real-browser trace showed `/app`
+served from the **disk cache** on a browser Back (`200 / (disk cache)`) — frozen at the
+server-rendered state, so the calibration banner reflected a stale `has_anchor` until a
+manual refresh. Investigated the actual cause and the proposed `no-store` fix:
+
+- **`no-store` cannot be set in `next dev`.** `next/dist/server/base-server.js` hardcodes
+  `Cache-Control: no-cache, must-revalidate` on every page document in dev and discards
+  any computed value ("In dev, we should not cache pages for any reason"), set last —
+  so the value is **not overridable** by the proxy, `next.config.ts headers()`, or a
+  route segment config. Verified empirically: setting `no-store` in both the proxy and
+  next.config still produced `no-cache, must-revalidate` on the wire after a restart.
+- **Production is already correct and unaffected.** That dev branch never runs in a
+  prod build, where `/app` is `force-dynamic` (revalidate 0) and Next emits
+  `private, no-cache, no-store, max-age=0, must-revalidate` (`lib/cache-control.js`).
+  `no-store` keeps it out of the disk cache, so Back revalidates on its own.
+- **Conclusion: this is a Next DEV-ONLY artifact, NOT a production bug — do not
+  re-investigate it as one.** `no-cache, must-revalidate` lets browsers reuse the disk
+  copy on history navigation without revalidating; only `no-store` (prod) prevents it.
+
+Fix (dev-only quality-of-life), replacing the removed `BfcacheRefresh`:
+
+- **`BfcacheRefresh` removed** (component + test): a disk-cache Back is a FRESH document
+  load (JS re-executes), so `pageshow.persisted` is `false` and the bfcache handler
+  never fired — it targeted the wrong mechanism.
+- **New `DevHistoryRefresh`** on the authed layout: reads the Navigation Timing entry
+  and, when `type === "back_forward"`, calls `router.refresh()` to re-run the route's
+  Server Components (re-reading `has_anchor`), preserving scroll + client state — the
+  same mechanism the cross-tab anchor listener uses. **Gated to `NODE_ENV ===
+  "development"`**; the guard is a Next-inlined literal so the effect body is
+  **dead-code-eliminated from the prod bundle** (a true no-op there — no navigation
+  read, no refresh, no redundant refetch on a prod back-navigation). Verified against an
+  actual `next build`: `back_forward` appears **0 times** in the production client
+  chunks. The anti-flash banner behaviour and 004 cross-tab sync are untouched.
+- Honest test at the seams (inject the Next router + the Navigation Timing entry): dev
+  back/forward refreshes, dev normal-nav does not, **prod is a no-op even on
+  back/forward**. The live Back-in-dev re-sync remains a manual smoke check.
