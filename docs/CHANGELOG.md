@@ -1273,3 +1273,28 @@ readable backing is separated from the breath and the heavy/opaque part is small
 
 The get-ready / recording preview softening is reduced from 3px to 2px — still
 softened (not fully sharp), just a lighter veil over the self-view.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — calibration banner reveals after browser Back (bfcache restore)
+
+- **Cause:** `/app` is restored from the back-forward cache (bfcache) after a browser
+  Back out of the full-document calibration flow. On a bfcache restore the page is
+  frozen — Server Components don't re-run and the client tree isn't re-evaluated — so
+  the banner's `useSyncExternalStore` reveal never re-fires (a manual refresh fixes
+  it), and the header/theme toggle can look stale.
+- **Fix (targeted, no full reload):** a `<BfcacheRefresh>` client component on the
+  authed layout adds a `pageshow` listener that, **only when `event.persisted`** (a
+  real bfcache restore), calls `router.refresh()`. That re-runs the route's Server
+  Components — re-reading `has_anchor` so the banner conditional re-evaluates — and
+  re-renders the client tree (the banner store snapshot + the header/theme toggle),
+  preserving scroll and client state. It reuses the same `router.refresh()` mechanism
+  the cross-tab anchor listener already uses on `/app`. Normal/fresh loads
+  (`persisted` false) are untouched. The anti-flash banner behaviour (server snapshot
+  → client reveal) and 004's cross-tab sync are preserved.
+- **Hydration:** no hydration error found on the restore path — the banner uses the
+  hydration-safe `useSyncExternalStore` + server-snapshot pattern and the theme toggle
+  uses next-themes' documented `mounted` guard. (Runtime hydration cannot be observed
+  headless.)
+- Honest test at the I/O seam (inject the router): `pageshow` + `persisted` refreshes;
+  a fresh load does not; the listener is removed on unmount. Real-browser Back-restore
+  behaviour (and whether the toggle needs a scoped `location.reload()` escalation if
+  it proves genuinely de-hydrated rather than stale) is a manual smoke check.
