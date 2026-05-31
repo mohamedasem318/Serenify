@@ -11,7 +11,7 @@ import time
 
 # Seed env before any app import (settings are required, no defaults).
 os.environ.setdefault("SUPABASE_JWT_SECRET", "test-secret-please-change-0123456789abcdef")
-os.environ.setdefault("ALLOWED_ORIGIN", "http://127.0.0.1:3000")
+os.environ.setdefault("ALLOWED_ORIGINS", "http://127.0.0.1:3000")
 # A JWKS source so the asymmetric (ES256) branch is exercised; the tests stub the
 # JWK client so no network is touched. HS256 tokens ignore this and use the secret.
 os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")

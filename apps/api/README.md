@@ -17,7 +17,7 @@ session client. Raw video is deleted server-side immediately (Principle I).
 
 ```sh
 cd apps/api
-cp .env.example .env          # SUPABASE_JWT_SECRET + ALLOWED_ORIGIN (dev: http://localhost:3000)
+cp .env.example .env          # SUPABASE_JWT_SECRET + ALLOWED_ORIGINS (dev: http://localhost:3000)
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl localhost:8000/healthz

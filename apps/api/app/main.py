@@ -26,7 +26,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Serenify Anchor API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.allowed_origin],
+        allow_origins=settings.cors_origins,
         allow_methods=["GET", "POST", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )

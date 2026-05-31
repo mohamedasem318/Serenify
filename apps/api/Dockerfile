@@ -22,6 +22,6 @@ WORKDIR /srv/apps/api
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
-# SUPABASE_JWT_SECRET and ALLOWED_ORIGIN are injected at run time, never baked in
-# (Principle IX). The production ALLOWED_ORIGIN is [TBD by deployment].
+# SUPABASE_JWT_SECRET and ALLOWED_ORIGINS are injected at run time, never baked in
+# (Principle IX). The production ALLOWED_ORIGINS is [TBD by deployment].
 CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
