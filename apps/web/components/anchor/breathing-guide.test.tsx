@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { BreathingGuide } from "./breathing-guide";
+import { BreathingOrb, BreathingPacer } from "./breathing-guide";
 
 function mockMatchMedia(matches: boolean) {
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
@@ -18,17 +18,28 @@ function mockMatchMedia(matches: boolean) {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe("BreathingGuide (FR-015/016 — focal point, not progress)", () => {
-  it("is NOT a progress indicator", () => {
+describe("BreathingOrb (FR-015/016 — focal graphic, not progress)", () => {
+  it("is a graphic with no words and no progress role", () => {
     mockMatchMedia(false);
-    render(<BreathingGuide />);
+    const { container } = render(<BreathingOrb />);
     expect(screen.queryByRole("progressbar")).toBeNull();
-    expect(screen.getByText(/in for four, out for six/i)).toBeInTheDocument();
+    expect(container.textContent).toBe(""); // no words on the video
+    expect(container.querySelector(".rounded-full")).not.toBeNull();
+  });
+});
+
+describe("BreathingPacer (FR-015/016/048 — words in the card below)", () => {
+  it("uses a stepped Breathe in / Breathe out cue with motion (starts on the inhale)", () => {
+    mockMatchMedia(false);
+    render(<BreathingPacer />);
+    expect(screen.getByText("Breathe in")).toBeInTheDocument();
+    // the old "with the light" line is gone — the orb carries that idea now
+    expect(screen.queryByText(/with the light|in for four/i)).toBeNull();
   });
 
-  it("gives a true motion-free textual cue under reduced motion", () => {
+  it("uses the same stepped cue under reduced motion", () => {
     mockMatchMedia(true);
-    render(<BreathingGuide />);
-    expect(screen.getByText("Breathe in for four, out for six.")).toBeInTheDocument();
+    render(<BreathingPacer />);
+    expect(screen.getByText("Breathe in")).toBeInTheDocument();
   });
 });

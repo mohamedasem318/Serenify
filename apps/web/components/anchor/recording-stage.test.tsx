@@ -23,7 +23,7 @@ describe("RecordingStage (FR-015–020)", () => {
   it("shows the breathing guide, the 60s timer, the reassurance, and a calm Stop", () => {
     const onStop = vi.fn();
     render(<RecordingStage remaining={45} onStop={onStop} />);
-    expect(screen.getByText(/in for four, out for six/i)).toBeInTheDocument(); // breathing guide
+    expect(screen.getByText(/breathe in/i)).toBeInTheDocument(); // breathing pacer (stepped cue)
     expect(screen.getByText("0:45")).toBeInTheDocument(); // sole progress timer
     expect(screen.getByRole("timer")).toBeInTheDocument();
     expect(screen.getByText(/we.ve got you/i)).toBeInTheDocument();

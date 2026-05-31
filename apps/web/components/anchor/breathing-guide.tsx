@@ -57,17 +57,17 @@ export function BreathingOrb() {
 const PHASE_LABEL = { in: "Breathe in", out: "Breathe out" } as const;
 
 /**
- * The pacer line — lives in the controls card below the preview. With motion it's a
- * single calm instruction. Under reduced motion (FR-048) it becomes a STEPPED cue
- * that swaps "Breathe in" (held 4s) / "Breathe out" (held 6s) on the breath
- * cadence, with an instant content swap (no transition) — a true motion-free pacer.
+ * The pacer line — lives in the controls card below the preview. A STEPPED cue that
+ * swaps plain "Breathe in" (held 4s) / "Breathe out" (held 6s) on the breath cadence
+ * with an instant content swap (no transition). Both the animated and the
+ * reduced-motion paths now use this same stepped cue (FR-048): the orb carries the
+ * "with the light" idea visually, so the line doesn't need to — and pointing people
+ * at the orb is moot now that the orb is reliably visible on its own seating.
  */
 export function BreathingPacer() {
-  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [phase, setPhase] = useState<"in" | "out">("in");
 
   useEffect(() => {
-    if (!reducedMotion) return;
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
     const schedule = (current: "in" | "out") => {
@@ -88,16 +88,11 @@ export function BreathingPacer() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [reducedMotion]);
+  }, []);
 
-  if (reducedMotion) {
-    return (
-      <p aria-live="polite" className="text-center text-base text-ink">
-        {PHASE_LABEL[phase]}
-      </p>
-    );
-  }
   return (
-    <p className="text-center text-base text-ink">Breathe with the light — in for four, out for six.</p>
+    <p aria-live="polite" className="text-center text-base text-ink">
+      {PHASE_LABEL[phase]}
+    </p>
   );
 }
