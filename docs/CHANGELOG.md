@@ -1330,3 +1330,27 @@ text backing was unaffected (it's opaque); only the animated pool was invisible.
   rim feathers with no hard edge, the frost flattens busy detail, and the pool reads
   over varied backgrounds. The orb's appearance and tuning **over a real camera feed**
   (lighting, skin tones, motion perceptibility) remains a **manual smoke check**.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing pool: clearer green + opacity pulse
+
+The frost backing (above) was the right mechanism, but the animated **pool itself**
+was still too dilute to read on it: a `meadow ~26% → transparent` wash has almost no
+contrast over a light frost, and its size change alone was imperceptible.
+
+- The pool is now a **clearly green but still dim** meadow (`55% → 38% → 12% →
+  transparent`) so a soft green pool reads against the light frost. Still **fully
+  feathered** (no hard edge) and dim-toned — and the opaque text backing covers its
+  flat centre, so the *visible* pool is the feathered ring around the words (a soft
+  pool/lung, never a hard or bright coin). Footprint unchanged; text backing untouched.
+- The breath now modulates **opacity in addition to scale**: scale + opacity peak
+  together at the 4s-inhale (fuller / slightly brighter) and ebb through the 6s exhale
+  (softer / smaller) — the lung filling and emptying — so the motion stays legible even
+  when the absolute contrast over a real feed is modest. Both are transform/opacity
+  only (compositor-friendly).
+- **Reduced motion** (repo `useMediaQuery`, not framer): the pool is held at a fixed
+  mid-size AND fixed mid-opacity (no pulse, true zero-motion); the label still swaps
+  "Breathe in" / "Breathe out" on the 4s/6s cadence (instant content swap).
+- De-risked the static look headless (peak vs trough over bright / dark feeds, both
+  modes): clearly a soft green pool, feathered, not glaring, with a visible
+  inhale/exhale delta. The **live-feed appearance and the pulse tuning remain a manual
+  smoke check** (saturation/dimness judged by eye over a real camera).

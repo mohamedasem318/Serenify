@@ -26,10 +26,13 @@ import { useMediaQuery } from "@/hooks/use-media-query";
  *    radial MASK feathers the whole thing to nothing at the rim — no disc edge — and
  *    keeps it LOCAL to the orb; the rest of the preview stays at 2px. Static (only
  *    the pool breathes).
- *  - ORB_GLOW — a soft, dim, translucent, feathered pool of light (no hard edge, no
- *    "coin"): the ONLY animated layer, gently expanding on the 4s inhale and
- *    contracting on the 6s exhale. Kept small so it leaves clear space to the framing
- *    brackets (no crowding).
+ *  - ORB_GLOW — a soft pool of meadow, clearly green so it reads over the frost yet
+ *    still dim and feathered to nothing (no hard edge, no "coin"): the ONLY animated
+ *    layer. The breath modulates BOTH its scale and its opacity — fuller and slightly
+ *    brighter at the 4s-inhale peak, softer and smaller through the 6s exhale (the
+ *    lung filling and emptying), so the motion stays legible even when the absolute
+ *    contrast over a real feed is modest. Kept small so it leaves clear space to the
+ *    framing brackets (no crowding).
  *  - TEXT_BACKING — a SMALL, FIXED, feathered backing (opaque only through a small
  *    centre, dim pale-meadow, feathered to nothing — no hard circle) sized to back
  *    the longest label ("Breathe out") with padding. It does NOT scale, so the words
@@ -54,11 +57,14 @@ const FROST_FILTER = "blur(8px) saturate(0.85) brightness(1.04)";
 const FROST_VEIL = "rgba(255, 255, 255, 0.1)"; // flat; the mask shapes & feathers it
 const FROST_MASK = "radial-gradient(circle, #000 0%, #000 42%, transparent 84%)";
 
-// Soft, dim, translucent pool — feathered fully to transparent at the rim (no edge).
+// Soft pool of meadow — clearly green (it must READ over the light frost) yet still
+// dim and FULLY feathered to transparent at the rim (no coin edge). The breath
+// modulates this layer's scale AND opacity (fuller/brighter inhale, softer exhale).
 const ORB_GLOW =
   "radial-gradient(circle, " +
-  "color-mix(in srgb, var(--color-meadow) 26%, transparent) 0%, " +
-  "color-mix(in srgb, var(--color-meadow) 14%, transparent) 55%, " +
+  "color-mix(in srgb, var(--color-meadow) 55%, transparent) 0%, " +
+  "color-mix(in srgb, var(--color-meadow) 38%, transparent) 48%, " +
+  "color-mix(in srgb, var(--color-meadow) 12%, transparent) 76%, " +
   "transparent 100%)";
 // Small fixed backing — dim pale-meadow, opaque only through a small centre (backs
 // the words) then feathered to nothing. text-ink / dark:text-bg reads dark on it.
@@ -75,8 +81,9 @@ export function BreathingOrb() {
 
   // The breath pacer (BOTH the animated and reduced-motion paths): swap the label on
   // the 4s-in / 6s-out cadence with an instant content swap (FR-048). On the animated
-  // path the glow scales on the same cadence; under reduced motion the glow is held
-  // at a fixed mid-size and the label cadence alone carries the pace.
+  // path the glow scales + fades on the same cadence; under reduced motion the glow is
+  // held at a fixed mid-size AND mid-opacity (no pulse) and the label cadence alone
+  // carries the pace.
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout>;
@@ -118,23 +125,25 @@ export function BreathingOrb() {
         }}
       />
 
-      {/* the breath — a soft, dim pool that gently expands (inhale) / contracts
-          (exhale); the only animated layer. Held at a fixed mid-size under reduced
-          motion. Kept small so it leaves clear space to the framing brackets. */}
+      {/* the breath — a soft green pool that gently fills (scale + opacity up on the
+          inhale) and empties (down through the exhale); the only animated layer. Held
+          at a fixed mid-size AND mid-opacity under reduced motion. Kept small so it
+          leaves clear space to the framing brackets. */}
       {reducedMotion ? (
         <div
           aria-hidden
           className="absolute size-32 rounded-full sm:size-40"
-          style={{ background: ORB_GLOW, transform: "scale(0.85)" }}
+          style={{ background: ORB_GLOW, transform: "scale(0.85)", opacity: 0.85 }}
         />
       ) : (
         <motion.div
           aria-hidden
           className="absolute size-32 rounded-full sm:size-40"
           style={{ background: ORB_GLOW }}
-          initial={{ scale: 0.7 }}
-          animate={{ scale: [0.7, 1, 0.7] }}
-          // 10s cycle: 0→40% = 4s inhale, 40→100% = 6s exhale (FR-016)
+          initial={{ scale: 0.7, opacity: 0.72 }}
+          animate={{ scale: [0.7, 1, 0.7], opacity: [0.72, 1, 0.72] }}
+          // 10s cycle: 0→40% = 4s inhale, 40→100% = 6s exhale (FR-016). Scale + opacity
+          // peak together at the inhale (fuller/brighter), ebb through the exhale.
           transition={{ duration: 10, times: [0, 0.4, 1], repeat: Infinity, ease: "easeInOut" }}
         />
       )}
