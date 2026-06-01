@@ -1228,3 +1228,139 @@ header assertion); the smoke matrix and the mobile-HTTPS verification are
 human/device-dependent runs, not code.
 **Address by**: all three BEFORE the detector ships to any real (HTTPS, real-tenant)
 environment. T004 specifically must precede the detector's first production call.
+
+### Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate
+**Status**: bug
+**Category**: backend / extraction quality (anchor validity)
+**Observed**: 2026-06-01, feature 005 smoke — a 60 s baseline recording in which the
+user's face was actually in frame for only **~2 s** was still accepted as success
+("Your baseline is set", `apps/web/components/anchor/success-state.tsx:23`).
+**Symptom**: An almost-empty recording produces a "successful" calibration. The user
+believes they are calibrated when the baseline is built from a handful of usable
+frames and is almost certainly garbage — which then poisons every later
+delta-from-baseline reading at inference (feature 006). The failure is silent: there
+is no warning, no failure chip, no "insufficient footage" path. It is a correctness
+bug, not polish — a green calibration that is not actually a usable baseline.
+
+**Findings (read-only investigation 2026-06-01):**
+
+**1. The API never gates on how many frames had a usable face — it returns a vector
+whenever ≥1 face frame exists.** `POST /anchor` (`apps/api/app/routers/anchor.py`)
+calls `ml_video.compute_anchor(tmp_path)` and, unless that raises
+`FeatureExtractionError` (→ 422), base64-encodes the vector and returns 200. The only
+gates inside `compute_anchor` (`packages/ml-video/src/ml_video/anchor.py`) are a final
+**shape** check (`features.shape != (FEATURE_DIM,)`) and an **all-finite** check
+(`np.all(np.isfinite(features))`) — neither says anything about face *coverage*. The
+two upstream feature functions impose only degenerate floors:
+  - `lbp_top_features` (`packages/ml-video/src/ml_video/features.py:110`) skips
+    zero-row (no-detection) frames per ROI and raises **only if a whole ROI yields
+    ZERO valid frames** — i.e. **one** usable frame per ROI is enough:
+    ```python
+    if not crops:
+        raise FeatureExtractionError(
+            f"ROI '{roi}' produced no valid frames; LBP-TOP would be < 90-d"
+        )
+    ```
+  - `motion_features` (`features.py:136`) raises only if there are **fewer than 2
+    frames total** — and it is "Computed over the FULL landmark array, zero-rows
+    included", so no-face frames satisfy this floor:
+    ```python
+    if landmarks.shape[0] < 2:
+        raise FeatureExtractionError(
+            "need at least 2 frames to compute motion features"
+        )
+    ```
+There is **no** minimum count or fraction of face-present frames, and **no**
+confidence/quality score gating the response. (MediaPipe's `min_detection_confidence`
+is used internally per frame, then collapsed to a binary face/zero-row — no aggregate
+confidence is retained.) Concretely: a 60 s clip is downsampled to ~2.5 fps
+(`pipeline.py` `TARGET_FPS = 5`, `FRAME_SKIP_MOD = 2`), ≈150 kept frames; a ~2 s face
+presence ≈ **~5 non-zero rows out of ~150** — LBP passes (≥1/ROI), motion passes (≥2
+total, zero-rows count), shape + finite pass → **200 success**. Exactly the symptom.
+
+**2. The server-side pipeline ALREADY has the signal it would need — it just doesn't
+count it.** `extract_landmarks` (`packages/ml-video/src/ml_video/pipeline.py:48`)
+emits a **zero-row** for any frame with no detected face:
+```python
+def _landmarks_from_result(result) -> np.ndarray:
+    faces = getattr(result, "multi_face_landmarks", None)
+    if not faces:
+        return np.zeros(LANDMARK_DIM, dtype=np.float64)
+    ...
+```
+So `clip.landmarks` already distinguishes face frames (non-zero rows) from no-face
+frames (all-zero rows), and `lbp_top_features` literally inspects this per frame
+(`if not np.any(row): continue`, `features.py:123`). The usable-frame count is one
+line away — `int(np.count_nonzero(np.any(clip.landmarks, axis=1)))` — but the backend
+never computes, retains, or acts on it. The raw signal exists; the gate does not.
+
+**3. The frontend ALREADY tracks face-presence across the whole recording — but only
+to label a failure, never to prevent a success.** The framing detector runs during
+recording (not just the green-room gate), and `anchor-recorder.tsx:226` folds every
+per-frame signal into `CauseTelemetry` while recording:
+```python
+const handleSignal = useCallback((signal: FramingSignal) => {
+  if (recorderRef.current?.state === "recording") accumulate(telemetryRef.current, signal);
+}, []);
+```
+`accumulate` (`apps/web/lib/face-detect/cause-telemetry.ts:33`) counts `totalFrames`
+and `offTargetFrames` (which includes `!signal.facePresent`) — so the client already
+holds an off-target/absence ratio for the minute. **But that telemetry is consumed
+ONLY on a backend 422** (`anchor-recorder.tsx:302`, `dominantCause(...)` inside the
+`extraction_failed` branch) to pick the failure chip; on a 200 it is discarded. For
+the 2-s clip, `offTargetFrames/totalFrames` would be ~0.97 (well over the 0.35
+`CAUSE_MIN_RATIO`), yet because the backend returns 200 the rich presence summary is
+thrown away and "Your baseline is set" shows anyway.
+
+**Candidate fixes (feature 006 / backend-quality pass — NOT a 005 task):**
+- **Primary — backend min-usable-frames / coverage gate (authoritative).** In
+  `ml_video` (in `extract_landmarks`/`compute_anchor`), count non-zero landmark rows
+  and raise `FeatureExtractionError` when usable face frames fall below a calibrated
+  threshold (an absolute floor and/or a fraction of kept frames). This reuses the
+  existing failure channel — `FeatureExtractionError` → **HTTP 422** → the frontend's
+  `extract-failed` state, cause chip, and 3-strike escape — so **no new API surface
+  is required**. Optionally give it a distinct reason (e.g. `insufficient_face_frames`)
+  so the chip can say "we couldn't see your face for enough of the recording" instead
+  of the generic cause. The threshold must be calibrated against the training
+  distribution (how many usable frames a *real* StressID anchor clip yields), so it
+  pairs naturally with the end-to-end fidelity check below.
+- **Alternative/companion — an extraction-confidence/quality score.** Derive an
+  aggregate detectability/quality score for the clip and gate on it, rather than a raw
+  frame count — more robust to fps/duration variation, but needs a defensible
+  threshold (same calibration dependency).
+- **Optional — frontend presence-summary assist (defense-in-depth, NOT the gate).**
+  The client already computes coverage in `CauseTelemetry`; it could warn earlier and
+  more kindly ("we lost sight of your face for most of that — try again?") before/at
+  upload. This must NOT be the only gate: the on-device detector can be `unavailable`
+  → the soft gate is bypassed and no telemetry is collected (FR-011,
+  `use-framing-guide.ts`), and it is a different model from the server's FaceMesh. The
+  authoritative decision belongs server-side (Principle III — modality logic lives in
+  `ml_video`); the frontend summary is only earlier/kinder feedback.
+
+**Why this is deferred, not fixed now**: feature 005 is **locked to no
+backend/contract changes** (`contracts/backend-unchanged.md`); the real fix lives in
+`packages/ml-video` + `apps/api`, which 005 must not touch. It belongs with the
+inference work that consumes these anchors.
+
+**Cross-references (standing extraction/anchor-quality caveats):**
+- "End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 006)"
+  (above) — the same calibration/dataset run that would fix this should also fix the
+  coverage threshold; treat min-usable-frames as part of that go/no-go fidelity gate.
+- "Store an extraction/pipeline-version alongside each anchor (auto-invalidation)"
+  (above) — a different anchor-validity axis (stale feature space); this entry is
+  about a *thin* anchor in the current feature space. Both feed feature 006's
+  "is this anchor trustworthy?" decision.
+- The `# CAVEAT` fidelity markers in `features.py` (lines 8–18) and MODEL_HANDOFF §8
+  red-flags 6/8 — the existing "confirm against the training notebook before trusting
+  production vectors" caveat; coverage is the volume-of-evidence companion to it.
+- DECISION-24 (cause telemetry) — the existing client signal this entry proposes
+  promoting from "explain a failure" to (optionally) "warn before a thin success".
+
+**Fix scope**: small-to-medium for the backend gate itself (a frame-count/coverage
+check + a 422 reason + a unit test); the load-bearing cost is **calibrating the
+threshold** against real anchor clips, which is gated on the same MediaPipe runtime +
+StressID dataset as the end-to-end fidelity check.
+**Address by**: feature 006 (live inference) / a backend-quality pass — before any
+live prediction trusts a stored anchor. A thin baseline silently poisons every
+delta-from-baseline reading, so this is a correctness prerequisite for inference, not
+optional polish.
