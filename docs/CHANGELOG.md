@@ -1423,3 +1423,25 @@ Principle V's existing palette roles, not an amendment to them — recorded in f
 DECISIONS.md 2026-05-31 (banner CTA meadow → foggy). The T028 task line and the
 Phase 9 goal/independent-test are aligned to match. Lifecycle, cross-tab mirror, and
 the full-document `<a href>` navigation are unchanged.
+
+## 2026-06-01 - test(005-calibration-capture-flow): strengthen the FR-050 egress proof
+
+- `apps/web/tests/e2e/anchor-egress.spec.ts` now asserts, in addition to the existing
+  video-signature checks (multipart `.webm`/`.mp4` clip part or `video/*` Content-Type),
+  that **no outbound body of ANY kind** reaches a non-allowlisted destination across the
+  green-room / mid-recording / post-success checkpoints. This closes the gap where a
+  frame leak encoded as JSON / base64 / image bytes to any URL would have passed the
+  video-only check undetected.
+- Benign allowlist (the only destinations permitted to carry an outbound body): the
+  single final `/anchor` clip POST; the Supabase host (auth/token refresh + the
+  derived-hex anchor-vector REST write); and same-origin Next **server actions** matched
+  by the `Next-Action` request header (the sign-in auth RPC — a bespoke frame leak would
+  be a headerless fetch/beacon and stay flagged, so this is header-scoped, not a blanket
+  same-origin pass).
+
+Rationale: the prior assertion proved no *video-looking* payload egressed, but the
+guarantee FR-050/SC-014 makes is that **nothing** derived from the camera frames leaves
+the device for framing. The strengthened accumulator makes that the literal assertion.
+The existing video checks are kept intact (added to, not replaced). Verified passing on
+chromium; the DECISION-26 / FR-050 note in `docs/DECISIONS.md` is updated to describe the
+two-layer check. No production code change.

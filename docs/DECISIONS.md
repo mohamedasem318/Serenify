@@ -2221,10 +2221,19 @@ the too-dark floor.
 **Why it earns its keep**: it is what makes the **NON-NEGOTIABLE** FR-050/SC-014
 egress proof (`anchor-egress.spec.ts`) possible as an *active-pipeline* assertion —
 Playwright intercepts every request across BOTH the green room (framing loop running)
-and the full 60 s recording and proves **zero** video/frame bytes egress except the
-single final encoded clip POSTed to `/anchor` on success (verified passing on
-chromium). Without the seam, the only deterministic CI option is the
-detector-unavailable bypass, which would never exercise the framing pipeline active.
+and the full 60 s recording and proves, at the green-room / mid-recording / post-success
+checkpoints, that **(a)** no VIDEO payload egresses (multipart `.webm`/`.mp4` clip part
+or `video/*` Content-Type) except the single final clip POSTed to `/anchor` on success,
+**and (b)** — strengthened 2026-06-01 — **no outbound body of ANY kind** reaches a
+non-allowlisted destination, so a frame leak disguised as JSON/base64/image bytes to any
+URL is caught too. The benign allowlist is exactly: the final `/anchor` clip POST; the
+Supabase host (auth/token + the derived-hex anchor-vector write); and same-origin Next
+**server actions** (matched by the `Next-Action` header — the sign-in auth RPC; a bespoke
+frame leak would be a headerless fetch/beacon and stay flagged). Verified: across the
+framing phases there are **zero** body-carrying requests at all (the clip POST + Supabase
+write both fire only at success). Verified passing on chromium. Without the seam, the
+only deterministic CI option is the detector-unavailable bypass, which would never
+exercise the framing pipeline active.
 
 **Scope**: the three stale 004 e2e specs (`anchor-onboarding`, `anchor-health-precheck`,
 `anchor-skip`), which were `test.skip(true, "…re-author under T031")`, are removed and

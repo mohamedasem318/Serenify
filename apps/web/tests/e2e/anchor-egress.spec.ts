@@ -26,12 +26,36 @@ import {
  * the detector (injected), /healthz + /anchor (intercepted). Supabase is the real
  * local instance (its writes carry the DERIVED vector as hex text — never video).
  *
- * "Video egress" is defined structurally: a request whose body is a multipart file
- * part with a video filename (the `clip` field, `anchor.webm`/`.mp4`), or whose
- * Content-Type is `video/*`. Expected non-video traffic — page/RSC loads, /healthz,
- * Supabase REST, any same-origin detector asset GETs — is allowed; the assertion is
- * specifically that no VIDEO payload egresses anywhere except that one final clip.
+ * Two layers of detection, both asserted at the green-room / mid-recording / post-
+ * success checkpoints:
+ *  - VIDEO egress (structural): a request whose body is a multipart file part with a
+ *    video filename (the `clip` field, `anchor.webm`/`.mp4`), or whose Content-Type is
+ *    `video/*` — the only legitimate instance is the single final `/anchor` clip POST.
+ *  - ANY-DATA egress (strengthened): a request that is POST/PUT/PATCH or carries a
+ *    non-empty body to a destination NOT on the benign allowlist below. This catches a
+ *    frame leak even if it were disguised as JSON/base64/image bytes to any URL — the
+ *    earlier video-signature check alone would miss that.
+ *
+ * Benign allowlist — the ONLY destinations allowed to carry an outbound body:
+ *  (1) the single final clip POST to `/anchor` (the one legitimate video egress);
+ *  (2) the Supabase host (browser auth/token refresh + the REST anchor-vector write —
+ *      DERIVED hex data, not raw video); and
+ *  (3) same-origin Next **server actions**, matched by the `Next-Action` request header
+ *      (the auth sign-in RPC + any framework RPC). These carry NO on-device framing
+ *      signal: the detector outputs (bounding box / luma / drift) live only in React
+ *      state and are never serialized into a server action. A bespoke frame leak would
+ *      be a plain fetch / XHR / sendBeacon WITHOUT that header → still flagged. This is
+ *      a header-scoped allow, not a blanket same-origin pass.
  */
+
+/** The Supabase origin (from the test-runner env) whose body-carrying requests are benign. */
+const SUPABASE_HOST = (() => {
+  try {
+    return new URL(process.env.NEXT_PUBLIC_SUPABASE_URL ?? "").host;
+  } catch {
+    return "";
+  }
+})();
 
 /** Read the request body as bytes-preserving text so multipart ASCII headers survive. */
 function bodyText(req: Request): string {
@@ -57,6 +81,22 @@ function isAnchorClipPost(req: Request): boolean {
   return req.method() === "POST" && /\/anchor(\?|$)/.test(req.url());
 }
 
+/** The only destinations permitted to carry an outbound body in this flow (see header). */
+function isBenignDataDestination(req: Request): boolean {
+  const url = req.url();
+  // (1) the single legitimate video egress, on success
+  if (/\/anchor(\?|$)/.test(url)) return true;
+  // (2) Supabase auth/token refresh + the REST anchor-vector write (derived hex, not video)
+  try {
+    if (SUPABASE_HOST && new URL(url).host === SUPABASE_HOST) return true;
+  } catch {
+    /* unparseable url → not allowlisted */
+  }
+  // (3) same-origin Next server actions (header-scoped — see the file header)
+  if (req.headers()["next-action"] !== undefined) return true;
+  return false;
+}
+
 test("no video leaves the device for framing — only the final clip is POSTed (FR-050, SC-014)", async ({
   page,
   browserName,
@@ -74,12 +114,23 @@ test("no video leaves the device for framing — only the final clip is POSTed (
   // the proof does not hinge on Playwright reading the multipart body.
   const videoEgress: string[] = [];
   const anchorClipPosts: string[] = [];
+  // STRENGTHENED: any outbound body to a non-allowlisted destination — catches a frame
+  // leak disguised as JSON/base64/image bytes to any URL, not only video-signature ones.
+  const unexpectedDataEgress: string[] = [];
   let totalRequests = 0;
   page.on("request", (req) => {
     totalRequests += 1;
+    const method = req.method();
     const clipPost = isAnchorClipPost(req);
     if (clipPost) anchorClipPosts.push(req.url());
-    if (clipPost || isVideoEgress(req)) videoEgress.push(`${req.method()} ${req.url()}`);
+    if (clipPost || isVideoEgress(req)) videoEgress.push(`${method} ${req.url()}`);
+
+    const mutating = method === "POST" || method === "PUT" || method === "PATCH";
+    const hasBody = bodyText(req).length > 0;
+    if ((mutating || hasBody) && !isBenignDataDestination(req)) {
+      const ct = req.headers()["content-type"] ?? "(none)";
+      unexpectedDataEgress.push(`${method} ${req.url()} [${ct}]`);
+    }
   });
 
   const emp = await createCalibratableEmployee();
@@ -95,9 +146,11 @@ test("no video leaves the device for framing — only the final clip is POSTed (
 
   const requestsByGreenRoom = totalRequests;
   expect(requestsByGreenRoom, "the green room did make network requests").toBeGreaterThan(0);
-  // PROOF #1 — across the entire green room, the framing pipeline transmitted no video.
+  // PROOF #1 — across the entire green room, the framing pipeline transmitted no video…
   expect(videoEgress, "no video egress during the green room").toEqual([]);
   expect(anchorClipPosts, "no clip POST during the green room").toEqual([]);
+  // …and no OTHER outbound data to any non-allowlisted destination either.
+  expect(unexpectedDataEgress, "no unexpected outbound data during the green room").toEqual([]);
 
   // ── RECORDING — the real 60s lifecycle ────────────────────────────────────────
   const timer = page.getByRole("timer");
@@ -114,6 +167,7 @@ test("no video leaves the device for framing — only the final clip is POSTed (
   await page.waitForTimeout(4_000);
   expect(videoEgress, "no per-frame video egress mid-recording").toEqual([]);
   expect(anchorClipPosts, "no clip POST mid-recording").toEqual([]);
+  expect(unexpectedDataEgress, "no unexpected outbound data mid-recording").toEqual([]);
 
   // the recorder auto-stops at 60s → uploads the single clip → writes → success.
   await expect(
@@ -126,4 +180,6 @@ test("no video leaves the device for framing — only the final clip is POSTed (
   // the set of ALL video-bearing requests equals exactly that one /anchor clip POST.
   expect(videoEgress).toHaveLength(1);
   expect(videoEgress[0]).toContain(anchorClipPosts[0]);
+  // …and NO unexpected outbound data appeared anywhere across the whole flow.
+  expect(unexpectedDataEgress, "no unexpected outbound data across the whole flow").toEqual([]);
 });
