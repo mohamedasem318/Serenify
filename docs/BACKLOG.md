@@ -1179,3 +1179,52 @@ the CI Supabase/ML setup is already a tracked feature-006 dependency (see the
 feature-002 "CI integration" entry) — pair them.
 **Address by**: before trusting any live prediction in feature 006 (live inference).
 Treat as a go/no-go gate on feature-space fidelity, not optional polish.
+
+---
+
+## From feature 005 (calibration-capture-flow) — in progress
+
+### Before the 005 detector ships — outstanding launch blockers
+**Status**: deferred (launch gate)
+**Category**: deploy gate / pre-launch verification
+**Observed**: 2026-06-01, feature 005 implementation (Phase 1 + Phase 10 follow-ups)
+**Description**: The on-device face detector and the redesigned capture flow are
+implemented and CI-green — the NON-NEGOTIABLE FR-050 zero-egress proof and the
+consolidated e2e (`anchor-egress` / `anchor-flow` / `anchor-camera-access` /
+`anchor-banner` / `anchor-cross-tab`) pass on chromium with boundary seams. Three
+items MUST still be cleared before the detector ships to a real environment; tracked
+together here as the 005 pre-launch gate:
+
+- [ ] **⛔ T004 — flip the capture-route CSP from report-only to ENFORCE** (HARD
+  blocker, must land before any detector call ships). The scoped
+  `script-src 'wasm-unsafe-eval'` (+ provisional `worker-src 'self' blob:`) delta on
+  `/onboarding` + `/app/calibrate` currently ships **report-only** (T003). Run the
+  `securitypolicyviolation` sweep under Playwright on both capture routes with the
+  detector loading, narrow to the minimal allowance (drop `worker-src` if the runtime
+  needs no blob worker), then flip to **enforce** in `apps/web/proxy.ts`. Per
+  DECISION-20 / Risk R-2 the enforce MUST be verified BEFORE the detector's first real
+  call — a report-only policy does not actually block, so a CSP regression would
+  otherwise reach production silently.
+
+- [ ] **Run the T032 smoke matrix on a real webcam** — specifically the cross-browser
+  webcam permission matrix (§1) and the three real camera-access conditions (§2:
+  Blocked / Busy / No-camera) in
+  `specs/005-calibration-capture-flow/smoke-tests.md`. CI proves the orchestration with
+  injected seams (getUserMedia/detector); the real permission prompts, real
+  cross-browser `MediaRecorder`, and the real detector clearing the soft gate on a real
+  face are human-validated only — they are explicitly deferred there, not faked green
+  (DECISION-26). Mohamed signs off the smoke table before merge.
+
+- [ ] **Verify the mobile camera path over HTTPS** — `getUserMedia` requires a secure
+  context, so the local plain-HTTP-over-LAN stack cannot exercise mobile capture
+  (camera prompt → 60s record → upload → extraction → anchor write), including that a
+  mobile-browser codec (Android WebM/VP8-9, iOS MP4/H.264) decodes server-side. This is
+  the same gate as the feature-004 entry "Post-deploy mobile camera → upload → anchor
+  verification (real devices, HTTPS)" and the iOS ST-24 cell above — re-stated here so
+  005 is not declared shippable without it.
+
+**Fix scope**: T004 is small (the violation sweep + one `proxy.ts` edit + a Playwright
+header assertion); the smoke matrix and the mobile-HTTPS verification are
+human/device-dependent runs, not code.
+**Address by**: all three BEFORE the detector ships to any real (HTTPS, real-tenant)
+environment. T004 specifically must precede the detector's first production call.
