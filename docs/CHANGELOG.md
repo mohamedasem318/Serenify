@@ -1445,3 +1445,29 @@ the device for framing. The strengthened accumulator makes that the literal asse
 The existing video checks are kept intact (added to, not replaced). Verified passing on
 chromium; the DECISION-26 / FR-050 note in `docs/DECISIONS.md` is updated to describe the
 two-layer check. No production code change.
+
+## 2026-06-01 - fix(005-calibration-capture-flow): green-room gate-clear sync (helper text no longer leads)
+
+- `apps/web/components/anchor/green-room.tsx`: the affirmative status line ("You're all
+  set — start when you're ready.", with its bold treatment + inline check) now keys off
+  the **confirmed, debounced** gate signal (`ready`, held for `SET_DEBOUNCE_MS`) — the
+  SAME signal that already enables "I'm ready" and lights the meadow brackets/check —
+  instead of the **raw per-frame verdict** (`gate === "ready"`), which flipped a render
+  early. A momentarily-good frame that hasn't yet held the debounce now reads a calm
+  "Almost there — hold steady." rather than a premature "all set". The gate **nudges**
+  (no-face / off-centre / too-dark) still come straight off the raw verdict, so they
+  surface instantly.
+- `apps/web/components/anchor/green-room-gate-sync.test.tsx` (new): drives synthetic
+  detector frames through the REAL `toFramingSignal` + `evaluateGate` debounce (not
+  mocked green) and asserts the invariant — the affirmative line, the enabled button, and
+  the meadow check all flip together at the one confirmed boundary, never a frame apart.
+  Also pins the preserved detector-unavailable bypass (`ready = true` with its own "No
+  live guide" copy and NO "all set" affirmative).
+
+Rationale: alignment of the implementation with already-intended behaviour (FR-008's
+single gate-cleared moment), **not** a design-principle change — so no DECISIONS entry.
+`SET_DEBOUNCE_MS` is unchanged (it still prevents the affirmative from flickering on a
+momentary detection); the fix makes the text respect that same debounce rather than
+firing on the raw signal. The inset-glow coexistence (affirmative brackets ⟷ enabled
+"I'm ready"), the detector-unavailable bypass, and the reduced-motion static affirmative
+are all untouched and verified by the existing suite (161 anchor tests green).

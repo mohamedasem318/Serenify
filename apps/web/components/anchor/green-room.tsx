@@ -53,17 +53,28 @@ export function GreenRoom({
   onNotNow: () => void;
 }) {
   const loading = guide === "loading";
-  // Affirmative only when the live detector actively confirms the framing — never
-  // for the unavailable bypass (we don't claim "set" for a frame we can't see), and
-  // never while the backend is down (nothing is "set" if we can't record).
-  const affirmed = !serviceUnavailable && guide === "active" && gate === "ready";
+  // Affirmative only when the live detector CONFIRMS the framing — i.e. off the
+  // debounced `ready` (held for SET_DEBOUNCE_MS), the SAME signal that enables
+  // "I'm ready" and lights the meadow brackets, never the raw per-frame verdict
+  // (`gate === "ready"`), which turns ready a render before the debounce confirms
+  // it (the line must not lead the button + brackets). Still never for the
+  // unavailable bypass (we don't claim "set" for a frame we can't see) nor while the
+  // backend is down (nothing is "set" if we can't record).
+  const affirmed = !serviceUnavailable && guide === "active" && ready;
   const helper = serviceUnavailable
     ? "Hang on a moment — checking the connection."
     : loading
       ? "Getting your live guide ready…"
       : guide === "unavailable"
         ? "No live guide — you can still record."
-        : GATE_HELP[gate];
+        : affirmed
+          ? GATE_HELP.ready
+          : gate === "ready"
+            ? // A momentarily-good frame that hasn't yet held for the set-debounce:
+              // a calm "almost", NOT a premature "all set". Nudges below still come
+              // straight off the raw verdict, so they surface at once.
+              "Almost there — hold steady."
+            : GATE_HELP[gate];
 
   return (
     <div className="space-y-3 rounded-card border border-border bg-surface p-4 shadow-soft sm:p-5">
