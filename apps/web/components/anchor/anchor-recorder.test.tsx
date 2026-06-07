@@ -1,85 +1,136 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { checkHealth, postAnchor } from "@/lib/api/anchor-client";
-
-import { AnchorRecorder } from "./anchor-recorder";
-
-// The recorder talks to the FastAPI client, the user's Supabase session, and the
-// cross-tab broadcaster. Stub all three so the test exercises the component's own
-// state transitions, not those collaborators.
-vi.mock("@/lib/api/anchor-client", () => ({
-  checkHealth: vi.fn(),
-  postAnchor: vi.fn(),
-}));
-vi.mock("@/lib/auth-broadcast", () => ({ broadcastAnchorCaptured: vi.fn() }));
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: () => ({
-    auth: { getSession: async () => ({ data: { session: null } }) },
-    from: () => ({ update: () => ({ eq: async () => ({ error: null }) }) }),
-  }),
-}));
-
-const mockedCheckHealth = vi.mocked(checkHealth);
-const mockedPostAnchor = vi.mocked(postAnchor);
+import { AnchorRecorder, type RecorderDeps } from "./anchor-recorder";
 
 /**
- * A getUserMedia + MediaRecorder that actually SUCCEED, so the only thing that
- * can stop the recorder reaching the `recording` state (the preview + countdown)
- * is the health gate itself. Without working camera stubs, a regression test
- * could pass for the wrong reason — getUserMedia rejecting, not the health gate.
+ * Honest boundary-seam tests (📌 DECISION-26): inject ONLY at the unavoidable I/O
+ * boundary (getUserMedia, MediaRecorder, postAnchor/checkHealth, the detector, and
+ * the Supabase write) and run the REAL orchestration — the reducer, the /healthz
+ * gate, the framing-guide bypass, the timer, and the write-gating all execute.
+ *
+ * The detector is injected as `null` so the framing guide reports `unavailable` and
+ * the soft gate is bypassed (`ready`) — which also exercises the never-lock-out
+ * guarantee (FR-011 / analyze C1) in the US1 slice. With reduced-motion forced on,
+ * every animated surface renders static, so the timer-driven flow is deterministic.
  */
-function installWorkingCameraStubs() {
-  // happy-dom's <video>.srcObject setter rejects anything that is not a real
-  // MediaStream, and the recorder assigns the stream to the preview the moment
-  // it reaches `recording`. Use happy-dom's own MediaStream so the pre-fix code
-  // genuinely paints the preview + countdown (the regression) instead of
-  // throwing — otherwise the test would fail for the wrong reason.
+
+// happy-dom's <video>.srcObject setter rejects a non-MediaStream; use a real
+// happy-dom MediaStream instance (with a no-op getTracks for the release path).
+function makeFakeStream(): MediaStream {
   const RealMediaStream = (globalThis as { MediaStream?: typeof MediaStream }).MediaStream;
-  const fakeStream: MediaStream = RealMediaStream
+  const stream: MediaStream = RealMediaStream
     ? new RealMediaStream()
     : ({ getTracks: () => [] } as unknown as MediaStream);
-  // happy-dom's MediaStream instance satisfies the srcObject instanceof check but
-  // does not implement getTracks(); the recorder calls it when releasing the
-  // camera on unmount, so give the instance a no-op tracks list.
-  (fakeStream as unknown as { getTracks?: () => MediaStreamTrack[] }).getTracks = () => [];
+  const api = stream as unknown as {
+    getTracks: () => MediaStreamTrack[];
+    getVideoTracks: () => MediaStreamTrack[];
+  };
+  api.getTracks = () => [];
+  api.getVideoTracks = () => []; // no tagged device → orchestrator remembers nothing
+  return stream;
+}
+
+// A fake stream that reports which device it came from (via getVideoTracks +
+// getSettings), so the orchestrator's "already on this device?" guard can compare
+// the live stream against the picker selection (Bug 1).
+function makeFakeStreamWithDevice(deviceId: string): MediaStream {
+  const track = { stop: () => {}, getSettings: () => ({ deviceId }) } as unknown as MediaStreamTrack;
+  const RealMediaStream = (globalThis as { MediaStream?: typeof MediaStream }).MediaStream;
+  const stream: MediaStream = RealMediaStream ? new RealMediaStream() : ({} as MediaStream);
+  const api = stream as unknown as {
+    getTracks: () => MediaStreamTrack[];
+    getVideoTracks: () => MediaStreamTrack[];
+  };
+  api.getTracks = () => [track];
+  api.getVideoTracks = () => [track];
+  return stream;
+}
+
+const TWO_CAMERAS = [
+  { deviceId: "cam-A", kind: "videoinput", label: "Front", groupId: "g", toJSON: () => ({}) },
+  { deviceId: "cam-B", kind: "videoinput", label: "Back", groupId: "g", toJSON: () => ({}) },
+] as unknown as MediaDeviceInfo[];
+
+/** Mock the device-enumeration I/O seam, run `body`, and always restore navigator. */
+async function withCameras(
+  enumerate: () => Promise<MediaDeviceInfo[]>,
+  body: () => Promise<void>,
+): Promise<void> {
+  const original = Object.getOwnPropertyDescriptor(navigator, "mediaDevices");
   Object.defineProperty(navigator, "mediaDevices", {
     configurable: true,
-    value: {
-      getUserMedia: vi.fn().mockResolvedValue(fakeStream),
-      enumerateDevices: vi.fn().mockResolvedValue([]),
-    },
+    value: { enumerateDevices: enumerate },
   });
-
-  class FakeMediaRecorder {
-    state = "inactive";
-    mimeType: string;
-    ondataavailable: ((e: { data: Blob }) => void) | null = null;
-    onstop: (() => void) | null = null;
-    constructor(_s: MediaStream, opts?: { mimeType?: string }) {
-      this.mimeType = opts?.mimeType ?? "video/webm";
-    }
-    static isTypeSupported() {
-      return true;
-    }
-    start() {
-      this.state = "recording";
-    }
-    stop() {
-      this.state = "inactive";
-      this.ondataavailable?.({ data: new Blob([new Uint8Array([0])], { type: this.mimeType }) });
-      this.onstop?.();
-    }
+  try {
+    await body();
+  } finally {
+    if (original) Object.defineProperty(navigator, "mediaDevices", original);
+    else Reflect.deleteProperty(navigator as unknown as Record<string, unknown>, "mediaDevices");
   }
-  Object.defineProperty(window, "MediaRecorder", {
-    configurable: true,
-    writable: true,
-    value: FakeMediaRecorder,
-  });
+}
 
-  // Countdown reads prefers-reduced-motion; happy-dom needs matchMedia stubbed.
+// A MediaRecorder that succeeds: stop() emits one chunk, then fires onstop.
+class FakeRecorder {
+  state = "inactive";
+  mimeType = "video/webm";
+  ondataavailable: ((event: { data: Blob }) => void) | null = null;
+  onstop: (() => void) | null = null;
+  start() {
+    this.state = "recording";
+  }
+  stop() {
+    this.state = "inactive";
+    this.ondataavailable?.({ data: new Blob([new Uint8Array([1, 2, 3])], { type: this.mimeType }) });
+    this.onstop?.();
+  }
+}
+
+function buildDeps(over: Partial<RecorderDeps> = {}): {
+  deps: Partial<RecorderDeps>;
+  spies: {
+    getUserMedia: ReturnType<typeof vi.fn>;
+    postAnchor: ReturnType<typeof vi.fn>;
+    writeAnchor: ReturnType<typeof vi.fn>;
+    checkHealth: ReturnType<typeof vi.fn>;
+    broadcastAnchorCaptured: ReturnType<typeof vi.fn>;
+  };
+} {
+  const spies = {
+    getUserMedia: vi.fn().mockResolvedValue(makeFakeStream()),
+    postAnchor: vi.fn().mockResolvedValue({ ok: true, vectorB64: "QUJD", modelVersion: "v1", dim: 2958 }),
+    writeAnchor: vi.fn().mockResolvedValue({ ok: true }),
+    checkHealth: vi.fn().mockResolvedValue(true),
+    broadcastAnchorCaptured: vi.fn(),
+  };
+  const deps: Partial<RecorderDeps> = {
+    getUserMedia: spies.getUserMedia as RecorderDeps["getUserMedia"],
+    createRecorder: () => new FakeRecorder(),
+    postAnchor: spies.postAnchor as RecorderDeps["postAnchor"],
+    checkHealth: spies.checkHealth as RecorderDeps["checkHealth"],
+    createDetector: vi.fn().mockResolvedValue(null) as RecorderDeps["createDetector"],
+    getSession: vi.fn().mockResolvedValue({ accessToken: "tok", userId: "user-1" }) as RecorderDeps["getSession"],
+    writeAnchor: spies.writeAnchor as RecorderDeps["writeAnchor"],
+    broadcastAnchorCaptured: spies.broadcastAnchorCaptured as RecorderDeps["broadcastAnchorCaptured"],
+    probeCameraPermission: vi.fn().mockResolvedValue("prompt") as RecorderDeps["probeCameraPermission"],
+    ...over,
+  };
+  return { deps, spies };
+}
+
+/** Advance fake timers AND flush the awaited I/O promises in between, inside act. */
+async function flush(ms = 0) {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(ms);
+  });
+}
+
+beforeEach(() => {
+  vi.useFakeTimers();
+  // Force reduced motion so framer-driven surfaces render static (no animation
+  // loop competing with the fake-timer flow).
   window.matchMedia = vi.fn().mockImplementation((query: string) => ({
-    matches: false,
+    matches: true,
     media: query,
     onchange: null,
     addEventListener: vi.fn(),
@@ -88,66 +139,293 @@ function installWorkingCameraStubs() {
     removeListener: vi.fn(),
     dispatchEvent: vi.fn(),
   }));
-}
-
-beforeEach(() => {
-  installWorkingCameraStubs();
-  mockedPostAnchor.mockReset();
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   localStorage.clear();
 });
 
-const UNAVAILABLE = /temporarily unavailable/i;
+async function reachGreenRoom() {
+  fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+  await flush(); // probe + getUserMedia + PERMISSION_GRANTED
+  await flush(); // <video> mounts → detector(null) → guide unavailable → gate bypassed
+  await flush();
+}
 
-describe("AnchorRecorder — health pre-check gates the recording UI (ST-18 / FR-048)", () => {
-  it("never paints the preview + countdown when the backend dies after a healthy mount", async () => {
-    // Mount probe succeeds (backend up); every later probe fails (backend died).
-    mockedCheckHealth.mockResolvedValueOnce(true).mockResolvedValue(false);
+/**
+ * From the green room: clear the /healthz gate and drain the 3·2·1 countdown into
+ * recording. The countdown re-schedules each tick through a React passive effect,
+ * which only flushes at each `act()` boundary — so advance ONE second per flush and
+ * stop the moment the recording stage (its Stop control) appears.
+ */
+async function startRecording() {
+  fireEvent.click(screen.getByRole("button", { name: /ready/i }));
+  await flush(); // checkHealth → get-ready
+  for (let i = 0; i < 6 && !screen.queryByRole("button", { name: /stop/i }); i += 1) {
+    await flush(1000);
+  }
+}
 
-    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} />);
+describe("AnchorRecorder — US1 happy path (T017, FR-001–026)", () => {
+  it("runs intro → green room → countdown → 60 s → success, writing the anchor only at the end", async () => {
+    const onComplete = vi.fn();
+    const { deps, spies } = buildDeps();
+    render(<AnchorRecorder mode="first-time" onComplete={onComplete} onSkip={() => {}} deps={deps} />);
 
-    // Health resolved up → the live Start button appears.
-    const start = await screen.findByRole("button", { name: "Start recording" });
+    // Intro → green room (camera acquired; never auto-records).
+    await reachGreenRoom();
+    expect(spies.getUserMedia).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(start);
+    // Never locked out: detector unavailable ⇒ "I'm ready" is available (FR-011/C1).
+    const ready = screen.getByRole("button", { name: /ready/i });
+    expect(ready).toBeEnabled();
+    // Nothing has touched the baseline yet.
+    expect(spies.writeAnchor).not.toHaveBeenCalled();
 
-    // The Start re-check must surface the unavailable copy WITHOUT ever painting
-    // the countdown. On the pre-fix recorder (no awaited re-check) the click
-    // would optimistically reach `recording` and render the timer — the
-    // assertion below catches exactly that regression.
-    await waitFor(() => expect(screen.getByText(UNAVAILABLE)).toBeInTheDocument());
+    // "I'm ready" → /healthz ok → get-ready (3·2·1) → recording.
+    await startRecording();
+    expect(spies.checkHealth).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+
+    // The full minute elapses → upload → write → success.
+    await flush(61000);
+
+    expect(screen.getByText(/your baseline is set/i)).toBeInTheDocument();
+    // The ONLY clip egress is the single final POST on success; the write follows it.
+    // (The network-level proof across BOTH framing phases is T031 / FR-050.)
+    expect(spies.postAnchor).toHaveBeenCalledTimes(1);
+    expect(spies.postAnchor.mock.calls[0]?.[0]).toBeInstanceOf(Blob);
+    expect(spies.writeAnchor).toHaveBeenCalledTimes(1);
+    expect(spies.writeAnchor.mock.calls[0]?.[0]).toMatchObject({ userId: "user-1", vectorB64: "QUJD" });
+    expect(spies.broadcastAnchorCaptured).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole("button", { name: /back to home/i }));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("AnchorRecorder — /healthz gate before the countdown (T016, FR-056)", () => {
+  it("blocks the countdown and shows the calm gate copy when the backend is down", async () => {
+    const { deps, spies } = buildDeps({
+      checkHealth: vi.fn().mockResolvedValue(false) as RecorderDeps["checkHealth"],
+    });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    await reachGreenRoom();
+    fireEvent.click(screen.getByRole("button", { name: /ready/i }));
+    await flush();
+
+    // Calm, foggy gate copy — and the countdown never started.
+    expect(screen.getByText(/quiet moment/i)).toBeInTheDocument();
     expect(screen.queryByRole("timer")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Start recording" })).toBeNull();
-    // Recording-state side effects must never have fired.
-    expect(mockedPostAnchor).not.toHaveBeenCalled();
-    expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
+    expect(spies.postAnchor).not.toHaveBeenCalled();
+    expect(spies.writeAnchor).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
 
-  it("shows the unavailable copy and no Start button when the backend is down on mount (bonus)", async () => {
-    mockedCheckHealth.mockResolvedValue(false);
+  it("recovers when the backend returns — the modal 'Try again' re-probes and advances", async () => {
+    const checkHealth = vi
+      .fn()
+      .mockResolvedValueOnce(false) // first gate check → down (blocking modal)
+      .mockResolvedValue(true); //     re-probe → healthy → advance
+    const { deps } = buildDeps({ checkHealth: checkHealth as RecorderDeps["checkHealth"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
 
-    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} />);
+    await reachGreenRoom();
+    fireEvent.click(screen.getByRole("button", { name: /ready/i }));
+    await flush(); // → down, the blocking modal is up
+    expect(screen.getByText(/quiet moment/i)).toBeInTheDocument();
 
-    await waitFor(() => expect(screen.getByText(UNAVAILABLE)).toBeInTheDocument());
-    expect(screen.queryByRole("button", { name: "Start recording" })).toBeNull();
-    expect(screen.queryByRole("timer")).toBeNull();
-    // Skip is always available in the unavailable state (FR-007/048).
-    expect(screen.getByRole("button", { name: "Skip for now" })).toBeInTheDocument();
+    // The modal's foggy "Try again" re-probes /healthz; on success it dismisses and
+    // the get-ready countdown begins (no dismiss path left "I'm ready" live).
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    for (let i = 0; i < 6 && !screen.queryByRole("button", { name: /stop/i }); i += 1) {
+      await flush(1000);
+    }
+    expect(checkHealth).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole("button", { name: /stop/i })).toBeInTheDocument();
+  });
+});
+
+describe("AnchorRecorder — overwrite-on-success-only (FR-053 / DECISION-22)", () => {
+  it("does NOT write the anchor when extraction fails (422)", async () => {
+    const postAnchor = vi.fn().mockResolvedValue({ ok: false, kind: "extraction_failed", reason: "no face" });
+    const { deps, spies } = buildDeps({ postAnchor: postAnchor as RecorderDeps["postAnchor"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    await reachGreenRoom();
+    await startRecording();
+    await flush(61000);
+
+    expect(screen.getByText(/couldn.t set your baseline/i)).toBeInTheDocument();
+    expect(postAnchor).toHaveBeenCalledTimes(1);
+    expect(spies.writeAnchor).not.toHaveBeenCalled(); // baseline untouched on failure
+  });
+});
+
+describe("AnchorRecorder — getUserMedia error → the three calm states (FR-031–035)", () => {
+  it("routes a busy camera to the camera-in-use state without a strike", async () => {
+    const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });
+    const { deps, spies } = buildDeps({
+      getUserMedia: vi.fn().mockRejectedValue(busy) as RecorderDeps["getUserMedia"],
+    });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+    await flush();
+    await flush();
+
+    expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+    expect(spies.writeAnchor).not.toHaveBeenCalled();
+  });
+});
+
+describe("AnchorRecorder — switching camera re-acquires the live preview (Bug 1)", () => {
+  it("stops the old tracks and re-calls getUserMedia with the new deviceId", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        // getUserMedia returns a stream tagged with the device it was asked for
+        // (video:true → the default, cam-A), so the live-device guard can compare.
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) =>
+          Promise.resolve(
+            makeFakeStreamWithDevice(
+              (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact ?? "cam-A",
+            ),
+          ),
+        );
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+        await reachGreenRoom();
+        // initial acquire only — the picker's echo of the ACTIVE camera is a no-op
+        expect(getUserMedia).toHaveBeenCalledTimes(1);
+
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
+
+        // the preview follows the choice: re-acquired with the NEW deviceId
+        expect(getUserMedia).toHaveBeenCalledTimes(2);
+        expect(getUserMedia.mock.calls[1]?.[0]).toMatchObject({
+          video: { deviceId: { exact: "cam-B" } },
+        });
+      },
+    );
   });
 
-  it("records normally when the backend is healthy on both the mount probe and the Start re-check", async () => {
-    mockedCheckHealth.mockResolvedValue(true);
+  it("surfaces the camera-in-use state when the newly picked device is busy", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+          const id = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+          if (id === "cam-B") {
+            return Promise.reject(Object.assign(new Error("busy"), { name: "NotReadableError" }));
+          }
+          return Promise.resolve(makeFakeStreamWithDevice(id ?? "cam-A"));
+        });
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
 
-    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} />);
+        await reachGreenRoom();
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
 
-    const start = await screen.findByRole("button", { name: "Start recording" });
-    fireEvent.click(start);
+        // picking a busy device makes the busy state reachable (Bug 1 secondary goal)
+        expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+      },
+    );
+  });
+});
 
-    // Re-check passed → permission granted → recording: the countdown paints.
-    await waitFor(() => expect(screen.getByRole("timer")).toBeInTheDocument());
-    expect(navigator.mediaDevices.getUserMedia).toHaveBeenCalledTimes(1);
+describe("AnchorRecorder — busy/dead camera never locks the user out (Task 1)", () => {
+  const CAMERA_KEY = "serenify-anchor-camera";
+
+  it("falls back to the default when the remembered camera is busy on entry — no lockout", async () => {
+    localStorage.setItem(CAMERA_KEY, "cam-A"); // remembered from a prior session, now busy
+    const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });
+    const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+      const exact = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+      if (exact === "cam-A") return Promise.reject(busy); // the remembered device is busy
+      return Promise.resolve(makeFakeStreamWithDevice(exact ?? "cam-default")); // default works
+    });
+    const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+    await flush();
+    await flush();
+    await flush();
+
+    // recovered into the green room on the default — NOT stuck on the busy screen
+    expect(screen.queryByRole("heading", { name: /camera.s in use/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /ready/i })).toBeInTheDocument();
+    // tried the remembered device, then fell back to the default
+    expect(getUserMedia).toHaveBeenCalledTimes(2);
+    // the dead key is repaired to the device that actually started
+    expect(localStorage.getItem(CAMERA_KEY)).not.toBe("cam-A");
+  });
+
+  it("never remembers a device that failed to acquire (a busy pick keeps the prior good camera)", async () => {
+    await withCameras(
+      () => Promise.resolve(TWO_CAMERAS),
+      async () => {
+        const getUserMedia = vi.fn().mockImplementation((c: MediaStreamConstraints) => {
+          const exact = (c.video as { deviceId?: { exact?: string } })?.deviceId?.exact;
+          if (exact === "cam-B") {
+            return Promise.reject(Object.assign(new Error("busy"), { name: "NotReadableError" }));
+          }
+          return Promise.resolve(makeFakeStreamWithDevice(exact ?? "cam-A"));
+        });
+        const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+        render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+        await reachGreenRoom(); // acquires the default (cam-A) → cam-A remembered
+        expect(localStorage.getItem(CAMERA_KEY)).toBe("cam-A");
+
+        const select = screen.getByLabelText(/camera/i);
+        await act(async () => {
+          fireEvent.change(select, { target: { value: "cam-B" } });
+          await flush();
+        });
+
+        // cam-B failed → it must NOT be remembered; cam-A (the last good one) stays
+        expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+        expect(localStorage.getItem(CAMERA_KEY)).toBe("cam-A");
+      },
+    );
+  });
+
+  it("'Try again' after a busy state reaches a working camera once it's freed (not re-trapped)", async () => {
+    const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });
+    let freed = false;
+    const getUserMedia = vi.fn().mockImplementation(() =>
+      freed ? Promise.resolve(makeFakeStreamWithDevice("cam-A")) : Promise.reject(busy),
+    );
+    const { deps } = buildDeps({ getUserMedia: getUserMedia as RecorderDeps["getUserMedia"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /turn on camera/i }));
+    await flush();
+    await flush();
+    expect(screen.getByRole("heading", { name: /camera.s in use/i })).toBeInTheDocument();
+
+    // the user frees the camera, then taps Try again → reaches the green room
+    freed = true;
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    await flush();
+    await flush();
+    await flush();
+
+    expect(screen.queryByRole("heading", { name: /camera.s in use/i })).toBeNull();
+    expect(screen.getByRole("button", { name: /ready/i })).toBeInTheDocument();
   });
 });

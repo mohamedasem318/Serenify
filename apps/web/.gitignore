@@ -41,3 +41,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# self-hosted MediaPipe detector WASM — reproduced from the pinned
+# @mediapipe/tasks-vision dep by scripts/copy-face-detect-wasm.mjs (predev/prebuild).
+# The .tflite model in public/face-detect/ IS committed; the wasm runtime is not.
+/public/face-detect/wasm/

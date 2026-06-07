@@ -2081,3 +2081,446 @@ is not extraction-derived and is unaffected.)
 **Revisit if**: production gains a separate extraction/pipeline-version field — then
 feature-space changes like this should invalidate stored anchors via that field
 rather than by manual re-capture (backlog item; not addressed in this hotfix).
+
+## 2026-05-31 — DECISION-22 (005 draft): recalibrate via `?mode=recalibrate`; overwrite-on-success-only; no DB change
+
+**Status**: Draft (feature 005 — consolidated with entries 19–28 at T033).
+
+**Decision**: The account "Set a new baseline" entry launches the *same* capture
+flow in recalibrate mode through a **full-document navigation** —
+`<a href="/app/calibrate?mode=recalibrate">`, never a `<Link>`/router transition —
+so the per-route `camera=(self)` Permissions-Policy applies (DECISION-16, FR-055).
+`calibrate/page.tsx` reads `searchParams.mode` and, in recalibrate, **suppresses the
+`has_anchor`→`/app` redirect** (the ST-17 guard) so a calibrated user is not bounced
+out of their own replacement. The recorder runs with `mode="recalibrate"`: copy
+nudges "set"→"update" (success: "Your baseline is updated") and both exits
+hard-navigate to **`/app/account`** (first-time exits stay `/app`). The reconciliation
+and the exit map are a pure module (`lib/anchor/calibrate-mode.ts` —
+`resolveCalibrateMode`/`calibrateExit`) so the decision is unit-tested directly.
+
+**Clarification #3 (hardening)**: `mode` is reconciled against the *real*
+`has_anchor`. A stray `?mode=recalibrate` for a user with **no** baseline falls back
+to first-time semantics (copy "set", exit `/app`) — the URL alone never manufactures
+a recalibration. Conservative on a null/error `has_anchor`: treated as
+not-calibrated, so a transient RPC failure neither redirects nor spuriously
+recalibrates.
+
+**Overwrite-on-success-only**: the existing client write path (decode `vector_b64` →
+bytea → `UPDATE` the owner's `profiles` row) already runs **only** after a successful
+extraction, so stop / processing-failure / "Not now" / "Maybe later" naturally leave
+the prior baseline untouched. The write is the same single in-place `UPDATE` for both
+first-time and recalibrate — **no baseline history, no new table, no migration** (the
+DECISION-12 UPDATE whitelist already permits the owner to overwrite their anchor
+columns). An honest test injects the Supabase client and asserts `.update()` fires
+exactly once on success and **never** on any abort/defer
+(`anchor-recorder.write-gating.test.tsx`).
+
+## 2026-05-31 — DECISION-23 (005 draft): account "Your calm baseline" is whether-set-only; capture date NOT surfaced
+
+**Status**: Draft (feature 005 — consolidated with entries 19–28 at T033).
+
+**Decision**: The account "Your calm baseline" section surfaces **only whether** a
+baseline is set (from the scope-guarded `has_anchor(auth.uid())` boolean) plus the
+"Set a new baseline" action. It does **not** surface the capture date or any
+timestamp (FR-041), and it renders only for **employees** (team_lead/admin have no
+anchor flow — Principle I).
+
+**Why**: the date column was deliberately hidden from everyone — including the
+owner's own read — in DECISION-12, to deny managers a calibration-timing pressure
+signal. Surfacing even the owner's own date would need a new self-scoped
+SECURITY DEFINER read, a DB surface this redesign does not require; the spec defaults
+to whether-set-only (FR-041). A self-scoped date read is a clean future addition when
+feature 006's inference read path lands. The section never exposes another user's
+state or date.
+
+**Voice (FR-040)**: the copy talks about the baseline itself and must not imply that
+live stress monitoring or check-ins are already running; calm, no exclamation marks.
+Enforced by an RTL assertion over the rendered section text
+(`baseline-section.test.tsx`).
+
+## 2026-05-31 — DECISION (005): home calibration banner CTA meadow → foggy
+
+**Status**: Accepted (feature 005, T028).
+
+**Decision**: The `/app` calibration banner is restyled amber → **foggy** (surface
+border + bg), and its primary CTA — relabelled "Set baseline" — uses the
+**foggy-filled** `Button` variant (`variant="foggy"`: `bg-foggy` with `text-ink` /
+`dark:text-bg`), the *same* CTA treatment already shipped this cycle on the
+failure-state and the three camera-access screens. The CTA is **foggy, not meadow**.
+The lifecycle is untouched: `useSyncExternalStore` + session-dismiss +
+`broadcastAnchorBannerDismissed` + the cross-tab mirror are preserved verbatim, and
+the `aria-label="Calibration"` region (which the Playwright cross-tab spec keys off)
+is unchanged. The CTA remains a full-document `<a href="/app/calibrate">` (Button
+`asChild`), guarded by a source-level test, so the per-route `camera=(self)`
+Permissions-Policy still applies (FR-055 / DECISION-16). Render-site employee-gating
+already existed on `/app` (`profile.role === "employee"`, the same determination the
+account baseline section uses) — not duplicated.
+
+**Why this is an application of Principle V, not an amendment to it**: Principle V's
+palette roles are unchanged — amber stays reserved for stress/affective signals,
+crimson for destructive surfaces, meadow for affirmative confirmation, foggy for the
+calm "needs your attention, not stress" state. The original task text said *meadow*
+for the banner button; that was reconsidered because the banner is an **attention
+prompt**, not an **affirmative confirmation** — so foggy (attention) is the correct
+role, and meadow (reserved for "you did it" moments like the success state) would be
+a misapplication. This refines *which* calm colour the CTA-colour rule selects for an
+attention CTA; it does not alter any principle, so it is logged here rather than as a
+constitution amendment. Spec FR-043 and the T028 task line are aligned to read foggy.
+
+**AA note**: foggy fill + ink text clears WCAG AA in both themes
+(`text-ink` ~6.8:1 light, `dark:text-bg` ~9:1 dark on the foggy fill); a white/ink
+fill on the foggy wash would not, which is the practical reason the shared
+`variant="foggy"` exists rather than a hand-rolled fill.
+
+## 2026-05-31 — DECISION-25 (005 draft): device-memory — re-persist the resolved default on a cleared store
+
+**Status**: Draft (feature 005, T029 — consolidated with entries 19–28 at T033).
+
+**Decision**: `device-picker.tsx`'s mount effect now (re-)writes the remembered-camera
+preference when the store is **empty/cleared** and a real default camera resolves
+(`if (!stored && next) rememberCamera(next)`), so a cleared preference recovers for
+the session rather than silently staying empty (FR-045). The write is guarded on
+`!stored`, so a **stored-but-temporarily-absent** device is never clobbered — its
+memory is kept and it is re-preferred when it reconnects (preserving FR-005).
+
+**What the earlier busy-camera fix already covered (the bulk of DECISION-25)**: the
+inescapable-lockout fix had already moved all *selection-time* persistence out of the
+picker into the orchestrator, which writes **only a device that getUserMedia actually
+started** and **repairs a dead key** by falling back to the system default and
+persisting whatever started. Those two invariants (only-write-what-started,
+repair-on-failure) are untouched. The picker still does **not** persist a user
+*selection* — a busy/dead pick is never remembered until it starts.
+
+**The remainder this task implemented**: only the mount-effect's auto-resolved
+default was never persisted, so a *cleared* store never re-seeded for the session —
+the one resolution the orchestrator can miss (a started track may expose no
+`deviceId`). Persisting it does not re-introduce the lockout: it fires only when
+nothing is stored (never over a known-good device), and a busy persisted default is
+still repaired on the next entry by the orchestrator's fallback. An honest Vitest
+(`device-picker.test.tsx`) **fails against the pre-fix code** (cleared store + one
+camera → the preference is null, expected the resolved id) and passes after; sibling
+cases assert the don't-clobber guard and that a still-present remembered device is
+left untouched. The prior "writes nothing" test was reconciled to assert the real
+invariant (a *selection* is never persisted; the mount default is).
+
+## 2026-05-31 — DECISION (005): e2e detector injection seam + the FR-050 egress proof (T031)
+
+**Status**: Accepted (feature 005, T031).
+
+**Decision**: `lib/face-detect/detector.ts::createFaceDetector` reads an optional
+`window.__anchorE2EDetector__` factory *first* and, when present, returns it instead
+of loading the real WASM. **No application code ever sets it** — it is written only by
+a Playwright `addInitScript` (`installActiveDetector`) — so it is inert in production
+and guarded by presence. This is the DECISION-26 "inject the detector" seam at the
+e2e layer: it lets the **real** `useFramingGuide` loop + the **real** framing gate run
+against a deterministic centred-face detector, so the soft gate clears without a real
+face (BlazeFace sees none in a headless browser) and the flow reaches the full
+recording. The fake feed is painted bright each rAF so the on-device luma read clears
+the too-dark floor.
+
+**Why it earns its keep**: it is what makes the **NON-NEGOTIABLE** FR-050/SC-014
+egress proof (`anchor-egress.spec.ts`) possible as an *active-pipeline* assertion —
+Playwright intercepts every request across BOTH the green room (framing loop running)
+and the full 60 s recording and proves, at the green-room / mid-recording / post-success
+checkpoints, that **(a)** no VIDEO payload egresses (multipart `.webm`/`.mp4` clip part
+or `video/*` Content-Type) except the single final clip POSTed to `/anchor` on success,
+**and (b)** — strengthened 2026-06-01 — **no outbound body of ANY kind** reaches a
+non-allowlisted destination, so a frame leak disguised as JSON/base64/image bytes to any
+URL is caught too. The benign allowlist is exactly: the final `/anchor` clip POST; the
+Supabase host (auth/token + the derived-hex anchor-vector write); and same-origin Next
+**server actions** (matched by the `Next-Action` header — the sign-in auth RPC; a bespoke
+frame leak would be a headerless fetch/beacon and stay flagged). Verified: across the
+framing phases there are **zero** body-carrying requests at all (the clip POST + Supabase
+write both fire only at success). Verified passing on chromium. Without the seam, the
+only deterministic CI option is the detector-unavailable bypass, which would never
+exercise the framing pipeline active.
+
+**Scope**: the three stale 004 e2e specs (`anchor-onboarding`, `anchor-health-precheck`,
+`anchor-skip`), which were `test.skip(true, "…re-author under T031")`, are removed and
+re-authored into the 005 consolidation (`anchor-flow`, `anchor-camera-access`,
+`anchor-banner`, plus the re-authored `anchor-cross-tab`). Genuinely device/browser-
+dependent behaviour (real webcam, real OS prompts, the real detector clearing the gate
+on a real face, the weak-device unavailable fallback) is **deferred to smoke-tests.md**
+with an explicit note — not faked green. No backend/DB/seed change.
+
+---
+
+## 2026-06-08 — feature 005 architecture decisions (collected & finalised; 📌 DECISION-19 through DECISION-28)
+
+This block **finalises** (Status: Accepted) the architectural decisions of feature
+005 (calibration-capture-flow) and folds every mid-cycle 005 record into the planned
+**19–28** numbering: the three numbered drafts (DECISION-22/23/25, dated 2026-05-31)
+and the two dated-but-unnumbered Accepted notes — the **banner CTA meadow→foggy**
+decision (2026-05-31, folded into DECISION-28) and the **e2e detector-seam / FR-050
+egress-proof** note (2026-05-31, strengthened 2026-06-01, folded into DECISION-26).
+Source tasks are named per entry and traceable to 📌 markers in
+`specs/005-calibration-capture-flow/{tasks.md, plan.md, data-model.md, contracts/}`.
+This collected block is authoritative; the 2026-05-29 → 2026-06-01 draft entries above
+are the preserved mid-cycle record (append-only, Principle VIII).
+
+**Whole-feature invariant**: feature 005 is **UI / read-path only** — no migration, no
+backend or contract change, no seed change. The web app reuses feature 004's extraction
+service, the `/healthz` gate, the scope-guarded `has_anchor(auth.uid())` RPC, and the
+owner-side anchor write verbatim (`contracts/backend-unchanged.md`).
+
+---
+
+### 📌 DECISION-19 — On-device framing system: self-hosted detector + pure gate/drift + throttled live guide
+
+**Status**: Accepted.
+
+**Decision**: The live framing guide is computed **entirely on-device** in three layers.
+(1) `lib/face-detect/detector.ts` lazily loads a **self-hosted** MediaPipe Tasks-Vision
+BlazeFace detector from same-origin `/face-detect/` (vendored WASM, gitignored, re-copied
+by `next.config.ts` on dev start) behind a `WebAssembly` capability probe and a **hard
+init timeout** (~4.5 s) → `Promise<DetectorHandle | null>` that never hangs. (2)
+`lib/face-detect/framing.ts` is **pure** (frame signal + prior debounce → verdict + next
+debounce; no DOM, timers, or I/O) with forgiving named thresholds (`CENTRE_MAX`,
+`LUMA_MIN`, `SIZE_MIN/MAX`, `SET_DEBOUNCE_MS`, `DRIFT_GRACE_MS`): only no-face /
+badly-off-centre / too-dark hold the soft gate, and a drift wobble shorter than the grace
+window produces **no** nudge. (3) `lib/face-detect/use-framing-guide.ts` binds a
+`<video>` to the detector through a throttled loop (~7 fps green room, ~3.5 fps recording,
+on a downscaled frame + canvas luma) and exposes `loading → active | unavailable`.
+**`unavailable` bypasses the gate** (`ready = true`) so the user is **never locked out**
+(FR-011). Nothing here ever auto-stops, and no frame leaves the browser (Principle I,
+FR-050).
+
+**Source tasks**: T002 (asset self-host), T005 (loader), T006 (pure framing), T007 (live
+loop). Revisit if the detector model or the fps budget changes (Risk R-3).
+
+---
+
+### 📌 DECISION-20 — Scoped CSP delta: `'wasm-unsafe-eval'` on capture routes only (report-only; enforce = the T004 deploy blocker)
+
+**Status**: Accepted (report-only). **Flipping to enforce is open as T004.**
+
+**Decision**: Compiling the DECISION-19 detector's WASM requires `'wasm-unsafe-eval'` in
+`script-src`. `proxy.ts`'s `buildCsp(nonce, pathname)` appends it (plus a provisional
+`worker-src 'self' blob:`) **only** on the two capture routes (`/onboarding`,
+`/app/calibrate`) — present there, absent on every other route. **No `connect-src` host
+is added** (the detector is same-origin under `connect-src 'self'`) and **COEP stays
+unset** (enabling it would break Supabase cross-origin). The allowance currently ships
+**Report-Only**. Flipping it to **enforce** — after a `securitypolicyviolation` sweep
+narrows the minimal set (dropping `worker-src` if no blob worker is needed) — is **T004**,
+a **hard pre-ship deploy blocker** logged in `docs/BACKLOG.md` ("Before the 005 detector
+ships"); the detector must not reach production under report-only.
+
+**Source tasks**: T003 (scoped delta, report-only — done), **T004 (sweep + flip to
+enforce — OPEN)**. `contracts/face-detection.md` §4, FR-050, Risk R-2.
+
+---
+
+### 📌 DECISION-21 — Recorder state-machine redesign (settle-before-record; 3-way camera split; mode; strike semantics)
+
+**Status**: Accepted.
+
+**Decision**: `use-anchor-recorder.ts` stays a **pure reducer** (+ a derived selector) so
+it is unit-testable in isolation while the orchestrator owns every side effect. The 004
+machine is redesigned: new `intro` / `green-room` / `get-ready` / `stop-confirming`
+states let the user **settle before anything records**; the old `permission-denied`
+splits into **three calm camera states** (`camera-blocked` / `camera-busy` /
+`camera-no-device`) mapped from the `getUserMedia` `error.name` by the pure
+`cameraErrorKind`; a mount-fixed `mode: "first-time" | "recalibrate"`; framing readiness
+carried through; and the strike semantics preserved — **only a backend 422 increments
+`failureCount`** (transport and camera errors are never strikes), with the "continue
+without calibration" escape at `failureCount ≥ 3`.
+
+**Source tasks**: T008 (reducer); transitions + the error mapping are unit-tested directly
+(`use-anchor-recorder.test.ts`). FR-053, FR-031–035, FR-027/028.
+
+---
+
+### 📌 DECISION-22 — Recalibrate via `?mode=recalibrate` (full-doc nav; mode reconciled against `has_anchor`; overwrite-on-success-only; no DB change)
+
+**Status**: Accepted (finalises the 2026-05-31 draft).
+
+**Decision**: The account "Set a new baseline" action launches the *same* capture flow in
+recalibrate mode through a **full-document navigation** —
+`<a href="/app/calibrate?mode=recalibrate">`, never a `<Link>`/router transition — so the
+per-route `camera=(self)` Permissions-Policy applies (DECISION-16, FR-055).
+`calibrate/page.tsx` reads `searchParams.mode` and, in recalibrate, **suppresses the
+`has_anchor`→`/app` redirect** so a calibrated user is not bounced out of their own
+replacement. The recorder runs `mode="recalibrate"`: copy nudges "set"→"update" (success
+"Your baseline is updated") and both exits hard-navigate to **`/app/account`** (first-time
+exits stay `/app`). The reconciliation + exit map are a pure module
+(`lib/anchor/calibrate-mode.ts` — `resolveCalibrateMode` / `calibrateExit`), unit-tested
+directly.
+
+**Clarification #3 (hardening)**: `mode` is reconciled against the **real** `has_anchor`
+— a stray `?mode=recalibrate` for a user with **no** baseline falls back to first-time
+semantics (the URL alone never manufactures a recalibration); a null/error `has_anchor` is
+treated as not-calibrated, so a transient RPC failure neither redirects nor spuriously
+recalibrates.
+
+**Overwrite-on-success-only**: the existing client write (decode `vector_b64` → bytea →
+`UPDATE` the owner's `profiles` row) already runs **only** after a successful extraction,
+so stop / processing-failure / "Not now" / "Maybe later" leave the prior baseline
+untouched. The write is the **same single in-place `UPDATE`** for both modes — **no
+baseline history, no new table, no migration** (the DECISION-12 column whitelist already
+permits the owner to overwrite their own anchor columns). An honest test injects the
+Supabase client and asserts `.update()` fires exactly once on success and **never** on any
+abort/defer (`anchor-recorder.write-gating.test.tsx`).
+
+**Source tasks**: T025, T026, T027. FR-036/037/053/055, DECISION-16.
+
+---
+
+### 📌 DECISION-23 — Account "Your calm baseline" is whether-set-only; capture date NOT surfaced; employees only
+
+**Status**: Accepted (finalises the 2026-05-31 draft).
+
+**Decision**: The account "Your calm baseline" section surfaces **only whether** a
+baseline is set (from the scope-guarded `has_anchor(auth.uid())` boolean) plus the "Set a
+new baseline" action. It does **not** surface the capture date or any timestamp (FR-041),
+and renders only for **employees** (team_lead/admin have no anchor flow — Principle I).
+
+**Why no date**: the `anchor_captured_at` column was deliberately hidden from everyone —
+including the owner's own read — in DECISION-12, to deny managers a calibration-timing
+pressure signal. Surfacing even the owner's own date would need a new self-scoped SECURITY
+DEFINER read this redesign does not require; whether-set-only is the spec default
+(FR-041). A self-scoped date read is a clean future addition when feature 006's inference
+read path lands.
+
+**Voice (FR-040)**: the copy talks about the baseline itself and must not imply that live
+stress monitoring or check-ins are already running; calm, no exclamation marks — enforced
+by an RTL assertion over the rendered section (`baseline-section.test.tsx`).
+
+**Source tasks**: T025. FR-040/041.
+
+---
+
+### 📌 DECISION-24 — Cause-telemetry → adaptive failure chip (low-light / out-of-frame / our-side default)
+
+**Status**: Accepted.
+
+**Decision**: During recording the orchestrator accumulates **pure** `CauseTelemetry`
+(`darkFrames` / `offTargetFrames` / `totalFrames` / `detectorAvailable`) from the same
+on-device framing signals (`lib/face-detect/cause-telemetry.ts`), then collapses it to one
+`dominantCause()` ∈ {`low-light`, `out-of-frame`, `our-side`} that drives the post-422
+failure chip (`failure-state.tsx`). A user-side cause must dominate ≥ `CAUSE_MIN_RATIO`
+(0.35) of measured frames to be claimed; otherwise — and **whenever the detector was
+unavailable** (no frames) — the chip defaults to **our-side**, which carries no "do
+better" instruction. The mapping is pure and unit-tested. The failure surface is **foggy,
+never amber/crimson** (FR-046). Guiding principle: never assert a user-side cause we did
+not measure.
+
+**Source tasks**: T021 (accumulation), T024 (failure-state surface + chip). FR-027–030.
+
+---
+
+### 📌 DECISION-25 — Device-memory: re-persist the resolved default on a cleared store, without clobbering a temporarily-absent device
+
+**Status**: Accepted (finalises the 2026-05-31 draft).
+
+**Decision**: `device-picker.tsx`'s mount effect now (re-)writes the remembered-camera
+preference when the store is **empty/cleared** and a real default camera resolves
+(`if (!stored && next) rememberCamera(next)`), so a cleared preference recovers for the
+session rather than staying silently empty (FR-045). The write is guarded on `!stored`, so
+a **stored-but-temporarily-absent** device is never clobbered — its memory is kept and
+re-preferred when it reconnects (FR-005).
+
+**Relationship to the busy-camera fix**: the inescapable-lockout fix (CHANGELOG
+2026-05-31) had already moved all *selection-time* persistence into the orchestrator, which
+writes **only a device that `getUserMedia` actually started** and **repairs a dead key** by
+falling back to the system default. Those invariants are untouched; the picker still never
+persists a mere *selection*. This task added only the mount-effect's auto-resolved default
+(the one resolution the orchestrator can miss — a started track may expose no `deviceId`).
+Persisting it cannot re-introduce the lockout: it fires only when nothing is stored, and a
+busy persisted default is still repaired on next entry. An honest Vitest
+(`device-picker.test.tsx`) **fails against the pre-fix code** (cleared store + one camera →
+null preference) and passes after; siblings assert the don't-clobber guard.
+
+**Source tasks**: T029. FR-045/005; the device-memory honest-test is FR-052.
+
+---
+
+### 📌 DECISION-26 — Honest-test boundary seams + the e2e detector seam + the two-layer FR-050 egress proof
+
+**Status**: Accepted (folds in the 2026-05-31 e2e-seam note, strengthened 2026-06-01).
+
+**Decision**: Every 005 test injects **only at the unavoidable I/O boundary**
+(`getUserMedia`, `MediaRecorder`, `postAnchor`, `checkHealth`, the detector factory, the
+session Supabase client) and exercises the **real** orchestration / gate / drift / reducer
+logic — never mocking the unit logic green. Two seams make this airtight:
+
+- **e2e detector seam**: `detector.ts::createFaceDetector` reads an optional
+  `window.__anchorE2EDetector__` factory **first** and returns it when present. **No
+  application code ever sets it** — only a Playwright `addInitScript` (`installActiveDetector`)
+  does — so it is inert in production and guarded by presence. It lets the **real**
+  `useFramingGuide` loop + framing gate run against a deterministic centred-face detector
+  over a bright synthetic feed, so the soft gate clears without a real face (BlazeFace sees
+  none headless) and the flow reaches the full 60 s recording.
+- **Two-layer FR-050 egress proof** (`anchor-egress.spec.ts`, NON-NEGOTIABLE per SC-014):
+  Playwright intercepts every request across the green room (framing loop running) and the
+  full recording and asserts, at the green-room / mid-recording / post-success checkpoints,
+  that **(a)** no VIDEO payload egresses (multipart `.webm`/`.mp4` part or `video/*`
+  Content-Type) except the single final clip POSTed to `/anchor` on success, **and (b)** —
+  strengthened 2026-06-01 — **no outbound body of ANY kind** reaches a non-allowlisted
+  destination (so a frame leak disguised as JSON/base64/image bytes is caught too). The
+  benign allowlist is exactly: the final `/anchor` clip POST; the Supabase host (auth/token
+  + the derived-hex anchor write); and same-origin Next **server actions** matched by the
+  `Next-Action` header (a bespoke frame leak would be a headerless fetch/beacon and stay
+  flagged). Verified: across the framing phases there are **zero** body-carrying requests at
+  all. Passing on chromium.
+
+**Scope**: the three stale 004 specs (`anchor-onboarding`, `anchor-health-precheck`,
+`anchor-skip`) are removed and re-authored into the 005 consolidation (`anchor-flow`,
+`anchor-camera-access`, `anchor-banner`, `anchor-egress`, re-authored `anchor-cross-tab`).
+Genuinely device/browser-dependent behaviour (real webcam, OS prompts, a real face clearing
+the gate, the weak-device unavailable fallback) is **deferred to `smoke-tests.md`** with an
+explicit note — not faked green.
+
+**Source tasks**: applies to every task; concretely T031 (e2e consolidation + egress proof),
+T032 (smoke matrix). FR-050/051/052, SC-014.
+
+---
+
+### 📌 DECISION-27 — Reduced-motion standardised on the shared `useMediaQuery` hook; every animated element has a motion-free equivalent
+
+**Status**: Accepted.
+
+**Decision**: All 005 motion is gated on the **shared**
+`useMediaQuery("(prefers-reduced-motion: reduce)")` hook (`hooks/use-media-query.ts`); the
+004 `countdown.tsx`'s inline `usePrefersReducedMotion` is refactored onto it. Every animated
+element ships a **motion-free equivalent that preserves the information**: the breathing orb
+holds at a fixed mid-size/opacity while the "Breathe in"/"Breathe out" label still swaps on
+the 4 s-in / 6 s-out cadence; the 3→2→1 countdown drops the zoom/fade and shows numeral
+ticks; the success check is static (no bloom); the corner-bracket drift keeps its **foggy
+hue** without the blink; the preview-blur transition is instant. This is the WCAG SC
+2.3.3-correct behaviour (FR-048).
+
+**Source tasks**: T001 (standardisation), consumed by T010/T012/T013 and the recording /
+success surfaces. `contracts/components.md`, FR-048/049.
+
+---
+
+### 📌 DECISION-28 — 005 supplants the 004 calibration surfaces (old UI removed; recorder remounted; home banner amber→foggy with a foggy CTA; `mode` the only behavioural fork)
+
+**Status**: Accepted (folds in the 2026-05-31 banner CTA meadow→foggy note).
+
+**Decision**: The 005 redesign **replaces** feature 004's calibration surfaces wholesale.
+The old 004 calibration UI is **fully removed — no stragglers** — and the redesigned
+`<AnchorRecorder>` mounts at both the onboarding first-time capture
+(`(onboarding)/onboarding/onboarding-form.tsx`) and the standalone `/app/calibrate` route; a
+static check asserts no removed component is still imported (clarification #1). `mode`
+("first-time" | "recalibrate") is the **only** behavioural fork — it nudges copy and (via the
+host) the exit destinations, nothing else.
+
+**Home calibration banner (amber→foggy; foggy CTA — folds in the 2026-05-31 note)**: the
+`/app` banner that 004 shipped **amber** is restyled **foggy** (surface border + bg), and its
+primary CTA — relabelled "Set baseline" — uses the **foggy-filled** `Button` variant
+(`bg-foggy` + `text-ink`/`dark:text-bg`), the same treatment shipped on the failure-state and
+the three camera-access screens. The CTA is **foggy, not meadow** (the original task text said
+meadow): the banner is an **attention prompt**, not an **affirmative confirmation**, so foggy
+(attention) is the correct Principle V role and meadow (reserved for "you did it" moments like
+the success state) would be a misapplication — this refines *which* calm colour the rule
+selects, so it is an **application** of Principle V, not an amendment (FR-043). The lifecycle
+is untouched (`useSyncExternalStore` + session-dismiss + `broadcastAnchorBannerDismissed` +
+cross-tab mirror + the `aria-label="Calibration"` region the Playwright spec keys off), the
+CTA stays a full-document `<a href="/app/calibrate">` so the per-route `camera=(self)` policy
+applies (FR-055 / DECISION-16), and render-site employee-gating already existed. **AA**: foggy
+fill + ink text clears WCAG AA in both themes; a white/ink fill on the foggy wash would not,
+which is why the shared `variant="foggy"` exists.
+
+**Source tasks**: T018 (old-UI removal + mount), T028 (banner restyle). Clarification #1,
+FR-043/055, Constitution Principle V (applied, not amended).

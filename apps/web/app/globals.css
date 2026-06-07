@@ -2,6 +2,16 @@
 @import "tw-animate-css";
 
 /*
+ * Class-based dark mode. next-themes (attribute="class") toggles `.dark` on
+ * <html>; the palette swaps tokens under `:root.dark` below, which is how nearly
+ * every surface adapts. This variant additionally lets the rare utility that needs
+ * an explicit per-mode value respond to that class — specifically the solid meadow
+ * CTA, where `ink`/`bg` swap the WRONG way for dark-on-meadow text. No existing
+ * code uses `dark:`, so this is purely additive.
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
  * Mist & Meadow palette — locked by Constitution Principle V.
  * Light mode is the default; dark mode swaps tokens via the `.dark`
  * class on the <html> element (next-themes attribute="class") —

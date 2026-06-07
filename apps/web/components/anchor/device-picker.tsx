@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 
-const STORAGE_KEY = "serenify-anchor-camera";
+import { readRememberedCamera, rememberCamera } from "./device-memory";
 
 /**
  * Camera chooser (📌 DECISION-13, FR-005). Before the first getUserMedia grant
  * browsers hide device labels, so a single "Default camera" placeholder is
  * shown; after `permissionGranted` flips true the list re-enumerates with real
- * labels. The chosen deviceId is persisted to localStorage (last-write-wins) and
- * pre-selected on return; if the stored device is gone it falls back to the
- * default with no error. A native <select> is used for built-in keyboard +
- * mobile-picker accessibility.
+ * labels. The remembered device (the last that SUCCESSFULLY started) is pre-selected
+ * on return; if the stored device is gone it falls back to the default with no error.
+ * The picker does NOT persist on selection — the orchestrator remembers a device only
+ * after it actually starts (device-memory.ts), so a busy/dead pick is never stored.
+ * It DOES re-persist the auto-resolved default when nothing is stored at all, so a
+ * cleared preference recovers for the session without clobbering a temporarily-absent
+ * remembered device (FR-045, DECISION-25). A native <select> is used for built-in
+ * keyboard + mobile-picker accessibility.
  */
 export function DevicePicker({
   permissionGranted,
@@ -37,12 +41,24 @@ export function DevicePicker({
       const cams = all.filter((d) => d.kind === "videoinput");
       setDevices(cams);
 
-      const stored =
-        typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+      const stored = readRememberedCamera();
       const storedPresent = stored && cams.some((c) => c.deviceId === stored);
       const next = storedPresent ? stored : (cams[0]?.deviceId ?? "");
       setSelected(next);
       onChange(next || undefined);
+
+      // FR-045 / DECISION-25: when the store is empty/cleared AND a real default
+      // camera resolves, (re-)write it so the remembered-device preference doesn't
+      // silently break for the session. Guarded on `!stored` so a stored-but-
+      // temporarily-absent device is NEVER clobbered — its memory is kept so it
+      // returns when it reconnects (preserving FR-005). This is the one resolution
+      // the orchestrator can miss (it persists only what getUserMedia actually
+      // started, and a started track may expose no deviceId); the no-lockout
+      // invariant still holds because a busy remembered device is repaired on the
+      // next entry (orchestrator fallback + repair).
+      if (!stored && next) {
+        rememberCamera(next);
+      }
     }
     void enumerate();
     return () => {
@@ -53,7 +69,8 @@ export function DevicePicker({
   function handleChange(event: React.ChangeEvent<HTMLSelectElement>) {
     const id = event.target.value;
     setSelected(id);
-    if (id && typeof localStorage !== "undefined") localStorage.setItem(STORAGE_KEY, id);
+    // No persistence here — the orchestrator remembers a device only after it
+    // SUCCESSFULLY starts, so a busy/dead pick is never written (no lockout).
     onChange(id || undefined);
   }
 

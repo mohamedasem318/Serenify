@@ -3,78 +3,106 @@
 import { useReducer } from "react";
 
 /**
- * The anchor recorder state machine (📌 DECISION-13). Pure reducer + derived
- * selectors so it is unit-testable in isolation (T039); the orchestrator
- * (anchor-recorder.tsx) owns all side effects (getUserMedia, MediaRecorder,
- * the API call, the DB write).
+ * The calibration recorder state machine (feature 005 — 📌 DECISION-21; redesign of
+ * the 004 reducer). Pure reducer + a tiny derived selector, so it is unit-testable
+ * in isolation; the orchestrator (`anchor-recorder.tsx`) owns every side effect
+ * (getUserMedia, the framing guide, MediaRecorder, the API call, the DB write).
  *
- *   idle → permission-requesting → permission-granted → recording
- *        → uploading → success
- *   permission-requesting ─denied→ permission-denied        (no strike)
- *   uploading ─transport→ upload-failed                     (retry; no strike)
- *   uploading ─422→ extract-failed                          (retry; ++failureCount)
+ * The 005 flow lets the user settle BEFORE anything records:
  *
- * `uploading` covers the single POST /anchor request that both uploads the clip
- * and triggers server-side extraction; the result discriminates the two failure
- * branches.
+ *   intro ──Turn on camera──▶ permission-requesting
+ *     permission-requesting ─granted──▶ green-room
+ *     permission-requesting ─error────▶ camera-blocked | camera-busy | camera-no-device
+ *     green-room ─I'm ready (gate ready + /healthz ok)──▶ get-ready ─3·2·1──▶ recording
+ *     recording  ─stop──▶ stop-confirming ─Keep going──▶ recording
+ *     recording  ─stop──▶ stop-confirming ─Start over──▶ green-room   (nothing saved)
+ *     recording  ─60 s──▶ uploading ─POST /anchor (upload + server extraction)
+ *     uploading  ─200──▶ success
+ *     uploading  ─422──▶ extract-failed   (++failureCount; cause chip; escape at ≥3)
+ *     uploading  ─transport/401──▶ upload-failed   (retry, NOT a strike)
+ *
+ * `uploading` covers the single POST /anchor that both uploads the clip and
+ * triggers server-side extraction (004 convention — no separate `extracting`
+ * state; the result discriminates the two failure branches).
+ *
+ * Camera and transport errors are NEVER strikes — only a backend 422 increments
+ * `failureCount`, and the "continue without calibration" escape appears at ≥3.
  */
 
 export type RecorderStatus =
-  | "idle"
+  | "intro"
   | "permission-requesting"
-  | "permission-denied"
-  | "permission-granted"
+  | "camera-blocked"
+  | "camera-busy"
+  | "camera-no-device"
+  | "green-room"
+  | "get-ready"
   | "recording"
+  | "stop-confirming"
   | "uploading"
   | "success"
   | "upload-failed"
   | "extract-failed";
 
+/** The three camera-access states, named for the reducer status they map to. */
+export type CameraErrorStatus = "camera-blocked" | "camera-busy" | "camera-no-device";
+
+export type RecorderMode = "first-time" | "recalibrate";
+
 export interface RecorderState {
   status: RecorderStatus;
-  /** Increments ONLY on a backend 422 (FR-027) — never on transport or permission. */
+  /** Drives copy (set→update) and the exit destinations (FR-053). Fixed at mount. */
+  mode: RecorderMode;
+  /** Increments ONLY on a backend 422 (FR-027) — never on transport or camera errors. */
   failureCount: number;
-  /** Set once the user scrolls past the explanation copy (FR-004). */
-  scrolledPastExplanation: boolean;
-  /** Practical-cause reason from the last 422, surfaced in the retry copy. */
+  /** Practical-cause reason from the last 422, a secondary cause-chip input. */
   errorReason?: string;
-  /**
-   * True when the OS/browser has hard-blocked the camera for this origin
-   * (navigator.permissions.query → "denied"): the prompt will not reappear
-   * on retry, so copy must point the user to their browser settings.
-   * False/undefined for a fresh deny that can still be re-prompted.
-   */
-  permissionBlocked?: boolean;
 }
 
-export const initialRecorderState: RecorderState = {
-  status: "idle",
-  failureCount: 0,
-  scrolledPastExplanation: false,
-};
+export function makeInitialState(mode: RecorderMode = "first-time"): RecorderState {
+  return { status: "intro", mode, failureCount: 0 };
+}
+
+export const initialRecorderState: RecorderState = makeInitialState("first-time");
 
 export type RecorderAction =
-  | { type: "REQUEST_PERMISSION" }
+  | { type: "TURN_ON_CAMERA" }
   | { type: "PERMISSION_GRANTED" }
-  | { type: "PERMISSION_DENIED"; blocked?: boolean }
+  | { type: "CAMERA_ERROR"; kind: CameraErrorStatus }
+  | { type: "READY" }
+  | { type: "CANCEL_GET_READY" }
   | { type: "START_RECORDING" }
+  | { type: "REQUEST_STOP" }
+  | { type: "KEEP_GOING" }
+  | { type: "CONFIRM_STOP" }
   | { type: "RECORDING_COMPLETE" }
   | { type: "UPLOAD_SUCCESS" }
   | { type: "UPLOAD_FAILED" }
-  | { type: "EXTRACT_FAILED"; reason?: string }
-  | { type: "SCROLLED_PAST_EXPLANATION" };
+  | { type: "EXTRACT_FAILED"; reason?: string };
 
 export function recorderReducer(state: RecorderState, action: RecorderAction): RecorderState {
   switch (action.type) {
-    case "REQUEST_PERMISSION":
+    case "TURN_ON_CAMERA":
       return { ...state, status: "permission-requesting", errorReason: undefined };
     case "PERMISSION_GRANTED":
-      return { ...state, status: "permission-granted", permissionBlocked: false };
-    case "PERMISSION_DENIED":
-      // FR-027: a declined prompt is not a 3-fail strike — failureCount untouched.
-      return { ...state, status: "permission-denied", permissionBlocked: action.blocked === true };
+      return { ...state, status: "green-room" };
+    case "CAMERA_ERROR":
+      // A camera problem is never a 3-fail strike — failureCount untouched (FR-031–035).
+      return { ...state, status: action.kind };
+    case "READY":
+      // Gate cleared + /healthz ok (the orchestrator awaits both before dispatching).
+      return { ...state, status: "get-ready" };
+    case "CANCEL_GET_READY":
+      return { ...state, status: "green-room" };
     case "START_RECORDING":
       return { ...state, status: "recording", errorReason: undefined };
+    case "REQUEST_STOP":
+      return { ...state, status: "stop-confirming" };
+    case "KEEP_GOING":
+      return { ...state, status: "recording" };
+    case "CONFIRM_STOP":
+      // "Start over" — nothing was saved, so nothing is lost; back to the green room.
+      return { ...state, status: "green-room" };
     case "RECORDING_COMPLETE":
       return { ...state, status: "uploading" };
     case "UPLOAD_SUCCESS":
@@ -90,30 +118,43 @@ export function recorderReducer(state: RecorderState, action: RecorderAction): R
         failureCount: state.failureCount + 1,
         errorReason: action.reason,
       };
-    case "SCROLLED_PAST_EXPLANATION":
-      return { ...state, scrolledPastExplanation: true };
     default:
       return state;
   }
 }
 
-/** "Skip for now" visibility — FR-004 (scroll/first failure) + FR-007 (always in denied). */
-export function isSkipVisible(state: RecorderState): boolean {
-  if (state.status === "permission-denied") return true; // FR-007
-  return state.failureCount >= 1 || state.scrolledPastExplanation; // FR-004
+/**
+ * Map a `getUserMedia` rejection to one of the three calm camera-access states
+ * (contracts/components.md §1). Pure, so the mapping is unit-tested directly.
+ * Anything unrecognised (incl. `NotAllowedError`/`SecurityError`) reads as a block —
+ * the most common cause and the one whose copy points at the address-bar control.
+ */
+export function cameraErrorKind(error: unknown): CameraErrorStatus {
+  const name = typeof error === "object" && error !== null ? (error as { name?: string }).name : undefined;
+  switch (name) {
+    case "NotReadableError":
+    case "TrackStartError":
+    case "AbortError":
+      return "camera-busy";
+    case "NotFoundError":
+    case "OverconstrainedError":
+    case "DevicesNotFoundError":
+      return "camera-no-device";
+    default:
+      return "camera-blocked";
+  }
 }
 
-/** The "skip and continue without calibration" escape — at exactly the 3rd 422 (FR-027/028). */
+/** The "continue without calibration" escape — at the 3rd backend 422 (FR-027/028). */
 export function isEscapeVisible(state: RecorderState): boolean {
   return state.failureCount >= 3;
 }
 
-export function useAnchorRecorder() {
-  const [state, dispatch] = useReducer(recorderReducer, initialRecorderState);
+export function useAnchorRecorder(mode: RecorderMode = "first-time") {
+  const [state, dispatch] = useReducer(recorderReducer, mode, makeInitialState);
   return {
     state,
     dispatch,
-    skipVisible: isSkipVisible(state),
     escapeVisible: isEscapeVisible(state),
   };
 }

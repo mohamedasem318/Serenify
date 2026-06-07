@@ -2,46 +2,76 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { checkHealth, postAnchor } from "@/lib/api/anchor-client";
-import { broadcastAnchorCaptured } from "@/lib/auth-broadcast";
-import { Button } from "@/components/ui/button";
+import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
+import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
+import {
+  accumulate,
+  dominantCause,
+  emptyTelemetry,
+  type CauseTelemetry,
+} from "@/lib/face-detect/cause-telemetry";
+import type { CreateDetectorOptions, DetectorHandle } from "@/lib/face-detect/detector";
+import type { FramingSignal } from "@/lib/face-detect/framing";
+import { useFramingGuide } from "@/lib/face-detect/use-framing-guide";
 import { createClient } from "@/lib/supabase/client";
 
-import { Countdown } from "./countdown";
+import { BackendDownModal } from "./backend-down-modal";
+import { BreathingOrb } from "./breathing-guide";
+import { CameraAccessState, type CameraAccessKind } from "./camera-access-state";
+import { readRememberedCamera, rememberCamera } from "./device-memory";
 import { DevicePicker } from "./device-picker";
-import { useAnchorRecorder } from "./use-anchor-recorder";
+import { FailureState, type FailureCause } from "./failure-state";
+import { FramingOverlay } from "./framing-overlay";
+import { GetReadyCountdown } from "./get-ready-countdown";
+import { GreenRoom } from "./green-room";
+import { Intro } from "./intro";
+import { RecordingStage } from "./recording-stage";
+import { StopConfirm } from "./stop-confirm";
+import { SuccessState } from "./success-state";
+import {
+  cameraErrorKind,
+  useAnchorRecorder,
+  type CameraErrorStatus,
+  type RecorderMode,
+} from "./use-anchor-recorder";
 
 const RECORDING_SECONDS = 60;
 
 /**
- * Calm-voice copy (Principle V). Explanation/failure strings locked with Mohamed
- * 2026-05-27; success heading/body locked 2026-05-28. Identical for onboarding +
- * calibrate. A transport failure after the /healthz pre-check (upload-failed)
- * reuses `unavailable`: the service became unreachable mid-upload, which reads to
- * the user as the same "temporarily unavailable" condition.
+ * Calm-voice copy (Principle V) for the two orchestrator-owned, between-surface
+ * beats: the "setting your baseline" wait and the FR-056 health gate. FOGGY, never
+ * amber/crimson (this is a 005 surface). The capture surfaces own their own copy.
  */
 const COPY = {
-  explanation:
-    "To detect stress accurately for you, we need to learn what your relaxed state looks like. We'll record about a minute of you looking at the camera. The video itself is never stored — only a small set of measurements derived from it.",
-  permissionDenied:
-    "Camera access wasn't granted. You can update your browser permissions and try again, or skip for now and come back from your dashboard later.",
-  permissionBlocked:
-    "Camera access is blocked in your browser. Enable it for this site in your settings, then try again.",
-  extractionFailed:
-    "We couldn't see your face clearly in that recording. Better lighting and facing the camera directly usually helps. Want to try again?",
-  unavailable:
-    "Calibration is temporarily unavailable. We'll have it back shortly — please try again in a few minutes.",
-  successHeading: "You're all set",
-  successBody:
-    "Your calm baseline is saved and stress detection is active. The recording wasn't kept — only the measurements derived from it.",
+  uploading: "Setting your baseline — one calm moment…",
+  unavailableHeading: "Calibration’s having a quiet moment",
+  unavailableBody:
+    "We can’t set your baseline just now. Give it a moment and try again — nothing’s lost.",
 } as const;
 
+/** Codec probe order (📌 DECISION-13); the backend accepts mp4 + webm. */
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  for (const type of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/mp4"]) {
+    if (MediaRecorder.isTypeSupported?.(type)) return type;
+  }
+  return undefined;
+}
+
+function base64ToHex(b64: string): string {
+  const bin = atob(b64);
+  let hex = "";
+  for (let i = 0; i < bin.length; i += 1) {
+    hex += bin.charCodeAt(i).toString(16).padStart(2, "0");
+  }
+  return hex;
+}
+
 /**
- * Best-effort permission probe (📌 ST-02 retry-flash fix). Chrome/Edge/Firefox
- * and Safari 16+ return one of {granted, prompt, denied}; older Safari/WebKit
- * either lacks the API or throws on the "camera" name. The probe is wrapped so
- * a missing/throwing implementation collapses to "unsupported" — callers must
- * treat that as "don't know; behave like prompt".
+ * Best-effort permission probe (📌 ST-02 anti-flash). A hard block makes
+ * getUserMedia reject synchronously; probing first lets us route straight to
+ * `camera-blocked` without a re-call. Missing/throwing implementations collapse to
+ * "unsupported" → behave like "prompt".
  */
 async function probeCameraPermission(): Promise<"granted" | "denied" | "prompt" | "unsupported"> {
   if (typeof navigator === "undefined" || !navigator.permissions?.query) return "unsupported";
@@ -56,108 +86,181 @@ async function probeCameraPermission(): Promise<"granted" | "denied" | "prompt" 
   }
 }
 
-/** Codec probe order (📌 DECISION-13 / T038); the backend accepts mp4 + webm (FR-047). */
-function pickMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  for (const type of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/mp4"]) {
-    if (MediaRecorder.isTypeSupported?.(type)) return type;
-  }
-  return undefined; // let the browser choose its default container
+/**
+ * The minimal MediaRecorder surface the orchestrator drives. Injectable (📌
+ * DECISION-26) so honest tests run the REAL orchestration against a fake recorder —
+ * jsdom/happy-dom ships no MediaRecorder. `pause`/`resume` are optional (used only
+ * for the stop-confirm freeze; absent in tests).
+ */
+export interface MinimalRecorder {
+  start(): void;
+  stop(): void;
+  pause?(): void;
+  resume?(): void;
+  state: string;
+  mimeType: string;
+  ondataavailable: ((event: { data: Blob }) => void) | null;
+  onstop: (() => void) | null;
 }
 
-function base64ToHex(b64: string): string {
-  const bin = atob(b64);
-  let hex = "";
-  for (let i = 0; i < bin.length; i += 1) {
-    hex += bin.charCodeAt(i).toString(16).padStart(2, "0");
-  }
-  return hex;
+/** The single anchor write the client performs with the user's own session (DECISION-9). */
+export interface AnchorSession {
+  accessToken: string;
+  userId: string;
 }
 
-/** Amber notice (never red) matching the onboarding-form alert idiom (Principle V). */
-function Notice({ children }: { children: React.ReactNode }) {
-  return (
-    <p
-      role="alert"
-      className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm leading-relaxed text-ink"
-    >
-      {children}
-    </p>
-  );
+/**
+ * The unavoidable I/O boundary, injectable for honest tests (📌 DECISION-26 §4).
+ * `postAnchor` (the FastAPI extraction) and `writeAnchor` (the Supabase row write)
+ * are SEPARATE seams so a test can assert the write fires ONLY on success
+ * (overwrite-on-success-only — FR-053 / DECISION-22). Production uses the real
+ * implementations via `defaultDeps()`.
+ */
+export interface RecorderDeps {
+  getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
+  createRecorder: (stream: MediaStream) => MinimalRecorder;
+  postAnchor: (clip: Blob, accessToken: string) => Promise<AnchorResult>;
+  checkHealth: () => Promise<boolean>;
+  createDetector?: (opts?: CreateDetectorOptions) => Promise<DetectorHandle | null>;
+  getSession: () => Promise<AnchorSession | null>;
+  writeAnchor: (input: { userId: string; vectorB64: string; modelVersion: string }) => Promise<{ ok: boolean }>;
+  broadcastAnchorCaptured: () => void;
+  probeCameraPermission: () => Promise<"granted" | "denied" | "prompt" | "unsupported">;
 }
 
+function defaultDeps(): RecorderDeps {
+  return {
+    getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
+    createRecorder: (stream) => {
+      const mimeType = pickMimeType();
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      return recorder as unknown as MinimalRecorder;
+    },
+    postAnchor: defaultPostAnchor,
+    checkHealth: defaultCheckHealth,
+    // createDetector omitted → useFramingGuide uses the real self-hosted loader.
+    getSession: async () => {
+      const supabase = createClient();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.access_token) return null;
+      return { accessToken: session.access_token, userId: session.user.id };
+    },
+    writeAnchor: async ({ userId, vectorB64, modelVersion }) => {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          anchor_vector: `\\x${base64ToHex(vectorB64)}`,
+          anchor_captured_at: new Date().toISOString(),
+          anchor_model_version: modelVersion,
+        })
+        .eq("id", userId);
+      return { ok: !error };
+    },
+    broadcastAnchorCaptured: defaultBroadcast,
+    probeCameraPermission,
+  };
+}
+
+/**
+ * Calibration capture orchestrator (feature 005 — T016/T017). Owns the persistent
+ * `<video>` + MediaStream, drives the on-device framing guide, runs MediaRecorder
+ * for the 60 s, and renders each reducer state to its built surface. The /healthz
+ * gate sits immediately before the get-ready countdown (clarification #2 / FR-056):
+ * the user reaches the calm green room freely, but never records a full minute into
+ * a dead backend.
+ *
+ * The anchor is written ONLY on a successful extraction (FR-053): stop / processing
+ * failure / "Not now" / "Maybe later" leave any existing baseline untouched. The
+ * same flow serves onboarding, `/app/calibrate`, and the account recalibrate entry
+ * (DECISION-28) — `mode` only nudges copy and (via the host) the exit destinations.
+ */
 export function AnchorRecorder({
   onComplete,
   onSkip,
+  mode = "first-time",
+  deps: depsOverride,
 }: {
   onComplete: () => void;
   onSkip: () => void;
-  /** Copy/telemetry only; behavior is identical for both hosts (contract). */
+  /** Copy/telemetry + exit semantics; behaviour is otherwise identical per host. */
   context?: "onboarding" | "calibrate";
+  mode?: RecorderMode;
+  /** Honest-test seam: override any subset of the I/O boundary (📌 DECISION-26). */
+  deps?: Partial<RecorderDeps>;
 }) {
-  const { state, dispatch, skipVisible, escapeVisible } = useAnchorRecorder();
-  const [health, setHealth] = useState<"checking" | "up" | "down">("checking");
-  const [remaining, setRemaining] = useState(RECORDING_SECONDS);
+  const depsRef = useRef<RecorderDeps>({ ...defaultDeps(), ...depsOverride });
+  const deps = depsRef.current;
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const { state, dispatch, escapeVisible } = useAnchorRecorder(mode);
+  const { status } = state;
+
+  const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  const [remaining, setRemaining] = useState(RECORDING_SECONDS);
+  const [healthGate, setHealthGate] = useState<"ok" | "checking" | "down">("ok");
+  // A re-probe from the blocking modal: keep `healthGate` at "down" (so the modal
+  // stays up, not flickering closed) and track the in-flight probe separately.
+  const [rechecking, setRechecking] = useState(false);
+  const [failureCause, setFailureCause] = useState<FailureCause>("our-side");
+
   const streamRef = useRef<MediaStream | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
+  // The live <video> node, mirrored in a ref so the device-switch path can re-point
+  // it at a new stream without depending on render-state (keeps callbacks stable).
+  const videoElRef = useRef<HTMLVideoElement | null>(null);
+  const recorderRef = useRef<MinimalRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
+  const discardRef = useRef(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const remainingRef = useRef(RECORDING_SECONDS);
   const deviceIdRef = useRef<string | undefined>(undefined);
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const gatingRef = useRef(false);
+  // Client-observed adverse signal during the 60 s, collapsed to the failure chip
+  // cause on a processing failure (📌 DECISION-24). Stays empty when the detector
+  // is unavailable → dominantCause() returns "our-side".
+  const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
 
-  // --- Readiness pre-check (FR-048): never let the user record into a dead backend.
-  useEffect(() => {
-    let active = true;
-    void checkHealth().then((ok) => {
-      if (active) setHealth(ok ? "up" : "down");
-    });
-    return () => {
-      active = false;
-    };
+  // Accumulate framing telemetry ONLY while actually recording (the guide also
+  // signals in the green room). Nothing leaves the device — this counts frames.
+  const handleSignal = useCallback((signal: FramingSignal) => {
+    if (recorderRef.current?.state === "recording") accumulate(telemetryRef.current, signal);
   }, []);
 
-  // --- Reveal "Skip for now" once the explanation is scrolled past (FR-004).
-  // IntersectionObserver delivers an initial entry synchronously after observe()
-  // with the element's current visibility. The sentinel sits right below a short
-  // paragraph, so on any normal viewport it is in view on mount — without the
-  // first-callback guard the initial entry would fire isIntersecting:true and
-  // reveal Skip before the user had done anything (📌 ST-10). Discard that
-  // first entry and react only to genuine transitions afterwards.
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
-    let isInitial = true;
-    const observer = new IntersectionObserver((entries) => {
-      if (isInitial) {
-        isInitial = false;
-        return;
-      }
-      if (entries.some((entry) => entry.isIntersecting)) {
-        dispatch({ type: "SCROLLED_PAST_EXPLANATION" });
-      }
-    });
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [dispatch]);
+  // The framing guide runs only while a live preview is on screen. The <video> is
+  // PERSISTENT across green-room → get-ready → recording → stop-confirming (one
+  // element, one tree slot) so the preview never remounts/flickers (FR-013); the
+  // guide reads `phase` through a ref and does NOT tear down on a green-room →
+  // recording transition.
+  const inStage =
+    status === "green-room" ||
+    status === "get-ready" ||
+    status === "recording" ||
+    status === "stop-confirming";
+  const guidePhase = status === "recording" || status === "stop-confirming" ? "recording" : "green-room";
 
-  // Attaching the stream has to wait for the <video> to actually mount. The
-  // element is only rendered once status reaches permission-granted/recording —
-  // a render that happens AFTER getUserMedia resolves — so assigning srcObject
-  // inside startCapture hits a still-null ref and the preview stays black. A
-  // callback ref sets srcObject the moment React attaches the node (and again on
-  // retry, when the node re-mounts).
+  const { guide, gate, ready, drift } = useFramingGuide({
+    video: inStage ? videoEl : null,
+    phase: guidePhase,
+    // Read straight from the prop (not the merged-deps ref) so this stays a plain
+    // render-time value — undefined in production, where the hook uses the real
+    // self-hosted loader; a fake in tests.
+    createDetector: depsOverride?.createDetector,
+    onSignal: handleSignal,
+  });
+
+  // Wire srcObject the moment React attaches the node (and re-wire on any remount),
+  // and surface the element as state so the framing-guide effect re-runs when the
+  // preview mounts/unmounts.
   const attachVideo = useCallback((node: HTMLVideoElement | null) => {
-    videoRef.current = node;
+    videoElRef.current = node;
     if (node && streamRef.current) node.srcObject = streamRef.current;
+    setVideoEl(node);
   }, []);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
   const clearTimer = useCallback(() => {
@@ -167,306 +270,426 @@ export function AnchorRecorder({
     }
   }, []);
 
-  // --- Release camera + timer on unmount (privacy + no leaked intervals).
-  // Detach the recorder handlers BEFORE stopping the tracks: stopping a live
-  // stream makes MediaRecorder fire a final `stop`, which would run submitClip and
-  // write an anchor for an ABANDONED recording (e.g. the user hits Back to abort
-  // mid-capture). An anchor must only be written on an intentional, completed
-  // recording — never as a side effect of navigating away.
-  useEffect(() => () => {
-    clearTimer();
-    const recorder = recorderRef.current;
-    if (recorder) {
-      recorder.ondataavailable = null;
-      recorder.onstop = null;
-    }
-    stopStream();
-  }, [clearTimer, stopStream]);
+  // Release camera + timer on unmount (privacy + no leaked intervals). Detach the
+  // recorder handlers BEFORE stopping tracks: stopping a live stream fires a final
+  // `stop`, which would otherwise submit a clip for an abandoned recording.
+  useEffect(
+    () => () => {
+      clearTimer();
+      const recorder = recorderRef.current;
+      if (recorder) {
+        recorder.ondataavailable = null;
+        recorder.onstop = null;
+      }
+      stopStream();
+    },
+    [clearTimer, stopStream],
+  );
 
   const submitClip = useCallback(
     async (blob: Blob) => {
-      const supabase = createClient();
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.access_token) {
+      const session = await deps.getSession();
+      if (!session) {
+        setFailureCause("our-side");
         dispatch({ type: "UPLOAD_FAILED" });
         return;
       }
-
-      const result = await postAnchor(blob, session.access_token);
+      const result = await deps.postAnchor(blob, session.accessToken);
       if (!result.ok) {
         if (result.kind === "extraction_failed") {
+          // 422 — the chip reflects what we actually measured this minute
+          // (low-light / out-of-frame), or "our-side" when nothing dominated.
+          setFailureCause(dominantCause(telemetryRef.current));
           dispatch({ type: "EXTRACT_FAILED", reason: result.reason });
         } else {
+          setFailureCause("our-side"); // transport / 401 — our side
           dispatch({ type: "UPLOAD_FAILED" });
         }
         return;
       }
-
-      // The web app writes the derived vector with the user's own session client;
-      // the backend holds no DB creds (DECISION-9). bytea is sent as a \x-hex
-      // string (resolved decision 2). RLS update-self + the column grant allow it.
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          anchor_vector: `\\x${base64ToHex(result.vectorB64)}`,
-          anchor_captured_at: new Date().toISOString(),
-          anchor_model_version: result.modelVersion,
-        })
-        .eq("id", session.user.id);
-
-      if (error) {
+      // The write is the ONLY thing that touches the baseline, and it runs only here
+      // — on a successful extraction (FR-053 overwrite-on-success-only).
+      const write = await deps.writeAnchor({
+        userId: session.userId,
+        vectorB64: result.vectorB64,
+        modelVersion: result.modelVersion,
+      });
+      if (!write.ok) {
+        setFailureCause("our-side"); // the write is our side
         dispatch({ type: "UPLOAD_FAILED" });
         return;
       }
-
       dispatch({ type: "UPLOAD_SUCCESS" });
-      // US7: refresh sibling tabs on the onboarding step / /app/calibrate (FR-034).
-      // Fires on success regardless of when THIS tab dismisses the success view.
-      broadcastAnchorCaptured();
-      // No auto-redirect — the success view is user-dismissible (Mohamed 2026-05-28);
-      // its "Continue to dashboard" button calls onComplete().
+      deps.broadcastAnchorCaptured(); // refresh sibling tabs (FR-054)
     },
-    [dispatch],
+    [deps, dispatch],
   );
 
   const stopRecording = useCallback(() => {
     clearTimer();
     const recorder = recorderRef.current;
-    if (recorder && recorder.state !== "inactive") recorder.stop();
+    if (recorder && recorder.state !== "inactive") recorder.stop(); // discardRef false → onstop submits
   }, [clearTimer]);
 
-  const beginRecording = useCallback(
-    (stream: MediaStream) => {
-      const mimeType = pickMimeType();
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-      recorderRef.current = recorder;
+  const startTimer = useCallback(() => {
+    clearTimer();
+    timerRef.current = setInterval(() => {
+      remainingRef.current -= 1;
+      setRemaining(remainingRef.current);
+      if (remainingRef.current <= 0) stopRecording();
+    }, 1000);
+  }, [clearTimer, stopRecording]);
+
+  const beginRecording = useCallback(() => {
+    const stream = streamRef.current;
+    if (!stream) return;
+    if (recorderRef.current && recorderRef.current.state === "recording") return; // guard double-begin
+
+    const recorder = deps.createRecorder(stream);
+    recorderRef.current = recorder;
+    chunksRef.current = [];
+    discardRef.current = false;
+    telemetryRef.current = emptyTelemetry(); // fresh cause telemetry for this minute
+
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      const type = recorder.mimeType || "video/webm";
+      const chunks = chunksRef.current;
       chunksRef.current = [];
+      if (discardRef.current) return; // abandoned via stop-confirm — keep the stream, submit nothing
+      stopStream(); // we have the clip — release the camera immediately
+      dispatch({ type: "RECORDING_COMPLETE" });
+      void submitClip(new Blob(chunks, { type }));
+    };
 
-      recorder.ondataavailable = (event) => {
-        if (event.data.size > 0) chunksRef.current.push(event.data);
-      };
-      recorder.onstop = () => {
-        const type = recorder.mimeType || mimeType || "video/webm";
-        stopStream(); // we have the clip — release the camera immediately
-        dispatch({ type: "RECORDING_COMPLETE" });
-        void submitClip(new Blob(chunksRef.current, { type }));
-      };
+    recorder.start();
+    dispatch({ type: "START_RECORDING" });
+    remainingRef.current = RECORDING_SECONDS;
+    setRemaining(RECORDING_SECONDS);
+    startTimer();
+  }, [deps, dispatch, stopStream, submitClip, startTimer]);
 
-      recorder.start();
-      dispatch({ type: "START_RECORDING" });
+  // --- Turn on camera (and "Try again" everywhere): acquire the stream, settle in
+  // the green room. Never auto-records — the user starts the minute from the green
+  // room. A camera error routes to one of the three calm states (not a strike).
+  //
+  // The remembered / last-chosen camera is PREFERRED, but never a dead-end: if it's
+  // unavailable (busy / unplugged), we fall back to the system default so a working
+  // camera is always reachable from any entry — and only a device that actually
+  // starts is remembered, which repairs a remembered-but-dead key. This is what
+  // breaks the busy-camera lockout (a busy device can no longer trap every entry).
+  const startCapture = useCallback(async () => {
+    setHealthGate("ok");
+    dispatch({ type: "TURN_ON_CAMERA" });
 
-      remainingRef.current = RECORDING_SECONDS;
-      setRemaining(RECORDING_SECONDS);
-      timerRef.current = setInterval(() => {
-        remainingRef.current -= 1;
-        setRemaining(remainingRef.current);
-        if (remainingRef.current <= 0) stopRecording();
-      }, 1000);
+    if ((await deps.probeCameraPermission()) === "denied") {
+      dispatch({ type: "CAMERA_ERROR", kind: "camera-blocked" });
+      return;
+    }
+
+    const preferred = deviceIdRef.current ?? readRememberedCamera();
+    // Try the preferred device first (the user may have freed it), then fall back to
+    // the default. With no preference, just the default.
+    const attempts: MediaStreamConstraints["video"][] = preferred
+      ? [{ deviceId: { exact: preferred } }, true]
+      : [true];
+
+    let stream: MediaStream | null = null;
+    let lastError: unknown;
+    for (const video of attempts) {
+      try {
+        stream = await deps.getUserMedia({ video, audio: false }); // mic off — audio is feature 013
+        break;
+      } catch (error) {
+        lastError = error;
+      }
+    }
+
+    if (!stream) {
+      // Every available camera failed (incl. the default). Re-probe so a hard block
+      // (browser downgrades prompt → denied on "Block") surfaces as camera-blocked
+      // rather than the raw error name; otherwise it's a genuine busy / no-device.
+      const after = await deps.probeCameraPermission();
+      const kind: CameraErrorStatus = after === "denied" ? "camera-blocked" : cameraErrorKind(lastError);
+      dispatch({ type: "CAMERA_ERROR", kind });
+      return;
+    }
+
+    streamRef.current = stream;
+    const acquiredId = stream.getVideoTracks()[0]?.getSettings().deviceId;
+    deviceIdRef.current = acquiredId ?? undefined;
+    rememberCamera(acquiredId); // persist ONLY a device that actually started (repairs a dead key)
+    dispatch({ type: "PERMISSION_GRANTED" }); // → green-room; attachVideo wires srcObject on mount
+  }, [deps, dispatch]);
+
+  // --- The /healthz gate (T016 / FR-056): pressing "I'm ready" checks the backend
+  // and only a healthy one advances to the countdown. A down backend raises the
+  // blocking modal and never starts the countdown — never a full minute recorded
+  // into a dead backend. `fromModal` re-probes without closing the modal.
+  const runHealthCheck = useCallback(
+    async (fromModal: boolean) => {
+      if (gatingRef.current) return;
+      gatingRef.current = true;
+      if (fromModal) setRechecking(true);
+      else setHealthGate("checking");
+      try {
+        const ok = await deps.checkHealth();
+        if (!ok) {
+          setHealthGate("down"); // raise / hold the blocking modal
+          return;
+        }
+        setHealthGate("ok");
+        dispatch({ type: "READY" }); // → get-ready (3·2·1)
+      } finally {
+        gatingRef.current = false;
+        setRechecking(false);
+      }
     },
-    [dispatch, stopStream, stopRecording, submitClip],
+    [deps, dispatch],
   );
 
-  // --- Start (or retry): request the camera, then record immediately (ST-01).
-  // ST-02 anti-flash: on retry from permission-denied, the optimistic
-  // permission-requesting dispatch would briefly replace the denial notice with
-  // the start-recording form (idle/permission-requesting share that render
-  // branch). A hard-blocked camera makes getUserMedia reject synchronously, so
-  // the user sees a one-frame flicker before snapping back to denied. Avoid it
-  // by (1) probing permissions.query first and short-circuiting on "denied",
-  // and (2) when we DO call getUserMedia from the denied state, skipping the
-  // optimistic dispatch so the denial notice stays put until the stream
-  // actually resolves. The anti-flash holds even if the probe is unsupported.
-  const startCapture = useCallback(async () => {
-    // ST-18 / FR-048: the recording-state transition MUST be downstream of an
-    // awaited 200 from /healthz — never optimistic. Re-check on every Start and
-    // retry so a backend that died after the mount-time probe (or was still
-    // being probed when the user clicked) surfaces the unavailable gate instead
-    // of flashing the preview + countdown. Setting "checking" also disables the
-    // action button for the duration, so the Start click can't slip a capture
-    // through before we know the backend is reachable.
-    setHealth("checking");
-    if (!(await checkHealth())) {
-      setHealth("down");
-      return;
-    }
-    setHealth("up");
+  const handleReady = useCallback(() => {
+    void runHealthCheck(false);
+  }, [runHealthCheck]);
 
-    const isRetryFromDenied = state.status === "permission-denied";
-    if (isRetryFromDenied) {
-      const probed = await probeCameraPermission();
-      if (probed === "denied") {
-        dispatch({ type: "PERMISSION_DENIED", blocked: true });
-        return;
-      }
+  const handleModalRetry = useCallback(() => {
+    void runHealthCheck(true);
+  }, [runHealthCheck]);
+
+  const handleCancelGetReady = useCallback(() => {
+    dispatch({ type: "CANCEL_GET_READY" });
+  }, [dispatch]);
+
+  const handleRequestStop = useCallback(() => {
+    clearTimer(); // freeze the countdown
+    recorderRef.current?.pause?.();
+    dispatch({ type: "REQUEST_STOP" });
+  }, [clearTimer, dispatch]);
+
+  const handleKeepGoing = useCallback(() => {
+    recorderRef.current?.resume?.();
+    dispatch({ type: "KEEP_GOING" });
+    startTimer(); // resume from the frozen `remaining`
+  }, [dispatch, startTimer]);
+
+  const handleConfirmStop = useCallback(() => {
+    // "Start over": discard the in-flight clip (onstop sees the flag and submits
+    // nothing), keep the camera live, and return to the green room for a fresh
+    // minute — nothing saved, nothing lost (FR-021–024).
+    discardRef.current = true;
+    const recorder = recorderRef.current;
+    if (recorder && recorder.state !== "inactive") recorder.stop();
+    recorderRef.current = null;
+    clearTimer();
+    remainingRef.current = RECORDING_SECONDS;
+    setRemaining(RECORDING_SECONDS);
+    dispatch({ type: "CONFIRM_STOP" });
+  }, [clearTimer, dispatch]);
+
+  // Re-acquire the camera for a newly chosen device WITHOUT leaving the green room:
+  // acquire the new stream FIRST, then stop the old tracks, then point the SAME
+  // persistent <video> at it. The framing guide/gate read that element (its effect
+  // keys on the node, not the stream), so they re-bind to the new feed on the next
+  // frame — no remount, no flicker. A busy/disconnected/blocked pick is routed to the
+  // matching camera-failure state, so those cases are reachable for testing (Bug 1).
+  const reacquire = useCallback(
+    async (id: string | undefined) => {
+      let next: MediaStream;
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: deviceIdRef.current ? { deviceId: { exact: deviceIdRef.current } } : true,
+        next = await deps.getUserMedia({
+          video: id ? { deviceId: { exact: id } } : true,
           audio: false,
         });
-        streamRef.current = stream;
-        dispatch({ type: "PERMISSION_GRANTED" });
-        beginRecording(stream);
-      } catch {
-        // Re-probe so a hard block surfaces the blocked-state copy on the
-        // next render (some browsers downgrade prompt → denied on the user's
-        // explicit "Block" click, which only the post-call probe reflects).
-        const after = await probeCameraPermission();
-        dispatch({ type: "PERMISSION_DENIED", blocked: after === "denied" });
+      } catch (error) {
+        stopStream(); // the picked device is unavailable — drop the feed, surface the state
+        const after = await deps.probeCameraPermission();
+        const kind: CameraErrorStatus = after === "denied" ? "camera-blocked" : cameraErrorKind(error);
+        dispatch({ type: "CAMERA_ERROR", kind });
+        return;
       }
-      return;
-    }
+      stopStream(); // success — release the OLD device, then swap in the new stream
+      streamRef.current = next;
+      const acquiredId = next.getVideoTracks()[0]?.getSettings().deviceId ?? id;
+      deviceIdRef.current = acquiredId;
+      rememberCamera(acquiredId); // the user successfully switched here — remember it
+      if (videoElRef.current) videoElRef.current.srcObject = next;
+    },
+    [deps, stopStream, dispatch],
+  );
 
-    dispatch({ type: "REQUEST_PERMISSION" });
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: deviceIdRef.current ? { deviceId: { exact: deviceIdRef.current } } : true,
-        audio: false, // mic stays off — audio is feature 013
-      });
-      streamRef.current = stream;
-      dispatch({ type: "PERMISSION_GRANTED" }); // mounts <video>; attachVideo wires srcObject
-      beginRecording(stream);
-    } catch {
-      const after = await probeCameraPermission();
-      dispatch({ type: "PERMISSION_DENIED", blocked: after === "denied" });
-    }
-  }, [dispatch, beginRecording, state.status]);
+  // Stable identity (reads refs + stable callbacks) so DevicePicker's enumerate effect
+  // does not re-run each render. The selection also seeds the next acquisition (e.g.
+  // "Try again"); when a live preview is already up it re-acquires immediately so the
+  // preview follows the choice — skipping the picker's initial echo of the active
+  // camera (which would only flicker).
+  const handleDeviceChange = useCallback(
+    (id: string | undefined) => {
+      deviceIdRef.current = id;
+      if (!id || !streamRef.current) return;
+      const current = streamRef.current.getVideoTracks()[0]?.getSettings().deviceId;
+      if (id === current) return; // already streaming this device — no-op
+      void reacquire(id);
+    },
+    [reacquire],
+  );
 
-  // Stable identity so DevicePicker's enumerate effect doesn't re-run each render.
-  const handleDeviceChange = useCallback((id: string | undefined) => {
-    deviceIdRef.current = id;
-  }, []);
+  // Sharp only in the green room; eases to a deliberate softened (never fully
+  // sharp, never fully blurred) for get-ready + recording (FR-013).
+  const softened = inStage && status !== "green-room";
 
-  const isRecording = state.status === "recording" || state.status === "permission-granted";
-  const isBusy = state.status === "permission-requesting" || state.status === "uploading";
-
-  // --- Health gates the whole flow ----------------------------------------
-  if (health === "down") {
-    return (
-      <section className="space-y-6">
-        <Notice>{COPY.unavailable}</Notice>
-        <Button className="h-12 w-full" variant="ghost" onClick={onSkip}>
-          Skip for now
-        </Button>
-      </section>
-    );
-  }
-
-  // --- Success is sticky + user-dismissible (no auto-redirect): one confirmation,
-  // one action. The anchor is already written + broadcast by now, so leaving by
-  // any means keeps it; the button is the explicit path to /app (Mohamed 2026-05-28).
-  if (state.status === "success") {
-    return (
-      <section className="space-y-6">
-        <div className="space-y-2">
-          <p className="text-lg font-medium text-ink">
-            <span aria-hidden="true" className="text-meadow">✓</span> {COPY.successHeading}
-          </p>
-          <p className="text-sm leading-relaxed text-muted">{COPY.successBody}</p>
-        </div>
-        <Button className="h-12 w-full" onClick={onComplete}>
-          Continue to dashboard
-        </Button>
-      </section>
-    );
-  }
+  // The green-room affirmative: ONE signal drives both the on-preview halo (meadow
+  // brackets + glow + check) and the enabled "I'm ready", so they always coexist
+  // (FR-008 — the enabled state can't clobber the halo). It stays off on the
+  // detector-unavailable bypass (we don't confirm a frame we can't see) and while
+  // the backend is down — both intentional, not a hidden halo.
+  const affirmed = guide === "active" && ready && healthGate !== "down";
 
   return (
     <section className="space-y-6">
-      {(state.status === "idle" || state.status === "permission-requesting") && (
-        <>
-          <p className="text-sm leading-relaxed text-muted">{COPY.explanation}</p>
-          <div ref={sentinelRef} aria-hidden="true" />
-        </>
-      )}
+      {status === "intro" && <Intro mode={mode} onTurnOnCamera={startCapture} />}
 
-      {state.status === "permission-denied" && (
-        <Notice>{state.permissionBlocked ? COPY.permissionBlocked : COPY.permissionDenied}</Notice>
-      )}
-      {state.status === "extract-failed" && <Notice>{COPY.extractionFailed}</Notice>}
-      {state.status === "upload-failed" && <Notice>{COPY.unavailable}</Notice>}
-
-      {/* Live preview + countdown while recording. */}
-      {isRecording && (
-        <div className="space-y-4">
-          <video
-            ref={attachVideo}
-            autoPlay
-            muted
-            playsInline
-            className="aspect-video w-full rounded-control border border-border bg-ink/5 object-cover"
-          />
-          <div className="flex justify-center">
-            <Countdown remaining={remaining} total={RECORDING_SECONDS} />
-          </div>
-        </div>
-      )}
-
-      {state.status === "uploading" && (
-        <p className="text-center text-sm text-muted" aria-live="polite">
-          One moment…
-        </p>
-      )}
-
-      {/* Device picker only before recording starts. */}
-      {(state.status === "idle" || state.status === "permission-requesting") && (
-        <DevicePicker
-          permissionGranted={false}
-          onChange={handleDeviceChange}
-          disabled={isBusy}
+      {(status === "camera-blocked" || status === "camera-busy" || status === "camera-no-device") && (
+        <CameraAccessState
+          kind={status.replace("camera-", "") as CameraAccessKind}
+          onRetry={startCapture}
+          onNotNow={onSkip}
         />
       )}
 
-      {/* Primary action. Disabled until the readiness probe confirms the backend
-          is reachable, so the recording-state transition only ever runs after an
-          awaited 200 (ST-18) — no flash of preview + countdown into a dead backend. */}
-      {(state.status === "idle" || state.status === "permission-requesting") && (
-        <Button className="h-12 w-full" onClick={startCapture} disabled={isBusy || health === "checking"}>
-          {state.status === "permission-requesting"
-            ? "Requesting camera…"
-            : health === "checking"
-              ? "Checking availability…"
-              : "Start recording"}
-        </Button>
+      {inStage && (
+        <div className="mx-auto w-full max-w-lg">
+          {/* PREVIEW — ONE element, ONE shape (natural 16:9) across green room →
+              get-ready → recording (it never changes shape or size between stages).
+              The portrait framing is the corner brackets + the dimming OUTSIDE them,
+              never a crop or a nested video. GRAPHICS ONLY sit on the video — the
+              brackets, the countdown numeral, the breathing orb, the "you're set"
+              check/glow; every WORD lives in the card below. Sharp in the green
+              room, eased to softened for get-ready + recording (FR-013). */}
+          <div className="relative aspect-video w-full overflow-hidden rounded-card bg-ink/5">
+            <video
+              ref={attachVideo}
+              autoPlay
+              muted
+              playsInline
+              className={`absolute inset-0 h-full w-full object-cover transition-[filter] duration-700 motion-reduce:transition-none ${
+                // a gentle softening to ease self-consciousness about appearance —
+                // NOT contrast work (the orb backs its own words), so kept light:
+                // just enough to soften, never fully sharp.
+                softened ? "blur-[2px]" : "blur-0"
+              }`}
+            />
+
+            {/* green room — fixed target + spotlight; brackets turn meadow + the
+                check/glow appears the moment the gate clears (coexists with the
+                enabled "I'm ready" — both driven by `affirmed`). */}
+            {status === "green-room" && (
+              <FramingOverlay drift="centred" showNudge={false} gateReady={affirmed} />
+            )}
+
+            {/* get-ready — the same fixed target + the numbers-only countdown as a
+                focal graphic over the blurred preview. No words on the video. */}
+            {status === "get-ready" && (
+              <>
+                <FramingOverlay drift="centred" showNudge={false} />
+                <div className="absolute inset-0 grid place-items-center bg-ink/10">
+                  <GetReadyCountdown onComplete={beginRecording} />
+                </div>
+              </>
+            )}
+
+            {/* recording — the persistent brackets (with the grace-gated drift
+                bracket treatment) + the breathing orb as the focal graphic. The
+                words (timer, pacer, nudge text, reassurance, Stop) are in the card
+                below, never over the video. */}
+            {(status === "recording" || status === "stop-confirming") && (
+              <>
+                <FramingOverlay drift={drift} />
+                <div className="absolute inset-0 grid place-items-center">
+                  <BreathingOrb />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* CONTROLS / WORDS — a calm region BELOW the preview for every stage,
+              never absolutely positioned over it (so it can't clip the brackets). */}
+          <div className="mt-4">
+            {status === "green-room" && (
+              <GreenRoom
+                guide={guide}
+                gate={gate}
+                // disabled while down (modal blocks) or mid-check; enabled only when
+                // the soft gate has cleared AND the backend is reachable.
+                ready={healthGate === "down" ? false : ready && healthGate !== "checking"}
+                serviceUnavailable={healthGate === "down"}
+                devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
+                onReady={handleReady}
+                onNotNow={onSkip}
+              />
+            )}
+
+            {status === "get-ready" && (
+              // the single calm line + the quiet Cancel — below the preview, off the
+              // video. Cancel returns to the green room (CANCEL_GET_READY).
+              <div className="flex flex-col items-center gap-3 text-center">
+                <p className="text-sm text-muted">Beginning now — settle in.</p>
+                <button
+                  type="button"
+                  onClick={handleCancelGetReady}
+                  className="inline-flex min-h-11 items-center rounded-control px-4 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
+            {(status === "recording" || status === "stop-confirming") && (
+              <RecordingStage remaining={remaining} drift={drift} onStop={handleRequestStop} />
+            )}
+          </div>
+
+          {/* FR-056 health gate — a TRUE blocking modal (backdrop, focus-trapped,
+              controls beneath inert, no dismiss path) holding the user in the green
+              room. "Try again" re-probes; "Not now" exits per mode. */}
+          {status === "green-room" && (
+            <BackendDownModal
+              open={healthGate === "down"}
+              heading={COPY.unavailableHeading}
+              body={COPY.unavailableBody}
+              checking={rechecking}
+              onRetry={handleModalRetry}
+              onNotNow={onSkip}
+            />
+          )}
+        </div>
       )}
 
-      {(state.status === "extract-failed" || state.status === "upload-failed") && (
-        <Button
-          className="h-12 w-full"
-          variant="secondary"
-          onClick={startCapture}
-          disabled={health === "checking"}
-        >
-          Try again
-        </Button>
+      {status === "stop-confirming" && (
+        <StopConfirm onKeepGoing={handleKeepGoing} onConfirmStop={handleConfirmStop} />
       )}
 
-      {state.status === "permission-denied" && (
-        <Button
-          className="h-12 w-full"
-          variant="secondary"
-          onClick={startCapture}
-          disabled={health === "checking"}
-        >
-          Try again
-        </Button>
+      {status === "uploading" && (
+        <p className="py-10 text-center text-base text-muted" aria-live="polite" role="status">
+          {COPY.uploading}
+        </p>
       )}
 
-      {/* Skip-for-now — revealed by scroll / first failure, always in denied (FR-004/007). */}
-      {skipVisible && state.status !== "recording" && state.status !== "uploading" && (
-        <Button className="h-12 w-full" variant="ghost" onClick={onSkip}>
-          Skip for now
-        </Button>
-      )}
+      {status === "success" && <SuccessState mode={mode} onDone={onComplete} />}
 
-      {/* Three-failure escape (FR-027/028). */}
-      {escapeVisible && (
-        <Button className="h-12 w-full" variant="ghost" onClick={onSkip}>
-          Skip and continue without calibration
-        </Button>
+      {(status === "upload-failed" || status === "extract-failed") && (
+        // The adaptive cause chip reflects the recording cause-telemetry
+        // (T021/DECISION-24): low-light / out-of-frame when measured, else our-side
+        // (incl. transport + detector-unavailable). "Try again" re-enters via the
+        // green room (FR-029).
+        <FailureState
+          cause={failureCause}
+          escapeVisible={escapeVisible}
+          onRetry={startCapture}
+          onNotNow={onSkip}
+          onPause={onSkip}
+        />
       )}
     </section>
   );

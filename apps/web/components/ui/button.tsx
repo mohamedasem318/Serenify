@@ -18,8 +18,16 @@ const buttonVariants = cva(
         default: "bg-ink text-bg hover:opacity-90",
         destructive:
           "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        // Outlined neutral (e.g. stop-confirm "Start over"). Resting text is the
+        // inherited `ink`, which is dark in light mode and light in dark mode — both
+        // contrasty against `bg-background`. The hover fills with `accent` (foggy,
+        // LIGHT in both modes); the prior `hover:text-accent-foreground` set the text
+        // to `ink`, which in DARK mode is light → light-on-light ~1.5:1 washout (the
+        // reported bug). Light mode never needed an override (inherited ink is dark),
+        // so we only force dark text on the dark-mode hover: `dark:hover:text-bg`
+        // (~6.3:1 light / ~8.8:1 dark on the foggy hover fill — both ≥ WCAG AA).
         outline:
-          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+          "border border-input bg-background hover:bg-accent dark:hover:text-bg",
         // Secondary action with character. Outlined meadow on a
         // surface tile carries the brand accent without competing
         // with the primary's solid ink. Yields AAA contrast in both
@@ -28,6 +36,20 @@ const buttonVariants = cva(
         // is meadow at 10% — feedback without contrast collapse.
         secondary:
           "bg-surface text-ink border border-meadow hover:bg-meadow/10",
+        // Affirmative brand CTA (feature 005 calibration: "Turn on camera",
+        // "I'm ready", "Set baseline"). Solid meadow that reads unmistakably green,
+        // with DARK text in BOTH modes: `text-ink` is dark in light mode, and
+        // `dark:text-bg` keeps it dark on the lighter dark-mode meadow (ink/bg swap
+        // the wrong way alone). ~4.8:1 light / ~7.7:1 dark — both ≥ WCAG AA.
+        meadow: "bg-meadow text-ink hover:opacity-90 dark:text-bg",
+        // Foggy CTA for the calm-but-not-forward surfaces — the primary action on
+        // a FOGGY screen (post-recording failure, the three camera-access states,
+        // the backend-down gate). The foggy token is light-toned in BOTH modes, so
+        // it takes DARK text in both, mirroring `meadow` exactly: `text-ink` is dark
+        // in light mode and `dark:text-bg` keeps it dark on the lighter dark-mode
+        // foggy (~6.8:1 light / ~9:1 dark — both ≥ WCAG AA). The colour matches the
+        // screen's treatment so the CTA never reads as a forward/meadow action.
+        foggy: "bg-foggy text-ink hover:opacity-90 dark:text-bg",
         // Quiet tier. A low-opacity foggy wash on hover gives feedback in BOTH
         // modes without overriding the text color (mirrors `secondary`'s
         // hover:bg-meadow/10 idiom). The previous hover:bg-accent +

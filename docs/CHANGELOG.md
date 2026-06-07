@@ -1113,3 +1113,402 @@ inference is feature 005's decision, not 004's.
   sum-to-9.0 invariant in `test_pipeline_fixtures.py` did not catch the drift.
 
 Rationale: see DECISIONS.md 2026-05-29 (LBP-TOP ROI resize interpolation).
+
+## 2026-05-31 — polish(004-onboarding-video-anchor) — recording-overlay visibility pass
+
+Post-ship polish on the onboarding capture overlay (the redesigned 005 surfaces
+mounted at the onboarding first-time capture), surfaced during smoke review. No
+state-machine, gate, or detector logic changed — visual/copy only.
+
+- **Breathing orb seating**: the orb was composited onto the bare webcam feed, so
+  its visibility depended on what the camera saw (invisible on dark/busy frames).
+  It now sits on its own soft, feathered dark radial vignette (a local seating, not
+  a hard opaque disc) with a luminous pale-meadow glow. Measured orb-vs-seating
+  contrast ≈ 4:1 over a worst-case bright feed and ≈ 10:1 over a dark feed (WCAG
+  non-text bar is 3:1). Pale sage is an intentional calmer choice over a pure-white
+  core that would measure higher but read clinical.
+- **Preview blur** reduced 6px → 3px. It was never doing contrast work (the orb now
+  carries its own backing); kept only as a gentle softening of self-consciousness.
+- **Breathing pacer copy**: "Breathe with the light — in for four, out for six."
+  → plain stepped "Breathe in" (4s) / "Breathe out" (6s). The animated path now
+  uses the same stepped swap the reduced-motion path already used; the orb carries
+  the "with the light" idea visually.
+- **Framing brackets** made legible: centred shows STEADY meadow brackets (was
+  faint white); off-centre BLINKS in foggy (was a too-faint foggy). Two colours
+  only — no third alarm hue (red is constitution-forbidden on affective surfaces;
+  amber is wrong for a calming screen). Each bracket carries a soft dark edge halo
+  so the stroke survives on bright and dark feeds. No checkmark on the recording
+  screen — it stays exclusive to the green-room affirmative. Reduced motion drops
+  the blink, keeping the foggy hue (the card text below still carries the words).
+
+Live-feed appearance (orb seating over a real feed, bracket visibility, blur level)
+is a manual smoke check — it can't be asserted headless without a camera.
+
+Not in this entry (investigation/preview only, no behaviour change): a dark-mode
+button-contrast investigation (root cause is the shared `outline` variant's hover,
+not the `foggy` variant — see report) and a temporary `/dev/button-contrast`
+preview route for the pending meadow ink-vs-white decision (a DECISIONS.md entry +
+constitution check, not yet made).
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — outline button dark-mode hover contrast
+
+Applies the fix the investigation above scoped. Behaviour change, dark mode only.
+
+- **Root cause (confirmed, not the `foggy` variant):** the shared shadcn `outline`
+  variant set `hover:text-accent-foreground` (= `ink`) on `hover:bg-accent`
+  (= `foggy`, which is light-toned in BOTH modes). In dark mode `ink` is light
+  (`#DCDED5`), so hover rendered light-on-light foggy — measured **~1.5:1**, far
+  below AA. The `foggy` variant itself was never affected (its hover is opacity-only
+  with dark text in both modes; measured 6.26:1 light / 8.73:1 dark).
+- **Scope:** the only production surface using `variant="outline"` is the
+  stop-confirm "Start over" button; the rest are the temporary dev route.
+- **Fix:** `outline` →
+  `border border-input bg-background hover:bg-accent dark:hover:text-bg`. Light mode
+  never needed a hover text override (the inherited `ink` is already dark there), so
+  the prior `hover:text-accent-foreground` is dropped and dark text is forced only on
+  the dark-mode hover (`dark:hover:text-bg`). No competing `hover:text-*` rule remains,
+  so it applies regardless of variant ordering.
+- **Measured (live, getComputedStyle incl. real `:hover`):** dark-mode hover
+  **1.5:1 → 8.73:1** (`#161917` on foggy `#9cbbc7`); light-mode hover 6.3:1; resting
+  unchanged (~13:1 in both modes). AA is met in every state.
+
+Deferred (no behaviour change, reported only): the §5 meadow-foreground question.
+Light-mode meadow CTA measures **ink 4.6:1** (passes AA for normal text, marginally)
+vs **white 3.39:1** (fails AA for normal text; large-text only). `meadow` is shared
+(Turn on camera / I'm ready / Back to home / Keep going) and its foreground is fixed
+by Constitution Principle V (amendment 1.1.0), so any global flip needs a DECISIONS.md
+entry + constitution check — not made here. The temporary `/dev/button-contrast`
+route is retained for that decision and MUST be deleted once it lands.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breath pacer moved onto the orb
+
+Visual/copy relocation, no state-machine/gate/detector logic touched.
+
+- The stepped "Breathe in" (4s) / "Breathe out" (6s) label moved from the controls
+  card BELOW the preview ONTO the breathing orb, centred over its core, so attention
+  stays in one place. The duplicate label is removed from the card (which keeps the
+  timer, drift nudge, reassurance, and Stop).
+- The label is a FIXED-size text layer above the orb graphic: the breath glow scales
+  behind it while the words never scale. The orb gains a STATIC luminous core (opaque
+  pale-meadow through the centre, feathered at the rim — not a hard disc) that fully
+  backs the words even at the breath's smallest (exhale) point, so the words never
+  spill onto raw camera content.
+- Reduced motion unchanged in spirit: static orb, the label still swaps on the 4s/6s
+  cadence (instant content swap).
+- Text-vs-core contrast (ink/bg over the opaque core centre, a known backing):
+  ≈ 7.3:1 light / ≈ 10.3:1 dark. Over a real feed the seating + glow soften it; final
+  legibility is a manual smoke check.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — green-room camera switch re-acquires the preview (Bug 1)
+
+- **Root cause:** the device picker's `onChange` only stored the chosen `deviceId` in
+  a ref that was consumed on the NEXT `getUserMedia` (e.g. "Try again"). Switching the
+  camera in the green room never re-acquired the live stream, so the preview kept the
+  old device — and the camera-busy / no-camera states were unreachable by picking a
+  bad device.
+- **Fix:** on a device change while a preview is live, acquire the new stream first,
+  stop the old tracks, and re-point the SAME persistent `<video>` at it (the framing
+  guide/gate key on the node, not the stream, so they re-bind to the new feed on the
+  next frame — no remount). The picker's initial echo of the already-active camera is
+  a no-op (guarded by comparing the selection to the live track's `deviceId`, so no
+  flicker). A busy/disconnected/blocked pick is routed to the matching camera-failure
+  state, making those cases reachable for manual testing.
+- **Honest test (seam = `getUserMedia` + `enumerateDevices`):** switching to a second
+  enumerated camera re-calls `getUserMedia` with `{ deviceId: { exact } }` for the new
+  device; a newly-picked busy device surfaces the camera-in-use state. The real
+  re-acquire/guard logic runs.
+- Live-feed outcomes (the preview actually showing the new camera, the busy/no-camera
+  states over a real device) remain manual smoke checks.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — busy/dead camera no longer locks the user out (Task 1)
+
+- **Root cause (three compounding):** (1) the device picker wrote the chosen
+  `deviceId` to localStorage on *selection*, before it was known to acquire — so a
+  busy/unplugged pick got remembered; (2) entry acquired the remembered device with
+  `{ deviceId: { exact } }` and **no fallback**, dead-ending on the camera-busy state;
+  (3) "Try again" re-acquired the same remembered device. Net effect: once a camera
+  was busy, every subsequent entry landed on (and was trapped on) the camera-in-use
+  screen.
+- **Fix — device memory now means "last camera that SUCCESSFULLY started":**
+  - Persistence moved out of the picker (`device-memory.ts`); the picker only reports
+    the selection. A device is remembered **only after `getUserMedia` succeeds**, so a
+    failed pick is never stored.
+  - Entry/"Try again" prefer the remembered device but **fall back to the system
+    default** when it's unavailable (busy/unplugged), then persist whatever actually
+    started — which **repairs a remembered-but-dead key**. A working camera is always
+    reachable; from the green room the picker lets the user switch.
+  - Only when *every* available camera (incl. the default) fails does it show the
+    genuine busy/no-device state, where "Try again" still recovers once the camera is
+    freed.
+- **Honest tests (seam = `getUserMedia` + `enumerateDevices`; real recovery logic):**
+  remembered-busy-on-entry recovers to the green room (no dead-end) and repairs the
+  key; a busy pick is never remembered (the prior good camera stays); "Try again"
+  after a busy state reaches a working camera once freed.
+- Live-camera recovery (busy device freed, hot-unplug, all-cameras-busy) remains a
+  manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing orb redesign (lighter, calmer)
+
+The orb read as a large, bright, hard opaque disc (too heavy). Redesigned so the
+readable backing is separated from the breath and the heavy/opaque part is small:
+
+- The opaque, readable **text backing** shrinks to a small fixed area sized to back
+  the longest label ("Breathe out") with padding, **feathered edges (no hard circle)**,
+  dimmed to a calm pale sage. It does NOT scale, so the words always sit fully on it,
+  never on raw camera content.
+- The **breath** is now a separate soft, dim, translucent, fully-feathered pool of
+  light (no coin edge) — the only animated layer, gently expanding on the 4s inhale /
+  contracting on the 6s exhale (eased to 0.7↔1, gentler than before).
+- **Footprint reduced** (orb container 144/176px, glow 128/160px vs the old
+  176/208px) so the glow leaves clear space to the framing brackets (no crowding).
+  The dark seating vignette is dropped — the small opaque backing carries text
+  legibility on its own.
+- Reduced motion: glow held at a fixed mid-size; the label still swaps "Breathe in" /
+  "Breathe out" on the 4s/6s cadence (instant content swap).
+- **Text-vs-backing contrast** (ink/bg over the opaque backing centre, a known fixed
+  surface): **7.04:1 light / 9.88:1 dark** — past AA (≥ AAA). Orb appearance over a
+  real feed is a manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — preview blur 3px → 2px
+
+The get-ready / recording preview softening is reduced from 3px to 2px — still
+softened (not fully sharp), just a lighter veil over the self-view.
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — calibration banner reveals after browser Back (bfcache restore)
+
+- **Cause:** `/app` is restored from the back-forward cache (bfcache) after a browser
+  Back out of the full-document calibration flow. On a bfcache restore the page is
+  frozen — Server Components don't re-run and the client tree isn't re-evaluated — so
+  the banner's `useSyncExternalStore` reveal never re-fires (a manual refresh fixes
+  it), and the header/theme toggle can look stale.
+- **Fix (targeted, no full reload):** a `<BfcacheRefresh>` client component on the
+  authed layout adds a `pageshow` listener that, **only when `event.persisted`** (a
+  real bfcache restore), calls `router.refresh()`. That re-runs the route's Server
+  Components — re-reading `has_anchor` so the banner conditional re-evaluates — and
+  re-renders the client tree (the banner store snapshot + the header/theme toggle),
+  preserving scroll and client state. It reuses the same `router.refresh()` mechanism
+  the cross-tab anchor listener already uses on `/app`. Normal/fresh loads
+  (`persisted` false) are untouched. The anti-flash banner behaviour (server snapshot
+  → client reveal) and 004's cross-tab sync are preserved.
+- **Hydration:** no hydration error found on the restore path — the banner uses the
+  hydration-safe `useSyncExternalStore` + server-snapshot pattern and the theme toggle
+  uses next-themes' documented `mounted` guard. (Runtime hydration cannot be observed
+  headless.)
+- Honest test at the I/O seam (inject the router): `pageshow` + `persisted` refreshes;
+  a fresh load does not; the listener is removed on unmount. Real-browser Back-restore
+  behaviour (and whether the toggle needs a scoped `location.reload()` escalation if
+  it proves genuinely de-hydrated rather than stale) is a manual smoke check.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing-pool contrast: light frost seat
+
+The prior orb redesign dropped the orb's seating, leaving the animated breathing
+**pool** (a dim, translucent pale-meadow fill) with nothing to contrast against — over
+real webcam content it washed out and the breath motion was barely visible. The fixed
+text backing was unaffected (it's opaque); only the animated pool was invisible.
+
+- **Re-introduced a backing for the pool as a localized "light frost"** behind the orb
+  — NOT the old dark-vignette seating (which read heavy/clinical), and not a hard
+  opaque disc. A `backdrop-filter` (stronger LOCAL `blur(8px)` on top of the preview's
+  2px, plus `saturate(0.85)` + `brightness(1.04)`) flattens whatever the camera sees
+  into a smooth, low-detail, gently-lit surface, so the dim pool reads on ANY feed
+  (bright / dark / busy). A faint flat white veil (`rgba(255,255,255,0.1)`) is a
+  guaranteed light floor over a dark feed — and the graceful fallback if
+  `backdrop-filter` is unavailable on the live `<video>`. A radial `mask`
+  (`#000 0%→42%`, fading to `transparent 84%`) feathers blur + veil **together to
+  nothing at the rim — no disc edge anywhere** — and keeps the frost LOCAL to the orb;
+  the rest of the preview stays at 2px.
+- **Footprint kept modest** (frost matches the pool box, 128/160px) so it doesn't crowd
+  the framing brackets. The frost is **static** — only the pool still breathes (4s
+  inhale / 6s exhale).
+- **Reduced motion** (repo `useMediaQuery`, not framer): unchanged — pool held at a
+  fixed mid-size, the label still swaps "Breathe in" / "Breathe out" on the 4s/6s
+  cadence (instant content swap). The frost is static in both paths.
+- Text-vs-backing contrast is unchanged (the opaque text backing was untouched):
+  ≈ 7.04:1 light / 9.88:1 dark.
+- **De-risked headless** via a static harness reproducing the exact layers over busy /
+  colour / dark-room / flat-bright synthetic feeds (Chromium screenshot): confirmed the
+  rim feathers with no hard edge, the frost flattens busy detail, and the pool reads
+  over varied backgrounds. The orb's appearance and tuning **over a real camera feed**
+  (lighting, skin tones, motion perceptibility) remains a **manual smoke check**.
+
+## 2026-05-31 — change(005-calibration-capture-flow) — breathing pool: clearer green + opacity pulse
+
+The frost backing (above) was the right mechanism, but the animated **pool itself**
+was still too dilute to read on it: a `meadow ~26% → transparent` wash has almost no
+contrast over a light frost, and its size change alone was imperceptible.
+
+- The pool is now a **clearly green but still dim** meadow (`55% → 38% → 12% →
+  transparent`) so a soft green pool reads against the light frost. Still **fully
+  feathered** (no hard edge) and dim-toned — and the opaque text backing covers its
+  flat centre, so the *visible* pool is the feathered ring around the words (a soft
+  pool/lung, never a hard or bright coin). Footprint unchanged; text backing untouched.
+- The breath now modulates **opacity in addition to scale**: scale + opacity peak
+  together at the 4s-inhale (fuller / slightly brighter) and ebb through the 6s exhale
+  (softer / smaller) — the lung filling and emptying — so the motion stays legible even
+  when the absolute contrast over a real feed is modest. Both are transform/opacity
+  only (compositor-friendly).
+- **Reduced motion** (repo `useMediaQuery`, not framer): the pool is held at a fixed
+  mid-size AND fixed mid-opacity (no pulse, true zero-motion); the label still swaps
+  "Breathe in" / "Breathe out" on the 4s/6s cadence (instant content swap).
+- De-risked the static look headless (peak vs trough over bright / dark feeds, both
+  modes): clearly a soft green pool, feathered, not glaring, with a visible
+  inhale/exhale delta. The **live-feed appearance and the pulse tuning remain a manual
+  smoke check** (saturation/dimness judged by eye over a real camera).
+
+## 2026-05-31 — fix(005-calibration-capture-flow) — stale banner after browser Back is a Next DEV-ONLY artifact (not a prod bug)
+
+Supersedes the bfcache handler from `563441d`. A real-browser trace showed `/app`
+served from the **disk cache** on a browser Back (`200 / (disk cache)`) — frozen at the
+server-rendered state, so the calibration banner reflected a stale `has_anchor` until a
+manual refresh. Investigated the actual cause and the proposed `no-store` fix:
+
+- **`no-store` cannot be set in `next dev`.** `next/dist/server/base-server.js` hardcodes
+  `Cache-Control: no-cache, must-revalidate` on every page document in dev and discards
+  any computed value ("In dev, we should not cache pages for any reason"), set last —
+  so the value is **not overridable** by the proxy, `next.config.ts headers()`, or a
+  route segment config. Verified empirically: setting `no-store` in both the proxy and
+  next.config still produced `no-cache, must-revalidate` on the wire after a restart.
+- **Production is already correct and unaffected.** That dev branch never runs in a
+  prod build, where `/app` is `force-dynamic` (revalidate 0) and Next emits
+  `private, no-cache, no-store, max-age=0, must-revalidate` (`lib/cache-control.js`).
+  `no-store` keeps it out of the disk cache, so Back revalidates on its own.
+- **Conclusion: this is a Next DEV-ONLY artifact, NOT a production bug — do not
+  re-investigate it as one.** `no-cache, must-revalidate` lets browsers reuse the disk
+  copy on history navigation without revalidating; only `no-store` (prod) prevents it.
+
+Fix (dev-only quality-of-life), replacing the removed `BfcacheRefresh`:
+
+- **`BfcacheRefresh` removed** (component + test): a disk-cache Back is a FRESH document
+  load (JS re-executes), so `pageshow.persisted` is `false` and the bfcache handler
+  never fired — it targeted the wrong mechanism.
+- **New `DevHistoryRefresh`** on the authed layout: reads the Navigation Timing entry
+  and, when `type === "back_forward"`, calls `router.refresh()` to re-run the route's
+  Server Components (re-reading `has_anchor`), preserving scroll + client state — the
+  same mechanism the cross-tab anchor listener uses. **Gated to `NODE_ENV ===
+  "development"`**; the guard is a Next-inlined literal so the effect body is
+  **dead-code-eliminated from the prod bundle** (a true no-op there — no navigation
+  read, no refresh, no redundant refetch on a prod back-navigation). Verified against an
+  actual `next build`: `back_forward` appears **0 times** in the production client
+  chunks. The anti-flash banner behaviour and 004 cross-tab sync are untouched.
+- Honest test at the seams (inject the Next router + the Navigation Timing entry): dev
+  back/forward refreshes, dev normal-nav does not, **prod is a no-op even on
+  back/forward**. The live Back-in-dev re-sync remains a manual smoke check.
+
+## 2026-05-31 — revert(005-calibration-capture-flow) — remove the DevHistoryRefresh dev-only banner-refresh shim
+
+The `DevHistoryRefresh` client component (added in the entry above) is removed: it only
+papered over a cosmetic DEV-ONLY issue and correlated with new dev breakage. The authed
+layout returns to its pre-shim state (no import, no render, no leftover dev-gate wiring);
+the component and its test are deleted.
+
+The **explanation above STAYS** and is unchanged: the stale-banner-after-Back is a Next
+**DEV-ONLY** artifact — `next dev` hardcodes `Cache-Control: no-cache, must-revalidate`
+and discards `no-store`, whereas a production build's `force-dynamic` `/app` emits
+`private, no-cache, no-store, max-age=0, must-revalidate` and revalidates on Back on its
+own. **Production is unaffected; this is not a prod bug and should not be re-investigated
+as one.** We are removing only the code workaround, not that finding.
+
+## 2026-05-31 - spec(005-calibration-capture-flow) amendment: banner CTA meadow → foggy
+
+- FR-043 amended: the home calibration banner's primary CTA is now the
+  **foggy-filled** button treatment (dark/ink text), **not meadow**. The banner
+  surface was already specified foggy; only the button colour changed.
+
+Rationale: the banner is an **attention prompt** ("needs your attention, not
+stress"), not an **affirmative confirmation** — so the CTA takes foggy (the
+attention role), reusing the same `variant="foggy"` already shipped on the
+failure-state and camera-access screens, rather than meadow (reserved for "you did
+it" moments like the success state). This is an application of Constitution
+Principle V's existing palette roles, not an amendment to them — recorded in full at
+DECISIONS.md 2026-05-31 (banner CTA meadow → foggy). The T028 task line and the
+Phase 9 goal/independent-test are aligned to match. Lifecycle, cross-tab mirror, and
+the full-document `<a href>` navigation are unchanged.
+
+## 2026-06-01 - test(005-calibration-capture-flow): strengthen the FR-050 egress proof
+
+- `apps/web/tests/e2e/anchor-egress.spec.ts` now asserts, in addition to the existing
+  video-signature checks (multipart `.webm`/`.mp4` clip part or `video/*` Content-Type),
+  that **no outbound body of ANY kind** reaches a non-allowlisted destination across the
+  green-room / mid-recording / post-success checkpoints. This closes the gap where a
+  frame leak encoded as JSON / base64 / image bytes to any URL would have passed the
+  video-only check undetected.
+- Benign allowlist (the only destinations permitted to carry an outbound body): the
+  single final `/anchor` clip POST; the Supabase host (auth/token refresh + the
+  derived-hex anchor-vector REST write); and same-origin Next **server actions** matched
+  by the `Next-Action` request header (the sign-in auth RPC — a bespoke frame leak would
+  be a headerless fetch/beacon and stay flagged, so this is header-scoped, not a blanket
+  same-origin pass).
+
+Rationale: the prior assertion proved no *video-looking* payload egressed, but the
+guarantee FR-050/SC-014 makes is that **nothing** derived from the camera frames leaves
+the device for framing. The strengthened accumulator makes that the literal assertion.
+The existing video checks are kept intact (added to, not replaced). Verified passing on
+chromium; the DECISION-26 / FR-050 note in `docs/DECISIONS.md` is updated to describe the
+two-layer check. No production code change.
+
+## 2026-06-01 - fix(005-calibration-capture-flow): green-room gate-clear sync (helper text no longer leads)
+
+- `apps/web/components/anchor/green-room.tsx`: the affirmative status line ("You're all
+  set — start when you're ready.", with its bold treatment + inline check) now keys off
+  the **confirmed, debounced** gate signal (`ready`, held for `SET_DEBOUNCE_MS`) — the
+  SAME signal that already enables "I'm ready" and lights the meadow brackets/check —
+  instead of the **raw per-frame verdict** (`gate === "ready"`), which flipped a render
+  early. A momentarily-good frame that hasn't yet held the debounce now reads a calm
+  "Almost there — hold steady." rather than a premature "all set". The gate **nudges**
+  (no-face / off-centre / too-dark) still come straight off the raw verdict, so they
+  surface instantly.
+- `apps/web/components/anchor/green-room-gate-sync.test.tsx` (new): drives synthetic
+  detector frames through the REAL `toFramingSignal` + `evaluateGate` debounce (not
+  mocked green) and asserts the invariant — the affirmative line, the enabled button, and
+  the meadow check all flip together at the one confirmed boundary, never a frame apart.
+  Also pins the preserved detector-unavailable bypass (`ready = true` with its own "No
+  live guide" copy and NO "all set" affirmative).
+
+Rationale: alignment of the implementation with already-intended behaviour (FR-008's
+single gate-cleared moment), **not** a design-principle change — so no DECISIONS entry.
+`SET_DEBOUNCE_MS` is unchanged (it still prevents the affirmative from flickering on a
+momentary detection); the fix makes the text respect that same debounce rather than
+firing on the raw signal. The inset-glow coexistence (affirmative brackets ⟷ enabled
+"I'm ready"), the detector-unavailable bypass, and the reduced-motion static affirmative
+are all untouched and verified by the existing suite (161 anchor tests green).
+
+## 2026-06-08 — docs(005-calibration-capture-flow) — T033 finalisation + the remaining 005 deltas
+
+Closes feature 005's implementation record (Principle VIII). `docs/DECISIONS.md` gains the
+collected, finalised **📌 DECISION-19 through DECISION-28** block (folding the 2026-05-31
+DECISION-22/23/25 drafts and the two dated-but-unnumbered notes — banner CTA meadow→foggy →
+DECISION-28, e2e-seam / FR-050 egress → DECISION-26 — into the numbered scheme);
+`docs/PROGRESS.md` gains the running feature-005 entry. The 005 deltas not yet individually
+logged are recorded here so the changelog set is complete:
+
+- **Home calibration banner amber → foggy (+ foggy CTA).** 004's amber `/app` calibration
+  banner is restyled **foggy** (surface border + bg) with a **foggy-filled** "Set baseline"
+  CTA — attention, not affirmative (the CTA-colour finalisation was logged 2026-05-31; this
+  records the full amber→foggy surface change as a 004→005 delta). Amber stays reserved for
+  stress signals (Constitution Principle V); the banner is calm-attention.
+- **Old feature-004 calibration UI fully removed; redesigned recorder remounted.** No 004
+  calibration stragglers remain referenced; `<AnchorRecorder>` mounts at both the onboarding
+  first-time capture and the standalone `/app/calibrate` route (clarification #1).
+- **Scoped CSP `'wasm-unsafe-eval'` on the capture routes — REPORT-ONLY.** `proxy.ts`
+  appends the allowance (+ provisional `worker-src 'self' blob:`) only on `/onboarding` and
+  `/app/calibrate` so the self-hosted detector WASM compiles; no `connect-src` host added,
+  COEP unset. **It ships report-only. Flipping it to ENFORCE (T004) is a hard pre-ship
+  deploy blocker** — see `docs/BACKLOG.md` "Before the 005 detector ships"; the detector must
+  not reach production under report-only.
+- **No migration / no backend / no contract / no seed change.** The whole feature is UI /
+  read-path only — it reuses 004's extraction service, the `/healthz` gate,
+  `has_anchor(auth.uid())`, and the owner-side anchor write verbatim
+  (`contracts/backend-unchanged.md`). The recalibrate overwrite is the same single in-place
+  `profiles` `UPDATE` (no baseline-history table).
+- **Device-memory fix (T029 / DECISION-25).** `device-picker.tsx` re-persists the resolved
+  default camera when the store is cleared, without clobbering a stored-but-temporarily-
+  absent device; an honest Vitest fails against the pre-fix code.
+- **Static guardrail scan (T030).** A source scan over the 005 surfaces asserts zero
+  `amber`/`crimson` tokens and zero exclamation marks / blocklist terms ("detected",
+  "REQUIRED", "MANDATORY", "alert", "abnormal", "elevated risk") on any calibration or error
+  surface.
+
+Already logged this cycle and unchanged: the green-room gate-clear sync (2026-06-01), the
+two-layer FR-050 egress proof (2026-06-01), and the busy/dead-camera lockout fix
+(2026-05-31). No Cloud-dashboard parity items — all edits are in-repo. No code change in this
+entry (docs only).
