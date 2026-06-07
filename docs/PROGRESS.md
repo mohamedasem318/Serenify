@@ -4,6 +4,90 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 005 — Calibration Capture Flow (implementation complete; one pre-ship blocker open)
+
+**Branch**: `005-calibration-capture-flow`
+**Status**: implementation complete; **one hard pre-ship blocker open (T004 — flip the
+capture-route CSP from report-only to enforce)**; awaiting the real-webcam smoke run +
+merge approval.
+**Date**: 2026-06-08 (docs-finalisation close; implementation spanned 2026-05-29 → 2026-06-08)
+
+**Scope shipped** — a calm redesign of the calibration capture UX over feature 004's
+**unchanged** extraction backend (no migration, no backend/contract change, no seed
+change; `contracts/backend-unchanged.md`):
+
+- **On-device framing guide (DECISION-19/20)** — a self-hosted MediaPipe BlazeFace
+  detector (vendored WASM, capability-probed, hard-timeout, never hangs) drives a pure
+  gate/drift module through a throttled live loop; `loading → active | unavailable`, with
+  `unavailable` bypassing the gate so the user is never locked out. A scoped CSP
+  `'wasm-unsafe-eval'` allowance on the two capture routes only (report-only) lets the WASM
+  compile; no `connect-src` host added, COEP unset. **Nothing leaves the browser.**
+- **Settle-before-record flow (DECISION-21/27)** — redesigned reducer
+  `intro → green-room → (healthz) → get-ready → recording → success`: a green room that
+  lets the user settle with live framing + device switching before anything records, a
+  numbers-only 3→2→1, a breathing orb (4-in/6-out) as the only non-progress motion, the
+  60 s timer as the sole progress indicator, and a reduced-motion equivalent for every
+  animated element on the shared `useMediaQuery` hook.
+- **Three calm camera-access states + honest stop-confirm + adaptive failure
+  (DECISION-21/24)** — `getUserMedia` `error.name` maps to foggy Blocked / Busy /
+  No-camera screens with recovery; a non-destructive "start the minute over" stop-confirm;
+  and a foggy failure state whose cause chip (low-light / out-of-frame / our-side default)
+  is collapsed from on-device telemetry, never asserting a user-side cause we didn't
+  measure. The `/healthz` gate + backend-down modal reuse 004 and block recording into a
+  dead backend.
+- **Recalibrate from account (DECISION-22/23)** — an employees-only "Your calm baseline"
+  section (whether-set only, never the date) with a heads-up dialog → full-document
+  `<a href="/app/calibrate?mode=recalibrate">`; `mode` reconciled against the real
+  `has_anchor` (a stray `?mode=` never manufactures a recalibration); copy "set"→"update";
+  exits to `/app/account`. The baseline is overwritten **only on a successful capture** —
+  the same single in-place `UPDATE`, no history table, no migration.
+- **Home calibration banner restyled (DECISION-28)** — 004's amber banner becomes foggy
+  with a foggy-filled "Set baseline" CTA (attention, not affirmative); lifecycle, cross-tab
+  mirror, and the full-document nav unchanged; employees-only.
+- **Old 004 calibration UI fully removed (DECISION-28)** and the redesigned recorder
+  mounted at both onboarding and `/app/calibrate`.
+- **Device-memory fix (DECISION-25)** — a cleared store re-seeds the resolved default
+  camera for the session without clobbering a temporarily-absent remembered device.
+- **Honest tests + the NON-NEGOTIABLE egress proof (DECISION-26)** — boundary-seam tests
+  exercise the real orchestration; an e2e detector seam runs the real gate to a full
+  recording; a two-layer Playwright egress proof asserts **no video AND no outbound body of
+  any kind** leaves for framing across green-room / mid-recording / post-success, except the
+  single final `/anchor` clip POST on success.
+- **Static guardrail scan (T030)** — a source scan over the 005 surfaces asserts zero
+  `amber`/`crimson` tokens and zero exclamation marks / blocklist terms ("detected",
+  "alert", "abnormal", "elevated risk", …) on any calibration or error surface.
+
+**Test results** (as last recorded; this docs pass ran no suites):
+
+- Web anchor Vitest: **161 anchor tests green** (last recorded at the green-room gate-sync
+  fix); typecheck 0 / lint 0 at the last code change.
+- Anchor e2e (Playwright, chromium): the consolidated 005 specs (`anchor-flow`,
+  `anchor-camera-access`, `anchor-banner`, `anchor-egress`, `anchor-cross-tab`) green; the
+  egress proof passes both layers. firefox/webkit + the real-detector paths fall to the
+  smoke matrix.
+
+**Decisions logged in DECISIONS.md (2026-06-08, T033)**: the collected, finalised
+feature-005 block **📌 DECISION-19 through DECISION-28** (folding the 2026-05-31
+DECISION-22/23/25 drafts, the banner-CTA meadow→foggy note → DECISION-28, and the e2e-seam /
+FR-050 egress note → DECISION-26 into the numbered scheme).
+
+**Open / deferred — before the 005 detector ships** (tracked in `docs/BACKLOG.md`):
+
+- **T004 — flip the capture-route CSP report-only → enforce** after a
+  `securitypolicyviolation` sweep. **Hard deploy blocker**; the detector must not ship to
+  production under report-only.
+- **Run the T032 smoke matrix on a real webcam** (cross-browser; the three real
+  camera-access conditions; the weak-device detector-unavailable fallback; 360 px;
+  reduced-motion; light/dark) — none of it is CI-reproducible.
+- **Verify mobile camera over HTTPS** (the 004-deferred real-device camera path).
+- Pre-production: the invite-only `/signup` gate (security slice 7) remains a separate
+  pre-launch blocker, unchanged by 005.
+
+**Next**: feature 006 — stress-inference-service (the live inference read path that consumes
+`anchor_vector` as the per-user delta baseline 005 calibrates).
+
+---
+
 ## Feature 004 — Onboarding Video Anchor Flow (merged to main)
 
 **Branch**: `004-onboarding-video-anchor` (squash-merged via PR #14, then deleted)

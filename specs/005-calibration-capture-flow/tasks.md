@@ -165,7 +165,7 @@ recording continuing throughout.
 **Independent Test**: during recording, Stop → confirm framing → Keep going resumes;
 Confirm stop → back in the green room (not a fresh countdown), nothing persisted.
 
-- [ ] T022 [US3] `apps/web/components/anchor/stop-confirm.tsx` — honest dialog (shadcn `dialog`): "starting the minute over", "nothing saved yet, so nothing is lost", "Keep going" as the easy default, **non-destructive (no crimson)**; confirm → **green-room**. (FR-021–024)
+- [X] T022 [US3] `apps/web/components/anchor/stop-confirm.tsx` — honest dialog (shadcn `dialog`): "starting the minute over", "nothing saved yet, so nothing is lost", "Keep going" as the easy default, **non-destructive (no crimson)**; confirm → **green-room**. (FR-021–024)
   - **Honest test**: RTL — "Keep going" resumes; confirm → green-room (real reducer transition); assert no crimson token on the surface.
 
 **Checkpoint**: US1–US3.
@@ -179,7 +179,7 @@ Confirm stop → back in the green room (not a fresh countdown), nothing persist
 **Independent Test**: drive permission-denied, camera-busy, and no-device — each shows
 its distinct foggy state with "Try again" / "Not now".
 
-- [ ] T023 [US4] `apps/web/components/anchor/camera-access-state.tsx` — the three foggy states (Blocked / Busy / No-camera) + "Try again" / "Not now", wired to the `getUserMedia` `error.name` mapping from T008. (FR-031–035)
+- [X] T023 [US4] `apps/web/components/anchor/camera-access-state.tsx` — the three foggy states (Blocked / Busy / No-camera) + "Try again" / "Not now", wired to the `getUserMedia` `error.name` mapping from T008. (FR-031–035)
   - **Honest test**: inject `getUserMedia` rejections by `error.name` → each distinct state, **foggy (no amber/crimson)**, "Try again" re-requests, "Not now" exits per `mode`.
 
 **Checkpoint**: US1–US4.
@@ -193,7 +193,7 @@ its distinct foggy state with "Try again" / "Not now".
 **Independent Test**: drive each cause (dark / off-frame / our-side) → correct chip;
 reach the threshold → the escape appears.
 
-- [ ] T024 [US5] `apps/web/components/anchor/failure-state.tsx` — foggy failure (never red/amber); adaptive cause chip from telemetry (low-light / out-of-frame / **our-side default**); "Try again" (→ green room) / "Not now"; escape at the threshold ("Maybe later" / "Try once more"). (FR-027–030, DECISION-24)
+- [X] T024 [US5] `apps/web/components/anchor/failure-state.tsx` — foggy failure (never red/amber); adaptive cause chip from telemetry (low-light / out-of-frame / **our-side default**); "Try again" (→ green room) / "Not now"; escape at the threshold ("Maybe later" / "Try once more"). (FR-027–030, DECISION-24)
   - **Honest test**: inject `causeTelemetry` + a 422 → correct chip; the escape appears only at/after the threshold; our-side when the detector was unavailable; no amber/crimson.
   - **Docs**: `docs/DECISIONS.md` entry 24 (draft).
 
@@ -252,7 +252,7 @@ dismiss (session) → reappears next session → disappears on calibrate; cross-
 - [X] T031 Playwright e2e consolidation in `apps/web/tests/e2e/` — the happy path, the recalibrate path, the three camera-access states, and the banner appear/disappear/persist + cross-tab — all with boundary seams (detector / `getUserMedia` / `MediaRecorder` / `postAnchor` / Supabase injected, real orchestration). **Explicitly mark** CI-impossible behaviour as deferred to `smoke-tests.md` (not mocked green). (FR-051/052, DECISION-26)
   - **Acceptance (Principle I — TOP PRIORITY; automated proof of FR-050/SC-014):** a network-level assertion (Playwright request interception over the whole flow) proves that across **both** framing phases — the **green room** *and* the full **60-second recording** — **zero** video bytes leave the device for framing, and the **only** video egress in the entire flow is the single final encoded clip POSTed to `/anchor` on success. A manual smoke check is **not** sufficient for this NON-NEGOTIABLE; this is the automated guarantee that the on-device detector "transmits nothing".
 - [X] T032 Author `specs/005-calibration-capture-flow/smoke-tests.md` — the six human-validated check groups (see the file's own structure): cross-browser webcam matrix; the three real camera-access conditions; the detector-unavailable fallback on a weak device; the recording screen at 360px; reduced-motion across every animated element; light/dark parity. Each enumerated as a manual check, none mocked. (FR-049, SC-011/012/014, DECISION-26)
-- [ ] T033 Docs finalisation — append `docs/DECISIONS.md` entries **19–28**, the running 005 entry to `docs/PROGRESS.md`, and `docs/CHANGELOG.md` deltas (banner amber→foggy; old-UI removal; scoped CSP `'wasm-unsafe-eval'`; the explicit no-migration / no-backend-change note). (Principle VIII)
+- [X] T033 Docs finalisation — append `docs/DECISIONS.md` entries **19–28**, the running 005 entry to `docs/PROGRESS.md`, and `docs/CHANGELOG.md` deltas (banner amber→foggy; old-UI removal; scoped CSP `'wasm-unsafe-eval'`; the explicit no-migration / no-backend-change note). (Principle VIII)
 
 ---
 

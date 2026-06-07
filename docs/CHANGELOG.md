@@ -1471,3 +1471,44 @@ momentary detection); the fix makes the text respect that same debounce rather t
 firing on the raw signal. The inset-glow coexistence (affirmative brackets ⟷ enabled
 "I'm ready"), the detector-unavailable bypass, and the reduced-motion static affirmative
 are all untouched and verified by the existing suite (161 anchor tests green).
+
+## 2026-06-08 — docs(005-calibration-capture-flow) — T033 finalisation + the remaining 005 deltas
+
+Closes feature 005's implementation record (Principle VIII). `docs/DECISIONS.md` gains the
+collected, finalised **📌 DECISION-19 through DECISION-28** block (folding the 2026-05-31
+DECISION-22/23/25 drafts and the two dated-but-unnumbered notes — banner CTA meadow→foggy →
+DECISION-28, e2e-seam / FR-050 egress → DECISION-26 — into the numbered scheme);
+`docs/PROGRESS.md` gains the running feature-005 entry. The 005 deltas not yet individually
+logged are recorded here so the changelog set is complete:
+
+- **Home calibration banner amber → foggy (+ foggy CTA).** 004's amber `/app` calibration
+  banner is restyled **foggy** (surface border + bg) with a **foggy-filled** "Set baseline"
+  CTA — attention, not affirmative (the CTA-colour finalisation was logged 2026-05-31; this
+  records the full amber→foggy surface change as a 004→005 delta). Amber stays reserved for
+  stress signals (Constitution Principle V); the banner is calm-attention.
+- **Old feature-004 calibration UI fully removed; redesigned recorder remounted.** No 004
+  calibration stragglers remain referenced; `<AnchorRecorder>` mounts at both the onboarding
+  first-time capture and the standalone `/app/calibrate` route (clarification #1).
+- **Scoped CSP `'wasm-unsafe-eval'` on the capture routes — REPORT-ONLY.** `proxy.ts`
+  appends the allowance (+ provisional `worker-src 'self' blob:`) only on `/onboarding` and
+  `/app/calibrate` so the self-hosted detector WASM compiles; no `connect-src` host added,
+  COEP unset. **It ships report-only. Flipping it to ENFORCE (T004) is a hard pre-ship
+  deploy blocker** — see `docs/BACKLOG.md` "Before the 005 detector ships"; the detector must
+  not reach production under report-only.
+- **No migration / no backend / no contract / no seed change.** The whole feature is UI /
+  read-path only — it reuses 004's extraction service, the `/healthz` gate,
+  `has_anchor(auth.uid())`, and the owner-side anchor write verbatim
+  (`contracts/backend-unchanged.md`). The recalibrate overwrite is the same single in-place
+  `profiles` `UPDATE` (no baseline-history table).
+- **Device-memory fix (T029 / DECISION-25).** `device-picker.tsx` re-persists the resolved
+  default camera when the store is cleared, without clobbering a stored-but-temporarily-
+  absent device; an honest Vitest fails against the pre-fix code.
+- **Static guardrail scan (T030).** A source scan over the 005 surfaces asserts zero
+  `amber`/`crimson` tokens and zero exclamation marks / blocklist terms ("detected",
+  "REQUIRED", "MANDATORY", "alert", "abnormal", "elevated risk") on any calibration or error
+  surface.
+
+Already logged this cycle and unchanged: the green-room gate-clear sync (2026-06-01), the
+two-layer FR-050 egress proof (2026-06-01), and the busy/dead-camera lockout fix
+(2026-05-31). No Cloud-dashboard parity items — all edits are in-repo. No code change in this
+entry (docs only).
