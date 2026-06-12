@@ -61,7 +61,7 @@ def assert_usable_face_coverage(landmarks):
     if usable < MIN_USABLE_FRAMES or fraction < MIN_COVERAGE_FRACTION:
         logger.info("coverage reject: usable=%d kept=%d fraction=%.3f", usable, kept, fraction)
         raise FeatureExtractionError(
-            f"usable face coverage below floor (usable={usable} kept={kept} fraction={fraction:.3f})",
+            "insufficient usable face coverage",   # GENERIC message — counts stay in the log only
             code="insufficient_face_frames",
         )
 ```

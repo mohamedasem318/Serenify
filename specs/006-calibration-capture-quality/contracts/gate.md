@@ -28,9 +28,11 @@ def assert_usable_face_coverage(landmarks: np.ndarray) -> None:
     fails EITHER the absolute floor OR the coverage fraction (FR-005/006/007)."""
     usable, kept, fraction = usable_face_coverage(landmarks)
     if usable < MIN_USABLE_FRAMES or fraction < MIN_COVERAGE_FRACTION:
+        # Counts go ONLY to the server log — NEVER into the exception message
+        # (so even str(exc) cannot leak them). Wire reason is the categorical code.
         logger.info("coverage reject: usable=%d kept=%d fraction=%.3f", usable, kept, fraction)
         raise FeatureExtractionError(
-            f"usable face coverage below floor (usable={usable} kept={kept} fraction={fraction:.3f})",
+            "insufficient usable face coverage",   # generic, count-free
             code="insufficient_face_frames",
         )
 ```
@@ -48,9 +50,11 @@ def assert_usable_face_coverage(landmarks: np.ndarray) -> None:
   frames); `fraction` guards divide-by-zero defensively.
 
 ### Privacy contract (Principle I / FR-016)
-- `usable`, `kept`, `fraction` are emitted **only** to the server log line above.
-- The raised error's `code` is the **categorical** token; the numeric message is for
-  logs. The wire reason (see `messaging.md`) is the code, never the numbers.
+- `usable`, `kept`, `fraction` are emitted **only** to the server log line above —
+  **never** in the exception message and never on the wire.
+- The exception **message is generic and count-free** (`"insufficient usable face
+  coverage"`); the `code` is the **categorical** token. The wire reason (see
+  `messaging.md`) is the code, so even `str(exc)` cannot leak counts.
 
 ## Call site: `packages/ml-video/src/ml_video/anchor.py` (MODIFIED)
 

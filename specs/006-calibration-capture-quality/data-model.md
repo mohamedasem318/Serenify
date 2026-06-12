@@ -33,7 +33,7 @@ MIN_COVERAGE_FRACTION`; reject (raise) if **either** fails. Calibrated so the
 
 | Member | Type | Default | Notes |
 |---|---|---|---|
-| message (positional) | `str` | — | Human-readable; contains the numeric detail for **logs** only. |
+| message (positional) | `str` | — | **Generic, count-free** (`"insufficient usable face coverage"`). The numeric detail (`usable`/`kept`/`fraction`) goes to a **separate `logger` line only**, never the message — so even `str(exc)` cannot leak counts. |
 | `code` (keyword-only) | `str \| None` | `None` | NEW. The gate passes `"insufficient_face_frames"`. Existing raises omit it → `None` (unchanged behaviour). |
 
 ### `POST /anchor` 422 body — SHAPE UNCHANGED
