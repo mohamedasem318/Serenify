@@ -244,6 +244,37 @@ slot.)
 
 ---
 
+## Path confirmation (T003) — `compute_anchor` is baseline-capture-path-only
+
+Verified before wiring the gate (the Phase 2 BLOCKING task), by tracing every
+`compute_anchor` and `predict_delta` reference across `apps/` and `packages/`
+(excluding `specs/` and `.venv/`):
+
+**`compute_anchor` references**
+- `apps/api/app/routers/anchor.py:56` — `ml_video.compute_anchor(tmp_path)` — **the
+  only production caller**: the `POST /anchor` baseline/anchor capture route.
+- `apps/api/tests/test_anchor.py:128` — test (monkeypatches `compute_anchor`).
+- `packages/ml-video/tests/test_pipeline_fixtures.py:22,91,111,112` — tests.
+- `packages/ml-video/src/ml_video/anchor.py:18` (definition),
+  `__init__.py:12,18` (import/export), `features.py:6,10` (comments),
+  `README.md`, `docs/MODEL_HANDOFF.md`, `docs/BACKLOG.md` — definition/docs only.
+
+**Inference entry point is separate and not yet wired**
+- `Predictor.predict_delta` is defined at `packages/ml-video/src/ml_video/loader.py:39`
+  and has **zero callers in `apps/`** — the live-inference route does not exist yet
+  (a later feature). `model.predict`/`predict_proba` appear only inside
+  `predict_delta` itself.
+- The `/anchor` route touches the predictor only for `predictor.model_version`
+  (`anchor.py:64`, a response label) and startup load (`main.py:20`) / health
+  (`health.py:18`) — never `predict_delta`.
+
+**Conclusion**: `compute_anchor` is invoked **only** on the baseline/anchor capture
+path; the live-inference path uses the distinct `Predictor.predict_delta` entry
+point and is not even wired. Inserting the gate inside `compute_anchor` (after
+`extract_landmarks`, before the feature floors) therefore **cannot affect
+inference**. `docs/BACKLOG.md:1249–1317` independently anticipated this exact
+placement. **Safe to wire the gate (Phase 4).**
+
 ## Part B — Glasses (investigation-only; recorded, no code) — 📌 DECISION-32
 
 The investigation is complete and produces **no functional requirement and no code**.

@@ -1,0 +1,7 @@
+# Raw calibration clips must NEVER be committed (Constitution Principle I / X).
+# Only the derived .npy landmark arrays + the README + the extractor are tracked.
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv

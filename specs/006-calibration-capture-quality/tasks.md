@@ -44,8 +44,8 @@ accept-good / no-false-reject (US2), `[US3]` = calm message + chips-unchanged (U
 
 **Purpose**: Confirm the environment and scaffold the fixtures location.
 
-- [ ] T001 Confirm the active branch is `006-calibration-capture-quality` and the `packages/ml-video` env is the pinned one: `cd packages/ml-video && uv run python -c "import sys, mediapipe; print(sys.version.split()[0], mediapipe.__version__)"` MUST print `3.12.x 0.10.13` (NOT a 3.9 conda env). Record the output. If it differs, STOP and fix the env before any gate work.
-- [ ] T002 [P] Scaffold `packages/ml-video/tests/fixtures/` with a placeholder `packages/ml-video/tests/fixtures/README.md` stating: fixtures are derived landmark `.npy` arrays (no frames), raw clips are intentionally NOT committed (Principle I/X), and provenance + the pinned env will be recorded at calibration (T015). Add `packages/ml-video/tests/fixtures/*.mp4` / `*.webm` to `.gitignore` so a raw clip can never be committed by accident.
+- [X] T001 Confirm the active branch is `006-calibration-capture-quality` and the `packages/ml-video` env is the pinned one: `cd packages/ml-video && uv run python -c "import sys, mediapipe; print(sys.version.split()[0], mediapipe.__version__)"` MUST print `3.12.x 0.10.13` (NOT a 3.9 conda env). Record the output. If it differs, STOP and fix the env before any gate work. → **PASS: `3.12.13 0.10.13`.**
+- [X] T002 [P] Scaffold `packages/ml-video/tests/fixtures/` with a placeholder `packages/ml-video/tests/fixtures/README.md` stating: fixtures are derived landmark `.npy` arrays (no frames), raw clips are intentionally NOT committed (Principle I/X), and provenance + the pinned env will be recorded at calibration (T015). Add `packages/ml-video/tests/fixtures/*.mp4` / `*.webm` to `.gitignore` so a raw clip can never be committed by accident. → **Done: `README.md` + `.gitignore` (`*.mp4/*.webm/*.mov/*.avi/*.mkv`).**
 
 **Checkpoint**: Pinned env verified; fixtures dir exists and raw clips are gitignored.
 
@@ -59,7 +59,7 @@ accept-good / no-false-reject (US2), `[US3]` = calm message + chips-unchanged (U
 **⚠️ CRITICAL**: T003 blocks Phase 4 (the wiring). Do not wire the gate until this
 passes.
 
-- [ ] T003 Trace every caller of `compute_anchor` / `ml_video.compute_anchor` across `apps/api/` and `packages/` (e.g. `grep -rn "compute_anchor" apps packages`). Confirm the ONLY invocation is the baseline/anchor capture path (`POST /anchor` in `apps/api/app/routers/anchor.py`), and that the live-inference path uses `Predictor.predict_delta` (a DIFFERENT entry point), not `compute_anchor`. Record the caller list in `specs/006-calibration-capture-quality/research.md` (a short "Path confirmation (T003)" note). If ANY live-inference or non-baseline caller of `compute_anchor` is found, STOP and report — do not proceed to wiring.
+- [X] T003 Trace every caller of `compute_anchor` / `ml_video.compute_anchor` across `apps/api/` and `packages/` (e.g. `grep -rn "compute_anchor" apps packages`). Confirm the ONLY invocation is the baseline/anchor capture path (`POST /anchor` in `apps/api/app/routers/anchor.py`), and that the live-inference path uses `Predictor.predict_delta` (a DIFFERENT entry point), not `compute_anchor`. Record the caller list in `specs/006-calibration-capture-quality/research.md` (a short "Path confirmation (T003)" note). If ANY live-inference or non-baseline caller of `compute_anchor` is found, STOP and report — do not proceed to wiring. → **CONFIRMED: only prod caller is `anchor.py:56` (`POST /anchor`); `predict_delta` (loader.py:39) has zero `apps/` callers (live-inference route not wired). Caller list recorded in research.md "Path confirmation (T003)".**
 
 **Checkpoint**: `compute_anchor` confirmed baseline-path-only; safe to add the gate.
 
