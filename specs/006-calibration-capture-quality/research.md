@@ -202,6 +202,36 @@ detects, which depends on the mediapipe build.
 
 ---
 
+## Calibration measurements (T013) — three real clips through the real pipeline
+
+Extracted once in the pinned env (Python **3.12.13**, **mediapipe 0.10.13**, via
+`uv run`) with `tests/fixtures/extract_coverage_fixtures.py`. Coverage =
+`usable / kept`, `usable` = non-zero landmark rows.
+
+| Clip | usable | kept | fraction | target |
+|------|-------:|-----:|---------:|--------|
+| thin           |   4 | 172 | **0.023** | reject |
+| good-ideal     | 154 | 154 | **1.000** | accept |
+| good-realistic | 129 | 129 | **1.000** | accept (binding lower bound) |
+
+**Key finding — the good-realistic clip came out at 1.000 coverage.** FaceMesh held
+the face through the natural brief look-aways (glances/turns keep enough of the face
+visible to detect), so the "realistic" clip did **not** exercise sub-100% coverage;
+empirically it matches good-ideal on fraction (it differs only in `kept`, being a
+shorter clip). The accept-side **binding lower bound is therefore `usable = 129`,
+`fraction = 1.000`** — the thresholds must sit clearly below that, and are chosen
+**conservatively low** so a genuine user whose coverage dips below this particular
+clip is never false-rejected (we have no genuine sub-100% sample to pin a tighter
+bound).
+
+**Margin verdict (T014 STOP-gate): PASS — a very large, clean gap exists.** thin
+coverage `0.023` vs good `1.000` (≈43×); thin usable `4` vs good `129`/`154` (≈32×).
+No threshold needs to sit anywhere near the binding clip, so there is no risk of
+no-separating-margin; the STOP condition does not trigger.
+
+**Thresholds: NOT yet set** (T015 is gated on Mohamed's review of these numbers).
+`coverage.py` still holds the inert `0` / `0.0` placeholders.
+
 ## Spec-assumption flags surfaced while reading (NOT contradictions — clarifications)
 
 Per the user's instruction to STOP and flag rather than paper over, two things in the

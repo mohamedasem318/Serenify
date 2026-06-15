@@ -34,9 +34,14 @@ media). Extracted **once** in the pinned ml-video env — Python 3.12,
 different mediapipe build would shift detection and thus coverage).
 
 | Clip | usable | kept | fraction | accept/reject |
-|------|--------|------|----------|---------------|
-| thin           | _(T013)_ | _(T013)_ | _(T013)_ | reject |
-| good-ideal     | _(T013)_ | _(T013)_ | _(T013)_ | accept |
-| good-realistic | _(T013)_ | _(T013)_ | _(T013)_ | accept (binding upper bound) |
+|------|-------:|-----:|---------:|---------------|
+| thin           |   4 | 172 | 0.023 | reject |
+| good-ideal     | 154 | 154 | 1.000 | accept |
+| good-realistic | 129 | 129 | 1.000 | accept (binding lower bound) |
 
-Chosen thresholds + margin: _(recorded at T015)_.
+Extracted in the pinned env (Python 3.12.13, mediapipe 0.10.13). Note: the
+good-realistic clip measured 1.000 coverage — FaceMesh held the face through the
+brief look-aways — so it did not exercise sub-100% coverage; see research.md
+"Calibration measurements (T013)".
+
+Chosen thresholds + margin: _(recorded at T015, after review)_.
