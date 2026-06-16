@@ -83,6 +83,7 @@ change.
 | `thin.npy` | `float64 (N_kept, 956)` | thin clip via `extract_landmarks` in the pinned env | reject-below assertion |
 | `good_ideal.npy` | `float64 (N_kept, 956)` | good-ideal clip, same | accept-above assertion |
 | `good_realistic.npy` | `float64 (N_kept, 956)` | good-realistic clip, same | accept-above (binding upper bound) + gate-level no-regression (detected-throughout) |
+| `half.npy` | `float64 (N_kept, 956)` | half-present boundary clip (~30 s present / ~30 s absent), same | reject-via-coverage-lever boundary assertion (added in the real-webm recalibration — DECISION-32 / DECISION-29) |
 | `README.md` | doc | — | records clip provenance, the pinned env, and that raw clips are intentionally **not** committed |
 
 Fixtures are **derived landmark geometry** (no frames/images), extracted **once** by

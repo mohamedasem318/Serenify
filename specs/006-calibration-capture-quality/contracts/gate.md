@@ -12,9 +12,10 @@ from .errors import FeatureExtractionError
 
 logger = logging.getLogger(__name__)
 
-# [CALIBRATION-PENDING] — set by the DECISION-32 procedure during /speckit-implement.
-MIN_USABLE_FRAMES: int = ...        # absolute floor (FR-005, secondary backstop)
-MIN_COVERAGE_FRACTION: float = ...  # coverage fraction (FR-006, primary lever)
+# Calibrated values (📌 DECISION-32; recalibrated on real webm — DECISION-29).
+# Authoritative source: docs/DECISIONS.md DECISION-32 + research.md "Calibration measurements".
+MIN_USABLE_FRAMES: int = 50          # absolute floor (FR-005, secondary backstop)
+MIN_COVERAGE_FRACTION: float = 0.65  # coverage fraction (FR-006, primary lever)
 
 def usable_face_coverage(landmarks: np.ndarray) -> tuple[int, int, float]:
     """(usable, kept, fraction). usable = non-zero rows; kept = total rows."""
@@ -80,6 +81,9 @@ features = np.concatenate([
 - **Reject-below / accept-above at the real boundary**, gate logic **never mocked**:
   - `assert_usable_face_coverage(load("thin.npy"))` **raises**, with
     `exc.code == "insufficient_face_frames"`.
+  - `assert_usable_face_coverage(load("half.npy"))` **raises** — the ~30 s-present
+    boundary clip, rejected by the coverage lever (added in the real-webm
+    recalibration, DECISION-32).
   - `assert_usable_face_coverage(load("good_ideal.npy"))` does **not** raise.
   - `assert_usable_face_coverage(load("good_realistic.npy"))` does **not** raise
     (binding upper bound; the no-false-reject assertion, SC-002).

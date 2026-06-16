@@ -420,24 +420,25 @@ landing on `006-calibration-capture-quality`; tests pass before the next starts.
 ## DECISIONS.md entries this plan implies
 
 Appended to `docs/DECISIONS.md` during `/speckit-implement` (date `2026-06-11+`,
-feature 006), continuing from 005's DECISION-28:
+feature 006) as **DECISION-30 through DECISION-33** — 005 ended at DECISION-28 and the
+VFR-decode fix (📌 DECISION-29, PR #18) landed in between:
 
-29. **Usable-face-coverage gate** — pure `coverage.py` helper called by
+30. **Usable-face-coverage gate** — pure `coverage.py` helper called by
     `compute_anchor` after `extract_landmarks`, before the feature floors; usable =
     non-zero landmark row (the existing predicate); reject if usable <
     `MIN_USABLE_FRAMES` **or** fraction < `MIN_COVERAGE_FRACTION`; additive and
     strictly stricter, never loosening the existing floors. 📌 DECISION-30.
-30. **Messaging via a new reason value** `insufficient_face_frames` carried in the
+31. **Messaging via a new reason value** `insufficient_face_frames` carried in the
     existing 422 `reason` (optional `FeatureExtractionError.code`; router
     `reason = exc.code or str(exc)`); server reason takes precedence over client
     `dominantCause`; new `insufficient-face` chip; existing chips/selection unchanged;
     categorical-only on the wire (no counts → Principle I). 📌 DECISION-31.
-31. **Threshold calibration method** — real clips run through the pinned-env pipeline
+32. **Threshold calibration method** — real clips run through the pinned-env pipeline
     (four after the real-webm recalibration on the fixed VFR decode — DECISION-29);
     coverage fraction primary, absolute floor backstop; numbers produced at implement,
     recalibrated to 0.65/50; landmark arrays committed as deterministic fixtures.
     📌 DECISION-32.
-32. **Glasses (Part B)** — investigation-only guidance (calibrate with glasses, avoid
+33. **Glasses (Part B)** — investigation-only guidance (calibrate with glasses, avoid
     glare, don't ban) + thesis between-subject limitation; no code. 📌 DECISION-33.
 
 ## Complexity Tracking
