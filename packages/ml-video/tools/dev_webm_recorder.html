@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  DEV-ONLY webcam recorder — NOT shipped, NOT a product surface.
+
+  Purpose: produce a REAL Chrome getUserMedia + MediaRecorder webm (the exact
+  variable-frame-rate VP9 container the calibration flow uploads) so the decode path
+  can be exercised against true browser output. It mirrors the production capture in
+  apps/web/components/anchor/anchor-recorder.tsx: video:true / audio:false and the
+  vp9 -> vp8 -> mp4 mimeType preference.
+
+  Use it to capture a clip for the REQUIRED post-fix fidelity re-validation: record a
+  ~60 s face clip, run it through ml_video.extract_landmarks / compute_anchor, and
+  compare the webm feature vector against the mp4 / training distribution before any
+  merge. The downloaded clip is RAW user media — keep it out of git (Constitution
+  Principle I / X); only derived, non-reversible arrays may be committed.
+
+  Serve from a SECURE CONTEXT (getUserMedia needs localhost/127.0.0.1 or HTTPS), e.g.:
+    python -m http.server 8137   # then open http://localhost:8137/dev_webm_recorder.html
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>DEV webm recorder</title>
+    <style>
+      body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+      video { width: 100%; background: #111; border-radius: 8px; }
+      button { font: inherit; padding: .5rem 1rem; margin-right: .5rem; border-radius: 6px; }
+      .row { margin: 1rem 0; display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+      code { background: #f2f2f2; padding: .1rem .3rem; border-radius: 4px; }
+      #log { white-space: pre-wrap; background: #f7f7f7; padding: .75rem; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <h1>DEV-only webm recorder</h1>
+    <p>Records a real Chrome getUserMedia + MediaRecorder clip for the decode-sampling
+       fidelity re-validation. <strong>Raw clips must not be committed.</strong></p>
+    <video id="preview" autoplay muted playsinline></video>
+    <div class="row">
+      <label>seconds <input id="secs" type="number" value="60" min="1" max="180" style="width:5rem" /></label>
+      <button id="start">Start camera</button>
+      <button id="record" disabled>Record</button>
+      <button id="stop" disabled>Stop</button>
+    </div>
+    <div id="log">idle</div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+      const log = (m) => { $("log").textContent = m; };
+      let stream = null, recorder = null, chunks = [];
+
+      // Mirrors anchor-recorder.tsx pickMimeType().
+      function pickMimeType() {
+        for (const t of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/mp4"]) {
+          if (window.MediaRecorder && MediaRecorder.isTypeSupported(t)) return t;
+        }
+        return undefined;
+      }
+
+      $("start").onclick = async () => {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          $("preview").srcObject = stream;
+          $("record").disabled = false;
+          log("camera on — press Record");
+        } catch (e) { log("getUserMedia failed: " + e); }
+      };
+
+      $("record").onclick = () => {
+        const mimeType = pickMimeType();
+        recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+        chunks = [];
+        recorder.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+        recorder.onstop = () => {
+          const type = recorder.mimeType || "video/webm";
+          const ext = type.includes("mp4") ? "mp4" : "webm";
+          const blob = new Blob(chunks, { type });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = `dev-calibration-${Date.now()}.${ext}`;
+          a.click();
+          URL.revokeObjectURL(url);
+          log(`saved ${a.download} (${(blob.size / 1024).toFixed(0)} KiB, ${type}). Keep it out of git.`);
+        };
+        recorder.start();
+        $("record").disabled = true;
+        $("stop").disabled = false;
+        const secs = Math.max(1, Math.min(180, Number($("secs").value) || 60));
+        log(`recording ${secs}s as ${recorder.mimeType}…`);
+        setTimeout(() => { if (recorder && recorder.state !== "inactive") $("stop").onclick(); }, secs * 1000);
+      };
+
+      $("stop").onclick = () => {
+        if (recorder && recorder.state !== "inactive") recorder.stop();
+        $("record").disabled = false;
+        $("stop").disabled = true;
+      };
+    </script>
+  </body>
+</html>
