@@ -1,6 +1,6 @@
 # Contract: Rejection messaging — new reason value, existing 422 channel
 
-📌 DECISION-30. Reuses the existing `FeatureExtractionError → HTTP 422 →
+📌 DECISION-31. Reuses the existing `FeatureExtractionError → HTTP 422 →
 005 failure-screen / cause-chip` flow (FR-009/010); adds **one** reason value and
 **one** chip, additively. No new endpoint, status, or response field.
 

@@ -27,13 +27,13 @@ plan resolves the three decisions the spec deferred — by reading the real code
    coverage.py`, called from `compute_anchor` **immediately after**
    `extract_landmarks` and **before** `lbp_top_features` / `motion_features`. It
    is **additive and strictly stricter** — it runs ahead of the existing
-   degenerate floors and never loosens them. 📌 DECISION-29.
+   degenerate floors and never loosens them. 📌 DECISION-30.
 2. **Messaging mechanism** (FR-012): **no existing 005 chip covers it**, so add a
    new reason **value** `insufficient_face_frames` carried inside the existing 422
    `reason` field (via a new optional `FeatureExtractionError.code`), mapped on the
    client to a new `insufficient-face` failure chip. The server reason takes
    precedence over the client `dominantCause` on a 422; every existing chip and its
-   selection are untouched. 📌 DECISION-30.
+   selection are untouched. 📌 DECISION-31.
 3. **Calibration method** (not numbers): extract landmark arrays from the three
    real fixture clips (thin / good-ideal / good-realistic) **once**, in the pinned
    ml-video env (Python 3.12, `mediapipe==0.10.13`), count non-zero rows + coverage,
@@ -42,14 +42,14 @@ plan resolves the three decisions the spec deferred — by reading the real code
    produced during `/speckit-implement`; the plan fixes only the procedure. The
    **coverage fraction is the primary lever** for the canonical full-length /
    face-absent 2s bug; the **absolute floor is the secondary backstop** for
-   too-short clips. 📌 DECISION-31.
+   too-short clips. 📌 DECISION-32.
 
 **Part B (glasses)** is investigation-only and produces no code; it becomes a
 guidance decision (calibrate with glasses, avoid glare, don't ban) plus a thesis
-limitation note. 📌 DECISION-32.
+limitation note. 📌 DECISION-33.
 
-The permanent architectural choices (📌 DECISION-29 … 📌 DECISION-32) are
-enumerated for one-shot review and become `docs/DECISIONS.md` entries 29–32 during
+The permanent architectural choices (📌 DECISION-30 … 📌 DECISION-33) are
+enumerated for one-shot review and become `docs/DECISIONS.md` entries 30–33 during
 `/speckit-implement`, continuing from 005's DECISION-28.
 
 ## Technical Context
@@ -124,7 +124,7 @@ signal leaves inference; no counts to the client) and **VII** (honest boundary t
 | III. Modality Isolation | ✅ | The gate is **authoritative inside `packages/ml-video/`** (FR-001) — modality logic stays in the package. The client framing detector remains **advisory UI only** and can be unavailable (FR-011/FR-002). The `apps/api` change is a **1-line mapping** of the modality's existing error to the existing 422 — the API layer already owns that mapping; it adds no modality logic. |
 | V. Calm-First Design Language | ✅ | The new chip copy is calm, specific, non-blaming, Principle-V voice — "We couldn't see your face for enough of that recording — let's try again." It renders on the existing **foggy** 005 failure screen (never amber/crimson), no exclamation marks, no "detected"/clinical/alarmist words, and does **not** moralize or instruct ("do better"). |
 | VII. Mandatory Testing Per PR | ✅ | **Honest test at the real boundary**: committed real landmark arrays (thin / good-ideal / good-realistic) fed to the **real** `assert_usable_face_coverage` and the **real** `compute_anchor` wiring (extract monkeypatched to return the fixture rows) — asserting reject-below / accept-above with the gate's own logic **never mocked green**. No-false-reject is asserted on the **good-realistic** binding fixture; no-regression is asserted on existing chip selection. Fixtures are extracted once in the pinned env so CI stays mediapipe-free + deterministic (mirrors the 005 DECISION-18 fixture discipline). |
-| VIII. Spec-Driven Workflow | ✅ | This is the plan artifact; spec → plan → tasks → implement. Decisions logged in `docs/DECISIONS.md` (29–32), progress in `docs/PROGRESS.md`, the feature-ordering drift (constitution's provisional `006-stress-inference-service` → actual `006-calibration-capture-quality`) recorded in `docs/CHANGELOG.md` during implement (Principle VIII permits provisional reordering when recorded). |
+| VIII. Spec-Driven Workflow | ✅ | This is the plan artifact; spec → plan → tasks → implement. Decisions logged in `docs/DECISIONS.md` (30–33), progress in `docs/PROGRESS.md`, the feature-ordering drift (constitution's provisional `006-stress-inference-service` → actual `006-calibration-capture-quality`) recorded in `docs/CHANGELOG.md` during implement (Principle VIII permits provisional reordering when recorded). |
 
 **Privacy Review (Quality Gate 6).** This feature touches the signal-capture path,
 so an explicit Principle-I note is required. (a) The gate consumes only landmark
@@ -148,7 +148,7 @@ Long-form treatment of each — including the cited code that justified it — i
 [contracts/messaging.md](./contracts/messaging.md), and
 [contracts/unchanged.md](./contracts/unchanged.md).
 
-### 📌 DECISION-29 — Gate placement: a pure `coverage.py` helper called by `compute_anchor`, before the existing floors
+### 📌 DECISION-30 — Gate placement: a pure `coverage.py` helper called by `compute_anchor`, before the existing floors
 
 **Where it sits.** `compute_anchor` (`anchor.py`) currently does:
 `clip = extract_landmarks(video_path)` → `lbp_top_features(clip.frames,
@@ -191,10 +191,10 @@ never accept anything the floors would reject (control still reaches the floors 
 the gate passes) and it newly rejects the captures that previously slipped through
 the floors — exactly the ~2s-of-face clip, which clears "≥1 usable frame per ROI"
 and "≥2 kept frames" but has far too little coverage. The thresholds are tuned
-(DECISION-31) so genuine captures clear the gate and the floors remain a deeper
+(DECISION-32) so genuine captures clear the gate and the floors remain a deeper
 backstop emitting their own existing reasons.
 
-### 📌 DECISION-30 — Messaging: new `insufficient_face_frames` reason value in the existing 422; new `insufficient-face` chip; existing chips untouched
+### 📌 DECISION-31 — Messaging: new `insufficient_face_frames` reason value in the existing 422; new `insufficient-face` chip; existing chips untouched
 
 **No existing 005 chip covers "face not visible for enough of the recording."**
 Reading the real client logic:
@@ -242,7 +242,7 @@ code path consumed it. 006 is the first to consume it — additively, for this o
 authoritative case. (Flagged in research.md as a spec-assumption clarification, not
 a contradiction.)
 
-### 📌 DECISION-31 — Threshold calibration method (numbers produced at implement, not guessed here)
+### 📌 DECISION-32 — Threshold calibration method (numbers produced at implement, not guessed here)
 
 The two constants live in `coverage.py` as `MIN_USABLE_FRAMES: int` and
 `MIN_COVERAGE_FRACTION: float`, marked `[CALIBRATION-PENDING]` until set by this
@@ -276,7 +276,7 @@ procedure during `/speckit-implement`:
    committed `.npy` under `packages/ml-video/tests/fixtures/` so CI never runs
    mediapipe and the gate test is deterministic.
 
-### 📌 DECISION-32 — Glasses (Part B): investigation-only guidance + thesis caveat (no code)
+### 📌 DECISION-33 — Glasses (Part B): investigation-only guidance + thesis caveat (no code)
 
 Recorded as a decision, not a requirement. The completed investigation (24/53
 subjects wore glasses; glasses-stratified LOSO showed no gap — macro-F1 0.720 vs
@@ -312,23 +312,23 @@ specs/006-calibration-capture-quality/
 ```text
 packages/ml-video/
 ├── src/ml_video/
-│   ├── coverage.py                 # NEW — usable_face_coverage()/assert_usable_face_coverage() + MIN_USABLE_FRAMES/MIN_COVERAGE_FRACTION (CALIBRATION-PENDING) (📌 DECISION-29/31)
-│   ├── anchor.py                   # MODIFIED — call assert_usable_face_coverage(clip.landmarks) after extract_landmarks, before features (📌 DECISION-29)
-│   ├── errors.py                   # MODIFIED — FeatureExtractionError gains optional `code: str | None` (backward-compatible) (📌 DECISION-30)
+│   ├── coverage.py                 # NEW — usable_face_coverage()/assert_usable_face_coverage() + MIN_USABLE_FRAMES/MIN_COVERAGE_FRACTION (CALIBRATION-PENDING) (📌 DECISION-30/32)
+│   ├── anchor.py                   # MODIFIED — call assert_usable_face_coverage(clip.landmarks) after extract_landmarks, before features (📌 DECISION-30)
+│   ├── errors.py                   # MODIFIED — FeatureExtractionError gains optional `code: str | None` (backward-compatible) (📌 DECISION-31)
 │   └── __init__.py                 # MODIFIED — export the coverage helpers for the test boundary (optional)
 └── tests/
-    ├── fixtures/                   # NEW — committed landmark .npy arrays (thin / good-ideal / good-realistic) + provenance README (📌 DECISION-31)
+    ├── fixtures/                   # NEW — committed landmark .npy arrays (thin / good-ideal / good-realistic) + provenance README (📌 DECISION-32)
     ├── fixtures/extract_coverage_fixtures.py  # NEW — DEV-ONLY one-time extractor (not collected by pytest); run via uv in the pinned env
-    └── test_usable_face_coverage_gate.py      # NEW — reject-below / accept-above at the real boundary; no mock-green; compute_anchor wiring (📌 DECISION-29, FR-017/018)
+    └── test_usable_face_coverage_gate.py      # NEW — reject-below / accept-above at the real boundary; no mock-green; compute_anchor wiring (📌 DECISION-30, FR-017/018)
 apps/api/
-└── app/routers/anchor.py           # MODIFIED — 1 line: reason = getattr(exc, "code", None) or str(exc) (same 422 shape) (📌 DECISION-30)
+└── app/routers/anchor.py           # MODIFIED — 1 line: reason = getattr(exc, "code", None) or str(exc) (same 422 shape) (📌 DECISION-31)
 apps/web/
 └── components/anchor/
-    ├── failure-state.tsx           # MODIFIED — add FailureCause "insufficient-face" + one CAUSE entry (existing entries unchanged) (📌 DECISION-30)
-    ├── anchor-recorder.tsx         # MODIFIED — submitClip: server reason precedence (insufficient_face_frames → new chip; else dominantCause unchanged) (📌 DECISION-30)
+    ├── failure-state.tsx           # MODIFIED — add FailureCause "insufficient-face" + one CAUSE entry (existing entries unchanged) (📌 DECISION-31)
+    ├── anchor-recorder.tsx         # MODIFIED — submitClip: server reason precedence (insufficient_face_frames → new chip; else dominantCause unchanged) (📌 DECISION-31)
     └── *.test.tsx                  # MODIFIED/NEW — assert the new mapping + no-regression on existing chip selection (FR-018)
 docs/
-├── DECISIONS.md                    # APPENDED 29–32 during /speckit-implement
+├── DECISIONS.md                    # APPENDED 30–33 during /speckit-implement
 ├── PROGRESS.md                     # APPENDED running entry
 └── CHANGELOG.md                    # APPENDED — feature-ordering drift note (006 = calibration-capture-quality)
 CLAUDE.md                           # MODIFIED — SPECKIT pointer → 006 plan (this commit)
@@ -350,26 +350,26 @@ landing on `006-calibration-capture-quality`; tests pass before the next starts.
    `assert_usable_face_coverage` + the two `[CALIBRATION-PENDING]` constants) and
    `FeatureExtractionError.code`. Write `test_usable_face_coverage_gate.py` first
    against placeholder constants using **small hand-authored arrays** so the
-   reject/accept logic is proven before real numbers exist. (📌 DECISION-29/30)
+   reject/accept logic is proven before real numbers exist. (📌 DECISION-30/31)
 2. **Wire into `compute_anchor`** — call `assert_usable_face_coverage` after
    `extract_landmarks`; add a test that `compute_anchor` raises with code
    `insufficient_face_frames` when `extract_landmarks` is monkeypatched to return
-   thin landmark rows (the real boundary, no mediapipe). (📌 DECISION-29)
+   thin landmark rows (the real boundary, no mediapipe). (📌 DECISION-30)
 3. **Fixtures + calibration** — run `extract_coverage_fixtures.py` once in the pinned
    env over the three real clips; commit the `.npy` arrays + provenance README;
    **set the real thresholds** so thin rejects and both good clips (esp.
    good-realistic) accept; record the measurements. Re-point the gate test at the
    committed fixtures (reject-below / accept-above; no-false-reject on good-realistic).
-   (📌 DECISION-31, FR-017/018)
+   (📌 DECISION-32, FR-017/018)
 4. **Router surfacing** — the 1-line `reason = exc.code or str(exc)` in
    `apps/api/app/routers/anchor.py`; a pytest asserting a gate-raised error surfaces
    `reason == "insufficient_face_frames"` and an existing error's reason is unchanged.
-   (📌 DECISION-30)
+   (📌 DECISION-31)
 5. **Frontend chip (additive)** — `failure-state.tsx` new `insufficient-face` cause +
    copy; `anchor-recorder.tsx` server-reason precedence; Vitest asserting (a) the new
    reason → new chip, (b) any other reason → `dominantCause` (unchanged), (c) existing
-   `CAUSE` entries unchanged. (📌 DECISION-30, FR-013/018)
-6. **Docs + smoke** — `docs/DECISIONS.md` 29–32, `docs/CHANGELOG.md` ordering note,
+   `CAUSE` entries unchanged. (📌 DECISION-31, FR-013/018)
+6. **Docs + smoke** — `docs/DECISIONS.md` 30–33, `docs/CHANGELOG.md` ordering note,
    the glasses guidance + thesis caveat; `smoke-tests.md` for the manual real-clip
    checks (thin → 422 → failure screen with the face-absence chip; full minute →
    success). Mohamed runs the smoke after `/speckit-implement`.
@@ -422,18 +422,18 @@ feature 006), continuing from 005's DECISION-28:
     `compute_anchor` after `extract_landmarks`, before the feature floors; usable =
     non-zero landmark row (the existing predicate); reject if usable <
     `MIN_USABLE_FRAMES` **or** fraction < `MIN_COVERAGE_FRACTION`; additive and
-    strictly stricter, never loosening the existing floors. 📌 DECISION-29.
+    strictly stricter, never loosening the existing floors. 📌 DECISION-30.
 30. **Messaging via a new reason value** `insufficient_face_frames` carried in the
     existing 422 `reason` (optional `FeatureExtractionError.code`; router
     `reason = exc.code or str(exc)`); server reason takes precedence over client
     `dominantCause`; new `insufficient-face` chip; existing chips/selection unchanged;
-    categorical-only on the wire (no counts → Principle I). 📌 DECISION-30.
+    categorical-only on the wire (no counts → Principle I). 📌 DECISION-31.
 31. **Threshold calibration method** — three real clips run through the pinned-env
     pipeline; coverage fraction primary, absolute floor backstop; numbers produced at
     implement and pinned; landmark arrays committed as deterministic fixtures.
-    📌 DECISION-31.
+    📌 DECISION-32.
 32. **Glasses (Part B)** — investigation-only guidance (calibrate with glasses, avoid
-    glare, don't ban) + thesis between-subject limitation; no code. 📌 DECISION-32.
+    glare, don't ban) + thesis between-subject limitation; no code. 📌 DECISION-33.
 
 ## Complexity Tracking
 
@@ -448,9 +448,9 @@ No waivers required; both items are reviewed and consistent with the principles.
 
 | ID | Risk | Mitigation |
 |----|------|------------|
-| R-1 | **Thresholds set too high → false-reject normal users** (the over-reach the spec warns against). | The **good-realistic** clip (brief natural look-aways) is the **binding upper bound**: `MIN_COVERAGE_FRACTION` and `MIN_USABLE_FRAMES` are set clearly below its measured values with margin; no-false-reject is asserted against it in CI (DECISION-31, SC-002). |
-| R-2 | **Coverage numbers shift with a different mediapipe build** (e.g. a Python 3.9 conda env), invalidating the calibration. | Fixtures + calibration are produced **only** in the pinned ml-video env (Python 3.12, `mediapipe==0.10.13`) via `uv run`; the env is named in DECISION-31 and the fixtures are committed so CI is build-independent. |
-| R-3 | **Counts leak to the client** (privacy / Principle I). | The 422 `reason` is the **categorical** token only; usable/kept/fraction are **server-logs only**; the router maps the gate error via `exc.code`, never `str(exc)` (which contains the numbers), for this case (DECISION-30, FR-016). |
+| R-1 | **Thresholds set too high → false-reject normal users** (the over-reach the spec warns against). | The **good-realistic** clip (brief natural look-aways) is the **binding upper bound**: `MIN_COVERAGE_FRACTION` and `MIN_USABLE_FRAMES` are set clearly below its measured values with margin; no-false-reject is asserted against it in CI (DECISION-32, SC-002). |
+| R-2 | **Coverage numbers shift with a different mediapipe build** (e.g. a Python 3.9 conda env), invalidating the calibration. | Fixtures + calibration are produced **only** in the pinned ml-video env (Python 3.12, `mediapipe==0.10.13`) via `uv run`; the env is named in DECISION-32 and the fixtures are committed so CI is build-independent. |
+| R-3 | **Counts leak to the client** (privacy / Principle I). | The 422 `reason` is the **categorical** token only; usable/kept/fraction are **server-logs only**; the router maps the gate error via `exc.code`, never `str(exc)` (which contains the numbers), for this case (DECISION-31, FR-016). |
 | R-4 | **Frontend regression** — the new branch changes existing chip selection. | The precedence branch only **adds** a case before `dominantCause`; a Vitest no-regression test asserts every non-`insufficient_face_frames` reason still selects via `dominantCause` and the existing `CAUSE` entries are byte-for-byte unchanged (FR-013/018). |
-| R-5 | **Gate accidentally loosens an existing floor.** | The gate only **raises early**; it never gates the floors out — control reaches `lbp_top_features`/`motion_features` unchanged whenever the gate passes. A test confirms a clip that the floors would reject is still rejected (DECISION-29). |
-| R-6 | **005-documented reason→chip wiring was never built** — assuming it exists could mislead implement. | Flagged explicitly in research.md: 006 is the **first** consumer of the 422 `reason` for chip selection; the reducer's `errorReason` already exists, so the change is additive, not a new channel (DECISION-30). |
+| R-5 | **Gate accidentally loosens an existing floor.** | The gate only **raises early**; it never gates the floors out — control reaches `lbp_top_features`/`motion_features` unchanged whenever the gate passes. A test confirms a clip that the floors would reject is still rejected (DECISION-30). |
+| R-6 | **005-documented reason→chip wiring was never built** — assuming it exists could mislead implement. | Flagged explicitly in research.md: 006 is the **first** consumer of the 422 `reason` for chip selection; the reducer's `errorReason` already exists, so the change is additive, not a new channel (DECISION-31). |

@@ -299,7 +299,7 @@ export function AnchorRecorder({
         if (result.kind === "extraction_failed") {
           // 422 — the server reason is authoritative for the face-absence case (the
           // usable-face-coverage gate, incl. when the on-device detector was
-          // unavailable so our telemetry would say "our-side" — DECISION-30). Every
+          // unavailable so our telemetry would say "our-side" — DECISION-31). Every
           // other reason keeps the existing measured-telemetry selection (low-light /
           // out-of-frame, or "our-side" when nothing dominated).
           const cause =

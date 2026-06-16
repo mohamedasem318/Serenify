@@ -19,7 +19,7 @@ from .errors import FeatureExtractionError
 
 logger = logging.getLogger(__name__)
 
-# Calibrated against three real clips (006 T013/T015, DECISION-31): thin
+# Calibrated against three real clips (006 T013/T015, DECISION-32): thin
 # 4 usable / 0.023 coverage (reject) vs good-ideal 154/1.000 and good-realistic
 # 129/1.000 (accept). The values sit in a WIDE EMPTY GAP — the clips proved clean
 # separation of the egregious thin case, but there is NO genuine sub-100%-coverage

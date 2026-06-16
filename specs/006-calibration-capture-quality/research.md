@@ -229,7 +229,7 @@ coverage `0.023` vs good `1.000` (≈43×); thin usable `4` vs good `129`/`154` 
 No threshold needs to sit anywhere near the binding clip, so there is no risk of
 no-separating-margin; the STOP condition does not trigger.
 
-### Chosen thresholds (T015 / 📌 DECISION-31)
+### Chosen thresholds (T015 / 📌 DECISION-32)
 
 Set in `coverage.py` after review:
 
@@ -327,7 +327,7 @@ point and is not even wired. Inserting the gate inside `compute_anchor` (after
 inference**. `docs/BACKLOG.md:1249–1317` independently anticipated this exact
 placement. **Safe to wire the gate (Phase 4).**
 
-## Part B — Glasses (investigation-only; recorded, no code) — 📌 DECISION-32
+## Part B — Glasses (investigation-only; recorded, no code) — 📌 DECISION-33
 
 The investigation is complete and produces **no functional requirement and no code**.
 
@@ -340,4 +340,4 @@ The investigation is complete and produces **no functional requirement and no co
   comparison, so it is **not proof of zero glasses effect**; it cannot test the
   calibrate-with / infer-without mismatch; and the group sizes are modest.
 
-Recorded as `docs/DECISIONS.md` DECISION-32 + a thesis note during implement.
+Recorded as `docs/DECISIONS.md` DECISION-33 + a thesis note during implement.

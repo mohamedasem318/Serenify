@@ -1,6 +1,6 @@
 # Contract: Server-side usable-face-coverage gate (`packages/ml-video/`)
 
-Authoritative modality logic (Constitution Principle III / FR-001). 📌 DECISION-29.
+Authoritative modality logic (Constitution Principle III / FR-001). 📌 DECISION-30.
 
 ## Module: `packages/ml-video/src/ml_video/coverage.py` (NEW)
 
@@ -12,7 +12,7 @@ from .errors import FeatureExtractionError
 
 logger = logging.getLogger(__name__)
 
-# [CALIBRATION-PENDING] — set by the DECISION-31 procedure during /speckit-implement.
+# [CALIBRATION-PENDING] — set by the DECISION-32 procedure during /speckit-implement.
 MIN_USABLE_FRAMES: int = ...        # absolute floor (FR-005, secondary backstop)
 MIN_COVERAGE_FRACTION: float = ...  # coverage fraction (FR-006, primary lever)
 
@@ -67,7 +67,7 @@ features = np.concatenate([
 ])
 ```
 
-### Composition contract (additive, never loosening — DECISION-29)
+### Composition contract (additive, never loosening — DECISION-30)
 - The gate runs **first**. It can only **raise earlier**; it never bypasses or relaxes
   the existing floors — when the gate passes, control reaches `lbp_top_features` /
   `motion_features` unchanged.

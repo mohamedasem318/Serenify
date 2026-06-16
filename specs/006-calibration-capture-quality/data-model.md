@@ -20,8 +20,8 @@ returned to the client; the 422 carries a categorical reason, not numbers.
 
 | Constant | Type | Value | Set by |
 |---|---|---|---|
-| `MIN_USABLE_FRAMES` | `int` | **[CALIBRATION-PENDING]** | DECISION-31 procedure, during `/speckit-implement` (absolute floor — FR-005; secondary backstop). |
-| `MIN_COVERAGE_FRACTION` | `float` | **[CALIBRATION-PENDING]** | DECISION-31 procedure, during `/speckit-implement` (coverage fraction — FR-006; primary lever). |
+| `MIN_USABLE_FRAMES` | `int` | **[CALIBRATION-PENDING]** | DECISION-32 procedure, during `/speckit-implement` (absolute floor — FR-005; secondary backstop). |
+| `MIN_COVERAGE_FRACTION` | `float` | **[CALIBRATION-PENDING]** | DECISION-32 procedure, during `/speckit-implement` (coverage fraction — FR-006; primary lever). |
 
 **Gate rule (FR-007):** accept iff `usable >= MIN_USABLE_FRAMES` **and** `fraction >=
 MIN_COVERAGE_FRACTION`; reject (raise) if **either** fails. Calibrated so the

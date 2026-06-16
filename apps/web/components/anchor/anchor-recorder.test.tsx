@@ -265,7 +265,7 @@ describe("AnchorRecorder — overwrite-on-success-only (FR-053 / DECISION-22)", 
   });
 });
 
-describe("AnchorRecorder — server reason drives the failure chip (006, T021/DECISION-30)", () => {
+describe("AnchorRecorder — server reason drives the failure chip (006, T021/DECISION-31)", () => {
   it("shows the face-absence chip when the server reason is insufficient_face_frames", async () => {
     const postAnchor = vi
       .fn()

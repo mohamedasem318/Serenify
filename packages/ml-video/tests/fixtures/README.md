@@ -15,7 +15,7 @@ These fixtures back the usable-face-coverage gate's honest boundary test
 > Status: calibrated (Phase 5 complete through T016). The `.npy` arrays + extractor
 > were produced in T011–T012; the per-clip `usable / kept / fraction` and the chosen
 > thresholds are recorded below and in research.md "Calibration measurements (T013)"
-> / "Chosen thresholds (T015 / DECISION-31)".
+> / "Chosen thresholds (T015 / DECISION-32)".
 
 ## Why raw clips are NOT committed
 
@@ -44,9 +44,9 @@ good-realistic clip measured 1.000 coverage — FaceMesh held the face through t
 brief look-aways — so it did not exercise sub-100% coverage; see research.md
 "Calibration measurements (T013)".
 
-Chosen thresholds (T015 / DECISION-31): **`MIN_COVERAGE_FRACTION = 0.40`**
+Chosen thresholds (T015 / DECISION-32): **`MIN_COVERAGE_FRACTION = 0.40`**
 (thin 0.023 vs 0.40, ~17× margin; good clips 1.000) and **`MIN_USABLE_FRAMES = 50`**
 (thin 4 vs 50, ~12× margin; good-realistic 129, the binding lower bound). The
 thresholds sit in a wide empty gap — a conservative judgment to revisit against
 real-user data, since no genuine sub-100%-coverage sample exists (good-realistic
-held at 1.000). See research.md for the full DECISION-31 note.
+held at 1.000). See research.md for the full DECISION-32 note.

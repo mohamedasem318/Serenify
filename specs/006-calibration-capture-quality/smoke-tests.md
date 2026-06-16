@@ -59,7 +59,7 @@ frame, or point the camera away, then briefly appear). Let the full minute elaps
 ## §2 — Genuine full minute → success (no false reject)
 
 **Action**: Record a **real full minute sitting normally** — face in frame the whole time,
-looking at the screen (glasses fine, per DECISION-32).
+looking at the screen (glasses fine, per DECISION-33).
 
 **Expect**: **success** — "Your baseline is set". The gate does **not** fire; the baseline
 is written once on success.
@@ -83,7 +83,7 @@ stay seated and present (the face leaves the frame only momentarily, not for mos
 minute).
 
 **Expect**: **success** — "Your baseline is set". The brief glances must **not** trip the
-gate (FaceMesh holds the face through seated glances — DECISION-31). If this **rejects**,
+gate (FaceMesh holds the face through seated glances — DECISION-32). If this **rejects**,
 the threshold is too strict for real use — **file it** (candidate revisit range: coverage
 0.40–0.60, usable 30–60).
 

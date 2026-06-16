@@ -57,7 +57,7 @@ def test_anchor_coverage_gate_surfaces_categorical_reason(
 ):
     """The usable-face-coverage gate's ``code`` becomes the 422 ``reason`` verbatim,
     and NO count detail (usable/kept/fraction, or any digit) may reach the wire
-    (feature 006, DECISION-30 / FR-016 / Principle I)."""
+    (feature 006, DECISION-31 / FR-016 / Principle I)."""
 
     def raise_gate(_path):
         # Message carries no counts (they live only in a server log line); the wire

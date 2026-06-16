@@ -6,7 +6,7 @@ How to build, calibrate, and verify the usable-face-coverage gate locally.
 - The ml-video package env (uv): Python **3.12**, `mediapipe==0.10.13`,
   `scikit-learn==1.6.1` (see `packages/ml-video/README.md`). **Do not** use a Python
   3.9 conda env — a different mediapipe build shifts landmark detection and would
-  invalidate the calibration (DECISION-31).
+  invalidate the calibration (DECISION-32).
 - `apps/api` (FastAPI) and `apps/web` (Next 16) only needed for the end-to-end smoke.
 
 ## 1. Run the gate unit tests (CI-equivalent, no mediapipe)
@@ -32,7 +32,7 @@ uv run python tests/fixtures/extract_coverage_fixtures.py \
 # writes tests/fixtures/{thin,good_ideal,good_realistic}.npy
 ```
 
-## 3. Set the thresholds (calibration — DECISION-31)
+## 3. Set the thresholds (calibration — DECISION-32)
 ```sh
 # print usable/kept/fraction for each fixture
 uv run python - <<'PY'
