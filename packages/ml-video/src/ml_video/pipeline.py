@@ -8,14 +8,18 @@ loading mediapipe's native runtime, and so that importing this module is cheap.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .errors import FeatureExtractionError
 from .features import LANDMARK_DIM
+
+logger = logging.getLogger(__name__)
 
 TARGET_FPS = 5
 FRAME_SKIP_MOD = 2
@@ -168,8 +172,9 @@ def extract_landmarks(video_path) -> DecodedClip:
     ``_select_keep_indices``. Decode is two-pass: pass 1 collects per-frame timestamps
     (grab only, no pixel copy) to choose the keep set; pass 2 retrieves just those frames.
     """
-    fps, timestamps_ms = _probe_timestamps(video_path)
-    keep_set = set(_select_keep_indices(len(timestamps_ms), fps, timestamps_ms))
+    fps, frame_count, width, height, timestamps_ms = _probe_timestamps(video_path)
+    n_decoded = len(timestamps_ms)
+    keep_set = set(_select_keep_indices(n_decoded, fps, timestamps_ms))
 
     # Pass 2 - retrieve only the selected frames (sequential decode; no seeking, which is
     # unreliable on VFR webm). Stop once the last kept frame is read.
@@ -189,27 +194,65 @@ def extract_landmarks(video_path) -> DecodedClip:
         if callable(close):
             close()
 
-    return DecodedClip(frames=kept, landmarks=np.asarray(rows, dtype=np.float64))
+    landmarks = np.asarray(rows, dtype=np.float64)
+
+    # TEMPORARY (decode diagnostic — remove/gate before merge): ONE INFO line per decode,
+    # SERVER-SIDE ONLY (nothing here reaches the HTTP client). Confirms a live VFR webm no
+    # longer collapses the kept count vs a CFR mp4. `usable` = non-zero rows (the detected-
+    # face predicate the coverage gate uses). Wrapped so a diagnostic error can never alter
+    # extraction behaviour.
+    try:
+        reliable = _timestamps_reliable(timestamps_ms)
+        sampling = (
+            "index(legacy)"
+            if (not reliable or _reported_fps_trustworthy(fps, timestamps_ms))
+            else "timestamp(2.5fps)"
+        )
+        span_s = (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0 if reliable else 0.0
+        true_fps = (n_decoded - 1) / span_s if span_s > 0 else 0.0
+        usable = int(np.count_nonzero(np.any(landmarks, axis=1)))
+        logger.info(
+            "TEMP decode-diagnostic: container=%s reported_fps=%.3f frame_count=%d "
+            "resolution=%dx%d true_fps=%.3f sampling=%s raw_decoded=%d kept=%d usable=%d",
+            Path(str(video_path)).suffix or "?",
+            fps if fps else 0.0,
+            int(frame_count),
+            int(width),
+            int(height),
+            true_fps,
+            sampling,
+            n_decoded,
+            len(kept),
+            usable,
+        )
+    except Exception:  # noqa: BLE001 - a diagnostic must never affect extraction
+        pass
+
+    return DecodedClip(frames=kept, landmarks=landmarks)
 
 
-def _probe_timestamps(video_path) -> tuple[float, list[float]]:
+def _probe_timestamps(video_path) -> tuple[float, float, float, float, list[float]]:
     """Pass 1: open the clip and collect per-frame timestamps without decoding pixels.
 
-    Returns ``(reported_fps, timestamps_ms)``. ``grab()`` advances the decoder and
-    updates CAP_PROP_POS_MSEC without the pixel ``retrieve()``, so this pass is cheaper
-    than a full read.
+    Returns ``(reported_fps, frame_count, width, height, timestamps_ms)``. ``grab()``
+    advances the decoder and updates CAP_PROP_POS_MSEC without the pixel ``retrieve()``,
+    so this pass is cheaper than a full read. frame_count/width/height feed the
+    TEMPORARY decode diagnostic only.
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise FeatureExtractionError(f"could not open video: {video_path}")
     try:
         fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+        width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+        height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
         timestamps_ms: list[float] = []
         while cap.grab():
             timestamps_ms.append(cap.get(cv2.CAP_PROP_POS_MSEC))
     finally:
         cap.release()
-    return fps, timestamps_ms
+    return fps, frame_count, width, height, timestamps_ms
 
 
 def _retrieve_frames(video_path, keep_set: set[int]) -> list[np.ndarray]:

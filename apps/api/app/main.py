@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 import ml_video
@@ -10,6 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
 from .routers import anchor, health
+
+# TEMPORARY (decode diagnostic — remove/gate before merge): apps/api ships no logging
+# config, so ml_video's INFO decode-diagnostic line is otherwise suppressed under
+# uvicorn. A minimal root handler at INFO surfaces it in the server console. SERVER-SIDE
+# ONLY — this changes nothing in any HTTP response.
+logging.basicConfig(level=logging.INFO)
 
 
 @asynccontextmanager
