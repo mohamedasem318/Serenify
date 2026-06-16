@@ -196,37 +196,38 @@ def extract_landmarks(video_path) -> DecodedClip:
 
     landmarks = np.asarray(rows, dtype=np.float64)
 
-    # TEMPORARY (decode diagnostic — remove/gate before merge): ONE INFO line per decode,
-    # SERVER-SIDE ONLY (nothing here reaches the HTTP client). Confirms a live VFR webm no
-    # longer collapses the kept count vs a CFR mp4. `usable` = non-zero rows (the detected-
-    # face predicate the coverage gate uses). Wrapped so a diagnostic error can never alter
-    # extraction behaviour.
-    try:
-        reliable = _timestamps_reliable(timestamps_ms)
-        sampling = (
-            "index(legacy)"
-            if (not reliable or _reported_fps_trustworthy(fps, timestamps_ms))
-            else "timestamp(2.5fps)"
-        )
-        span_s = (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0 if reliable else 0.0
-        true_fps = (n_decoded - 1) / span_s if span_s > 0 else 0.0
-        usable = int(np.count_nonzero(np.any(landmarks, axis=1)))
-        logger.info(
-            "TEMP decode-diagnostic: container=%s reported_fps=%.3f frame_count=%d "
-            "resolution=%dx%d true_fps=%.3f sampling=%s raw_decoded=%d kept=%d usable=%d",
-            Path(str(video_path)).suffix or "?",
-            fps if fps else 0.0,
-            int(frame_count),
-            int(width),
-            int(height),
-            true_fps,
-            sampling,
-            n_decoded,
-            len(kept),
-            usable,
-        )
-    except Exception:  # noqa: BLE001 - a diagnostic must never affect extraction
-        pass
+    # DEBUG observability (quiet by default — emits only when this logger is at DEBUG):
+    # one line per decode recording the chosen sampling path and frame counts, to diagnose
+    # any future VFR / decode regression. SERVER-SIDE ONLY (nothing here reaches the HTTP
+    # client); `usable` = non-zero rows, the detected-face predicate the coverage gate uses.
+    # Wrapped so a logging error can never affect extraction.
+    if logger.isEnabledFor(logging.DEBUG):
+        try:
+            reliable = _timestamps_reliable(timestamps_ms)
+            sampling = (
+                "index(legacy)"
+                if (not reliable or _reported_fps_trustworthy(fps, timestamps_ms))
+                else "timestamp(2.5fps)"
+            )
+            span_s = (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0 if reliable else 0.0
+            true_fps = (n_decoded - 1) / span_s if span_s > 0 else 0.0
+            usable = int(np.count_nonzero(np.any(landmarks, axis=1)))
+            logger.debug(
+                "decode: container=%s reported_fps=%.3f frame_count=%d resolution=%dx%d "
+                "true_fps=%.3f sampling=%s raw_decoded=%d kept=%d usable=%d",
+                Path(str(video_path)).suffix or "?",
+                fps if fps else 0.0,
+                int(frame_count),
+                int(width),
+                int(height),
+                true_fps,
+                sampling,
+                n_decoded,
+                len(kept),
+                usable,
+            )
+        except Exception:  # noqa: BLE001 - logging must never affect extraction
+            pass
 
     return DecodedClip(frames=kept, landmarks=landmarks)
 
@@ -236,8 +237,8 @@ def _probe_timestamps(video_path) -> tuple[float, float, float, float, list[floa
 
     Returns ``(reported_fps, frame_count, width, height, timestamps_ms)``. ``grab()``
     advances the decoder and updates CAP_PROP_POS_MSEC without the pixel ``retrieve()``,
-    so this pass is cheaper than a full read. frame_count/width/height feed the
-    TEMPORARY decode diagnostic only.
+    so this pass is cheaper than a full read. frame_count/width/height feed the DEBUG
+    decode log only.
     """
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
