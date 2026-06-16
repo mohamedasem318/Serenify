@@ -29,6 +29,15 @@ class Settings(BaseSettings):
     # when unset the verifier is HS256-only (legacy projects / unit-test default).
     supabase_url: str | None = None
 
+    # Log level for the service's own (`app`) and the `ml_video` package loggers
+    # (see app.logging_config). apps/api ships no other logging config, so without
+    # it ml_video's INFO records — notably the usable-face-coverage gate's
+    # privacy-safe reject line (counts are server-log-only, never the wire —
+    # Principle I) — are swallowed by the root WARNING default under uvicorn. INFO
+    # surfaces that line; DEBUG additionally surfaces the decode-sampling
+    # diagnostic. Server-side only. Env: LOG_LEVEL.
+    log_level: str = "INFO"
+
     @property
     def cors_origins(self) -> list[str]:
         """Parsed CORS origins. The browser matches the Origin string EXACTLY, so

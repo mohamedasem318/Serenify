@@ -7,7 +7,7 @@ import os
 
 import ml_video
 import numpy as np
-from ml_video import pipeline
+from ml_video import FeatureExtractionError, coverage, pipeline
 
 from tests.conftest import FakeFaceMesh, NoFaceMesh, make_es256_token, make_token
 
@@ -25,6 +25,12 @@ def _post(client, token, content, content_type="video/mp4", filename="clip.mp4")
 
 def test_anchor_happy_path_returns_2958d_vector(client, valid_token, mp4_clip_bytes, monkeypatch):
     monkeypatch.setattr(pipeline, "_build_face_mesh", FakeFaceMesh)
+    # The synthetic conftest clip yields only 7 kept frames — below the calibrated
+    # MIN_USABLE_FRAMES floor (feature 006). This test exercises the happy 200 path
+    # and the real 2958-d vector, NOT the coverage gate (proven on real .npy fixtures
+    # in packages/ml-video), so disable the gate here. Mirrors test_pipeline_fixtures.py.
+    monkeypatch.setattr(coverage, "MIN_USABLE_FRAMES", 0)
+    monkeypatch.setattr(coverage, "MIN_COVERAGE_FRACTION", 0.0)
 
     resp = _post(client, valid_token, mp4_clip_bytes)
 
@@ -44,6 +50,51 @@ def test_anchor_no_face_returns_422(client, valid_token, mp4_clip_bytes, monkeyp
 
     assert resp.status_code == 422, resp.text
     assert resp.json()["error"] == "extraction_failed"
+
+
+def test_anchor_coverage_gate_surfaces_categorical_reason(
+    client, valid_token, mp4_clip_bytes, monkeypatch
+):
+    """The usable-face-coverage gate's ``code`` becomes the 422 ``reason`` verbatim,
+    and NO count detail (usable/kept/fraction, or any digit) may reach the wire
+    (feature 006, DECISION-31 / FR-016 / Principle I)."""
+
+    def raise_gate(_path):
+        # Message carries no counts (they live only in a server log line); the wire
+        # reason is the categorical code.
+        raise FeatureExtractionError(
+            "insufficient usable face coverage", code="insufficient_face_frames"
+        )
+
+    monkeypatch.setattr(ml_video, "compute_anchor", raise_gate)
+
+    resp = _post(client, valid_token, mp4_clip_bytes)
+
+    assert resp.status_code == 422, resp.text
+    # Categorical reason only — body is byte-for-byte the existing shape + the token.
+    assert resp.json() == {"error": "extraction_failed", "reason": "insufficient_face_frames"}
+    # FR-016: no numeric detail and no count vocabulary may leak through the body.
+    body_text = resp.text
+    assert not any(ch.isdigit() for ch in body_text), body_text
+    for token in ("usable", "kept", "fraction"):
+        assert token not in body_text, body_text
+
+
+def test_anchor_legacy_error_keeps_message_reason(
+    client, valid_token, mp4_clip_bytes, monkeypatch
+):
+    """A pre-006 extraction failure (no ``code``) still surfaces ``str(exc)`` as the
+    422 reason — backward-compatible, unchanged."""
+
+    def raise_legacy(_path):
+        raise FeatureExtractionError("some message")
+
+    monkeypatch.setattr(ml_video, "compute_anchor", raise_legacy)
+
+    resp = _post(client, valid_token, mp4_clip_bytes)
+
+    assert resp.status_code == 422, resp.text
+    assert resp.json() == {"error": "extraction_failed", "reason": "some message"}
 
 
 def test_anchor_missing_token_returns_401(client, mp4_clip_bytes):
@@ -78,6 +129,10 @@ def test_anchor_accepts_es256_token_via_jwks(client, mp4_clip_bytes, monkeypatch
 
     monkeypatch.setattr(auth, "_jwk_client", lambda _url: _FakeJWKClient())
     monkeypatch.setattr(pipeline, "_build_face_mesh", FakeFaceMesh)
+    # Disable the 006 coverage gate — this exercises the ES256 auth branch through a
+    # real extraction, not the gate; the 7-frame synthetic clip is below the floor.
+    monkeypatch.setattr(coverage, "MIN_USABLE_FRAMES", 0)
+    monkeypatch.setattr(coverage, "MIN_COVERAGE_FRACTION", 0.0)
 
     resp = _post(client, make_es256_token(private_key), mp4_clip_bytes)
 

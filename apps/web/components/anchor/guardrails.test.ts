@@ -96,6 +96,27 @@ describe("005 surfaces — calm voice: no alarmist blocklist terms (FR-047, SC-0
   });
 });
 
+// feature 006 — the new face-absence chip specifically obeys the calm-voice + foggy
+// rules (FR-012, Principle V). The file-wide scans above already cover it; this
+// pins the new chip's copy line explicitly so a future edit to it can't drift.
+describe("006 face-absence chip — calm voice + foggy (FR-012)", () => {
+  const FACE_ABSENCE = /couldn.t see your face for enough/i;
+
+  it("isolates the new chip's copy line and asserts no '!', no blocklist term, no colour token", () => {
+    const code = stripComments(readSurface("failure-state.tsx"));
+    const line = code.split("\n").find((l) => FACE_ABSENCE.test(l)) ?? "";
+    expect(line, "the insufficient-face chip line must exist after comment-strip").toMatch(
+      FACE_ABSENCE,
+    );
+    expect(line, "no exclamation mark").not.toContain("!");
+    expect(line, "no amber token").not.toMatch(/\bamber\b/);
+    expect(line, "no crimson token").not.toMatch(/\bcrimson\b/);
+    for (const term of BLOCKLIST) {
+      expect(line, `no blocklist term ${term}`).not.toMatch(term);
+    }
+  });
+});
+
 // Proves the scan is not vacuously green: the matchers fire on known-bad input, and
 // correctly exempt comments and JS `!` operators (the two false-positive sources).
 describe("guardrail self-check — the scan detects real violations", () => {

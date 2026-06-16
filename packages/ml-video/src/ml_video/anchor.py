@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .coverage import assert_usable_face_coverage
 from .errors import FeatureExtractionError
 from .features import FEATURE_DIM, lbp_top_features, motion_features
 from .pipeline import extract_landmarks
@@ -18,11 +19,17 @@ from .pipeline import extract_landmarks
 def compute_anchor(video_path) -> np.ndarray:
     """Decode + extract -> (2958,) float64. Raises ``FeatureExtractionError``.
 
-    Raised when an ROI drops out (LBP-TOP < 90-d), there are too few frames for
-    motion, or the result is otherwise malformed/non-finite (handoff §3 Step 4,
-    FR-012). The caller (API) maps this to HTTP 422, never a 500.
+    Raised when the usable-face-coverage gate rejects the capture
+    (``code="insufficient_face_frames"`` — feature 006, too few usable face frames
+    or too little coverage), when an ROI drops out (LBP-TOP < 90-d), when there are
+    too few frames for motion, or when the result is otherwise malformed/non-finite
+    (handoff §3 Step 4, FR-012). The caller (API) maps this to HTTP 422, never a 500.
+
+    The coverage gate runs FIRST — immediately after extraction, before the feature
+    floors — so it is additive and strictly stricter, never loosening them.
     """
     clip = extract_landmarks(video_path)
+    assert_usable_face_coverage(clip.landmarks)
     features = np.concatenate(
         [
             lbp_top_features(clip.frames, clip.landmarks),  # (90,)

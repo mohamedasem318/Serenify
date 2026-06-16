@@ -55,9 +55,14 @@ async def create_anchor(
         try:
             vector = ml_video.compute_anchor(tmp_path)
         except FeatureExtractionError as exc:
+            # Prefer the categorical machine code (e.g. the usable-face-coverage gate's
+            # "insufficient_face_frames") when present; otherwise the legacy free-text
+            # message. The code is count-free, so no numeric detail leaks (FR-016,
+            # Principle I); existing raises (code is None) keep str(exc) unchanged.
+            reason = getattr(exc, "code", None) or str(exc)
             return JSONResponse(
                 status_code=422,
-                content={"error": "extraction_failed", "reason": str(exc)},
+                content={"error": "extraction_failed", "reason": reason},
             )
         vector_b64 = base64.b64encode(vector.astype("<f4").tobytes()).decode("ascii")
         return AnchorResponse(

@@ -1062,6 +1062,24 @@ accept). Pairs with the post-deploy mobile HTTPS verification above for ST-24.
 **Address by**: when a macOS machine (ST-21) and an iOS device on an HTTPS path
 (ST-24) are accessible.
 
+**Feature 006 addendum (2026-06-17) — usable-face-coverage gate Safari/WebKit smoke
+deferred.** The 006 coverage gate and the VFR-timestamp decode it depends on
+(DECISION-29) were calibrated and smoke-validated **only on Chrome and Firefox webm** —
+see `specs/006-calibration-capture-quality/smoke-tests.md` §1 / §1b / §2 / §3, where the
+**Safari/WebKit** cells are marked N-A / deferred. WebKit's `MediaRecorder` emits a
+different container/codec than Chrome's webm (historically MP4/H.264; Safari's webm
+support differs), which decodes through a different server-side path and could shift
+per-frame face detection and therefore the measured coverage fraction — so the gate's
+accept/reject boundary (`MIN_COVERAGE_FRACTION = 0.65` / `MIN_USABLE_FRAMES = 50`,
+DECISION-32) is **unproven on Safari**. Re-run the four 006 flows on a real iPhone (thin
+→ reject; half-present → reject; full minute + realistic look-aways → accept) and confirm
+the same gate outcomes and the categorical `422 {"reason":"insufficient_face_frames"}`.
+**Owner**: Gehad Mohamed (iPhone access). **Status**: pending.
+**Pre-production gate**: clear this **before relying on live inference** — the anchor the
+gate guards is the reference every later delta-from-baseline reading is measured against
+(Principle II), so a Safari-specific gate miscalibration would silently poison or wrongly
+block real baselines.
+
 ### Camera device selection not always written back to localStorage (ST-05)
 **Status**: bug
 **Observed**: 2026-05-29, feature 004 smoke ST-05 (remembered device + fallback)

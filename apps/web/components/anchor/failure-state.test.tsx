@@ -46,4 +46,37 @@ describe("FailureState (FR-027–030)", () => {
     expect(onRetry).toHaveBeenCalled();
     expect(onPause).toHaveBeenCalled();
   });
+
+  // feature 006 — the new face-absence chip (DECISION-30 / FR-012).
+  it("renders the face-absence chip for the insufficient-face cause (006)", () => {
+    render(
+      <FailureState
+        cause="insufficient-face"
+        escapeVisible={false}
+        onRetry={noop}
+        onNotNow={noop}
+        onPause={noop}
+      />,
+    );
+    expect(
+      screen.getByText(/couldn.t see your face for enough of that recording/i),
+    ).toBeInTheDocument();
+  });
+
+  it("leaves the three existing cause chips byte-for-byte unchanged (006 no-regression)", () => {
+    const { rerender } = render(
+      <FailureState cause="low-light" escapeVisible={false} onRetry={noop} onNotNow={noop} onPause={noop} />,
+    );
+    expect(screen.getByText("Facing a little more light usually helps.")).toBeInTheDocument();
+    rerender(
+      <FailureState cause="out-of-frame" escapeVisible={false} onRetry={noop} onNotNow={noop} onPause={noop} />,
+    );
+    expect(screen.getByText("Staying roughly centred and still helps.")).toBeInTheDocument();
+    rerender(
+      <FailureState cause="our-side" escapeVisible={false} onRetry={noop} onNotNow={noop} onPause={noop} />,
+    );
+    expect(
+      screen.getByText("This one was on our side — give it a moment and try again."),
+    ).toBeInTheDocument();
+  });
 });
