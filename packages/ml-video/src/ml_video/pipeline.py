@@ -8,13 +8,17 @@ loading mediapipe's native runtime, and so that importing this module is cheap.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from pathlib import Path
 
 import cv2
 import numpy as np
 
 from .errors import FeatureExtractionError
 from .features import LANDMARK_DIM
+
+logger = logging.getLogger(__name__)
 
 TARGET_FPS = 5
 FRAME_SKIP_MOD = 2
@@ -66,6 +70,13 @@ def extract_landmarks(video_path) -> DecodedClip:
     fps = cap.get(cv2.CAP_PROP_FPS)
     skip_ratio = max(1, round(fps / TARGET_FPS)) if fps and fps > 0 else 1
 
+    # TEMPORARY (feature 006 decode diagnostic — remove/gate before merge): read-only
+    # probes of the container's reported metadata. They do NOT influence decoding or the
+    # sampling math (skip_ratio is unchanged); they are only echoed in the log below.
+    _diag_frame_count = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    _diag_width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    _diag_height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+
     # Step 1 - keep every skip_ratio-th frame (downsample toward 5 fps).
     frames_5fps: list[np.ndarray] = []
     i = 0
@@ -102,4 +113,31 @@ def extract_landmarks(video_path) -> DecodedClip:
         if callable(close):
             close()
 
-    return DecodedClip(frames=kept, landmarks=np.asarray(rows, dtype=np.float64))
+    landmarks = np.asarray(rows, dtype=np.float64)
+
+    # TEMPORARY (feature 006 decode diagnostic — remove/gate before merge): ONE INFO
+    # line per decode, SERVER-SIDE ONLY (nothing here reaches the HTTP client; the 422
+    # body stays categorical — Principle I / FR-016). Confirms whether a live VFR webm
+    # collapses the kept-frame count vs a CFR mp4 fixture. `usable` = non-zero rows, the
+    # same detected-face predicate the coverage gate uses. Wrapped so a diagnostic error
+    # can never alter extraction behaviour.
+    try:
+        _diag_usable = int(np.count_nonzero(np.any(landmarks, axis=1)))
+        logger.info(
+            "TEMP decode-diagnostic (006): container=%s reported_fps=%.3f "
+            "frame_count=%d resolution=%dx%d skip_ratio=%d raw_decoded=%d "
+            "kept=%d usable=%d",
+            Path(str(video_path)).suffix or "?",
+            fps if fps else 0.0,
+            int(_diag_frame_count),
+            int(_diag_width),
+            int(_diag_height),
+            skip_ratio,
+            i,
+            len(kept),
+            _diag_usable,
+        )
+    except Exception:  # noqa: BLE001 - a diagnostic must never affect extraction
+        pass
+
+    return DecodedClip(frames=kept, landmarks=landmarks)
