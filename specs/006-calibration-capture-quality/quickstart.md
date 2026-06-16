@@ -38,17 +38,19 @@ uv run python tests/fixtures/extract_coverage_fixtures.py \
 uv run python - <<'PY'
 import numpy as np
 from ml_video.coverage import usable_face_coverage
-for name in ("thin","good_ideal","good_realistic"):
+for name in ("thin","good_ideal","good_realistic","half"):
     lm = np.load(f"tests/fixtures/{name}.npy")
     print(name, usable_face_coverage(lm))
 PY
 ```
-Set `MIN_USABLE_FRAMES` and `MIN_COVERAGE_FRACTION` in
-`src/ml_video/coverage.py` so **thin** rejects and **both good clips accept**, with
-`MIN_COVERAGE_FRACTION` clearly **below** the good-realistic clip's coverage (the
-binding upper bound) and `MIN_USABLE_FRAMES` clearly below its usable count. The
-**coverage fraction** is the primary lever; the **absolute floor** is the backstop.
-Record the measured rows + chosen thresholds in the `docs/DECISIONS.md` note.
+Set `MIN_USABLE_FRAMES` and `MIN_COVERAGE_FRACTION` in `src/ml_video/coverage.py` so
+**thin** and **half** reject while **both good clips accept**, with
+`MIN_COVERAGE_FRACTION` between the half-present clip's coverage (the binding
+reject-side datapoint) and the good clips' coverage. The **coverage fraction** is the
+primary lever; the **absolute floor** is the backstop. Current calibrated values
+(DECISION-32, recalibrated on real webm): `MIN_COVERAGE_FRACTION = 0.65`,
+`MIN_USABLE_FRAMES = 50`. Record the measured rows + chosen thresholds in the
+`docs/DECISIONS.md` note.
 
 ## 4. Drive a rejection through the API (optional)
 ```sh

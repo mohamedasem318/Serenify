@@ -20,12 +20,13 @@ returned to the client; the 422 carries a categorical reason, not numbers.
 
 | Constant | Type | Value | Set by |
 |---|---|---|---|
-| `MIN_USABLE_FRAMES` | `int` | **[CALIBRATION-PENDING]** | DECISION-32 procedure, during `/speckit-implement` (absolute floor — FR-005; secondary backstop). |
-| `MIN_COVERAGE_FRACTION` | `float` | **[CALIBRATION-PENDING]** | DECISION-32 procedure, during `/speckit-implement` (coverage fraction — FR-006; primary lever). |
+| `MIN_USABLE_FRAMES` | `int` | **50** | DECISION-32 (absolute floor — FR-005; secondary backstop). |
+| `MIN_COVERAGE_FRACTION` | `float` | **0.65** | DECISION-32, recalibrated on real webm — DECISION-29 (coverage fraction — FR-006; primary lever). |
 
 **Gate rule (FR-007):** accept iff `usable >= MIN_USABLE_FRAMES` **and** `fraction >=
-MIN_COVERAGE_FRACTION`; reject (raise) if **either** fails. Calibrated so the
-**good-realistic** clip clears both with margin (the binding upper bound).
+MIN_COVERAGE_FRACTION`; reject (raise) if **either** fails. Calibrated so both good
+clips clear both with margin (1.000 ≥ 0.65), while the half-present clip (0.513) is
+rejected by the coverage lever and the thin clip by both.
 
 ## Error / reason shapes (additive)
 

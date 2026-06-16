@@ -56,6 +56,32 @@ frame, or point the camera away, then briefly appear). Let the full minute elaps
 
 ---
 
+## §1b — Half-present minute (~30 s absent) → rejected (the boundary case)
+
+**The calibration boundary** — the clip that set `MIN_COVERAGE_FRACTION = 0.65` (DECISION-32).
+The `half` fixture measured **0.513 coverage** (77 usable / 150 kept) and is a **documented
+reject**: a baseline where the face is present for only about half the minute is incomplete and
+must not anchor every downstream delta.
+
+**Action**: Record a full minute but keep your face **present for only about half of it** — in
+frame and looking at the screen for roughly the first ~30 s, then step out of frame (or turn
+fully away) for the remaining ~30 s. Let the full minute elapse and submit.
+
+**Expect**:
+- The **005 failure screen**, **not** the success screen — it must **NOT** say "Your baseline is set".
+- The **face-absence** chip: *"We couldn't see your face for enough of that recording — let's try again."*
+- HTTP **422** with body `{"error":"extraction_failed","reason":"insufficient_face_frames"}`.
+- If this **accepts**, the threshold is too lenient — **file it** (coverage ≈ fraction-of-minute-
+  present, so a ~0.5 capture must fall below the 0.65 line).
+
+| Browser | Result | Notes (initials / date) |
+|---|---|---|
+| Chrome  | ☐ Pass ☐ Fail | |
+| Firefox | ☐ Pass ☐ Fail | |
+| Safari/WebKit | ☐ Pass ☐ Fail ☐ N-A | |
+
+---
+
 ## §2 — Genuine full minute → success (no false reject)
 
 **Action**: Record a **real full minute sitting normally** — face in frame the whole time,
@@ -83,9 +109,11 @@ stay seated and present (the face leaves the frame only momentarily, not for mos
 minute).
 
 **Expect**: **success** — "Your baseline is set". The brief glances must **not** trip the
-gate (FaceMesh holds the face through seated glances — DECISION-32). If this **rejects**,
-the threshold is too strict for real use — **file it** (candidate revisit range: coverage
-0.40–0.60, usable 30–60).
+gate (FaceMesh holds the face through seated glances — DECISION-32; the good clips measured
+1.000, well clear of the 0.65 line). If this **rejects**, the threshold is too strict for real
+use — **file it** (the accept-side absence tolerance — ~15–20 s of a 60 s minute — is
+extrapolated from the validated linearity, not directly measured; revisit `MIN_COVERAGE_FRACTION`
+downward against real-user data).
 
 | Browser | Result | Notes |
 |---|---|---|

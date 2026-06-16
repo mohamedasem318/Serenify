@@ -163,15 +163,17 @@ to **add a new reason**.
 ## Decision 3 — Threshold calibration method (FR-008; numbers NOT in the plan)
 
 **Decision.** The two constants `MIN_USABLE_FRAMES` and `MIN_COVERAGE_FRACTION` live
-in `coverage.py` as `[CALIBRATION-PENDING]` and are set during `/speckit-implement`
-by running the three real fixture clips through the real pipeline in the pinned env.
+in `coverage.py` and are set by running the real fixture clips through the real
+pipeline in the pinned env. (Initially three mp4-handled clips → `0.40`; **recalibrated
+to four real-webm clips through the fixed VFR decode → `0.65`** — see "Calibration
+measurements" below and 📌 DECISION-29 / DECISION-32.)
 
 **Procedure.**
 
-1. Acquire three real clips (developers' own recordings, **not** StressID media):
-   **thin** (~2s of face in a full minute), **good-ideal** (face the whole minute),
-   **good-realistic** (genuine calm minute with natural brief look-aways — face for
-   the large majority but not 100%).
+1. Acquire the real clips (developers' own recordings, **not** StressID media), recorded
+   as browser `.webm`: **thin** (~2–3 s of face in a full minute), **good-ideal** (face
+   the whole minute), **good-realistic** (genuine calm minute with natural brief
+   look-aways), and **half** (the boundary case — ~30 s present, ~30 s absent).
 2. Run each through `extract_landmarks` in the **pinned ml-video env** — `uv run`,
    Python 3.12, `mediapipe==0.10.13` (the README/pyproject pin, DECISION-1) — **not**
    a Python 3.9 conda env, whose different mediapipe build would shift landmark values
@@ -202,57 +204,66 @@ detects, which depends on the mediapipe build.
 
 ---
 
-## Calibration measurements (T013) — three real clips through the real pipeline
+## Calibration measurements — four real webm clips through the real (fixed-decode) pipeline
+
+**Recalibrated on real browser webm.** The initial calibration measured three clips
+handled as mp4 through the **pre-fix decode**, which mis-sampled variable-frame-rate
+browser webm (📌 DECISION-29). After the VFR-timestamp decode landed, the measurement
+was **redone on real `.webm` recordings through the fixed pipeline** — the path
+production runs — and a deliberate **half-present** boundary clip was added to probe the
+previously empty gap. The webm figures below **supersede** the mp4 ones (mp4: `thin
+4/172/0.023`, `good-ideal 154/154/1.000`, `good-realistic 129/129/1.000`).
 
 Extracted once in the pinned env (Python **3.12.13**, **mediapipe 0.10.13**, via
-`uv run`) with `tests/fixtures/extract_coverage_fixtures.py`. Coverage =
-`usable / kept`, `usable` = non-zero landmark rows.
+`uv run`) with `tests/fixtures/extract_coverage_fixtures.py`. Coverage = `usable / kept`,
+`usable` = non-zero landmark rows. All four confirmed on the **VFR timestamp decode path**
+(reported `fps=1000` is garbage; true ~28.7–30.1 fps).
 
-| Clip | usable | kept | fraction | target |
-|------|-------:|-----:|---------:|--------|
-| thin           |   4 | 172 | **0.023** | reject |
-| good-ideal     | 154 | 154 | **1.000** | accept |
-| good-realistic | 129 | 129 | **1.000** | accept (binding lower bound) |
+| Clip | kept | usable | fraction | duration | target |
+|------|-----:|-------:|---------:|---------:|--------|
+| thin           | 150 |  11 | **0.073** | 59.97 s | reject |
+| good-ideal     | 150 | 150 | **1.000** | 59.94 s | accept |
+| good-realistic | 151 | 151 | **1.000** | 60.29 s | accept |
+| half           | 150 |  77 | **0.513** | 59.97 s | reject (boundary) |
 
-**Key finding — the good-realistic clip came out at 1.000 coverage.** FaceMesh held
-the face through the natural brief look-aways (glances/turns keep enough of the face
-visible to detect), so the "realistic" clip did **not** exercise sub-100% coverage;
-empirically it matches good-ideal on fraction (it differs only in `kept`, being a
-shorter clip). The accept-side **binding lower bound is therefore `usable = 129`,
-`fraction = 1.000`** — the thresholds must sit clearly below that, and are chosen
-**conservatively low** so a genuine user whose coverage dips below this particular
-clip is never false-rejected (we have no genuine sub-100% sample to pin a tighter
-bound).
+**Key finding — legitimate captures cluster at 1.000.** `good-realistic` came out at
+**1.000** coverage: FaceMesh holds the face through natural seated look-aways
+(glances/turns keep enough of the face visible to detect), so coverage only drops when
+the face *truly leaves the frame*. The added **`half`** clip (~30 s present / ~30 s
+absent) measured **0.513**, almost exactly the 0.5 that even-time frame sampling
+predicts — confirming the gate fraction is a faithful proxy for *fraction-of-minute-
+present*. `half` is the one intermediate datapoint between the egregious `thin` (0.073)
+and the saturated good clips (1.000).
 
-**Margin verdict (T014 STOP-gate): PASS — a very large, clean gap exists.** thin
-coverage `0.023` vs good `1.000` (≈43×); thin usable `4` vs good `129`/`154` (≈32×).
-No threshold needs to sit anywhere near the binding clip, so there is no risk of
-no-separating-margin; the STOP condition does not trigger.
+**Margin verdict: clean separation with a populated boundary.** thin coverage `0.073`
+and the boundary `half` `0.513` both sit below any sane accept line; both good clips at
+`1.000` sit well above. The coverage threshold can now be placed *between* `half` and
+the good clips rather than guessed in an empty gap.
 
-### Chosen thresholds (T015 / 📌 DECISION-32)
+### Chosen thresholds (📌 DECISION-32)
 
-Set in `coverage.py` after review:
+Set in `coverage.py` after the recalibration:
 
-- **`MIN_COVERAGE_FRACTION = 0.40`** (primary lever — the face-absent bug). Margin:
-  thin `0.023` vs `0.40` (rejects with ~17× headroom); both good clips `1.000` clear
-  it with ~2.5× headroom.
-- **`MIN_USABLE_FRAMES = 50`** (secondary backstop — too-short captures). Margin:
-  thin `4` vs `50` (rejects with ~12× headroom); good-realistic `129` (binding) and
-  good-ideal `154` clear it with ≥2.6× headroom.
-- thin is rejected by **both** conditions (belt-and-suspenders); both good clips clear
-  **both**.
+- **`MIN_COVERAGE_FRACTION = 0.65`** (primary lever — the face-absent bug). `half` 0.513
+  rejects with a **0.137 margin**; both good clips 1.000 clear it by 0.35.
+  `0.65 ≈ "face present ≥ ~40 s of the 60 s"`.
+- **`MIN_USABLE_FRAMES = 50`** (secondary backstop — too-short captures). `thin` 11 < 50;
+  `half` 77 and the good clips ≥ 150 clear it — so the **coverage lever, not the floor,
+  rejects `half`**.
+- `thin` is rejected by **both** conditions; `half` by the coverage lever alone; both
+  good clips clear **both**.
 
-**These values sit in a WIDE EMPTY GAP — a conservative judgment, not a data-derived
-precise bound.** The three clips proved clean separation of the *egregious* thin case
-(2.3% coverage), but we have **no acceptable sub-100%-coverage sample**: the
-good-realistic clip held at **1.000** coverage because **FaceMesh is robust to seated
-glances** — a glance/turn keeps enough of the face visible to detect, so coverage
-only drops when the face *truly leaves the frame*. There is therefore no empirical
-point anywhere between `0.023` and `1.000` to pin a tighter bound. `0.40` / `50` are
-deliberately well below the only accept-side evidence (`1.000` / `129`) so a genuine
-user whose coverage dips below this particular clip is not false-rejected; **the
-numbers MUST be revisited against real-user calibration data** once it exists
-(candidate range from the analysis: coverage `0.40–0.60`, usable `30–60`).
+**The anchor is the reference every later delta is measured against** (Principle II), so
+a half-absent baseline is rejected as incomplete / possibly biased — a redo is cheap; a
+poisoned baseline corrupts every downstream reading.
+
+**Honest caveats (revisit against real-user data).** Only one intermediate sample
+(`half`) pins the knee; the accept-side absence tolerance (~15–20 s) is **extrapolated**
+from the validated linearity (`half` ≈ 0.5), not directly measured; and the real-world
+coverage distribution is unknown until deployment. The reject rate is now **observable**
+— the `apps/api` logging config emits the server-side reject line (`coverage reject:
+usable=… kept=… fraction=…`; no counts on the wire — FR-016) — so the threshold can be
+tuned from field data.
 
 ## Spec-assumption flags surfaced while reading (NOT contradictions — clarifications)
 

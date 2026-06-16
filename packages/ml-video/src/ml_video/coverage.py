@@ -19,17 +19,27 @@ from .errors import FeatureExtractionError
 
 logger = logging.getLogger(__name__)
 
-# Calibrated against three real clips (006 T013/T015, DECISION-32): thin
-# 4 usable / 0.023 coverage (reject) vs good-ideal 154/1.000 and good-realistic
-# 129/1.000 (accept). The values sit in a WIDE EMPTY GAP — the clips proved clean
-# separation of the egregious thin case, but there is NO genuine sub-100%-coverage
-# sample (good-realistic held at 1.000: FaceMesh is robust to seated glances —
-# coverage drops only when the face truly leaves the frame), so these are a
-# CONSERVATIVE judgment to revisit against real-user data, not a data-derived
-# precise bound. Coverage fraction is the primary lever (the face-absent bug); the
-# absolute floor is the secondary backstop (too-short captures).
-MIN_USABLE_FRAMES: int = 50          # 4 (thin) << 50 << 129 (good-realistic, binding)
-MIN_COVERAGE_FRACTION: float = 0.40  # 0.023 (thin) << 0.40 << 1.000 (both good clips)
+# Recalibrated against four real browser-webm clips (006 DECISION-32), recorded on
+# the fixed VFR-timestamp decode (DECISION-29) in the pinned env (Python 3.12.13,
+# mediapipe 0.10.13). Coverage = usable/kept:
+#   thin            11/150  0.073  (face ~2-3 s of the minute)   -> reject
+#   good-ideal     150/150  1.000  (present, steady)             -> accept
+#   good-realistic 151/151  1.000  (natural seated look-aways)   -> accept
+#   half            77/150  0.513  (~30 s present / 30 s absent) -> reject (boundary)
+# good-realistic held at 1.000 despite genuine look-aways — FaceMesh tracks through
+# seated glances — so legitimate captures cluster at ~1.0 and a stricter gate does
+# not clip them. half validates that coverage ~= fraction-of-minute-present (~0.5, as
+# even-time sampling predicts), so 0.65 ~= "face present >= ~40 s of the 60 s": it
+# rejects the half-absent baseline (0.513, a 0.137 margin) while both good clips clear
+# it by 0.35. The anchor is the reference every later delta is measured against, so a
+# half-absent baseline is rejected (incomplete / possibly biased; a redo is cheap).
+# Coverage fraction is the primary lever (the face-absent bug); the absolute floor is
+# the secondary backstop (too-short captures). Provisional: only one intermediate
+# sample (half), so the accept-side absence tolerance (~15-20 s) is extrapolated from
+# the validated linearity, not directly measured — revisit against real-user data
+# (the apps/api logging config emits the reject line, so the reject rate is observable).
+MIN_USABLE_FRAMES: int = 50          # floor: thin 11 < 50; half 77 & good 150 clear it
+MIN_COVERAGE_FRACTION: float = 0.65  # lever: half 0.513 < 0.65 < 1.000 (both good clips)
 
 
 def usable_face_coverage(landmarks: np.ndarray) -> tuple[int, int, float]:

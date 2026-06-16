@@ -81,12 +81,16 @@ dependency, or migration.**
   message, categorical wire token, so nothing numeric leaks (Principle I / FR-016). Every
   other reason still selects via `dominantCause` (incl. detector-unavailable → `our-side`);
   the three existing chips are byte-for-byte unchanged.
-- **Calibration (DECISION-32).** `MIN_COVERAGE_FRACTION = 0.40` (primary) / `MIN_USABLE_FRAMES
-  = 50` (backstop), measured against three real clips in the pinned env (Python 3.12.13,
-  mediapipe 0.10.13): thin `0.023/4` rejects; good-ideal `1.000/154` and good-realistic
-  `1.000/129` (binding) accept. Values sit in a **wide empty gap** (good-realistic held at
-  1.000 — FaceMesh is robust to seated glances, so there is no sub-100% sample); **explicitly
-  provisional — revisit against real-user data (coverage 0.40–0.60, usable 30–60)**.
+- **Calibration (DECISION-32, recalibrated on real webm).** `MIN_COVERAGE_FRACTION = 0.65`
+  (primary) / `MIN_USABLE_FRAMES = 50` (backstop), measured against **four real browser-webm
+  clips through the fixed VFR decode** (DECISION-29; pinned env Python 3.12.13, mediapipe
+  0.10.13): thin `0.073/11` and **half `0.513/77`** reject; good-ideal `1.000/150` and
+  good-realistic `1.000/151` accept. good-realistic held at 1.000 despite genuine look-aways
+  (FaceMesh tracks through seated glances), so legitimate captures cluster at ~1.0 and 0.65 does
+  not clip them; `half` validates coverage ≈ fraction-present, so `0.65 ≈ "face present ≥ ~40 s
+  of 60 s"` and rejects the half-absent baseline (0.137 margin). **Provisional** — one
+  intermediate sample (`half`); revisit against real-user data (the apps/api logging config emits
+  the reject line, so the reject rate is observable).
 - **Glasses (DECISION-33, investigation-only).** No glasses/no-glasses gap (24/53; macro-F1
   0.720 vs 0.717; stress recall 0.844 vs 0.818) → calibrate as you normally sit, glasses
   included; do not ban. Recorded with the between-subject thesis caveat.
@@ -115,6 +119,20 @@ throughout (RED → GREEN) for the gate, the router reason, and the frontend chi
 **Branch commit ordering** (PR-sized, tests green per step): P1–2 env/scaffold (`8cd2027`) →
 P3–4 gate core + wiring (`60983cb`) → P5 fixtures + measurements (`46e3bb8`) → P5 calibrate +
 lock (`68c199b`) → P6–7 router reason + chip (`4428060`) → P8 docs + smoke.
+
+**Recalibration (2026-06-16, after the decode fix landed).** The first calibration set the
+coverage gate at `0.40` from three clips measured through the *broken* VFR decode (DECISION-29)
+— a "wide empty gap" with no honest intermediate sample. Once the timestamp-driven decode
+merged, the four clips were re-recorded as real browser webm and run through the *fixed* pipeline
+production actually uses. good-realistic again saturated at `1.000` (FaceMesh holds the face
+through seated glances), but the deliberately half-absent **`half`** clip landed at `0.513` —
+almost exactly the 0.5 even-time sampling predicts, validating that the gate's coverage fraction
+really is "fraction of the minute the face was present." With a populated boundary the threshold
+could finally be placed *between* the half-absent baseline and the good clips rather than guessed:
+`MIN_COVERAGE_FRACTION` rises **`0.40 → 0.65`**, the `.npy` fixtures are regenerated from the webm
+clips (and `half.npy` added), and `half` becomes a documented reject (smoke §1b). The choice is
+honest about its limits — one intermediate datapoint, an extrapolated accept-side tolerance — but
+the reject rate is now observable in the server log, so the number is tunable from real use.
 
 ---
 

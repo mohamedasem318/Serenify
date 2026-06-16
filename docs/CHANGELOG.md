@@ -1555,3 +1555,34 @@ consumes those baselines, so the stress-inference-service work moves to a later 
 Principle VIII permits provisional reordering **when recorded** — this is that record. (005
 DECISION-23 already anticipated "feature 006's inference read path"; that reference now points
 to the later slot.) No spec content changed; this is an ordering/naming note only.
+
+## 2026-06-16 — recalibration(006) — coverage gate `MIN_COVERAGE_FRACTION` 0.40 → 0.65 on real webm
+
+The usable-face-coverage gate was **recalibrated against real browser-webm clips** after the
+VFR-timestamp decode fix (DECISION-29) landed. The original `0.40` was set from three clips
+measured through the *pre-fix* decode, in a "wide empty gap" with no intermediate sample.
+
+- **What changed.** `MIN_COVERAGE_FRACTION` raised **0.40 → 0.65** (`MIN_USABLE_FRAMES = 50`
+  unchanged), in `packages/ml-video/src/ml_video/coverage.py`. 📌 **DECISION-32** rewritten with
+  the real-webm figures and rationale; the stale mp4 figures (`thin 4/172/0.023`, good clips
+  `154`/`129`) are superseded.
+- **Fixtures.** The committed `.npy` landmark arrays were **regenerated from the four `.webm`
+  clips** through the fixed pipeline, and a new **`half.npy`** (the ~30 s-present / ~30 s-absent
+  boundary clip) was added. Raw clips remain uncommitted (gitignored — Principle I/X); only the
+  derived `.npy` are tracked (≈1.1 MB each, four total ≈ 4.4 MB).
+- **Measurements (pinned env, Python 3.12.13 / mediapipe 0.10.13; all on the VFR decode path).**
+  `thin 11/150/0.073` (reject), `good-ideal 150/150/1.000` (accept), `good-realistic
+  151/151/1.000` (accept), `half 77/150/0.513` (**now reject** — coverage lever, 0.137 margin).
+- **Rationale.** good-realistic held at 1.000 despite natural look-aways (FaceMesh tracks
+  through seated glances → honest captures cluster at ~1.0, so 0.65 does not clip them); `half`
+  at 0.513 validates coverage ≈ fraction-of-minute-present, so `0.65 ≈ "face present ≥ ~40 s of
+  60 s"`. The anchor is the reference every later delta is measured against, so a half-absent
+  baseline is rejected (a redo is cheap; a poisoned baseline corrupts every downstream reading).
+- **Tests/docs.** Added `test_real_half_fixture_is_rejected` and updated the real-fixture
+  expectations in `test_usable_face_coverage_gate.py`; smoke-tests gain a documented half-reject
+  case (§1b). Provisional — one intermediate datapoint; the reject rate is observable via the
+  server reject log (counts log-only, never on the wire — FR-016), so the threshold is tunable
+  from real-user data later.
+
+Measurement + threshold decision made by the operator from the real clips; this entry records
+the implementation on the `006-calibration-capture-quality` branch.

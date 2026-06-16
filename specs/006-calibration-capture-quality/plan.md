@@ -245,13 +245,15 @@ a contradiction.)
 ### 📌 DECISION-32 — Threshold calibration method (numbers produced at implement, not guessed here)
 
 The two constants live in `coverage.py` as `MIN_USABLE_FRAMES: int` and
-`MIN_COVERAGE_FRACTION: float`, marked `[CALIBRATION-PENDING]` until set by this
-procedure during `/speckit-implement`:
+`MIN_COVERAGE_FRACTION: float`, set by this procedure during `/speckit-implement` and
+later **recalibrated on real browser webm** through the fixed VFR decode (DECISION-29)
+to the final values **`MIN_COVERAGE_FRACTION = 0.65` / `MIN_USABLE_FRAMES = 50`**:
 
-1. **Acquire three real clips** (developers' own calibration recordings, not StressID
-   media): **thin** (~2s of face in a full minute), **good-ideal** (face present the
-   whole minute), **good-realistic** (a genuine calm minute with natural brief
-   look-aways — face present for the large majority but not 100%).
+1. **Acquire the real clips** (developers' own calibration recordings, not StressID
+   media), recorded as browser `.webm`: **thin** (~2–3 s of face in a full minute),
+   **good-ideal** (face present the whole minute), **good-realistic** (a genuine calm
+   minute with natural brief look-aways), and **half** (the boundary — ~30 s present,
+   ~30 s absent).
 2. **Run each clip through the REAL anchor pipeline** — `extract_landmarks` in the
    **pinned ml-video env** (`uv run` → Python 3.12, `mediapipe==0.10.13`); **not** a
    Python 3.9 conda env, whose different mediapipe build could shift landmark values
@@ -259,12 +261,13 @@ procedure during `/speckit-implement`:
 3. **Measure** `usable`, `kept`, `fraction` per clip via `usable_face_coverage`.
    Record all three rows.
 4. **Set the thresholds** so:
-   - **thin → rejected** (fails at least one condition);
+   - **thin → rejected** (fails both conditions);
+   - **half → rejected** — the **binding reject-side datapoint** for coverage:
+     `MIN_COVERAGE_FRACTION` MUST sit clearly **above** the half-present clip's measured
+     coverage (which rejects it by the coverage lever, not the floor);
    - **good-ideal → accepted**;
-   - **good-realistic → accepted** — the **binding upper bound**:
-     `MIN_COVERAGE_FRACTION` MUST sit clearly **below** the good-realistic clip's
-     measured coverage (with margin), and `MIN_USABLE_FRAMES` clearly **below** its
-     usable count.
+   - **good-realistic → accepted**: `MIN_COVERAGE_FRACTION` and `MIN_USABLE_FRAMES` sit
+     clearly **below** the good clips' measured coverage / usable count (with margin).
    - **Primary lever**: the **coverage fraction** catches the canonical 2s bug
      (full-length, face-absent → very low coverage). The **absolute floor** is the
      **secondary backstop** for genuinely too-short clips (high coverage but few
@@ -312,12 +315,12 @@ specs/006-calibration-capture-quality/
 ```text
 packages/ml-video/
 ├── src/ml_video/
-│   ├── coverage.py                 # NEW — usable_face_coverage()/assert_usable_face_coverage() + MIN_USABLE_FRAMES/MIN_COVERAGE_FRACTION (CALIBRATION-PENDING) (📌 DECISION-30/32)
+│   ├── coverage.py                 # NEW — usable_face_coverage()/assert_usable_face_coverage() + MIN_USABLE_FRAMES=50 / MIN_COVERAGE_FRACTION=0.65 (recalibrated on real webm) (📌 DECISION-30/32)
 │   ├── anchor.py                   # MODIFIED — call assert_usable_face_coverage(clip.landmarks) after extract_landmarks, before features (📌 DECISION-30)
 │   ├── errors.py                   # MODIFIED — FeatureExtractionError gains optional `code: str | None` (backward-compatible) (📌 DECISION-31)
 │   └── __init__.py                 # MODIFIED — export the coverage helpers for the test boundary (optional)
 └── tests/
-    ├── fixtures/                   # NEW — committed landmark .npy arrays (thin / good-ideal / good-realistic) + provenance README (📌 DECISION-32)
+    ├── fixtures/                   # NEW — committed landmark .npy arrays (thin / good-ideal / good-realistic / half, real webm) + provenance README (📌 DECISION-32)
     ├── fixtures/extract_coverage_fixtures.py  # NEW — DEV-ONLY one-time extractor (not collected by pytest); run via uv in the pinned env
     └── test_usable_face_coverage_gate.py      # NEW — reject-below / accept-above at the real boundary; no mock-green; compute_anchor wiring (📌 DECISION-30, FR-017/018)
 apps/api/
@@ -356,10 +359,11 @@ landing on `006-calibration-capture-quality`; tests pass before the next starts.
    `insufficient_face_frames` when `extract_landmarks` is monkeypatched to return
    thin landmark rows (the real boundary, no mediapipe). (📌 DECISION-30)
 3. **Fixtures + calibration** — run `extract_coverage_fixtures.py` once in the pinned
-   env over the three real clips; commit the `.npy` arrays + provenance README;
-   **set the real thresholds** so thin rejects and both good clips (esp.
-   good-realistic) accept; record the measurements. Re-point the gate test at the
-   committed fixtures (reject-below / accept-above; no-false-reject on good-realistic).
+   env over the real clips (four after the real-webm recalibration — thin / good-ideal /
+   good-realistic / half); commit the `.npy` arrays + provenance README; **set the real
+   thresholds** so thin and half reject and both good clips accept; record the
+   measurements. Re-point the gate test at the committed fixtures (reject-below /
+   accept-above; no-false-reject on good-realistic; half rejected by the coverage lever).
    (📌 DECISION-32, FR-017/018)
 4. **Router surfacing** — the 1-line `reason = exc.code or str(exc)` in
    `apps/api/app/routers/anchor.py`; a pytest asserting a gate-raised error surfaces
@@ -428,9 +432,10 @@ feature 006), continuing from 005's DECISION-28:
     `reason = exc.code or str(exc)`); server reason takes precedence over client
     `dominantCause`; new `insufficient-face` chip; existing chips/selection unchanged;
     categorical-only on the wire (no counts → Principle I). 📌 DECISION-31.
-31. **Threshold calibration method** — three real clips run through the pinned-env
-    pipeline; coverage fraction primary, absolute floor backstop; numbers produced at
-    implement and pinned; landmark arrays committed as deterministic fixtures.
+31. **Threshold calibration method** — real clips run through the pinned-env pipeline
+    (four after the real-webm recalibration on the fixed VFR decode — DECISION-29);
+    coverage fraction primary, absolute floor backstop; numbers produced at implement,
+    recalibrated to 0.65/50; landmark arrays committed as deterministic fixtures.
     📌 DECISION-32.
 32. **Glasses (Part B)** — investigation-only guidance (calibrate with glasses, avoid
     glare, don't ban) + thesis between-subject limitation; no code. 📌 DECISION-33.

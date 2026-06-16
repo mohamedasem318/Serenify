@@ -50,7 +50,8 @@
 - Items marked incomplete require spec updates before `/speckit-clarify` or
   `/speckit-plan`.
 - **Deferred decisions now resolved (implementation closed, 2026-06-16)**: FR-008
-  thresholds → `MIN_COVERAGE_FRACTION = 0.40` / `MIN_USABLE_FRAMES = 50`
-  (`docs/DECISIONS.md` DECISION-32, calibrated against three real clips); FR-012
-  messaging → new `insufficient_face_frames` reason in the existing 422 + one new
-  `insufficient-face` chip (DECISION-31). Part B glasses recorded as DECISION-33.
+  thresholds → `MIN_COVERAGE_FRACTION = 0.65` / `MIN_USABLE_FRAMES = 50`
+  (`docs/DECISIONS.md` DECISION-32, **recalibrated against four real browser-webm clips**
+  through the fixed VFR decode — DECISION-29); FR-012 messaging → new
+  `insufficient_face_frames` reason in the existing 422 + one new `insufficient-face`
+  chip (DECISION-31). Part B glasses recorded as DECISION-33.

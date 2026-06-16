@@ -205,27 +205,41 @@ def test_gate_does_not_loosen_existing_floors(monkeypatch):
 # ---------------------------------------------------------------------------
 # Phase 5 / Step 3 (T016): the honest boundary test with the REAL calibrated
 # constants (NO monkeypatch) over the committed landmark fixtures. This LOCKS the
-# calibration — thin rejects, both good clips accept. CI runs NO mediapipe: only
-# numpy over the committed .npy arrays (extracted once, offline, in the pinned env).
+# calibration — thin + half reject, both good clips accept. The fixtures are real
+# browser-webm clips decoded through the fixed VFR-timestamp path (DECISION-29) and
+# recalibrated to MIN_COVERAGE_FRACTION = 0.65 (DECISION-32). CI runs NO mediapipe:
+# only numpy over the committed .npy arrays (extracted once, offline, in the pinned env).
 # ---------------------------------------------------------------------------
 
 
 def test_real_thin_fixture_is_rejected():
-    # ~2s of face in a full minute (4 usable / 172 kept / 0.023) -> rejected.
+    # Face present ~2-3 s of the minute (11 usable / 150 kept / 0.073) -> rejected by
+    # BOTH the absolute floor (11 < 50) and the coverage lever (0.073 < 0.65).
     with pytest.raises(FeatureExtractionError) as exc:
         coverage.assert_usable_face_coverage(_fixture("thin"))
     assert exc.value.code == "insufficient_face_frames"
 
 
 def test_real_good_ideal_fixture_is_accepted():
-    # Face present throughout (154 / 154 / 1.000) -> accepted (must NOT raise).
+    # Face present throughout (150 / 150 / 1.000) -> accepted (must NOT raise).
     coverage.assert_usable_face_coverage(_fixture("good_ideal"))
 
 
 def test_real_good_realistic_fixture_is_accepted():
-    # Natural brief look-aways — the binding lower bound (129 / 129 / 1.000) ->
-    # accepted: the no-false-reject guarantee (SC-002).
+    # Natural seated look-aways, yet FaceMesh holds 1.000 (151 / 151 / 1.000) ->
+    # accepted: the no-false-reject guarantee (SC-002). Legitimate captures cluster at
+    # ~1.0, well clear of the 0.65 gate.
     coverage.assert_usable_face_coverage(_fixture("good_realistic"))
+
+
+def test_real_half_fixture_is_rejected():
+    # The boundary case — ~30 s present / ~30 s absent (77 usable / 150 kept / 0.513).
+    # Clears the absolute floor (77 >= 50) but fails the coverage lever (0.513 < 0.65,
+    # a 0.137 margin) -> rejected. This is the binding reject-side datapoint for the
+    # coverage threshold: a half-absent baseline must not anchor downstream deltas.
+    with pytest.raises(FeatureExtractionError) as exc:
+        coverage.assert_usable_face_coverage(_fixture("half"))
+    assert exc.value.code == "insufficient_face_frames"
 
 
 def test_detected_throughout_passes_regardless_of_framing():

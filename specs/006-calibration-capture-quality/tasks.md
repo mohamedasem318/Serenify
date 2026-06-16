@@ -115,6 +115,15 @@ accepts BOTH good fixtures with the REAL constants and no monkeypatch.
 
 **Checkpoint**: Real thresholds set; thin rejects, both good clips accept; CI mediapipe-free.
 
+> **Recalibration (post-merge of the VFR decode fix, DECISION-29).** T011–T016 above were
+> executed on three clips handled as mp4 through the *pre-fix* decode, giving
+> `MIN_COVERAGE_FRACTION = 0.40`. After the timestamp-driven decode landed, the calibration was
+> **redone on four real browser-webm clips** through the fixed pipeline (adding a deliberate
+> **half**-present boundary clip): the `.npy` fixtures were regenerated, `half.npy` added, the
+> threshold raised to **0.65** (`MIN_USABLE_FRAMES = 50` unchanged), and a
+> `test_real_half_fixture_is_rejected` case added. The completed-step text above is left intact
+> as the historical record; the authoritative figures live in 📌 DECISION-32 and research.md.
+
 ---
 
 ## Phase 6: Step 4 — Surface the categorical reason through the 422
