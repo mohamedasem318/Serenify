@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import get_settings
+from .logging_config import configure_logging
 from .routers import anchor, health
 
 
@@ -23,6 +24,10 @@ async def lifespan(app: FastAPI):
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    # Install the service's logging before anything emits: apps/api otherwise ships
+    # no logging config, so ml_video's INFO records (the usable-face-coverage reject
+    # line) would be suppressed under uvicorn. Server-side only — no response change.
+    configure_logging(settings.log_level)
     app = FastAPI(title="Serenify Anchor API", version="0.1.0", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware,
