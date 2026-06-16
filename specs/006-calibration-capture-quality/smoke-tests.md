@@ -51,8 +51,8 @@ frame, or point the camera away, then briefly appear). Let the full minute elaps
 | Browser | Result | Notes (initials / date) |
 |---|---|---|
 | Chrome  | ✅ Pass ☐ Fail | MA / 2026-06-16 |
-| Firefox | ☐ Pass ☐ Fail | |
-| Safari/WebKit | ☐ Pass ☐ Fail ☐ N-A | |
+| Firefox | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Safari/WebKit | ☐ Pass ☐ Fail ✅ N-A | Deferred — no macOS hardware; Gehad Mohamed to test on iPhone |
 
 ---
 
@@ -76,9 +76,9 @@ fully away) for the remaining ~30 s. Let the full minute elapse and submit.
 
 | Browser | Result | Notes (initials / date) |
 |---|---|---|
-| Chrome  | ☐ Pass ☐ Fail | |
-| Firefox | ☐ Pass ☐ Fail | |
-| Safari/WebKit | ☐ Pass ☐ Fail ☐ N-A | |
+| Chrome  | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Firefox | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Safari/WebKit | ☐ Pass ☐ Fail ✅ N-A | Deferred — no macOS hardware; Gehad Mohamed to test on iPhone |
 
 ---
 
@@ -92,9 +92,9 @@ is written once on success.
 
 | Browser | Result | Notes |
 |---|---|---|
-| Chrome  | ☐ Pass ☐ Fail | |
-| Firefox | ☐ Pass ☐ Fail | |
-| Safari/WebKit | ☐ Pass ☐ Fail ☐ N-A | |
+| Chrome  | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Firefox | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Safari/WebKit | ☐ Pass ☐ Fail ✅ N-A | Deferred — no macOS hardware; Gehad Mohamed to test on iPhone |
 
 ---
 
@@ -117,9 +117,9 @@ downward against real-user data).
 
 | Browser | Result | Notes |
 |---|---|---|
-| Chrome  | ☐ Pass ☐ Fail | |
-| Firefox | ☐ Pass ☐ Fail | |
-| Safari/WebKit | ☐ Pass ☐ Fail ☐ N-A | |
+| Chrome  | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Firefox | ✅ Pass ☐ Fail | MA / 2026-06-17 |
+| Safari/WebKit | ☐ Pass ☐ Fail ✅ N-A | Deferred — no macOS hardware; Gehad Mohamed to test on iPhone |
 
 ---
 
@@ -135,16 +135,18 @@ face-absence chip. Confirms the gate is additive and the existing framing chips 
 
 | Browser | Result | Notes |
 |---|---|---|
-| Chrome  | ☐ Pass ☐ Fail | |
+| Chrome  | ✅ Pass ☐ Fail | MA / 2026-06-17 — face to the right, success |
+| Firefox | ✅ Pass ☐ Fail | MA / 2026-06-17 |
 
 ---
 
 ## Sign-off
 
-- [ ] §1 thin → 422 + face-absence chip (not "baseline set", not "our-side")
-- [ ] §2 full minute → success
-- [ ] §3 realistic look-aways → success (no false reject)
-- [ ] §4 off-centre-but-detected control → unchanged behaviour
+- [x] §1 thin → 422 + face-absence chip (not "baseline set", not "our-side")
+- [x] §1b half-present → 422 + face-absence chip (boundary case)
+- [x] §2 full minute → success
+- [x] §3 realistic look-aways → success (no false reject)
+- [x] §4 off-centre-but-detected control → unchanged behaviour
 - [x] Privacy spot-check: 422 body categorical, no counts on the wire; counts only in server log
 
-**Signed off (Mohamed)**: ____________________  **Date**: ____________
+**Signed off (Mohamed)**: Mohamed Asem  **Date**: 2026-06-17
