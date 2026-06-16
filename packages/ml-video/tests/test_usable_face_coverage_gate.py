@@ -10,6 +10,8 @@ the only injected seam (mirrors ``test_pipeline_fixtures.py``).
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import cv2
 import numpy as np
 import pytest
@@ -17,6 +19,12 @@ import pytest
 from ml_video import compute_anchor, coverage, pipeline
 from ml_video.errors import FeatureExtractionError
 from ml_video.features import FEATURE_DIM, LANDMARK_DIM, N_LANDMARKS
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
+
+
+def _fixture(name: str) -> np.ndarray:
+    return np.load(FIXTURES / f"{name}.npy")
 
 
 def _landmarks(presence: list[bool]) -> np.ndarray:
@@ -192,3 +200,36 @@ def test_gate_does_not_loosen_existing_floors(monkeypatch):
         compute_anchor("ignored-path")
     # Rejected by an existing floor (no gate code) — the gate let control through.
     assert exc.value.code != "insufficient_face_frames"
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 / Step 3 (T016): the honest boundary test with the REAL calibrated
+# constants (NO monkeypatch) over the committed landmark fixtures. This LOCKS the
+# calibration — thin rejects, both good clips accept. CI runs NO mediapipe: only
+# numpy over the committed .npy arrays (extracted once, offline, in the pinned env).
+# ---------------------------------------------------------------------------
+
+
+def test_real_thin_fixture_is_rejected():
+    # ~2s of face in a full minute (4 usable / 172 kept / 0.023) -> rejected.
+    with pytest.raises(FeatureExtractionError) as exc:
+        coverage.assert_usable_face_coverage(_fixture("thin"))
+    assert exc.value.code == "insufficient_face_frames"
+
+
+def test_real_good_ideal_fixture_is_accepted():
+    # Face present throughout (154 / 154 / 1.000) -> accepted (must NOT raise).
+    coverage.assert_usable_face_coverage(_fixture("good_ideal"))
+
+
+def test_real_good_realistic_fixture_is_accepted():
+    # Natural brief look-aways — the binding lower bound (129 / 129 / 1.000) ->
+    # accepted: the no-false-reject guarantee (SC-002).
+    coverage.assert_usable_face_coverage(_fixture("good_realistic"))
+
+
+def test_detected_throughout_passes_regardless_of_framing():
+    # No-regression (FR-013): the gate counts face PRESENCE only, not framing — an
+    # off-centre-but-detected capture (all non-zero rows) is NOT rejected here; only
+    # a largely-absent face trips it, so it never overlaps the existing framing chips.
+    coverage.assert_usable_face_coverage(_landmarks([True] * 60))  # 60 usable, 1.000

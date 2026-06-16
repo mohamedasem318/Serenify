@@ -229,8 +229,30 @@ coverage `0.023` vs good `1.000` (≈43×); thin usable `4` vs good `129`/`154` 
 No threshold needs to sit anywhere near the binding clip, so there is no risk of
 no-separating-margin; the STOP condition does not trigger.
 
-**Thresholds: NOT yet set** (T015 is gated on Mohamed's review of these numbers).
-`coverage.py` still holds the inert `0` / `0.0` placeholders.
+### Chosen thresholds (T015 / 📌 DECISION-31)
+
+Set in `coverage.py` after review:
+
+- **`MIN_COVERAGE_FRACTION = 0.40`** (primary lever — the face-absent bug). Margin:
+  thin `0.023` vs `0.40` (rejects with ~17× headroom); both good clips `1.000` clear
+  it with ~2.5× headroom.
+- **`MIN_USABLE_FRAMES = 50`** (secondary backstop — too-short captures). Margin:
+  thin `4` vs `50` (rejects with ~12× headroom); good-realistic `129` (binding) and
+  good-ideal `154` clear it with ≥2.6× headroom.
+- thin is rejected by **both** conditions (belt-and-suspenders); both good clips clear
+  **both**.
+
+**These values sit in a WIDE EMPTY GAP — a conservative judgment, not a data-derived
+precise bound.** The three clips proved clean separation of the *egregious* thin case
+(2.3% coverage), but we have **no acceptable sub-100%-coverage sample**: the
+good-realistic clip held at **1.000** coverage because **FaceMesh is robust to seated
+glances** — a glance/turn keeps enough of the face visible to detect, so coverage
+only drops when the face *truly leaves the frame*. There is therefore no empirical
+point anywhere between `0.023` and `1.000` to pin a tighter bound. `0.40` / `50` are
+deliberately well below the only accept-side evidence (`1.000` / `129`) so a genuine
+user whose coverage dips below this particular clip is not false-rejected; **the
+numbers MUST be revisited against real-user calibration data** once it exists
+(candidate range from the analysis: coverage `0.40–0.60`, usable `30–60`).
 
 ## Spec-assumption flags surfaced while reading (NOT contradictions — clarifications)
 

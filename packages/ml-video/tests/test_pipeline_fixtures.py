@@ -19,7 +19,7 @@ import cv2
 import numpy as np
 import pytest
 
-from ml_video import compute_anchor, load_model, pipeline
+from ml_video import compute_anchor, coverage, load_model, pipeline
 from ml_video.features import FEATURE_DIM, LANDMARK_DIM, LBP_DIM, N_LANDMARKS
 
 # --- Scripted FaceMesh stand-in ----------------------------------------------
@@ -87,6 +87,11 @@ def synthetic_clip(tmp_path):
 
 def test_compute_anchor_shape_and_structure(synthetic_clip, monkeypatch):
     monkeypatch.setattr(pipeline, "_build_face_mesh", FakeFaceMesh)
+    # This 7-kept-frame fixture is below the 006 usable-face-coverage floor by design;
+    # bypass the gate here — it is exercised on the real clips in
+    # test_usable_face_coverage_gate.py. This test validates feature-vector structure.
+    monkeypatch.setattr(coverage, "MIN_USABLE_FRAMES", 0)
+    monkeypatch.setattr(coverage, "MIN_COVERAGE_FRACTION", 0.0)
 
     vec = compute_anchor(synthetic_clip)
 
@@ -108,6 +113,9 @@ def test_compute_anchor_shape_and_structure(synthetic_clip, monkeypatch):
 
 def test_compute_anchor_is_deterministic(synthetic_clip, monkeypatch):
     monkeypatch.setattr(pipeline, "_build_face_mesh", FakeFaceMesh)
+    # Below the 006 coverage floor by design — bypass the gate (see above).
+    monkeypatch.setattr(coverage, "MIN_USABLE_FRAMES", 0)
+    monkeypatch.setattr(coverage, "MIN_COVERAGE_FRACTION", 0.0)
     first = compute_anchor(synthetic_clip)
     second = compute_anchor(synthetic_clip)
     assert np.array_equal(first, second)

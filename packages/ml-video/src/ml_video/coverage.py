@@ -19,13 +19,17 @@ from .errors import FeatureExtractionError
 
 logger = logging.getLogger(__name__)
 
-# [CALIBRATION-PENDING] — inert (gate disabled; never false-rejects) until the
-# calibration task (006 T015) sets values measured against the three real fixture
-# clips (thin / good-ideal / good-realistic). With these inert defaults the gate
-# never fires, so wiring it changes no existing behaviour. Tests inject thresholds
-# via monkeypatch; no calibrated number is committed before Phase 5.
-MIN_USABLE_FRAMES: int = 0
-MIN_COVERAGE_FRACTION: float = 0.0
+# Calibrated against three real clips (006 T013/T015, DECISION-31): thin
+# 4 usable / 0.023 coverage (reject) vs good-ideal 154/1.000 and good-realistic
+# 129/1.000 (accept). The values sit in a WIDE EMPTY GAP — the clips proved clean
+# separation of the egregious thin case, but there is NO genuine sub-100%-coverage
+# sample (good-realistic held at 1.000: FaceMesh is robust to seated glances —
+# coverage drops only when the face truly leaves the frame), so these are a
+# CONSERVATIVE judgment to revisit against real-user data, not a data-derived
+# precise bound. Coverage fraction is the primary lever (the face-absent bug); the
+# absolute floor is the secondary backstop (too-short captures).
+MIN_USABLE_FRAMES: int = 50          # 4 (thin) << 50 << 129 (good-realistic, binding)
+MIN_COVERAGE_FRACTION: float = 0.40  # 0.023 (thin) << 0.40 << 1.000 (both good clips)
 
 
 def usable_face_coverage(landmarks: np.ndarray) -> tuple[int, int, float]:
