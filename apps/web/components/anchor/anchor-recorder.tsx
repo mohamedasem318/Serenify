@@ -297,9 +297,16 @@ export function AnchorRecorder({
       const result = await deps.postAnchor(blob, session.accessToken);
       if (!result.ok) {
         if (result.kind === "extraction_failed") {
-          // 422 — the chip reflects what we actually measured this minute
-          // (low-light / out-of-frame), or "our-side" when nothing dominated.
-          setFailureCause(dominantCause(telemetryRef.current));
+          // 422 — the server reason is authoritative for the face-absence case (the
+          // usable-face-coverage gate, incl. when the on-device detector was
+          // unavailable so our telemetry would say "our-side" — DECISION-30). Every
+          // other reason keeps the existing measured-telemetry selection (low-light /
+          // out-of-frame, or "our-side" when nothing dominated).
+          const cause =
+            result.reason === "insufficient_face_frames"
+              ? "insufficient-face"
+              : dominantCause(telemetryRef.current);
+          setFailureCause(cause);
           dispatch({ type: "EXTRACT_FAILED", reason: result.reason });
         } else {
           setFailureCause("our-side"); // transport / 401 — our side

@@ -265,6 +265,43 @@ describe("AnchorRecorder — overwrite-on-success-only (FR-053 / DECISION-22)", 
   });
 });
 
+describe("AnchorRecorder — server reason drives the failure chip (006, T021/DECISION-30)", () => {
+  it("shows the face-absence chip when the server reason is insufficient_face_frames", async () => {
+    const postAnchor = vi
+      .fn()
+      .mockResolvedValue({ ok: false, kind: "extraction_failed", reason: "insufficient_face_frames" });
+    const { deps } = buildDeps({ postAnchor: postAnchor as RecorderDeps["postAnchor"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    await reachGreenRoom();
+    await startRecording();
+    await flush(61000);
+
+    // Server-reason precedence: the face-absence chip overrides the empty-telemetry
+    // (detector-unavailable → our-side) default — even though the detector was null.
+    expect(
+      screen.getByText(/couldn.t see your face for enough of that recording/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/on our side/i)).toBeNull();
+  });
+
+  it("still selects via dominantCause for any other reason (our-side when detector unavailable)", async () => {
+    const postAnchor = vi
+      .fn()
+      .mockResolvedValue({ ok: false, kind: "extraction_failed", reason: "some other reason" });
+    const { deps } = buildDeps({ postAnchor: postAnchor as RecorderDeps["postAnchor"] });
+    render(<AnchorRecorder onComplete={() => {}} onSkip={() => {}} deps={deps} />);
+
+    await reachGreenRoom();
+    await startRecording();
+    await flush(61000);
+
+    // Unchanged: detector unavailable → empty telemetry → dominantCause → our-side.
+    expect(screen.getByText(/on our side/i)).toBeInTheDocument();
+    expect(screen.queryByText(/couldn.t see your face for enough/i)).toBeNull();
+  });
+});
+
 describe("AnchorRecorder — getUserMedia error → the three calm states (FR-031–035)", () => {
   it("routes a busy camera to the camera-in-use state without a strike", async () => {
     const busy = Object.assign(new Error("in use"), { name: "NotReadableError" });

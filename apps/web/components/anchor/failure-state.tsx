@@ -1,6 +1,6 @@
 "use client";
 
-import { CloudOff, MoveDiagonal, RefreshCw, Sun } from "lucide-react";
+import { CloudOff, MoveDiagonal, RefreshCw, ScanFace, Sun } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,12 +17,18 @@ import { Button } from "@/components/ui/button";
  * stays a quiet text link.
  */
 
-export type FailureCause = "low-light" | "out-of-frame" | "our-side";
+export type FailureCause = "low-light" | "out-of-frame" | "our-side" | "insufficient-face";
 
 const CAUSE: Record<FailureCause, { Icon: LucideIcon; line: string }> = {
   "low-light": { Icon: Sun, line: "Facing a little more light usually helps." },
   "out-of-frame": { Icon: MoveDiagonal, line: "Staying roughly centred and still helps." },
   "our-side": { Icon: CloudOff, line: "This one was on our side — give it a moment and try again." },
+  // feature 006 — the server-authoritative face-absence cause (DECISION-30). Calm,
+  // foggy, non-blaming: states what happened and offers a gentle retry (Principle V).
+  "insufficient-face": {
+    Icon: ScanFace,
+    line: "We couldn’t see your face for enough of that recording — let’s try again.",
+  },
 };
 
 export function FailureState({
