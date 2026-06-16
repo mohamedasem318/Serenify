@@ -121,7 +121,7 @@ def _nb_extract_roi(frame, landmarks2d, idxs, margin=10):
 
 def _nb_build_roi_video(frames, landmarks_seq, roi_indices):
     seq = []
-    for frame, landmarks_flat in zip(frames, landmarks_seq):
+    for frame, landmarks_flat in zip(frames, landmarks_seq, strict=True):
         lm = landmarks_flat.reshape(-1, 2)
         roi = _nb_extract_roi(frame, lm, roi_indices)
         if roi is None:
