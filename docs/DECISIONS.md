@@ -2524,3 +2524,118 @@ which is why the shared `variant="foggy"` exists.
 
 **Source tasks**: T018 (old-UI removal + mount), T028 (banner restyle). Clarification #1,
 FR-043/055, Constitution Principle V (applied, not amended).
+
+---
+
+## 2026-06-16 — fix(ml-video): VFR-webm decode mis-sampling — timestamp-driven frame sampling
+
+### 📌 DECISION-29 — VFR-webm decode mis-sampling fix — timestamp-driven frame sampling
+
+**Status**: Accepted; validated. Branch `fix/webm-vfr-decode-sampling` → PR #18 into `main`.
+A decode-sampling fix only — no change to the usable-face-coverage gate, the `(N_kept, 956)`
+`DecodedClip` contract, the feature dimensions, or any HTTP response.
+
+**The bug.** `pipeline.extract_landmarks` decodes a calibration/anchor clip and downsamples
+toward the model's ~2.5 fps working rate (`MODEL_HANDOFF §3` Steps 1–2: keep every
+`skip_ratio`-th frame to ≈5 fps, then a `%2` step to ≈2.5 fps). `skip_ratio` was
+`max(1, round(reported_fps / TARGET_FPS))` with `TARGET_FPS = 5`, reading `reported_fps`
+from OpenCV's `CAP_PROP_FPS`. Production captures come from the browser (`getUserMedia` +
+`MediaRecorder` → Chrome VP9 webm), which is **variable-frame-rate**: the container carries
+no fixed frame rate, only per-frame timestamps on a 1 ms timebase. OpenCV/FFmpeg then *guess*
+`CAP_PROP_FPS` from container metadata, and the guess is unreliable and unstable — two real
+~60 s captures from the **same browser and format** read:
+
+| reported_fps | frame_count | skip_ratio | raw decoded | kept | outcome |
+|---|---|---|---|---|---|
+| 8.417 | 504 | 2 | 505 | 126 | fine |
+| 1000.0 | 59 890 | 200 | 1 738 | 4 | **collapsed** |
+
+Because `skip_ratio` is derived from this garbage, the kept-frame count was **nondeterministic
+for identical input** — sometimes ≈126, sometimes 4. A dev harness reproduced the pathology
+exactly on a real Chrome `MediaRecorder` webm: `reported_fps = 1000.0`, `frame_count = 11 452`
+for a clip that truly held 269 frames over 11.45 s (note `1000 fps × 11.451 s ≈ 11 451` —
+OpenCV multiplies the 1/timebase "fps" by the true duration to fabricate the frame count),
+and the legacy sampler kept **1** frame.
+
+**Why it mattered (latent, silent, every capture).** The damage was twofold. (a) **Fidelity:**
+the model's video features (LBP-TOP texture + landmark motion) were validated at the
+temporally-even ≈2.5 fps density a CFR clip produces (~150 frames per 60 s). When `skip_ratio`
+is wrong, live captures are sampled at an inconsistent, often far-too-sparse density, so the
+feature vector lands in a different distribution than the one the StandardScaler/RandomForest
+were fit on — and worse, the **anchor** (per-user 60 s baseline) and subsequent **live
+readings** could be sampled at *different* rates, corrupting the delta-from-baseline that
+Constitution **Principle II** makes the unit of every prediction. This degraded silently on
+essentially every browser capture. (b) **Availability:** a capture collapsed to a handful of
+frames intermittently false-rejects a perfectly good baseline downstream. The bug was **latent
+since the capture flow first shipped** (feature 004); it was finally surfaced by feature 006's
+usable-face-coverage gate **smoke test**, where the same good clip passed on one run and failed
+on the next — a textbook case of an **end-to-end smoke test catching what unit tests
+structurally could not** (the unit tests fed CFR synthetic clips, on which the legacy sampler
+is correct; only a real VFR webm exposes the metadata pathology).
+
+**The fix — hybrid, container-agnostic sampling.** Frame selection is decided from the frames'
+**actual presentation timestamps** (`CAP_PROP_POS_MSEC`), which a one-time empirical probe
+showed are **reliable and strictly monotonic** on these `MediaRecorder` webms (the timestamps
+are real even when the derived fps/frame-count are not). `extract_landmarks` is now two-pass:
+**pass 1** walks the clip with `cap.grab()` (advances the decoder and updates `POS_MSEC`
+*without* the pixel `retrieve()`, ~25 % cheaper) to collect per-frame timestamps; **pass 2**
+sequentially re-decodes and retrieves only the selected frames (sequential, never `seek` —
+seeking is itself unreliable on VFR webm). The selection policy (`_select_keep_indices`):
+
+- **CFR / reliable metadata** — intervals near-uniform (inter-frame-interval coefficient of
+  variation ≤ 0.05) **and** `reported_fps` within 10 % of the timestamp-derived true fps →
+  keep the **legacy index selection bit-for-bit**. The model-validated mp4/avi path is
+  therefore *byte-identical*, at any frame rate.
+- **VFR / garbage metadata** — sample by timestamp on a fixed **2.5 fps grid** phased at
+  200 ms, keeping the first frame in each 400 ms bucket. The 200 ms phase is chosen so that,
+  on a constant-rate stream, this rule selects *exactly* the frames the legacy index path
+  keeps — i.e. the timestamp sampler is a strict generalisation, not a replacement. A large
+  gap simply leaves intervening buckets empty (no catch-up clustering). Result: ≈150 kept
+  frames per 60 s regardless of what fps the container reports.
+- **Fallback** — if timestamps themselves are unusable (non-monotonic or zero span), fall
+  back to the legacy index path (today's behaviour; no regression).
+
+**No new dependency was added.** Because `POS_MSEC` proved reliable, the alternative of
+transcoding the upload to CFR with FFmpeg before decode was **deliberately not taken** — it
+would add an `ffmpeg` runtime binary to the API's deployment surface for no fidelity benefit.
+(FFmpeg/`ffprobe` are present on the dev box and were used only to *probe* clips.)
+
+**Why hybrid rather than a single universal timestamp sampler.** A pure fixed-2.5 fps
+timestamp sampler is bit-identical to the legacy selection only when the frame rate is a
+multiple of 5 (e.g. 30 fps); for other CFR rates the `round(fps/5)` quantisation makes the two
+diverge by 1–2 frame positions (measured on a 24 fps clip: same kept *count*, but indices
+`[5,15,25,35,45,55,65]` legacy vs `[5,15,24,34,44,53,63]` naive-timestamp). Routing CFR
+through the **legacy** path keeps the validated mp4 fidelity exact for **all** frame rates,
+while still moving every VFR webm onto the consistent 2.5 fps grid. CFR-vs-VFR separates
+cleanly in the data (interval CoV ≈ 0.0000 for mp4/avi vs ≈ 1.6 for the real webm), so the
+classifier has an enormous margin.
+
+**Validation.** Real Chrome webm captures now yield **kept ≈ 150 consistently** across
+`reported_fps` of 8.4, 1000, and deliberate metadata-mismatch — the kept count is finally a
+function of the clip's *duration*, not its (garbage) reported fps — and `usable ≈ kept` on a
+full face-present capture. CFR `mp4` (30 fps) and `avi` (24 fps) select the **identical**
+frames to the pre-fix pipeline (verified at the index level, not merely by count). Tests:
+`packages/ml-video/tests/test_vfr_sampling.py` pins garbage-fps consistency, CFR-unchanged at
+30 **and** 24 fps, and the broken-timestamp fallback; full ml-video + apps/api suites green.
+
+**Relation to Principle II (fidelity is load-bearing).** Principle II makes per-user
+calibration mandatory: every delivered prediction is a *delta from the user's ~60 s calm
+baseline*, so the baseline's feature fidelity is not cosmetic — it is the measurement datum.
+This fix does not *alter* the model's feature behaviour; it **restores** it: webm now samples
+at the same temporally-even ≈2.5 fps density the model was trained on, and CFR stays
+bit-identical. It is therefore an *application* of Principle II (protecting
+evaluation/calibration fidelity), not a model change.
+
+**Residual caveat (deferred, not observed).** A webm with **both** a garbage reported fps
+**and** unusable timestamps would hit the fallback and could still collapse. This was never
+observed — `POS_MSEC` was reliable on every real capture probed — so the FFmpeg
+transcode-to-CFR fallback is **deferred**. Revisit (add the transcode path, accepting the
+runtime dependency) only if real captures ever exhibit broken timestamps.
+
+**Source.** `packages/ml-video/src/ml_video/pipeline.py` — `_select_keep_indices`,
+`_timestamp_keep_indices`, `_index_keep_indices`, `_reported_fps_trustworthy`,
+`_timestamps_reliable`, and the two-pass `extract_landmarks` / `_probe_timestamps`. Tests:
+`tests/test_vfr_sampling.py`. Dev aid retained for the fidelity re-check:
+`packages/ml-video/tools/dev_webm_recorder.html`. A quiet `logger.debug` decode line records
+the chosen sampling path per decode. Branch `fix/webm-vfr-decode-sampling`, PR #18.
+`MODEL_HANDOFF §3` Steps 1–2.
