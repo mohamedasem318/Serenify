@@ -4,6 +4,55 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Fix — VFR-webm decode mis-sampling (timestamp-driven frame sampling)
+
+**Branch**: `fix/webm-vfr-decode-sampling` → **PR #18** into `main` (open; awaiting the
+operator's merge click).
+**Status**: code validated; this entry is the implementation record. Full rationale in
+**📌 DECISION-29**.
+**Date**: 2026-06-16.
+
+**Chronology (the thesis narrative)** — how a latent fidelity bug was found, diagnosed, and
+fixed:
+
+1. **Surfaced by an end-to-end smoke, not a unit test.** Feature 006's usable-face-coverage
+   gate **smoke test** showed an **intermittent false-reject**: a good baseline clip passed on
+   one run and was rejected on the next. The unit suite was green throughout — it exercised
+   CFR synthetic clips, on which the legacy sampler is correct, so it structurally could not
+   see the bug.
+2. **Diagnosed to VFR container metadata.** Instrumenting the decode showed production uploads
+   are Chrome `MediaRecorder` **variable-frame-rate webm**, and OpenCV's `CAP_PROP_FPS` /
+   `CAP_PROP_FRAME_COUNT` are unreliable on them — the **same format** read `8.417 fps /
+   504 frames` on one capture and `1000.0 fps / 59 890 frames` on another.
+3. **Confirmed the nondeterministic collapse.** Because `skip_ratio = round(reported_fps / 5)`,
+   the kept-frame count tracked the garbage fps — **126 frames one run, 4 the next** for
+   equivalent input. A dev harness reproduced `fps=1000.0` exactly on a real `MediaRecorder`
+   webm (269 true frames over 11.45 s) and measured the legacy sampler keeping **1** frame.
+4. **Timestamp-driven hybrid fix.** A probe established that `CAP_PROP_POS_MSEC` is reliable
+   and strictly monotonic on these webms. Sampling now reads timestamps: **CFR** keeps the
+   legacy index selection **bit-for-bit** (mp4/avi unchanged at any frame rate); **VFR**
+   samples on a fixed **2.5 fps grid** (≈150 frames per 60 s, regardless of reported metadata);
+   unusable timestamps fall back to legacy. Two-pass decode (`grab` for timestamps, then
+   retrieve only the kept frames). **No new dependency** — the FFmpeg transcode-to-CFR fallback
+   was deliberately not needed.
+5. **Validated.** Real captures now yield **kept ≈ 150 consistently** across reported_fps
+   8.4 / 1000 / metadata-mismatch (the count is now a function of *duration*, not garbage fps);
+   `usable ≈ kept` on a full capture; CFR mp4/avi select **identical** frames to before;
+   `tests/test_vfr_sampling.py` + full ml-video/apps/api suites green.
+
+**Scope**: decode sampling only — the usable-face-coverage gate and every output contract are
+untouched. A quiet `logger.debug` decode line and a DEV-only webm recorder
+(`packages/ml-video/tools/dev_webm_recorder.html`) were added. The residual caveat (a webm
+with **both** garbage fps **and** garbage timestamps would fall back to legacy and could still
+collapse — not observed; transcode fallback deferred) is recorded in **DECISION-29**.
+
+**Relation to Principle II**: per-user calibration makes every prediction a delta from the
+~60 s baseline, so the baseline's feature fidelity is the measurement datum. The fix
+**restores** the model's trained ≈2.5 fps sampling density on webm and keeps CFR bit-identical
+— an application of Principle II, not a model change.
+
+---
+
 ## Feature 005 — Calibration Capture Flow (implementation complete; one pre-ship blocker open)
 
 **Branch**: `005-calibration-capture-flow`

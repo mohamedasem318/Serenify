@@ -1512,3 +1512,32 @@ Already logged this cycle and unchanged: the green-room gate-clear sync (2026-06
 two-layer FR-050 egress proof (2026-06-01), and the busy/dead-camera lockout fix
 (2026-05-31). No Cloud-dashboard parity items — all edits are in-repo. No code change in this
 entry (docs only).
+
+## 2026-06-16 — fix(ml-video, PR #18) — VFR-webm decode mis-sampling fix
+
+Branch `fix/webm-vfr-decode-sampling` (off `main`). Browser `getUserMedia`/`MediaRecorder`
+uploads are variable-frame-rate VP9 webm whose OpenCV `CAP_PROP_FPS` / `CAP_PROP_FRAME_COUNT`
+are unreliable — a real capture read `fps=1000.0`, `frame_count=11452` for a 269-frame clip,
+and two same-format captures read 8.4 vs 1000 fps. The legacy `skip_ratio =
+round(reported_fps/5)` downsample then collapsed the kept-frame count **nondeterministically**
+(126 frames one run, 4 the next for equivalent input), silently degrading feature fidelity on
+every live capture and intermittently false-rejecting good baselines.
+
+- **Fix.** Frame selection is now driven by actual frame timestamps (`CAP_PROP_POS_MSEC`).
+  Hybrid + container-agnostic: CFR inputs (regular intervals + fps matching the timestamps)
+  keep the legacy index selection **bit-for-bit** (mp4/avi unchanged at any frame rate); VFR
+  inputs sample on a 2.5 fps timestamp grid → ≈150 frames per 60 s regardless of garbage
+  metadata; unusable timestamps fall back to legacy. Two-pass decode (`grab` for timestamps,
+  then retrieve only the kept frames). **No new dependency** — `POS_MSEC` was reliable and
+  monotonic, so the FFmpeg transcode-to-CFR fallback was not needed.
+- **Validation.** Real webm captures now yield kept ≈ 150 consistently across reported_fps
+  8.4 / 1000 / mismatch; `usable ≈ kept`; CFR mp4 (30 fps) and avi (24 fps) select identical
+  frames to before. New `packages/ml-video/tests/test_vfr_sampling.py`; ml-video 15/15 +
+  apps/api 11/11 green; ruff clean.
+- **Scope.** Decode sampling only — the usable-face-coverage gate, the `DecodedClip` contract,
+  feature dimensions, and all HTTP responses are untouched. A quiet `logger.debug` decode line
+  and a DEV-only webm recorder (`packages/ml-video/tools/dev_webm_recorder.html`, for the
+  fidelity re-check) were added. Full rationale + residual caveat in **📌 DECISION-29**.
+
+Awaiting the operator's merge of PR #18. This entry is documentation only — the code landed
+earlier on the branch.
