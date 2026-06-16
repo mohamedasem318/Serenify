@@ -1512,3 +1512,17 @@ Already logged this cycle and unchanged: the green-room gate-clear sync (2026-06
 two-layer FR-050 egress proof (2026-06-01), and the busy/dead-camera lockout fix
 (2026-05-31). No Cloud-dashboard parity items — all edits are in-repo. No code change in this
 entry (docs only).
+
+## 2026-06-16 — feature-ordering drift: slot 006 realised as `006-calibration-capture-quality`
+
+The constitution's **provisional** feature ordering (§ Spec-Driven Workflow) listed slot 006
+as `006-stress-inference-service`. The feature actually built in slot 006 is
+**`006-calibration-capture-quality`** — a backend correctness fix (the usable-face-coverage
+gate) that 005 smoke testing made urgent: a 60 s baseline with the face in frame for only ~2 s
+was being silently accepted, poisoning every later delta-from-baseline reading (Principle II).
+Fixing the calibration *input* gate must precede building the inference *read path* that
+consumes those baselines, so the stress-inference-service work moves to a later slot.
+
+Principle VIII permits provisional reordering **when recorded** — this is that record. (005
+DECISION-23 already anticipated "feature 006's inference read path"; that reference now points
+to the later slot.) No spec content changed; this is an ordering/naming note only.

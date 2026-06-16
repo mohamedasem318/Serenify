@@ -4,6 +4,71 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 006 — Calibration Capture Quality (implementation complete; awaiting smoke + review)
+
+**Branch**: `006-calibration-capture-quality`
+**Status**: implementation complete (Phases 1–8 / T001–T028); **awaiting Mohamed's manual
+smoke run (`smoke-tests.md`) + merge approval**. No pre-ship blocker.
+**Date**: 2026-06-16 (implementation spanned the 006 cycle on the branch above)
+
+**Scope shipped** — a server-side, authoritative **usable-face-coverage gate** that fixes the
+005-era bug where a 60 s baseline with the face in frame for only ~2 s was silently accepted,
+poisoning every later delta-from-baseline reading (Constitution Principle II — per-user
+calibration is load-bearing). **Additive only: no new endpoint, status, response shape,
+dependency, or migration.**
+
+- **The gate (DECISION-29).** `packages/ml-video/src/ml_video/coverage.py` —
+  `usable_face_coverage(landmarks) -> (usable, kept, fraction)` (usable = non-zero landmark
+  row, the predicate `lbp_top_features` already uses) + `assert_usable_face_coverage`, called
+  from `compute_anchor` **after `extract_landmarks`, before the existing degenerate floors**.
+  Strictly stricter and additive — it never loosens the floors and short-circuits thin clips.
+  Confirmed gate-cannot-touch-inference (T003): `compute_anchor` is baseline-path-only; live
+  inference uses the separate, unwired `Predictor.predict_delta`.
+- **Messaging (DECISION-30).** New categorical reason `insufficient_face_frames` carried in
+  the **unchanged** 422 `reason` field via an optional `FeatureExtractionError.code`
+  (`reason = getattr(exc, "code", None) or str(exc)`), mapped to **one** new client
+  `insufficient-face` chip with server-reason precedence over `dominantCause`. **Counts
+  (`usable`/`kept`/`fraction`) live only in a server `logger` line** — generic exception
+  message, categorical wire token, so nothing numeric leaks (Principle I / FR-016). Every
+  other reason still selects via `dominantCause` (incl. detector-unavailable → `our-side`);
+  the three existing chips are byte-for-byte unchanged.
+- **Calibration (DECISION-31).** `MIN_COVERAGE_FRACTION = 0.40` (primary) / `MIN_USABLE_FRAMES
+  = 50` (backstop), measured against three real clips in the pinned env (Python 3.12.13,
+  mediapipe 0.10.13): thin `0.023/4` rejects; good-ideal `1.000/154` and good-realistic
+  `1.000/129` (binding) accept. Values sit in a **wide empty gap** (good-realistic held at
+  1.000 — FaceMesh is robust to seated glances, so there is no sub-100% sample); **explicitly
+  provisional — revisit against real-user data (coverage 0.40–0.60, usable 30–60)**.
+- **Glasses (DECISION-32, investigation-only).** No glasses/no-glasses gap (24/53; macro-F1
+  0.720 vs 0.717; stress recall 0.844 vs 0.818) → calibrate as you normally sit, glasses
+  included; do not ban. Recorded with the between-subject thesis caveat.
+
+**Testing (honest, no mock-green — Principle VII)**: the gate logic is never mocked; the only
+injected seam is native extraction (mediapipe), and **CI runs no mediapipe** — the boundary
+tests load committed `.npy` landmark fixtures (raw clips never committed — Principle I/X). TDD
+throughout (RED → GREEN) for the gate, the router reason, and the frontend chip.
+
+- ✅ `packages/ml-video` `uv run pytest` — green (gate logic + wiring + real-fixture boundary).
+- ✅ `apps/api` pytest — green (categorical-reason + legacy-message-unchanged; happy/ES256
+  paths bypass the gate via inert thresholds since the synthetic clip is below the floor).
+- ✅ `apps/web` Vitest — green (new chip render + server-reason precedence + byte-for-byte
+  no-regression on the existing chips; static voice/colour guardrail on the new chip).
+- ✅ `tsc --noEmit` + eslint clean.
+
+**Gates**:
+
+- ✅ Constitution Check — Principles I, II, III, V, VII, VIII addressed in `plan.md`.
+- ✅ Test gate — all three suites + typecheck + lint green locally.
+- ✅ Privacy — counts log-only; raw clips never committed; 422 body categorical.
+- ⏳ Smoke-test gate — pending Mohamed's run of
+  `specs/006-calibration-capture-quality/smoke-tests.md` (T027, manual).
+- ⏳ Mohamed's final review and merge to `main`.
+
+**Branch commit ordering** (PR-sized, tests green per step): P1–2 env/scaffold (`8cd2027`) →
+P3–4 gate core + wiring (`60983cb`) → P5 fixtures + measurements (`46e3bb8`) → P5 calibrate +
+lock (`68c199b`) → P6–7 router reason + chip (`4428060`) → P8 docs + smoke.
+
+---
+
 ## Feature 005 — Calibration Capture Flow (implementation complete; one pre-ship blocker open)
 
 **Branch**: `005-calibration-capture-flow`

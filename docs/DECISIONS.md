@@ -2524,3 +2524,124 @@ which is why the shared `variant="foggy"` exists.
 
 **Source tasks**: T018 (old-UI removal + mount), T028 (banner restyle). Clarification #1,
 FR-043/055, Constitution Principle V (applied, not amended).
+
+---
+
+## 2026-06-16 — feature 006 architecture decisions (collected; 📌 DECISION-29 through DECISION-32)
+
+Feature **006 — Calibration Capture Quality**: a backend correctness fix for the 005-era
+bug where a 60 s baseline with the face in frame for only ~2 s was silently accepted,
+poisoning every later delta-from-baseline reading (Constitution Principle II — per-user
+calibration is load-bearing). The fix adds a server-side, authoritative usable-face-coverage
+gate in `packages/ml-video/`, surfaced through the **unchanged** `FeatureExtractionError →
+HTTP 422 → 005 failure-screen` flow. The four decisions below are collected from
+`specs/006-calibration-capture-quality/{research,plan,contracts/*}.md` and the implement run.
+
+### 📌 DECISION-29 — Usable-face-coverage gate: placement, and composition with the existing floors
+
+**Status**: Accepted.
+
+**Decision**: A pure helper module `packages/ml-video/src/ml_video/coverage.py` exposes
+`usable_face_coverage(landmarks) -> (usable, kept, fraction)` and
+`assert_usable_face_coverage(landmarks)`. `compute_anchor` (`anchor.py`) calls the assert
+**immediately after `extract_landmarks` and before `lbp_top_features` / `motion_features`**.
+A **usable** frame is a **non-zero landmark row** (`np.any(row)`) — the exact predicate
+`lbp_top_features` already uses to skip no-detection frames and the same all-zero `(956,)`
+row `pipeline._landmarks_from_result` emits when no face is detected; the gate **counts a
+signal that already exists, it adds no detector**. The gate is **additive and strictly
+stricter**: it runs *ahead* of the existing degenerate floors (`lbp_top_features` needs ≥1
+usable frame per ROI; `motion_features` needs ≥2 kept frames — neither is a coverage check),
+short-circuits thin clips before the heavier LBP-TOP / motion work, and **never loosens**
+the floors (control still flows into them when the gate passes). It lives **inside the
+package** (Principle III), not the API router (which has no access to the landmark rows).
+Confirmed gate-cannot-touch-inference: `compute_anchor` is the **baseline-capture-path-only**
+entry point; live inference uses the distinct `Predictor.predict_delta`, which has zero
+`apps/` callers (T003 path trace).
+
+**Source tasks**: T003 (path confirmation), T004–T010 (gate core + wiring, TDD), research.md
+Decision 1, `contracts/gate.md`, `contracts/unchanged.md`. FR-001–007.
+
+### 📌 DECISION-30 — Rejection messaging: new `insufficient_face_frames` reason in the existing 422 (categorical-only, counts log-only) + server-reason precedence
+
+**Status**: Accepted.
+
+**Decision**: No existing 005 chip covers "face not visible for enough of the recording" —
+the client `dominantCause` returns **`our-side`** in exactly the detector-unavailable case
+(FR-011) the server gate must explain — so add **one** new reason value
+`insufficient_face_frames`, carried **inside the existing 422 `reason` field**, mapped to
+**one** new client `insufficient-face` chip. Mechanism: `FeatureExtractionError(message, *,
+code: str | None = None)` (backward-compatible; existing raises keep `code=None`); the gate
+raises with `code="insufficient_face_frames"`; the router maps `reason = getattr(exc, "code",
+None) or str(exc)` — **same endpoint, status, and `{error, reason}` shape**. The chip is
+selected by **server-reason precedence**: in `submitClip`, `result.reason ===
+"insufficient_face_frames" ? "insufficient-face" : dominantCause(...)`; **every other reason
+still selects via `dominantCause`, unchanged** (incl. detector-unavailable → `our-side`), and
+the three existing chips are byte-for-byte untouched. **Privacy is load-bearing**: the
+`usable` / `kept` / `fraction` counts live **only in a server `logger.info` line** — the
+exception message is generic ("insufficient usable face coverage") and the wire reason is the
+categorical token, so **no numeric detail leaks even via `str(exc)`** (Principle I / FR-016).
+The chip copy is calm Principle-V voice: *"We couldn't see your face for enough of that
+recording — let's try again."* (no exclamation, no "detected"/alarmist term, foggy surface).
+
+**Source tasks**: T005/T006 (error.code + generic message), T017–T022 (router + chip, TDD),
+research.md Decision 2, `contracts/messaging.md`. FR-009–016.
+
+### 📌 DECISION-31 — Threshold calibration: `MIN_COVERAGE_FRACTION = 0.40` / `MIN_USABLE_FRAMES = 50`, measured against three real clips in the pinned env
+
+**Status**: Accepted (**explicitly provisional — revisit against real-user data**).
+
+**Decision**: The two constants were set during `/speckit-implement` by running three real
+developer clips (never StressID media; raw clips never committed — Principle I/X) through the
+**real** pipeline in the **pinned env** (Python **3.12.13**, `mediapipe==0.10.13`, `uv run`;
+**not** a 3.9 conda env, whose different build would shift detection and invalidate the
+calibration), then committing each clip's extracted landmark array as a `.npy` fixture so CI
+never runs mediapipe.
+
+Measured `usable / kept / fraction`:
+
+| Clip | usable | kept | fraction | target |
+|------|-------:|-----:|---------:|--------|
+| thin           |   4 | 172 | **0.023** | reject |
+| good-ideal     | 154 | 154 | **1.000** | accept |
+| good-realistic | 129 | 129 | **1.000** | accept (binding lower bound) |
+
+Chosen: **`MIN_COVERAGE_FRACTION = 0.40`** (primary lever — the face-absent bug) and
+**`MIN_USABLE_FRAMES = 50`** (secondary backstop — genuinely too-short captures). thin is
+rejected by **both**; both good clips clear **both** (≈2.5× / ≥2.6× headroom).
+
+**These values sit in a WIDE EMPTY GAP — a conservative judgment, not a data-derived precise
+bound.** The **good-realistic clip held at `1.000` coverage**: FaceMesh is robust to seated
+glances (a glance/turn keeps enough of the face visible to detect), so coverage only drops
+when the face *truly leaves the frame* — there is **no acceptable sub-100%-coverage sample**
+between `0.023` and `1.000` to pin a tighter bound. `0.40` / `50` are deliberately well below
+the only accept-side evidence (`1.000` / `129`) so a genuine user whose coverage dips below
+this particular clip is not false-rejected. **The numbers MUST be revisited against real-user
+calibration data** once it exists (candidate range from the analysis: coverage **0.40–0.60**,
+usable **30–60**).
+
+**Calibrated-floor interaction (recorded so it is not mistaken for a regression).** The 50-
+frame absolute floor exceeds the kept-frame count of the short *synthetic* test clips (the
+ml-video 7-frame fixture clip; the apps/api conftest clip extracts `kept=7, fraction=1.000`).
+Those tests exercise feature structure / the 200 + ES256 paths, **not** the gate, so they
+disable the gate with a scoped inert-threshold monkeypatch (`MIN_USABLE_FRAMES=0`,
+`MIN_COVERAGE_FRACTION=0.0`); the gate is proven separately on the real `.npy` fixtures.
+
+**Source tasks**: T011–T016 (extract → measure → STOP-gate → set → lock), research.md
+"Calibration measurements (T013)" + "Chosen thresholds (T015)". FR-008/017/018, SC-001/002.
+
+### 📌 DECISION-32 — Glasses: calibrate the way you normally sit (glasses included), avoid glare, do not ban — with the between-subject thesis caveat
+
+**Status**: Accepted (investigation-only; **no functional requirement, no code**).
+
+**Decision**: A glasses-stratified LOSO evaluation found **no performance gap** between
+glasses and no-glasses cohorts — by-eye count **24/53** subjects wearing glasses; **macro-F1
+0.720** (glasses) vs **0.717** (no-glasses); **stress-class recall 0.844 vs 0.818**.
+**Guidance**: calibrate the way you normally sit — **glasses included** — and avoid glare;
+**do not ban glasses**.
+
+**Thesis limitation (must accompany the result).** This is a **between-subject** comparison,
+so it is **not proof of zero glasses effect**; it **cannot** test the calibrate-with /
+infer-without mismatch (the failure mode that would actually matter for a per-user baseline);
+and the **group sizes are modest** (24/53). State all three alongside the headline numbers.
+
+**Source tasks**: T026 (record only), research.md "Part B — Glasses". Investigation-only.

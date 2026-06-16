@@ -49,3 +49,8 @@
   and `docs/DECISIONS.md`.
 - Items marked incomplete require spec updates before `/speckit-clarify` or
   `/speckit-plan`.
+- **Deferred decisions now resolved (implementation closed, 2026-06-16)**: FR-008
+  thresholds → `MIN_COVERAGE_FRACTION = 0.40` / `MIN_USABLE_FRAMES = 50`
+  (`docs/DECISIONS.md` DECISION-31, calibrated against three real clips); FR-012
+  messaging → new `insufficient_face_frames` reason in the existing 422 + one new
+  `insufficient-face` chip (DECISION-30). Part B glasses recorded as DECISION-32.
