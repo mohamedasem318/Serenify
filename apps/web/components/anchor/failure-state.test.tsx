@@ -63,7 +63,7 @@ describe("FailureState (FR-027–030)", () => {
     ).toBeInTheDocument();
   });
 
-  it("leaves the three existing cause chips byte-for-byte unchanged (006 no-regression)", () => {
+  it("pins the exact rendered copy of the three existing cause chips", () => {
     const { rerender } = render(
       <FailureState cause="low-light" escapeVisible={false} onRetry={noop} onNotNow={noop} onPause={noop} />,
     );
@@ -76,7 +76,7 @@ describe("FailureState (FR-027–030)", () => {
       <FailureState cause="our-side" escapeVisible={false} onRetry={noop} onNotNow={noop} onPause={noop} />,
     );
     expect(
-      screen.getByText("This one was on our side — give it a moment and try again."),
+      screen.getByText("This one was on our side."),
     ).toBeInTheDocument();
   });
 });

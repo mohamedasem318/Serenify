@@ -47,7 +47,7 @@ const COPY = {
   uploading: "Setting your baseline — one calm moment…",
   unavailableHeading: "Calibration’s having a quiet moment",
   unavailableBody:
-    "We can’t set your baseline just now. Give it a moment and try again — nothing’s lost.",
+    "We can’t set your baseline just now — nothing’s lost.",
 } as const;
 
 /** Codec probe order (📌 DECISION-13); the backend accepts mp4 + webm. */

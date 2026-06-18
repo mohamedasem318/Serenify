@@ -1636,3 +1636,37 @@ Documentation note (no spec change): the planning-time DECISIONS entries of
 2026-06-17 sketched a 16px base and an orb "progress ring"; the as-shipped values
 are a 17px base (FR-011) and a preview-hugging progress **bar** (FR-030). The
 2026-06-18 DECISIONS entries record the as-built mechanism; no FR changed.
+
+## 2026-06-18 — copy(007): trim redundant retry CTA from calibration failure/access notices
+
+Smoke-test finding: the small foggy reason-banner on the calibration **failure**
+screen repeated the call to action the screen already gives (the heading + the
+"Try again" button), so it now states the **reason only**. The same trim is
+applied to the other failure causes and to the camera-access / backend-down
+notices for consistency — reason/fix only, with the retry CTA carried solely by
+the on-screen button.
+
+This is a deliberate **deviation from the verbatim-copy stance**: FR-001/FR-002
+preserve the *meaning* of copy, and these edits remove only the duplicated retry
+CTA — the reason's meaning, each notice's fix instruction, and the reassurance
+are all unchanged. The foggy soft-tint treatment and icons are untouched.
+
+Trimmed (before → after):
+
+- failure `insufficient-face`: "…enough of that recording — let’s try again." →
+  "…enough of that recording."
+- failure `our-side`: "This one was on our side — give it a moment and try
+  again." → "This one was on our side."
+- camera-access `blocked`: "…in your address bar, then try again." → "…in your
+  address bar."
+- camera-access `busy`: "…Closing it frees it up, then try again." → "…Closing
+  it frees it up."
+- camera-access `no-device`: "…pick it from the selector and try again." → "…pick
+  it from the selector."
+- backend-down body: "We can’t set your baseline just now. Give it a moment and
+  try again — nothing’s lost." → "We can’t set your baseline just now — nothing’s
+  lost."
+
+Untouched: the `low-light` / `out-of-frame` chips (advisory tips, no retry CTA);
+every heading, subtext, and the "Try again" / "Not now" buttons.
+`failure-state.test.tsx` was updated to pin the trimmed `our-side` copy.
