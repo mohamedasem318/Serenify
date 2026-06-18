@@ -127,7 +127,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-A — Auth screens (US2)
 
-- [ ] T009 [P] [US2] Recolour/re-type the four auth flows in `apps/web/app/(auth)/login/{page,login-form}.tsx`,
+- [x] T009 [P] [US2] Recolour/re-type the four auth flows in `apps/web/app/(auth)/login/{page,login-form}.tsx`,
   `apps/web/app/(auth)/signup/{page,signup-form}.tsx`,
   `apps/web/app/(auth)/forgot-password/{page,forgot-form}.tsx`,
   `apps/web/app/(auth)/reset-password/{page,reset-form}.tsx`, and the shared auth UI
@@ -142,7 +142,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-A* — Onboarding (US1)
 
-- [ ] T010 [P] [US1] Recolour/re-type onboarding in
+- [x] T010 [P] [US1] Recolour/re-type onboarding in
   `apps/web/app/(onboarding)/onboarding/{page,onboarding-form}.tsx`. Do **not** edit
   `(onboarding)/layout.tsx` (Phase 1) or `actions.ts`. **Satisfies**: FR-034 (onboarding); SC-002.
   **Done when**: the onboarding form reads Graphite/Outfit-Inter in both modes and its existing tests
@@ -178,7 +178,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-C — Home dashboard (US1/US5)
 
-- [ ] T013 [P] [US1] Recolour/re-type the dashboard in `apps/web/app/(authed)/app/page.tsx`,
+- [x] T013 [P] [US1] Recolour/re-type the dashboard in `apps/web/app/(authed)/app/page.tsx`,
   `apps/web/components/home/{welcome-banner,recent-chats-card,todays-checkin-card,things-that-might-help-card}.tsx`,
   `apps/web/components/chat-pill.tsx`, `apps/web/components/role-placeholder/role-placeholder.tsx`
   (team-lead/admin home view), and `apps/web/components/anchor/calibration-banner.tsx` — an anchor-dir
@@ -192,7 +192,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-D — Account (US1/US2)
 
-- [ ] T014 [P] [US2] Recolour/re-type Account in `apps/web/app/(authed)/app/account/page.tsx`,
+- [x] T014 [P] [US2] Recolour/re-type Account in `apps/web/app/(authed)/app/account/page.tsx`,
   `apps/web/components/account/{profile-section,security-section,notifications-placeholder,privacy-placeholder,sign-out-section}.tsx`,
   and `apps/web/components/anchor/baseline-section.tsx` (Account-rendered; **owned here, not by
   P2-E**). Apply the **has-anchor pill text fix** (FR-017) in `baseline-section.tsx` (migrate the
