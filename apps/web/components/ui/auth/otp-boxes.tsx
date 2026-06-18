@@ -58,7 +58,7 @@ type Visual = {
   lit: number; // boxes lit during the halo sweep (0..6)
   merged: boolean; // separators melt, boxes fill meadow + round into one bar
   pill: boolean; // the "Verified" label resolves on the bar
-  lifted: boolean; // the pill lifts toward the next step
+  faded: boolean; // the pill fades out before the handoff (no vertical movement)
   sway: boolean; // gentle foggy sway on a wrong code
   instant: boolean; // reduced motion → state applied directly, no transitions
 };
@@ -67,7 +67,7 @@ const IDLE: Visual = {
   lit: 0,
   merged: false,
   pill: false,
-  lifted: false,
+  faded: false,
   sway: false,
   instant: false,
 };
@@ -133,7 +133,7 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
     async playSuccess() {
       if (reducedRef.current) {
         meltTogether();
-        setVisual({ lit: COUNT, merged: true, pill: true, lifted: false, sway: false, instant: true });
+        setVisual({ lit: COUNT, merged: true, pill: true, faded: false, sway: false, instant: true });
         await wait(650);
         return;
       }
@@ -150,8 +150,8 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
       // 3 · the bar resolves into the "Verified" pill
       setVisual((v) => ({ ...v, pill: true }));
       await wait(560);
-      // 4 · the pill lifts toward the next step
-      setVisual((v) => ({ ...v, lifted: true }));
+      // 4 · the pill fades out (no vertical lift — avoids overlapping the next view)
+      setVisual((v) => ({ ...v, faded: true }));
       await wait(700);
     },
   }));
@@ -197,9 +197,8 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
     <div
       className={cn(
         "relative flex min-h-[56px] justify-center",
-        !visual.instant &&
-          "transition-[transform,opacity] duration-700 ease-[cubic-bezier(.34,1.1,.5,1)]",
-        visual.lifted && "-translate-y-5 opacity-0",
+        !visual.instant && "transition-opacity duration-700 ease-out",
+        visual.faded && "opacity-0",
       )}
     >
       <motion.div
