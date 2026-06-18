@@ -1670,3 +1670,25 @@ Trimmed (before → after):
 Untouched: the `low-light` / `out-of-frame` chips (advisory tips, no retry CTA);
 every heading, subtext, and the "Try again" / "Not now" buttons.
 `failure-state.test.tsx` was updated to pin the trimmed `our-side` copy.
+
+## 2026-06-18 — fix(007): OTP boxes stay on one line (SC-004 "may wrap" fallback superseded)
+
+Smoke-test finding (~640px): the sixth OTP box wrapped to a second line. Root
+cause: the boxes were sized off the **viewport** (`w-[clamp(44px,12vw,52px)]`)
+inside the fixed-width (`max-w-md`) auth card — as the viewport widened the boxes
+ballooned to their 52px max while the card stayed narrow, so the row overflowed
+and `flex-wrap` dropped the sixth box.
+
+`components/ui/auth/otp-boxes.tsx` now sizes the boxes to the **container**, not
+the viewport: a non-wrapping row (`flex w-full flex-nowrap`, 8px gap) of
+`flex-1 min-w-0 max-w-[52px]` boxes at a fixed 52px height. Verified on the real
+auth card — **six boxes on one line with no overflow at 360 / 640 / desktop**:
+42px-wide × 52px-tall at 360px (height keeps the ≥44px touch target; width is
+above the ~40px floor), 52×52 from ~600px up. The success merge still lines up
+(boxes slide edge-to-edge, meadow-filled, centred on the card — verified live).
+
+This is a deliberate **deviation that supersedes the SC-004 "the boxes … may
+wrap" fallback**: at 360px they now shrink to one line rather than wrapping (a
+strict improvement on SC-004's intent). No unit/e2e test asserted the wrap
+behaviour, so none needed changing; the `otp-panel` behaviour tests stay green.
+The spec/smoke-tests text still says "may wrap" — reconcile there if desired.

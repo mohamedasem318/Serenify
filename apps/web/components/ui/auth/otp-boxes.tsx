@@ -203,7 +203,7 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
     >
       <motion.div
         ref={rowRef}
-        className="flex flex-wrap justify-center gap-[clamp(6px,2vw,10px)]"
+        className="flex w-full flex-nowrap justify-center gap-2"
         animate={visual.sway ? { x: [0, -4, 4, -2, 1, 0] } : { x: 0 }}
         transition={visual.sway ? { duration: 0.95, ease: "easeInOut" } : { duration: 0 }}
       >
@@ -233,7 +233,7 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
               onKeyDown={(e) => handleKeyDown(i, e)}
               onPaste={handlePaste}
               className={cn(
-                "h-14 w-[clamp(44px,12vw,52px)] border bg-bg text-center font-display text-[clamp(20px,5vw,26px)] font-medium text-ink outline-none",
+                "h-[52px] min-w-0 max-w-[52px] flex-1 border bg-bg text-center font-display text-[clamp(20px,5vw,26px)] font-medium text-ink outline-none",
                 radius,
                 !visual.instant &&
                   "transition-[transform,background-color,color,border-color,border-radius,box-shadow] duration-500 ease-[cubic-bezier(.4,0,.2,1)]",
