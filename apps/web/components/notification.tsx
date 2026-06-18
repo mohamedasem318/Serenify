@@ -73,15 +73,16 @@ export type NotificationProps = {
  *     is intentional — modal context implies its affordances are
  *     temporarily blocked.
  *
- * Overlay (Phase 9 polish — Decision G):
+ * Overlay (Phase 9 polish — Decision G; 007 scrim re-token — FR-021):
  *   shadcn's default DialogContent always renders a bg-black/80
- *   overlay, which is too harsh against M&M's ink+cream palette AND
+ *   overlay, which is too harsh against the Graphite palette AND
  *   wrong for the desktop "non-modal slide-in" feel. Resolution:
  *     - Desktop: overlay carries `md:hidden`, so the slide-in card
  *       appears over the live page without a dimming layer.
- *     - Mobile: overlay renders with bg-black/50 — softer than the
- *       shadcn default, modal-context-appropriate. No new token
- *       needed (per resume-guidance option (a)).
+ *     - Mobile: overlay renders with `bg-scrim` — the shared
+ *       --color-scrim token (Graphite ink @ 60%, fixed in both
+ *       modes) — softer than the shadcn default and unified with the
+ *       dialog/sheet scrims under FR-021.
  *
  * Dismiss (📌 DECISION-6):
  *   Explicit-dismiss-only. No auto-dismiss timer. A consuming feature
@@ -129,7 +130,7 @@ export function Notification({
             <DialogPrimitive.Overlay forceMount asChild>
               <motion.div
                 data-testid="notification-overlay"
-                className="fixed inset-0 z-50 bg-black/50 md:hidden"
+                className="fixed inset-0 z-50 bg-scrim md:hidden"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}

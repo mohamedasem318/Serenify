@@ -154,15 +154,16 @@ describe("Notification — mobile bottom-sheet variant", () => {
     );
   });
 
-  it("renders the bg-black/50 overlay (softer than shadcn default)", async () => {
+  it("renders the scrim-token overlay (FR-021, not a raw bg-black scrim)", async () => {
     setup({ mobile: true });
     render(
       <Notification open onOpenChange={vi.fn()} title="Heads up" />,
     );
     const overlay = await screen.findByTestId("notification-overlay");
-    expect(overlay.className).toMatch(/\bbg-black\/50\b/);
-    // And NOT the shadcn default which we are deliberately replacing.
-    expect(overlay.className).not.toMatch(/\bbg-black\/80\b/);
+    expect(overlay.className).toMatch(/\bbg-scrim\b/);
+    // And NOT a raw bg-black/* scrim — 007 re-tokenised every overlay to
+    // the shared --color-scrim token (FR-021), replacing the shadcn default.
+    expect(overlay.className).not.toMatch(/\bbg-black\//);
   });
 });
 
