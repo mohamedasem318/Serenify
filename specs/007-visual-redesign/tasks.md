@@ -204,7 +204,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-E — Calibration flow (US1)
 
-- [ ] T015 [P] [US1] Recolour/re-type the full calibration flow in
+- [x] T015 [P] [US1] Recolour/re-type the full calibration flow in
   `apps/web/app/(authed)/app/calibrate/{page,calibrate-recorder}.tsx` and
   `apps/web/components/anchor/{intro,green-room,countdown,get-ready-countdown,recording-stage,recording-timer,stop-confirm,success-state,failure-state,camera-access-state,backend-down-modal,anchor-recorder,device-picker}.tsx`.
   Recolour to Graphite (preserve intro/green-room/countdown/recording/stop-confirm/success/failure
