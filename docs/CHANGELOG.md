@@ -1595,3 +1595,122 @@ service`); `007-visual-redesign` inserted ahead of the remaining product
 features, shifting them +1. Cross-references updated: Principle III fusion
 015→017, Principle IV audio 013→015. Recorded per Principle VIII (ordering is
 provisional; changes logged here).
+
+## 2026-06-18 — impl(007-visual-redesign): Graphite re-skin + two bespoke components
+
+The Graphite visual redesign shipped as a pure re-skin + re-type + the listed
+targeted changes — no application logic, routing, data-model, Supabase, ML,
+API-contract, or auth-logic change (FR-001 / FR-004). What landed:
+
+- **Tokens.** The nine `@theme` role tokens swapped to the Graphite light/dark
+  values (names unchanged); three new real tokens added — `--color-on-accent`,
+  `--color-meadow-text`, `--color-scrim`. `@theme inline` (the shadcn alias
+  layer) untouched; `--color-muted` kept outside it.
+- **Type + fonts.** Type scale via overriding Tailwind v4's `--text-*`
+  (17px base body); `Outfit` display + `Inter` body wired in the layout, `DM
+  Serif Display` retired everywhere; wordmark now lowercase `serenify` (no dot)
+  in all three locations.
+- **Contrast fixes.** Filled meadow/foggy CTA foreground fixed at the button
+  primitive (`on-accent` light / `bg` dark); small meadow text → `meadow-text`;
+  errors are foggy soft-tints everywhere (the OTP amber error box retired); the
+  account-menu dropdown hover → a foggy/15 soft-tint with ink text. All
+  documented pairings verified at WCAG AA in both modes.
+- **Finish.** Zero glassmorphism — the breathing-orb `backdrop-blur` frost
+  removed in favour of a layered meadow bloom; all scrims re-tokenised to
+  `bg-scrim`; dark `--shadow-soft` deepened so the single soft shadow still
+  reads.
+- **Bespoke components.** The OTP six-box → "Verified" pill merge and the
+  breathing-orb bloom, both gated for reduced motion via the repo's
+  `useMediaQuery` hook (zero use of framer's `useReducedMotion`).
+
+Full as-built decision records are in `docs/DECISIONS.md` (2026-06-18 entries).
+
+**Deviation (Principle VIII)**: FR-024 specifies the verified OTP pill "lifts
+toward the next step." As implemented, the pill **fades out** (`opacity → 0`)
+before the handoff instead of lifting — a vertical lift overlapped the incoming
+next view during the calm ~3s pacing. Behaviour is otherwise unchanged
+(`router.replace(successHref)` + `refresh`, copy, validation, and the
+reduced-motion fallback). Recorded in DECISIONS 2026-06-18.
+
+Documentation note (no spec change): the planning-time DECISIONS entries of
+2026-06-17 sketched a 16px base and an orb "progress ring"; the as-shipped values
+are a 17px base (FR-011) and a preview-hugging progress **bar** (FR-030). The
+2026-06-18 DECISIONS entries record the as-built mechanism; no FR changed.
+
+## 2026-06-18 — copy(007): trim redundant retry CTA from calibration failure/access notices
+
+Smoke-test finding: the small foggy reason-banner on the calibration **failure**
+screen repeated the call to action the screen already gives (the heading + the
+"Try again" button), so it now states the **reason only**. The same trim is
+applied to the other failure causes and to the camera-access / backend-down
+notices for consistency — reason/fix only, with the retry CTA carried solely by
+the on-screen button.
+
+This is a deliberate **deviation from the verbatim-copy stance**: FR-001/FR-002
+preserve the *meaning* of copy, and these edits remove only the duplicated retry
+CTA — the reason's meaning, each notice's fix instruction, and the reassurance
+are all unchanged. The foggy soft-tint treatment and icons are untouched.
+
+Trimmed (before → after):
+
+- failure `insufficient-face`: "…enough of that recording — let’s try again." →
+  "…enough of that recording."
+- failure `our-side`: "This one was on our side — give it a moment and try
+  again." → "This one was on our side."
+- camera-access `blocked`: "…in your address bar, then try again." → "…in your
+  address bar."
+- camera-access `busy`: "…Closing it frees it up, then try again." → "…Closing
+  it frees it up."
+- camera-access `no-device`: "…pick it from the selector and try again." → "…pick
+  it from the selector."
+- backend-down body: "We can’t set your baseline just now. Give it a moment and
+  try again — nothing’s lost." → "We can’t set your baseline just now — nothing’s
+  lost."
+
+Untouched: the `low-light` / `out-of-frame` chips (advisory tips, no retry CTA);
+every heading, subtext, and the "Try again" / "Not now" buttons.
+`failure-state.test.tsx` was updated to pin the trimmed `our-side` copy.
+
+## 2026-06-18 — fix(007): OTP boxes stay on one line (SC-004 "may wrap" fallback superseded)
+
+Smoke-test finding (~640px): the sixth OTP box wrapped to a second line. Root
+cause: the boxes were sized off the **viewport** (`w-[clamp(44px,12vw,52px)]`)
+inside the fixed-width (`max-w-md`) auth card — as the viewport widened the boxes
+ballooned to their 52px max while the card stayed narrow, so the row overflowed
+and `flex-wrap` dropped the sixth box.
+
+`components/ui/auth/otp-boxes.tsx` now sizes the boxes to the **container**, not
+the viewport: a non-wrapping row (`flex w-full flex-nowrap`, 8px gap) of
+`flex-1 min-w-0 max-w-[52px]` boxes at a fixed 52px height. Verified on the real
+auth card — **six boxes on one line with no overflow at 360 / 640 / desktop**:
+42px-wide × 52px-tall at 360px (height keeps the ≥44px touch target; width is
+above the ~40px floor), 52×52 from ~600px up. The success merge still lines up
+(boxes slide edge-to-edge, meadow-filled, centred on the card — verified live).
+
+This is a deliberate **deviation that supersedes the SC-004 "the boxes … may
+wrap" fallback**: at 360px they now shrink to one line rather than wrapping (a
+strict improvement on SC-004's intent). No unit/e2e test asserted the wrap
+behaviour, so none needed changing; the `otp-panel` behaviour tests stay green.
+The spec/smoke-tests text still says "may wrap" — reconcile there if desired.
+
+## 2026-06-18 — feat(007): calibration-intro accents foggy → meadow soft-tint
+
+Design refinement (smoke-test): on the calibration intro ("Set your calm
+baseline") the three setup-hint icon tiles and the privacy-note shield used
+**foggy**, which competed with the meadow CTA on what is a calm, affirmative
+setup screen. Recoloured these **informational/affirmative accents foggy →
+meadow soft-tint** (kept soft-tint, never solid — the meadow CTA remains the
+single solid focal point), in `components/anchor/intro.tsx`:
+
+- setup-hint icon tiles: `bg-foggy/15 text-foggy` → `bg-meadow/10 text-meadow-text`
+  (icon clears the ≥3.0 non-text bar: 4.69:1 light / 6.45:1 dark)
+- privacy-note shield icon: inherited `text-muted` → `text-meadow` (4.22:1 light /
+  7.43:1 dark); heading/body text unchanged.
+
+Deliberate **Principle-V refinement** — calm informational/reassurance accents =
+meadow soft-tint; foggy reserved for attention/error (see DECISIONS 2026-06-18).
+This is **not** a blanket foggy→meadow swap: every attention/error surface stays
+foggy (OTP wrong-code, calibration failure banners, the off-center nudge,
+camera-access-denied, backend-down, auth error `role="alert"` notices, and the
+home calibration attention banner). No unit test pinned these classes, so none
+needed changing.

@@ -65,7 +65,7 @@ export function BaselineSection({ hasAnchor }: { hasAnchor: boolean }) {
           <span
             aria-hidden
             className={`inline-flex size-9 shrink-0 items-center justify-center rounded-full ${
-              hasAnchor ? "bg-meadow/15 text-meadow" : "bg-ink/5 text-muted"
+              hasAnchor ? "bg-meadow/15 text-meadow-text" : "bg-ink/5 text-muted"
             }`}
           >
             {hasAnchor ? <Check className="size-4" /> : <Minus className="size-4" />}

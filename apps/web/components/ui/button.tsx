@@ -37,19 +37,20 @@ const buttonVariants = cva(
         secondary:
           "bg-surface text-ink border border-meadow hover:bg-meadow/10",
         // Affirmative brand CTA (feature 005 calibration: "Turn on camera",
-        // "I'm ready", "Set baseline"). Solid meadow that reads unmistakably green,
-        // with DARK text in BOTH modes: `text-ink` is dark in light mode, and
-        // `dark:text-bg` keeps it dark on the lighter dark-mode meadow (ink/bg swap
-        // the wrong way alone). ~4.8:1 light / ~7.7:1 dark — both ≥ WCAG AA.
-        meadow: "bg-meadow text-ink hover:opacity-90 dark:text-bg",
+        // "I'm ready", "Set baseline"). Solid meadow that reads unmistakably green.
+        // Filled-accent foreground (FR-008/FR-014): near-white `text-on-accent` in
+        // light mode, and `dark:text-bg` (the deep graphite bg) on the lighter
+        // dark-mode meadow (ink/bg swap the wrong way alone). ~4.8:1 light /
+        // ~7.4:1 dark — both ≥ WCAG AA.
+        meadow: "bg-meadow text-on-accent hover:opacity-90 dark:text-bg",
         // Foggy CTA for the calm-but-not-forward surfaces — the primary action on
         // a FOGGY screen (post-recording failure, the three camera-access states,
-        // the backend-down gate). The foggy token is light-toned in BOTH modes, so
-        // it takes DARK text in both, mirroring `meadow` exactly: `text-ink` is dark
-        // in light mode and `dark:text-bg` keeps it dark on the lighter dark-mode
-        // foggy (~6.8:1 light / ~9:1 dark — both ≥ WCAG AA). The colour matches the
-        // screen's treatment so the CTA never reads as a forward/meadow action.
-        foggy: "bg-foggy text-ink hover:opacity-90 dark:text-bg",
+        // the backend-down gate). Filled-accent foreground (FR-008/FR-014),
+        // mirroring `meadow`: near-white `text-on-accent` in light mode and
+        // `dark:text-bg` on the lighter dark-mode foggy (~5.3:1 light / ~8.3:1 dark
+        // — both ≥ WCAG AA). The colour matches the screen's treatment so the CTA
+        // never reads as a forward/meadow action.
+        foggy: "bg-foggy text-on-accent hover:opacity-90 dark:text-bg",
         // Quiet tier. A low-opacity foggy wash on hover gives feedback in BOTH
         // modes without overriding the text color (mirrors `secondary`'s
         // hover:bg-meadow/10 idiom). The previous hover:bg-accent +

@@ -4,6 +4,94 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 007 — Visual Redesign (Graphite) (implementation complete; smoke signed off; ready to merge)
+
+**Branch**: `007-visual-redesign`
+**Status**: implementation complete (Phases 1–3 / T001–T031, all checked); **`smoke-tests.md`
+signed off by Mohamed 2026-06-18 — all 11 checks PASS**; all gates green. **Ready for Mohamed's
+PR + squash-merge to `main`** (branch is local — not pushed, no PR opened).
+**Date**: 2026-06-18 (close; implementation spanned the 007 cycle on the branch above)
+
+**Scope shipped** — a re-skin + re-type of the entire `apps/web` app onto the deepened **Graphite**
+palette, **implementing** Constitution v1.4.0 **Amendment 4** (it implements, it does not
+re-litigate, the ratified hexes / typefaces / contrast rules). Recolour + re-type + a small set of
+targeted changes + two bespoke animated components only — **no behavioural rewrite** (FR-001/FR-004):
+no app logic, routing, data model, Supabase, ML, API-contract, or auth-logic change, and no new
+runtime dependency beyond the self-hosted fonts.
+
+- **Phase 1 — frozen foundation (serial, T001–T008).** Swapped the nine `@theme` role token
+  **values** to Graphite (names unchanged → auto-propagates every token-driven surface + `/10 /15 /50`
+  opacity variants); added three real `@theme` tokens — `--color-on-accent` (`#F8F9FA` light),
+  `--color-meadow-text` (`#346A56` / `#63B292`), `--color-scrim` (graphite ink @ 60%, fixed both
+  modes); overrode three type-scale steps (`--text-xs` 13 / `--text-base` 17 / `--text-4xl` 38) for
+  the locked 8-step scale with a 17px base body — **mechanism = override Tailwind v4 `--text-*`**
+  (research R-1; zero call-site churn across 149 sites); wired **Outfit** display + kept **Inter**
+  body, retiring **DM Serif Display**; fixed the filled meadow/foggy CTA foreground at the button
+  primitive (`text-ink` → `text-on-accent`, keep `dark:text-bg`); lowercased the **`serenify`**
+  wordmark (no dot) in all three locations; confirmed the dark `--shadow-soft`.
+- **Phase 2 — surfaces + two bespoke components (parallel, disjoint scopes, T009–T020).**
+  Re-skinned auth / onboarding / dashboard / account / full calibration flow / shared primitives /
+  nav shell; migrated small meadow text → `--color-meadow-text`; amber error notices → **foggy**;
+  re-tokenised the three raw-black scrims → `bg-scrim`; dark-mode dropdown contrast fix. **OTP**
+  redesigned from a single box into the **six-box merge** (`otp-panel.tsx` + new `otp-boxes.tsx` /
+  `otp-notice.tsx`) — numeric inputmode, auto-advance, paste-fills-six, foggy wrong-code sway, success
+  merge-into-pill → fade-out, reduced-motion via `useMediaQuery`; **props frozen, verification logic +
+  backend unchanged**. **Breathing orb** rebuilt as a layered meadow bloom replacing the inline
+  `backdropFilter` frost (no glassmorphism remains); preview-hugging progress **bar** (not a ring);
+  state-coloured framing brackets (meadow/foggy). Behaviour tests for both bespoke components.
+- **Phase 3 — integration, verification & docs (serial, T021–T031).** Preserved-States Checklist
+  walk (both modes × 3 roles); WCAG AA both modes; zero-glassmorphism grep → 0; colour-literal +
+  typeface sweeps; errors=foggy sweep; 360px + reduced-motion; docs + smoke sign-off + cleanup.
+
+**Closing pass (2026-06-18)** — resolved the one finding from `/speckit-analyze` and reconciled drift:
+
+- **C1 (Principle VI fix).** The one-line OTP boxes measured **42.33px** wide at 360px — below the
+  ≥44×44px touch-target floor. Tightened the OTP gap + panel padding responsively (`gap-1.5 sm:gap-2`,
+  `px-3 sm:px-4`; OTP files only) → re-measured **45.33px @360 / 50.33 @390 / 52 @414**, still one
+  line, merge/sweep/fade/wrong-state unchanged.
+- **Doc reconciliation.** Corrected now-false `spec.md` / `smoke-tests.md` wording: OTP "may wrap" →
+  "shrink to one line (no wrap, ≥44px)"; success "lifts toward the next step" → "fades out (no lift)"
+  (the build followed the FR-027 mock, whose `.lift` class is `opacity:0`); re-signed ST-4/ST-6. Added
+  FR-002 items **(7)** intro foggy→meadow accent refinement and **(8)** failure/access retry-CTA trim,
+  making the two logged smoke refinements traceable (resolving the FR-003 tension).
+- **Cleanup.** Deleted the three untracked 007 mocks (FR-036); removed the dead `anchor/countdown.tsx`
+  + its test (only its own test imported it; the live countdown is `GetReadyCountdown`).
+
+**Test results** (closing pass, 2026-06-18):
+
+- Vitest: **457/457 in 49 files** (the 3 dead `countdown` tests removed with the component).
+- Typecheck (`tsc --noEmit`): 0 errors. Lint (`eslint`): 0 warnings.
+- Playwright e2e: **chromium + firefox fully green** (all specs, 3 roles, OTP, 360px); **webkit green
+  on re-run** — one pre-existing `employee-dashboard-shell:48` load-timing flake (password-update
+  aria-status; passes in isolation / under CI `retries:2`), unrelated to this diff; the changed OTP /
+  auth surfaces pass on all three browsers. (A transient three-runners-on-one-Supabase collision and a
+  Windows-webkit IPC wedge were diagnosed and cleared mid-run — environmental, not product; consistent
+  with the documented suite-wide load-timing flake.)
+
+**Gates**:
+
+- ✅ Constitution Check — implements Amendment 4; Principles V, VI, VII, VIII addressed in `plan.md`;
+  Principle I privacy note (capture **rendering** only — no signal capture, transport, or aggregation
+  change).
+- ✅ Test gate — all suites + typecheck + lint green locally (webkit flake per above).
+- ✅ Smoke-test gate — **signed off by Mohamed 2026-06-18; all 11 ST PASS** (ST-4/ST-6 re-signed to
+  as-shipped after the C1 fix + reconciliation).
+- ⏳ Mohamed's PR + squash-merge to `main` (branch not yet pushed).
+
+**Decisions logged in DECISIONS.md**: the 2026-06-17 Amendment-4 block (palette → Graphite, Outfit,
+filled-accent foreground, amber soft-tint, type scale, orb bloom, 007 isolation) + the 2026-06-18
+as-built block (type-scale mechanism = override `--text-*`; `--color-on-accent`; `--color-meadow-text`;
+errors=foggy; `--color-scrim`; dark `--shadow-soft`; dropdown soft-tint; OTP fade-out-not-lift; intro
+meadow-accent refinement). Spec deviations recorded in CHANGELOG.md (2026-06-18).
+
+**Branch commits (close)**: `d85d524` C1 OTP gap fix → `14e9deb` reconcile wrap/lift wording + trace
+smoke refinements → `8462ad7` remove mocks + dead countdown → `888d6e1` mark Phase 3 complete.
+
+**Next**: feature 008 — stress-inference-service (the live inference read path consuming `anchor_vector`
+as the per-user delta baseline that 005 calibrates).
+
+---
+
 ## Fix — VFR-webm decode mis-sampling (timestamp-driven frame sampling)
 
 **Branch**: `fix/webm-vfr-decode-sampling` → **PR #18** into `main` (open; awaiting the

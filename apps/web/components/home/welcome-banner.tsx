@@ -12,7 +12,7 @@ type WelcomeBannerProps = {
 /**
  * Banner shown at the top of the employee /app body. Two lines:
  *
- *   1. <h1> DM Serif Display: "Good morning, Jane" / "Good afternoon"
+ *   1. <h1> Outfit (font-display): "Good morning, Jane" / "Good afternoon"
  *      / "Good evening" — name-less when fullName is null/empty.
  *   2. <p> Inter: the static subtitle locked by plan.md Decision M.
  *

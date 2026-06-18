@@ -39,7 +39,7 @@ export function Intro({
       <ul className="mx-auto flex w-full max-w-sm flex-col gap-4 text-left">
         {EXPECT.map(({ Icon, text }) => (
           <li key={text} className="flex items-center gap-3">
-            <span className="grid size-10 shrink-0 place-items-center rounded-control bg-foggy/15 text-foggy">
+            <span className="grid size-10 shrink-0 place-items-center rounded-control bg-meadow/10 text-meadow-text">
               <Icon className="size-5" strokeWidth={1.75} aria-hidden />
             </span>
             <span className="text-base text-ink">{text}</span>
@@ -48,7 +48,7 @@ export function Intro({
       </ul>
 
       <p className="mx-auto flex max-w-md items-start justify-center gap-2 text-pretty text-sm text-muted">
-        <ShieldCheck className="mt-0.5 size-4 shrink-0" strokeWidth={1.75} aria-hidden />
+        <ShieldCheck className="mt-0.5 size-4 shrink-0 text-meadow" strokeWidth={1.75} aria-hidden />
         <span>Your video isn’t stored — only the calm reading it produces.</span>
       </p>
 

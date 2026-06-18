@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import { Inter, DM_Serif_Display } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import { CrossTabAuth } from "@/components/cross-tab-auth";
 import { Providers } from "./providers";
 import "./globals.css";
@@ -10,9 +10,8 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-const dmSerifDisplay = DM_Serif_Display({
+const outfit = Outfit({
   variable: "--font-display",
-  weight: "400",
   subsets: ["latin"],
 });
 
@@ -33,7 +32,7 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${dmSerifDisplay.variable} h-full antialiased`}
+      className={`${inter.variable} ${outfit.variable} h-full antialiased`}
     >
       <head>
         {/*

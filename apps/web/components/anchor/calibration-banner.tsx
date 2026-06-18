@@ -84,10 +84,12 @@ export function CalibrationBanner() {
               and getUserMedia is rejected with "Permissions policy violation".
               Same idiom as the Router Cache hard-nav fix (DECISIONS 2026-05-27).
               See docs/CHANGELOG.md 2026-05-28. */}
-          {/* FOGGY-filled CTA (dark/ink text) — the same `variant="foggy"` shipped
-              on the failure-state and camera-access screens (FR-043). This surface
-              is "attention, not affirmative-forward", so it is foggy, NOT meadow;
-              white/ink-fill would fail AA on the foggy wash. */}
+          {/* FOGGY-filled CTA — the same `variant="foggy"` shipped on the
+              failure-state and camera-access screens (FR-043). This surface is
+              "attention, not affirmative-forward", so it is foggy, NOT meadow. The
+              shared Button's Phase-1 foggy variant carries the AA-fixed foreground
+              (on-accent in light, bg-token in dark), legible on the foggy fill in
+              both modes. */}
           <Button asChild variant="foggy" className="h-11">
             <a href="/app/calibrate">Set baseline</a>
           </Button>

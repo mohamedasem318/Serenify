@@ -65,12 +65,12 @@ describe("CalibrationBanner — foggy restyle, no amber (FR-043/046)", () => {
     expect(document.querySelector('[class*="crimson"]')).toBeNull();
   });
 
-  it("the primary CTA is the FOGGY-filled treatment (dark/ink text), not meadow", () => {
+  it("the primary CTA is the FOGGY-filled treatment (on-accent text), not meadow", () => {
     render(<CalibrationBanner />);
     const cta = screen.getByRole("link", { name: "Set baseline" });
-    // foggy fill + dark text in both themes (text-ink light / dark:text-bg dark) — AA.
+    // foggy fill + AA foreground: on-accent (light) / dark:text-bg (dark) — Phase-1 T006.
     expect(cta.className).toMatch(/bg-foggy/);
-    expect(cta.className).toMatch(/text-ink/);
+    expect(cta.className).toMatch(/text-on-accent/);
     expect(cta.className).toMatch(/dark:text-bg/);
     // never the affirmative meadow, never the default ink-fill, never amber.
     expect(cta.className).not.toMatch(/meadow/);

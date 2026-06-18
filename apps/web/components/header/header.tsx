@@ -24,9 +24,8 @@ export function Header({ fullName, email }: HeaderProps) {
           className="inline-flex items-baseline gap-2"
         >
           <span className="font-display text-2xl leading-none tracking-tight text-ink">
-            Serenify
+            serenify
           </span>
-          <span aria-hidden className="h-1 w-1 rounded-full bg-meadow" />
         </Link>
       </div>
 

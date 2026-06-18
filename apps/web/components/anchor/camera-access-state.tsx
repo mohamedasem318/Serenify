@@ -23,17 +23,17 @@ const CONTENT: Record<CameraAccessKind, { Icon: LucideIcon; title: string; body:
   blocked: {
     Icon: Lock,
     title: "Camera’s blocked",
-    body: "Your browser is blocking the camera. Re-enable it from the camera icon in your address bar, then try again.",
+    body: "Your browser is blocking the camera. Re-enable it from the camera icon in your address bar.",
   },
   busy: {
     Icon: CameraOff,
     title: "Camera’s in use",
-    body: "Another app — often a video call or screen recorder — has the camera. Closing it frees it up, then try again.",
+    body: "Another app — often a video call or screen recorder — has the camera. Closing it frees it up.",
   },
   "no-device": {
     Icon: CircleHelp,
     title: "No camera found",
-    body: "We couldn’t find a camera. Connect or enable one, then pick it from the selector and try again.",
+    body: "We couldn’t find a camera. Connect or enable one, then pick it from the selector.",
   },
 };
 

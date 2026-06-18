@@ -41,7 +41,7 @@ const COPY: Record<Role, { heading: string; subtitle: string }> = {
  *   - max-w-2xl + text-center keeps the copy column readable on
  *     wide viewports without forcing the heading to span the full
  *     dashboard width.
- *   - DM Serif Display heading at the welcome-banner scale
+ *   - Outfit (font-display) heading at the welcome-banner scale
  *     (text-3xl sm:text-4xl) so the visual hierarchy reads as a
  *     proper page-level title.
  *   - Inter subtitle in text-muted matches the muted secondary copy

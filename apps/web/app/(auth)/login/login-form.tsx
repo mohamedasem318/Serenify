@@ -90,12 +90,12 @@ export function LoginForm() {
         {submitState?.status === "invalid" && (
           <p
             role="alert"
-            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+            className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
           >
             Those details didn&apos;t match an account. Try again, or{" "}
             <Link
               href="/forgot-password"
-              className="text-meadow underline-offset-4 hover:underline"
+              className="text-meadow-text underline-offset-4 hover:underline"
             >
               reset your password
             </Link>
@@ -106,7 +106,7 @@ export function LoginForm() {
         {submitState?.status === "unconfirmed" && (
           <div
             role="status"
-            className="space-y-2 rounded-control border border-amber/50 bg-amber/10 px-3 py-3 text-sm text-ink"
+            className="space-y-2 rounded-control border border-foggy/30 bg-foggy/10 px-3 py-3 text-sm text-ink"
           >
             <p>Confirm your email first. We can send a fresh link.</p>
             <button
@@ -116,7 +116,7 @@ export function LoginForm() {
                 resendConfirmation(submitState.email);
                 setResent(true);
               }}
-              className="text-meadow underline-offset-4 hover:underline disabled:opacity-60"
+              className="text-meadow-text underline-offset-4 hover:underline disabled:opacity-60"
             >
               {resent ? "Link sent." : "Send a new confirmation link"}
             </button>
@@ -126,7 +126,7 @@ export function LoginForm() {
         {submitState?.status === "error" && (
           <p
             role="alert"
-            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+            className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
           >
             {submitState.message}
           </p>
@@ -143,13 +143,13 @@ export function LoginForm() {
         <div className="flex items-center justify-between text-sm text-muted">
           <Link
             href="/forgot-password"
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Forgot password?
           </Link>
           <Link
             href="/signup"
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Create account
           </Link>

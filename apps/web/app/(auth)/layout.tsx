@@ -6,7 +6,7 @@ import { ThemeToggle } from "../theme-toggle";
  * Shell for /login, /signup, /forgot-password, /reset-password.
  *
  * Editorial-calm direction: no card chrome — the page IS the surface.
- * The DM Serif Display wordmark is the one display moment per
+ * The Outfit wordmark is the one display moment per
  * Constitution Principle V's "display fonts MUST be used sparingly —
  * not for body, buttons, labels, or chart text" rule. Inter for
  * everything else.
@@ -39,12 +39,8 @@ export default function AuthLayout({
           className="inline-flex items-baseline gap-2"
         >
           <span className="font-display text-4xl leading-none tracking-tight text-ink sm:text-5xl">
-            Serenify
+            serenify
           </span>
-          <span
-            aria-hidden
-            className="h-1.5 w-1.5 rounded-full bg-meadow"
-          />
         </Link>
         <ThemeToggle />
       </header>

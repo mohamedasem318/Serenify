@@ -22,12 +22,12 @@ export type FailureCause = "low-light" | "out-of-frame" | "our-side" | "insuffic
 const CAUSE: Record<FailureCause, { Icon: LucideIcon; line: string }> = {
   "low-light": { Icon: Sun, line: "Facing a little more light usually helps." },
   "out-of-frame": { Icon: MoveDiagonal, line: "Staying roughly centred and still helps." },
-  "our-side": { Icon: CloudOff, line: "This one was on our side — give it a moment and try again." },
+  "our-side": { Icon: CloudOff, line: "This one was on our side." },
   // feature 006 — the server-authoritative face-absence cause (DECISION-31). Calm,
   // foggy, non-blaming: states what happened and offers a gentle retry (Principle V).
   "insufficient-face": {
     Icon: ScanFace,
-    line: "We couldn’t see your face for enough of that recording — let’s try again.",
+    line: "We couldn’t see your face for enough of that recording.",
   },
 };
 

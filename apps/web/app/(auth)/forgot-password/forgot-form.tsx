@@ -83,7 +83,7 @@ export function ForgotForm({
         <p className="pt-2 text-sm text-muted">
           <Link
             href="/login"
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Back to sign in
           </Link>
@@ -142,7 +142,7 @@ export function ForgotForm({
           Remembered it?{" "}
           <Link
             href="/login"
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Back to sign in
           </Link>

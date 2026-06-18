@@ -17,8 +17,9 @@ import type { DriftState } from "@/lib/face-detect/framing";
  *  - Recording (showNudge): centred → STEADY meadow brackets (good); off-centre →
  *    BLINKING foggy brackets (ease back). No checkmark here — the check is exclusive
  *    to the green-room affirmative.
- *  - Green room / get-ready (showNudge=false): quiet white brackets, turning to the
- *    meadow affirmative (brackets + glow + check) the moment the soft gate clears.
+ *  - Green room / get-ready (showNudge=false): quiet **muted** (Graphite-neutral)
+ *    brackets — no raw white (FR-022) — turning to the meadow affirmative (brackets +
+ *    glow + check) the moment the soft gate clears.
  *
  * The brackets are thin lines over arbitrary video, so each carries a soft dark edge
  * halo (`drop-shadow`) — a legibility treatment, not surface elevation — so the
@@ -55,18 +56,22 @@ export function FramingOverlay({
   const affirming = !driftFeedback && gateReady;
 
   // foggy = come back; meadow = good (centred while recording, or gate cleared in the
-  // green room); white = quiet/neutral before any signal.
+  // green room); muted = quiet/neutral before any signal (Graphite-neutral, not raw
+  // white — FR-022; the pre-gate green-room state is neither "good" nor "attention").
   const bracketColor = off
     ? "border-foggy"
     : centredGood || affirming
       ? "border-meadow"
-      : "border-white/70";
+      : "border-muted";
   const blink = off && !reducedMotion ? "animate-pulse" : "";
 
   // The green-room affirmative layers a meadow halo (outer + inset, so it survives
   // the preview's overflow-hidden). Recording-centred keeps just the steady meadow
   // brackets — no halo competing with the breathing orb.
-  const spotlight = "0 0 0 100vmax rgba(20, 24, 22, 0.46)";
+  // Spotlight dim: a Graphite ink-derived veil (the light-mode ink hue #1C2023 =
+  // rgb(28,32,35), consistent with the --color-scrim token, R-2) at the existing soft
+  // alpha — fixed in both modes so the dim always reads (FR-022).
+  const spotlight = "0 0 0 100vmax rgba(28, 32, 35, 0.46)";
   const boxShadow = affirming
     ? `${spotlight}, 0 0 26px 1px var(--color-meadow), inset 0 0 22px 0 var(--color-meadow)`
     : spotlight;
