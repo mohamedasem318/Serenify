@@ -2907,3 +2907,143 @@ next product feature so later work is built on the final look.
 
 **Rationale**: Bundling a design-system migration into feature 003 previously
 caused a 112-commit sprawl. Isolation keeps the diff reviewable and `main` clean.
+
+---
+
+## 2026-06-18 — 007 type-scale mechanism: override Tailwind v4 `--text-*` (supersedes the 2026-06-17 type-scale entry)
+
+**Status**: Accepted.
+
+**Decision**: The locked role→px type scale ships by **overriding three of
+Tailwind v4's built-in `--text-*` steps** in the real `@theme` block — not by
+minting new semantic token names: `--text-xs` 12→13px (`0.8125rem`),
+`--text-base` 16→17px (`1.0625rem`), `--text-4xl` →38px (`2.375rem`), each with a
+`--text-*--line-height` companion (body ≈1.5, heading ≈1.15). `sm/lg/xl/2xl/3xl`
+already equalled the locked values and were left untouched. Body inherits 17px
+via `body { font-size: var(--text-base) }` in `@layer base`; the root/`html`
+font-size is unchanged so rem-based zoom/scaling stays intact.
+
+**Rationale**: Tailwind v4 already exposes `--text-*` as theme tokens, so
+overriding the three deltas auto-migrates every existing `text-xs/base/4xl` call
+site with zero per-component churn and keeps utilities idiomatic (research.md
+R-1). This refines/supersedes the 2026-06-17 "Type scale bump + introduce
+font-size tokens" entry: the as-shipped base is **17px** (not the 16px sketched
+there) and the mechanism is **overriding the built-in scale**, not new token
+names.
+
+---
+
+## 2026-06-18 — 007 `--color-on-accent`: single filled-accent foreground token
+
+**Status**: Accepted.
+
+**Decision**: `--color-on-accent: #F8F9FA` (defined in light only) is the single
+foreground for filled meadow/foggy CTAs in light mode; dark mode uses the
+`--color-bg` token (`#101214`) as the filled-accent foreground (no dark override
+of `--color-on-accent`). Applied once at the shared button primitive
+(`button.tsx`: meadow/foggy variants `text-on-accent dark:text-bg`).
+
+**Rationale**: ink-on-accent failed AA (ink on foggy = 2.92:1). `on-accent`
+clears AA on both fills (meadow 4.78:1, foggy 5.33:1 light; bg-on-accent
+7.43:1 / 8.34:1 dark). One token — not per-component literals — prevents drift
+below AA.
+
+---
+
+## 2026-06-18 — 007 `--color-meadow-text`: small-meadow-text token
+
+**Status**: Accepted.
+
+**Decision**: `--color-meadow-text: #346A56` (light) / `#63B292` (dark, = regular
+dark meadow) is used for **small meadow-coloured text** on light backgrounds;
+regular `--color-meadow` stays for fills, icons, graphics, and large text.
+Migrated sites: all auth links (login/signup/forgot/reset), the
+password-requirement "met" text, and the account has-anchor pill.
+
+**Rationale**: old meadow-as-text was 4.22:1 (fail). `meadow-text` clears AA at
+every migrated site (5.26:1 link on bg, 4.79:1 has-anchor pill on the meadow/15
+tint, light; ≥5.30:1 dark). A distinct token keeps the migration from
+over-reaching into the graphic meadow uses (which already pass the 3.0 non-text
+bar).
+
+---
+
+## 2026-06-18 — 007 errors are foggy (confirmation)
+
+**Status**: Accepted.
+
+**Decision**: Every error/attention state is a **foggy soft-tint** notice — a
+foggy tint background (`bg-foggy/10`) + a foggy hairline (`border-foggy/30…/50`)
++ `text-ink` + a foggy icon — in both modes, never amber and never a sharp red.
+Confirmed across the auth notices, the OTP wrong-code notice (`otp-notice.tsx`,
+which replaces the old inline `border-amber/50 bg-amber/10`), the calibration
+failure / camera-access states, and the calibration banner. Amber survives only
+as the stress-signal soft-tint (see the 2026-06-17 amber entry) or a graphic
+hue; crimson stays destructive-only.
+
+**Rationale**: a stressed user should never meet an alarm colour; foggy reads
+calm and clears AA comfortably (ink on foggy/10 ≈ 12–13:1).
+
+---
+
+## 2026-06-18 — 007 scrim token: fixed Graphite ink @ 60%
+
+**Status**: Accepted.
+
+**Decision**: `--color-scrim: rgba(28, 32, 35, 0.60)` — Graphite ink (`#1C2023`)
+at 60% — backs every dialog/sheet/notification scrim (`bg-scrim`, replacing the
+old `black/80` and `black/50`). It is **fixed in both modes** (no dark override,
+research.md R-2). In dark mode the modal's separation is carried by the surface
+token + the 0.5px `border` + the soft shadow rather than a scrim-vs-bg luminance
+delta (human-verified by eye per smoke ST-9).
+
+**Rationale**: an ink-derived scrim is on-palette and warmer than raw black; a
+single fixed value keeps both modes consistent (light surface-vs-dimmed-bg ≈
+4.5:1, clearing the 3.0 non-text bar).
+
+---
+
+## 2026-06-18 — 007 dark `--shadow-soft` value
+
+**Status**: Accepted.
+
+**Decision**: dark-mode `--shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.5)` (light
+keeps `0 1px 2px rgba(0, 0, 0, 0.04)`). This single soft shadow plus the 0.5px
+border is the only elevation treatment in both modes.
+
+**Rationale**: the light 0.04 alpha is invisible against the near-black dark bg;
+a deeper 0.5 alpha lets the one soft shadow still read in dark without adding a
+second elevation shadow (FR-020 / research.md R-3.5).
+
+---
+
+## 2026-06-18 — 007 dropdown soft-tint hover/selected treatment
+
+**Status**: Accepted.
+
+**Decision**: the account-menu dropdown hover / focus / open / selected state is a
+**soft foggy tint with ink text** — `focus:bg-foggy/15 focus:text-ink` (and the
+`data-[state=open]:bg-foggy/15 …` equivalents) — in both modes, **not** a solid
+accent fill (`dropdown-menu.tsx`).
+
+**Rationale**: a solid-accent highlight pushed the item text below AA in dark; the
+foggy/15 tint with ink text reads at AA in both modes (ink on foggy/15 ≈
+10–12:1) and matches the calm soft-tint idiom used for notices.
+
+---
+
+## 2026-06-18 — 007 OTP success resolves by fade-out, not a vertical lift
+
+**Status**: Accepted.
+
+**Decision**: on a correct code the six boxes sweep → merge edge-to-edge into the
+meadow "Verified" pill, which then **fades out** (`opacity → 0`) before the
+handoff to `successHref` — there is **no vertical "lift."** Navigation
+(`router.replace(successHref)` + `router.refresh()`), the copy, the validation
+rule, and the reduced-motion path (verified pill shown directly; no
+sweep/merge/fade) are all unchanged.
+
+**Rationale**: a vertical lift visually collided with the incoming next view
+during the calm ~3s handoff; a fade-out avoids the overlap and reads cleaner.
+This is a deviation from FR-024's "lifts toward the next step" — recorded in
+CHANGELOG 2026-06-18. Source of truth: `serenify-007-otp-mock.html`.

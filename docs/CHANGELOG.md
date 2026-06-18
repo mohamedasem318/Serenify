@@ -1595,3 +1595,44 @@ service`); `007-visual-redesign` inserted ahead of the remaining product
 features, shifting them +1. Cross-references updated: Principle III fusion
 015→017, Principle IV audio 013→015. Recorded per Principle VIII (ordering is
 provisional; changes logged here).
+
+## 2026-06-18 — impl(007-visual-redesign): Graphite re-skin + two bespoke components
+
+The Graphite visual redesign shipped as a pure re-skin + re-type + the listed
+targeted changes — no application logic, routing, data-model, Supabase, ML,
+API-contract, or auth-logic change (FR-001 / FR-004). What landed:
+
+- **Tokens.** The nine `@theme` role tokens swapped to the Graphite light/dark
+  values (names unchanged); three new real tokens added — `--color-on-accent`,
+  `--color-meadow-text`, `--color-scrim`. `@theme inline` (the shadcn alias
+  layer) untouched; `--color-muted` kept outside it.
+- **Type + fonts.** Type scale via overriding Tailwind v4's `--text-*`
+  (17px base body); `Outfit` display + `Inter` body wired in the layout, `DM
+  Serif Display` retired everywhere; wordmark now lowercase `serenify` (no dot)
+  in all three locations.
+- **Contrast fixes.** Filled meadow/foggy CTA foreground fixed at the button
+  primitive (`on-accent` light / `bg` dark); small meadow text → `meadow-text`;
+  errors are foggy soft-tints everywhere (the OTP amber error box retired); the
+  account-menu dropdown hover → a foggy/15 soft-tint with ink text. All
+  documented pairings verified at WCAG AA in both modes.
+- **Finish.** Zero glassmorphism — the breathing-orb `backdrop-blur` frost
+  removed in favour of a layered meadow bloom; all scrims re-tokenised to
+  `bg-scrim`; dark `--shadow-soft` deepened so the single soft shadow still
+  reads.
+- **Bespoke components.** The OTP six-box → "Verified" pill merge and the
+  breathing-orb bloom, both gated for reduced motion via the repo's
+  `useMediaQuery` hook (zero use of framer's `useReducedMotion`).
+
+Full as-built decision records are in `docs/DECISIONS.md` (2026-06-18 entries).
+
+**Deviation (Principle VIII)**: FR-024 specifies the verified OTP pill "lifts
+toward the next step." As implemented, the pill **fades out** (`opacity → 0`)
+before the handoff instead of lifting — a vertical lift overlapped the incoming
+next view during the calm ~3s pacing. Behaviour is otherwise unchanged
+(`router.replace(successHref)` + `refresh`, copy, validation, and the
+reduced-motion fallback). Recorded in DECISIONS 2026-06-18.
+
+Documentation note (no spec change): the planning-time DECISIONS entries of
+2026-06-17 sketched a 16px base and an orb "progress ring"; the as-shipped values
+are a 17px base (FR-011) and a preview-hugging progress **bar** (FR-030). The
+2026-06-18 DECISIONS entries record the as-built mechanism; no FR changed.
