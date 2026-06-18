@@ -282,7 +282,7 @@ for serial integration + verification.
 get the smoke sign-off, and clean up. Serial because it spans every surface and the smoke/visual-debug
 loop is the real bottleneck (plan.md "Honest fan-out caveat").
 
-- [ ] T021 Walk the **Preserved-States Checklist** (spec.md) in **both** modes across all three roles
+- [x] T021 *(verified via ST-2)* Walk the **Preserved-States Checklist** (spec.md) in **both** modes across all three roles
   (employee/team-lead/admin); reconcile every removal against FR-002 (FR-003) — any untraceable
   removal is reverted. Also confirm the FR-020 "don't-change" geometry survived: the named one-off
   geometries (`rounded-[28px]`, `aspect-[3/4]`, per-call button heights) still render and no
@@ -290,16 +290,16 @@ loop is the real bottleneck (plan.md "Honest fan-out caveat").
   **Done when**: every listed state renders/functions, the one-off geometries are intact, and no
   out-of-list change in meaning remains.
 
-- [ ] T022 Verify **WCAG AA in both modes** for every documented pairing (filled-CTA fg on meadow +
+- [x] T022 *(verified via ST-1)* Verify **WCAG AA in both modes** for every documented pairing (filled-CTA fg on meadow +
   foggy, foggy notice text, amber soft-tint text, every migrated `--color-meadow-text` site, the
   scrim separation) using a contrast tool. **Satisfies**: SC-001, FR-018. **Done when**: 100% of the
   documented pairings clear AA (≥4.5:1 text, ≥3.0:1 large/non-text) in both modes.
 
-- [ ] T023 **No-glassmorphism sweep**: `rg "backdropFilter|backdrop-filter|WebkitBackdropFilter|backdrop-blur" apps/web`
+- [x] T023 *(verified via ST-3)* **No-glassmorphism sweep**: `rg "backdropFilter|backdrop-filter|WebkitBackdropFilter|backdrop-blur" apps/web`
   → **0** hits (the orb frost was an inline `style` prop; the utility grep alone is insufficient).
   **Satisfies**: SC-003, FR-019. **Done when**: zero matches anywhere in `apps/web`.
 
-- [ ] T024 **Colour-literal sweep (token integrity)**: confirm no surface kept a per-component colour
+- [x] T024 *(verified via ST-11)* **Colour-literal sweep (token integrity)**: confirm no surface kept a per-component colour
   literal pinning an old value after the token swap — `rg "bg-\[#|text-\[#|border-\[#" apps/web` plus a
   grep for the legacy Mist & Meadow hexes
   (`rg -i "7A9275|8AA9B6|DCB587|7B4244|D6D7D1|ECEEE9|F5F6F2|1F2522|6E7572|161917|20231F|DCDED5|8B928F|97AE91|9CBBC7|2D3130|C17F81" apps/web`).
@@ -307,40 +307,40 @@ loop is the real bottleneck (plan.md "Honest fan-out caveat").
   FR-006. **Done when**: no old-value colour literal remains — every surviving `#hex` / `[#…]` is a
   deliberate, documented value.
 
-- [ ] T025 **Typeface sweep**: `rg "DM_Serif|DM Serif Display" apps/web` → **0**; confirm the wordmark
+- [x] T025 *(verified via ST-7)* **Typeface sweep**: `rg "DM_Serif|DM Serif Display" apps/web` → **0**; confirm the wordmark
   reads lowercase `serenify` in all three locations and Outfit is confined to
   display/heading/wordmark/large-numeral (never body/buttons/labels/chart text). **Satisfies**:
   SC-007, FR-010, FR-013. **Done when**: zero DM-Serif matches and the wordmark/Outfit-scope checks
   pass.
 
-- [ ] T026 **Errors=foggy sweep**: confirm every error/attention state is a foggy soft-tint notice
+- [x] T026 *(verified via ST-8)* **Errors=foggy sweep**: confirm every error/attention state is a foggy soft-tint notice
   (never amber, never sharp red) across the auth notices, the OTP wrong-code notice, the calibration
   failure states, and any attention banner; amber appears only as soft-tint stress notice or graphic
   hue (no solid-amber-with-ink fill). **Satisfies**: SC-008, FR-015, FR-016. **Done when**: no amber
   or red error treatment remains.
 
-- [ ] T027 Verify **360px integrity** (OTP boxes wrap, dashboard two-column grid stacks, calibration
+- [x] T027 *(verified via ST-4/ST-5; OTP boxes re-measured 45.3px @360px)* Verify **360px integrity** (OTP boxes wrap, dashboard two-column grid stacks, calibration
   preview holds 16:9) with all touch targets ≥44×44px, and **reduced-motion** honoured on every
   animation (OTP merge, orb breathing, transitions) via `useMediaQuery` — OTP shows the verified pill
   directly / skips the sway, the orb is a static bloom while its progress bar still advances.
   **Satisfies**: SC-004, SC-005, FR-026, FR-032. **Done when**: every in-scope surface is correct at
   360px→desktop and every animation respects the reduced-motion setting.
 
-- [ ] T028 Run the test gate: `npm run test` (Vitest/RTL — incl. the new `OtpPanel` + `BreathingOrb`
+- [x] T028 *(this pass: unit 457/457, typecheck + lint clean; e2e chromium + firefox green, webkit green on re-run — one pre-existing `employee-dashboard-shell` load-timing flake)* Run the test gate: `npm run test` (Vitest/RTL — incl. the new `OtpPanel` + `BreathingOrb`
   specs) and `npm run test:e2e` (Playwright role e2e, all three roles) both green. **Satisfies**:
   Constitution Principle VII. **Done when**: all unit/RTL tests and the three role e2e tests pass.
 
-- [ ] T029 Update docs (append-only) at `docs/DECISIONS.md` — the type-scale + naming **mechanism**
+- [x] T029 *(DECISIONS + CHANGELOG entries present, 2026-06-18)* Update docs (append-only) at `docs/DECISIONS.md` — the type-scale + naming **mechanism**
   (override Tailwind `--text-*`), the `--color-on-accent` token, the `--color-meadow-text` token, the
   **errors=foggy** confirmation, and the **scrim token** (`--color-scrim`) — and note any spec
   deviation in `docs/CHANGELOG.md`. **Satisfies**: FR-035, SC-009, Principle VIII. **Done when**: all
   five decisions are recorded in `docs/DECISIONS.md` and any deviation is in `docs/CHANGELOG.md`.
 
-- [ ] T030 Run `specs/007-visual-redesign/smoke-tests.md` and record results; **Mohamed signs off**
+- [x] T030 *(smoke-tests.md signed off — all 11 PASS)* Run `specs/007-visual-redesign/smoke-tests.md` and record results; **Mohamed signs off**
   (Principle VII / Dev-Workflow gate 5). **Satisfies**: FR-035, SC-009, and the human halves of
   SC-001/002/004/005/006. **Done when**: every smoke check is recorded pass and the file is signed off.
 
-- [ ] T031 **End-of-feature cleanup (FR-036)**: delete the throwaway preview/mock files from the repo
+- [x] T031 *(done this pass)* **End-of-feature cleanup (FR-036)**: delete the throwaway preview/mock files from the repo
   root — `serenify-007-otp-mock.html`, `serenify-007-orb-mock.html`, `serenify-007-patterns-swatch.html`
   (and any prior `serenify-redesign-preview.html` / `serenify-font-preview-d5.html`). They stay
   **untracked** until this task. **Satisfies**: FR-036. **Done when**: none of the listed mocks remain
