@@ -256,10 +256,11 @@ enumerated hand-work + the two bespoke builds.
   `apps/web/components/ui/sheet.tsx` (`bg-black/80` → `bg-scrim`),
   `apps/web/components/notification.tsx` (`bg-black/50` → `bg-scrim` on the mobile overlay; desktop
   keeps `md:hidden`), and recolour `apps/web/components/ui/{dropdown-menu,card,avatar,separator}.tsx`
-  (incl. the dark-mode account-menu dropdown contrast fix). Does **not** touch `button.tsx` (Phase 1).
-  **Satisfies**: FR-021, FR-034 (shared primitives), FR-019; SC-001 (scrim), SC-003. **Done when**:
-  no `bg-black/*` scrim remains, all three overlays use `bg-scrim`, the dark dropdown reads at AA, and
-  primitive tests pass.
+  (incl. the account-menu dropdown hover/selected contrast fix — both light and dark; soft foggy-tint
+  highlight with ink/text-token foreground, **not** a solid accent fill). Does **not** touch
+  `button.tsx` (Phase 1). **Satisfies**: FR-021, FR-034 (shared primitives), FR-019; SC-001 (scrim),
+  SC-003. **Done when**: no `bg-black/*` scrim remains, all three overlays use `bg-scrim`, the dropdown
+  hover/selected reads at AA in both modes, and primitive tests pass.
 
 ### P2-G — Header / nav shell consumers (US1)
 
