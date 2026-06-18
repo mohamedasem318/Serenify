@@ -77,13 +77,15 @@ rg "backdropFilter|backdrop-filter|WebkitBackdropFilter|backdrop-blur" apps/web
 
 Resize to **360px** width (and spot-check tablet/desktop), both modes.
 
-- ☒ OTP: the six boxes **shrink and may wrap**, and the merge still resolves into one legible pill.
+- ☒ OTP: the six boxes **shrink to one line (no wrap), staying ≥44px wide**, and the merge still
+  resolves into one legible pill.
 - ☒ Dashboard: the two-column card grid **stacks**.
 - ☒ Calibration: the preview **holds 16:9 in-viewport** (no overflow/letterbox break).
 - ☒ Every interactive control is **≥44×44px** on a touch viewport (OTP boxes, buttons, nav, pills).
 - ☒ Scales cleanly up to desktop with no clipping or horizontal scroll.
 
-**Pass when**: all five hold. Result: PASS 2026-06-18
+**Pass when**: all five hold. Result: PASS — OTP boxes measured **45.3px** wide at 360px on one line
+(no wrap); re-verified 2026-06-18.
 
 ---
 
@@ -107,13 +109,14 @@ Enable `prefers-reduced-motion` (OS setting or DevTools rendering emulation), bo
 Open the mocks from the working tree and compare side-by-side, both modes.
 
 - ☒ **OTP** matches `serenify-007-otp-mock.html`: six boxes → meadow halo sweep → boxes merge
-  edge-to-edge as separators melt → "Verified" pill → lift toward the next step (~3s); wrong-code
+  edge-to-edge as separators melt → "Verified" pill → fade-out (no lift) toward the next step (~3s); wrong-code
   foggy sway (not red) + foggy notice + clear + refocus box 1. Verified in **both** the
   sign-up-verification and password-reset contexts.
 - ☒ **Orb** matches `serenify-007-orb-mock.html`: layered meadow bloom (concentric translucent discs)
   scaling on the ~8s breathe cycle; centred "Breathe in / Breathe out" label; **no** frost.
 
-**Pass when**: both match the mocks by eye in both modes. Result: PASS 2026-06-18
+**Pass when**: both match the mocks by eye in both modes. Result: PASS — OTP resolves by fade-out
+(matches the mock's `.lift` class, which sets `opacity:0`); re-verified 2026-06-18.
 
 ---
 
@@ -190,9 +193,9 @@ rg -i "7A9275|8AA9B6|DCB587|7B4244|D6D7D1|ECEEE9|F5F6F2|1F2522|6E7572|161917|202
 | ST-1 | WCAG AA both modes | PASS | Row 4 (amber notice) N/A — not yet implemented |
 | ST-2 | Preserved states / 3 roles | PASS | |
 | ST-3 | Zero glassmorphism | PASS | grep: 0 matches |
-| ST-4 | 360px + touch targets | PASS | |
+| ST-4 | 360px + touch targets | PASS | OTP boxes 45.3px wide at 360px, one line (no wrap) |
 | ST-5 | Reduced motion | PASS | live toggle confirmed |
-| ST-6 | Mock fidelity (OTP + orb) | PASS | |
+| ST-6 | Mock fidelity (OTP + orb) | PASS | OTP resolves by fade-out (mock `.lift` = opacity:0) |
 | ST-7 | Wordmark + typeface | PASS | DM Serif grep: 0 matches |
 | ST-8 | Errors foggy / amber signal-only | PASS | |
 | ST-9 | Dark-mode scrim | PASS | |

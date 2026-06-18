@@ -138,8 +138,9 @@ that single box into six separate single-digit boxes that auto-advance as they t
 code into all six at once, and support backspace-to-previous, in **both** flows. It changes
 presentation and animation **only** — the existing verification/validation logic and all backend
 behaviour are untouched (consistent with FR-004). When the code is correct, the six boxes resolve
-into a single calm "Verified" pill that lifts toward the flow's next step — onboarding after sign-up
-verification, or the existing password-reset continuation after a verified reset code; when it is
+into a single calm "Verified" pill that fades out (no lift) as the flow hands off to its next step —
+onboarding after sign-up verification, or the existing password-reset continuation after a verified
+reset code; when it is
 wrong, the row gives a gentle foggy sway, shows a calm foggy notice, clears, and returns focus to the
 first box — never a sharp red shake. The merge / sway / reduced-motion behaviour is identical in both
 flows; only the success handoff target differs.
@@ -153,7 +154,8 @@ distinctive new build in this feature and has an approved mock as its source of 
 **Independent Test**: Drive the OTP component through empty, partial, complete, wrong-code, and
 success states in **both** the sign-up-verification and password-reset contexts. On success, confirm
 the meadow halo sweep, the boxes merging edge-to-edge into one pill as their separators melt, the
-"Verified" check resolving, and the lift toward that flow's next step — matching the approved mock —
+"Verified" check resolving, and the verified pill fading out (no lift) as it hands off to that
+flow's next step — matching the approved mock —
 and confirm the reduced-motion path shows the verified pill directly with no sweep/merge/lift. On a
 wrong code, confirm the foggy sway (not red, not a sharp shake), the calm foggy notice, the cleared
 digits, and focus back on box 1 — and confirm the reduced-motion path skips the sway but still shows
@@ -163,14 +165,15 @@ the notice and clears.
 
 1. **Given** the six-box input, **When** the user types digits, **Then** focus auto-advances on
    entry, backspace moves to the previous box, a pasted code fills all six, the boxes use a numeric
-   input mode, each box is a ≥44px touch target, and the boxes shrink and may wrap at 360px.
+   input mode, each box is a ≥44px touch target, and the boxes shrink to one line at 360px (no
+   wrap), staying ≥44px wide.
 2. **Given** a correct code with motion allowed, **When** it is accepted, **Then** a meadow halo
    sweeps box 1→6 staggered, the six boxes slide together edge-to-edge centred while their
    separators (borders + gaps) melt and the boxes fill meadow with rounded ends so the row *becomes*
    one pill (no separate pill fading in over the top), a "Verified" check resolves on it, and the
-   pill lifts toward the flow's next step (onboarding after sign-up verification; the password-reset
-   continuation after a verified reset code) — at a calm ~3s pacing weighted so the merge reads
-   clearly.
+   pill fades out (no vertical lift) as it hands off to the flow's next step (onboarding after
+   sign-up verification; the password-reset continuation after a verified reset code) — at a calm
+   ~3s pacing weighted so the merge reads clearly.
 3. **Given** a correct code with `prefers-reduced-motion`, **When** it is accepted, **Then** the
    sweep and merge are skipped, the verified pill is shown directly, and there is no lift.
 4. **Given** a wrong code with motion allowed, **When** it is submitted, **Then** the row gives a
@@ -251,7 +254,7 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 **Acceptance Scenarios**:
 
 1. **Given** a 360px viewport, **When** each surface renders, **Then** it is correct and usable —
-   OTP boxes shrink/wrap, the dashboard two-column grid stacks, and the calibration preview holds
+   OTP boxes shrink to one line (no wrap, ≥44px), the dashboard two-column grid stacks, and the calibration preview holds
    16:9 in-viewport — scaling cleanly up to desktop.
 2. **Given** a touch-capable viewport, **When** interactive controls render, **Then** every touch
    target is ≥44×44px.
@@ -265,8 +268,8 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 
 ### Edge Cases
 
-- **OTP at 360px**: the six boxes must shrink and may wrap to keep ≥44px touch targets; the merge
-  animation must still resolve into a single legible pill at that width.
+- **OTP at 360px**: the six boxes must shrink to one line (no wrap) while keeping ≥44px touch
+  targets; the merge animation must still resolve into a single legible pill at that width.
 - **OTP paste of a too-short / too-long / non-numeric string**: the existing validation behaviour is
   preserved (the OTP component changes presentation and animation, not the validation rule or its
   copy meaning).
@@ -305,8 +308,16 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
   filled meadow/foggy buttons → near-white (light) / bg-token (dark); (4) the capital "Serenify" +
   meadow-dot wordmark → lowercase `serenify`, no dot; (5) meadow used as *small text* on light
   backgrounds → the deepened `--color-meadow-text` token; (6) amber auth notices and any amber
-  error states → foggy (errors are foggy, never amber). Removing or changing the meaning of any
-  element, state, or copy string **not** on this list is a spec violation.
+  error states → foggy (errors are foggy, never amber); (7) the calibration-intro
+  informational/affirmative accents (the three setup-hint icon tiles + the privacy-note shield) →
+  **meadow soft-tint** — a Principle-V role refinement on a calm, affirmative setup screen, where a
+  foggy accent read as a competing attention colour; attention/error surfaces stay foggy (recorded
+  in DECISIONS + CHANGELOG 2026-06-18); (8) the **redundant retry CTA** trimmed from the calibration
+  failure, camera-access, and backend-down notices — the "…try again" clause that merely duplicated
+  the on-screen "Try again" button; each notice's reason, fix instruction, and reassurance are
+  preserved, so FR-001's copy-*meaning* guarantee still holds (recorded in CHANGELOG 2026-06-18).
+  Removing or changing the meaning of any element, state, or copy string **not** on this list is a
+  spec violation.
 - **FR-003**: Each implementation slice MUST report, in its summary, anything it removed or replaced
   and why (the anti-silent-removal rule). A removal not traceable to FR-002 is a defect to be
   reverted.
@@ -415,17 +426,20 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 - **FR-023**: The app's existing OTP verification step — today a single text box, used in **both**
   the sign-up / account-verification flow and the password-reset flow — MUST be redesigned into six
   separate single-digit boxes (Outfit numerals) with numeric input mode, auto-advance on entry,
-  backspace-to-previous, paste-fills-all-six, ≥44px touch targets, and boxes that shrink and may wrap
-  at 360px, in **both** flows. The OTP redesign changes presentation and animation **only** — it MUST
+  backspace-to-previous, paste-fills-all-six, ≥44px touch targets, and boxes that shrink to one line
+  (no wrap, staying ≥44px wide) at 360px, in **both** flows. The OTP redesign changes presentation and animation **only** — it MUST
   NOT change the underlying code-verification/validation rule, the backend behaviour, or the meaning
   of its copy (consistent with FR-004).
 - **FR-024**: On a **correct** code (motion allowed), a meadow halo MUST sweep box 1→6 (staggered),
   then the six boxes MUST slide together edge-to-edge centred while their separators (borders + gaps)
   **melt** — boxes fill meadow and the ends round — so the row *becomes* one pill (no separate pill
-  fading in over the top); a "Verified" check resolves on it; the pill then lifts toward **the flow's
-  next step** — onboarding after sign-up verification, or the existing password-reset continuation
-  after a verified reset code. Pacing is calm (~3s total), weighted so the merge-into-pill reads
-  clearly. The merge behaviour is identical in both flows; only the success handoff target differs.
+  fading in over the top); a "Verified" check resolves on it; the pill then **fades out** (no
+  vertical lift) as the flow hands off to **the flow's next step** — onboarding after sign-up
+  verification, or the existing password-reset continuation after a verified reset code. Pacing is
+  calm (~3s total), weighted so the merge-into-pill reads clearly. The merge behaviour is identical
+  in both flows; only the success handoff target differs. (The approved mock
+  `serenify-007-otp-mock.html` — the FR-027 source of truth the implementation followed — resolves
+  by fade-out, not a vertical translate; see DECISIONS 2026-06-18.)
 - **FR-025**: On a **wrong** code (motion allowed), the row MUST give a gentle **foggy** sway (low
   amplitude, ~0.9s, ease-in-out — never a sharp red shake), show a foggy soft-tint notice reading
   "That code didn't match — give it another go.", then clear the digits and return focus to box 1.
@@ -508,7 +522,7 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 - **Wordmark**: the lowercase `serenify` (no dot) set in Outfit, in the header, auth layout, and
   onboarding layout.
 - **OTP merge component**: the bespoke six-box → single-pill verification interaction, with the
-  meadow success merge/lift, the foggy wrong-code sway, and the reduced-motion fallbacks; source of
+  meadow success merge/fade-out, the foggy wrong-code sway, and the reduced-motion fallbacks; source of
   truth is `serenify-007-otp-mock.html`.
 - **Breathing-orb bloom**: the bespoke layered-disc meadow bloom replacing the frosted orb, with
   state-coloured portrait brackets, the preview-hugging progress bar, and the card-below status
@@ -537,14 +551,16 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 - **SC-001**: Every documented colour pairing passes **WCAG AA in both light and dark mode** (≥4.5:1
   normal text, ≥3.0:1 large text and non-text/icon) — verified for the filled-CTA foregrounds on
   meadow and foggy, the foggy notice text, the amber soft-tint notice text, every migrated
-  meadow-as-text call site, and the scrim — in 100% of the documented pairings.
+  meadow-as-text call site, and the scrim — in 100% of the documented pairings. (The amber soft-tint
+  **notice** pairing is vacuously satisfied: no amber-notice surface ships — amber appears only as a
+  graphic/indicator hue per FR-016 — so smoke ST-1 row 4 is N/A, not a coverage gap.)
 - **SC-002**: Every state in the **Preserved-States Checklist** is present and functional after the
   redesign, and nothing outside the FR-002 Intended Replacements list has been removed or changed in
   meaning — verified by walking the full checklist in both modes and across the three role views.
 - **SC-003**: **No `backdrop-blur` / glassmorphism remains anywhere** in the app (cards, modals,
   navs, overlays, or the orb) — verified to zero occurrences.
 - **SC-004**: Every in-scope surface is **correct and usable at 360px** width and scales cleanly to
-  desktop (OTP boxes shrink/wrap, the dashboard two-column grid stacks, the calibration preview
+  desktop (OTP boxes shrink to one line (no wrap, ≥44px), the dashboard two-column grid stacks, the calibration preview
   holds 16:9 in-viewport), with all touch targets ≥44×44px on touch viewports.
 - **SC-005**: `prefers-reduced-motion` is **honoured on every animation** (OTP merge, orb breathing,
   and any transition), detected via the repo's `useMediaQuery` hook — verified that, with reduced
