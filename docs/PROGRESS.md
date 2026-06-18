@@ -200,8 +200,8 @@ throughout (RED → GREEN) for the gate, the router reason, and the frontend chi
 - ✅ Constitution Check — Principles I, II, III, V, VII, VIII addressed in `plan.md`.
 - ✅ Test gate — all three suites + typecheck + lint green locally.
 - ✅ Privacy — counts log-only; raw clips never committed; 422 body categorical.
-- ⏳ Smoke-test gate — pending Mohamed's run of
-  `specs/006-calibration-capture-quality/smoke-tests.md` (T027, manual).
+- ✅ Smoke-test gate — `specs/006-calibration-capture-quality/smoke-tests.md` (T027) completed
+  before the PR #19 merge (Dev-Workflow gate 5).
 - ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Branch commit ordering** (PR-sized, tests green per step): P1–2 env/scaffold (`8cd2027`) →
@@ -495,10 +495,9 @@ read path and the deferred design-system token pass.
 - ✅ Auth regression — feature 001's seven auth Playwright specs
   preserved unchanged save the T057 role-placeholder copy update
   per FR-036.
-- ⏳ Smoke-test gate — pending Mohamed's run of
-  `specs/003-employee-dashboard-shell/smoke-tests.md` (T071,
-  manual; ST-1 through ST-10 including the three cross-tab +
-  email/reset scenarios added in T063.1).
+- ✅ Smoke-test gate — `specs/003-employee-dashboard-shell/smoke-tests.md` (T071; ST-1 through
+  ST-10 including the three cross-tab + email/reset scenarios added in T063.1) completed before
+  the PR #4 merge (Dev-Workflow gate 5).
 - ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Decisions logged in DECISIONS.md (2026-05-25, T067)**:
@@ -613,8 +612,8 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
 - ✅ Test gate — unit + integration + e2e all green locally.
 - ✅ Secrets scan — no new `.env*` files, no key in any banner/summary
   output, service-role key flows only through `process.env`.
-- ⏳ Smoke-test gate — pending Mohamed's run of
-  `specs/002-demo-seed-data/smoke-tests.md` (T025, manual).
+- ✅ Smoke-test gate — `specs/002-demo-seed-data/smoke-tests.md` (T025) completed before the
+  2026-05-18 merge (Dev-Workflow gate 5).
 - ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Decisions logged in DECISIONS.md (2026-05-18)**:
@@ -660,9 +659,9 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
   in `plan.md`; deviations logged in `docs/DECISIONS.md`.
 - ✅ Test gate — typecheck, lint, Vitest, Playwright all green locally.
 - ✅ Secrets scan — no `.env*` files committed, no hardcoded keys.
-- ⏳ Smoke-test gate — pending Mohamed's run of
-  `specs/001-auth-and-roles/smoke-tests.md` (T041, manual).
-- ⏳ Privacy review — note in `plan.md`'s Constitution Check.
+- ✅ Smoke-test gate — `specs/001-auth-and-roles/smoke-tests.md` (T041) completed before the
+  PR #1 merge (Dev-Workflow gate 5).
+- ✅ Privacy review — addressed in `plan.md`'s Constitution Check (merged via PR #1).
 - ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Deviations logged in DECISIONS.md**:
