@@ -7,157 +7,105 @@ import { motion } from "framer-motion";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
 /**
- * The breathing guide (feature 005, FR-015/016) — the focal graphic ON the softened
- * preview. The stepped "Breathe in" / "Breathe out" pacer lives ON the orb so
- * attention stays in one place; the controls card below keeps the timer, drift
- * nudge, reassurance, and Stop. It is not a progress indicator — the 60-second timer
- * is the sole progress.
+ * The breathing guide (feature 005 FR-015/016; redesigned for 007 FR-028/032/033)
+ * — the focal graphic ON the softened preview. A clean **layered meadow bloom**:
+ * concentric translucent meadow discs (radial-gradient / stepped-opacity, no
+ * glassmorphism) that gently fill and empty with the ~8s breathe cycle, with the
+ * stepped "Breathe in" / "Breathe out" pacer centred on it. It is not a progress
+ * indicator — the capture progress bar (below the preview) is the sole progress.
  *
- * The readable backing is kept SEPARATE from the breath so the heavy/opaque part
- * stays small and calm (the earlier single opaque core read as a large, bright,
- * hard disc). Layers, back to front:
- *  - FROST — a localized "light frost" SEAT for the pool, so the dim pool never
- *    depends on what the camera sees (bright face, dark room, busy background). A
- *    stronger LOCAL backdrop blur (on top of the preview's 2px) flattens the feed
- *    into a smooth, low-detail surface; a gentle desaturate + slight lift keep it a
- *    calm NEUTRAL light — deliberately NOT a dark vignette (the earlier dark seating
- *    read heavy/clinical). A faint flat white veil is a guaranteed light floor over a
- *    dark feed (and the light-scrim fallback if backdrop-filter is unavailable). A
- *    radial MASK feathers the whole thing to nothing at the rim — no disc edge — and
- *    keeps it LOCAL to the orb; the rest of the preview stays at 2px. Static (only
- *    the pool breathes).
- *  - ORB_GLOW — a soft pool of meadow, clearly green so it reads over the frost yet
- *    still dim and feathered to nothing (no hard edge, no "coin"): the ONLY animated
- *    layer. The breath modulates BOTH its scale and its opacity — fuller and slightly
- *    brighter at the 4s-inhale peak, softer and smaller through the 6s exhale (the
- *    lung filling and emptying), so the motion stays legible even when the absolute
- *    contrast over a real feed is modest. Kept small so it leaves clear space to the
- *    framing brackets (no crowding).
- *  - TEXT_BACKING — a SMALL, FIXED, feathered backing (opaque only through a small
- *    centre, dim pale-meadow, feathered to nothing — no hard circle) sized to back
- *    the longest label ("Breathe out") with padding. It does NOT scale, so the words
- *    always sit fully on it, never on raw camera content.
- *  - the label — fixed size, centred, never scales while the glow breathes behind it.
+ * Source of truth: `serenify-007-orb-mock.html`. The 007 redesign **removes the
+ * earlier frosted-glass effect** (glassmorphism, FR-019) and the separate pale
+ * text-backing: the bloom is just the discs, and the label sits on it as white +
+ * a soft drop-shadow — the established on-video text treatment (FR-022); it is the
+ * ONLY text permitted on the raw video (all status copy lives in the card below,
+ * FR-031).
  *
- * Text-vs-backing contrast (ink/bg over the opaque backing centre, a known fixed
- * surface): ≈ 7.0:1 light, ≈ 10.0:1 dark — past the AA floor. The dim pale sage reads
- * calm, not glaring. Orb appearance over a real feed is a manual smoke check.
+ * The bloom is the only animated layer: its scale eases up on the inhale and down
+ * through the exhale (the lung filling and emptying). Under reduced motion
+ * (detected via the repo `useMediaQuery`, NOT framer's useReducedMotion) the bloom
+ * is static and the label is a single static "Breathe gently" (FR-032). Component
+ * interface is frozen (no props) — consumed by the recording stage unchanged.
  */
 
 const PHASE_LABEL = { in: "Breathe in", out: "Breathe out" } as const;
+const STATIC_LABEL = "Breathe gently";
 
-// FROST — the pool's light seat. A stronger LOCAL blur flattens the live feed into a
-// smooth, low-detail surface so the dim pool reads on ANY feed (bright/dark/busy);
-// saturate↓ mutes a colourful background so it doesn't fight the meadow; brightness↑
-// is a gentle neutral lift (a frost lightens — never a dark vignette). The flat white
-// VEIL is a guaranteed light floor over a dark feed AND the graceful fallback if
-// backdrop-filter is unavailable. The MASK feathers blur + veil together to nothing
-// at the rim (no disc edge) and keeps it local to the orb.
-const FROST_FILTER = "blur(8px) saturate(0.85) brightness(1.04)";
-const FROST_VEIL = "rgba(255, 255, 255, 0.1)"; // flat; the mask shapes & feathers it
-const FROST_MASK = "radial-gradient(circle, #000 0%, #000 42%, transparent 84%)";
-
-// Soft pool of meadow — clearly green (it must READ over the light frost) yet still
-// dim and FULLY feathered to transparent at the rim (no coin edge). The breath
-// modulates this layer's scale AND opacity (fuller/brighter inhale, softer exhale).
-const ORB_GLOW =
-  "radial-gradient(circle, " +
-  "color-mix(in srgb, var(--color-meadow) 55%, transparent) 0%, " +
-  "color-mix(in srgb, var(--color-meadow) 38%, transparent) 48%, " +
-  "color-mix(in srgb, var(--color-meadow) 12%, transparent) 76%, " +
-  "transparent 100%)";
-// Small fixed backing — dim pale-meadow, opaque only through a small centre (backs
-// the words) then feathered to nothing. text-ink / dark:text-bg reads dark on it.
-const TEXT_BACKING =
-  "radial-gradient(circle, " +
-  "color-mix(in srgb, var(--color-meadow) 70%, white) 0%, " +
-  "color-mix(in srgb, var(--color-meadow) 70%, white) 80%, " +
-  "color-mix(in srgb, var(--color-meadow) 48%, transparent) 92%, " +
-  "transparent 100%)";
+// Concentric meadow discs, outer→inner: a feathered outer halo, then progressively
+// smaller / denser translucent pools. All derive from --color-meadow via color-mix,
+// so both modes track the token swap (no hardcoded hue). Sizes are % of the orb box
+// so the bloom scales with the responsive container.
+const DISCS = [
+  {
+    size: "size-full",
+    bg: "radial-gradient(circle, color-mix(in srgb, var(--color-meadow) 18%, transparent) 0%, transparent 70%)",
+  },
+  { size: "size-[79%]", bg: "color-mix(in srgb, var(--color-meadow) 12%, transparent)" },
+  { size: "size-[59%]", bg: "color-mix(in srgb, var(--color-meadow) 20%, transparent)" },
+  { size: "size-[40%]", bg: "color-mix(in srgb, var(--color-meadow) 34%, transparent)" },
+] as const;
 
 export function BreathingOrb() {
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const [phase, setPhase] = useState<"in" | "out">("in");
 
-  // The breath pacer (BOTH the animated and reduced-motion paths): swap the label on
-  // the 4s-in / 6s-out cadence with an instant content swap (FR-048). On the animated
-  // path the glow scales + fades on the same cadence; under reduced motion the glow is
-  // held at a fixed mid-size AND mid-opacity (no pulse) and the label cadence alone
-  // carries the pace.
+  // Swap the label on the breath cadence (4s inhale / 4s exhale = the 8s cycle),
+  // an instant content swap. Held static under reduced motion (FR-032) — the
+  // effect simply doesn't schedule, so the label stays on STATIC_LABEL.
   useEffect(() => {
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = (current: "in" | "out") => {
-      // hold the inhale for 4s, the exhale for 6s, then swap (instant, no tween)
-      timer = setTimeout(
-        () => {
-          if (cancelled) return;
-          const next = current === "in" ? "out" : "in";
-          setPhase(next);
-          schedule(next);
-        },
-        current === "in" ? 4000 : 6000,
-      );
-    };
-    // initial render already shows the inhale (useState "in"); just start the loop
-    schedule("in");
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, []);
+    if (reducedMotion) return;
+    const id = setInterval(() => {
+      setPhase((p) => (p === "in" ? "out" : "in"));
+    }, 4000);
+    return () => clearInterval(id);
+  }, [reducedMotion]);
+
+  const label = reducedMotion ? STATIC_LABEL : PHASE_LABEL[phase];
+
+  // The four concentric discs — purely decorative, hidden from assistive tech.
+  const discs = DISCS.map((d, i) => (
+    <span
+      key={i}
+      aria-hidden
+      className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full ${d.size}`}
+      style={{ background: d.bg }}
+    />
+  ));
 
   return (
     <div className="relative grid size-36 place-items-center sm:size-44">
-      {/* frost seat — a localized, fully-feathered light frost (stronger LOCAL blur +
-          gentle neutral lift) so the dim pool has a consistent low-detail surface to
-          read against on ANY feed. Static (only the pool breathes); no hard edge; the
-          rest of the preview stays at 2px. */}
-      <div
-        aria-hidden
-        className="absolute size-32 rounded-full sm:size-40"
-        style={{
-          background: FROST_VEIL,
-          backdropFilter: FROST_FILTER,
-          WebkitBackdropFilter: FROST_FILTER,
-          maskImage: FROST_MASK,
-          WebkitMaskImage: FROST_MASK,
-        }}
-      />
-
-      {/* the breath — a soft green pool that gently fills (scale + opacity up on the
-          inhale) and empties (down through the exhale); the only animated layer. Held
-          at a fixed mid-size AND mid-opacity under reduced motion. Kept small so it
-          leaves clear space to the framing brackets. */}
+      {/* the breath — concentric meadow discs that scale up on the inhale and down
+          through the exhale; the only animated layer. Held static under reduced
+          motion. Decorative (aria-hidden); the label below carries the meaning. */}
       {reducedMotion ? (
         <div
           aria-hidden
-          className="absolute size-32 rounded-full sm:size-40"
-          style={{ background: ORB_GLOW, transform: "scale(0.85)", opacity: 0.85 }}
-        />
+          data-testid="breath-bloom-static"
+          className="absolute inset-0"
+        >
+          {discs}
+        </div>
       ) : (
         <motion.div
           aria-hidden
-          className="absolute size-32 rounded-full sm:size-40"
-          style={{ background: ORB_GLOW }}
-          initial={{ scale: 0.7, opacity: 0.72 }}
-          animate={{ scale: [0.7, 1, 0.7], opacity: [0.72, 1, 0.72] }}
-          // 10s cycle: 0→40% = 4s inhale, 40→100% = 6s exhale (FR-016). Scale + opacity
-          // peak together at the inhale (fuller/brighter), ebb through the exhale.
-          transition={{ duration: 10, times: [0, 0.4, 1], repeat: Infinity, ease: "easeInOut" }}
-        />
+          data-testid="breath-bloom-animated"
+          className="absolute inset-0"
+          animate={{ scale: [0.84, 1.12, 0.84] }}
+          // 8s cycle: 0→50% = 4s inhale (fuller), 50→100% = 4s exhale (softer).
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        >
+          {discs}
+        </motion.div>
       )}
 
-      {/* small fixed feathered backing — the words always sit fully on it */}
-      <div aria-hidden className="absolute size-28 rounded-full" style={{ background: TEXT_BACKING }} />
-
-      {/* the pacer label — fixed size, centred, NEVER scales. Dark text in both modes
-          (the backing is pale-meadow in both): text-ink / dark:text-bg. */}
+      {/* the pacer label — fixed size, centred, never scales. White + soft
+          drop-shadow is the established on-video text treatment (FR-022); the only
+          text on the raw video. aria-live announces the cadence to screen readers. */}
       <p
         aria-live="polite"
-        className="absolute text-center text-sm font-semibold tracking-wide text-ink dark:text-bg"
+        className="relative z-10 text-center text-sm font-medium tracking-wide text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.45)]"
       >
-        {PHASE_LABEL[phase]}
+        {label}
       </p>
     </div>
   );
