@@ -3047,3 +3047,28 @@ sweep/merge/fade) are all unchanged.
 during the calm ~3s handoff; a fade-out avoids the overlap and reads cleaner.
 This is a deviation from FR-024's "lifts toward the next step" — recorded in
 CHANGELOG 2026-06-18. Source of truth: `serenify-007-otp-mock.html`.
+
+---
+
+## 2026-06-18 — 007 calm informational accents = meadow soft-tint; foggy reserved for attention/error
+
+**Status**: Accepted.
+
+**Decision**: On affirmative/calm setup surfaces, informational & reassurance
+accents take a **meadow soft-tint**, not foggy — kept as a soft-tint (never solid,
+so the single solid-meadow CTA stays the focal point). First applied on the
+calibration intro ("Set your calm baseline"): the three setup-hint icon tiles →
+`bg-meadow/10` + `text-meadow-text` icon; the privacy-note shield → `text-meadow`.
+**Foggy stays reserved for attention/error** surfaces — OTP wrong-code, the
+calibration failure banners, the off-center recording nudge, camera-access-denied,
+backend-down, auth error notices (`role="alert"`), and the home calibration
+attention banner. Affirmative **success** notices remain meadow soft-tint (already
+the case in account profile/security `status === "ok"`).
+
+**Rationale**: a foggy info accent on a calm, meadow-CTA setup screen read as a
+competing attention colour; recolouring the affirmative accents to meadow keeps the
+screen reassuring and reserves foggy as the genuine attention/error signal
+(Principle V). The meadow icons clear the ≥3.0 non-text bar in both modes — tile
+icon (meadow-text on `meadow/10`) 4.69:1 light / 6.45:1 dark; shield (meadow on bg)
+4.22:1 light / 7.43:1 dark. This is a targeted refinement, **not** a blanket
+foggy→meadow swap.

@@ -1692,3 +1692,25 @@ wrap" fallback**: at 360px they now shrink to one line rather than wrapping (a
 strict improvement on SC-004's intent). No unit/e2e test asserted the wrap
 behaviour, so none needed changing; the `otp-panel` behaviour tests stay green.
 The spec/smoke-tests text still says "may wrap" — reconcile there if desired.
+
+## 2026-06-18 — feat(007): calibration-intro accents foggy → meadow soft-tint
+
+Design refinement (smoke-test): on the calibration intro ("Set your calm
+baseline") the three setup-hint icon tiles and the privacy-note shield used
+**foggy**, which competed with the meadow CTA on what is a calm, affirmative
+setup screen. Recoloured these **informational/affirmative accents foggy →
+meadow soft-tint** (kept soft-tint, never solid — the meadow CTA remains the
+single solid focal point), in `components/anchor/intro.tsx`:
+
+- setup-hint icon tiles: `bg-foggy/15 text-foggy` → `bg-meadow/10 text-meadow-text`
+  (icon clears the ≥3.0 non-text bar: 4.69:1 light / 6.45:1 dark)
+- privacy-note shield icon: inherited `text-muted` → `text-meadow` (4.22:1 light /
+  7.43:1 dark); heading/body text unchanged.
+
+Deliberate **Principle-V refinement** — calm informational/reassurance accents =
+meadow soft-tint; foggy reserved for attention/error (see DECISIONS 2026-06-18).
+This is **not** a blanket foggy→meadow swap: every attention/error surface stays
+foggy (OTP wrong-code, calibration failure banners, the off-center nudge,
+camera-access-denied, backend-down, auth error `role="alert"` notices, and the
+home calibration attention banner). No unit test pinned these classes, so none
+needed changing.
