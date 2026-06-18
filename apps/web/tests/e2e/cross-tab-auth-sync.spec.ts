@@ -153,10 +153,14 @@ test("cross-tab: OTP signup verify on tab B propagates tab A from /login to /app
 
     // Pull the 6-digit code from Mailpit and verify via the inline panel
     // (not the email link) so this exercises the OtpPanel completion path.
+    // The redesigned panel is six auto-advancing boxes that auto-submit on
+    // the sixth digit (no submit button, T011); broadcastSignIn() still
+    // fires the moment verify succeeds — before the ~3s success animation —
+    // so the pageA propagation window below is unchanged.
     const otp = await fetchLatestOtp(email);
-    await pageB.getByLabel("6-digit code").fill(otp);
-    await pageB.getByRole("button", { name: "Verify code" }).click();
-    await expect(pageB).toHaveURL(/\/(app|onboarding)$/, { timeout: 5_000 });
+    await pageB.getByLabel("Digit 1").click();
+    await pageB.keyboard.type(otp);
+    await expect(pageB).toHaveURL(/\/(app|onboarding)$/, { timeout: 10_000 });
 
     // Contract: pageA (still at /login) catches the signin broadcast that
     // OtpPanel wrote and navigates within 2s.

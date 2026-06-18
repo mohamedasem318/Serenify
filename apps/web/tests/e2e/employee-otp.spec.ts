@@ -27,14 +27,17 @@ test("employee can sign up and verify with the 6-digit OTP fallback (FR-020)", a
   const otp = await fetchLatestOtp(email);
   expect(otp).toMatch(/^\d{6}$/);
 
-  // Submit it through the inline panel — same outcome as clicking the
-  // magic link.
-  await page.getByLabel("6-digit code").fill(otp);
-  await page.getByRole("button", { name: "Verify code" }).click();
+  // Drive the redesigned six-box panel exactly as a user does: focus the
+  // first box and type the code. Each box auto-advances, and the panel
+  // auto-submits the instant the sixth digit lands — there is no submit
+  // button (T011 redesign). Same outcome as clicking the magic link.
+  await page.getByLabel("Digit 1").click();
+  await page.keyboard.type(otp);
 
   // Proxy lands the verified user on /app (full_name was carried via
-  // raw_user_meta_data at signup, so no onboarding stop).
-  await expect(page).toHaveURL(/\/app$/);
+  // raw_user_meta_data at signup, so no onboarding stop). The success
+  // merge animation runs ~3s before the handoff, so allow headroom.
+  await expect(page).toHaveURL(/\/app$/, { timeout: 10_000 });
   // Phase 7 T044: the role-banner testid is no longer rendered for
   // employees — they see the welcome banner + skeleton cards now.
   // T057's "drop role-banner / use welcome banner" guidance applied
