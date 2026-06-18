@@ -1586,3 +1586,12 @@ measured through the *pre-fix* decode, in a "wide empty gap" with no intermediat
 
 Measurement + threshold decision made by the operator from the real clips; this entry records
 the implementation on the `006-calibration-capture-quality` branch.
+
+## 2026-06-17 — Feature ordering correction (Constitution Amendment 4)
+
+Provisional feature ordering updated: 006 realized as
+`006-calibration-capture-quality` (was provisionally `006-stress-inference-
+service`); `007-visual-redesign` inserted ahead of the remaining product
+features, shifting them +1. Cross-references updated: Principle III fusion
+015→017, Principle IV audio 013→015. Recorded per Principle VIII (ordering is
+provisional; changes logged here).

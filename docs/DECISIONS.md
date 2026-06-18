@@ -2794,3 +2794,116 @@ infer-without mismatch (the failure mode that would actually matter for a per-us
 and the **group sizes are modest** (24/53). State all three alongside the headline numbers.
 
 **Source tasks**: T026 (record only), research.md "Part B — Glasses". Investigation-only.
+
+---
+
+## 2026-06-17 — Visual redesign: palette refreshed to "Graphite" (D5) values
+
+**Status**: Accepted.
+
+**Decision**: The Calm-First palette values are replaced with the "Graphite"
+set (light/dark in Constitution Principle V, Amendment 4). Semantic role token
+names (`--color-meadow/foggy/amber/crimson`) and the red-forbidden rule are
+unchanged — only values deepen. Token-driven surfaces migrate automatically
+from the nine `@theme` token edits in `apps/web/app/globals.css`; never edit the
+`@theme inline` shadcn aliases (they chain to the runtime tokens).
+
+**Rationale**: The former "Mist & Meadow" values read washed-out/timid. The
+brief was richer/deeper/more modern while staying calm. Values were moved to the
+confident end of "calm" and AA-verified in both modes before selection. Chosen
+by the team from a nine-direction set.
+
+---
+
+## 2026-06-17 — Display typeface: Outfit replaces DM Serif Display; wordmark lowercased
+
+**Status**: Accepted.
+
+**Decision**: `--font-display` becomes Outfit (self-hosted, OFL); Inter stays
+for body/UI. The wordmark is lowercase `serenify` with no trailing dot (the
+prior `font-display` serif and the meadow dot are removed). Three wordmark sites
+update: `header.tsx`, `(auth)/layout.tsx`, `(onboarding)/layout.tsx`.
+
+**Rationale**: DM Serif Display read fussy/dated in a tech-health product. The
+team wanted a modern Google/Samsung-adjacent feel; Outfit is a clean geometric
+sans that delivers it and is freely self-hostable. (Google Sans itself is now
+OFL and a viable future swap, but is not confirmed on the Google Fonts web API.)
+
+---
+
+## 2026-06-17 — Filled meadow/foggy CTA foreground: near-white (light) / bg token (dark)
+
+**Status**: Accepted. Supersedes the deferred meadow-button AA item.
+
+**Decision**: On filled meadow/foggy action surfaces, foreground text is
+near-white in light mode and the `bg` token in dark mode. In `button.tsx` the
+`meadow` and `foggy` variants change from `text-ink` to the bg/near-white
+foreground accordingly.
+
+**Rationale**: The deepened accents fail AA with ink foreground in light
+(meadow + ink ≈ below 4.5:1); near-white passes at ~4.7–6.5:1. In dark the
+accents are light, so the bg token passes. This is the clean rule that resolves
+the long-deferred meadow button-fill AA failure (white on the old meadow was
+~3.39:1).
+
+---
+
+## 2026-06-17 — Amber stress signal: soft-tint notice treatment
+
+**Status**: Accepted.
+
+**Decision**: The amber stress/affective signal renders as a soft-tint notice
+(tint background + deep same-family text): light `#F4E3C6` / `#7E5310`, dark
+`#3B2F19` / `#E6C386`, in addition to amber as a graphic/indicator hue. Dark
+ink on a solid-amber fill is forbidden.
+
+**Rationale**: A deepened solid amber with near-black ink read muddy and failed
+AA in dark. The tint+deep-text notice pattern is warm, legible (5.3:1 light /
+7.8:1 dark), and consistent across themes. Amber remains stress-only
+(Principle V).
+
+---
+
+## 2026-06-17 — Type scale bump + introduce font-size tokens
+
+**Status**: Accepted.
+
+**Decision**: Bump the base reading scale — body 14→16px, failure/error card
+copy →16–17px, captions/metadata stay 12–14px, headings remain large. Introduce
+a small set of semantic font-size tokens (there are currently none; every size
+is a per-component `text-*` utility) so future scale changes are centralized.
+
+**Rationale**: A calm wellness product earns a more generous scale, and a
+stressed person should not squint at an error. Not everything grows — flattening
+the hierarchy would lose emphasis. Centralizing sizes avoids the per-component
+churn this bump otherwise requires.
+
+---
+
+## 2026-06-17 — Breathing orb: clean layered bloom replaces frosted-glass treatment
+
+**Status**: Accepted.
+
+**Decision**: The calibration breathing orb drops the backdrop-blur "frost"
+layer in favour of a clean layered bloom (concentric translucent meadow discs +
+progress ring + the existing "Breathe in / out" label). The reduced-motion
+fallback (static state via the repo's `useMediaQuery` hook) and the
+text-off-video rule are retained. The full preview + orb-overlay + corner-
+bracket composition is unchanged.
+
+**Rationale**: The frosted look read dated and skirts Principle V's
+"no glassmorphism anywhere" rule; the clean bloom is calmer, more modern, and
+unambiguously compliant.
+
+---
+
+## 2026-06-17 — Visual redesign isolated as feature 007, no feature work riding along
+
+**Status**: Accepted.
+
+**Decision**: The design-system migration is its own feature/branch
+(`007-visual-redesign`) with no product features bundled in. It ships before the
+next product feature so later work is built on the final look.
+
+**Rationale**: Bundling a design-system migration into feature 003 previously
+caused a 112-commit sprawl. Isolation keeps the diff reviewable and `main` clean.

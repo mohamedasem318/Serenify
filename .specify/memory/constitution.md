@@ -113,6 +113,35 @@ literal strings, so no template edit is required.
 Cross-references:
 - docs/DECISIONS.md entry 2026-05-27
 - docs/CHANGELOG.md entry 2026-05-27
+
+Amendment 4: 1.3.0 → 1.4.0 (2026-06-17, MINOR)
+Bump rationale: Visual redesign (feature 007-visual-redesign). Principle V's
+palette VALUES are replaced with the deeper, less-desaturated "Graphite" (D5)
+values (light + dark), and the display typeface changes from DM Serif Display
+to Outfit (Inter unchanged for body/UI). The semantic role system is
+UNCHANGED — meadow = calm/affirmative, foggy = attention/error, amber =
+stress/affective signal only, crimson = destructive only; the token names
+(--color-meadow/foggy/amber/crimson) are unchanged. Two contrast-driven rules
+are added to Principle V: (a) filled meadow/foggy action surfaces take
+near-white foreground in light and the bg token in dark (deepened accents fail
+AA with ink), replacing the prior ink-on-accent treatment; (b) the amber
+stress signal becomes a soft-tint notice treatment (tint background + deep
+same-family text) — solid-amber-with-ink is forbidden. Principle VIII's
+provisional ordering is corrected (006 realized as calibration-capture-quality;
+007-visual-redesign inserted; downstream provisional slots shift +1), which
+moves the feature-number cross-references in Principle III (fusion 015→017) and
+Principle IV (audio 013→015). MINOR bump: refinement of existing rules +
+expanded guidance; no new principle, no removed principle, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-
+template.md for palette/font literals (hex values, "DM Serif Display", "Mist &
+Meadow") and feature-number strings; templates reference principles by number,
+not by these literals, so no template edit is required.
+
+Cross-references:
+- docs/DECISIONS.md entries 2026-06-17
+- docs/CHANGELOG.md entry 2026-06-17
+- specs/007-visual-redesign/ (spec to follow)
 -->
 
 # Serenify Constitution
@@ -209,7 +238,7 @@ Each package MUST expose the same inference contract (input shape, output
 schema, confidence/quality signal). Adding a new modality MUST be a config
 change in the inference service plus a new package — never a rewrite of
 shared code. Cross-modality fusion lives in a separate fusion layer (see
-feature 015) and consumes the common interface only.
+feature 017) and consumes the common interface only.
 
 **Rationale**: Modalities arrive at different times (video first, then
 audio, then physio, then fusion). Coupling them would force every modality
@@ -235,7 +264,7 @@ directly.
   N turns) that reconciles with the physiological signal stream.
 
 **Fine-tuning clause (open decision, must close before audio modality lands
-in feature 013):** Default is prompting-only. If the team chooses to
+in feature 015):** Default is prompting-only. If the team chooses to
 fine-tune later, the fine-tuned model MUST (a) be served behind the same
 `LLMProvider` interface so app code does not change, (b) be evaluated on a
 documented held-out set with metrics published in `docs/MODELS.md`, and
@@ -252,24 +281,36 @@ neutralize both. The training-data restriction protects user trust.
 Serenify's surface MUST feel calm. Calm is enforced by these
 non-negotiable rules:
 
-**Palette — "Mist & Meadow"** (locked; no additions without amendment):
-- Light: bg `#ECEEE9`, surface `#F5F6F2`, ink `#1F2522`, muted `#6E7572`,
-  meadow accent `#7A9275`, foggy accent `#8AA9B6`, amber `#DCB587`,
-  crimson `#7B4244`, border `#D6D7D1`.
-- Dark: bg `#161917`, surface `#20231F`, text `#DCDED5`, muted `#8B928F`,
-  meadow accent `#97AE91`, foggy accent `#9CBBC7`, amber `#DCB587`,
-  crimson `#C17F81`, border `#2D3130`.
-- **Red is forbidden on affective and ambient surfaces** — stress
-  detection states, physiological indicators, charts, status badges,
-  notifications, and any in-product affective copy or imagery. Stress
-  signals use amber (`#DCB587`) in both modes. Red IS permitted on
-  **destructive action surfaces** (delete-account, leave-team,
-  revoke-session, inline destructive text links) using the Mist &
-  Meadow `crimson` token, because hiding visual urgency on
-  irreversible user actions is hostile design. The `red`, `#FF0000`
-  family, and any hue in the 340–20° red sector MUST NOT appear on
-  affective or ambient surfaces; only the documented `crimson` token
-  may appear on destructive action surfaces.
+**Palette — "Graphite"** (refreshed values of the former "Mist & Meadow"
+system; locked, no additions without amendment). Semantic role token names are
+unchanged — only the values are deepened. Light and dark are designed in tandem
+and every documented pairing meets WCAG AA:
+- Light: bg `#EAEBEC`, surface `#F4F5F6`, ink `#1C2023`, muted `#585D61`,
+  meadow accent `#3E7A63`, foggy accent `#356E88`, amber `#C98637`,
+  crimson `#894A4E`, border `#D7D9DC`.
+- Dark: bg `#101214`, surface `#181B1E`, text `#E2E5E8`, muted `#939A9F`,
+  meadow accent `#63B292`, foggy accent `#74B6CE`, amber `#E4AE5C`,
+  crimson `#C98589`, border `#23272B`.
+- **Filled-accent foregrounds (AA):** on filled meadow or foggy action surfaces
+  (primary and attention CTAs) the foreground text MUST be near-white in light
+  mode and the `bg` token in dark mode. The deepened accents fail AA with ink
+  foreground; this replaces the prior ink-on-accent treatment. Soft accent
+  tints (e.g. a `foggy/10` attention banner) keep ink-token text.
+- **Amber stress signal:** the amber role is a soft-tint notice treatment — a
+  light amber tint background with deep same-family text (light: tint `#F4E3C6`
+  / text `#7E5310`; dark: tint `#3B2F19` / text `#E6C386`), alongside amber as
+  a graphic/indicator hue (values above). Dark ink on a solid-amber fill is
+  forbidden (fails AA and reads muddy).
+- **Red is forbidden on affective and ambient surfaces** — stress detection
+  states, physiological indicators, charts, status badges, notifications, and
+  any in-product affective copy or imagery. Stress signals use the amber role
+  (above) in both modes. Red IS permitted on **destructive action surfaces**
+  (delete-account, leave-team, revoke-session, inline destructive text links)
+  using the Mist & Meadow `crimson` token, because hiding visual urgency on
+  irreversible user actions is hostile design. The `red`, `#FF0000` family, and
+  any hue in the 340–20° red sector MUST NOT appear on affective or ambient
+  surfaces; only the documented `crimson` token may appear on destructive
+  action surfaces.
 
 **Visual finish**:
 - Flat base. Optional 3–5% paper-noise texture on the page background ONLY,
@@ -282,9 +323,11 @@ non-negotiable rules:
 - Whitespace is generous; cramming is a violation. White space signals
   calm.
 
-**Typography**: Inter for all UI text. DM Serif Display is reserved for
-hero/display moments and MUST be used sparingly — not for body, buttons,
-labels, or chart text.
+**Typography**: Inter for all UI/body text. Outfit is the display/heading
+typeface — wordmark, page and section headings, card titles, and large numerals
+— and MUST NOT be used for body, buttons, labels, or chart text. The wordmark
+is set lowercase (`serenify`). Outfit and Inter are both self-hosted under the
+SIL Open Font License; DM Serif Display is retired.
 
 **Iconography**: Lucide library only. Stroke weight MUST be consistent
 across the surface.
@@ -368,11 +411,12 @@ implement, in that order. Implementation without a spec is forbidden.
   `docs/CHANGELOG.md`):
   `001-auth-and-roles`, `002-demo-seed-data`,
   `003-employee-dashboard-shell`, `004-onboarding-video-anchor`,
-  `005-per-user-calibration`, `006-stress-inference-service`,
-  `007-questionnaire`, `008-llm-client-and-chatbot`,
-  `009-recommendations`, `010-privacy-controls-and-transparency`,
-  `011-team-lead-dashboard`, `012-admin-dashboard`,
-  `013-audio-modality`, `014-physio-modality`, `015-fusion`.
+  `005-per-user-calibration`, `006-calibration-capture-quality`,
+  `007-visual-redesign`, `008-stress-inference-service`,
+  `009-questionnaire`, `010-llm-client-and-chatbot`,
+  `011-recommendations`, `012-privacy-controls-and-transparency`,
+  `013-team-lead-dashboard`, `014-admin-dashboard`,
+  `015-audio-modality`, `016-physio-modality`, `017-fusion`.
 
 **Rationale**: A four-person team building an ML product needs a single
 source of truth per feature. Spec-driven development makes scope explicit,
@@ -550,4 +594,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.3.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-05-27
+**Version**: 1.4.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-17
