@@ -180,11 +180,14 @@ enumerated hand-work + the two bespoke builds.
 
 - [ ] T013 [P] [US1] Recolour/re-type the dashboard in `apps/web/app/(authed)/app/page.tsx`,
   `apps/web/components/home/{welcome-banner,recent-chats-card,todays-checkin-card,things-that-might-help-card}.tsx`,
-  `apps/web/components/chat-pill.tsx`, and `apps/web/components/role-placeholder/role-placeholder.tsx`
-  (team-lead/admin home view). Header-shell one-row calibration-banner desktop layout, greeting,
-  two-column card grid that **stacks at 360px**, chat pill; preserve populated-vs-empty card states.
-  **Satisfies**: FR-034 (home dashboard); SC-002, SC-004. **Done when**: the dashboard reads
-  Graphite/Outfit-Inter in both modes, the grid stacks cleanly at 360px, empty/populated states
+  `apps/web/components/chat-pill.tsx`, `apps/web/components/role-placeholder/role-placeholder.tsx`
+  (team-lead/admin home view), and `apps/web/components/anchor/calibration-banner.tsx` — an anchor-dir
+  file **rendered only by the dashboard** (`app/(authed)/app/page.tsx:44`), so owned here, not by P2-E
+  (mirrors `baseline-section.tsx`→P2-D). Header-shell one-row calibration-banner desktop layout (present
+  vs dismissed states preserved), greeting, two-column card grid that **stacks at 360px**, chat pill;
+  preserve populated-vs-empty card states. **Satisfies**: FR-034 (home dashboard, incl. the calibration
+  banner); SC-002, SC-004. **Done when**: the dashboard reads Graphite/Outfit-Inter in both modes, the
+  grid stacks cleanly at 360px, the calibration banner (present/dismissed) and empty/populated states
   survive, and the three role views still differ correctly.
 
 ### P2-D — Account (US1/US2)
@@ -203,13 +206,14 @@ enumerated hand-work + the two bespoke builds.
 
 - [ ] T015 [P] [US1] Recolour/re-type the full calibration flow in
   `apps/web/app/(authed)/app/calibrate/{page,calibrate-recorder}.tsx` and
-  `apps/web/components/anchor/{intro,green-room,countdown,get-ready-countdown,recording-stage,recording-timer,stop-confirm,success-state,failure-state,camera-access-state,calibration-banner,backend-down-modal,anchor-recorder,device-picker}.tsx`.
+  `apps/web/components/anchor/{intro,green-room,countdown,get-ready-countdown,recording-stage,recording-timer,stop-confirm,success-state,failure-state,camera-access-state,backend-down-modal,anchor-recorder,device-picker}.tsx`.
   Recolour to Graphite (preserve intro/green-room/countdown/recording/stop-confirm/success/failure
   incl. `insufficient-face`, the three camera-access states, and the backend-down modal). Show capture
   progress as a **bar hugging the preview, not a ring** (FR-030); keep all status text **in the card
   below the preview** (FR-031); keep the on-video countdown `text-white` + drop-shadow overlay,
   legibility verified (FR-022). **Imports** `breathing-guide`/`framing-overlay` but does **not** edit
-  them; does **not** touch `baseline-section.tsx` (P2-D). For FR-032, ensure the **progress bar still
+  them; does **not** touch `baseline-section.tsx` (P2-D) or `calibration-banner.tsx` (P2-C —
+  dashboard-rendered). For FR-032, ensure the **progress bar still
   advances** under reduced motion (the orb-static half is T016). **Satisfies**: FR-034 (full
   calibration), FR-022, FR-030, FR-031, FR-032 (progress half); SC-002, SC-004 (16:9 preview), SC-008.
   **Done when**: every calibration state renders in Graphite both modes, progress is a preview-hugging
@@ -279,8 +283,11 @@ loop is the real bottleneck (plan.md "Honest fan-out caveat").
 
 - [ ] T021 Walk the **Preserved-States Checklist** (spec.md) in **both** modes across all three roles
   (employee/team-lead/admin); reconcile every removal against FR-002 (FR-003) — any untraceable
-  removal is reverted. **Satisfies**: SC-002, FR-001, FR-003. **Done when**: every listed state
-  renders/functions and no out-of-list change in meaning remains.
+  removal is reverted. Also confirm the FR-020 "don't-change" geometry survived: the named one-off
+  geometries (`rounded-[28px]`, `aspect-[3/4]`, per-call button heights) still render and no
+  interactive radius falls outside 8–16px. **Satisfies**: SC-002, FR-001, FR-003, FR-020 (geometry).
+  **Done when**: every listed state renders/functions, the one-off geometries are intact, and no
+  out-of-list change in meaning remains.
 
 - [ ] T022 Verify **WCAG AA in both modes** for every documented pairing (filled-CTA fg on meadow +
   foggy, foggy notice text, amber soft-tint text, every migrated `--color-meadow-text` site, the
@@ -291,40 +298,48 @@ loop is the real bottleneck (plan.md "Honest fan-out caveat").
   → **0** hits (the orb frost was an inline `style` prop; the utility grep alone is insufficient).
   **Satisfies**: SC-003, FR-019. **Done when**: zero matches anywhere in `apps/web`.
 
-- [ ] T024 **Typeface sweep**: `rg "DM_Serif|DM Serif Display" apps/web` → **0**; confirm the wordmark
+- [ ] T024 **Colour-literal sweep (token integrity)**: confirm no surface kept a per-component colour
+  literal pinning an old value after the token swap — `rg "bg-\[#|text-\[#|border-\[#" apps/web` plus a
+  grep for the legacy Mist & Meadow hexes
+  (`rg -i "7A9275|8AA9B6|DCB587|7B4244|D6D7D1|ECEEE9|F5F6F2|1F2522|6E7572|161917|20231F|DCDED5|8B928F|97AE91|9CBBC7|2D3130|C17F81" apps/web`).
+  Expect only intentional values; migrate any stray literal to its Graphite token. **Satisfies**:
+  FR-006. **Done when**: no old-value colour literal remains — every surviving `#hex` / `[#…]` is a
+  deliberate, documented value.
+
+- [ ] T025 **Typeface sweep**: `rg "DM_Serif|DM Serif Display" apps/web` → **0**; confirm the wordmark
   reads lowercase `serenify` in all three locations and Outfit is confined to
   display/heading/wordmark/large-numeral (never body/buttons/labels/chart text). **Satisfies**:
   SC-007, FR-010, FR-013. **Done when**: zero DM-Serif matches and the wordmark/Outfit-scope checks
   pass.
 
-- [ ] T025 **Errors=foggy sweep**: confirm every error/attention state is a foggy soft-tint notice
+- [ ] T026 **Errors=foggy sweep**: confirm every error/attention state is a foggy soft-tint notice
   (never amber, never sharp red) across the auth notices, the OTP wrong-code notice, the calibration
   failure states, and any attention banner; amber appears only as soft-tint stress notice or graphic
   hue (no solid-amber-with-ink fill). **Satisfies**: SC-008, FR-015, FR-016. **Done when**: no amber
   or red error treatment remains.
 
-- [ ] T026 Verify **360px integrity** (OTP boxes wrap, dashboard two-column grid stacks, calibration
+- [ ] T027 Verify **360px integrity** (OTP boxes wrap, dashboard two-column grid stacks, calibration
   preview holds 16:9) with all touch targets ≥44×44px, and **reduced-motion** honoured on every
   animation (OTP merge, orb breathing, transitions) via `useMediaQuery` — OTP shows the verified pill
   directly / skips the sway, the orb is a static bloom while its progress bar still advances.
   **Satisfies**: SC-004, SC-005, FR-026, FR-032. **Done when**: every in-scope surface is correct at
   360px→desktop and every animation respects the reduced-motion setting.
 
-- [ ] T027 Run the test gate: `npm run test` (Vitest/RTL — incl. the new `OtpPanel` + `BreathingOrb`
+- [ ] T028 Run the test gate: `npm run test` (Vitest/RTL — incl. the new `OtpPanel` + `BreathingOrb`
   specs) and `npm run test:e2e` (Playwright role e2e, all three roles) both green. **Satisfies**:
   Constitution Principle VII. **Done when**: all unit/RTL tests and the three role e2e tests pass.
 
-- [ ] T028 Update docs (append-only) at `docs/DECISIONS.md` — the type-scale + naming **mechanism**
+- [ ] T029 Update docs (append-only) at `docs/DECISIONS.md` — the type-scale + naming **mechanism**
   (override Tailwind `--text-*`), the `--color-on-accent` token, the `--color-meadow-text` token, the
   **errors=foggy** confirmation, and the **scrim token** (`--color-scrim`) — and note any spec
   deviation in `docs/CHANGELOG.md`. **Satisfies**: FR-035, SC-009, Principle VIII. **Done when**: all
   five decisions are recorded in `docs/DECISIONS.md` and any deviation is in `docs/CHANGELOG.md`.
 
-- [ ] T029 Run `specs/007-visual-redesign/smoke-tests.md` and record results; **Mohamed signs off**
+- [ ] T030 Run `specs/007-visual-redesign/smoke-tests.md` and record results; **Mohamed signs off**
   (Principle VII / Dev-Workflow gate 5). **Satisfies**: FR-035, SC-009, and the human halves of
   SC-001/002/004/005/006. **Done when**: every smoke check is recorded pass and the file is signed off.
 
-- [ ] T030 **End-of-feature cleanup (FR-036)**: delete the throwaway preview/mock files from the repo
+- [ ] T031 **End-of-feature cleanup (FR-036)**: delete the throwaway preview/mock files from the repo
   root — `serenify-007-otp-mock.html`, `serenify-007-orb-mock.html`, `serenify-007-patterns-swatch.html`
   (and any prior `serenify-redesign-preview.html` / `serenify-font-preview-d5.html`). They stay
   **untracked** until this task. **Satisfies**: FR-036. **Done when**: none of the listed mocks remain
@@ -342,7 +357,7 @@ ready for Mohamed's merge review.
 - **Phase 1 (T001–T008)**: serial, single-agent. **T008 is a hard gate** — Phase 2 cannot start
   until the Phase-1 exit re-check passes.
 - **Phase 2 (T009–T020)**: all `[P]` — disjoint file scopes against the frozen Phase-1 contract.
-- **Phase 3 (T021–T030)**: serial, after all of Phase 2 merges.
+- **Phase 3 (T021–T031)**: serial, after all of Phase 2 merges.
 
 ### Within-phase notes
 
@@ -357,7 +372,7 @@ ready for Mohamed's merge review.
     frozen interfaces, so parallel.
   - T019 (primitives) ∥ T020 (their nav consumers) — disjoint files.
   - T012 depends on T011; T017 depends on T016 (same bespoke-component agent, test alongside build).
-- **Phase 3**: T021→…→T030 in order; T030 (mock deletion) is strictly **last**.
+- **Phase 3**: T021→…→T031 in order; T031 (mock deletion) is strictly **last**.
 
 ### Parallel execution example (Phase 2, after T008 passes)
 

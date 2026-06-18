@@ -220,13 +220,15 @@ not scope changes; they keep the plan honest.
 
 7. **OTP is one shared component across both verify flows.** `OtpPanel`
    (`components/ui/auth/otp-panel.tsx`, props `{ email, action, successHref, helperText }`) is
-   rendered by `signup-form.tsx:86` (`action=verifySignupOtp`, success → onboarding) and
-   `forgot-form.tsx:75` (`action=verifyResetOtp`, success → reset-password continuation). The
+   rendered by `signup-form.tsx:86` (`action=verifySignupOtp`, literal `successHref="/app"`) and
+   `forgot-form.tsx:75` (`action=verifyResetOtp`, literal `successHref="/reset-password"`). The
    password-reset code is entered on the **`/forgot-password` "check email" surface**, not on
    `/reset-password`. Only `action`/`successHref` differ — exactly the spec's "same component, only
-   the success handoff target differs." **Freezing `OtpPanel`'s props API** is what keeps the OTP
-   task and the auth-screens task on disjoint files (the call sites pass props; they are not edited
-   for the OTP redesign).
+   the success handoff target differs." **Note**: the sign-up `successHref` is the literal **`/app`**
+   (not `/onboarding`); `/app` routes onward to onboarding for incomplete profiles, which is the spec's
+   "onboarding after sign-up verification" outcome — so T012 asserts `router.replace("/app")`.
+   **Freezing `OtpPanel`'s props API** is what keeps the OTP task and the auth-screens task on disjoint
+   files (the call sites pass props; they are not edited for the OTP redesign).
 
 8. **`baseline-section.tsx` lives under `components/anchor/` but is rendered only by the Account
    page** (`account/page.tsx:9,63`), not by the calibration route. Its redesign concern — the

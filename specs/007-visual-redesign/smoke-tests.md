@@ -49,6 +49,8 @@ Intended Replacements changed in meaning.
 - ☐ **Account baseline**: has-anchor · no-anchor
 - ☐ **Dashboard cards**: populated · empty (e.g. no recent chats)
 - ☐ **Roles**: employee · team-lead · admin views (where they differ)
+- ☐ **One-off geometry (FR-020)**: the named one-offs (`rounded-[28px]`, `aspect-[3/4]`, per-call
+  button heights) still render, and no interactive radius falls outside 8–16px.
 
 **Pass when**: every item renders/functions; no route, validation rule, or copy meaning changed.
 Result: ____________________________________________
@@ -165,6 +167,22 @@ The global override bumps `text-xs` 12→13 and `text-base` 16→17.
 
 ---
 
+## ST-11 — No stray colour literals (token integrity, FR-006)
+
+After the token swap, no surface should keep a per-component colour literal pinning an old value.
+
+```bash
+rg "bg-\[#|text-\[#|border-\[#" apps/web
+rg -i "7A9275|8AA9B6|DCB587|7B4244|D6D7D1|ECEEE9|F5F6F2|1F2522|6E7572|161917|20231F|DCDED5|8B928F|97AE91|9CBBC7|2D3130|C17F81" apps/web
+```
+
+- ☐ No stray `#hex` / `bg-[#…]` / `text-[#…]` colour literal pins an old value; every surviving literal
+  is a deliberate, documented value (migrated to its Graphite token otherwise).
+
+**Pass when**: no old-value colour literal remains. Result: ____________________________
+
+---
+
 ## Result log
 
 | ID | Check | Result | Note |
@@ -179,3 +197,4 @@ The global override bumps `text-xs` 12→13 and `text-base` 16→17.
 | ST-8 | Errors foggy / amber signal-only | ☐ | |
 | ST-9 | Dark-mode scrim | ☐ | |
 | ST-10 | Type-scale bump no reflow | ☐ | |
+| ST-11 | No stray colour literals | ☐ | |
