@@ -12,7 +12,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Mist & Meadow palette — locked by Constitution Principle V.
+ * Graphite palette — locked by Constitution Principle V.
  * Light mode is the default; dark mode swaps tokens via the `.dark`
  * class on the <html> element (next-themes attribute="class") —
  * shadcn's expected selector convention.
@@ -25,22 +25,34 @@
  */
 @theme {
   /* Light mode (default) */
-  --color-bg:       #ECEEE9;
-  --color-surface:  #F5F6F2;
-  --color-ink:      #1F2522;
-  --color-muted:    #6E7572;
-  --color-meadow:   #7A9275;
-  --color-foggy:    #8AA9B6;
-  --color-amber:    #DCB587;
-  --color-crimson:  #7B4244;
-  --color-border:   #D6D7D1;
+  --color-bg:       #EAEBEC;
+  --color-surface:  #F4F5F6;
+  --color-ink:      #1C2023;
+  --color-muted:    #585D61;
+  --color-meadow:   #3E7A63;
+  --color-foggy:    #356E88;
+  --color-amber:    #C98637;
+  --color-crimson:  #894A4E;
+  --color-border:   #D7D9DC;
+
+  /* New role tokens (Amendment 4) */
+  --color-on-accent:   #F8F9FA;                 /* filled meadow/foggy CTA fg (light); dark fg = --color-bg */
+  --color-meadow-text: #346A56;                 /* small meadow TEXT on light bg (FR-017); swaps per mode */
+  --color-scrim:       rgba(28, 32, 35, 0.60);  /* Graphite ink @ 60% — fixed in both modes (R-2) */
 
   --radius-card:    12px;
   --radius-control: 8px;
   --shadow-soft:    0 1px 2px rgba(0, 0, 0, 0.04);
 
+  /* Type scale — override only the three deltas vs TW v4 defaults;
+     sm/lg/xl/2xl/3xl already equal the locked values (research.md R-1).
+     Root html font-size is NOT changed (keeps rem zoom/scaling intact). */
+  --text-xs:   0.8125rem;  /* 13px */  --text-xs--line-height:   1.4;
+  --text-base: 1.0625rem;  /* 17px */  --text-base--line-height: 1.5;   /* body ≈1.5 (FR-011) */
+  --text-4xl:  2.375rem;   /* 38px */  --text-4xl--line-height:  1.15;  /* heading ≈1.2 (FR-011) */
+
   --font-sans:      "Inter", system-ui, sans-serif;
-  --font-display:   "DM Serif Display", serif;
+  --font-display:   "Outfit", sans-serif;
 }
 
 /*
@@ -121,21 +133,34 @@
 @layer base {
   /* Dark mode override — equal-priority per Constitution Principle VI. */
   :root.dark {
-    --color-bg:      #161917;
-    --color-surface: #20231F;
-    --color-ink:     #DCDED5;
-    --color-muted:   #8B928F;
-    --color-meadow:  #97AE91;
-    --color-foggy:   #9CBBC7;
-    --color-amber:   #DCB587;
-    --color-crimson: #C17F81;
-    --color-border:  #2D3130;
+    --color-bg:      #101214;
+    --color-surface: #181B1E;
+    --color-ink:     #E2E5E8;
+    --color-muted:   #939A9F;
+    --color-meadow:  #63B292;
+    --color-foggy:   #74B6CE;
+    --color-amber:   #E4AE5C;
+    --color-crimson: #C98589;
+    --color-border:  #23272B;
+
+    /* meadow-as-text swaps to the dark meadow; on-accent + scrim do NOT swap */
+    --color-meadow-text: #63B292;
+
+    /* Dark elevation: deeper alpha so the single soft shadow still reads
+       against the near-black bg (FR-020 / research.md R-3.5). */
+    --shadow-soft:   0 1px 2px rgba(0, 0, 0, 0.5);
   }
 
   html, body {
     background-color: var(--color-bg);
     color: var(--color-ink);
     font-family: var(--font-sans);
+  }
+
+  /* 17px base body (FR-011): a px-token inherit on <body> only — never a
+     root/html font-size change (that would rescale every rem utility). */
+  body {
+    font-size: var(--text-base);
   }
 
   /* Respect prefers-reduced-motion per Constitution Principle VI. */
