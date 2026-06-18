@@ -99,7 +99,7 @@ export function SignupForm({
               setSubmitState(null);
               setSubmittedEmail(null);
             }}
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Start over
           </button>
@@ -170,19 +170,19 @@ export function SignupForm({
         {existsMessage && (
           <p
             role="status"
-            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+            className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
           >
             {existsMessage}{" "}
             <Link
               href="/login"
-              className="text-meadow underline-offset-4 hover:underline"
+              className="text-meadow-text underline-offset-4 hover:underline"
             >
               Sign in
             </Link>{" "}
             ·{" "}
             <Link
               href="/forgot-password"
-              className="text-meadow underline-offset-4 hover:underline"
+              className="text-meadow-text underline-offset-4 hover:underline"
             >
               Reset password
             </Link>
@@ -192,7 +192,7 @@ export function SignupForm({
         {errorMessage && submitState?.status === "error" && (
           <p
             role="alert"
-            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+            className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
           >
             {errorMessage}
           </p>
@@ -210,7 +210,7 @@ export function SignupForm({
           Already have an account?{" "}
           <Link
             href="/login"
-            className="text-meadow underline-offset-4 hover:underline"
+            className="text-meadow-text underline-offset-4 hover:underline"
           >
             Sign in
           </Link>

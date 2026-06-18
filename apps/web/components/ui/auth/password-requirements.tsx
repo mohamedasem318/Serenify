@@ -33,7 +33,7 @@ type Props = {
 /**
  * Live password requirements checklist. Replaces the static helper
  * string "At least 8 characters with a letter and a number." with a
- * three-item list that lights up (Lucide Check, text-meadow) as the
+ * three-item list that lights up (Lucide Check, text-meadow-text) as the
  * user types and each rule is met. Once all three are satisfied the
  * list collapses to a single calm "Password looks good." line.
  *
@@ -55,7 +55,7 @@ export function PasswordRequirements({ value, id }: Props) {
             <li
               key={ruleId}
               data-met={met ? "true" : "false"}
-              className={`flex items-center gap-2 ${met ? "text-meadow" : "text-muted"}`}
+              className={`flex items-center gap-2 ${met ? "text-meadow-text" : "text-muted"}`}
             >
               <Check
                 aria-hidden

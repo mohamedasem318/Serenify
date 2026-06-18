@@ -18,7 +18,7 @@ export default async function LoginPage({
       {isExpiredLink && (
         <p
           role="status"
-          className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+          className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
         >
           Your activation link expired. Please sign in below.
         </p>
