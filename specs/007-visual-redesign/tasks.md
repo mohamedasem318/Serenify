@@ -150,7 +150,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-B — OTP bespoke component (US3)
 
-- [ ] T011 [P] [US3] Redesign `OtpPanel` into the six-box merge in
+- [x] T011 [P] [US3] Redesign `OtpPanel` into the six-box merge in
   `apps/web/components/ui/auth/otp-panel.tsx` plus new `apps/web/components/ui/auth/otp-*.tsx`
   sub-files (owns the `otp-*` filename namespace under `ui/auth/`). Six single-digit boxes (Outfit
   numerals), numeric inputmode, auto-advance, backspace-to-previous, paste-fills-all-six, ≥44px touch
@@ -166,7 +166,7 @@ enumerated hand-work + the two bespoke builds.
   `verifyResetOtp`/`/reset-password`) render the same six-box component; the merge/sway/reduced-motion
   match the mock by eye; the props signature is unchanged.
 
-- [ ] T012 [P] [US3] Author Vitest/RTL **behaviour** tests in
+- [x] T012 [P] [US3] Author Vitest/RTL **behaviour** tests in
   `apps/web/components/ui/auth/otp-panel.test.tsx` (extend if present): reduced-motion branch is
   taken via `useMediaQuery` (no sweep/merge/lift; verified pill shown directly); a wrong code clears
   all six digits and returns focus to box 1; a correct code calls `router.replace(successHref)` for
