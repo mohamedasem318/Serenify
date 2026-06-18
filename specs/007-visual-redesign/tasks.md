@@ -42,7 +42,7 @@ depends on. Single-agent and serial because these are shared files. **No Phase-2
 T008 (the Phase-1 exit re-check) passes.** Tasks T001–T005 all edit `apps/web/app/globals.css` and
 are sequential edits to that one file.
 
-- [ ] T001 Swap the nine semantic role token **values** to Graphite (names unchanged) in the real
+- [x] T001 Swap the nine semantic role token **values** to Graphite (names unchanged) in the real
   `@theme` block and the `:root.dark` override of `apps/web/app/globals.css`, per plan.md §1.1
   (light: bg `#EAEBEC`, surface `#F4F5F6`, ink `#1C2023`, muted `#585D61`, meadow `#3E7A63`, foggy
   `#356E88`, amber `#C98637`, crimson `#894A4E`, border `#D7D9DC`; dark: bg `#101214`, surface
@@ -51,7 +51,7 @@ are sequential edits to that one file.
   FR-006. **Done when**: every role token holds its Graphite value in both blocks; the `@theme inline`
   alias layer is byte-for-byte unchanged; `--color-muted` is still outside `@theme inline`.
 
-- [ ] T002 Add the three new real `@theme` tokens in `apps/web/app/globals.css`, per plan.md §1.2:
+- [x] T002 Add the three new real `@theme` tokens in `apps/web/app/globals.css`, per plan.md §1.2:
   `--color-on-accent: #F8F9FA` (light; no dark override — dark filled-accent fg uses `--color-bg`);
   `--color-meadow-text: #346A56` (light) with a `:root.dark` override `#63B292`; and
   `--color-scrim: rgba(28,32,35,0.60)` (fixed, **no** dark override — research.md R-2).
@@ -59,7 +59,7 @@ are sequential edits to that one file.
   `text-meadow-text` utilities resolve; `--color-meadow-text` swaps per mode; `--color-scrim` does
   not swap.
 
-- [ ] T003 Override the three type-scale steps + line-heights and set the 17px base body in
+- [x] T003 Override the three type-scale steps + line-heights and set the 17px base body in
   `apps/web/app/globals.css`, per plan.md §1.3 / research.md R-1 (`--text-xs: 0.8125rem`/13px,
   `--text-base: 1.0625rem`/17px, `--text-4xl: 2.375rem`/38px, with `--text-*--line-height`
   companions: body ≈1.5, headings ≈1.2; add `body { font-size: var(--text-base) }` in `@layer base`).
@@ -68,13 +68,13 @@ are sequential edits to that one file.
   `text-4xl`=38px render; untokened body text inherits 17px; the `sm:text-5xl` hero wordmark and
   `text-8xl` countdown one-offs are untouched.
 
-- [ ] T004 Confirm the dark-mode `--shadow-soft` value and refresh the palette comment in
+- [x] T004 Confirm the dark-mode `--shadow-soft` value and refresh the palette comment in
   `apps/web/app/globals.css`, per plan.md §1.7 / research.md R-3.5 (add a `:root.dark`
   `--shadow-soft` with a perceptible alpha, or document border-only dark elevation; rename the
   "Mist & Meadow" comment to "Graphite"). **Satisfies**: FR-020. **Done when**: a single soft shadow
   is the only elevation shadow and reads in both modes; the comment says Graphite.
 
-- [ ] T005 Wire **Outfit** as the display font and retire DM Serif Display in
+- [x] T005 Wire **Outfit** as the display font and retire DM Serif Display in
   `apps/web/app/layout.tsx` (replace the `DM_Serif_Display` import/instance with `Outfit` from
   `next/font/google`, keep `Inter`; keep the `--font-display` / `--font-sans` variable bindings) and
   repoint `--font-display: "Outfit", sans-serif` in `apps/web/app/globals.css`, per plan.md §1.4 /
@@ -82,21 +82,21 @@ are sequential edits to that one file.
   sites render Outfit; `DM_Serif`/`"DM Serif Display"` appears in **no** source (stale code comments
   cleaned).
 
-- [ ] T006 Fix the filled-accent foreground at the shared button primitive in
+- [x] T006 Fix the filled-accent foreground at the shared button primitive in
   `apps/web/components/ui/button.tsx`, per plan.md §1.5: `meadow` and `foggy` variants change
   `text-ink` → `text-on-accent` (keep `dark:text-bg`); all other variants/props/names/sizes
   unchanged. **Satisfies**: FR-008, FR-014. **Done when**: filled meadow/foggy buttons render
   near-white (light) / bg-token (dark) foreground; the `buttonVariants` public API
   (`default|destructive|outline|secondary|meadow|foggy|ghost|link`, `size`, `asChild`) is unchanged.
 
-- [ ] T007 Replace the wordmark in its **three** locations — `apps/web/components/header/header.tsx`,
+- [x] T007 Replace the wordmark in its **three** locations — `apps/web/components/header/header.tsx`,
   `apps/web/app/(auth)/layout.tsx`, `apps/web/app/(onboarding)/layout.tsx`: capital `Serenify` +
   meadow-dot `<span>` → lowercase **`serenify`**, dot removed, `font-display` (Outfit) kept; update
   the stale "DM Serif Display wordmark" comment in `(auth)/layout.tsx`. These three files are owned
   entirely by Phase 1. **Satisfies**: FR-013. **Done when**: all three render lowercase `serenify`
   with no dot; capital-`Serenify`-as-wordmark and the dot span appear in none of the three.
 
-- [ ] T008 **Phase-1 exit re-check (GATE)** — verify before unfreezing Phase 2, per plan.md
+- [x] T008 **Phase-1 exit re-check (GATE)** — verify before unfreezing Phase 2, per plan.md
   "Phase-1 exit": (a) `@theme inline` untouched and `--color-muted` still outside it; (b) AA spot-
   check the filled-CTA foregrounds (meadow + foggy) and `--color-meadow-text` in **both** modes;
   (c) grep confirms DM Serif and the capital-wordmark/dot are gone from the three frozen files;
