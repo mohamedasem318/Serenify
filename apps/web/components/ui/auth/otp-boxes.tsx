@@ -101,20 +101,29 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
   }, [disabled, digits]);
 
   // Slide the six boxes edge-to-edge, centred, so the row reads as one bar.
-  // Measured from layout; a no-op where layout is unavailable (jsdom/SSR),
-  // where the pill overlay alone carries the verified state.
+  // The converged boxes OVERLAP by a hair (OVERLAP px) rather than merely
+  // abutting: at narrow / fractional widths and high DPR, six abutting meadow
+  // fills can land on sub-pixel boundaries and expose a hairline seam where the
+  // page bg shows between adjacent boxes. A ~1.5px same-colour overlap (meadow
+  // over meadow → invisible) makes a seam impossible at every width without
+  // changing the merge motion. Measured from layout; a no-op where layout is
+  // unavailable (jsdom/SSR), where the pill overlay alone carries the verified
+  // state.
   function meltTogether() {
     const first = inputs.current[0];
     const row = rowRef.current;
     if (!first || !row) return;
     const w = first.getBoundingClientRect().width;
     if (w <= 0) return;
+    const OVERLAP = 1.5;
+    const step = w - OVERLAP; // adjacent box-left spacing → a 1.5px meadow overlap
+    const barW = COUNT * w - (COUNT - 1) * OVERLAP;
     const r = row.getBoundingClientRect();
-    const mid = r.left + r.width / 2;
+    const startLeft = r.left + r.width / 2 - barW / 2; // keep the merged bar centred
     inputs.current.forEach((box, i) => {
       if (!box) return;
       const cur = box.getBoundingClientRect();
-      const target = mid - (COUNT / 2) * w + i * w;
+      const target = startLeft + i * step;
       box.style.transform = `translateX(${target - cur.left}px)`;
     });
   }
