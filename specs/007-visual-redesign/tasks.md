@@ -221,7 +221,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-E-orb — Breathing-orb bloom (bespoke) (US4)
 
-- [ ] T016 [P] [US4] Rebuild the orb as a clean layered meadow bloom in
+- [x] T016 [P] [US4] Rebuild the orb as a clean layered meadow bloom in
   `apps/web/components/anchor/breathing-guide.tsx`: **remove the inline `backdropFilter`/
   `WebkitBackdropFilter` frost** (the `FROST_FILTER`/`FROST_VEIL`/`FROST_MASK` glassmorphism) and
   render concentric translucent meadow discs (radial-gradient / stepped-opacity) that scale with the
@@ -231,7 +231,7 @@ enumerated hand-work + the two bespoke builds.
   SC-003, SC-005, SC-006. **Done when**: no backdrop-filter remains in the file, the orb matches the
   mock by eye, and the reduced-motion branch renders a static bloom.
 
-- [ ] T017 [P] [US4] Author Vitest/RTL **behaviour** tests in
+- [x] T017 [P] [US4] Author Vitest/RTL **behaviour** tests in
   `apps/web/components/anchor/breathing-guide.test.tsx` (extend the existing file): the reduced-motion
   branch is taken via `useMediaQuery` (static bloom — no animating `motion.div`); the breathe label
   swaps on the in/out cadence. Assert behaviour/state, **not** animation visuals. **Satisfies**:
@@ -240,7 +240,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-E-overlay — Framing brackets / spotlight (US4)
 
-- [ ] T018 [P] [US4] Recolour the framing overlay in
+- [x] T018 [P] [US4] Recolour the framing overlay in
   `apps/web/components/anchor/framing-overlay.tsx`: state-coloured brackets — **meadow when tracking
   is good, foggy when attention is needed**, neutral `border-white/70` brackets migrated to a state
   colour (FR-022/FR-029); the spotlight dim `rgba(20,24,22,…)` → a Graphite ink-derived value; the
