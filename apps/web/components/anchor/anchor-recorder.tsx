@@ -25,6 +25,7 @@ import { FramingOverlay } from "./framing-overlay";
 import { GetReadyCountdown } from "./get-ready-countdown";
 import { GreenRoom } from "./green-room";
 import { Intro } from "./intro";
+import { CaptureProgressBar } from "./recording-timer";
 import { RecordingStage } from "./recording-stage";
 import { StopConfirm } from "./stop-confirm";
 import { SuccessState } from "./success-state";
@@ -619,6 +620,16 @@ export function AnchorRecorder({
               </>
             )}
           </div>
+
+          {/* CAPTURE PROGRESS — a slim bar HUGGING the preview (FR-030: a bar
+              directly below the preview, never a ring around the orb). Advances
+              even under reduced motion (FR-032); the mm:ss readout lives in the
+              card below. */}
+          {(status === "recording" || status === "stop-confirming") && (
+            <div className="mt-2">
+              <CaptureProgressBar remaining={remaining} total={RECORDING_SECONDS} />
+            </div>
+          )}
 
           {/* CONTROLS / WORDS — a calm region BELOW the preview for every stage,
               never absolutely positioned over it (so it can't clip the brackets). */}
