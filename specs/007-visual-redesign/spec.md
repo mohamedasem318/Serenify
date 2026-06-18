@@ -132,24 +132,32 @@ scrim against the surfaces it covers.
 
 ### User Story 3 - OTP verification feels like a calm handoff, not a form (Priority: P2)
 
-At the auth → onboarding handoff, the user enters a six-digit verification code into six separate
-single-digit boxes that auto-advance as they type, accept a pasted code into all six at once, and
-support backspace-to-previous. When the code is correct, the six boxes resolve into a single calm
-"Verified" pill that lifts toward onboarding; when it is wrong, the row gives a gentle foggy sway,
-shows a calm foggy notice, clears, and returns focus to the first box — never a sharp red shake.
+The app already has a functional OTP verification step — rendered today as a single text box — used
+in **two** existing flows: sign-up / account verification and password reset. This feature redesigns
+that single box into six separate single-digit boxes that auto-advance as they type, accept a pasted
+code into all six at once, and support backspace-to-previous, in **both** flows. It changes
+presentation and animation **only** — the existing verification/validation logic and all backend
+behaviour are untouched (consistent with FR-004). When the code is correct, the six boxes resolve
+into a single calm "Verified" pill that lifts toward the flow's next step — onboarding after sign-up
+verification, or the existing password-reset continuation after a verified reset code; when it is
+wrong, the row gives a gentle foggy sway, shows a calm foggy notice, clears, and returns focus to the
+first box — never a sharp red shake. The merge / sway / reduced-motion behaviour is identical in both
+flows; only the success handoff target differs.
 
-**Why this priority**: The OTP component is bespoke new interaction work (not a re-skin of an
-existing surface) and is the emotional first impression of the post-signup journey. It is P2 rather
-than P1 because the foundation (US1) and legibility (US2) must be frozen first, but it is the
-single most distinctive new build in this feature and has an approved mock as its source of truth.
+**Why this priority**: The OTP component is the most distinctive bespoke interaction in this feature
+— a presentation-and-animation redesign of the existing single-box verification step (logic
+untouched), shared across the sign-up-verification and password-reset flows. It is P2 rather than P1
+because the foundation (US1) and legibility (US2) must be frozen first, but it is the single most
+distinctive new build in this feature and has an approved mock as its source of truth.
 
 **Independent Test**: Drive the OTP component through empty, partial, complete, wrong-code, and
-success states. On success, confirm the meadow halo sweep, the boxes merging edge-to-edge into one
-pill as their separators melt, the "Verified" check resolving, and the lift — matching the approved
-mock — and confirm the reduced-motion path shows the verified pill directly with no sweep/merge/
-lift. On a wrong code, confirm the foggy sway (not red, not a sharp shake), the calm foggy notice,
-the cleared digits, and focus back on box 1 — and confirm the reduced-motion path skips the sway but
-still shows the notice and clears.
+success states in **both** the sign-up-verification and password-reset contexts. On success, confirm
+the meadow halo sweep, the boxes merging edge-to-edge into one pill as their separators melt, the
+"Verified" check resolving, and the lift toward that flow's next step — matching the approved mock —
+and confirm the reduced-motion path shows the verified pill directly with no sweep/merge/lift. On a
+wrong code, confirm the foggy sway (not red, not a sharp shake), the calm foggy notice, the cleared
+digits, and focus back on box 1 — and confirm the reduced-motion path skips the sway but still shows
+the notice and clears.
 
 **Acceptance Scenarios**:
 
@@ -160,7 +168,9 @@ still shows the notice and clears.
    sweeps box 1→6 staggered, the six boxes slide together edge-to-edge centred while their
    separators (borders + gaps) melt and the boxes fill meadow with rounded ends so the row *becomes*
    one pill (no separate pill fading in over the top), a "Verified" check resolves on it, and the
-   pill lifts toward onboarding — at a calm ~3s pacing weighted so the merge reads clearly.
+   pill lifts toward the flow's next step (onboarding after sign-up verification; the password-reset
+   continuation after a verified reset code) — at a calm ~3s pacing weighted so the merge reads
+   clearly.
 3. **Given** a correct code with `prefers-reduced-motion`, **When** it is accepted, **Then** the
    sweep and merge are skipped, the verified pill is shown directly, and there is no lift.
 4. **Given** a wrong code with motion allowed, **When** it is submitted, **Then** the row gives a
@@ -170,6 +180,10 @@ still shows the notice and clears.
 5. **Given** a wrong code with `prefers-reduced-motion`, **When** it is submitted, **Then** the sway
    is skipped but the foggy notice still appears and the digits still clear; the error treatment is
    never red.
+6. **Given** either flow (sign-up verification or password reset), **When** the OTP step renders,
+   **Then** it is the same six-box component with identical merge / sway / reduced-motion behaviour,
+   and the underlying verification/validation logic and backend behaviour are unchanged from today's
+   single-box step — presentation and animation only.
 
 ---
 
@@ -304,10 +318,13 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 ### Functional Requirements — Graphite tokens & palette
 
 - **FR-005**: The semantic role token names MUST be **unchanged** (`--color-bg`, `--color-surface`,
-  `--color-ink`/`--color-text`, `--color-muted`, `--color-meadow`, `--color-foggy`, `--color-amber`,
+  `--color-ink`, `--color-muted`, `--color-meadow`, `--color-foggy`, `--color-amber`,
   `--color-crimson`, `--color-border`); only their **values** change to the Graphite light/dark
-  values ratified in Constitution Principle V (Amendment 4). The real tokens live in the Tailwind v4
-  `@theme` layer.
+  values ratified in Constitution Principle V (Amendment 4). The foreground-text role is the **single
+  existing `--color-ink` token** whose value is swapped per mode (light `#1C2023`; dark `#E2E5E8`, set
+  in the `:root.dark` override) — there is **no** separate `--color-text` token in `globals.css`, and
+  one MUST NOT be introduced; the Graphite dark-mode "text" value is carried by `--color-ink`. The
+  real tokens live in the Tailwind v4 `@theme` layer.
 - **FR-006**: Swapping the ~9 `@theme` token values MUST **auto-propagate** to every token-driven
   surface, including all `/10 /15 /50` opacity variants. No surface may keep a per-component colour
   literal that pins an old value; any such literal is migrated to the token.
@@ -393,28 +410,34 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
   soft drop-shadow on-video overlay → kept (the established on-video pattern) with legibility
   verified.
 
-### Functional Requirements — Bespoke component: OTP verification (auth → onboarding)
+### Functional Requirements — Bespoke component: OTP verification (sign-up verification + password reset)
 
-- **FR-023**: The OTP input MUST be six separate single-digit boxes (Outfit numerals) with numeric
-  input mode, auto-advance on entry, backspace-to-previous, paste-fills-all-six, ≥44px touch
-  targets, and boxes that shrink and may wrap at 360px. The OTP component changes presentation and
-  animation only — it MUST NOT change the underlying code-validation rule or the meaning of its
-  copy.
+- **FR-023**: The app's existing OTP verification step — today a single text box, used in **both**
+  the sign-up / account-verification flow and the password-reset flow — MUST be redesigned into six
+  separate single-digit boxes (Outfit numerals) with numeric input mode, auto-advance on entry,
+  backspace-to-previous, paste-fills-all-six, ≥44px touch targets, and boxes that shrink and may wrap
+  at 360px, in **both** flows. The OTP redesign changes presentation and animation **only** — it MUST
+  NOT change the underlying code-verification/validation rule, the backend behaviour, or the meaning
+  of its copy (consistent with FR-004).
 - **FR-024**: On a **correct** code (motion allowed), a meadow halo MUST sweep box 1→6 (staggered),
   then the six boxes MUST slide together edge-to-edge centred while their separators (borders + gaps)
   **melt** — boxes fill meadow and the ends round — so the row *becomes* one pill (no separate pill
-  fading in over the top); a "Verified" check resolves on it; the pill then lifts toward onboarding.
-  Pacing is calm (~3s total), weighted so the merge-into-pill reads clearly.
+  fading in over the top); a "Verified" check resolves on it; the pill then lifts toward **the flow's
+  next step** — onboarding after sign-up verification, or the existing password-reset continuation
+  after a verified reset code. Pacing is calm (~3s total), weighted so the merge-into-pill reads
+  clearly. The merge behaviour is identical in both flows; only the success handoff target differs.
 - **FR-025**: On a **wrong** code (motion allowed), the row MUST give a gentle **foggy** sway (low
   amplitude, ~0.9s, ease-in-out — never a sharp red shake), show a foggy soft-tint notice reading
   "That code didn't match — give it another go.", then clear the digits and return focus to box 1.
-  The wrong-code treatment MUST never be red.
+  The wrong-code treatment MUST never be red. This wrong-code behaviour is identical in both the
+  sign-up-verification and password-reset flows.
 - **FR-026**: Under `prefers-reduced-motion`, the OTP MUST: on success, skip the sweep and merge,
   show the verified pill directly, and not lift; on a wrong code, skip the sway but still show the
   notice and clear the digits. Reduced motion MUST be detected via the repo's `useMediaQuery` hook,
-  **not** framer's `useReducedMotion`.
+  **not** framer's `useReducedMotion`. This reduced-motion behaviour is identical in both flows.
 - **FR-027**: The OTP component MUST match its approved mock (`serenify-007-otp-mock.html`) as the
-  visual source of truth.
+  visual source of truth, in both the sign-up-verification and password-reset contexts (the same
+  component renders in both).
 
 ### Functional Requirements — Bespoke component: breathing-orb bloom (calibration)
 
@@ -444,7 +467,9 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 
 - **FR-034**: The following surfaces MUST be recoloured + re-typed against their already-approved
   layouts, with the folded-in fixes noted: **Auth** (login, signup, forgot-password, reset-password,
-  plus the new OTP flow; meadow links → `--color-meadow-text`; any amber notices → foggy);
+  plus the redesigned OTP verification step that appears in **both** the sign-up-verification and
+  password-reset flows per FR-023…FR-027; meadow links → `--color-meadow-text`; any amber notices →
+  foggy);
   **Onboarding**; **Home dashboard** (header shell, calibration banner one-row desktop layout,
   greeting, two-column card grid, chat pill); **Account** (baseline/recalibrate section incl. the
   has-anchor pill text fix, plus the dark-mode account-menu dropdown contrast fix folded in);
@@ -459,8 +484,13 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
   mechanism, the `--color-on-accent` token, the `--color-meadow-text` token, the errors=foggy
   confirmation, and the scrim token treatment. `docs/CHANGELOG.md` MUST note any deviation from this
   spec. A `smoke-tests.md` MUST be authored and signed off by Mohamed.
-- **FR-036**: The throwaway preview files `serenify-redesign-preview.html` and
-  `serenify-font-preview-d5.html` MUST be deleted as cleanup (if present in the working tree).
+- **FR-036**: All throwaway preview/mock files in the repo root MUST be deleted as cleanup at the
+  **end** of the feature: the prior previews `serenify-redesign-preview.html` and
+  `serenify-font-preview-d5.html` (if present), **and** the three approved 007 mocks
+  `serenify-007-otp-mock.html`, `serenify-007-orb-mock.html`, and `serenify-007-patterns-swatch.html`.
+  The three 007 mocks MUST remain **untracked** (never committed) while the feature is in progress, so
+  the implementing session can open them from the working tree as the visual source of truth, and MUST
+  be deleted once the redesign is complete.
 
 ### Key Entities
 
@@ -490,7 +520,8 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
 
 #### Preserved-States Checklist (every item MUST still exist and function after the redesign)
 
-- **OTP**: empty, partial, complete, wrong-code, success.
+- **OTP** (in **both** the sign-up-verification and password-reset contexts): empty, partial,
+  complete, wrong-code, success.
 - **Calibration**: intro, green-room, countdown, recording, stop-confirm, success, failure-generic,
   failure `insufficient-face`, camera-access (prompt / granted / denied — three states), and the
   backend-down modal.
@@ -542,9 +573,10 @@ repo's `useMediaQuery` hook (not framer's `useReducedMotion`).
   re-litigate them.
 - **The approved mocks are the visual source of truth for the two bespoke pieces.**
   `serenify-007-otp-mock.html` and `serenify-007-orb-mock.html` (and the patterns reference
-  `serenify-007-patterns-swatch.html`) are approved; the OTP/orb behaviour is also fully specified
-  in text here. Claude Code cannot open the mocks from the repo; they may be provided to the
-  implementing session as attachments.
+  `serenify-007-patterns-swatch.html`) are approved. They live **untracked in the repo root** during
+  implementation, so the implementing session can open them directly from the working tree as the
+  visual source of truth; the OTP/orb behaviour is also fully specified in text here. The three mocks
+  MUST NOT be committed, and MUST be deleted at the end of the feature (FR-036).
 - **Token swap auto-propagates most of the palette.** Changing the ~9 `@theme` values is most of the
   recolour and is nearly free; the explicit non-auto-migrating items (scrims, the orb frost removal,
   the framing overlay, the framing brackets, the shadow, the meadow-as-text call sites) are the
@@ -603,12 +635,17 @@ The following are explicitly excluded from this feature:
 - **Constitution Principle VIII (Spec-Driven Workflow)** — SpecKit order (spec → plan → tasks →
   implement); append-only `docs/DECISIONS.md`; `docs/CHANGELOG.md` for any deviation; the Tailwind
   v4 `@theme` rule (real tokens never via `@theme inline`).
-- **Feature 005 (calibration capture flow)** — the intro / green-room / countdown / recording /
-  stop-confirm / success / failure-screen + cause-chip flow and the camera-access states that the
-  calibration re-skin recolours without behavioural change; the orb bloom replaces only the frosted
-  treatment within this flow.
-- **Feature 006 (calibration capture-quality gate)** — the `insufficient-face` failure reason and
-  its calm explanation are among the preserved calibration states that must survive the re-skin.
+- **Feature 004 (onboarding video anchor flow)** — the **origin** of calibration: the webcam
+  capture, the breathing orb, the per-user baseline/anchor, and the onboarding handoff that the
+  redesign recolours. The orb bloom replaces only the frosted treatment introduced here; behaviour is
+  unchanged.
+- **Feature 005 (calibration capture flow)** — the calibration flow reached its **current form** in
+  this feature: the intro / green-room / countdown / recording / stop-confirm / success /
+  failure-screen + cause-chip flow and the camera-access states that the 007 re-skin recolours
+  without behavioural change.
+- **Feature 006 (calibration capture-quality gate)** — added the capture-quality gate and its
+  `insufficient-face` failure reason; that reason and its calm explanation are among the preserved
+  calibration states that must survive the re-skin.
 - **The approved 007 mocks** — `serenify-007-otp-mock.html`, `serenify-007-orb-mock.html`, and
   `serenify-007-patterns-swatch.html` are the visual source of truth for the two bespoke pieces and
   the new patterns.
