@@ -100,7 +100,7 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
         {submitState && submitState.status !== "ok" && (
           <p
             role="alert"
-            className="rounded-control border border-amber/50 bg-amber/10 px-3 py-2 text-sm text-ink"
+            className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
           >
             {submitState.message}
           </p>
