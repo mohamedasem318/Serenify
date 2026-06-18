@@ -4,12 +4,12 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 007 — Visual Redesign (Graphite) (implementation complete; smoke signed off; ready to merge)
+## Feature 007 — Visual Redesign (Graphite) (merged to main)
 
 **Branch**: `007-visual-redesign`
-**Status**: implementation complete (Phases 1–3 / T001–T031, all checked); **`smoke-tests.md`
-signed off by Mohamed 2026-06-18 — all 11 checks PASS**; all gates green. **Ready for Mohamed's
-PR + squash-merge to `main`** (branch is local — not pushed, no PR opened).
+**Status**: **merged to `main`** via **PR #22** (squash `0b71d4a`, 2026-06-18). Implementation
+complete (Phases 1–3 / T001–T031); **`smoke-tests.md` signed off by Mohamed 2026-06-18 — all 11
+checks PASS**; all gates green. Feature branch deleted (local + remote).
 **Date**: 2026-06-18 (close; implementation spanned the 007 cycle on the branch above)
 
 **Scope shipped** — a re-skin + re-type of the entire `apps/web` app onto the deepened **Graphite**
@@ -76,7 +76,7 @@ runtime dependency beyond the self-hosted fonts.
 - ✅ Test gate — all suites + typecheck + lint green locally (webkit flake per above).
 - ✅ Smoke-test gate — **signed off by Mohamed 2026-06-18; all 11 ST PASS** (ST-4/ST-6 re-signed to
   as-shipped after the C1 fix + reconciliation).
-- ⏳ Mohamed's PR + squash-merge to `main` (branch not yet pushed).
+- ✅ **Merged to `main`** — PR #22 (squash `0b71d4a`, 2026-06-18); feature branch deleted.
 
 **Decisions logged in DECISIONS.md**: the 2026-06-17 Amendment-4 block (palette → Graphite, Outfit,
 filled-accent foreground, amber soft-tint, type scale, orb bloom, 007 isolation) + the 2026-06-18
@@ -94,8 +94,8 @@ as the per-user delta baseline that 005 calibrates).
 
 ## Fix — VFR-webm decode mis-sampling (timestamp-driven frame sampling)
 
-**Branch**: `fix/webm-vfr-decode-sampling` → **PR #18** into `main` (open; awaiting the
-operator's merge click).
+**Branch**: `fix/webm-vfr-decode-sampling` → **merged to `main` via PR #18** (`6e85484`,
+2026-06-16).
 **Status**: code validated; this entry is the implementation record. Full rationale in
 **📌 DECISION-29**.
 **Date**: 2026-06-16.
@@ -141,11 +141,11 @@ collapse — not observed; transcode fallback deferred) is recorded in **DECISIO
 
 ---
 
-## Feature 006 — Calibration Capture Quality (implementation complete; awaiting smoke + review)
+## Feature 006 — Calibration Capture Quality (merged to main)
 
 **Branch**: `006-calibration-capture-quality`
-**Status**: implementation complete (Phases 1–8 / T001–T028); **awaiting Mohamed's manual
-smoke run (`smoke-tests.md`) + merge approval**. No pre-ship blocker.
+**Status**: **merged to `main`** via **PR #19** (`7a1c2da`, 2026-06-17). Implementation complete
+(Phases 1–8 / T001–T028); no pre-ship blocker.
 **Date**: 2026-06-16 (implementation spanned the 006 cycle on the branch above)
 
 **Scope shipped** — a server-side, authoritative **usable-face-coverage gate** that fixes the
@@ -202,7 +202,7 @@ throughout (RED → GREEN) for the gate, the router reason, and the frontend chi
 - ✅ Privacy — counts log-only; raw clips never committed; 422 body categorical.
 - ⏳ Smoke-test gate — pending Mohamed's run of
   `specs/006-calibration-capture-quality/smoke-tests.md` (T027, manual).
-- ⏳ Mohamed's final review and merge to `main`.
+- ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Branch commit ordering** (PR-sized, tests green per step): P1–2 env/scaffold (`8cd2027`) →
 P3–4 gate core + wiring (`60983cb`) → P5 fixtures + measurements (`46e3bb8`) → P5 calibrate +
@@ -224,12 +224,12 @@ the reject rate is now observable in the server log, so the number is tunable fr
 
 ---
 
-## Feature 005 — Calibration Capture Flow (implementation complete; one pre-ship blocker open)
+## Feature 005 — Calibration Capture Flow (merged to main)
 
 **Branch**: `005-calibration-capture-flow`
-**Status**: implementation complete; **one hard pre-ship blocker open (T004 — flip the
-capture-route CSP from report-only to enforce)**; awaiting the real-webcam smoke run +
-merge approval.
+**Status**: **merged to `main`** via **PR #17** (`a6a9b19`, 2026-06-08). Implementation complete;
+the capture-route CSP report-only→enforce flip (T004) remained a tracked **deploy** follow-up at
+merge time.
 **Date**: 2026-06-08 (docs-finalisation close; implementation spanned 2026-05-29 → 2026-06-08)
 
 **Scope shipped** — a calm redesign of the calibration capture UX over feature 004's
@@ -392,10 +392,10 @@ read path and the deferred design-system token pass.
 
 ---
 
-## Feature 003 — Employee Dashboard Shell (implementation complete)
+## Feature 003 — Employee Dashboard Shell (merged to main)
 
 **Branch**: `003-employee-dashboard-shell`
-**Status**: implementation complete, awaiting smoke-test + merge approval.
+**Status**: **merged to `main`** via **PR #4** (`b079442`, 2026-05-25). Implementation complete.
 **Date**: 2026-05-25 (Phase 13 close; implementation work spanned 2026-05-19 → 2026-05-25)
 
 **Scope shipped** (13 phases / 71 tasks):
@@ -499,7 +499,7 @@ read path and the deferred design-system token pass.
   `specs/003-employee-dashboard-shell/smoke-tests.md` (T071,
   manual; ST-1 through ST-10 including the three cross-tab +
   email/reset scenarios added in T063.1).
-- ⏳ Mohamed's final review and merge to `main`.
+- ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Decisions logged in DECISIONS.md (2026-05-25, T067)**:
 
@@ -561,10 +561,10 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
 
 ---
 
-## Feature 002 — Demo Seed Data (implementation complete)
+## Feature 002 — Demo Seed Data (merged to main)
 
 **Branch**: `002-demo-seed-data`
-**Status**: implementation complete, awaiting smoke-test + merge approval.
+**Status**: **merged to `main`** (2026-05-18, `0d4f44c`). Implementation complete.
 **Date**: 2026-05-18
 
 **Scope shipped**:
@@ -615,7 +615,7 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
   output, service-role key flows only through `process.env`.
 - ⏳ Smoke-test gate — pending Mohamed's run of
   `specs/002-demo-seed-data/smoke-tests.md` (T025, manual).
-- ⏳ Mohamed's final review and merge to `main`.
+- ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Decisions logged in DECISIONS.md (2026-05-18)**:
 
@@ -629,10 +629,10 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
 
 ---
 
-## Feature 001 — Authentication and Role-Based Access (in review)
+## Feature 001 — Authentication and Role-Based Access (merged to main)
 
 **Branch**: `001-auth-and-roles`
-**Status**: implementation complete, awaiting smoke-test + merge approval.
+**Status**: **merged to `main`** via **PR #1** (`e8a0fac`, 2026-05-17). Implementation complete.
 **Date**: 2026-05-17
 
 **Scope shipped**:
@@ -663,7 +663,7 @@ through `f037b4a` "docs(003): T069 — sweep BACKLOG").
 - ⏳ Smoke-test gate — pending Mohamed's run of
   `specs/001-auth-and-roles/smoke-tests.md` (T041, manual).
 - ⏳ Privacy review — note in `plan.md`'s Constitution Check.
-- ⏳ Mohamed's final review and merge to `main`.
+- ✅ Merged to `main` (see **Status** above for PR / date).
 
 **Deviations logged in DECISIONS.md**:
 
