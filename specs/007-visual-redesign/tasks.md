@@ -251,7 +251,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-F — Shared primitives + scrims (US2)
 
-- [ ] T019 [P] [US2] Re-tokenise scrims and apply the dropdown contrast fix in
+- [x] T019 [P] [US2] Re-tokenise scrims and apply the dropdown contrast fix in
   `apps/web/components/ui/dialog.tsx` (`bg-black/80` → `bg-scrim`),
   `apps/web/components/ui/sheet.tsx` (`bg-black/80` → `bg-scrim`),
   `apps/web/components/notification.tsx` (`bg-black/50` → `bg-scrim` on the mobile overlay; desktop
@@ -264,7 +264,7 @@ enumerated hand-work + the two bespoke builds.
 
 ### P2-G — Header / nav shell consumers (US1)
 
-- [ ] T020 [P] [US1] Recolour/re-type the nav shell in `apps/web/app/(authed)/layout.tsx` and
+- [x] T020 [P] [US1] Recolour/re-type the nav shell in `apps/web/app/(authed)/layout.tsx` and
   `apps/web/components/header/{center-nav,mobile-menu,profile-dropdown}.tsx`. `mobile-menu` consumes
   `Sheet` (P2-F) and `profile-dropdown` consumes `dropdown-menu`/`avatar` (P2-F) — disjoint files, so
   parallel. Does **not** touch `header/header.tsx` (Phase 1). **Satisfies**: FR-034 (header shell);
