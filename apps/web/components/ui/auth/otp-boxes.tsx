@@ -212,7 +212,7 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
     >
       <motion.div
         ref={rowRef}
-        className="flex w-full flex-nowrap justify-center gap-2"
+        className="flex w-full flex-nowrap justify-center gap-1.5 sm:gap-2"
         animate={visual.sway ? { x: [0, -4, 4, -2, 1, 0] } : { x: 0 }}
         transition={visual.sway ? { duration: 0.95, ease: "easeInOut" } : { duration: 0 }}
       >

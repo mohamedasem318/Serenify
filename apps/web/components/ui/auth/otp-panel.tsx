@@ -133,7 +133,7 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
   return (
     <section
       aria-labelledby="otp-heading"
-      className="space-y-4 rounded-card border border-border bg-surface px-4 py-5"
+      className="space-y-4 rounded-card border border-border bg-surface px-3 py-5 sm:px-4"
     >
       <div className="space-y-1.5">
         <h2
