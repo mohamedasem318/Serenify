@@ -27,11 +27,11 @@ function renderHeader() {
 }
 
 describe("Header", () => {
-  it("renders the Serenify wordmark linked to /app with an accessible label", () => {
+  it("renders the serenify wordmark linked to /app with an accessible label", () => {
     renderHeader();
     const link = screen.getByLabelText("Go to home");
     expect(link).toHaveAttribute("href", "/app");
-    expect(link).toHaveTextContent("Serenify");
+    expect(link).toHaveTextContent("serenify");
   });
 
   it("renders the CenterNav and MobileMenu slots", () => {

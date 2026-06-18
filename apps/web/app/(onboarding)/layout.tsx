@@ -37,12 +37,8 @@ export default async function OnboardingLayout({
       <header className="mb-10 flex items-baseline justify-between sm:mb-12">
         <Link href="/app" className="inline-flex items-baseline gap-2">
           <span className="font-display text-4xl leading-none tracking-tight text-ink sm:text-5xl">
-            Serenify
+            serenify
           </span>
-          <span
-            aria-hidden
-            className="h-1.5 w-1.5 rounded-full bg-meadow"
-          />
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />
