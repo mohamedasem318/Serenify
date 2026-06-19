@@ -25,6 +25,7 @@ const SURFACES = [
   "breathing-guide.tsx",
   "calibration-banner.tsx",
   "camera-access-state.tsx",
+  "cause-chip.tsx",
   "device-picker.tsx",
   "failure-state.tsx",
   "framing-overlay.tsx",
@@ -103,7 +104,8 @@ describe("006 face-absence chip — calm voice + foggy (FR-012)", () => {
   const FACE_ABSENCE = /couldn.t see your face for enough/i;
 
   it("isolates the new chip's copy line and asserts no '!', no blocklist term, no colour token", () => {
-    const code = stripComments(readSurface("failure-state.tsx"));
+    // feature 008 T029 extracted the cause vocabulary into the shared cause-chip.tsx.
+    const code = stripComments(readSurface("cause-chip.tsx"));
     const line = code.split("\n").find((l) => FACE_ABSENCE.test(l)) ?? "";
     expect(line, "the insufficient-face chip line must exist after comment-strip").toMatch(
       FACE_ABSENCE,
