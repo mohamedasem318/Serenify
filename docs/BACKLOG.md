@@ -1382,3 +1382,85 @@ StressID dataset as the end-to-end fidelity check.
 live prediction trusts a stored anchor. A thin baseline silently poisons every
 delta-from-baseline reading, so this is a correctness prerequisite for inference, not
 optional polish.
+
+---
+
+## Product-wide / cross-cutting — captured 2026-06-19
+
+These two items were not deferred from a single feature; they are product-wide
+concerns surfaced during the feature 007 / 008 window and logged here so the
+roadmap pulls them in at the right gate rather than re-deriving them.
+
+### Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction) — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE
+**Status**: deferred-feature
+**Category**: legal / compliance / consent
+**Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
+**Description**: The app needs a **Terms of Service** and a **Privacy Policy**, plus an
+**acceptance checkbox on the signup page** (`apps/web/app/(auth)/signup/`) that **gates
+account creation** and links to both documents. None of these exist today.
+
+**Jurisdiction — Egypt.** The governing data-protection statute is the **Personal Data
+Protection Law (Law No. 151 of 2020)**. **Egyptian labour law is also in scope**, because
+the product is employee monitoring and may inform employment-affecting decisions — so the
+documents sit at the intersection of data-protection and employment regimes, not data
+protection alone.
+
+**High-sensitivity case.** This combines **facial/biometric capture**, **inferred
+health-adjacent data** (stress), in an **employment context** — exactly the categories
+these regimes treat **most strictly**. Generic templates are **not acceptable**; the
+documents must be grounded in the actual statute text and the app's real data flows
+(what is captured, where it is processed, who sees what, retention, cross-border).
+
+**⛔ Resourcing reality — record this caveat explicitly.** There is **no external legal
+reviewer available**. The documents will be drafted in-project (Claude + CC), grounded in
+the actual statute text — but this produces an **INFORMED DRAFT, not legal assurance**. A
+**qualified legal review is required before any real (non-demo) user data is processed**.
+The thesis/demo stage may proceed on the informed draft; a real-tenant launch may not.
+**Fix scope**: large (FEATURE work, not a doc-only task). Two real documents authored
+against Law 151/2020 + the employment-law overlay and the app's actual data-handling
+substance; a consent checkbox + links wired into the signup Server Action
+(`apps/web/app/(auth)/signup/actions.ts`) that blocks account creation until accepted;
+acceptance recorded (timestamp + document version) so consent is auditable; and the
+"informed-draft-not-legal-advice" caveat tracked until a qualified legal review clears it.
+**Address by**: draft **alongside feature 012 (privacy-controls-and-transparency)**, since
+that feature defines the exact data-handling substance the documents must describe (manager
+visibility, privacy slider, transparency view) — write the policy and the controls together
+so they cannot drift. **Ship the signup checkbox together with the real documents** (not a
+placeholder linking to empty pages). **Hard gate: before any real user data.** Pairs with
+the security-slice-7 "`/signup` is open self-serve — gate to invite-only — ⛔
+PRE-PRODUCTION DEPLOY BLOCKER" entry (both are binding pre-real-data gates on the signup
+surface) and with the `/app/account` Privacy placeholder that feature 012 fills in.
+
+### Internationalization — Arabic (RTL) and possibly French
+**Status**: deferred-feature
+**Category**: i18n / localization / layout
+**Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
+**Description**: The app should ship an **Arabic** version, and possibly **French**. In the
+Egyptian market **Arabic is arguably the primary language, not an add-on** — treating it as
+an afterthought misreads the target users.
+
+**Load-bearing cost — Arabic is right-to-left.** This is **layout mirroring**, not just
+string translation: logical CSS properties (`margin-inline-*`, `padding-inline-*`, `start`/
+`end`), `dir="rtl"` on the document, and a **per-surface review** of every directional
+element — nav, chevrons, progress bars, the calibration flow, the Graphite layout — to
+confirm it mirrors correctly. **Additional Arabic-specific costs:** the current type stack
+(**Inter and Outfit**) does **not** cover Arabic glyphs, so an Arabic-capable font must be
+added and tuned; and Arabic has **six CLDR plural categories** (vs English's two), so any
+count-driven copy needs full plural handling. **French is lower-cost** (Latin script, LTR)
+but still requires **full string externalization**. Beyond static UI, the **chatbot (010)**
+and **questionnaire (009)** generate **natural-language content** that also needs
+localization, and the **LLM prompts are English-only today**.
+
+**Open decision — is Arabic in scope for the thesis demo, or post-thesis?** The answer
+**changes how strings are written from feature 008 onward**: if Arabic is in, strings must
+be authored into message catalogs as features land; if it is deferred to post-thesis, that
+externalization can wait — but retrofitting it later is the expensive path.
+**Fix scope**: feature-sized for the full retrofit (layout mirroring + Arabic font +
+plural rules + content/LLM-prompt localization across every surface). **Cheap-insurance
+recommendation:** if Arabic is in scope for the thesis, **externalize UI strings into
+message catalogs as new features are built (008 onward)** rather than retrofitting at the
+end — the incremental cost per feature is small; the end-of-project retrofit is not.
+**Address by**: **decide the thesis-scope question early.** The full RTL retrofit is
+feature-sized and best **not** deferred to the very end if Arabic is in scope — the
+string-externalization discipline must start at feature 008 to avoid a costly retrofit,
+even if the actual Arabic translation + RTL pass ships later.
