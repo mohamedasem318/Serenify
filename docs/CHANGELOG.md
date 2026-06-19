@@ -1821,3 +1821,17 @@ is a plan-level amendment.
   GATE** (continuous clip vs ~6 stop/restart clips within tolerance). The R-6
   webm/VFR **codec** check stays scheduled hardening. *Superseded*: the B1 path in the
   bullet above.
+
+### 008 spec back-ported to the resolved decisions (2026-06-19)
+
+- **`spec.md` reconciled** (it had been left stale while the plan amended decisions
+  late; `/speckit-analyze` flagged the drift). The spec now matches — never reverts —
+  the authoritative plan resolutions: **SC-001/US1 timing 60–75 s → ~90–105 s**;
+  **`warming-up` added as the 7th operational state** (FR-004, SC-010); **FR-013 / the
+  thin-window edge case → a distinct foggy "skipped a read" note** (not the out-of-frame
+  surface); **FR-014 → D-3 resolved** (trailing mean of 4, bands 0.53/0.70, 4-reading
+  cold-start, server-side); **FR-019 → recap empty state**; **Deferred Decisions D-1…D-4
+  and Mock Gaps MG-1/2/3 annotated RESOLVED** (D-1 = self-scoped `get_my_anchor()`, no
+  service-role; D-2 = session-aware + B2 windowing; ended→dashboard; idle empty state);
+  Test Plan Notes + Principle VII note the **B2 multi-clip fidelity HARD GATE**. A
+  reconciliation note at the top of the spec records this.
