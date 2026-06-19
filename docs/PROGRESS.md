@@ -4,6 +4,34 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 008 — Stress Inference Service (planning)
+
+**Branch**: `008-stress-inference-service`
+**Status**: **plan complete — awaiting review before `/speckit-tasks`.** Spec
+generated + reviewed; `/speckit-plan` produced `plan.md`, `research.md`,
+`data-model.md`, `contracts/inference-api.md`, `contracts/smoothing-and-banding.md`,
+`quickstart.md`. Constitution Check: **PASS** with one logged, justified deviation
+(per-window HTTP request/response transport instead of WebSocket — the prediction
+is the synchronous response to an upload, not polling). No NON-NEGOTIABLE principle
+violated.
+**Date**: 2026-06-19
+
+**Decisions resolved** (DECISIONS 2026-06-19): **D-1** server-side service-role
+anchor read (the path feature 004 explicitly deferred to this feature) + server-side
+reading writes for integrity; **D-2** session-aware endpoints + client-assembled
+60 s window per 10 s stride + server-side smoothing (rolling-feature cache deferred
+to deployment); **D-3** rolling mean of `proba[1]` over last 4 scored readings,
+bands at 0.53 / 0.70 (operating point from metadata; tense-split a display-only
+config), cold-start 4 → first band ~90–105 s; **D-4** `monitoring_sessions` +
+`window_readings`, owner SELECT-own with raw probability/label held server-only, no
+manager policy, 90-day reading retention, FR-020 seam for 009. Seven mock-gap
+resolutions folded in (CHANGELOG 2026-06-19): warming-up 7th state, ~90 s first
+read, distinct foggy skipped-read note, calibrate-first panel, mobile stacking,
+ended→dashboard recap, idle recap empty state. Flagged: `metadata.json`'s stale
+`window_eval_config` (30 s) is not the production window (60 s is locked).
+
+---
+
 ## Feature 007 — Visual Redesign (Graphite) (merged to main)
 
 **Branch**: `007-visual-redesign`

@@ -1714,3 +1714,50 @@ foggy (OTP wrong-code, calibration failure banners, the off-center nudge,
 camera-access-denied, backend-down, auth error `role="alert"` notices, and the
 home calibration attention banner). No unit test pinned these classes, so none
 needed changing.
+
+## 2026-06-19 — spec(008-stress-inference-service) — mock-gap resolutions + one missed state (folded into the plan)
+
+Seven decisions handed down by the mock owner after spec review, folded into
+`specs/008-stress-inference-service/plan.md` (and `research.md`). They resolve the
+spec's three Mock-Gap open questions (MG-1/2/3) and add one operational state the
+spec missed. Per Constitution Principle VIII, the committed `spec.md` is **not**
+retroactively edited; the deltas are recorded here and the updated mock
+`serenify-008-monitoring-mock.html` is the visual contract.
+
+1. **Warming-up is a 7th operational state.** Before the first window completes
+   there is no reading. A calm, neutral-bloom **warming-up** state ("getting a read
+   on things") shows until the smoothing buffer holds enough readings (plan D-3
+   cold-start). **FR-004 delta** — the operational-state list becomes: permission,
+   **warming-up**, active, out-of-frame, paused, blocked, ended (plus the transient
+   skipped-read note and the calibrate-first surface).
+2. **First displayed reading at ~90 s, not ~60 s.** The first state the user sees
+   must already be smoothed, so the display holds warming-up until the cold-start
+   gate clears. **SC-001 delta** — first smoothed reading within **~90–105 s** (was
+   ~60–75 s), then ~every 10 s.
+3. **"Couldn't read this window" gets its own affordance** — a quiet **foggy
+   "skipped a read" note**, NOT the out-of-frame surface (a coverage failure can
+   occur while the user is plainly in frame — glare/low light — so "move back into
+   frame" would be wrong). It names the likely cause + a gentle fix, reusing the
+   feature 005/006 cause vocabulary (`dominantCause`); the bloom keeps the last
+   smoothed state underneath and capture continues. **FR-013 clarified** (it no
+   longer reuses the out-of-frame surface verbatim). Resolves **MG-2**.
+4. **Calibrate-first surface (no-anchor, US3)** — a **foggy** attention panel (not
+   stress) with a short line and a **"Start calibration"** action routing to the
+   calibration flow (forward button is **meadow** per Principle V). Resolves
+   **MG-1** (FR-011 / SC-004 visual).
+5. **Mobile (≥ 360 px) monitoring stage stacks** — bloom shrinks, controls go
+   full-width and stack, pill/viewfinder reposition (Principle VI). Resolves
+   **MG-3** (FR-025).
+6. **"Ended" is not a monitoring-page screen.** Ending returns the user to the
+   **dashboard with an updated recap**; no standalone ended screen is built.
+   **SC-010 delta** — "ended" is verified as the return-to-dashboard-with-recap
+   transition, not a distinct visual.
+7. **Idle recap empty state.** A calibrated user who has never run a session has no
+   "last session"; the idle check-in card shows a graceful empty state ("Start your
+   first check-in") rather than a blank/broken recap. (FR-019 refinement.)
+
+Also recorded in the plan (not a spec gap, but a contract clarification):
+`metadata.json` carries a stale `window_eval_config` (30 s) alongside the
+authoritative 60 s `loso_metrics_60s_calibrated` block — the production window is
+**60 s** per Constitution Principle II + `docs/MODELS.md`; the 30 s block is not
+used (research R-0 flags it for cleanup).

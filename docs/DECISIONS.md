@@ -3072,3 +3072,109 @@ screen reassuring and reserves foggy as the genuine attention/error signal
 icon (meadow-text on `meadow/10`) 4.69:1 light / 6.45:1 dark; shield (meadow on bg)
 4.22:1 light / 7.43:1 dark. This is a targeted refinement, **not** a blanket
 foggy→meadow swap.
+
+---
+
+## 2026-06-19 — feature 008 (stress-inference-service) plan decisions (D-1…D-4 + transport deviation)
+
+Resolves the four Deferred Decisions in `specs/008-stress-inference-service/spec.md`
+and records the one Constitution deviation the plan carries. Full reasoning in
+`specs/008-stress-inference-service/research.md` and `plan.md`. The seven mock-gap
+resolutions handed down by the mock owner are recorded as spec deltas in
+`docs/CHANGELOG.md` (2026-06-19), not here (they are spec amendments, not
+architectural decisions).
+
+**D-1 — Anchor read path: server-side service-role read (option a).** Status:
+Accepted. `apps/api` gains a scoped Supabase service-role client
+(`app/supabase_admin.py`) that reads `profiles.anchor_vector` keyed to the
+JWT-verified `user_id`, and performs the server-side session/reading writes. The
+anchor never enters an authenticated client SELECT.
+*Rationale*: only the server reads the anchor (for inference) and the API already
+operates server-side, so (a) avoids a new DB-function surface (maintainer's lean).
+This is **not** an override of feature 004's DECISION-9 ("the anchor-extract
+service holds no DB credentials") — feature 004 **explicitly deferred** this path
+to the inference feature: `supabase/migrations/20260527000000_anchor_columns.sql`
+states *"service_role (seed, future 005 server-side read) is untouched,"* and the
+004 decision block notes *"feature 005's inference read path for `anchor_vector`
+(server-side service-role read, or a self-scoped SECURITY DEFINER function) is
+still 005's decision"* ("005" = now-008 after the ordering reshuffle). Server-side
+reading also enables server-side **writes** of `window_readings`, required for
+integrity because those rows feed feature 009's sustained-tense detection and the
+client must not be able to fabricate them.
+*Guardrails (Principle IX)*: `SUPABASE_SERVICE_ROLE_KEY` is env-only (platform
+panel in prod; mirrors `apps/web` `serverEnv` + the existing `SUPABASE_JWT_SECRET`);
+the service-role client is used only to read own anchor, read own role (employee
+gate), and write/read own sessions+readings; **every query is keyed by the verified
+JWT `sub`** (service role bypasses RLS, so this keying discipline is the control)
+and is unit-tested.
+*Rejected*: (b) self-scoped SECURITY DEFINER returning the anchor — adds a DB-
+function surface and, if called from the browser, delivers the 2958-d anchor to the
+client (against "keep the anchor out of any authenticated client SELECT").
+
+**D-2 — Endpoint shape + upload/buffer model: session-aware, client-assembled 60 s
+window per stride, server-side smoothing.** Status: Accepted. Three endpoints —
+`POST /monitoring/sessions` (create + calibrate-first guard), `…/{id}/windows`
+(score one window, ~every 10 s), `…/{id}/end`, plus `PATCH …/{id}` for lifecycle
+status. The client assembles the full 60 s window and uploads it per 10 s stride
+(consecutive windows overlap 50 s); the server holds no rolling buffer. Smoothing,
+banding, and the cold-start gate are computed **server-side** in the window
+endpoint and the band is returned, so the first displayed reading is already
+smoothed and the card/page trends agree (SC-008). Reads (trend/recap) are
+browser-side Supabase RLS SELECTs, not API endpoints.
+*Rationale*: session-aware grouping makes the trend/recap and the 009 seam trivial
+and lets a rolling buffer move server-side later without a UI change; client-
+assembled windows reuse the proven `/anchor` multipart path and are negligible on
+localhost.
+*Documented future item (not built now)*: on real deployment this uploads ~6× the
+bytes and re-runs MediaPipe on ~6× overlapping frames; the optimization is a
+**server-side rolling-feature cache** (client sends only the new ~10 s; the server
+reuses overlapping extraction), which the session-aware shape already enables and
+which pairs with the WebSocket transport in the deviation below.
+*Rejected*: a single stateless per-window endpoint (no clean grouping/lifecycle);
+a server rolling buffer now (efficient end state, but stateful complexity before
+it is needed).
+
+**D-3 — Smoothing, banding, cold-start.** Status: Accepted. Smoothing = rolling
+mean of `proba[1]` over the last **N = 4 scored** readings (skipped windows
+excluded). Bands on the **smoothed** value: `< 0.53` At ease, `0.53 ≤ x < 0.70` A
+little tense, `≥ 0.70` Tense. `t_low = 0.53` is the metadata operating point
+(config `STRESS_OPERATING_POINT`, default read from `metadata.json`, never a
+literal — FR-012); `t_high = 0.70` is a **display-only** product split (config
+`STRESS_TENSE_BAND`) because the model carries only the single stress/not-stress
+operating point and `predict_proba` is not probability-calibrated. Cold-start
+**M = 4** scored readings before any band → first band at ~90–105 s (matches
+updated SC-001); the display holds warming-up until then. The internal 0.5 label
+from `predict_delta` is ignored. No numeric value is ever shown (FR-015).
+*Rationale*: 60 s windows overlap 50 s, so readings are already correlated; a
+4-reading trailing mean drifts rather than flickers (SC-003) while staying
+responsive. Details + tests in `contracts/smoothing-and-banding.md`.
+
+**D-4 — Readings persistence schema.** Status: Accepted. Two tables —
+`monitoring_sessions` (lifecycle: active/paused/out_of_frame/ended + end_reason +
+bounds + model_version) and `window_readings` (per window, keyed user+session+
+`captured_at`, with `scored`, `band`, `skip_cause`, and the **server-only** raw
+`label` + `stress_probability`). RLS = SELECT-own for the owner via a column
+whitelist that **excludes the raw probability/label** (the `anchor_vector`
+mechanism); **no manager policy** on either table (Principle I); all writes are
+service-role keyed to the verified `sub`. Retention: `window_readings` 90 days then
+purge (purge job is a documented follow-up); sessions kept longer. The persisted
+`band` + `captured_at` + `session_id` are the FR-020 seam — sufficient for feature
+009 to detect sustained-tense by query; **008 builds no questionnaire trigger**.
+Full schema in `data-model.md`.
+
+**Constitution deviation — per-window HTTP request/response transport (not
+WebSocket).** Status: Accepted (justified, logged). The Architecture-Constraints
+rule "real-time prediction streams … travel over WebSockets, not polling" is
+deviated from: inference is upload-bound (the client must send a 60 s window each
+stride; the reading is the synchronous response), and the live signal-quality
+indicator (framing/out-of-frame) is computed **on-device**, so nothing is polled.
+A WebSocket carrying 60 s video blobs every 10 s adds reconnect/backpressure
+complexity with no benefit while inference is upload-bound; it is **reserved** for a
+future server-push streaming optimization paired with the deferred server-side
+rolling-feature cache (D-2). Recorded in `plan.md` Complexity Tracking.
+
+**Revisit if**: the backend moves to hosted deployment (the D-2 bandwidth/compute
+cost becomes real → build the server-side rolling-feature cache + WebSocket
+transport); or `metadata.json`'s stale `window_eval_config` (30 s) is ever
+mistaken for the production window (it is not — 60 s is locked by Principle II +
+`docs/MODELS.md`; research R-0 flags the cleanup).
