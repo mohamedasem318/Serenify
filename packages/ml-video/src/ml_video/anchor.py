@@ -20,7 +20,7 @@ from .features import (
 from .pipeline import extract_landmarks
 
 
-def compute_anchor(video_path) -> np.ndarray:
+def compute_anchor(video_path, tail_seconds: float | None = None) -> np.ndarray:
     """Decode + extract -> (2958,) float64. Raises ``FeatureExtractionError``.
 
     Raised when the usable-face-coverage gate rejects the capture
@@ -31,8 +31,27 @@ def compute_anchor(video_path) -> np.ndarray:
 
     The coverage gate runs FIRST — immediately after extraction, before the feature
     floors — so it is additive and strictly stricter, never loosening them.
+
+    ``tail_seconds`` (feature-008 continuous single-stream tail-extract): when set, only the
+    trailing ``tail_seconds`` of the clip is scored — the server uploads the whole contiguous
+    recording-so-far each stride and scores its last 60 s.
+
+    **Implementation contract (load-bearing — this is what makes the window "faithful by
+    construction").** With ``tail_seconds`` set, extraction MUST sample the keep-indices on the
+    **whole decoded stream's file-global grid (anchored at the file's t=0)** and then **filter**
+    that global index set to frames whose timestamp ``>= duration - tail_seconds``. It MUST NOT
+    trim/seek to the last ``tail_seconds`` and re-run the sampler on the sub-stream — that
+    re-zeroes ``CAP_PROP_POS_MSEC`` to the sub-stream's t=0 and offsets every bucket by up to ½
+    the 400 ms sampling period (the per-clip phase reset that sank B2; ``research.md`` R-5).
+    Because the grid is preserved, the kept tail frames are **exactly the suffix** of the frames
+    the full-file extraction would keep, so a continuous 60 s window scores identically to the
+    equivalent single clip (no fidelity gate needed). This is enforced downstream in
+    ``pipeline._select_keep_indices`` → ``_filter_to_tail`` (reusing the existing decode + sampler
+    + features — not a second copy, Principle III) and guarded by ``tests/test_tail_window.py``.
+    For ``tail_seconds=None``, or a clip shorter than ``tail_seconds``, this **reduces exactly to**
+    the un-bounded ``compute_anchor``.
     """
-    clip = extract_landmarks(video_path)
+    clip = extract_landmarks(video_path, tail_seconds=tail_seconds)
     assert_usable_face_coverage(clip.landmarks)
     features = np.concatenate(
         [

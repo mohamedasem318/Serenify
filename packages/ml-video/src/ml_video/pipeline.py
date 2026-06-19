@@ -92,7 +92,9 @@ def _index_keep_indices(n_frames: int, fps: float) -> list[int]:
     return [idx for k, idx in enumerate(five, start=1) if k % FRAME_SKIP_MOD == 0]
 
 
-def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
+def _timestamp_keep_indices(
+    timestamps_ms: Sequence[float], tail_seconds: float | None = None
+) -> list[int]:
     """Keep the first frame that lands in each 1/2.5 s timestamp bucket.
 
     Driven by the frames' ACTUAL timestamps (CAP_PROP_POS_MSEC) instead of the reported
@@ -101,6 +103,14 @@ def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
     constant-rate stream (timestamps i*1000/fps), it selects exactly the frames the
     legacy index path keeps — preserving validated CFR fidelity. A large gap simply
     leaves intervening buckets empty (no catch-up clustering).
+
+    ``tail_seconds`` (feature-008 tail-window option): the kept set is first computed on
+    the WHOLE stream's **file-global grid** (anchored at the file's t=0, exactly as with no
+    bound) and only THEN filtered to frames whose timestamp ``>= timestamps_ms[-1] -
+    tail_seconds*1000`` — i.e. the *suffix* of the full-file selection. This is **never** a
+    re-sample of the trailing sub-stream: re-zeroing the grid to the sub-stream's t=0 would
+    offset every bucket by up to ½ the 400 ms period (the per-clip phase reset that sank B2;
+    see :func:`_filter_to_tail` and ``research.md`` R-5).
     """
     kept: list[int] = []
     last_bucket = -1
@@ -109,7 +119,31 @@ def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
         if bucket >= 0 and bucket > last_bucket:
             kept.append(idx)
             last_bucket = bucket
+    if tail_seconds is not None:
+        kept = _filter_to_tail(kept, timestamps_ms, tail_seconds)
     return kept
+
+
+def _filter_to_tail(
+    kept_indices: list[int], timestamps_ms: Sequence[float], tail_seconds: float
+) -> list[int]:
+    """Filter a FILE-GLOBAL keep-set down to its trailing ``tail_seconds`` window.
+
+    The cutoff is ``timestamps_ms[-1] - tail_seconds*1000`` (POS_MSEC is in ms). Because the
+    input indices were selected on the file-global grid anchored at the file's t=0, the
+    returned indices are **exactly the suffix** of that selection — the property that makes
+    the feature-008 tail-window "faithful by construction". This filtering MUST NOT be
+    replaced by trimming/seeking to the last ``tail_seconds`` and re-running the sampler:
+    that re-zeroes ``CAP_PROP_POS_MSEC`` to the sub-stream's t=0 and offsets every bucket by
+    up to ½ the 400 ms sampling period (the exact per-clip phase reset that sank B2 — see
+    ``research.md`` R-5 / ``smoke-tests.md`` Step F). On an empty keep-set it is a no-op; on
+    a clip shorter than ``tail_seconds`` the cutoff falls before t=0 so every kept frame
+    survives (reduces to the un-bounded selection).
+    """
+    if not kept_indices:
+        return kept_indices
+    cutoff_ms = timestamps_ms[-1] - tail_seconds * 1000.0
+    return [i for i in kept_indices if timestamps_ms[i] >= cutoff_ms]
 
 
 def _timestamps_reliable(timestamps_ms: Sequence[float]) -> bool:
@@ -148,21 +182,37 @@ def _reported_fps_trustworthy(fps: float, timestamps_ms: Sequence[float]) -> boo
     return abs(fps - true_fps) <= _FPS_REL_TOL * true_fps
 
 
-def _select_keep_indices(n_frames: int, fps: float, timestamps_ms: Sequence[float]) -> list[int]:
+def _select_keep_indices(
+    n_frames: int,
+    fps: float,
+    timestamps_ms: Sequence[float],
+    tail_seconds: float | None = None,
+) -> list[int]:
     """Choose which raw-frame indices to keep, robust to unreliable container metadata.
 
     - broken timestamps (non-monotonic / zero span) -> legacy index path (no regression);
     - CFR with metadata matching the timestamps -> legacy index path (bit-identical mp4);
     - otherwise (VFR webm, garbage reported fps) -> timestamp sampler (~2.5 fps).
+
+    ``tail_seconds`` (feature-008 tail-window option) bounds the result to the trailing window.
+    It is applied **after** the file-global selection above (regardless of which path is taken),
+    so the kept tail frames are exactly the *suffix* of the full-file selection — never a
+    re-sampled sub-stream (the B2 phase reset; see :func:`_filter_to_tail`). ``None`` (or a clip
+    shorter than ``tail_seconds``) leaves the selection unchanged — reducing exactly to the
+    un-bounded path.
     """
     if not _timestamps_reliable(timestamps_ms):
-        return _index_keep_indices(n_frames, fps)
-    if _reported_fps_trustworthy(fps, timestamps_ms):
-        return _index_keep_indices(n_frames, fps)
-    return _timestamp_keep_indices(timestamps_ms)
+        kept = _index_keep_indices(n_frames, fps)
+    elif _reported_fps_trustworthy(fps, timestamps_ms):
+        kept = _index_keep_indices(n_frames, fps)
+    else:
+        kept = _timestamp_keep_indices(timestamps_ms)
+    if tail_seconds is not None:
+        kept = _filter_to_tail(kept, timestamps_ms, tail_seconds)
+    return kept
 
 
-def extract_landmarks(video_path) -> DecodedClip:
+def extract_landmarks(video_path, tail_seconds: float | None = None) -> DecodedClip:
     """Decode ``video_path``, downsample to ~2.5 fps, and run FaceMesh per frame.
 
     Frame selection is driven by the frames' actual timestamps (CAP_PROP_POS_MSEC), not
@@ -171,10 +221,15 @@ def extract_landmarks(video_path) -> DecodedClip:
     bit-exact selection on the CFR clips the model was validated on. See
     ``_select_keep_indices``. Decode is two-pass: pass 1 collects per-frame timestamps
     (grab only, no pixel copy) to choose the keep set; pass 2 retrieves just those frames.
+
+    ``tail_seconds`` (feature-008 tail-window option) bounds the kept frames to the trailing
+    window: the keep set is chosen on the **whole** decoded stream's file-global grid and then
+    filtered to the suffix with timestamp ``>= duration - tail_seconds`` (``_select_keep_indices``
+    → ``_filter_to_tail``). ``None`` decodes/keeps the whole clip as before.
     """
     fps, frame_count, width, height, timestamps_ms = _probe_timestamps(video_path)
     n_decoded = len(timestamps_ms)
-    keep_set = set(_select_keep_indices(n_decoded, fps, timestamps_ms))
+    keep_set = set(_select_keep_indices(n_decoded, fps, timestamps_ms, tail_seconds=tail_seconds))
 
     # Pass 2 - retrieve only the selected frames (sequential decode; no seeking, which is
     # unreliable on VFR webm). Stop once the last kept frame is read.
