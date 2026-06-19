@@ -3406,3 +3406,85 @@ before + after) and `research.md` R-5. The gate catching this before any build i
 working as intended (Principle VII).
 
 **Revisit at**: the windowing design session (next 008 work session).
+
+---
+
+## 2026-06-19 — B2 windowing design session: cross-take fixture was a real flaw; single-source re-fixture isolates a residual per-clip sampling-phase divergence (gate still NOT cleared)
+
+**Status**: Accepted (analysis + test re-fixture; **no code/threshold change**). Amends the
+diagnosis of the **2026-06-19 — Multi-clip motion assembly made seam-aware** entry above.
+**GATE still NOT cleared — Phases 3–8 remain blocked.**
+
+**Context**: The prior entry diagnosed the seam-aware fix's residual as "broadband divergence
+beyond the seams" and sent windowing to a design session with the first action: *re-fixture to
+isolate assembly fidelity from recording variance — compare one continuous decode vs the **same
+decoded frames** re-chunked.* This entry executes that action and reports the result.
+
+**What was done (fix the test, not the budget)**: The Step E `chrome` fixture compared **two
+independent recordings** (a continuous take and a separate 6-clip take of "the same" ~60 s).
+Involuntary micro-motion (blinks, breathing, sway) and VFR sampling do not reproduce
+take-to-take, so the motion block (97% of the 2958-d vector) diverged for reasons unrelated to
+the **assembly** — the fixture conflated *assembly fidelity* with *recording reproducibility*.
+A new **single-source** fixture removes the confound with **no new recording**: the existing
+`chrome/continuous.webm` is **losslessly segmented** (`ffmpeg -c copy -f segment
+-segment_time 11 -reset_timestamps 1` — same VP9 frames, no re-encode) into 6 standalone clips.
+Verified same take: the 6 segments decode to **1984** frames, **exactly** `continuous.webm`'s
+1984. `-reset_timestamps 1` makes each segment restart at `t≈0`, modelling a real B2
+stop/restart clip. (Lossless cuts snap to the ~3.36 s keyframe grid, so segment durations are
+non-uniform — 13.4/10.0/10.0/13.4/10.0/8.8 s; this does not change the frames.) New artifacts:
+`tests/fixtures/multiclip/chrome-singlesource/` (README + `.gitkeep`; raw webm gitignored) and
+the diagnostic `tests/helpers/singlesource_fidelity.py`. The production gate
+(`test_multiclip_fidelity.py`) auto-discovers the fixture; **no threshold was loosened**.
+
+**Measured (production gate `_measure`, cross-checked by the diagnostic):**
+
+| Fixture | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤12) | seam_ratio |
+|---|---|---|---|---|---|
+| `chrome` (cross-take) | 0.8958 ❌ | 0.0089 ✅ | 0.6998 ❌ | 3 ✅ | 5.72 |
+| `chrome-singlesource` (lossless segments) | **0.9910** ❌ | 0.0025 ✅ | **0.3336** ❌ | **0** ✅ | 1.52 |
+
+**Finding 1 — the cross-take fixture WAS a real flaw (the prior "broadband" read was a fixture
+artifact).** Isolating to one source moves cosine **0.896 → 0.991**, median relative motion
+error **0.41 → 0.05**, LBP-block cosine to **0.99997**, and removes the broadband take-to-take
+noise. Most of Step E's failure was **recording reproducibility, not assembly**. The
+single-source (lossless-segment) fixture is the **correct test going forward**; the cross-take
+`chrome` fixture is retired as the wrong test (kept on disk only as a contrast row).
+
+**Finding 2 — but B2's assembly is still not faithful enough; a real, smaller divergence remains
+and is localized.** The single-source gate **still fails**: cosine **0.991 < 0.999**,
+motion_rel_p99 **0.334 > 0.25**. The residual is **motion-only** (LBP cosine 0.99997) and
+**localized to the per-clip sampling phase**:
+- `frames_lost = 0` (165 = 165) → not frame loss but frame **substitution**;
+- only **31.5%** of the 2.5 fps-sampled frames coincide (52/165); the other 113 picks are
+  offset from the continuous pick by **median 79 ms / p90 175 ms / max 195 ms** — up to ~½ the
+  400 ms sampling period;
+- **mechanism**: each standalone clip re-applies the 200 ms-phased 2.5 fps timestamp grid
+  (`_timestamp_keep_indices`) from its own `t≈0` (`CAP_PROP_POS_MSEC` resets per clip), and the
+  clip start offsets are not multiples of 400 ms, so each clip samples a **different set of
+  frames** than continuous sampling. Different frames → different landmark diffs → motion
+  magnitude ~14% lower (l2 ratio 0.864). LBP texture is phase-insensitive (averaged), so it is
+  unaffected.
+
+**Why this likely cannot be patched server-side for *real* B2 clips**: the lossless fixture has
+knowable global offsets, but a **real** stop/restart clip carries **no global clock** — its
+`POS_MSEC` genuinely starts at 0 and the server cannot know the (variable) recorder
+stop→restart wall-clock gaps, so the continuous sampling phase cannot be reconstructed from
+standalone clips. A **continuous single-stream upload** sidesteps re-phasing entirely.
+
+**Decision / consequence**:
+- **GATE still NOT cleared.** Per T009 / the plan, **STOP — do not start Phases 3–8.** No
+  threshold loosened; no production code changed.
+- The **single-source fixture is adopted as the canonical windowing fidelity test**; the
+  cross-take comparison is retired. Safari/iOS must be validated with the **same single-source
+  method** before any build (still independently required; no Safari fixture recorded yet).
+- The windowing-approach choice is the **maintainer's call, now with numbers in hand**: (a) make
+  per-clip decode+sample phase-faithful (appears intractable for real standalone clips — see
+  above), or (b) switch B2 to a **continuous single-stream upload**. This entry deliberately
+  **does not** make that change.
+
+**Numbers recorded in**: `specs/008-stress-inference-service/smoke-tests.md` (Step F) and
+`tests/fixtures/multiclip/chrome-singlesource/README.md`. Lint nit fixed in passing
+(`tests/helpers/decode_smoke.py` E501) so the T001 "ruff passed" record is accurate.
+
+**Revisit at**: the windowing-approach decision (continuous upload vs phase-faithful per-clip
+sampling) — the next 008 work session.

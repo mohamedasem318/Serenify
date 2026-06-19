@@ -5,12 +5,20 @@ Phase 2 (the windowing GATE).** The full feature smoke matrix (camera permission
 browsers, mobile 360 px, reduced-motion, privacy, etc.) is added in Phase 8 (task T054)
 once the feature is built.
 
-> **🚦 GATE STATUS: ❌ FAILED on Chrome (2026-06-19) — Phases 3–8 remain blocked.** T008
-> failed on the recorded Chrome fixtures; a seam-aware fix to the multi-clip motion
-> assembly improved the motion block but did **not** clear the gate (the residual is
-> broadband divergence beyond the seams — see Step E + `docs/DECISIONS.md` 2026-06-19).
-> Windowing fidelity goes to a **design session**. Safari/iOS was never reached and is
-> independently still required.
+> **🚦 GATE STATUS: ❌ NOT cleared (2026-06-19) — Phases 3–8 remain blocked.** Two findings,
+> both true: **(1)** the original cross-take fixture **was a real flaw** — it compared two
+> independent recordings, so the take-to-take micro-motion/VFR difference (not the assembly)
+> dominated. Re-fixturing to a **single source** (the continuous Chrome clip losslessly
+> re-segmented into 6 standalone clips — same frames, no re-encode) moves cosine **0.896 →
+> 0.991** and median relative motion error **0.41 → 0.05**, with LBP-block cosine 0.99997. The
+> **single-source fixture is the correct test going forward.** **(2)** Even so, the gate still
+> fails on the single-source fixture (**cosine 0.991 < 0.999**, motion_rel_p99 0.334 > 0.25):
+> a smaller but **real** assembly divergence localized to the **per-clip sampling phase** (only
+> 31.5% of sampled frames coincide; the rest are offset up to ~½ the 400 ms sampling period).
+> So **B2's assembly is not faithful enough yet** — see Step F + `docs/DECISIONS.md` 2026-06-19.
+> The maintainer's open call (numbers now in hand): make per-clip decode+sample phase-faithful
+> vs switch to a **continuous single-stream upload**. Safari/iOS was never reached and is
+> independently still required (run the same single-source test there).
 
 ---
 
@@ -170,3 +178,66 @@ not sufficient.
 - **Any FAIL** → STOP. The windowing approach is revisited before any further build (escalate
   a B2 NO-GO; do not proceed to Phase 3). Capture the failing numbers above so the budget vs
   a genuine fidelity problem can be told apart. *(This is the path taken — 2026-06-19.)*
+
+### Step F — single-source re-fixture: isolate assembly fidelity (2026-06-19, design session)
+
+**Fix the test, not the budget.** Step E's `chrome` fixture compared **two independent
+recordings** (one continuous take + one 6-clip take of "the same" ~60 s). Human micro-motion
+(blinks, breathing, sway) and VFR sampling are not reproducible take-to-take, so the motion
+block (97% of the 2958-d vector) differed for reasons unrelated to the multi-clip **assembly**.
+That fixture conflated **assembly fidelity** with **recording reproducibility** and could not
+answer the real question.
+
+The single-source fixture removes the confound: take the **existing** continuous Chrome clip
+and **losslessly segment** it (`ffmpeg -c copy -f segment` — same VP9 frames, no re-encode, no
+new recording) into 6 standalone clips. Union of decoded frames = **1984 = continuous's 1984**
+(provably the same take). See `tests/fixtures/multiclip/chrome-singlesource/README.md`
+(generation + keyframe-alignment caveat) and run:
+
+```bash
+# from packages/ml-video
+.venv/Scripts/python tests/helpers/singlesource_fidelity.py \
+  tests/fixtures/multiclip/chrome-singlesource/continuous.webm \
+  tests/fixtures/multiclip/chrome-singlesource/clips/clip_*.webm
+# and the production gate path (auto-discovers the new fixture):
+.venv/Scripts/python -m pytest tests/test_multiclip_fidelity.py -v -s -k fidelity_gate
+```
+
+**Measured (production gate `_measure`, 2026-06-19; no threshold loosened):**
+
+| Fixture | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤12) | seam_ratio | Verdict |
+|---|---|---|---|---|---|---|
+| `chrome` (cross-take, Step E) | 0.8958 ❌ | 0.0089 ✅ | 0.6998 ❌ | 3 ✅ | 5.72 | ❌ FAIL |
+| `chrome-singlesource` (lossless segments) | **0.9910** ❌ | 0.0025 ✅ | **0.3336** ❌ | **0** ✅ | 1.52 | ❌ FAIL |
+
+**Read (honest):**
+
+- **The cross-take fixture WAS a real flaw.** Isolating to one source moved cosine **0.896 →
+  0.991**, median relative motion error **0.41 → 0.05**, LBP-block cosine **0.99997**, and
+  removed the broadband take-to-take noise. Most of Step E's failure was **recording
+  reproducibility, not assembly**. The single-source (lossless-segment) fixture is the
+  **correct test going forward**; the cross-take `chrome` fixture is retired as the wrong test.
+- **But the gate still fails on the single-source fixture** (cosine 0.991 < 0.999;
+  motion_rel_p99 0.334 > 0.25). The residual is **real, smaller, motion-only** (LBP cosine
+  0.99997), and **localized to the per-clip sampling phase**:
+  - `frames_lost = 0` (165 = 165) → not frame loss, frame **substitution**;
+  - only **31.5%** of the 2.5 fps-sampled frames coincide (52/165); the other 113 picks are
+    offset from the continuous pick by **median 79 ms, p90 175 ms, max 195 ms** — up to ~½ the
+    400 ms sampling period;
+  - **why:** each standalone clip re-applies the 200 ms-phased 2.5 fps timestamp grid from its
+    own `t≈0` (`CAP_PROP_POS_MSEC` resets per clip), and the clip start offsets are not
+    multiples of 400 ms, so the per-clip grid lands a different set of frames than continuous
+    sampling. Different frames → different landmark diffs → motion magnitude ~14% lower
+    (l2 ratio 0.864). LBP is phase-insensitive (averaged texture), so it is unaffected.
+- **Why this likely cannot be patched server-side for *real* B2 clips:** the lossless fixture
+  happens to have knowable global offsets, but a **real** stop/restart clip carries **no global
+  clock** — its `POS_MSEC` genuinely starts at 0 and the server cannot know the (variable)
+  recorder stop→restart wall-clock gaps, so the continuous sampling phase cannot be
+  reconstructed from standalone clips. A **continuous single-stream upload** avoids re-phasing
+  entirely.
+
+**Verdict: GATE still NOT cleared.** B2's assembly is closer than Step E implied but **not
+faithful enough** (0.991 < 0.999). **Do not loosen the budget; do not patch yet.** This is the
+maintainer's call, now with numbers in hand: (a) make per-clip decode+sample phase-faithful, or
+(b) switch the windowing approach to a continuous single-stream upload. Safari/iOS still needs
+the **same single-source test** before any build. Phases 3–8 remain blocked.
