@@ -3488,3 +3488,113 @@ standalone clips. A **continuous single-stream upload** sidesteps re-phasing ent
 
 **Revisit at**: the windowing-approach decision (continuous upload vs phase-faithful per-clip
 sampling) — the next 008 work session.
+
+---
+
+## 2026-06-19 — feature 008 windowing DECISION: B2 REJECTED; adopt continuous single-stream upload + server tail-extract (D-2 reversed)
+
+**Status**: Accepted (windowing approach changed). **Reverses the D-2 + R-5 (B2)
+windowing decision** of the three 2026-06-19 amendment entries above, and resolves the
+maintainer's open call recorded in the *B2 windowing design session* entry. **Unchanged**:
+D-1 (self-scoped `SECURITY DEFINER` `get_my_anchor()`, no service-role, RLS-as-user
+writes), D-3 (smoothing/banding/cold-start), D-4 (schema), the 60 s window lock, the 0.53
+re-threshold, the transport deviation, and the seven mock-gap resolutions. Plan artifacts
+updated on `008-stress-inference-service`: `research.md` (D-2/R-5/R-6/R-7), `plan.md`,
+`contracts/inference-api.md`, `quickstart.md`, `spec.md`, and `tasks.md` re-issued;
+`data-model.md` is **unchanged** (it describes no assembly).
+
+**Why B2 is rejected — the single-source numbers settled it.** The single-source
+re-fixture (prior entry) removed the recording-reproducibility confound with **no new
+recording**: the existing continuous Chrome clip was **losslessly re-segmented** (same VP9
+frames, no re-encode) into 6 standalone clips. With **identical source content**, B2's
+multi-clip frame-concat assembly reached only:
+- **cosine 0.991 (< the 0.999 budget)**, with
+- a systematic **~14% motion-magnitude shortfall** (l2 ratio 0.864) and **motion_rel_p99
+  0.334 (> 0.25)**;
+- the divergence is **not** the seams and **not** frame loss (`frames_lost = 0`): it is a
+  **per-clip sampling-phase reset** — only **31.5%** of the 2.5 fps-sampled frames coincide
+  with continuous sampling (52/165); the rest are offset by up to ~½ the 400 ms sampling
+  period, because each standalone clip re-applies the timestamp grid from its **own `t≈0`**
+  (`CAP_PROP_POS_MSEC` resets per clip).
+
+Two things are both true and both recorded:
+1. **The earlier cross-take fixture was a real flaw** — it compared two *independent*
+   recordings, so take-to-take micro-motion / VFR noise (not assembly) dominated (cosine
+   0.896, motion p50 0.41). The **single-source fixture is the correct test** and is kept as
+   the canonical windowing-fidelity diagnostic.
+2. **Even with the correct test, B2 cannot reach fidelity, and the residual is not patchable
+   for real clips.** A real stop/restart clip carries **no global clock** — its `POS_MSEC`
+   genuinely starts at 0, and the server cannot know the variable recorder stop→restart
+   wall-clock gaps, so continuous sampling phase **cannot be reconstructed** from standalone
+   clips. (The lossless fixture only slips through by *accident* of having knowable global
+   offsets; real separately-recorded clips lose variable time at each restart.)
+
+**Decision — adopt continuous single-stream upload.**
+- **Client**: **one continuous `MediaRecorder`** (timeslice only for *incremental capture*,
+  never stop/restart). Each stride uploads the **contiguous recording-so-far** — the init
+  segment + all chunks **in order**, i.e. the literal growing file, which is **always
+  decodable** (the case already proven reliable; no surgery, no clip stitching, no
+  init-segment retention). No stop/restart, no per-clip containers.
+- **Server**: decode the uploaded continuous clip and extract the **last 60 s** with the
+  **existing, validated single-clip extraction path** (`compute_anchor` + the VFR
+  timestamp / `POS_MSEC` sampler) **bounded to the trailing window** — sample frames whose
+  timestamp ≥ `duration − 60 s`. **No multi-clip assembly.** The only ml-video change is a
+  thin **tail-window option** on the existing extraction (reuses the exact decode + sampler +
+  features; it only bounds *which* frames feed the features) — strictly smaller than
+  `compute_anchor_multiclip`.
+- **Faithful by construction.** The scored window is a **genuine continuous 60 s segment
+  sampled by one continuous grid** — no stop/restart seams, no per-clip phase resets — i.e.
+  exactly the single-clip input the extraction path is **already validated on** (the notebook
+  fidelity gate + the existing webm/VFR sampler). **There is therefore no new feature-fidelity
+  gate to pass.** (Residual: only a ≤200 ms *global* phase offset between the window grid and
+  a standalone clip's grid — within ordinary recording-to-recording sampling variation, **not**
+  the per-stride re-phasing that sank B2.)
+
+**Retired (kept in git history; removed from the active path).** `compute_anchor_multiclip`,
+`test_multiclip_fidelity.py`, the seam-aware `motion_features_seamaware` helper, and the
+multi-clip frame-concat **HARD GATE** are retired — the assembly step they validated no longer
+exists. The **single-source diagnostic** (`tests/helpers/singlesource_fidelity.py`), the
+single-source fixture, and the finding above **stay recorded** (they are *why* B2 was rejected).
+*(Code retirement is a task in the re-issued `tasks.md`; this session records the decision and
+does not edit code past the docs.)*
+
+**Known cost — accepted, with one flag.** Upload size and the server's decode-to-tail work
+**grow over the session** (each stride re-uploads the whole recording-so-far, and the server
+re-decodes it to reach the tail). Both are **bounded by the 5-minute hard cap** and
+**negligible on localhost** (the dev/demo target).
+- **⚠ Flag — growing per-stride decode could breach the 10 s stride within a 5-min session on
+  the droplet.** Real Chrome webm is VFR and VFR seek is unreliable, so reaching the tail means
+  **sequential decode from the start of the growing file** each stride. At the 5-min cap that
+  is ~300 s of video decoded per stride; to stay inside the 10 s stride the CPU must decode at
+  **≥ ~30× realtime** — plausible for low-res webcam video, **not guaranteed for 720p VP9 on
+  the DigitalOcean droplet** (the same CPU that makes MediaPipe ~3–5 s/window). Late-session
+  strides may exceed 10 s. **Bounded, not fatal**: FR-016 non-blocking means the client keeps
+  capturing and uploads are fire-and-forget, so only the *reading cadence* degrades toward
+  end-of-session; the 5-min cap caps the worst case. The keep-up check is exactly what the (now
+  lighter) windowing validation measures.
+- **Deferred optimization (unchanged — still deferred, not built now)**: a **server-side
+  rolling decoded-frame buffer** — retain the trailing 60 s of sampled frames and decode only
+  the **newest increment** each stride — collapses per-stride decode from O(elapsed) to
+  O(stride) and removes the growth. This is the **same** optimization already deferred (pairs
+  with the future WebSocket transport). **Build it before relying on long droplet sessions in
+  production**; localhost/demo does not need it.
+
+**Windowing validation is now much lighter (no fidelity gate).** The heavy multi-clip fidelity
+question is gone (faithful by construction). The remaining real-device check is only:
+**continuous recording + growing upload + last-60 s tail-extract works on real Chrome and real
+Safari/iOS, and per-stride server time stays within the 10 s stride across a 5-minute session.**
+It largely **reuses the proven `/anchor` single-clip upload+extract path**. The
+**real-Safari/iOS check stays the pre-production gate** — but it is now a *"does the continuous
+capture/upload/tail-extract work and keep up"* check, **not** a fidelity gate. A failure means
+"the deferred rolling-buffer optimization is needed for production," **not** "re-open the
+windowing approach."
+
+**Superseded**: B2 (standalone stop/restart clips + multi-clip frame-concat assembly + the
+multi-clip fidelity HARD GATE) and `compute_anchor_multiclip`. B1 remains rejected (prior
+entries).
+
+**Numbers recorded in**: this entry + `specs/008-stress-inference-service/smoke-tests.md`
+(Step F) + `tests/fixtures/multiclip/chrome-singlesource/README.md`.
+
+**Revisit at**: production deployment scale-up (when the deferred rolling decoded-frame buffer /
+WebSocket push becomes worth building).

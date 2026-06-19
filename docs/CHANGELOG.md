@@ -1835,3 +1835,48 @@ is a plan-level amendment.
   service-role; D-2 = session-aware + B2 windowing; ended→dashboard; idle empty state);
   Test Plan Notes + Principle VII note the **B2 multi-clip fidelity HARD GATE**. A
   reconciliation note at the top of the spec records this.
+
+## 2026-06-19 — plan(008-stress-inference-service) — windowing D-2 REVERSED: B2 rejected → continuous single-stream upload
+
+Reverses the **D-2 + B2** windowing decision (the "B1 NO-GO → B2" amendment above). Full
+reasoning + numbers in `docs/DECISIONS.md` (2026-06-19 — *feature 008 windowing DECISION*).
+Plan artifacts updated on the `008-stress-inference-service` branch: `research.md` (D-2,
+R-5/R-6/R-7), `plan.md`, `contracts/inference-api.md`, `quickstart.md`, `spec.md`, `tasks.md`
+re-issued; `data-model.md` unchanged (no assembly). **Everything else stands**: D-1, D-3, D-4,
+the 60 s lock, the 0.53 re-threshold, the transport deviation, the seven mock-gap resolutions.
+
+- **B2 is REJECTED.** The single-source re-fixture (identical source content, losslessly
+  re-segmented — no new recording) showed B2's multi-clip frame-concat assembly reaching only
+  **cosine 0.991 (< 0.999)**, with a **~14% motion-magnitude shortfall** and **only 31.5% of
+  sampled frames coinciding** with continuous sampling — a **per-clip sampling-phase reset**
+  (each standalone clip re-applies the 2.5 fps grid from its own `t≈0`; `POS_MSEC` resets per
+  clip). The earlier **cross-take fixture was a real flaw** (it conflated assembly fidelity with
+  recording reproducibility) and is corrected — the single-source fixture is the right test —
+  but **even corrected, B2 cannot hit fidelity**, and the residual is **not patchable** for real
+  clips (a real stop/restart clip has no global clock; the variable restart gaps are lost).
+- **Continuous single-stream upload is ADOPTED.** *Client*: **one continuous `MediaRecorder`**
+  (timeslice for incremental capture only — no stop/restart); each stride uploads the
+  **contiguous recording-so-far** (init + all chunks in order — always decodable, the proven
+  reliable case), no clip stitching. *Server*: decode the uploaded continuous clip and extract
+  the **last 60 s** with the **existing validated single-clip path** (`compute_anchor` + the
+  VFR `POS_MSEC` sampler) bounded to the trailing window (frames with timestamp ≥
+  `duration − 60 s`); **no multi-clip assembly**. The only ml-video change is a thin
+  **tail-window option** on the existing extraction.
+- **Faithful by construction → no new fidelity gate.** The scored window is a genuine
+  continuous 60 s segment sampled by one continuous grid — exactly the single-clip input the
+  extraction is already validated on. **`compute_anchor_multiclip`, `test_multiclip_fidelity.py`,
+  the seam-aware motion helper, and the multi-clip HARD GATE are retired** (kept in git history;
+  the single-source diagnostic + finding stay recorded).
+- **Windowing validation is now much lighter.** No fidelity gate. The remaining real-device
+  check (reusing the proven `/anchor` upload+extract path): continuous capture + growing upload
+  + last-60 s tail-extract **works** on real Chrome + real Safari/iOS and **keeps up** (per-stride
+  server time within the 10 s stride across a 5-min session). **Real Safari/iOS stays the
+  pre-production gate** but as a *works-and-keeps-up* check, not a fidelity gate.
+- **⚠ Known cost (flagged)**: upload size + the server's decode-to-tail work **grow over the
+  session** (bounded by the 5-min cap; negligible on localhost). VFR seek is unreliable, so
+  reaching the tail means sequential decode of the growing file — at the 5-min cap ~300 s/stride,
+  needing ≥ ~30× realtime decode to stay inside the 10 s stride; **plausible at low res, not
+  guaranteed for 720p VP9 on the droplet**, so late-session strides may exceed 10 s. Bounded,
+  not fatal (FR-016 non-blocking; cadence degrades, 5-min cap bounds it). Mitigation = the
+  already-deferred **server-side rolling decoded-frame buffer** (decode only the newest
+  increment) — kept deferred, built before long droplet sessions in production.
