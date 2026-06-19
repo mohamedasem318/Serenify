@@ -125,11 +125,13 @@ def test_multiclip_single_clip_equals_compute_anchor(tmp_path, _bypass_coverage)
     assert np.array_equal(direct, via_multi)
 
 
-def test_multiclip_is_exactly_concat_then_features(tmp_path, _bypass_coverage):
-    """compute_anchor_multiclip == manually [concat kept frames + landmarks] -> features.
+def test_multiclip_is_concat_lbp_and_seamaware_motion(tmp_path, _bypass_coverage):
+    """compute_anchor_multiclip == [LBP over concat frames+landmarks] ⊕ [SEAM-AWARE motion].
 
-    This pins the wrapper to the documented assembly: per-clip extract_landmarks, then one
-    LBP-TOP ⊕ motion over the concatenated set (Principle III — no second extraction)."""
+    This pins the wrapper to the documented assembly: per-clip extract_landmarks, then
+    LBP-TOP over the concatenated frames/landmarks (Principle III — no second extraction),
+    and a motion block whose frame-to-frame diffs are taken WITHIN each clip with the
+    cross-seam diffs excluded before mean/std/max (008 B2 seam-aware fix — research.md R-5)."""
     clips = [
         _write_synthetic_clip(tmp_path / "c0.avi", n_frames=90, seed=1),
         _write_synthetic_clip(tmp_path / "c1.avi", n_frames=90, seed=2),
@@ -143,9 +145,17 @@ def test_multiclip_is_exactly_concat_then_features(tmp_path, _bypass_coverage):
         frames.extend(decoded.frames)
         blocks.append(decoded.landmarks)
     landmarks = np.concatenate(blocks, axis=0)
-    from ml_video.features import lbp_top_features, motion_features
+    from ml_video.features import lbp_top_features
 
-    expected = np.concatenate([lbp_top_features(frames, landmarks), motion_features(landmarks)])
+    # LBP path is over the concatenated frames/landmarks (unchanged by the seam fix).
+    expected_lbp = lbp_top_features(frames, landmarks)
+    # Motion path is seam-aware: per-clip abs-diffs concatenated (cross-seam rows excluded),
+    # then mean/std/max over that combined diff set.
+    seam_abs = np.concatenate([np.abs(np.diff(b, axis=0)) for b in blocks], axis=0)
+    expected_motion = np.concatenate(
+        [seam_abs.mean(axis=0), seam_abs.std(axis=0), seam_abs.max(axis=0)]
+    )
+    expected = np.concatenate([expected_lbp, expected_motion])
 
     got = compute_anchor_multiclip(clips)
     assert got.shape == (FEATURE_DIM,)
@@ -153,6 +163,37 @@ def test_multiclip_is_exactly_concat_then_features(tmp_path, _bypass_coverage):
     # Structural sanity: LBP block (3 ROIs x 3 L1-normalized planes) sums to 9.0; motion >= 0.
     assert np.isclose(got[:LBP_DIM].sum(), 9.0)
     assert np.all(got[LBP_DIM:] >= 0.0)
+
+
+def test_multiclip_motion_excludes_cross_seam_diffs(tmp_path, _bypass_coverage):
+    """The motion block excludes the cross-seam frame-to-frame diffs.
+
+    Each clip's landmark stream is independent (FakeFaceMesh resets per extract_landmarks
+    call), so the last-frame-of-clip-N → first-frame-of-clip-N+1 transition is a spurious
+    stop/restart jump that a true continuous stream never has. The seam-aware motion block
+    must (a) equal the per-clip diff aggregation and (b) differ from the old seam-contaminated
+    diff-over-the-whole-stack, proving the seam rows are genuinely dropped (008 B2; T009)."""
+    from ml_video.features import motion_features
+
+    clips = [
+        _write_synthetic_clip(tmp_path / "c0.avi", n_frames=40, seed=1),
+        _write_synthetic_clip(tmp_path / "c1.avi", n_frames=40, seed=2),
+        _write_synthetic_clip(tmp_path / "c2.avi", n_frames=40, seed=3),
+    ]
+    blocks = [extract_landmarks(c).landmarks for c in clips]
+
+    # Seam-aware expected: cross-seam diff rows excluded.
+    seam_abs = np.concatenate([np.abs(np.diff(b, axis=0)) for b in blocks], axis=0)
+    expected_motion = np.concatenate(
+        [seam_abs.mean(axis=0), seam_abs.std(axis=0), seam_abs.max(axis=0)]
+    )
+    # Old, seam-contaminated aggregation (diff over the fully concatenated stack).
+    naive_motion = motion_features(np.concatenate(blocks, axis=0))
+
+    got_motion = compute_anchor_multiclip(clips)[LBP_DIM:]
+
+    assert np.allclose(got_motion, expected_motion)
+    assert not np.allclose(got_motion, naive_motion)
 
 
 def test_multiclip_combined_frame_count_is_sum_of_clips(tmp_path, _bypass_coverage):

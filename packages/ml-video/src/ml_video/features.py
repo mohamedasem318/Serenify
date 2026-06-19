@@ -151,3 +151,41 @@ def motion_features(landmarks: np.ndarray) -> np.ndarray:
             motion_abs.max(axis=0),
         ]
     )  # (2868,)
+
+
+def motion_features_seamaware(landmark_blocks: list[np.ndarray]) -> np.ndarray:
+    """Seam-aware 2868-d motion block for the multi-clip (feature-008 B2) assembly.
+
+    Same aggregation as :func:`motion_features` (mean, std, max of |frame-to-frame
+    landmark delta|), but the frame-to-frame diffs are taken **within each clip** and
+    the cross-seam diffs — the last frame of clip N → first frame of clip N+1 — are
+    **excluded** before aggregation. Those cross-seam jumps are artifacts of the
+    stop/restart recorder gap (~0.5–2 s between standalone clips) and do **not** exist
+    in a true continuous 60 s stream; including them collapses windowing fidelity
+    (cosine 0.90 vs the ≥0.999 budget — see ``smoke-tests.md`` T009, ``research.md`` R-5).
+
+    Dropping the handful of cross-seam diffs (~5 of ~149 for a 6-clip / 60 s window) is
+    negligible for the mean/std/max aggregates, which is why the assembled vector
+    converges to the continuous reference. For a single clip this reduces **exactly** to
+    :func:`motion_features` (no seams to drop).
+
+    The single-clip :func:`motion_features` path — which extracts the continuous
+    reference — is intentionally left untouched, so the two remain directly comparable.
+    """
+    per_clip_diffs = [
+        np.abs(np.diff(block, axis=0))
+        for block in landmark_blocks
+        if block.shape[0] >= 2
+    ]
+    if not per_clip_diffs:
+        raise FeatureExtractionError(
+            "need at least one clip with >= 2 frames to compute motion features"
+        )
+    motion_abs = np.concatenate(per_clip_diffs, axis=0)  # cross-seam diff rows excluded
+    return np.concatenate(
+        [
+            motion_abs.mean(axis=0),
+            motion_abs.std(axis=0),  # population std (ddof=0)
+            motion_abs.max(axis=0),
+        ]
+    )  # (2868,)

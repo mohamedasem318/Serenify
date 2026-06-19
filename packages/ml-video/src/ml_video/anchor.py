@@ -12,7 +12,12 @@ import numpy as np
 
 from .coverage import assert_usable_face_coverage
 from .errors import FeatureExtractionError
-from .features import FEATURE_DIM, lbp_top_features, motion_features
+from .features import (
+    FEATURE_DIM,
+    lbp_top_features,
+    motion_features,
+    motion_features_seamaware,
+)
 from .pipeline import extract_landmarks
 
 
@@ -56,17 +61,29 @@ def compute_anchor_multiclip(clip_paths) -> np.ndarray:
     corrupts ``motion_features``). This decodes **each** clip through the **same**
     per-clip path :func:`compute_anchor` uses (``extract_landmarks`` → kept frames +
     FaceMesh landmark rows), concatenates the kept frames and landmark rows across the
-    clips into one ~150-frame / ~60 s set, and runs the **identical** coverage gate +
-    ``lbp_top_features`` ⊕ ``motion_features`` on that assembled set.
+    clips into one ~150-frame / ~60 s set, runs the **identical** coverage gate +
+    ``lbp_top_features`` on that assembled set, and builds the motion block **seam-aware**
+    via :func:`motion_features_seamaware` (per-clip diffs, cross-seam diffs excluded — see
+    below).
 
     It is a thin assembly wrapper, **not** a second extraction (Constitution Principle
     III): per-clip decode/sampling, the feature-006 coverage gate, and the feature math
     are all the existing ``compute_anchor`` building blocks. The only B2-specific
-    behaviour is concatenating **frames** (never muxing containers). The two known,
-    bounded differences from a single continuous 60 s clip are (1) the per-seam jump in
-    ``motion_features`` — the ``np.diff`` taken across each clip boundary — and (2) the
-    handful of frames lost at each stop/restart; both are **measured** by
+    behaviour is concatenating **frames** (never muxing containers) and building the
+    motion block **seam-aware**: the frame-to-frame ``np.diff`` is taken *within each
+    clip* via :func:`motion_features_seamaware`, and the cross-seam diffs (last frame of
+    clip N → first frame of clip N+1) are **excluded** before the mean/std/max
+    aggregation. Those cross-seam jumps are stop/restart artifacts (a ~0.5–2 s recorder
+    gap separates the standalone clips) absent from a true continuous stream; including
+    them collapsed windowing fidelity to cosine ≈ 0.90 (vs the ≥0.999 budget), so they
+    are dropped — see ``smoke-tests.md`` T009 and ``research.md`` R-5. The LBP/texture
+    path, the coverage gate, and frame concatenation are unchanged.
+
+    The remaining bounded difference from a single continuous 60 s clip is the handful of
+    frames lost at each stop/restart; it is **measured** by
     ``tests/test_multiclip_fidelity.py`` (the hard fidelity gate), not silently absorbed.
+    The single-clip ``compute_anchor`` / ``motion_features`` path is intentionally left
+    untouched so the continuous reference and the multi-clip assembly stay comparable.
 
     The coverage gate runs on the **combined** landmark set (not per clip): the 60 s
     thresholds (``MIN_USABLE_FRAMES=50``, ``fraction >= 0.65``) describe a full window,
@@ -96,8 +113,8 @@ def compute_anchor_multiclip(clip_paths) -> np.ndarray:
     assert_usable_face_coverage(landmarks)
     features = np.concatenate(
         [
-            lbp_top_features(frames, landmarks),  # (90,)
-            motion_features(landmarks),  # (2868,)
+            lbp_top_features(frames, landmarks),  # (90,) — over the concatenated frames
+            motion_features_seamaware(landmark_blocks),  # (2868,) — cross-seam diffs excluded
         ]
     )
     if features.shape != (FEATURE_DIM,):
