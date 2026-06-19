@@ -3718,3 +3718,53 @@ windowing-refinements entry (R-5 keep-up split); `smoke-tests.md` § Windowing v
 
 **Revisit at**: Phase 3 build (T010+); production keep-up must be re-measured against the chosen
 deploy target (the rolling decoded-frame buffer is the decode-side lever if it breaches there).
+
+---
+
+## 2026-06-20 — feature 008: server-side smoothing reads an IN-MEMORY buffer, not the DB
+
+**Status**: Accepted. Resolves a read-path gap left open by the D-1 flip (see
+*2026-06-19 — feature 008 plan AMENDMENT: D-1 and D-2 reopened*).
+
+**Context (the gap)**: D-3 smooths the band over the **last N=4 scored `proba[1]`**,
+computed **server-side**. The *original* D-4 keyed all writes to the **service-role**, so
+the API would have read `stress_probability` back with that broad credential, bypassing
+the column whitelist. The **D-1 flip removed the service-role** (all DB I/O as the user via
+the forwarded JWT) but only reconciled the *anchor read* (`get_my_anchor()`) and the
+*writes* — it never specified how the server-side smoother reads prior `proba` back. With
+no service-role **and** the `window_readings` SELECT column whitelist deliberately
+**excluding `stress_probability` / `label`** from the `authenticated` role, the API (acting
+as the user) **cannot** read those columns — a plain `select("stress_probability")` is
+column-level permission-denied at runtime.
+
+**Decision**: keep the rolling smoothing buffer **in server memory**, never in the DB.
+- `smoothing.py` (T019) stays a **pure** function: given the recent scored `proba[1]` + the
+  config thresholds (`STRESS_OPERATING_POINT` / `STRESS_TENSE_BAND`), return mean → band.
+- `inference.py` (T020) holds a **per-session in-memory buffer** (`{session_id:
+  deque(maxlen=4)}`, LRU-capped on session count). Each window: extract → `predict_delta` →
+  the raw `proba[1]` is appended **only for scored windows** (skipped + `< 60 s` warming-up
+  windows are excluded from both the buffer and the M=4 count) → smooth → band → persist the
+  row (server-only `label` + `stress_probability` via the INSERT grant; `band` for the
+  trend). **The raw `stress_probability` is never read back from the DB**; the SELECT
+  whitelist stays exactly as committed (T010), and **no read RPC / read role is added**.
+- Per-session cleanup on End is wired in US2 / T036 (`buffers.drop(session_id)`); the LRU cap
+  bounds memory for abandoned sessions until then.
+
+**Rationale**: preserves every committed privacy invariant — managers get nothing, the
+owner still cannot SELECT a probability, no service-role, no new RPC that would expose the
+raw `proba` to a browser (the alternative `SECURITY DEFINER recent_scored_proba()` would, like
+`get_my_anchor()`, be callable by the owner's browser). The buffer is the natural home for
+overlapping-window smoothing state and matches the server-authoritative-band design (SC-008).
+
+**Trade-off (documented; deferred)**: the in-memory buffer assumes a **single worker** (or
+session affinity / a shared cache such as Redis) and is **lost on API restart** → that
+session simply **re-warms** (≤ ~90 s). Acceptable for the MVP / localhost demo; it is a
+production-deploy concern in the same class as the deferred rolling decoded-frame buffer and
+back-pressure. Logged in `docs/BACKLOG.md` (feature 008).
+
+**References**: `contracts/smoothing-and-banding.md`, `contracts/inference-api.md` §2 step 8,
+`data-model.md` (the `window_readings` SELECT whitelist), the D-1 flip entry above.
+
+**Revisit at**: production deploy (choose single-worker / session affinity / shared cache);
+and if write-integrity is ever enforced via the deferred INSERT-only role (the read path is
+unaffected — it never touches the DB for `proba`).
