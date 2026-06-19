@@ -10,7 +10,9 @@ container with OpenCV and counts the frames it can decode.
 Usage (real-device GATE — run from ``packages/ml-video`` with its ``.venv`` python; it
 has no intra-package imports, so invoke it as a direct script path, not ``-m``):
 
-    .venv/Scripts/python tests/helpers/decode_smoke.py tests/fixtures/multiclip/chrome/clips/clip_00.webm tests/fixtures/multiclip/chrome/continuous.webm
+    .venv/Scripts/python tests/helpers/decode_smoke.py \
+        tests/fixtures/multiclip/chrome/clips/clip_00.webm \
+        tests/fixtures/multiclip/chrome/continuous.webm
 
 Each path prints ``OK <n_frames> <path>`` or ``FAIL <path>`` and the process exits
 non-zero if any clip failed to open or yielded zero frames.
