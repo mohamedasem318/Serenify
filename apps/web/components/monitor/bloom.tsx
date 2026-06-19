@@ -60,7 +60,14 @@ export function Bloom({ tone, className }: { tone: BloomTone; className?: string
   );
 
   return (
-    <div aria-hidden data-testid="bloom" data-tone={tone} className={box} style={style}>
+    <div
+      aria-hidden
+      data-testid="bloom"
+      data-tone={tone}
+      data-motion={reducedMotion ? "static" : "animated"}
+      className={box}
+      style={style}
+    >
       {reducedMotion ? (
         <>
           {halo}
