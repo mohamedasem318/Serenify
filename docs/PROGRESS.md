@@ -16,19 +16,23 @@ is the synchronous response to an upload, not polling). No NON-NEGOTIABLE princi
 violated.
 **Date**: 2026-06-19
 
-**Decisions resolved** (DECISIONS 2026-06-19): **D-1** server-side service-role
-anchor read (the path feature 004 explicitly deferred to this feature) + server-side
-reading writes for integrity; **D-2** session-aware endpoints + client-assembled
-60 s window per 10 s stride + server-side smoothing (rolling-feature cache deferred
-to deployment); **D-3** rolling mean of `proba[1]` over last 4 scored readings,
-bands at 0.53 / 0.70 (operating point from metadata; tense-split a display-only
-config), cold-start 4 → first band ~90–105 s; **D-4** `monitoring_sessions` +
-`window_readings`, owner SELECT-own with raw probability/label held server-only, no
-manager policy, 90-day reading retention, FR-020 seam for 009. Seven mock-gap
-resolutions folded in (CHANGELOG 2026-06-19): warming-up 7th state, ~90 s first
-read, distinct foggy skipped-read note, calibrate-first panel, mobile stacking,
-ended→dashboard recap, idle recap empty state. Flagged: `metadata.json`'s stale
-`window_eval_config` (30 s) is not the production window (60 s is locked).
+**Decisions resolved** (DECISIONS 2026-06-19, as **amended** the same day after
+review): **D-1 (revised)** self-scoped `SECURITY DEFINER` `get_my_anchor()` read in
+the caller's RLS context — **no service-role key** (anon key + forwarded JWT);
+sessions/readings written under RLS as the user; write-integrity deferred (upgrade
+path = INSERT-only role). **D-2 (revised)** single-recorder ~10 s segments +
+**server-side** rolling 60 s assembly (flagged: container-level reassembly required;
+Safari spike de-risks it; B2 = multi-clip extraction fallback). **D-3** rolling mean
+of `proba[1]` over last 4 scored readings, bands at 0.53 / 0.70 (operating point
+from metadata; tense-split a display-only config), cold-start 4 → first band
+~90–105 s. **D-4** `monitoring_sessions` + `window_readings`, owner SELECT-own with
+raw probability/label held server-only, no manager policy, 90-day retention, FR-020
+seam for 009. Seven mock-gap resolutions folded in (CHANGELOG 2026-06-19):
+warming-up 7th state, ~90 s first read, distinct foggy skipped-read note,
+calibrate-first panel, mobile stacking, ended→dashboard recap, idle recap empty
+state. Front-loaded: **Safari/WebKit early-validation spike (R-7)**. Flagged:
+`metadata.json`'s stale `window_eval_config` (30 s) is not the production window
+(60 s locked; doc-only cleanup, no model-version bump / no anchor invalidation).
 
 ---
 

@@ -81,13 +81,22 @@ Indexes: `(session_id, captured_at)` for the trend; `(user_id, captured_at)` for
 
 ---
 
-## RLS & grants (the Principle-I mechanism)
+## RLS & grants (the Principle-I mechanism) — REVISED (2026-06-19, D-1 flip)
+
+> **Revised**: with D-1 flipped to **no service-role**, all writes happen **as the
+> user** (the API forwards the user JWT; RLS applies). So the tables need explicit
+> **insert-own / update-own** policies (not just select-own), and writes are no
+> longer "service-role only." The raw `stress_probability`/`label` stay server-only
+> via the **SELECT** column whitelist, unchanged.
 
 ```sql
 ALTER TABLE public.monitoring_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.monitoring_sessions FORCE  ROW LEVEL SECURITY;
 ALTER TABLE public.window_readings     ENABLE ROW LEVEL SECURITY;
--- NOT forced: service_role (the API) bypasses RLS to write/read on the user's
--- behalf, keyed to the JWT-verified sub. authenticated is constrained below.
+ALTER TABLE public.window_readings     FORCE  ROW LEVEL SECURITY;
+-- FORCE is safe now: there is no service-role/owner write path to exempt — every
+-- writer (the API and the browser) acts as `authenticated` via a forwarded JWT and
+-- is subject to RLS. FORCE additionally blocks any accidental owner-role bypass.
 
 -- Owner reads own rows only. NO admin/manager policy exists on either table
 -- (Principle I — the manager layer gets nothing from this feature).
@@ -95,30 +104,57 @@ CREATE POLICY ms_select_self ON public.monitoring_sessions
   FOR SELECT USING (auth.uid() = user_id);
 CREATE POLICY wr_select_self ON public.window_readings
   FOR SELECT USING (auth.uid() = user_id);
--- No INSERT/UPDATE/DELETE policies for authenticated → writes are service-role only.
+
+-- Owner writes own rows only (the API performs these as the user via forwarded JWT).
+CREATE POLICY ms_insert_self ON public.monitoring_sessions
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+CREATE POLICY ms_update_self ON public.monitoring_sessions
+  FOR UPDATE USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY wr_insert_self ON public.window_readings
+  FOR INSERT WITH CHECK (
+    auth.uid() = user_id
+    AND EXISTS (SELECT 1 FROM public.monitoring_sessions s
+                WHERE s.id = session_id AND s.user_id = auth.uid())
+  );
+-- No UPDATE/DELETE policy on window_readings (append-only from the owner's side).
 
 -- Per-role grants (Supabase grants explicitly per role; PUBLIC revoke is a no-op).
 REVOKE ALL ON public.monitoring_sessions FROM anon, authenticated;
 REVOKE ALL ON public.window_readings     FROM anon, authenticated;
 
--- monitoring_sessions: owner may read all columns (no sensitive raw here).
+-- monitoring_sessions: owner reads all columns (no sensitive raw here), inserts,
+-- and updates status/ended_at/end_reason on their own row.
 GRANT SELECT ON public.monitoring_sessions TO authenticated;
+GRANT INSERT (id, user_id, started_at, status, model_version) ON public.monitoring_sessions TO authenticated;
+GRANT UPDATE (status, ended_at, end_reason, updated_at)        ON public.monitoring_sessions TO authenticated;
 
--- window_readings: column whitelist EXCLUDES label + stress_probability,
--- exactly the anchor_vector withholding pattern. The owner can build the trend
--- (band/scored/skip_cause/captured_at) but can never read a probability → also
--- structurally enforces FR-015 ("no number") and keeps the raw signal server-only.
+-- window_readings:
+--  * SELECT column whitelist EXCLUDES label + stress_probability (the anchor_vector
+--    withholding pattern) → owner builds the trend from {captured_at, scored, band,
+--    skip_cause} but never reads a probability (FR-015; raw signal server-only).
+--  * INSERT grant INCLUDES label + stress_probability so the API (as the user) can
+--    write them; they remain unreadable by the owner via the SELECT whitelist.
 GRANT SELECT (id, session_id, user_id, captured_at, scored, band, skip_cause, created_at)
   ON public.window_readings TO authenticated;
-
--- service_role retains full table access (Supabase default) for the API writer.
+GRANT INSERT (id, session_id, user_id, captured_at, scored, band, skip_cause, label, stress_probability, created_at)
+  ON public.window_readings TO authenticated;
 ```
 
-**Why no `FORCE ROW LEVEL SECURITY`** (unlike `profiles`): the API legitimately
-writes/reads every row for the authenticated user via the service role; forcing
-RLS would block that. The control is (1) the API only ever queries keyed by the
-verified `sub`, and (2) the absence of any authenticated write grant means the
-browser cannot fabricate or alter readings. Both are unit-tested.
+Also in this migration: `public.get_my_anchor()` — a scope-guarded
+`SECURITY DEFINER` function returning the **caller's own** `anchor_vector`
+(filtered on `auth.uid()`, raising on a non-owner target), `STABLE`,
+`SET search_path = ''`, `OWNER TO postgres`, `REVOKE EXECUTE … FROM PUBLIC, anon`,
+`GRANT EXECUTE … TO authenticated` — mirroring the existing `has_anchor()`
+(`20260527000000_anchor_columns.sql`). The API calls it with the forwarded user
+JWT so `auth.uid()` resolves to the caller; the anchor is returned to the **API
+only**, never to a browser SELECT.
+
+**Write-integrity — deliberately deferred (low-stakes, D-1 amendment).** Because
+writes are `authenticated`-role under RLS, a user *could* fabricate **their own**
+readings (insert-own). Accepted: own data only; managers read nothing (no manager
+policy); the privacy invariant is unchanged. **Upgrade path (not built now)**:
+move INSERT to a **dedicated INSERT-only Postgres role** held by the API and
+`REVOKE INSERT … FROM authenticated`, so only the API can write readings.
 
 ---
 
@@ -151,9 +187,11 @@ Never exposed as a number.
 
 ## Reads — trend, recap, and the 009 seam
 
-All reads are **browser-side Supabase RLS SELECTs** (typed client,
+Trend/recap reads are **browser-side Supabase RLS SELECTs** (typed client,
 `apps/web/lib/api/monitoring-reads.ts`) — no extra API endpoints. The manager
-layer has no policy and therefore cannot run these.
+layer has no policy and therefore cannot run these. (The **API** also reads/writes
+these tables, but **as the user** via the forwarded JWT — the same RLS select-own /
+insert-own scope; revised D-1 — not with a broad credential.)
 
 **Session trend (card + page — SC-008 consistency).** A single shared reader:
 
@@ -207,7 +245,11 @@ to re-derive) are sufficient for 009 to define "sustained" however it chooses.
 ## Calibration Anchor (existing — read-only input)
 
 `profiles.anchor_vector bytea` (+ `anchor_captured_at`, `anchor_model_version`),
-from features 004–006. Read **server-side only** by the API's service-role client,
-keyed to the verified `user_id`, decoded to a `(2958,)` float vector for `delta =
-current − anchor`. **Not created or modified here.** Absence (`anchor_vector IS
-NULL`) triggers the calibrate-first guard (FR-011) — checked at session create.
+from features 004–006. Read **server-side only** via `public.get_my_anchor()` (a
+self-scoped `SECURITY DEFINER` function; the API calls it with the **forwarded user
+JWT** so `auth.uid()` resolves to the caller — **no service-role**), decoded to a
+`(2958,)` float vector for `delta = current − anchor`. The anchor is returned to
+the **API only**, never to a browser SELECT (the column whitelist still excludes
+`anchor_vector`). **Not created or modified here.** Absence (`anchor_vector IS
+NULL` → `get_my_anchor()` returns NULL) triggers the calibrate-first guard
+(FR-011) — checked at session create.

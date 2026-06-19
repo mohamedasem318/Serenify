@@ -1761,3 +1761,41 @@ Also recorded in the plan (not a spec gap, but a contract clarification):
 authoritative 60 s `loso_metrics_60s_calibrated` block — the production window is
 **60 s** per Constitution Principle II + `docs/MODELS.md`; the 30 s block is not
 used (research R-0 flags it for cleanup).
+
+## 2026-06-19 — plan(008-stress-inference-service) — D-1 + D-2 reopened after review (amendment)
+
+Two plan decisions were changed by the maintainer after review (full reasoning in
+`docs/DECISIONS.md` 2026-06-19 amendment). Plan artifacts updated on the
+`008-stress-inference-service` branch: `plan.md`, `research.md`, `data-model.md`,
+`contracts/inference-api.md`, `quickstart.md`. No spec FR/SC wording changes; this
+is a plan-level amendment.
+
+- **D-1 (revised) — no service-role; self-scoped `SECURITY DEFINER` read.**
+  `apps/api` gains **no** broad DB credential (DECISION-9 posture preserved). The
+  anchor is read by `public.get_my_anchor()` (filters on `auth.uid()`, EXECUTE to
+  `authenticated` only), called by the API **as the user** via the forwarded access
+  token + the **publishable anon key**. Sessions/readings are written **under RLS as
+  the user** (insert-own/select-own/update-own); raw `stress_probability`/`label`
+  stay server-only via the SELECT column whitelist (so the API, not the browser,
+  writes the row). **Constitution Check delta**: Principle IX now has **no new
+  secret** (publishable anon key only) — stronger than the original; the service-role
+  Complexity-Tracking row is removed. **Write-integrity deferred** (a user could
+  fabricate their *own* readings; managers see nothing; upgrade path = a dedicated
+  INSERT-only role, not built now). *Superseded*: original service-role read.
+- **D-2 + R-5 (revised) — single-recorder ~10 s segments + server-side 60 s
+  assembly.** The client streams ~10 s segments from a **single** `MediaRecorder`
+  (timeslice); the **server** buffers the last 6 and assembles the rolling 60 s
+  window (transient, in-memory, cleared on pause/end, deleted in `finally`). One
+  encoder instead of ~6 → lighter on mobile, ~6× less bandwidth, defensible for
+  fragile Safari `MediaRecorder`. **⚠ Flagged**: the preferred frame-level
+  concatenation is **not directly feasible** (timeslice chunks aren't independently
+  decodable; the shared extraction is single-file/path-based), so **container-level
+  reassembly** is required — recommended path B1, with the R-7 Safari spike de-risking
+  decodability (Chrome webm + Safari fMP4) and a B2 fallback (standalone segments + a
+  new multi-clip extraction entry, a package change) if it fails. *Superseded*:
+  client-assembled windows / staggered recorder pool.
+- **Safari/WebKit early validation (R-7)** is front-loaded as one of the first
+  `/speckit-tasks` items (real Safari/iOS, not Playwright-only).
+- **`metadata.json` hygiene** confirmed as metadata/doc-only — **no `model_version`
+  bump, no anchor invalidation**, model artifact not edited (backlog/task note,
+  flagged for the model owner).

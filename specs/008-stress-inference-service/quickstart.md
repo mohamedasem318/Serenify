@@ -15,10 +15,10 @@ context** (`localhost` or HTTPS).
 ## Backend (`apps/api`)
 
 ```bash
-# .env (env-only secrets — never commit)
+# .env (env-only — never commit; note: NO service-role key, revised D-1)
 SUPABASE_JWT_SECRET=...            # existing
-SUPABASE_URL=http://127.0.0.1:54321
-SUPABASE_SERVICE_ROLE_KEY=...      # NEW (D-1) — local service-role key
+SUPABASE_URL=http://127.0.0.1:54321   # now required (JWKS + user-context PostgREST)
+SUPABASE_ANON_KEY=...              # NEW — publishable anon key (same as web's NEXT_PUBLIC_SUPABASE_ANON_KEY); NOT a secret
 ALLOWED_ORIGINS=http://localhost:3000
 # STRESS_OPERATING_POINT unset → default read from metadata.json (0.53)
 # STRESS_TENSE_BAND unset → default 0.70
@@ -26,6 +26,11 @@ ALLOWED_ORIGINS=http://localhost:3000
 uvicorn app.main:app --reload      # boots: loads model (fail-fast), wires monitoring router
 curl localhost:8000/healthz        # {"status":"ready","model_version":"...@2.0.0"}
 ```
+
+The API talks to Supabase **as the user** (forwarded access token + the anon key),
+calling `get_my_anchor()` and writing sessions/readings under RLS — no service-role.
+The client streams **~10 s segments** from a single `MediaRecorder`; the **server**
+buffers the last 6 and assembles the rolling 60 s window for extraction (revised D-2).
 
 ## Frontend (`apps/web`)
 
@@ -68,6 +73,14 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 11. **Mobile (Principle VI)**: at 360 px the stage stacks (bloom shrinks, controls
     full-width); **reduced-motion** suppresses the bloom breathing while band +
     trend stay legible.
+12. **Safari/iOS early (R-7, front-loaded — do this FIRST, before the full build)**:
+    on real Safari (desktop + iOS), confirm the single `MediaRecorder` emits usable
+    ~10 s segments (Safari → fragmented MP4), the server reassembles
+    `[init + recent fragments]` into a container that decodes, and the extracted
+    2958-d vector is sane. If reassembly fails on Safari, switch to the R-5 **B2
+    fallback** (standalone segments + a new multi-clip extraction entry). Do **not**
+    rely on Playwright alone for this (false cross-browser confidence) — use the
+    real Safari smoke channel.
 
 ## Automated tests
 

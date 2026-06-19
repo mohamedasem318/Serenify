@@ -3178,3 +3178,98 @@ cost becomes real → build the server-side rolling-feature cache + WebSocket
 transport); or `metadata.json`'s stale `window_eval_config` (30 s) is ever
 mistaken for the production window (it is not — 60 s is locked by Principle II +
 `docs/MODELS.md`; research R-0 flags the cleanup).
+
+---
+
+## 2026-06-19 — feature 008 plan AMENDMENT: D-1 and D-2 reopened (maintainer review)
+
+Amends the **2026-06-19 — feature 008 plan decisions** entry above. After review,
+the maintainer flipped D-1 and D-2 having weighed the honestly-flagged trade-offs.
+Both prior decisions are **superseded** by the ones here; everything else in the
+original entry (D-3, D-4 shape, the transport deviation, the 60 s lock) stands.
+Plan artifacts updated on the `008-stress-inference-service` branch (`plan.md`,
+`research.md`, `data-model.md`, `contracts/inference-api.md`, `quickstart.md`).
+
+**D-1 (REVISED) — self-scoped `SECURITY DEFINER` read; NO service-role key.** The
+API must **not** gain a broad DB credential; DECISION-9's "no DB credentials in
+`apps/api`" posture is preserved. The anchor is read by `public.get_my_anchor()` (a
+`SECURITY DEFINER` function filtering strictly on `auth.uid()`, returning only the
+caller's own anchor; EXECUTE to `authenticated` only; mirrors `has_anchor()`). The
+API calls it **as the user** — forwarding the verified access token + the
+**publishable anon key** (RLS-respecting), never a service credential — so the
+anchor flows Supabase → API only and never enters a browser SELECT. Sessions/
+readings are written **under RLS as the user** (insert-own/select-own/update-own;
+still no manager policy). The raw `stress_probability`/`label` stay server-only via
+the SELECT column whitelist (so the **API**, not the browser, writes the reading
+row).
+*Rationale*: strongest secrets posture — **no new secret** in `apps/api` (the anon
+key is publishable, already in the browser bundle; grants nothing beyond RLS),
+strictly stronger than the original service-role design (Principle IX). `auth.uid()`
+resolves via the forwarded JWT — the established working pattern (DECISION-9 note:
+SECURITY DEFINER RPCs are called via the caller's token, not service-role). Feature
+004 named **both** options for this path; this is the safer one.
+*Verified alignment + flagged divergence*: the `/anchor` router does **zero** DB I/O
+(browser writes the anchor via its own RLS client). 008 preserves that *credential
+posture* (no broad credential; user-context RLS) but the **API itself** now does the
+DB I/O via forwarded JWT — a new pattern for `apps/api` (the forwarded-JWT-RPC
+pattern already exists in the **web** invite handler). 008 cannot push writes to the
+browser because the raw probability must stay server-side. Recorded as a deliberate
+divergence, not a contradiction.
+*Write-integrity — deliberately deferred (low stakes)*: under RLS-as-the-user
+writes, a user could fabricate **their own** readings. Accepted: own data only;
+managers never see raw readings (no manager policy); privacy invariant unchanged.
+**Upgrade path (not built now)**: a **dedicated INSERT-only Postgres role** (a narrow
+write credential, far less than service-role) held by the API, with INSERT revoked
+from `authenticated`.
+*Superseded*: original D-1 (server-side **service-role** read). Reason: it
+introduced a broad DB credential / new secret into `apps/api`.
+
+**D-2 + R-5 (REVISED) — single-recorder ~10 s segments + server-side 60 s
+assembly.** The client no longer assembles 60 s windows (no staggered
+`MediaRecorder` pool). It records with a **single** `MediaRecorder` (timeslice
+~10 s) and uploads only the newest segment; the **server** keeps a transient
+per-session buffer (last 6 segments + the init segment) and assembles the rolling
+60 s window for the existing single-path extraction. The session-aware endpoint
+shape is unchanged; the "deferred rolling buffer" becomes the **primary** design.
+*Rationale*: one client encoder instead of ~6 (far lighter on CPU/mobile), ~6× less
+upload bandwidth, and materially better cross-browser robustness — **WebKit/Safari
+`MediaRecorder` is the fragile case and Safari/iOS is a hard pre-production gate**,
+so the single-encoder path is the defensible choice. Buffer lifecycle: append; keep
+last 6 clusters; assemble per stride; **clear on pause/end**; segments + assembled
+window deleted in `finally` (Principle I — transient, never persisted).
+*⚠ FLAGGED contradiction (per the instruction to flag, not work around)*: the
+brief's preferred "decode each segment and concatenate sampled frames (not mux
+containers)" is **not directly feasible**. Verified: (1) timeslice chunks are **not
+independently decodable** — only the first webm/fMP4 chunk carries the init segment;
+(2) the shared extraction entry (`extract_landmarks`/`compute_anchor`) is
+**single-file/path-based** (`cv2.VideoCapture`, no frame-sequence entry). So the
+realistic path is **container-level reassembly** (`[init + recent clusters]` → one
+temp container → existing decode) — exactly the container concatenation the brief
+said to flag. Recommended path **B1** (container reassembly) with the R-7 early
+Safari spike de-risking decodability across Chrome webm + Safari fMP4; **B2
+fallback** = stop/restart standalone segments + a **new multi-clip extraction entry**
+in `packages/ml-video` (a package change) if B1 fails on Safari.
+*Superseded*: original D-2 client-assembled 60 s windows / R-5 staggered recorder
+pool.
+
+**Change 3 — Safari/WebKit early validation (carried into the plan, front-loaded).**
+The segment + server-assembly path MUST be validated on **WebKit/Safari (incl. iOS)
+early** — a small spike before the full build, among the first `/speckit-tasks`
+items — not discovered late. Rationale: Playwright has given false cross-browser
+capture/timing confidence (see the e2e-load-timing flake history), so the real
+Safari/iOS smoke gate is prioritized. Recorded as research R-7 + a plan test-plan
+item.
+
+**Change 4 — `metadata.json` hygiene (small, separate).** The stale
+`window_eval_config` (30 s) block should be removed or annotated (production contract
+is the 60 s LOSO block). This is **metadata/doc only** — no model/feature-space
+change, so **no `model_version` bump and no anchor invalidation**; the model artifact
+is **not** edited as part of this plan. Recorded as a backlog/task note + flagged for
+the model owner (research R-0).
+
+**Constitution Check delta**: Principle IX now has **no new secret** (publishable
+anon key only) — stronger than before; the original service-role Complexity-Tracking
+row is **removed**. Principle I still holds (managers read nothing; raw
+probability/label server-only via the SELECT whitelist; anchor server-side only) —
+the only change is writes now run as the user under RLS (write-integrity deferred as
+above). The transport-deviation entry is unchanged.
