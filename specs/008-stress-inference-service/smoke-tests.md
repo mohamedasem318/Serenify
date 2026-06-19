@@ -92,16 +92,72 @@ Record the per-component, per-stride times per browser:
 
 | Browser | stride (s) | decode-to-tail (s) | extract MP+LBP (s) | total (s) | (2958,)? | within 10 s? |
 |---|---|---|---|---|---|---|
-| Chrome (webm) | 60 |  |  |  | ☐ | ☐ |
-| Chrome (webm) | 120 |  |  |  | ☐ | ☐ |
-| Chrome (webm) | 180 |  |  |  | ☐ | ☐ |
-| Chrome (webm) | 240 |  |  |  | ☐ | ☐ |
-| Chrome (webm) | 300 |  |  |  | ☐ | ☐ |
+| Chrome (webm) | 60 | 30.26 | 15.74 | 46.10 | ✅ | ❌ |
+| Chrome (webm) | 120 | 122.51 | 23.52 | 146.46 | ✅ | ❌ |
+| Chrome (webm) | 180 | 96.52 | 7.44 | 104.56 | ✅ | ❌ |
+| Chrome (webm) | 240 | 142.86 | 13.94 | 157.09 | ✅ | ❌ |
+| Chrome (webm) | 300 | 133.78 | 5.36 | 139.72 | ✅ | ❌ |
 | Safari/iOS (fMP4) | 60 |  |  |  | ☐ | ☐ |
 | Safari/iOS (fMP4) | 120 |  |  |  | ☐ | ☐ |
 | Safari/iOS (fMP4) | 180 |  |  |  | ☐ | ☐ |
 | Safari/iOS (fMP4) | 240 |  |  |  | ☐ | ☐ |
 | Safari/iOS (fMP4) | 300 |  |  |  | ☐ | ☐ |
+
+> **Chrome (webm) — WORKS ✅ PASS** (real run 2026-06-19, Chrome 149, `video/webm;codecs=vp9`).
+> All 30 strides **decodable**; every framed stride (t≥30 s) tail-extracted to **`(2958,)`** (the
+> two t≤20 s rows are `skipped: insufficient_face_frames` — the coverage gate during initial
+> framing, still decodable, a *content* outcome not a decode failure). **KEEPS UP: breaches** (no
+> stride within 10 s past t=40 s) — **expected, not a fail** (see Step C). The breach **grows with
+> session length and is decode-to-tail-dominated** (decode-to-tail 30→122→134 s vs extract bounded
+> 5–24 s on a constant ~150-frame tail; at t=300 s decode is ~25× extract) ⇒ *decode* side ⇒ the
+> lever is the deferred rolling decoded-frame buffer (R-5). Full per-stride evidence below.
+
+<details><summary><b>Chrome exported table — full 30-stride run (2026-06-19)</b></summary>
+
+<!-- mime=video/webm;codecs=vp9 · userAgent=Chrome/149.0.0.0 (Windows NT 10.0; Win64; x64) -->
+
+| # | t (s) | upload MB | decode-to-tail (s) | extract (s) | server total (s) | within 10 s? | decodable? | shape / outcome |
+|--:|--:|--:|--:|--:|--:|:--:|:--:|:--|
+| 1 | 10 | 2.87 | 2.1541 | 0.5406 | 2.7044 | yes | yes | skipped: insufficient_face_frames · 23f |
+| 2 | 20 | 6.15 | 4.5605 | 1.1922 | 5.7729 | yes | yes | skipped: insufficient_face_frames · 48f |
+| 3 | 30 | 9.45 | 6.673 | 2.986 | 9.6915 | yes | yes | (2958,) · 74f |
+| 4 | 40 | 12.81 | 10.0808 | 5.4344 | 15.5637 | no | yes | (2958,) · 99f |
+| 5 | 50 | 15.85 | 15.3966 | 8.8772 | 24.3913 | no | yes | (2958,) · 122f |
+| 6 | 60 | 19.15 | 30.2562 | 15.7402 | 46.0959 | no | yes | (2958,) · 148f |
+| 7 | 70 | 22.42 | 47.0644 | 23.7098 | 70.9537 | no | yes | (2958,) · 150f |
+| 8 | 80 | 25.69 | 69.1728 | 19.9623 | 89.3283 | no | yes | (2958,) · 150f |
+| 9 | 90 | 29.04 | 84.7978 | 19.8304 | 104.8672 | no | yes | (2958,) · 150f |
+| 10 | 100 | 32.30 | 97.7319 | 21.4626 | 119.5177 | no | yes | (2958,) · 150f |
+| 11 | 110 | 35.25 | 109.7301 | 23.1552 | 133.336 | no | yes | (2958,) · 150f |
+| 12 | 120 | 38.60 | 122.5069 | 23.519 | 146.4579 | no | yes | (2958,) · 150f |
+| 13 | 131 | 41.95 | 135.8424 | 20.7843 | 156.9699 | no | yes | (2958,) · 150f |
+| 14 | 141 | 43.11 | 137.9968 | 16.379 | 154.8314 | no | yes | (2958,) · 150f |
+| 15 | 150 | 44.36 | 136.3704 | 9.092 | 145.8467 | no | yes | (2958,) · 150f |
+| 16 | 160 | 47.74 | 127.4655 | 8.8836 | 136.7176 | no | yes | (2958,) · 150f |
+| 17 | 170 | 51.01 | 115.6297 | 8.4357 | 124.5074 | no | yes | (2958,) · 150f |
+| 18 | 180 | 54.33 | 96.5188 | 7.4445 | 104.5576 | no | yes | (2958,) · 150f |
+| 19 | 190 | 57.34 | 80.1707 | 9.8114 | 90.4976 | no | yes | (2958,) · 150f |
+| 20 | 200 | 60.62 | 84.0443 | 15.9631 | 100.3899 | no | yes | (2958,) · 150f |
+| 21 | 210 | 63.93 | 106.7897 | 13.2151 | 120.2635 | no | yes | (2958,) · 150f |
+| 22 | 220 | 67.17 | 115.1747 | 9.8119 | 125.32 | no | yes | (2958,) · 150f |
+| 23 | 230 | 70.49 | 133.6732 | 14.8015 | 148.8258 | no | yes | (2958,) · 150f |
+| 24 | 240 | 73.53 | 142.8554 | 13.9354 | 157.09 | no | yes | (2958,) · 151f |
+| 25 | 250 | 76.74 | 165.9303 | 16.4774 | 182.7368 | no | yes | (2958,) · 150f |
+| 26 | 260 | 80.03 | 165.2354 | 11.0888 | 176.8811 | no | yes | (2958,) · 150f |
+| 27 | 270 | 83.31 | 157.2695 | 9.3055 | 166.9696 | no | yes | (2958,) · 150f |
+| 28 | 280 | 86.68 | 157.7327 | 7.4209 | 165.8038 | no | yes | (2958,) · 150f |
+| 29 | 290 | 89.62 | 139.0061 | 6.098 | 145.7107 | no | yes | (2958,) · 150f |
+| 30 | 300 | 92.94 | 133.7752 | 5.3599 | 139.7161 | no | yes | (2958,) · 150f |
+
+Fixtures saved (gitignored): `tests/fixtures/continuous/chrome/recording-so-far_{062,122,182,241,301}.webm`.
+
+**Offline re-confirm from the saved fixtures (belt-and-suspenders, agent-run):** `decode_smoke.py`
+→ `OK` on all five (1840 / 3646 / 5068 / 6847 / 8655 frames — growing with clip length; the
+`File ended prematurely` line is the benign *unfinalized live-webm trailer* warning, frames still
+decode); `compute_anchor(recording-so-far_301.webm, tail_seconds=60)` → **`(2958,)`, all-finite**.
+Matches the live table — WORKS confirmed both live and offline.
+
+</details>
 
 ### Step C — 🚦 T009 VALIDATION CHECKPOINT (light)
 
