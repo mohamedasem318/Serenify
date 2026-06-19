@@ -90,12 +90,18 @@ container reassembly).
    `200 {outcome:"warming_up"}` (no extraction; the window is not yet full — the 60 s
    contract is locked, partial windows are never scored). Otherwise hand the **~6
    clip paths** to the multi-clip extraction entry.
-   - **Assembly is frame-level (B2, R-5/R-7)**: each clip is decoded **on its own**
-     (its own init) and the **sampled frames are concatenated** into one ~150-frame /
-     ~60 s set — there is **no** container reassembly and **no** intra-file splice.
-     The two measurable seam effects (per-restart frames lost; per-seam
-     `motion_features` diff) are bounded by the **R-7 multi-clip fidelity gate**.
-     (The rejected B1 container-reassembly path is recorded in research R-5.)
+   - **Assembly is frame-level + seam-aware (B2, R-5/R-7)**: each clip is decoded **on
+     its own** (its own init) and the **sampled frames are concatenated** into one
+     ~150-frame / ~60 s set — there is **no** container reassembly and **no** intra-file
+     splice. The motion block is built **seam-aware** (`motion_features_seamaware`):
+     frame-to-frame diffs are taken **per clip** and the **cross-seam diffs are
+     excluded** before mean/std/max (they are stop/restart artifacts absent from a
+     continuous stream). The remaining seam effect is the per-restart frames lost.
+     ⚠️ **Gate status (2026-06-19): NOT cleared** — the R-7 fidelity gate still **FAILED**
+     on the Chrome fixtures after the seam-aware fix (residual is broadband divergence
+     beyond the seams; the continuous vs multi-clip fixtures are independent recordings).
+     Windowing fidelity is under a design session; this server path is **blocked** until
+     it clears. (The rejected B1 container-reassembly path is recorded in research R-5.)
 3. **Shared 2958-d extraction** on the clip set via
    `ml_video.compute_anchor_multiclip(clip_paths)` — a thin multi-clip wrapper over
    the *same* per-clip `extract_landmarks` + `lbp_top_features`/`motion_features`

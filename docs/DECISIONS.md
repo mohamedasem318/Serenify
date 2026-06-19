@@ -3337,3 +3337,72 @@ gating the rest of the build:
 D-2/R-5 decision of the prior 2026-06-19 amendment. The R-6 webm/VFR **codec** check
 remains scheduled hardening; its **assembly** dimension is now the R-7 multi-clip
 gate.
+
+---
+
+## 2026-06-19 — Multi-clip motion assembly made seam-aware; B2 fidelity gate still FAILS on Chrome (divergence beyond the seams)
+
+**Status**: Accepted (code change kept). **GATE NOT cleared — Phases 3–8 remain blocked.**
+
+**Context**: The first real-fixture run of the R-7 multi-clip fidelity HARD GATE
+(T008) on the recorded **Chrome** fixtures FAILED. Measured before vs after the fix:
+
+| | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤12) | seam_motion_ratio |
+|---|---|---|---|---|---|
+| **Before (seam-contaminated)** | **0.9010** ❌ | 0.0089 ✅ | **1.2923** ❌ | 3 ✅ | 5.72 |
+| **After (seam-aware)** | **0.8958** ❌ | 0.0089 ✅ | **0.6998** ❌ | 3 ✅ | 5.72 |
+
+The accepted diagnosis was that the only divergence was the motion block's
+frame-to-frame `np.diff` taken **across the stop/restart clip seams** (~0.5–2 s
+recorder gap → a spurious ~5.7× jump per seam, ~5 seams dominating the 2868-d motion
+block). The prescribed fix: compute motion diffs **per clip** and **exclude the
+cross-seam diffs** before the mean/std/max aggregation.
+
+**Decision**: The multi-clip motion assembly is now **seam-aware**. New
+`ml_video.features.motion_features_seamaware(landmark_blocks)` computes `|np.diff|`
+**within each clip** and concatenates the per-clip diffs (cross-seam rows excluded)
+before mean/std/max; `compute_anchor_multiclip` calls it instead of running
+`motion_features` over the fully-concatenated stack. The **single-clip
+`compute_anchor` / `motion_features` path** (which extracts the continuous reference)
+is **untouched**; the LBP/texture path, the coverage gate, and frame concatenation are
+unchanged; no gate threshold was loosened. For a single clip the seam-aware path
+reduces **exactly** to `motion_features`.
+
+**Outcome — the fix is correct but does NOT clear the gate; the seams were not the
+dominant divergence.** The fix did exactly what it should to the motion block —
+**motion-block cosine 0.861 → 0.956**, **motion_rel_p99 1.29 → 0.70** — confirming the
+seams *were* contributing to the tail. But the gate's headline **full-vector cosine
+barely moved (0.901 → 0.896, slightly worse)**: removing the spurious seam spikes shrank
+the multi-clip motion magnitude (l2 ratio multi/continuous: mean 0.79, std 0.55,
+**max 0.43**), rebalancing the full vector toward the near-perfectly-aligned LBP block
+(cosine 0.9997) and incurring a magnitude-mismatch penalty that cancelled the
+directional gain.
+
+The decisive evidence is the **relative motion-error distribution** after the fix:
+**p50 = 0.41, p90 = 0.64, p99 = 0.70** — ~41% error *at the median*, broadly distributed
+across **all** motion dims. A seam-localized problem is low-median / high-tail; this is
+**broadband**. Tighter seam handling cannot close a 41%-median broadband gap. The
+residual is **divergence beyond the seams**: the continuous clip and the 6 standalone
+clips are **two independent back-to-back recordings**, and the motion block captures
+exactly the involuntary micro-motion (blinks, sway, breathing, VFR sampling) that does
+**not** reproduce take-to-take. As fixtured, the gate conflates **assembly fidelity**
+with **recording reproducibility**, and the latter dominates the motion block (97% of
+the 2958 dims).
+
+**Consequence**:
+- The gate is **NOT cleared**. Per T009 / the plan, **STOP — do not start Phases 3–8.**
+  Safari/iOS was never reached (no fixtures recorded) and is independently still required.
+- The seam-aware code is **kept** (it is the correct multi-clip implementation and a real
+  improvement) but it is **not** sufficient, and **no threshold was changed**.
+- Windowing fidelity goes to a **design session**. Items for it: (1) re-fixture the gate
+  to isolate assembly fidelity from recording variance — compare one continuous decode vs
+  the **same decoded frames** programmatically re-chunked into N standalone clips, so the
+  only difference is assembly; (2) reconsider whether a 0.999 full-vector cosine is even
+  achievable on the take-irreproducible motion block, or whether the fidelity contract
+  needs a motion-aware / magnitude-normalized metric; (3) only then re-judge B2.
+
+**Numbers recorded in**: `specs/008-stress-inference-service/smoke-tests.md` (T009 table,
+before + after) and `research.md` R-5. The gate catching this before any build is the gate
+working as intended (Principle VII).
+
+**Revisit at**: the windowing design session (next 008 work session).

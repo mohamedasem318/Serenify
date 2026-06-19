@@ -5,8 +5,12 @@ Phase 2 (the windowing GATE).** The full feature smoke matrix (camera permission
 browsers, mobile 360 px, reduced-motion, privacy, etc.) is added in Phase 8 (task T054)
 once the feature is built.
 
-> **🚦 GATE STATUS: NOT YET CONFIRMED.** Phases 3–8 are blocked until a human records on
-> real devices and confirms T006 + T008 PASS on **both** Chrome and Safari/iOS (T009).
+> **🚦 GATE STATUS: ❌ FAILED on Chrome (2026-06-19) — Phases 3–8 remain blocked.** T008
+> failed on the recorded Chrome fixtures; a seam-aware fix to the multi-clip motion
+> assembly improved the motion block but did **not** clear the gate (the residual is
+> broadband divergence beyond the seams — see Step E + `docs/DECISIONS.md` 2026-06-19).
+> Windowing fidelity goes to a **design session**. Safari/iOS was never reached and is
+> independently still required.
 
 ---
 
@@ -27,18 +31,23 @@ once the feature is built.
 ## T007/T008 — multi-clip extraction entry + fidelity test ✅ (agent, synthetic layer)
 
 `ml_video.compute_anchor_multiclip(clip_paths)` is implemented (a thin assembly wrapper that
-reuses the per-clip `extract_landmarks` + `lbp_top_features`/`motion_features` — Principle
-III, no second copy) and validated by the **synthetic, env-runnable** layer of
-`tests/test_multiclip_fidelity.py` (5 tests, all passing):
+reuses the per-clip `extract_landmarks` + `lbp_top_features` — Principle III, no second copy)
+and validated by the **synthetic, env-runnable** layer of `tests/test_multiclip_fidelity.py`
+(6 tests, all passing):
 
-- one clip through `compute_anchor_multiclip` == `compute_anchor` (exact);
-- `compute_anchor_multiclip` == manually `[concat kept frames + landmarks] → features` (exact
-  — pins the documented assembly);
+- one clip through `compute_anchor_multiclip` == `compute_anchor` (exact — the seam-aware
+  motion path reduces to `motion_features` when there are no seams);
+- `compute_anchor_multiclip` == manually `[LBP over concat frames+landmarks] ⊕ [seam-aware
+  motion]` (exact — pins the documented assembly, motion diffs taken per-clip);
+- the motion block **excludes the cross-seam diffs** (matches the per-clip aggregation, and
+  differs from the old diff-over-the-whole-stack — **2026-06-19 seam-aware fix**, see Step E);
 - combined frame count == sum of per-clip kept frames;
 - empty input raises `FeatureExtractionError`;
 - the coverage gate runs on the **combined** set (`insufficient_face_frames`).
 
-The **real-content fidelity assertion** below needs real recordings and is the human gate.
+The **real-content fidelity assertion** below needs real recordings and is the human gate —
+**run 2026-06-19 on Chrome → FAILED** (Step E); the seam-aware fix was the response and is
+itself insufficient (residual is beyond the seams).
 
 ---
 
@@ -123,15 +132,41 @@ print a measured line per browser, e.g.:
 The test **asserts** the first four and **prints** the seam ratio. Both `[chrome]` and
 `[safari]` must pass.
 
-### Step E — T009 GATE DECISION (record the outcome here)
+### Step E — T009 GATE DECISION (recorded 2026-06-19, Chrome)
 
-| Browser | T006 decodable? | T008 cosine / lbp / motion_p99 / frames_lost | Verdict |
-|---|---|---|---|
-| Chrome (webm) | ☐ | ☐ | ☐ PASS / ☐ FAIL |
-| Safari/iOS (fMP4) | ☐ | ☐ | ☐ PASS / ☐ FAIL |
+**Verdict: ❌ FAIL on Chrome — GATE NOT cleared. STOP: Phases 3–8 remain blocked.**
+Safari/iOS not recorded yet (no fixtures) → independently still required.
+
+The gate ran on the recorded Chrome fixtures (continuous.webm + clip_00…05.webm). The
+first run caught a real fidelity failure; a seam-aware fix to the multi-clip motion
+assembly was then applied (see below) and the gate re-run on the **same** fixtures. No
+threshold was loosened.
+
+| Browser | T006 decodable? | run | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤2×n) | seam_ratio | Verdict |
+|---|---|---|---|---|---|---|---|---|
+| Chrome (webm) | ✅ (6 clips, 27 kept each; continuous 165) | **before** (seam-contaminated) | **0.9010** ❌ | 0.0089 ✅ | **1.2923** ❌ | 3 ✅ | 5.72 | ❌ FAIL |
+| Chrome (webm) | ✅ | **after** (seam-aware) | **0.8958** ❌ | 0.0089 ✅ | **0.6998** ❌ | 3 ✅ | 5.72 | ❌ FAIL |
+| Safari/iOS (fMP4) | ☐ not recorded | — | — | — | — | — | — | ☐ not run |
+
+**Read (honest — divergence is beyond the seams).** The seam-aware fix did exactly what
+it should to the motion block — motion-block cosine **0.861 → 0.956**, motion_rel_p99
+**1.29 → 0.70** — so the seams *were* contributing to the tail. But the headline
+full-vector **cosine barely moved (0.9010 → 0.8958, slightly worse)**. Decomposition
+(seam-aware): LBP-block cosine **0.9997**; motion magnitude ratio multi/continuous mean
+**0.79** / std **0.55** / max **0.43**; relative motion-error **p50 0.41 / p90 0.64 / p99
+0.70**. A ~41% error *at the median*, spread across **all** motion dims, is **broadband**,
+not seam-localized — tighter seam handling cannot close it. The continuous clip and the 6
+standalone clips are two **independent back-to-back recordings**, so the motion block is
+also measuring involuntary micro-motion / VFR-sampling differences that do not reproduce
+take-to-take: as fixtured, the gate conflates **assembly fidelity** with **recording
+reproducibility**. → **Windowing goes to a design session** (see `docs/DECISIONS.md`
+2026-06-19): re-fixture to isolate assembly fidelity (continuous vs the *same decoded
+frames* re-chunked), and reconsider whether a 0.999 full-vector cosine is achievable on
+the take-irreproducible motion block. The seam-aware code is kept (it is correct) but is
+not sufficient.
 
 - **Both PASS** → the GATE is cleared; authorize Phases 3–8. Note the date + measured numbers
-  here and in `docs/DECISIONS.md`.
+  here and in `docs/DECISIONS.md`. *(Not reached — Chrome failed.)*
 - **Any FAIL** → STOP. The windowing approach is revisited before any further build (escalate
   a B2 NO-GO; do not proceed to Phase 3). Capture the failing numbers above so the budget vs
-  a genuine fidelity problem can be told apart.
+  a genuine fidelity problem can be told apart. *(This is the path taken — 2026-06-19.)*

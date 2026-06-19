@@ -332,6 +332,27 @@ and add one missed state.
 > **REVISED — supersedes both the staggered-recorder pool (original R-5) and the
 > single-timeslice-recorder + container-reassembly approach (the first 2026-06-19
 > revision, "B1"). The R-7 spike returned a structural NO-GO on B1; B2 is adopted.**
+>
+> **AMENDED (2026-06-19, seam-aware motion + gate FAILED on Chrome).** The first
+> real-fixture run of the R-7 fidelity gate (Chrome) **FAILED** (cosine **0.901** vs the
+> ≥0.999 budget; motion rel-p99 **1.29** vs ≤0.25; texture matched, only 3 frames lost).
+> The motion block is now built **seam-aware** — frame-to-frame diffs are taken **per
+> clip** and the cross-seam diffs (the spurious ~5.7× stop/restart jump) are **excluded**
+> before mean/std/max (new `motion_features_seamaware`; the single-clip `motion_features`
+> that extracts the continuous reference is untouched). That improved the motion block
+> (motion-block cosine 0.861 → 0.956; rel-p99 1.29 → 0.70) **but the gate still FAILS**
+> (full cosine 0.901 → **0.896**, essentially flat). Decomposition shows the residual is
+> **broadband** (relative motion error p50 **0.41** / p90 0.64 / p99 0.70 across all
+> motion dims) and a motion-magnitude shortfall (multi/continuous l2 ratio: mean 0.79 /
+> std 0.55 / max 0.43), i.e. **divergence beyond the seams** — consistent with the
+> continuous clip and the 6 standalone clips being two **independent back-to-back
+> recordings** whose involuntary micro-motion / VFR sampling does not reproduce
+> take-to-take. **The seam diff is therefore *excluded*, not merely "measured/bounded", in
+> the assembly below** (so the "per-seam `motion_features` diff is a measurable, bounded
+> quantity" phrasing further down is superseded). **Windowing goes to a design session**
+> (re-fixture to isolate assembly fidelity from recording variance; reconsider the
+> motion-block fidelity metric). **Phases 3–8 stay blocked; Safari/iOS still required.**
+> Numbers: `docs/DECISIONS.md` (2026-06-19) and `smoke-tests.md` T009.
 
 **Decision (B2)**: The client records each stride as a **complete, standalone clip**
 — a single `MediaRecorder` that is **stopped and restarted every ~10–12 s**, so
