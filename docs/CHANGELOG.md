@@ -1799,3 +1799,25 @@ is a plan-level amendment.
 - **`metadata.json` hygiene** confirmed as metadata/doc-only — **no `model_version`
   bump, no anchor invalidation**, model artifact not edited (backlog/task note,
   flagged for the model owner).
+
+### 008 windowing amendment (2026-06-19) — B1 NO-GO → B2 (supersedes the D-2/R-5 bullet above)
+
+- **B1 (single timeslice recorder + server-side container reassembly) is REJECTED —
+  R-7 structural NO-GO.** Reasons: `[chunk0 + recent tail]` isn't a clean trailing
+  60 s without container surgery; the splice's time discontinuity **silently corrupts
+  `motion_features`** (spurious diff inflates max/std across the 2868 motion dims — a
+  decode can "succeed" yet be wrong); webm timeslice boundaries aren't guaranteed
+  cluster-aligned. Verdict accepted as-is; a B1 harness at `_scratch-008-b1-spike/`
+  allows optional confirmation but the decision doesn't wait on it.
+- **B2 is ADOPTED — standalone clips + server-side frame concatenation.** The client
+  **stops/restarts** the recorder every ~10–12 s so each clip is standalone and
+  independently decodable; the server buffers the last ~6 clips, **decodes each and
+  concatenates the sampled frames** into one ~150-frame / ~60 s set for LBP-TOP +
+  motion. Privacy unchanged (transient, in-memory, cleared on pause/end, deleted in
+  `finally`). Adds **one new public `ml-video` entry** `compute_anchor_multiclip`
+  (reuses the per-clip internals — not a second copy; Principle III).
+- **R-7 is now two front-loaded, gating checks**: (1) B2 capture validation on real
+  Chrome + Safari/iOS (not Playwright); (2) a multi-clip extraction **fidelity HARD
+  GATE** (continuous clip vs ~6 stop/restart clips within tolerance). The R-6
+  webm/VFR **codec** check stays scheduled hardening. *Superseded*: the B1 path in the
+  bullet above.

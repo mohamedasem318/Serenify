@@ -3273,3 +3273,67 @@ row is **removed**. Principle I still holds (managers read nothing; raw
 probability/label server-only via the SELECT whitelist; anchor server-side only) —
 the only change is writes now run as the user under RLS (write-integrity deferred as
 above). The transport-deviation entry is unchanged.
+
+## 2026-06-19 — feature 008 plan AMENDMENT: B1 windowing NO-GO → B2 (standalone clips + multi-clip frame concat)
+
+Amends the **D-2 + R-5 (REVISED)** decision in the *2026-06-19 — feature 008 plan
+AMENDMENT* entry above. The R-7 windowing spike returned a **structural NO-GO on B1**
+(single timeslice recorder + server-side **container reassembly**). **B2** is adopted
+as the windowing approach. Everything else in the prior amendment stands (D-1, D-3,
+D-4 shape, the 60 s lock, the transport deviation). Plan artifacts updated on the
+`008-stress-inference-service` branch (`research.md` R-5/R-7/R-6/D-2, `plan.md`,
+`contracts/inference-api.md`, `quickstart.md`; `data-model.md` needs no change — it
+describes no assembly).
+
+**B1 (container reassembly) is REJECTED — NO-GO (structural; accepted as-is, real-
+device confirmation optional/non-blocking).** Three reasons:
+1. **`[chunk0 + recent tail]` is not a clean trailing 60 s.** The first timeslice
+   blob is the init segment **plus ~10 s of media**, so stitching chunk0 onto a recent
+   tail is not a clean trailing 60 s **without container surgery**.
+2. **Silent `motion_features` corruption.** A spliced container has a **time
+   discontinuity** at the splice; `motion_features` is a frame-to-frame diff, so the
+   **spurious diff at the splice inflates max/std across the 2868 motion dims** — the
+   decode can **"succeed" and still be wrong** (no error raised). This silent feature
+   corruption is the disqualifying failure mode.
+3. **webm timeslice boundaries aren't guaranteed cluster-aligned**, so a reassembled
+   webm can be structurally invalid (cut mid-cluster) — decodability itself is
+   unreliable across browsers.
+
+A B1 harness exists at **`_scratch-008-b1-spike/`** for optional empirical
+confirmation; **the decision does not wait on it.**
+
+**B2 (ADOPTED) — standalone clips + server-side frame concatenation.** The client
+**stops/restarts** the `MediaRecorder` every ~10–12 s so each clip is a **complete,
+independently-decodable** standalone clip (its own init), uploading only the newest.
+The server buffers the **last ~6 clips**, **decodes each via the existing extraction
+path**, and **concatenates the sampled frames** into one ~150-frame / ~60 s set, then
+runs LBP-TOP + motion on that set. No shared-init surgery, no mid-cluster splice, no
+intra-file discontinuity. Privacy unchanged: clips are **transient, in-memory,
+cleared on pause/end, deleted in `finally`** — never persisted.
+*Package change (Principle III)*: B2 adds **one new public entry** to
+`packages/ml-video`, `compute_anchor_multiclip(clip_paths) -> (2958,)`, that **reuses**
+the existing per-clip `extract_landmarks` + `lbp_top_features`/`motion_features` and
+only adds frame-array concatenation — **not a second copy** of extraction. (B1 had
+kept ml-video untouched by reassembling containers in `apps/api`; that path is gone.)
+*Why B2 resolves the blockers the prior amendment flagged*: stop/restart makes every
+clip independently decodable (removes blocker 1), and the new multi-clip entry gives
+ml-video a multi-clip path (removes blocker 2). The cost — a recorder stop/restart
+each stride (a few frames lost per seam) and a package change — is accepted, and the
+**frames-lost-per-seam + per-seam `motion_features` diff are now measurable, bounded
+quantities** validated by a **hard fidelity gate**, not B1's silent corruption.
+
+**Front-loaded, gating validation (R-7).** The first two `/speckit-tasks` items, both
+gating the rest of the build:
+1. **B2 capture validation on real Chrome + real Safari/iOS (NOT Playwright)** — each
+   clip independently decodable; frames-lost-per-restart within budget; no glitches
+   across the ~5 seams of a 60 s window. The Safari/iOS pre-production gate.
+2. **Multi-clip extraction fidelity HARD GATE (`packages/ml-video`)** — the same ~60 s
+   as **one continuous clip** vs as **~6 stop/restart standalone clips** must agree
+   **within tolerance** (measuring the per-seam `motion_features` diff + frames lost
+   per restart). If it fails, the windowing approach is revisited before the rest of
+   the feature is built.
+
+*Superseded*: B1 (single timeslice recorder + server-side container reassembly), the
+D-2/R-5 decision of the prior 2026-06-19 amendment. The R-6 webm/VFR **codec** check
+remains scheduled hardening; its **assembly** dimension is now the R-7 multi-clip
+gate.

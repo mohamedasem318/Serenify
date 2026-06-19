@@ -29,8 +29,10 @@ curl localhost:8000/healthz        # {"status":"ready","model_version":"...@2.0.
 
 The API talks to Supabase **as the user** (forwarded access token + the anon key),
 calling `get_my_anchor()` and writing sessions/readings under RLS — no service-role.
-The client streams **~10 s segments** from a single `MediaRecorder`; the **server**
-buffers the last 6 and assembles the rolling 60 s window for extraction (revised D-2).
+The client uploads a **standalone ~10–12 s clip** each stride from a single
+`MediaRecorder` it **stops/restarts** (each clip independently decodable); the
+**server** buffers the last ~6 clips, decodes each, and concatenates the sampled
+frames into the rolling 60 s window for extraction (revised D-2; B2 — research R-5/R-7).
 
 ## Frontend (`apps/web`)
 
@@ -73,14 +75,16 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 11. **Mobile (Principle VI)**: at 360 px the stage stacks (bloom shrinks, controls
     full-width); **reduced-motion** suppresses the bloom breathing while band +
     trend stay legible.
-12. **Safari/iOS early (R-7, front-loaded — do this FIRST, before the full build)**:
-    on real Safari (desktop + iOS), confirm the single `MediaRecorder` emits usable
-    ~10 s segments (Safari → fragmented MP4), the server reassembles
-    `[init + recent fragments]` into a container that decodes, and the extracted
-    2958-d vector is sane. If reassembly fails on Safari, switch to the R-5 **B2
-    fallback** (standalone segments + a new multi-clip extraction entry). Do **not**
-    rely on Playwright alone for this (false cross-browser confidence) — use the
-    real Safari smoke channel.
+12. **B2 capture + multi-clip fidelity (R-7, front-loaded — do this FIRST, gating,
+    before the full build)**: on **real Chrome + real Safari/iOS** (Safari → fragmented
+    MP4, Chrome → webm), confirm the single `MediaRecorder` **stopped/restarted each
+    stride** emits **standalone, independently-decodable** ~10–12 s clips, with the
+    frames-lost-per-seam within budget and no glitches across the ~5 seams of a 60 s
+    window; then confirm `compute_anchor_multiclip` over ~6 clips yields a 2958-d
+    vector **within tolerance** of the same ~60 s as one continuous clip (the
+    multi-clip fidelity **HARD GATE**). Do **not** rely on Playwright alone (false
+    cross-browser confidence) — use the real Safari smoke channel. If the gate fails,
+    revisit the windowing approach before building the rest.
 
 ## Automated tests
 
@@ -88,6 +92,7 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 # Backend + first predict_delta test
 pytest apps/api/tests/test_monitoring_endpoints.py apps/api/tests/test_inference_service.py apps/api/tests/test_smoothing.py
 pytest packages/ml-video/tests/test_predict_delta.py
+pytest packages/ml-video/tests/test_multiclip_fidelity.py  # HARD GATE (R-7) — continuous vs ~6 stop/restart clips within tolerance
 pytest packages/ml-video/tests/test_webm_vfr_fidelity.py   # scheduled hardening (not a ship blocker)
 
 # Frontend
