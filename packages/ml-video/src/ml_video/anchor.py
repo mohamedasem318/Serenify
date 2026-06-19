@@ -17,7 +17,34 @@ from .features import (
     lbp_top_features,
     motion_features,
 )
-from .pipeline import extract_landmarks
+from .pipeline import _probe_timestamps, extract_landmarks
+
+
+def probe_recorded_seconds(video_path) -> float:
+    """Recorded duration (seconds) of ``video_path`` — the server-side ``< 60 s``
+    warming-up gate for the feature-008 continuous single-stream read path.
+
+    The continuous recorder uploads the whole contiguous recording-so-far each stride;
+    the server must NOT score a window until a full 60 s has accrued (the 60 s window is
+    locked by Constitution Principle II / FR-002 — partial windows are never scored). The
+    server measures the duration itself rather than trusting any client-supplied value.
+
+    Reuses the decode pipeline's pass-1 timestamp probe (``_probe_timestamps``) — the same
+    grab-only pass ``extract_landmarks`` already uses — so the VFR ``CAP_PROP_POS_MSEC``
+    handling (reliable + monotonic on real Chrome webm) is shared, not re-copied
+    (Principle III). The span is ``timestamps[-1] - timestamps[0]`` (a near-zero start on a
+    continuous recording), so it measures the actual recorded length regardless of the
+    container's (often garbage) reported fps. Raises ``FeatureExtractionError`` if the clip
+    cannot be opened (the caller maps that to a skipped reading).
+
+    (Under continuous upload this probe re-walks the growing clip each stride — an
+    O(elapsed) cost the deferred server-side rolling decoded-frame buffer would remove;
+    negligible on localhost, bounded by the 5-min session cap. See research R-5.)
+    """
+    _fps, _frame_count, _width, _height, timestamps_ms = _probe_timestamps(video_path)
+    if len(timestamps_ms) < 2:
+        return 0.0
+    return (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0
 
 
 def compute_anchor(video_path, tail_seconds: float | None = None) -> np.ndarray:

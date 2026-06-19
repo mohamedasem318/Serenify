@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from .auth import ForbiddenRoleError
 from .config import get_settings
 from .logging_config import configure_logging
-from .routers import anchor, health
+from .routers import anchor, health, monitoring
 
 
 @asynccontextmanager
@@ -54,13 +54,12 @@ def create_app() -> FastAPI:
     app.add_exception_handler(ForbiddenRoleError, _forbidden_role_handler)
     app.include_router(health.router)
     app.include_router(anchor.router)
-    # NOTE (feature 008): the monitoring router (POST /monitoring/sessions, …/windows,
-    # …/end, PATCH …/{id}) is built in Phase 4 / US1 (task T021) — the inference read
-    # path is out of Phase-3 scope. Its include lands with T021:
-    #     from .routers import monitoring
-    #     app.include_router(monitoring.router)
-    # The Phase-3 startup wiring it relies on (app.state.operating_point / .tense_band
-    # above, require_employee, the user-context client) is already in place.
+    # Feature 008 / US1 (T021): the session-aware inference read path. POST
+    # /monitoring/sessions (create + calibrate-first guard) and …/{id}/windows (score one
+    # contiguous-recording-so-far window). PATCH …/{id} + …/end are US2 (T036). Relies on
+    # the Phase-3 startup wiring above (app.state.operating_point / .tense_band), the
+    # require_employee gate, and the user-context client.
+    app.include_router(monitoring.router)
     return app
 
 
