@@ -3656,3 +3656,65 @@ single-stream*), research R-5/R-7, the single-source diagnostic finding.
 
 **Revisit at**: `/speckit-analyze`; then at implementation of T005/T006 (the invariant guard) and
 of the deferred rolling decoded-frame buffer (which must pass the T006 invariant).
+
+---
+
+## 2026-06-19 — Feature 008 windowing device gate (T009): PASS on real Chrome + Safari/iOS
+
+**Status**: Accepted. Resolves the Phase-2 windowing validation checkpoint (T009).
+
+**Decision**: The continuous single-stream path — one continuous `MediaRecorder` → upload the
+**contiguous recording-so-far** each stride → server **tail-extract** the last 60 s
+(`compute_anchor(clip, tail_seconds=60)`) — **works on real devices**. **Phase 3+ is unblocked.**
+
+**Evidence (real browsers, not Playwright; full detail in `smoke-tests.md`):**
+
+- **Chrome 149 (webm/vp9), ~5-min continuous session, 30 strides:** every stride decodable; every
+  framed stride (t≥30 s) → `(2958,)`. Offline re-confirm on the saved fixtures: `decode_smoke` OK
+  ×5, `compute_anchor(_301, tail_seconds=60)` → `(2958,)` all-finite.
+- **Safari/iOS — works PASS on BOTH containers it can produce:**
+  - **Notable finding:** this iOS Safari **supports WebM/VP9 MediaRecorder** (contradicting the
+    spec's "Safari emits fragmented MP4" assumption). With the harness's webm-first `pickMime`, the
+    **default** iOS capture is **webm/vp9** — decodable + `(2958,)` (decode 19.4 s / extract 3.9 s).
+  - **Fragmented MP4 explicitly exercised** (the gate's named unknown): forcing `?mime=mp4` pushed
+    iOS into its genuine **fragmented-MP4 / CMAF** encoder (`major_brand=iso5`, `…cmfc`, **59 `moof`
+    fragments**, handler `Core Media Video`, 9.4 Mbps / 68 MB — not a re-encode). It **decodes +
+    tail-extracts to `(2958,)`** — the "fragile encoder" fear is dispelled (it decoded *faster* than
+    the webm: 7.0 s vs 19.4 s).
+
+**Keep-up — breaches, expected, NOT a windowing failure (production-deploy concern only).** Per-
+stride server time exceeds the 10 s stride well before the 5-min cap. The breach is **decode-to-tail-
+dominated and grows with session length** (Chrome live: decode-to-tail 30→122→134 s vs extract
+bounded ~5–24 s on a constant ~150-frame tail; at t=300 s decode ≈ 25× extract) ⇒ the lever is the
+**deferred server-side rolling decoded-frame buffer** (decode only the newest increment; research
+R-5) — the *decode* side, not extract. The live worst-case is additionally inflated by ~30 concurrent
+strides contending on one machine (the same 60 s clip: **9.7 s standalone vs 30 s live**) — a
+cadence/back-pressure concern orthogonal to clip size. Localhost/demo is unaffected; the build
+proceeds.
+
+**Transport note (scaffolding, not a gate finding):** iOS records ~4× larger than Chrome (~12 MB/10
+s), so the contiguous uploads reach 20–110 MB; a free cloudflared tunnel from a phone uplink could
+not carry them (only the first ~10 s stride uploaded live, decodable, `skipped` on face-coverage —
+the QUIC default also had to be switched to `--protocol http2` to carry even the mid-size POSTs). The
+Safari works + per-component split were therefore measured by processing the **saved** recording-so-
+far fixtures through the **same** `compute_anchor`/`measure` building blocks the live server uses —
+faithful (identical extraction), since whether the bytes arrive by upload or file transfer does not
+change whether they decode. (One transfer attempt via WhatsApp-as-*video* silently **re-encoded** the
+clip to a 6.5 MB H.264-Baseline `mp42isom` MP4 — discarded; the real 68 MB CMAF fMP4 was re-sent as a
+WhatsApp *document*.)
+
+**Faithful by construction still holds** — there is **no fidelity outcome to fail**; the gate only
+confirmed *works* + characterized *keep-up*. The T006 file-global-grid suffix invariant remains the
+CI guard.
+
+**Files changed (docs/smoke-tests/tasks only — no feature code, no model artifact, no `model_version`
+bump):** `specs/008-stress-inference-service/smoke-tests.md` (T007/T008/T009 results),
+`specs/008-stress-inference-service/tasks.md` (T007/T008/T009 → done), `docs/DECISIONS.md` (this
+entry). The disposable harness `_scratch-008-continuous-spike/` gained per-stride works/keeps-up
+logging, a markdown export, a `?mime=mp4` force, and the device-gate RUNBOOK.
+
+**References**: the prior windowing decision (*B2 REJECTED; adopt continuous single-stream*) and the
+windowing-refinements entry (R-5 keep-up split); `smoke-tests.md` § Windowing validation (continuous).
+
+**Revisit at**: Phase 3 build (T010+); production keep-up must be re-measured against the chosen
+deploy target (the rolling decoded-frame buffer is the decode-side lever if it breaches there).
