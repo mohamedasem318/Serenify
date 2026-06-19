@@ -19,6 +19,10 @@ Two parts, one origin:
   timing instrument the device gate (T008) records — *growing decode-to-tail* vs *constant extract*
   (research R-5 / T009).
 
+> **Running the real-device gate (T007–T009)?** Follow **[`RUNBOOK.md`](./RUNBOOK.md)** — the
+> click-by-click maintainer guide (server start, Chrome warm-up, Safari/iOS via ngrok, what to
+> record, how to read the numbers). This README is the overview; the RUNBOOK is the procedure.
+
 ## Run it
 
 Use the **ml-video venv python** (it must import `ml_video` + cv2 + mediapipe):

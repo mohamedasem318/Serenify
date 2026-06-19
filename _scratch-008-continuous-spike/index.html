@@ -21,7 +21,10 @@
   th, td { border: 1px solid #8884; padding: 4px 6px; text-align: right; font-variant-numeric: tabular-nums; }
   th:first-child, td:first-child { text-align: left; }
   td.skipped { color: #b26a00; } td.reading { color: #2e7d32; } td.error { color: #c62828; }
+  td.yes { color: #2e7d32; font-weight: 600; } td.no { color: #c62828; font-weight: 600; }
   #status { font-size: .85rem; opacity: .8; }
+  #export { width: 100%; min-height: 160px; margin-top: 10px; display: none; box-sizing: border-box;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .78rem; padding: 8px; }
 </style>
 </head>
 <body>
@@ -38,6 +41,7 @@
     <button id="stop" disabled>Stop</button>
     <button id="uploadNow" disabled>Upload now</button>
     <button id="save" disabled>Save recording-so-far to disk</button>
+    <button id="export-md" disabled>Export as markdown</button>
   </div>
 
   <div class="row">
@@ -48,10 +52,14 @@
   <div id="strides"></div>
 
   <table>
-    <thead><tr><th>t (s)</th><th>upload MB</th><th>outcome</th><th>kept</th>
-      <th>decode-to-tail (s)</th><th>extract (s)</th><th>server total (s)</th><th>shape / reason</th></tr></thead>
+    <thead><tr><th>#</th><th>t (s)</th><th>upload MB</th>
+      <th>decode-to-tail (s)</th><th>extract (s)</th><th>server total (s)</th>
+      <th>within 10&nbsp;s?</th><th>decodable?</th><th>shape / outcome</th></tr></thead>
     <tbody id="rows"></tbody>
   </table>
+
+  <textarea id="export" readonly spellcheck="false"
+    aria-label="exported markdown — copy this into smoke-tests.md"></textarea>
 
 <script>
 const STRIDE_MS = 10_000;          // ~10 s upload cadence
@@ -61,6 +69,8 @@ const TARGET_STRIDES = [60, 120, 180, 240, 300];
 const $ = (id) => document.getElementById(id);
 let stream = null, recorder = null, chunks = [], mime = "", startTs = 0;
 let clockTimer = null, strideTimer = null;
+const strideLog = [];   // one record per upload — the source of truth for the markdown export
+let strideCount = 0;
 
 // render the target-stride chips
 $("strides").innerHTML = TARGET_STRIDES.map((s) => `<span data-s="${s}">${s}s</span>`).join("");
@@ -99,36 +109,92 @@ async function uploadSoFar() {
   if (!chunks.length) return;
   const blob = contiguousBlob();
   const tSec = Math.round((performance.now() - startTs) / 1000);
+  // one accumulated record per upload — the export reads straight off this.
+  const rec = { n: ++strideCount, tSec, bytes: blob.size };
+  strideLog.push(rec);
+  $("export-md").disabled = false;
   $("status").textContent = `uploading ${ (blob.size/1e6).toFixed(1) } MB @ ${tSec}s…`;
-  const row = addRow(tSec, blob.size);
+  rec.tr = addRow(rec);
   try {
     const res = await fetch("/upload", { method: "POST", headers: { "Content-Type": blob.type }, body: blob });
     const r = await res.json();
-    fillRow(row, r);
-    $("status").textContent = `recording — last: ${r.outcome} (decode ${r.decode_to_tail_s}s / extract ${r.extract_s}s)`;
+    applyResult(rec, r);
+    $("status").textContent = `recording — last: ${rec.outcome} (decode ${rec.decode_s}s / extract ${rec.extract_s}s, total ${rec.total_s}s ${rec.within10})`;
   } catch (err) {
-    fillRow(row, { outcome: "error", reason: String(err) });
+    applyResult(rec, { outcome: "error", reason: String(err) });
     $("status").textContent = "upload error — see row";
   }
 }
 
-function addRow(tSec, bytes) {
+// Fold the server JSON into the record, deriving the two yes/no gate columns.
+function applyResult(rec, r) {
+  rec.outcome = r.outcome ?? "error";
+  rec.kept = r.kept_frames ?? null;
+  rec.decode_s = r.decode_to_tail_s ?? null;
+  rec.extract_s = r.extract_s ?? null;
+  rec.total_s = r.server_total_s ?? null;
+  rec.shape = r.shape ?? null;
+  rec.reason = r.reason ?? null;
+  // decodable = the container opened server-side: both "reading" and "skipped" got past decode;
+  // only "error" (decode threw, or the upload itself failed) is not decodable.
+  rec.decodable = (rec.outcome === "reading" || rec.outcome === "skipped") ? "yes" : "no";
+  // within-10s = the per-stride server total fit the 10 s stride (informational — see RUNBOOK §4).
+  rec.within10 = rec.total_s == null ? "—" : (rec.total_s <= 10 ? "yes" : "no");
+  rec.cell = outcomeCell(rec);
+  fillRow(rec);
+}
+
+// the combined "shape / outcome" cell text (also reused verbatim in the export).
+function outcomeCell(rec) {
+  const kept = rec.kept == null ? "" : ` · ${rec.kept}f`;
+  if (rec.outcome === "reading") return `${rec.shape ?? "(2958,)"}${kept}`;
+  if (rec.outcome === "skipped") return `skipped: ${rec.reason ?? "?"}${kept}`;
+  return `error: ${rec.reason ?? "?"}`;
+}
+
+function addRow(rec) {
   const tr = document.createElement("tr");
-  tr.innerHTML = `<td>${tSec}</td><td>${(bytes/1e6).toFixed(2)}</td><td>…</td>`
-    + `<td></td><td></td><td></td><td></td><td></td>`;
+  tr.innerHTML = `<td>${rec.n}</td><td>${rec.tSec}</td><td>${(rec.bytes/1e6).toFixed(2)}</td>`
+    + `<td></td><td></td><td></td><td></td><td></td><td>…</td>`;
   $("rows").prepend(tr);
   return tr;
 }
 
-function fillRow(tr, r) {
-  const c = tr.children;
-  c[2].textContent = r.outcome ?? "?";
-  c[2].className = r.outcome ?? "";
-  c[3].textContent = r.kept_frames ?? "";
-  c[4].textContent = r.decode_to_tail_s ?? "";
-  c[5].textContent = r.extract_s ?? "";
-  c[6].textContent = r.server_total_s ?? "";
-  c[7].textContent = r.shape ?? r.reason ?? "";
+function fillRow(rec) {
+  const c = rec.tr.children;
+  c[3].textContent = rec.decode_s ?? "";
+  c[4].textContent = rec.extract_s ?? "";
+  c[5].textContent = rec.total_s ?? "";
+  c[6].textContent = rec.within10; c[6].className = rec.within10 === "—" ? "" : rec.within10;
+  c[7].textContent = rec.decodable; c[7].className = rec.decodable;
+  c[8].textContent = rec.cell;      c[8].className = rec.outcome ?? "";
+}
+
+// Dump the accumulated table as a markdown block the maintainer pastes into smoke-tests.md.
+function exportMarkdown() {
+  const esc = (s) => String(s).replace(/\|/g, "\\|");
+  const head = "| # | t (s) | upload MB | decode-to-tail (s) | extract (s) | server total (s) "
+    + "| within 10 s? | decodable? | shape / outcome |";
+  const sep = "|--:|--:|--:|--:|--:|--:|:--:|:--:|:--|";
+  const body = strideLog.map((r) =>
+    `| ${r.n} | ${r.tSec} | ${(r.bytes/1e6).toFixed(2)} | ${r.decode_s ?? ""} | ${r.extract_s ?? ""} `
+    + `| ${r.total_s ?? ""} | ${r.within10 ?? ""} | ${r.decodable ?? ""} | ${esc(r.cell ?? "")} |`);
+  const md = [
+    `<!-- 008 continuous works-and-keeps-up — exported ${new Date().toISOString()} -->`,
+    `<!-- mime=${mime || "n/a"} · userAgent=${navigator.userAgent} -->`,
+    "", head, sep, ...body, "",
+  ].join("\n");
+  const box = $("export");
+  box.value = md;
+  box.style.display = "block";
+  box.focus(); box.select();
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(md)
+      .then(() => { $("status").textContent = "exported — markdown copied to clipboard (also in the box below)"; })
+      .catch(() => { $("status").textContent = "exported — select-copy the box below (clipboard blocked)"; });
+  } else {
+    $("status").textContent = "exported — select-copy the box below";
+  }
 }
 
 $("start").onclick = async () => {
@@ -166,6 +232,8 @@ $("stop").onclick = () => {
 };
 
 $("uploadNow").onclick = () => uploadSoFar();
+
+$("export-md").onclick = () => exportMarkdown();
 
 $("save").onclick = () => {
   // download the current contiguous recording-so-far -> becomes a T007 fixture
