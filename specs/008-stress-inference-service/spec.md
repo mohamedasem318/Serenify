@@ -12,9 +12,10 @@
 > were resolved late and authoritatively during planning; the spec has been **back-ported to
 > match them** (it never reverts them). The authoritative resolutions live in
 > [`plan.md`](./plan.md) / [`research.md`](./research.md) and `docs/DECISIONS.md`:
-> **(1) Windowing = B2** — the client records standalone **stop/restart ~10–12 s clips** and the
-> server assembles the rolling 60 s window by **multi-clip frame concatenation** (the B1
-> single-timeslice + container-reassembly path was a structural **NO-GO**).
+> **(1) Windowing = continuous single-stream** — the client uploads the **contiguous
+> recording-so-far** from **one continuous `MediaRecorder`** and the server **tail-extracts
+> the last 60 s** via the existing single-clip path (no multi-clip assembly). The B1
+> container-reassembly and B2 stop/restart multi-clip frame-concat paths were both rejected.
 > **(2) Anchor read = self-scoped `SECURITY DEFINER` `get_my_anchor()`** called by the API as
 > the user (forwarded JWT + publishable anon key), with RLS-as-user session/reading writes and
 > **no service-role key**.
@@ -209,7 +210,7 @@ After (and during) a session, the employee can see a retrospective session trend
 These were flagged for planning and have since been **RESOLVED** (see [`plan.md`](./plan.md), [`research.md`](./research.md), `docs/DECISIONS.md`). Kept here for traceability; the planning resolution is authoritative.
 
 - **D-1 — Anchor read path at inference** — **RESOLVED: self-scoped `SECURITY DEFINER` `get_my_anchor()`**, called by the API **as the user** (forwarded JWT + the publishable anon key), with RLS-as-user session/reading writes and **no service-role key**. (The originally-recommended server-side **service-role** read was rejected to preserve DECISION-9's "no broad DB credential in `apps/api`" posture; the self-scoped DEFINER is the safer option feature 004 also named.)
-- **D-2 — Endpoint shape & windowing** — **RESOLVED: session-aware** (create → submit clip ×N → end) with **B2 windowing**: the client uploads standalone **stop/restart ~10–12 s clips** and the **server** assembles the rolling 60 s window by **multi-clip frame concatenation** (the B1 single-timeslice + container-reassembly path was a structural **NO-GO**). Smoothing/banding stay **server-side**.
+- **D-2 — Endpoint shape & windowing** — **RESOLVED: session-aware** (create → submit the contiguous recording-so-far ×N → end) with **continuous single-stream windowing**: the client uploads the **contiguous recording-so-far** from **one continuous `MediaRecorder`** and the **server** decodes it and **tail-extracts the last 60 s** via the existing single-clip path — no multi-clip assembly (B1 container-reassembly and B2 stop/restart multi-clip frame-concat were both rejected; the 60 s window is faithful by construction). Smoothing/banding stay **server-side**.
 - **D-3 — Smoothing & banding specifics** — **RESOLVED**: a trailing mean of the last **4 scored** windows; bands at **t_low = 0.53** (the metadata operating point) and **t_high = 0.70** (display-only product split); a **4-reading cold-start** (first band ~90–105 s).
 - **D-4 — Readings persistence schema** — **RESOLVED**: two tables (`monitoring_sessions`, `window_readings`) with RLS select/insert/update-own and **no manager policy**, the raw `stress_probability`/`label` held **server-only** via the SELECT column whitelist, **90-day** retention for readings, and the shared `getSessionTrend`/`getLastSessionRecap` reads. See [`data-model.md`](./data-model.md).
 
@@ -225,7 +226,7 @@ All mock gaps are **resolved** by the mock owner and folded into the plan ([`res
 ## Test Plan Notes
 
 - `predict_delta` currently has **zero tests**; this feature adds its first caller and its first test.
-- **Multi-clip windowing fidelity (B2 — HARD GATE, front-loaded)**: because the 60 s window is now assembled from ~6 standalone stop/restart clips, a hard gate confirms the multi-clip 2958-d vector matches the same content recorded as one continuous clip within tolerance — validated on real Chrome **and** real Safari/iOS (not Playwright) **before** the rest of the build. If it fails, the windowing approach is revisited. (Decision #1; see `plan.md` / `research.md` R-7.)
+- **Continuous-capture windowing validation (front-loaded, light — NOT a fidelity gate)**: the 60 s window is one continuous clip tail-extracted by the already-validated single-clip path, so it is **faithful by construction** and there is **no multi-clip fidelity gate**. The remaining front-loaded check, on real Chrome **and** real Safari/iOS (not Playwright), only confirms the continuous capture + growing upload + last-60 s tail-extract **works and keeps up** (per-stride server time within the 10 s stride across a 5-min session), reusing the `/anchor` path. It stays the Safari/iOS **pre-production gate**; a keep-up breach calls for the deferred rolling-buffer optimization, not a windowing change. (See `plan.md` / `research.md` R-5/R-7; the B2 multi-clip frame-concat path was rejected.)
 - **webm/VFR fidelity residual (planned hardening check, not a blocker)**: decode the same content as both mp4 (CFR) and webm (VFR), then confirm the extracted 2958-d vectors stay within tolerance. Real inference clips are browser MediaRecorder webm/VFR, which travel a timestamp-sampler path the notebook fidelity gate did not check. This is a hardening item to schedule, not a gate on shipping the feature.
 
 ## Constitution Alignment
@@ -234,4 +235,4 @@ All mock gaps are **resolved** by the mock owner and folded into the plan ([`res
 - **Principle II (Subject-Disjoint ML Evaluation / calibration & windows)**: 60s window / 10s stride is honored and not shortened (FR-002); per-user delta calibration is required with no global anchor (FR-011); subject-disjoint evaluation is already satisfied for the model and no new ML evaluation is in scope.
 - **Principle V (Calm-First Design Language)**: amber = stress only, foggy = attention/error, meadow = calm/affirmative; no big number; calm, non-alarmist copy (FR-021–FR-024, FR-026).
 - **Principle VI (Responsive & Accessible)**: ≥360px, reduced-motion, visible focus (FR-025).
-- **Principle VII (Mandatory Testing)**: first `predict_delta` caller and test; the **front-loaded B2 multi-clip windowing fidelity HARD GATE** (real Chrome + Safari/iOS); plus the webm/VFR hardening check (Test Plan Notes).
+- **Principle VII (Mandatory Testing)**: first `predict_delta` caller and test; the **front-loaded (light) continuous-capture windowing validation** (real Chrome + Safari/iOS — works + keeps up, no fidelity gate); plus the webm/VFR hardening check (Test Plan Notes).

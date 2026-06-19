@@ -29,10 +29,11 @@ curl localhost:8000/healthz        # {"status":"ready","model_version":"...@2.0.
 
 The API talks to Supabase **as the user** (forwarded access token + the anon key),
 calling `get_my_anchor()` and writing sessions/readings under RLS — no service-role.
-The client uploads a **standalone ~10–12 s clip** each stride from a single
-`MediaRecorder` it **stops/restarts** (each clip independently decodable); the
-**server** buffers the last ~6 clips, decodes each, and concatenates the sampled
-frames into the rolling 60 s window for extraction (revised D-2; B2 — research R-5/R-7).
+The client uploads the **contiguous recording-so-far** each stride from **one
+continuous `MediaRecorder`** (init + all chunks in order — always decodable); the
+**server** decodes that one continuous clip and **tail-extracts the last 60 s** via the
+existing single-clip path (`compute_anchor` + the VFR sampler, bounded to the trailing
+window) — no multi-clip assembly (revised D-2; research R-5/R-7).
 
 ## Frontend (`apps/web`)
 
@@ -75,16 +76,18 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 11. **Mobile (Principle VI)**: at 360 px the stage stacks (bloom shrinks, controls
     full-width); **reduced-motion** suppresses the bloom breathing while band +
     trend stay legible.
-12. **B2 capture + multi-clip fidelity (R-7, front-loaded — do this FIRST, gating,
-    before the full build)**: on **real Chrome + real Safari/iOS** (Safari → fragmented
-    MP4, Chrome → webm), confirm the single `MediaRecorder` **stopped/restarted each
-    stride** emits **standalone, independently-decodable** ~10–12 s clips, with the
-    frames-lost-per-seam within budget and no glitches across the ~5 seams of a 60 s
-    window; then confirm `compute_anchor_multiclip` over ~6 clips yields a 2958-d
-    vector **within tolerance** of the same ~60 s as one continuous clip (the
-    multi-clip fidelity **HARD GATE**). Do **not** rely on Playwright alone (false
-    cross-browser confidence) — use the real Safari smoke channel. If the gate fails,
-    revisit the windowing approach before building the rest.
+12. **Continuous-capture windowing validation (R-7, front-loaded — do this FIRST;
+    lighter, no fidelity gate)**: on **real Chrome + real Safari/iOS** (Safari → fragmented
+    MP4, Chrome → webm), confirm the **one continuous `MediaRecorder`** + **growing
+    upload** of the contiguous recording-so-far + **server tail-extract of the last 60 s**
+    both **works** (the contiguous file is decodable and the server returns a 2958-d
+    vector each stride) and **keeps up** (per-stride server time within the 10 s stride
+    across a 5-min session — worst case is the last stride, ~300 s decoded). This reuses
+    the proven `/anchor` upload+extract path. Do **not** rely on Playwright alone (false
+    cross-browser confidence) — use the real Safari smoke channel. It stays the
+    **Safari/iOS pre-production gate** but is **no longer a fidelity gate**: a keep-up
+    breach means the deferred rolling decoded-frame buffer is needed for production, not
+    that windowing re-opens.
 
 ## Automated tests
 
@@ -92,7 +95,7 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 # Backend + first predict_delta test
 pytest apps/api/tests/test_monitoring_endpoints.py apps/api/tests/test_inference_service.py apps/api/tests/test_smoothing.py
 pytest packages/ml-video/tests/test_predict_delta.py
-pytest packages/ml-video/tests/test_multiclip_fidelity.py  # HARD GATE (R-7) — continuous vs ~6 stop/restart clips within tolerance
+pytest packages/ml-video/tests/test_tail_window.py         # pins the tail-window option (last-60 s bound; reduces to compute_anchor for ≤60 s)
 pytest packages/ml-video/tests/test_webm_vfr_fidelity.py   # scheduled hardening (not a ship blocker)
 
 # Frontend

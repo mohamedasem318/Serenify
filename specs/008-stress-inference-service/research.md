@@ -123,65 +123,87 @@ SELECT whitelist) — no service credential needed.
 
 ---
 
-## D-2 — Endpoint shape AND upload/buffer model (REVISED — 2026-06-19 amendment)
+## D-2 — Endpoint shape AND upload/buffer model (REVISED — 2026-06-19; B2 REVERSED → continuous single-stream)
 
-> **REVISED — 2026-06-19 amendment, then B1 NO-GO → B2.** The maintainer flipped the
-> upload/buffer model: the client no longer assembles 60 s windows. It uploads one
-> short clip per stride from a **single** `MediaRecorder`, and the **server** buffers
-> the recent clips per session and assembles the rolling 60 s window. Following the
-> R-7 NO-GO on container reassembly (B1), the client now **stops/restarts** the
-> recorder each stride so each clip is **standalone** and the server assembles by
-> **frame concat** (B2 — see R-5). The session-aware endpoint shape (below) is
-> unchanged.
+> **REVISED — 2026-06-19, final.** Lineage: original client-assembled windows →
+> single-timeslice + server container reassembly (**B1, NO-GO**) → standalone
+> stop/restart clips + server multi-clip frame-concat (**B2, REJECTED** on the
+> single-source fidelity fixture — see R-5/R-7 and `docs/DECISIONS.md` 2026-06-19) →
+> **continuous single-stream upload (ADOPTED)**. The client now runs **one continuous
+> `MediaRecorder`** and uploads the **contiguous recording-so-far** each stride; the
+> **server** decodes that one continuous clip and **tail-extracts the last 60 s** via
+> the existing single-clip path — **no multi-clip assembly**. The session-aware
+> endpoint shape (below) is unchanged.
 
 **Decision (endpoint shape — unchanged)**: **Session-aware**, three endpoints:
 `POST /monitoring/sessions` (create) → `POST /monitoring/sessions/{id}/windows`
-(submit one standalone ~10–12 s clip, ×N) → `POST /monitoring/sessions/{id}/end`. A
+(submit the contiguous recording-so-far, ×N) → `POST /monitoring/sessions/{id}/end`. A
 lightweight `PATCH /monitoring/sessions/{id}` carries lifecycle status (paused /
 active / out_of_frame) for the recap. Reads (trend, recap) are **not** API
 endpoints — the browser reads its own rows via Supabase RLS (typed client).
 
-**Decision (upload/buffer model — REVISED, B2)**: The client records each stride as
-a **complete, standalone clip** — a single `MediaRecorder` **stopped/restarted every
-~10–12 s** (each clip carries its own init, independently decodable) — and uploads
-**only the newest clip**. The **server** keeps a small **transient per-session clip
-buffer** (the last ~6 clips = ~60 s), **decodes each clip via the existing
-extraction path**, and **concatenates the sampled frames** into one ~150-frame /
-~60 s set for LBP-TOP ⊕ motion (a new `compute_anchor_multiclip` entry — see R-5).
-No band is produced until the buffer holds a full ~60 s of clips (plus the D-3
-cold-start count of scored readings).
+**Decision (upload/buffer model — REVISED, continuous single-stream)**: The client runs
+**one continuous `MediaRecorder`** (timeslice used only for *incremental capture*, never
+stop/restart). Each stride it uploads the **contiguous recording-so-far** — the init
+segment + all chunks **in order**, i.e. the literal growing file, which is **always
+decodable** (the case already proven reliable — no surgery, no clip stitching, no
+init-segment retention). The **server** decodes that one continuous clip and **extracts
+the last 60 s** with the existing, validated single-clip extraction path (`compute_anchor`
++ the VFR timestamp / `POS_MSEC` sampler) **bounded to the trailing window** — frames whose
+timestamp ≥ `duration − 60 s`. **No multi-clip assembly, no per-session clip buffer.** No
+band is produced until ≥ 60 s of continuous recording exists (plus the D-3 cold-start count
+of scored readings). The only `packages/ml-video` change is a thin **tail-window option** on
+the existing extraction (reuses the exact decode + sampler + features; it only bounds *which*
+frames feed the features) — strictly smaller than the retired `compute_anchor_multiclip`.
+
+**Faithful by construction (no new fidelity gate)**: the scored window is a **genuine
+continuous 60 s segment sampled by one continuous grid** — no stop/restart seams, no
+per-clip phase resets — i.e. exactly the single-clip input the extraction path is **already
+validated on**. There is therefore **no new feature-fidelity gate** (contrast B2, whose
+multi-clip assembly needed a hard gate that it then failed — R-5/R-7). Residual: only a
+≤200 ms *global* sampling-phase offset, within ordinary recording-to-recording variation.
 
 **Decision (smoothing locus — unchanged)**: Smoothing, banding, and the cold-start
 gate stay **server-side** in the window endpoint; the band is returned and the
 client renders it (first reading already smoothed; card/page trends agree, SC-008).
 
 **Rationale**:
-- **One client encoder instead of ~6** (the original staggered-pool would run up
-  to six overlapping `MediaRecorder`s): far lighter on CPU/battery, especially on
-  mobile, and **~6× less upload bandwidth** (10 s/stride vs a full 60 s clip).
-- **Cross-browser robustness**: **WebKit/Safari `MediaRecorder` is the fragile
-  case** (limited webm; emits fragmented MP4) and **Safari/iOS is a hard
-  pre-production gate** — a single-encoder path is materially more defensible than
-  six concurrent recorders, and **B2's standalone clips sidestep cross-format
-  container reassembly entirely** (each clip is decoded on its own). (See R-7 for the
-  front-loaded, gating Safari + multi-clip-fidelity validation.)
-- Session-aware grouping still makes readings/trend/recap trivial and gives feature
-  009 a clean unit; the transient buffer is small and lives only for an active
-  session.
+- **Faithful by construction** is the deciding factor: the 60 s window *is* a real
+  continuous clip, identical to the training/calibration distribution and the
+  already-validated extraction — so windowing stops being a fidelity risk. B2's
+  standalone-clip assembly could not reproduce continuous sampling phase and failed the
+  fidelity gate (R-5); continuous upload removes the assembly step entirely.
+- **One client encoder, simplest possible capture**: a single continuous recorder with no
+  stop/restart and no clip lifecycle — the least fragile path on **Safari/WebKit**
+  `MediaRecorder` (the hard pre-production gate), since the contiguous file is whatever the
+  browser natively produces and is uploaded as-is.
+- **Reuses the proven `/anchor` path**: one continuous clip → multipart upload → single-clip
+  extraction is exactly the calibration upload+extract path, already validated end-to-end.
+- Session-aware grouping still makes readings/trend/recap trivial and gives feature 009 a
+  clean unit.
+- **Cost, accepted**: upload size and the server's decode-to-tail work grow over the session
+  (each stride re-uploads + re-decodes the whole recording-so-far), bounded by the 5-min hard
+  cap and negligible on localhost. See the flag + the deferred rolling decoded-frame buffer in
+  R-5 and `plan.md`.
 
-**Privacy (Principle I)**: buffered clips are **transient, server-side only, never
-persisted**; the clips and any temp files are deleted in a `finally` block (same
-pattern as `/anchor`). No raw video persists.
+**Privacy (Principle I)**: the uploaded continuous clip is **transient, server-side only,
+never persisted**; it (and any temp file) is deleted in a `finally` block (same pattern as
+`/anchor`). No per-session clip buffer is held; no raw video persists. *(The deferred
+server-side rolling decoded-frame buffer, if ever built, holds only decoded frames in memory
+for an active session — same transient, never-persisted posture.)*
 
 **Alternatives considered**:
 - **Single stateless per-window endpoint (no session)** — rejected (as before);
   no clean grouping/lifecycle home.
 - **Client-assembled 60 s window per stride (the original D-2)** — superseded:
-  ~6× bandwidth and a ~6-recorder encoder pool, fragile on Safari (see R-5).
-- **Single timeslice recorder + server-side container reassembly (B1, the first
-  2026-06-19 revision)** — **superseded by B2** after the R-7 NO-GO: timeslice
-  chunks aren't independently decodable, a spliced container silently corrupts
-  `motion_features`, and webm cluster boundaries aren't guaranteed (see R-5).
+  ~6× bandwidth and a ~6-recorder encoder pool, fragile on Safari.
+- **Single timeslice recorder + server-side container reassembly (B1)** — rejected (R-7
+  structural NO-GO): timeslice chunks aren't independently decodable, a spliced container
+  silently corrupts `motion_features`, and webm cluster boundaries aren't guaranteed (see R-5).
+- **Standalone stop/restart clips + server multi-clip frame-concat (B2)** — **rejected** on
+  the single-source fidelity fixture: a per-clip sampling-phase reset → cosine 0.991 < 0.999,
+  ~14% motion-magnitude shortfall, only 31.5% of sampled frames coinciding; not patchable for
+  real clips, which carry no global clock (R-5; `docs/DECISIONS.md` 2026-06-19).
 
 ---
 
@@ -327,102 +349,111 @@ and add one missed state.
 
 ---
 
-## R-5 — Standalone-clip streaming + server-side frame-concat assembly (REVISED — 2026-06-19, B1 NO-GO → B2)
+## R-5 — Continuous single-stream upload + server-side tail-extraction (REVISED — 2026-06-19; B1 NO-GO, B2 REJECTED)
 
-> **REVISED — supersedes both the staggered-recorder pool (original R-5) and the
-> single-timeslice-recorder + container-reassembly approach (the first 2026-06-19
-> revision, "B1"). The R-7 spike returned a structural NO-GO on B1; B2 is adopted.**
->
-> **AMENDED (2026-06-19, seam-aware motion + gate FAILED on Chrome).** The first
-> real-fixture run of the R-7 fidelity gate (Chrome) **FAILED** (cosine **0.901** vs the
-> ≥0.999 budget; motion rel-p99 **1.29** vs ≤0.25; texture matched, only 3 frames lost).
-> The motion block is now built **seam-aware** — frame-to-frame diffs are taken **per
-> clip** and the cross-seam diffs (the spurious ~5.7× stop/restart jump) are **excluded**
-> before mean/std/max (new `motion_features_seamaware`; the single-clip `motion_features`
-> that extracts the continuous reference is untouched). That improved the motion block
-> (motion-block cosine 0.861 → 0.956; rel-p99 1.29 → 0.70) **but the gate still FAILS**
-> (full cosine 0.901 → **0.896**, essentially flat). Decomposition shows the residual is
-> **broadband** (relative motion error p50 **0.41** / p90 0.64 / p99 0.70 across all
-> motion dims) and a motion-magnitude shortfall (multi/continuous l2 ratio: mean 0.79 /
-> std 0.55 / max 0.43), i.e. **divergence beyond the seams** — consistent with the
-> continuous clip and the 6 standalone clips being two **independent back-to-back
-> recordings** whose involuntary micro-motion / VFR sampling does not reproduce
-> take-to-take. **The seam diff is therefore *excluded*, not merely "measured/bounded", in
-> the assembly below** (so the "per-seam `motion_features` diff is a measurable, bounded
-> quantity" phrasing further down is superseded). **Windowing goes to a design session**
-> (re-fixture to isolate assembly fidelity from recording variance; reconsider the
-> motion-block fidelity metric). **Phases 3–8 stay blocked; Safari/iOS still required.**
-> Numbers: `docs/DECISIONS.md` (2026-06-19) and `smoke-tests.md` T009.
+> **REVISED — final 2026-06-19. Windowing lineage:** staggered-recorder pool (original
+> R-5) → single-timeslice recorder + server container reassembly (**B1, structural
+> NO-GO**) → standalone stop/restart clips + server multi-clip frame-concat (**B2,
+> REJECTED** on the single-source fidelity fixture) → **continuous single-stream upload
+> (ADOPTED)**. Each prior decision and its evidence is kept below for traceability; the
+> live path is continuous. Numbers: `docs/DECISIONS.md` (2026-06-19) and
+> `smoke-tests.md` (Step F).
 
-**Decision (B2)**: The client records each stride as a **complete, standalone clip**
-— a single `MediaRecorder` that is **stopped and restarted every ~10–12 s**, so
-every emitted clip carries its **own** container init and is **independently
-decodable**. The client uploads only the newest clip each stride. The **server**
-keeps a transient per-session buffer of the **last ~6 standalone clips** (= ~60 s),
-**decodes each clip via the existing extraction path** (`extract_landmarks` — the
-per-clip probe+retrieve + VFR timestamp sampler), **concatenates the sampled
-frames** from the ~6 clips into one **~150-frame / ~60 s** set, and runs **LBP-TOP ⊕
-motion** on that concatenated set → the 2958-d vector. No shared-init surgery, no
-mid-cluster splice, no intra-file discontinuity. Buffer lifecycle: append each clip;
-once > 6 clips, evict the oldest; assemble on each stride; **clear on pause/end**;
-clips + any temp files deleted in `finally`.
+**Decision (continuous single-stream)**: The client runs **one continuous `MediaRecorder`**
+(timeslice used only for *incremental capture*, never stop/restart). Each stride it uploads
+the **contiguous recording-so-far** — the init segment + all chunks **in order**, i.e. the
+literal growing file, which is **always decodable** (the case already proven reliable — no
+surgery, no clip stitching, no init-segment retention). The **server** decodes that one
+continuous clip and **extracts the last 60 s** with the existing, validated single-clip
+extraction path (`compute_anchor` + the VFR timestamp / `POS_MSEC` sampler) **bounded to the
+trailing window** — sample frames whose timestamp ≥ `duration − 60 s`, then run **LBP-TOP ⊕
+motion** on that ~150-frame / ~60 s set → the 2958-d vector. **No multi-clip assembly, no
+per-session clip buffer, no seam handling.** The uploaded clip + any temp file are deleted in
+`finally` (Principle I — no raw video persists).
 
-**Package change (Principle III)**: B2 adds **one new public extraction entry** to
-`packages/ml-video` — `compute_anchor_multiclip(clip_paths) -> (2958,)` — that
-**reuses** the existing per-clip `extract_landmarks` + `lbp_top_features` /
-`motion_features` internals and only adds the **frame-array concatenation** step
-before feature computation. This is **not a second copy** of extraction (Principle
-III): the per-clip decode, sampling, coverage gate, and feature math are the
-existing code; the new entry is a thin assembly wrapper. (Contrast B1, which kept
-ml-video untouched by reassembling containers in `apps/api` — that path is rejected,
-below.)
+**Faithful by construction (the deciding property)**: the scored window is a **genuine
+continuous 60 s segment sampled by one continuous grid** — no stop/restart seams, no per-clip
+phase resets — i.e. exactly the single-clip input the extraction path is **already validated
+on** (the notebook fidelity gate + the existing webm/VFR sampler). **There is therefore no new
+feature-fidelity gate to pass** — the heavy multi-clip fidelity question that blocked B2 simply
+does not exist here. (Residual: only a ≤200 ms *global* sampling-phase offset between the
+window grid and a standalone clip's grid — within ordinary recording-to-recording variation.)
 
-**Why B1 (container reassembly) is rejected — NO-GO (structural; accepted as-is)**:
-1. **`[chunk0 + recent tail]` is not a clean trailing 60 s.** With one
-   `MediaRecorder` in timeslice mode, the **first** blob is the init segment **plus
-   ~10 s of media**, so `[chunk0 + recent tail]` is **not** a clean trailing 60 s
-   **without container surgery** (dropping chunk0's media while keeping its init).
-2. **The dropped-tail timeline discontinuity silently corrupts `motion_features`.**
-   Splicing non-contiguous clusters into one container produces a **time
-   discontinuity** at the splice; `motion_features` is a frame-to-frame diff, so the
-   **spurious diff at the splice inflates max/std across the 2868 motion dims** — and
-   the decode can **"succeed" while the vector is wrong** (no error raised). A
-   silent, hard-to-detect feature corruption is the disqualifying failure mode.
-3. **webm timeslice boundaries aren't guaranteed cluster-aligned.** A reassembled
-   webm can therefore be structurally invalid (a cut mid-cluster/mid-block), making
-   decodability itself unreliable across browsers.
+**Package change (Principle III)**: a thin **tail-window option** on the existing single-clip
+extraction — `compute_anchor` gains a trailing-window bound (e.g. `tail_seconds=60`) on the
+VFR `_timestamp_keep_indices` sampler so only frames with timestamp ≥ `duration − 60 s` feed
+the features. It **reuses** the exact decode + sampler + feature math; for a ≤ 60 s clip it
+reduces to `compute_anchor` unchanged. This is **smaller** than the retired
+`compute_anchor_multiclip` (no concatenation, no seam-aware motion).
 
-The structural verdict is **accepted as-is**; **real-device confirmation is optional
-and not blocking.** A B1 harness exists at **`_scratch-008-b1-spike/`** for optional
-empirical confirmation, but the decision **does not wait on it**.
+**Retired (B2 artifacts — kept in git history, removed from the active path)**:
+`compute_anchor_multiclip`, `motion_features_seamaware`, `test_multiclip_fidelity.py`, and the
+multi-clip frame-concat **HARD GATE**. The **single-source diagnostic**
+(`tests/helpers/singlesource_fidelity.py`), the single-source fixture, and the finding below
+**stay recorded** — they are why B2 was rejected.
 
-**Why B2 resolves the two blockers the first revision flagged**: the first 2026-06-19
-revision flagged frame-level concat as "not directly feasible" for two reasons —
-(1) timeslice chunks aren't independently decodable, and (2) the shared extraction
-entry is single-file/path-based. B2 removes **both**: (1) stop/restart makes every
-clip a **self-contained, independently-decodable** container (its own init), and
-(2) the **new `compute_anchor_multiclip` entry** gives ml-video a multi-clip path.
-The cost — a recorder stop/restart each stride (a few frames lost at each seam) and
-a package change — is accepted, and crucially the **frames-lost-per-seam and the
-per-seam `motion_features` diff are now measurable, bounded quantities** validated
-by the R-7 multi-clip fidelity gate — **not** the **silent** corruption of B1's
-intra-file splice.
+**Why B2 (standalone clips + multi-clip frame-concat) is REJECTED — the single-source numbers**:
+the multi-clip fidelity gate ran on a **single-source** fixture (the continuous Chrome clip
+losslessly re-segmented — identical frames, no re-encode, no new recording, so the *only*
+variable is the assembly). Result: **cosine 0.991 < 0.999**, a systematic **~14% motion-magnitude
+shortfall** (l2 ratio 0.864), **motion_rel_p99 0.334 > 0.25**. The cause is **not** the seams and
+**not** frame loss (`frames_lost = 0`): it is a **per-clip sampling-phase reset** — only **31.5%**
+of the 2.5 fps-sampled frames coincide with continuous sampling (52/165); the rest are offset by
+up to ~½ the 400 ms sampling period, because each standalone clip re-applies the timestamp grid
+from its **own `t≈0`** (`CAP_PROP_POS_MSEC` resets per clip). **Not patchable for real clips**: a
+real stop/restart clip carries **no global clock** — its `POS_MSEC` genuinely starts at 0 and the
+server cannot know the variable recorder stop→restart gaps, so the continuous sampling phase cannot
+be reconstructed. (Two corrected findings, both recorded: the earlier *cross-take* fixture **was a
+real flaw** — it conflated assembly fidelity with recording reproducibility, cosine 0.896, motion
+p50 0.41 — and the single-source fixture is the **correct** test; but even corrected, B2 cannot hit
+fidelity.) The seam-aware motion fix (a prior amendment) was correct for the seams but did not and
+could not close this broadband sampling-phase gap.
 
-**Timeline (unchanged)**: the server can assemble a 60 s window only once ~6 clips
-(~60 s) have arrived → first scored reading ~60 s, readings every ~10 s thereafter;
-with D-3 cold-start = 4 scored readings, the first band lands ~90–105 s. Before
-~60 s of clips accrue there is **no** reading (warming-up) — partial windows are
-never scored (the 60 s contract is locked).
+**Why B1 (container reassembly) was rejected — NO-GO (structural; accepted as-is)**:
+1. **`[chunk0 + recent tail]` is not a clean trailing 60 s** without container surgery (the first
+   timeslice blob is init + ~10 s of media).
+2. **Silent `motion_features` corruption**: a spliced container has a time discontinuity at the
+   splice; the frame-to-frame diff inflates max/std across the 2868 motion dims, and the decode can
+   **"succeed" while the vector is wrong** (no error raised).
+3. **webm timeslice boundaries aren't guaranteed cluster-aligned** → a reassembled webm can be
+   structurally invalid (decodability itself unreliable across browsers).
+A B1 harness exists at `_scratch-008-b1-spike/` for optional confirmation; the decision did not
+wait on it.
 
-**Non-blocking (FR-016, SC-007)**: each clip's stop→emit→restart runs on the
-client's own timer; each upload is fire-and-forget; a slow server decode/assembly
-for one window never stalls the next clip's capture or upload, and each window is
-processed independently (threadpool) server-side.
+**Timeline (unchanged)**: the server can score a 60 s window only once ≥ 60 s of continuous
+recording exists → first scored reading ~60 s, readings ~every 10 s thereafter; with the D-3
+cold-start of 4 scored readings, the first band lands ~90–105 s. Before ~60 s there is **no**
+reading (warming-up) — partial windows are never scored (the 60 s contract is locked).
 
-**Note for /speckit-tasks**: the **B2 capture path (stop/restart standalone clips on
-real Chrome + Safari/iOS)** and the **multi-clip frame-concat fidelity** are the
-primary implementation risks and MUST be **front-loaded and gated** — validated
-before the rest of the build (see R-7 and the tasks ordering).
+**Non-blocking (FR-016, SC-007)**: the continuous recorder runs on the client's own timer;
+each upload is fire-and-forget; a slow server decode+extract for one window never stalls the
+next upload, and each window is processed independently (threadpool) server-side. (This matters
+more here than under B2 — see the growing-cost flag.)
+
+**⚠ Known cost — growing decode-to-tail (flagged)**: each stride re-uploads + re-decodes the
+**whole recording-so-far**, so upload size and server decode work **grow over the session**,
+bounded by the **5-minute hard cap**. Real Chrome webm is **VFR** and VFR seek is unreliable, so
+reaching the tail means **sequential decode from the start** of the growing file each stride. At
+the 5-min cap that is ~300 s of video decoded per stride; to stay inside the 10 s stride the CPU
+must decode at **≥ ~30× realtime** — plausible for low-res webcam video, **not guaranteed for
+720p VP9 on the DigitalOcean droplet** (the same CPU that makes MediaPipe ~3–5 s/window).
+Late-session strides may exceed 10 s. **Bounded, not fatal**: FR-016 non-blocking means capture
+continues and only the *reading cadence* degrades toward end-of-session; the 5-min cap bounds the
+worst case; **localhost (dev/demo) is unaffected**. The (now lighter) windowing validation
+measures exactly this (R-7).
+
+**Deferred optimization (unchanged — not built now)**: a **server-side rolling decoded-frame
+buffer** — retain the trailing 60 s of sampled frames and decode only the **newest increment**
+each stride — collapses per-stride decode from O(elapsed) to O(stride) and removes the growth.
+Same optimization already deferred (pairs with the future WebSocket transport). Build it
+**before** relying on long droplet sessions in production; not needed for localhost/demo.
+
+**Note for /speckit-tasks**: with fidelity faithful-by-construction, windowing is **no longer a
+hard fidelity gate**. The one remaining real-device check is light — continuous capture + growing
+upload + last-60 s tail-extract **works** on real Chrome + real Safari/iOS and **keeps up**
+(per-stride server time within the 10 s stride across a 5-min session), reusing the proven
+`/anchor` upload+extract path. The **real Safari/iOS check stays the pre-production gate** but as
+a *works-and-keeps-up* check, not a fidelity gate (see R-7 and the tasks ordering).
 
 ---
 
@@ -431,13 +462,13 @@ before the rest of the build (see R-7 and the tasks ordering).
 **Decision**: Add `packages/ml-video/tests/test_webm_vfr_fidelity.py` that decodes
 **the same visual content** as mp4 (CFR) and webm (VFR) and asserts the extracted
 2958-d vectors stay within tolerance. Record it as **scheduled hardening, not a
-ship blocker**. **Amendment note (2026-06-19, B1 NO-GO → B2)**: the **assembly
-dimension** of this check is **superseded by the R-7 multi-clip fidelity gate** —
-the same ~60 s decoded as **one continuous clip** vs as **~6 stop/restart standalone
-clips** must agree within tolerance (measuring the per-seam `motion_features` diff +
-the frames lost per restart). Unlike this CFR-vs-VFR **codec** check (scheduled
-hardening), the multi-clip **assembly** fidelity is a **hard gate** (R-7), because
-B2's frame-concat assembly — not a codec path — is the new correctness-critical step.
+ship blocker**. **Amendment note (2026-06-19, continuous single-stream adopted)**: there is
+**no assembly dimension** under the continuous design — the scored window is a single continuous
+clip through the same single-clip extraction the notebook gate validated, so the only residual
+is the **codec/sampler** path this check already covers (CFR mp4 vs Chrome webm/VFR through the
+`_timestamp_keep_indices` / `POS_MSEC` sampler). This stays **scheduled hardening, not a ship
+blocker**. (The earlier B2 amendment had routed the assembly dimension to a multi-clip fidelity
+hard gate; that gate and the multi-clip entry are **retired** with B2 — see R-5.)
 
 **Rationale**: The notebook fidelity gate (`docs/MODELS.md` lineage) was validated
 on CFR mp4. Real inference clips are Chrome MediaRecorder **webm/VFR**, which
@@ -450,36 +481,37 @@ existing CFR-validated fidelity plus the live smoke pass.
 
 ---
 
-## R-7 — B2 capture + multi-clip fidelity validation (front-loaded, gating) (2026-06-19, B1 NO-GO → B2)
+## R-7 — Continuous-capture windowing validation (front-loaded; Safari/iOS pre-production gate; NO longer a fidelity gate) (REVISED 2026-06-19)
 
-**Decision**: The **B2 path** — stop/restart **standalone-clip** recording +
-server-side **multi-clip frame-concat** extraction (R-5) — MUST be validated on
-**real devices early** (a spike **before** the full build), and the rest of the
-feature is **gated** on it. The original B1 spike (single-recorder timeslice +
-container reassembly) returned a **structural NO-GO** (R-5); B2 replaces it. Two
-front-loaded, gating checks (the first two `/speckit-tasks` items):
+> **REVISED — supersedes the B2 "capture + multi-clip fidelity HARD GATE" framing.** With
+> the continuous single-stream path **faithful by construction** (R-5), the windowing
+> question is **no longer a fidelity risk**: there is **no multi-clip fidelity gate**.
 
-1. **B2 capture validation — real Chrome + real Safari/iOS (NOT Playwright).**
-   Confirm stop/restart recording every ~10–12 s yields, on each browser, clips that
-   are **each independently decodable** (own init), with the **frames-lost-per-restart
-   seam within an acceptable budget** and **no recorder glitches across the ~5 seams**
-   of a 60 s window. Safari emits **fragmented MP4**, Chrome **webm**; both must
-   produce standalone, decodable clips. This is the **Safari/iOS pre-production
-   gate** — front-load it.
-2. **Multi-clip extraction fidelity gate (`packages/ml-video`).** Add the
-   `compute_anchor_multiclip` entry, then assert the multi-clip 2958-d vector is
-   **within tolerance** of the same ~60 s of content extracted as **one continuous
-   clip**. The known sources of difference to **measure** (not hand-wave): the
-   per-seam `motion_features` diff and the frames lost per restart. This is a **hard
-   gate**, not optional hardening — if it fails, the windowing approach is revisited
-   before the rest of the feature is built.
+**Decision**: What remains is a **light, real-device validation**, still front-loaded, that
+confirms the continuous capture/upload/tail-extract path **works** and **keeps up** on real
+browsers. It largely **reuses the proven `/anchor` single-clip upload+extract path**, so it is
+far cheaper than the retired B2 gate. One real-device check, on **real Chrome + real Safari/iOS
+(NOT Playwright)**:
 
-**Rationale**: **Safari/iOS is a hard pre-production gate** and WebKit
-`MediaRecorder` is the fragile case (container format + fragment behavior differ
-from Chrome). Playwright suites have historically given **false confidence** on
-cross-browser capture/timing behavior (see the e2e-load-timing flake history), so
-the real Safari/iOS smoke gate (the existing manual smoke channel) must be
-**prioritized**, not relied upon via Playwright alone. Front-loading **both** checks
-means a windowing failure is learned **on day one**, not after the UI is built. B2
-was chosen partly *for* Safari robustness — standalone clips sidestep the
-cross-format container reassembly that sank B1.
+1. **Works.** A single continuous `MediaRecorder` records a session; each stride the
+   **contiguous recording-so-far** uploads and is **decodable** on the server (Chrome webm,
+   Safari fragmented MP4), and the server **tail-extracts the last 60 s** → a 2958-d vector each
+   stride. (Safari is the fragile encoder — its native contiguous file must decode and
+   tail-extract the same way Chrome's does.)
+2. **Keeps up.** Per-stride server time (decode-to-tail + extract) stays **within the 10 s
+   stride across a 5-minute session** — record measured per-stride times at t ≈ 60 / 120 / 180 /
+   240 / 300 s per browser (the worst case is the last stride, ~300 s decoded). A breach late in
+   a 5-min session means the **deferred rolling decoded-frame buffer** is needed for production
+   (R-5) — it is **not** a fidelity failure and does **not** re-open the windowing approach.
+
+**This remains the Safari/iOS pre-production gate** — but as a *"does the continuous
+capture/upload/tail-extract work and keep up"* check, **not** a fidelity gate. Because fidelity
+can no longer fail, the feature build need not block on a fidelity result the way it did under
+B2; the real-Safari/iOS works-and-keeps-up validation is required **before production**.
+
+**Rationale**: Safari/WebKit `MediaRecorder` is still the fragile encoder and Playwright has
+historically given **false confidence** on cross-browser capture/timing (see the
+e2e-load-timing flake history), so the real Safari/iOS smoke channel — not Playwright — is the
+validator. Front-loading it surfaces a capture/keep-up problem early; but the catastrophic risk
+that justified B2's hard gate (silent feature corruption / unreproducible assembly) is gone by
+construction, so this is a *de-risking smoke*, not a build-blocking fidelity gate.

@@ -1,12 +1,13 @@
 # Contract — Inference API (008)
 
-> **REVISED 2026-06-19** for the D-1 + D-2 amendments (incl. the **B1 NO-GO → B2**
-> windowing flip): **no service-role** (DB access is in the caller's RLS context via
-> the forwarded user JWT + the publishable anon key); the `score window` endpoint now
-> accepts a **standalone ~10–12 s clip** (the client stops/restarts the recorder each
-> stride so every clip is independently decodable) and the **server assembles** the
-> rolling 60 s window by **decoding the recent clips and concatenating their sampled
-> frames** (a transient per-session clip buffer — B2, see research R-5/R-7).
+> **REVISED 2026-06-19 (windowing D-2 reversed → continuous single-stream).** DB access
+> is in the caller's RLS context via the forwarded user JWT + the publishable anon key
+> (**no service-role**). The `score window` endpoint accepts the **contiguous
+> recording-so-far** from **one continuous `MediaRecorder`** (init + all chunks in order
+> — always decodable); the **server decodes that one clip and tail-extracts the last
+> 60 s** via the existing single-clip path (no multi-clip assembly, no clip buffer). B1
+> container-reassembly and B2 standalone-clip frame-concat were both rejected — see
+> research R-5/R-7 and `docs/DECISIONS.md` 2026-06-19.
 
 The session-aware inference endpoints (D-2). All live in
 `apps/api/app/routers/monitoring.py`. Auth reuses the existing `verify_jwt`
@@ -16,7 +17,7 @@ dependency (`apps/api/app/auth.py`, returns the verified `user_id` from the toke
 as `apikey` + the **forwarded user JWT** as `Authorization`, so `auth.uid()`
 resolves to the caller and RLS applies — **no service-role key**.
 
-**Transport**: HTTP request/response (multipart for the ~10 s video segment),
+**Transport**: HTTP request/response (multipart for the contiguous recording-so-far),
 reusing the proven `/anchor` upload path. This is a logged Constitution deviation
 from the WebSocket-streams rule — see `plan.md` Complexity Tracking + DECISIONS
 2026-06-19.
@@ -66,51 +67,45 @@ told before capturing 60 s of video).
 
 ---
 
-## 2. Submit a clip — `POST /monitoring/sessions/{id}/windows`
+## 2. Submit a window — `POST /monitoring/sessions/{id}/windows`
 
-One **standalone ~10–12 s clip** in → at most one reading out (once ~6 clips / 60 s
-are buffered). Called ~every 10 s. **Non-blocking**: the handler runs the CPU-bound
-decode+assembly+extraction in a threadpool (FastAPI `def` handler /
-`run_in_threadpool`) so concurrent windows don't serialize on the event loop; the
-**client** keeps stop/restart-recording standalone clips on its own timer regardless
-of this response (FR-016, SC-007).
+The **contiguous recording-so-far** in → at most one reading out (once ≥ 60 s has
+been recorded). Called ~every 10 s. **Non-blocking**: the handler runs the CPU-bound
+decode+tail-extract in a threadpool (FastAPI `def` handler / `run_in_threadpool`) so
+concurrent windows don't serialize on the event loop; the **client** keeps its single
+continuous recorder running and uploads on its own timer regardless of this response
+(FR-016, SC-007). ⚠ The server's decode-to-tail cost **grows with elapsed session
+time** (it re-decodes the growing clip to reach the trailing 60 s; bounded by the 5-min
+cap, negligible on localhost) — see research R-5 for the keep-up flag + the deferred
+rolling decoded-frame buffer.
 
-**Request**: `multipart/form-data`, field `clip` = the latest **standalone ~10–12 s**
-clip (`video/webm` or `video/mp4`), matching the `/anchor` upload shape. The client
-**stops and restarts** the recorder each stride, so **every clip carries its own
-container init and is independently decodable** (B2 — no init-segment retention, no
-container reassembly).
+**Request**: `multipart/form-data`, field `clip` = the **contiguous recording-so-far**
+(`video/webm` or `video/mp4`), matching the `/anchor` upload shape. It is the literal
+growing file from **one continuous `MediaRecorder`** (init segment + all chunks in
+order), so it is **always decodable** — no init-segment retention, no container
+reassembly, no clip stitching.
 
 **Server steps** (the read path, FR-009 / FR-012):
 1. Verify session exists, is owned by the verified `user_id` (RLS select-own), and
    is not `ended` (else `404`/`409`).
-2. **Buffer + assemble** (`app/services/segment_buffer.py`): append the clip to the
-   session's transient in-memory buffer; keep the last **~6 standalone clips**
-   (= ~60 s), evicting the oldest. If **fewer than ~60 s** are buffered yet → return
+2. **Decode + tail-window** (`app/services/inference.py`): decode the uploaded
+   continuous clip. If it holds **fewer than 60 s** of recording yet → return
    `200 {outcome:"warming_up"}` (no extraction; the window is not yet full — the 60 s
-   contract is locked, partial windows are never scored). Otherwise hand the **~6
-   clip paths** to the multi-clip extraction entry.
-   - **Assembly is frame-level + seam-aware (B2, R-5/R-7)**: each clip is decoded **on
-     its own** (its own init) and the **sampled frames are concatenated** into one
-     ~150-frame / ~60 s set — there is **no** container reassembly and **no** intra-file
-     splice. The motion block is built **seam-aware** (`motion_features_seamaware`):
-     frame-to-frame diffs are taken **per clip** and the **cross-seam diffs are
-     excluded** before mean/std/max (they are stop/restart artifacts absent from a
-     continuous stream). The remaining seam effect is the per-restart frames lost.
-     ⚠️ **Gate status (2026-06-19): NOT cleared** — the R-7 fidelity gate still **FAILED**
-     on the Chrome fixtures after the seam-aware fix (residual is broadband divergence
-     beyond the seams; the continuous vs multi-clip fixtures are independent recordings).
-     Windowing fidelity is under a design session; this server path is **blocked** until
-     it clears. (The rejected B1 container-reassembly path is recorded in research R-5.)
-3. **Shared 2958-d extraction** on the clip set via
-   `ml_video.compute_anchor_multiclip(clip_paths)` — a thin multi-clip wrapper over
-   the *same* per-clip `extract_landmarks` + `lbp_top_features`/`motion_features`
-   calibration uses; it also runs the **feature-006 coverage gate** per clip. Delete
-   the buffered clips (and any temp files) in `finally` (Principle I — no raw video
-   persists; the buffer stays in memory only).
+   contract is locked, partial windows are never scored). Otherwise score the
+   **trailing 60 s**: the VFR `POS_MSEC` sampler is bounded to frames whose timestamp
+   ≥ `duration − 60 s`. **No multi-clip assembly, no clip buffer, no seam handling** —
+   the window is one genuine continuous segment.
+3. **Shared 2958-d extraction** on the trailing 60 s via
+   `ml_video.compute_anchor(clip_path, tail_seconds=60)` — the *same* `extract_landmarks`
+   + `lbp_top_features`/`motion_features` calibration uses, with a thin trailing-window
+   bound on the sampler (it reduces to `compute_anchor` for a ≤ 60 s clip); it also runs
+   the **feature-006 coverage gate**. **Faithful by construction** — the scored window is
+   a real continuous 60 s clip, exactly the single-clip input the extraction is already
+   validated on, so there is **no multi-clip fidelity gate**. Delete the uploaded clip
+   (and any temp file) in `finally` (Principle I — no raw video persists).
    - On `FeatureExtractionError` (e.g. `code="insufficient_face_frames"`, or any
-     decode/coverage failure on any clip) → **skipped** outcome (below): persist a
-     skipped reading, return `200 {outcome:"skipped"}`. (FR-013)
+     decode/coverage failure) → **skipped** outcome (below): persist a skipped reading,
+     return `200 {outcome:"skipped"}`. (FR-013)
 4. Read the user's anchor via `get_my_anchor()` (**forwarded JWT**, server-side) →
    decode `bytea` → `(2958,)` float64. (Defensive: NULL mid-session → `409 no_anchor`.)
 5. `delta = current_features − anchor_features` (elementwise float64).
@@ -137,7 +132,7 @@ container reassembly).
 { "outcome": "reading", "band": "at_ease" | "a_little_tense" | "tense",
   "captured_at": "2026-06-19T10:32:11Z" }
 
-// not yet a reading — buffer < 60 s OR < 4 scored readings (both render as warming-up)
+// not yet a reading — recording < 60 s OR < 4 scored readings (both render as warming-up)
 { "outcome": "warming_up", "captured_at": "…" }
 
 // couldn't read this window (coverage/extract failure) — routine, NOT an error
@@ -146,8 +141,8 @@ container reassembly).
 
 Notes:
 - **The client never receives a probability** — only the `band` (FR-015, Principle I).
-- **Two warming-up gates** both surface as `outcome:"warming_up"`: (a) the server
-  buffer does not yet hold a full 60 s window; (b) it does, but fewer than `M=4`
+- **Two warming-up gates** both surface as `outcome:"warming_up"`: (a) the continuous
+  recording does not yet hold a full 60 s window; (b) it does, but fewer than `M=4`
   scored readings have accrued (D-3 cold-start). The client shows the same
   warming-up state for both.
 - **Skipped is `200`, not `422`** (divergence from `/anchor`, which `422`s): for the
@@ -170,9 +165,9 @@ Notes:
 
 Records pause/resume/out-of-frame for the recap. Camera control is client-side;
 this updates `status` on the row **under RLS (update-own)**. On `status="paused"`
-the server **clears the session's transient clip buffer** (the client releases
-the camera; on resume the buffer refills from empty → the display warms up again,
-consistent with the 60 s contract).
+the client releases the camera and stops the continuous recorder; on resume it starts
+a **fresh** continuous recording → the next windows are < 60 s again → the display
+warms up again, consistent with the 60 s contract. (No server-side clip buffer to clear.)
 
 **Request**: `{ "status": "paused" | "active" | "out_of_frame" }`
 **Response 200**: `{ "session_id": "…", "status": "…" }`
@@ -184,7 +179,7 @@ consistent with the 60 s contract).
 
 **Request**: `{ "reason": "user" | "auto_absence" | "error" }` (default `"user"`).
 **Server**: set `ended_at=now()`, `status='ended'`, `end_reason=reason` **under RLS
-(update-own)**; **clear the transient clip buffer** for the session.
+(update-own)**. (No server-side clip buffer; the client stops its continuous recorder.)
 **Response 200**: `{ "session_id": "…", "ended_at": "…" }`
 
 "Ended" is **not** a monitoring-page screen (mock-gap #6): on success the client
@@ -223,10 +218,10 @@ from metadata at startup (not hard-coded); the env var only overrides it.
 
 ## Privacy review (Constitution Quality Gate 6)
 
-- Raw video: standalone ~10–12 s clips held in a **transient in-memory** per-session
-  buffer; each clip is decoded and its sampled frames concatenated for the 60 s
-  window, and the clips + any temp files are **deleted in `finally`**; the buffer is
-  **cleared on pause/end**. Never persisted, never forwarded. (FR-027, SC-009)
+- Raw video: the uploaded **continuous clip** is held **transiently in memory**,
+  decoded to its trailing 60 s of frames for extraction, then the clip + any temp file
+  is **deleted in `finally`**. **No per-session clip buffer.** Never persisted, never
+  forwarded. (FR-027, SC-009)
 - Manager layer: **no policy** on `monitoring_sessions` / `window_readings` →
   managers cannot read either table.
 - Raw decision signal (`stress_probability`, `label`): **server-only** columns
