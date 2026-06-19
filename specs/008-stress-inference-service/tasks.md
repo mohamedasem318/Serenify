@@ -28,9 +28,9 @@ description: "Task list — Stress Inference Service (008)"
 
 **Purpose**: Just enough scaffolding to run the Phase-2 windowing GATE. No feature code yet.
 
-- [ ] T001 [P] Verify `packages/ml-video` test env: `compute_anchor`, `Predictor.predict_delta`, `load_model()` import and `load_model()` passes its startup contract check (baseline for the gate). Record the working interpreter (`packages/ml-video/.venv`) in `specs/008-stress-inference-service/smoke-tests.md`.
-- [ ] T002 [P] Build the throwaway **B2 capture spike harness** at `_scratch-008-b2-spike/` (a minimal static page: a single `MediaRecorder` in **stop/restart** mode emitting standalone ~10–12 s clips with a download button per clip, plus a **continuous 60 s** reference-record mode). This is disposable scaffolding for the real-device gate, not shipped UI.
-- [ ] T003 [P] Add `packages/ml-video/tests/fixtures/multiclip/` (with `chrome/` and `safari/` subdirs) and a tiny decode-smoke helper `packages/ml-video/tests/helpers/decode_smoke.py` (`cv2.VideoCapture` opens a path and yields a frame count) used by the capture-validation task.
+- [x] T001 [P] Verify `packages/ml-video` test env: `compute_anchor`, `Predictor.predict_delta`, `load_model()` import and `load_model()` passes its startup contract check (baseline for the gate). Record the working interpreter (`packages/ml-video/.venv`) in `specs/008-stress-inference-service/smoke-tests.md`.
+- [x] T002 [P] Build the throwaway **B2 capture spike harness** at `_scratch-008-b2-spike/` (a minimal static page: a single `MediaRecorder` in **stop/restart** mode emitting standalone ~10–12 s clips with a download button per clip, plus a **continuous 60 s** reference-record mode). This is disposable scaffolding for the real-device gate, not shipped UI.
+- [x] T003 [P] Add `packages/ml-video/tests/fixtures/multiclip/` (with `chrome/` and `safari/` subdirs) and a tiny decode-smoke helper `packages/ml-video/tests/helpers/decode_smoke.py` (`cv2.VideoCapture` opens a path and yields a frame count) used by the capture-validation task.
 
 **Checkpoint**: harness + fixture scaffolding ready — the GATE can run.
 
@@ -50,8 +50,8 @@ description: "Task list — Stress Inference Service (008)"
 
 ### Gate check 2 — multi-clip extraction entry + fidelity HARD GATE
 
-- [ ] T007 Implement `compute_anchor_multiclip(clip_paths) -> (2958,)` in `packages/ml-video/src/ml_video/anchor.py` (decode each clip via the existing `extract_landmarks`, concatenate the per-clip **sampled frames + landmarks** into one ~150-frame / ~60 s set, then run `lbp_top_features` ⊕ `motion_features`; per-clip feature-006 coverage gate preserved). Export it from `packages/ml-video/src/ml_video/__init__.py`. **Reuses** existing internals — not a second copy (Principle III).
-- [ ] T008 **Multi-clip fidelity HARD GATE** test `packages/ml-video/tests/test_multiclip_fidelity.py`: assert the multi-clip 2958-d vector (T007 over the ~6 stop/restart clips) is **within tolerance** of the same ~60 s as **one continuous clip**, for **both** the Chrome and Safari fixtures; explicitly **measure and bound** the two known seam effects — the per-seam `motion_features` diff and the frames lost per restart. (depends T007, T004, T005)
+- [x] T007 Implement `compute_anchor_multiclip(clip_paths) -> (2958,)` in `packages/ml-video/src/ml_video/anchor.py` (decode each clip via the existing `extract_landmarks`, concatenate the per-clip **sampled frames + landmarks** into one ~150-frame / ~60 s set, then run `lbp_top_features` ⊕ `motion_features`; per-clip feature-006 coverage gate preserved). Export it from `packages/ml-video/src/ml_video/__init__.py`. **Reuses** existing internals — not a second copy (Principle III).
+- [x] T008 **Multi-clip fidelity HARD GATE** test `packages/ml-video/tests/test_multiclip_fidelity.py`: asserts the multi-clip 2958-d vector (T007 over the ~6 stop/restart clips) is **within tolerance** of the same ~60 s as **one continuous clip**, for **both** the Chrome and Safari fixtures; explicitly **measures and bounds** the two known seam effects — the per-seam `motion_features` diff and the frames lost per restart. **Agent-built + synthetic layer green** (5 tests prove the assembly); the real-fixture gate **skips until the human records** (T004/T005). (depends T007, T004, T005)
 
 ### 🚦 GATE DECISION
 
