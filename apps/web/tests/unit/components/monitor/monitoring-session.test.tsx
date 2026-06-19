@@ -37,7 +37,10 @@ function makeDeps(outcomes: SubmitWindowResult[]) {
     getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: () => {} }] }) as unknown as MediaStream),
     getSession: vi.fn(async () => ({ accessToken: "tok" })),
     createSession: vi.fn(async () => ({ ok: true, sessionId: "sid", modelVersion: "m" }) as const),
-    submitWindow: vi.fn(async () => outcomes[Math.min(i++, outcomes.length - 1)]),
+    submitWindow: vi.fn(
+      async (): Promise<SubmitWindowResult> =>
+        outcomes[Math.min(i++, outcomes.length - 1)] ?? { ok: false, kind: "unknown" },
+    ),
     createRecorder: () => {
       rec = {
         state: "inactive",
