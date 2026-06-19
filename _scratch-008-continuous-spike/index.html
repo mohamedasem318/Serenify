@@ -76,10 +76,19 @@ let strideCount = 0;
 $("strides").innerHTML = TARGET_STRIDES.map((s) => `<span data-s="${s}">${s}s</span>`).join("");
 
 function pickMime() {
-  const candidates = [
+  let candidates = [
     "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm",
     "video/mp4;codecs=h264", "video/mp4",
   ];
+  // Device-gate override: `?mime=mp4` forces the MP4 candidates first so a webm-capable
+  // iOS Safari is pushed into its **fragmented-MP4** encoder (the path the gate exists to
+  // test). Default (no param) is unchanged — webm-first. webm stays as a fallback in case a
+  // browser lacks MP4 MediaRecorder support; the saved file's extension + ffprobe confirm
+  // which container actually got used.
+  const pref = new URLSearchParams(location.search).get("mime");
+  if (pref === "mp4") {
+    candidates = candidates.filter((c) => c.includes("mp4")).concat(candidates.filter((c) => !c.includes("mp4")));
+  }
   for (const c of candidates) {
     if (window.MediaRecorder && MediaRecorder.isTypeSupported(c)) return c;
   }
