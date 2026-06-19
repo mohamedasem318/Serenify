@@ -43,3 +43,67 @@ def compute_anchor(video_path) -> np.ndarray:
     if not np.all(np.isfinite(features)):
         raise FeatureExtractionError("anchor vector contains non-finite values")
     return features
+
+
+def compute_anchor_multiclip(clip_paths) -> np.ndarray:
+    """Multi-clip variant of :func:`compute_anchor` — the feature-008 windowing path (B2).
+
+    The live monitoring read path records the rolling 60 s window as ~6 short
+    **standalone** clips: the client stops/restarts the recorder each ~10 s stride so
+    every clip carries its own container init and is independently decodable (see
+    ``specs/008-stress-inference-service/research.md`` R-5/R-7 — the B1
+    container-reassembly path was rejected because the mid-cluster splice silently
+    corrupts ``motion_features``). This decodes **each** clip through the **same**
+    per-clip path :func:`compute_anchor` uses (``extract_landmarks`` → kept frames +
+    FaceMesh landmark rows), concatenates the kept frames and landmark rows across the
+    clips into one ~150-frame / ~60 s set, and runs the **identical** coverage gate +
+    ``lbp_top_features`` ⊕ ``motion_features`` on that assembled set.
+
+    It is a thin assembly wrapper, **not** a second extraction (Constitution Principle
+    III): per-clip decode/sampling, the feature-006 coverage gate, and the feature math
+    are all the existing ``compute_anchor`` building blocks. The only B2-specific
+    behaviour is concatenating **frames** (never muxing containers). The two known,
+    bounded differences from a single continuous 60 s clip are (1) the per-seam jump in
+    ``motion_features`` — the ``np.diff`` taken across each clip boundary — and (2) the
+    handful of frames lost at each stop/restart; both are **measured** by
+    ``tests/test_multiclip_fidelity.py`` (the hard fidelity gate), not silently absorbed.
+
+    The coverage gate runs on the **combined** landmark set (not per clip): the 60 s
+    thresholds (``MIN_USABLE_FRAMES=50``, ``fraction >= 0.65``) describe a full window,
+    which a single ~10 s clip could never clear on its own — running the gate on the
+    assembled set is exactly what makes ``compute_anchor`` (continuous) and this
+    (multi-clip) comparable, and is the equivalence the fidelity gate asserts.
+
+    Raises ``FeatureExtractionError`` on empty input, an unreadable/empty clip, a
+    coverage-gate rejection (``code="insufficient_face_frames"``), a malformed shape, or
+    non-finite values — the same contract as :func:`compute_anchor`, so the API maps it
+    to the skipped-window outcome (FR-013).
+    """
+    paths = list(clip_paths)
+    if not paths:
+        raise FeatureExtractionError("compute_anchor_multiclip requires at least one clip path")
+
+    frames: list[np.ndarray] = []
+    landmark_blocks: list[np.ndarray] = []
+    for path in paths:
+        clip = extract_landmarks(path)  # reuse the per-clip decode + FaceMesh path (Principle III)
+        frames.extend(clip.frames)
+        landmark_blocks.append(clip.landmarks)
+
+    landmarks = np.concatenate(landmark_blocks, axis=0)  # (sum_i N_i, 956)
+
+    # Gate the ASSEMBLED window (combined set), exactly as compute_anchor gates its clip.
+    assert_usable_face_coverage(landmarks)
+    features = np.concatenate(
+        [
+            lbp_top_features(frames, landmarks),  # (90,)
+            motion_features(landmarks),  # (2868,)
+        ]
+    )
+    if features.shape != (FEATURE_DIM,):
+        raise FeatureExtractionError(
+            f"expected multiclip anchor shape ({FEATURE_DIM},), got {features.shape}"
+        )
+    if not np.all(np.isfinite(features)):
+        raise FeatureExtractionError("multiclip anchor vector contains non-finite values")
+    return features
