@@ -7,9 +7,9 @@ description: "Task list — Stress Inference Service (008)"
 **Input**: Design documents from `specs/008-stress-inference-service/`
 **Prerequisites**: `plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/inference-api.md`, `contracts/smoothing-and-banding.md`, `quickstart.md`
 
-**Tests**: INCLUDED. Constitution Principle VII makes testing mandatory for this PR (first-ever `predict_delta` test; smoothing/endpoint/RLS tests; one employee Playwright happy-path; the multi-clip fidelity **HARD GATE**; the webm/VFR codec hardening check; real-Safari smoke — **not** Playwright-only).
+**Tests**: INCLUDED. Constitution Principle VII makes testing mandatory for this PR (first-ever `predict_delta` test; the tail-window unit test; smoothing/endpoint/RLS tests; one employee Playwright happy-path; the webm/VFR codec hardening check; real-Safari **works-and-keeps-up** smoke — **not** Playwright-only). *(The multi-clip fidelity HARD GATE is retired — the continuous 60 s window is faithful by construction; see the windowing note below.)*
 
-**Organization**: Tasks are grouped by user story (US1–US4 from `spec.md`). **Phase 2 is a front-loaded, gating windowing validation** — per the amended plan (B1 container-reassembly **NO-GO** → **B2** standalone-clips + multi-clip frame-concat). Nothing past the Phase-2 GATE is built until both gate checks pass.
+**Organization**: Tasks are grouped by user story (US1–US4 from `spec.md`). **Phase 2 is a front-loaded but *light* windowing validation** — per the revised plan (windowing D-2 reversed: B1 container-reassembly and B2 multi-clip frame-concat both rejected → **continuous single-stream upload + server tail-extract**). The continuous 60 s window is **faithful by construction**, so there is **no fidelity gate**; Phase 2 only de-risks that the continuous capture/upload/tail-extract path **works and keeps up** on real devices (still the Safari/iOS pre-production gate).
 
 ## Format: `[ID] [P?] [Story] Description with file path`
 
@@ -18,52 +18,57 @@ description: "Task list — Stress Inference Service (008)"
 
 ## Windowing decision in force (read before starting)
 
-- **B1 (single timeslice recorder + server-side container reassembly) is REJECTED** — R-7 structural NO-GO (research R-5/R-7, `docs/DECISIONS.md` 2026-06-19, `docs/CHANGELOG.md`). Reasons: `[chunk0 + recent tail]` isn't a clean trailing 60 s without container surgery; the splice's time discontinuity **silently corrupts `motion_features`** (spurious diff inflates max/std across the 2868 motion dims — a decode can "succeed" yet be wrong); webm timeslice boundaries aren't guaranteed cluster-aligned.
-- **B2 (ADOPTED)**: the client **stops/restarts** a single `MediaRecorder` every ~10–12 s so each clip is a **complete, independently-decodable** standalone clip; the server buffers the last ~6 clips, **decodes each via the existing extraction path**, and **concatenates the sampled frames** into one ~150-frame / ~60 s set for LBP-TOP ⊕ motion (a **new** `compute_anchor_multiclip` ml-video entry — reuses per-clip internals, not a second copy; Principle III).
-- A B1 harness exists at `_scratch-008-b1-spike/` for **optional** empirical confirmation; the decision does **not** wait on it.
+- **Continuous single-stream upload is ADOPTED** (windowing D-2 reversed — research R-5/R-7, `docs/DECISIONS.md` 2026-06-19, `docs/CHANGELOG.md`). The client runs **one continuous `MediaRecorder`** (timeslice for incremental capture only — no stop/restart) and uploads the **contiguous recording-so-far** each stride (init + all chunks in order — always decodable). The **server** decodes that one clip and **tail-extracts the last 60 s** via the existing single-clip path (`compute_anchor` + the VFR `POS_MSEC` sampler, bounded to frames with timestamp ≥ duration − 60 s). **No multi-clip assembly, no clip buffer.**
+- **Faithful by construction → no fidelity gate.** The scored window is a genuine continuous 60 s segment sampled by one continuous grid — exactly the single-clip input the extraction is already validated on. The only `ml-video` change is a thin **tail-window option** on `compute_anchor` (reuses decode+sampler+features; Principle III).
+- **B1 (single timeslice recorder + container reassembly) is REJECTED** — R-7 structural NO-GO (silent `motion_features` corruption at the splice; non-decodable timeslice chunks; unaligned webm cluster boundaries).
+- **B2 (standalone stop/restart clips + multi-clip frame-concat) is REJECTED** — on the single-source fidelity fixture: a per-clip sampling-phase reset → cosine 0.991 < 0.999, ~14% motion shortfall, only 31.5% of sampled frames coinciding; not reconstructable for real clips (no global clock). `compute_anchor_multiclip`, `motion_features_seamaware`, and `test_multiclip_fidelity.py` are **retired** (kept in git history; the single-source diagnostic + fixture + finding stay recorded).
+- The `_scratch-008-b1-spike/` and `_scratch-008-b2-spike/` harnesses are superseded by a continuous-capture harness (T002).
 
 ---
 
-## Phase 1: Setup (enable the gate — minimal)
+## Phase 1: Setup (enable the validation — minimal)
 
-**Purpose**: Just enough scaffolding to run the Phase-2 windowing GATE. No feature code yet.
+**Purpose**: Just enough scaffolding to run the Phase-2 windowing validation. No feature code yet.
 
-- [x] T001 [P] Verify `packages/ml-video` test env: `compute_anchor`, `Predictor.predict_delta`, `load_model()` import and `load_model()` passes its startup contract check (baseline for the gate). Record the working interpreter (`packages/ml-video/.venv`) in `specs/008-stress-inference-service/smoke-tests.md`.
-- [x] T002 [P] Build the throwaway **B2 capture spike harness** at `_scratch-008-b2-spike/` (a minimal static page: a single `MediaRecorder` in **stop/restart** mode emitting standalone ~10–12 s clips with a download button per clip, plus a **continuous 60 s** reference-record mode). This is disposable scaffolding for the real-device gate, not shipped UI.
-- [x] T003 [P] Add `packages/ml-video/tests/fixtures/multiclip/` (with `chrome/` and `safari/` subdirs) and a tiny decode-smoke helper `packages/ml-video/tests/helpers/decode_smoke.py` (`cv2.VideoCapture` opens a path and yields a frame count) used by the capture-validation task.
+- [x] T001 [P] Verify `packages/ml-video` test env: `compute_anchor`, `Predictor.predict_delta`, `load_model()` import and `load_model()` passes its startup contract check (baseline). Record the working interpreter (`packages/ml-video/.venv`) in `specs/008-stress-inference-service/smoke-tests.md`. *(Done earlier; the env is unchanged.)*
+- [ ] T002 [P] Build a throwaway **continuous-capture spike harness** at `_scratch-008-continuous-spike/` (a minimal static page: **one continuous `MediaRecorder`** in timeslice mode, with a button to upload/download the **contiguous recording-so-far** at each ~10 s stride — matching the `/anchor` upload shape). Disposable scaffolding for the real-device validation, not shipped UI. (Supersedes the retired `_scratch-008-b1-spike/` + `_scratch-008-b2-spike/` harnesses.)
+- [ ] T003 [P] Continuous-fixture scaffolding: reuse the existing real continuous Chrome clip at `packages/ml-video/tests/fixtures/multiclip/chrome-singlesource/continuous.webm` (>60 s) as the tail-window unit-test input; keep the decode-smoke helper `packages/ml-video/tests/helpers/decode_smoke.py` (`cv2.VideoCapture` opens a path and yields a frame count) for the real-device decodability check. (No new stop/restart clip fixtures — those were B2.)
 
-**Checkpoint**: harness + fixture scaffolding ready — the GATE can run.
-
----
-
-## Phase 2: 🚧 WINDOWING VALIDATION GATE (B2) — FRONT-LOADED, BLOCKS EVERYTHING BELOW
-
-**Purpose**: De-risk the windowing approach on **real devices** before any feature build. Per the amended plan, **no Phase-3+ task may start until BOTH gate checks (T008) pass** on Chrome **and** Safari/iOS.
-
-**⚠️ CRITICAL**: This is the Safari/iOS pre-production gate. Validate on **real browsers, not Playwright** (Playwright has given false cross-browser capture/timing confidence — see the e2e-load-timing flake history).
-
-### Gate check 1 — B2 capture validation (real devices)
-
-- [ ] T004 [P] Record B2 fixtures on **real Chrome (webm)** using the T002 harness: the same ~60 s of content **two ways** — (a) one continuous clip, (b) ~6 stop/restart standalone clips — into `packages/ml-video/tests/fixtures/multiclip/chrome/`.
-- [ ] T005 [P] Record B2 fixtures on **real Safari/iOS (fragmented MP4)** the same two ways into `packages/ml-video/tests/fixtures/multiclip/safari/`. (Safari emits fMP4, not webm — the fragile case.)
-- [ ] T006 B2 capture validation smoke (manual, real Chrome + Safari/iOS — **not** Playwright): assert each standalone clip is **independently decodable** (`decode_smoke.py` opens it and yields frames), the **frames-lost-per-restart seam is within an agreed budget**, and there are **no recorder glitches across the ~5 seams** of a 60 s window. Define the seam budget and record pass/fail + frame counts per browser in `specs/008-stress-inference-service/smoke-tests.md`. (depends T004, T005)
-
-### Gate check 2 — multi-clip extraction entry + fidelity HARD GATE
-
-- [x] T007 Implement `compute_anchor_multiclip(clip_paths) -> (2958,)` in `packages/ml-video/src/ml_video/anchor.py` (decode each clip via the existing `extract_landmarks`, concatenate the per-clip **sampled frames + landmarks** into one ~150-frame / ~60 s set, then run `lbp_top_features` ⊕ `motion_features`; per-clip feature-006 coverage gate preserved). Export it from `packages/ml-video/src/ml_video/__init__.py`. **Reuses** existing internals — not a second copy (Principle III).
-- [x] T008 **Multi-clip fidelity HARD GATE** test `packages/ml-video/tests/test_multiclip_fidelity.py`: asserts the multi-clip 2958-d vector (T007 over the ~6 stop/restart clips) is **within tolerance** of the same ~60 s as **one continuous clip**, for **both** the Chrome and Safari fixtures; explicitly **measures and bounds** the two known seam effects — the per-seam `motion_features` diff and the frames lost per restart. **Agent-built + synthetic layer green** (5 tests prove the assembly); the real-fixture gate **skips until the human records** (T004/T005). (depends T007, T004, T005)
-
-### 🚦 GATE DECISION
-
-- [ ] T009 **GATE checkpoint**: T006 (capture) **and** T008 (fidelity) pass on Chrome **and** Safari/iOS → unblock Phase 3+. **If the fidelity gate fails, STOP** — the windowing approach must be revisited (escalate a B2 NO-GO and re-plan) **before any further build**. Record the gate outcome in `specs/008-stress-inference-service/smoke-tests.md` and note it in `docs/DECISIONS.md`.
-
-**Checkpoint**: windowing proven on real devices — feature build may begin.
+**Checkpoint**: harness + fixtures ready — the validation can run.
 
 ---
 
-## Phase 3: Foundational (post-GATE blocking prerequisites)
+## Phase 2: 🚦 WINDOWING VALIDATION (continuous) — FRONT-LOADED, LIGHT (no fidelity gate)
 
-**Purpose**: Shared backend/DB infrastructure every user story needs. **Depends on the Phase-2 GATE (T009).**
+**Purpose**: De-risk the **continuous** windowing path on **real devices** before the feature build. Because the 60 s window is **faithful by construction** (a real continuous clip through the already-validated single-clip extraction), there is **no multi-clip fidelity gate** — the only open question is whether the continuous capture/upload/tail-extract path **works** and **keeps up**. This stays the Safari/iOS pre-production gate.
+
+**⚠️ Real browsers, not Playwright** (Playwright has given false cross-browser capture/timing confidence — see the e2e-load-timing flake history).
+
+### Retire the rejected B2 multi-clip path
+
+- [ ] T004 Retire the rejected B2 artifacts from the **active path** (keep git history): remove `compute_anchor_multiclip` and `motion_features_seamaware` from `packages/ml-video/src/ml_video/` (and the `__init__` export) and delete/retire `packages/ml-video/tests/test_multiclip_fidelity.py`. **Keep** the single-source diagnostic (`tests/helpers/singlesource_fidelity.py`), the single-source fixture, and the `docs/DECISIONS.md` / `smoke-tests.md` findings (they are why B2 was rejected). Note the retirement in `smoke-tests.md`.
+
+### Tail-window extraction (replaces compute_anchor_multiclip)
+
+- [ ] T005 Add the **tail-window option** to `compute_anchor` in `packages/ml-video/src/ml_video/anchor.py`: a trailing-window bound (e.g. `tail_seconds: float | None = None`) that restricts the VFR `_timestamp_keep_indices` / `POS_MSEC` sampler to frames whose timestamp ≥ `duration − tail_seconds`, then runs the existing `lbp_top_features` ⊕ `motion_features` on the kept frames (coverage gate preserved). For `tail_seconds=None`, or a clip ≤ `tail_seconds`, it **reduces exactly to `compute_anchor`**. **Reuses** the existing decode+sampler+features — not a second copy (Principle III). Export unchanged.
+- [ ] T006 [P] Unit test `packages/ml-video/tests/test_tail_window.py` (env-runnable, **not** a real-device gate): on the >60 s continuous fixture (T003), `compute_anchor(path, tail_seconds=60)` keeps only the trailing-60 s frames (timestamp ≥ duration − 60); on a clip ≤ 60 s it returns **bit-identical** to `compute_anchor(path)`. Pins the bound — **no fidelity-tolerance assertion needed** (faithful by construction). (depends T005)
+
+### Real-device continuous validation (Safari/iOS pre-production gate)
+
+- [ ] T007 [P] Record continuous fixtures on **real Chrome (webm)** and **real Safari/iOS (fragmented MP4)** with the T002 harness: a ~5-min continuous session, capturing the **contiguous recording-so-far** at several strides (e.g. t≈60/120/180/240/300 s). Drop under `packages/ml-video/tests/fixtures/continuous/{chrome,safari}/` (raw video gitignored). (Safari emits fMP4, not webm — the fragile encoder.)
+- [ ] T008 Continuous-capture **works-and-keeps-up** validation (manual, real Chrome + Safari/iOS — **not** Playwright). For each browser and each stride sample: **(works)** the uploaded contiguous recording-so-far is **decodable** (`decode_smoke.py`) and `compute_anchor(clip, tail_seconds=60)` returns a `(2958,)` vector; **(keeps up)** the per-stride server time (decode-to-tail + extract) stays **within the 10 s stride** across the 5-min session — record measured times at t≈60/120/180/240/300 s (worst case is the last, ~300 s decoded). Reuses the proven `/anchor` upload+extract path. Record pass/fail + per-stride times per browser in `specs/008-stress-inference-service/smoke-tests.md`. (depends T005, T007)
+
+### 🚦 VALIDATION CHECKPOINT
+
+- [ ] T009 **Checkpoint (light)**: T008 **works and keeps up** on Chrome **and** Safari/iOS → unblock Phase 3+. **A keep-up breach is NOT a windowing failure** — it means the **deferred server-side rolling decoded-frame buffer** is needed for production (decode only the newest increment; research R-5); localhost/demo is unaffected and the build proceeds. There is **no fidelity outcome to fail** (faithful by construction). Record the outcome in `specs/008-stress-inference-service/smoke-tests.md` and note it in `docs/DECISIONS.md`.
+
+**Checkpoint**: continuous windowing proven on real devices — feature build may begin.
+
+---
+
+## Phase 3: Foundational (post-validation prerequisites)
+
+**Purpose**: Shared backend/DB infrastructure every user story needs. **Depends on the Phase-2 windowing validation (T009)** — the continuous path confirmed working on real devices; a keep-up breach is a production-deploy note (the deferred rolling decoded-frame buffer), **not** a build blocker (fidelity can no longer fail — faithful by construction).
 
 - [ ] T010 [P] DB migration `supabase/migrations/20260619000000_monitoring_sessions_and_readings.sql`: create `public.monitoring_sessions` + `public.window_readings` per `data-model.md` (columns, CHECKs, FKs `ON DELETE CASCADE`, indexes `(user_id, started_at desc)`, `(session_id, captured_at)`, `(user_id, captured_at)`); enable **+ FORCE** RLS; **select-own / insert-own / update-own** policies; **no manager policy**; per-role `REVOKE ALL FROM anon, authenticated` then explicit grants with the **SELECT column whitelist excluding `label` + `stress_probability`** and the **INSERT grant including** them.
 - [ ] T011 Add `public.get_my_anchor()` (`SECURITY DEFINER`, filters `auth.uid()`, `STABLE`, `SET search_path=''`, `OWNER TO postgres`, `REVOKE EXECUTE FROM PUBLIC, anon`, `GRANT EXECUTE TO authenticated`; mirrors `has_anchor()`) to the **same** migration file `supabase/migrations/20260619000000_monitoring_sessions_and_readings.sql`. (same file as T010 → sequential)
@@ -86,18 +91,18 @@ description: "Task list — Stress Inference Service (008)"
 
 ### Backend (US1)
 
-- [ ] T018 [P] [US1] `apps/api/app/services/segment_buffer.py` (NEW): transient per-session **standalone-clip** buffer — append each uploaded clip, keep the last ~6, evict the oldest; expose the ~6 clip paths for extraction; **clear on pause/end**; delete clips + any temp files in `finally`. (research R-5/B2; Principle I)
-- [ ] T019 [P] [US1] `apps/api/app/services/smoothing.py` (NEW): rolling mean over the last **N=4 scored** `proba[1]`, banding (`t_low=0.53`, `t_high=0.70`), cold-start **M=4** → `warming_up`; skipped windows excluded from the buffer and the M count. (contracts/smoothing-and-banding.md; D-3)
-- [ ] T020 [US1] `apps/api/app/services/inference.py` (NEW): the read path — assemble clip set (T018) → `compute_anchor_multiclip` (T007) → `get_my_anchor()` (T013) → `delta = current − anchor` → `predict_delta` → **re-threshold `proba[1] ≥ STRESS_OPERATING_POINT`** → smooth + band (T019) → persist a `window_readings` row under RLS (server-only `label`+`stress_probability`). On `FeatureExtractionError` → skipped reading. (depends T007, T013, T018, T019)
-- [ ] T021 [US1] `apps/api/app/routers/monitoring.py` (NEW): `POST /monitoring/sessions` (require_employee; **anchor-presence guard up front** → **409** `{"outcome":"no_anchor"}`; insert session under RLS) and `POST /monitoring/sessions/{id}/windows` (accept one standalone clip; run T020 in a **threadpool** so a slow window never blocks the next; return `reading` / `warming_up` / `skipped`; **never** return a probability). (depends T014, T015, T020)
+- [ ] ~~T018~~ **REMOVED** — no per-session clip buffer under continuous single-stream. The server receives the whole **contiguous recording-so-far** each stride, decodes it, tail-extracts the last 60 s, and deletes the temp clip in `finally` (handled inline by the inference service, T020). The deferred **rolling decoded-frame buffer** (research R-5) is the only future buffer and is **not built in 008**.
+- [ ] T019 [P] [US1] `apps/api/app/services/smoothing.py` (NEW): rolling mean over the last **N=4 scored** `proba[1]`, banding (`t_low=0.53`, `t_high=0.70`), cold-start **M=4** → `warming_up`; skipped windows excluded from the smoothing buffer and the M count. (contracts/smoothing-and-banding.md; D-3)
+- [ ] T020 [US1] `apps/api/app/services/inference.py` (NEW): the read path — write the uploaded **contiguous recording-so-far** to a temp file → if **< 60 s** recorded return `warming_up` → else `compute_anchor(clip, tail_seconds=60)` (T005) → `get_my_anchor()` (T013) → `delta = current − anchor` → `predict_delta` → **re-threshold `proba[1] ≥ STRESS_OPERATING_POINT`** → smooth + band (T019) → persist a `window_readings` row under RLS (server-only `label`+`stress_probability`) → **delete the temp clip in `finally`**. On `FeatureExtractionError` → skipped reading. (depends T005, T013, T019)
+- [ ] T021 [US1] `apps/api/app/routers/monitoring.py` (NEW): `POST /monitoring/sessions` (require_employee; **anchor-presence guard up front** → **409** `{"outcome":"no_anchor"}`; insert session under RLS) and `POST /monitoring/sessions/{id}/windows` (accept the **contiguous recording-so-far**; run T020 in a **threadpool** so a slow window never blocks the next; return `reading` / `warming_up` / `skipped`; **never** return a probability). (depends T014, T015, T020)
 - [ ] T022 [P] [US1] `apps/api/tests/test_smoothing.py`: warm-up (<4 scored → `band is None`), banding boundaries (`0.52→at_ease`, `0.53→a_little_tense`, `0.69→a_little_tense`, `0.70→tense`), drift-not-flicker (SC-003), skipped excluded, config override moves boundaries (proves no hard-coded literal). (contracts/smoothing-and-banding.md Tests)
 - [ ] T023 [P] [US1] `apps/api/tests/test_inference_service.py`: read path with a stubbed predictor + anchor — anchor `bytea` decode to `(2958,)`, `delta`, **re-threshold at 0.53**, server-only columns written, skipped path on `FeatureExtractionError`.
-- [ ] T024 [US1] `apps/api/tests/test_monitoring_endpoints.py` (US1 slice): create returns 201 / **403 forbidden_role** (non-employee) / **409 no_anchor**; window returns `warming_up` before ~60 s of clips, `reading` after warm-up, `skipped` on coverage failure; RLS keys writes to the **verified `sub`** (a caller can't write another user's rows; SC-004 no global anchor). (depends T021)
+- [ ] T024 [US1] `apps/api/tests/test_monitoring_endpoints.py` (US1 slice): create returns 201 / **403 forbidden_role** (non-employee) / **409 no_anchor**; window returns `warming_up` before ~60 s of recording, `reading` after warm-up, `skipped` on coverage failure; RLS keys writes to the **verified `sub`** (a caller can't write another user's rows; SC-004 no global anchor). (depends T021)
 
 ### Frontend (US1)
 
-- [ ] T025 [P] [US1] `apps/web/lib/api/monitoring-client.ts` (NEW): typed client → FastAPI (`createSession`, `submitClip`, `endSession`, `patchStatus`); sends the forwarded access token; multipart for the clip.
-- [ ] T026 [P] [US1] `apps/web/components/monitor/window-recorder.ts` (NEW): **stop/restart standalone-clip** recorder — a single `MediaRecorder` stopped/restarted each ~10–12 s stride, emitting one standalone clip and uploading the newest (fire-and-forget, **non-blocking**; FR-016). Reuse feature-005 `getUserMedia` + secure-context. (B2)
+- [ ] T025 [P] [US1] `apps/web/lib/api/monitoring-client.ts` (NEW): typed client → FastAPI (`createSession`, `submitWindow`, `endSession`, `patchStatus`); sends the forwarded access token; multipart for the contiguous recording-so-far.
+- [ ] T026 [P] [US1] `apps/web/components/monitor/window-recorder.ts` (NEW): **continuous** recorder — **one `MediaRecorder`** in timeslice mode (incremental capture, **no stop/restart**); each ~10–12 s stride it uploads the **contiguous recording-so-far** (init + all chunks in order — always decodable) (fire-and-forget, **non-blocking**; FR-016). Reuse feature-005 `getUserMedia` + secure-context. (continuous single-stream)
 - [ ] T027 [P] [US1] `apps/web/components/monitor/use-monitoring-session.ts` (NEW): reducer/state machine — US1 op-states (permission, **warming-up**, active, blocked, + transient skipped-read note over the last band). Maps `outcome`→state and `band`→display; holds warming-up until the server stops returning `warming_up`. (mock-gap #1/#2)
 - [ ] T028 [P] [US1] `apps/web/components/monitor/bloom.tsx` (NEW): ambient breathing **bloom**; band→color role (meadow = At ease; **amber soft-tint** = a-little-tense/tense; warming-up = neutral/meadow-muted); `prefers-reduced-motion` suppresses breathing; built on **Graphite tokens**, no number/gauge. (FR-021, FR-022, Principle V)
 - [ ] T029 [P] [US1] `apps/web/components/anchor/failure-state.tsx`: extract a **shared `CauseChip`** from the feature 005/006 cause vocabulary so the skipped-read note and calibration reuse one component. (Principle III reuse)
@@ -118,8 +123,8 @@ description: "Task list — Stress Inference Service (008)"
 
 **Independent Test**: During a session, step out of frame → auto-pause + self-view + foggy prompt → auto-resume on return; manual Pause releases the camera, Resume restarts, End returns to the dashboard with an updated recap.
 
-- [ ] T036 [US2] `apps/api/app/routers/monitoring.py`: add `PATCH /monitoring/sessions/{id}` (status `paused|active|out_of_frame` under RLS update-own; **clear the clip buffer on `paused`**) and `POST /monitoring/sessions/{id}/end` (`ended_at`, `status='ended'`, `end_reason`; **clear the buffer**). (depends T021)
-- [ ] T037 [P] [US2] `apps/api/tests/test_monitoring_endpoints.py` (US2 slice): PATCH transitions, end, **409 cannot-transition an ended session**, RLS update-own; buffer cleared on pause/end.
+- [ ] T036 [US2] `apps/api/app/routers/monitoring.py`: add `PATCH /monitoring/sessions/{id}` (status `paused|active|out_of_frame` under RLS update-own) and `POST /monitoring/sessions/{id}/end` (`ended_at`, `status='ended'`, `end_reason`). (No server-side clip buffer to clear under continuous single-stream; on pause the **client** stops the continuous recorder and starts a fresh recording on resume → warms up again.) (depends T021)
+- [ ] T037 [P] [US2] `apps/api/tests/test_monitoring_endpoints.py` (US2 slice): PATCH transitions, end, **409 cannot-transition an ended session**, RLS update-own.
 - [ ] T038 [US2] Extend `apps/web/components/monitor/use-monitoring-session.ts` + `monitoring-session.tsx`: out-of-frame (auto-pause after **90 s** no-face, show self-view + foggy prompt, **auto-resume** on return within ~one stride), manual **Pause** (release camera) / **Resume** (re-acquire, re-enter permission if revoked), **auto-end** after **5 min** absence, manual **End** → dashboard. (FR-005/006/007; SC-006)
 - [ ] T039 [P] [US2] Extend `apps/web/components/monitor/op-surfaces.tsx`: **out-of-frame** surface (foggy, self-view, "move back into frame") and **paused** surface — both **foggy, not amber**. (FR-004/007, FR-022)
 - [ ] T040 [P] [US2] Extend `apps/web/components/monitor/camera-pill.tsx` / `viewfinder.tsx`: out-of-frame + paused pill states; self-view reveal on out-of-frame.
@@ -163,13 +168,13 @@ description: "Task list — Stress Inference Service (008)"
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [ ] T051 [P] Playwright **employee happy-path** e2e `apps/web/tests/e2e/employee-monitoring.spec.ts` (start → permission → warming-up → reading → end → dashboard recap) using the feature-005 **detector-injection seam**. NOTE: this is **not** the cross-browser capture gate — that is the real-Safari smoke (Phase 2), which Playwright must not replace.
-- [ ] T052 [P] webm/VFR **codec** fidelity hardening `packages/ml-video/tests/test_webm_vfr_fidelity.py` (mp4/CFR vs webm/VFR 2958-d tolerance) — **scheduled hardening, not a ship blocker** (R-6; the assembly dimension is already covered by the Phase-2 multi-clip gate).
+- [ ] T052 [P] webm/VFR **codec** fidelity hardening `packages/ml-video/tests/test_webm_vfr_fidelity.py` (mp4/CFR vs webm/VFR 2958-d tolerance) — **scheduled hardening, not a ship blocker** (R-6; there is **no assembly dimension** under continuous single-stream — faithful by construction).
 - [ ] T053 [P] Responsive & a11y pass (Principle VI / FR-025): monitoring stage **stacks at ≥360 px** (bloom shrinks, controls full-width/stack, pill/viewfinder reposition — mock-gap #3); `prefers-reduced-motion` across all surfaces; visible keyboard focus; ≥44×44 px touch targets. Covered in `apps/web/components/monitor/*` + the page.
 - [ ] T054 [P] Author/expand `specs/008-stress-inference-service/smoke-tests.md`: human checks — camera permission on real browsers; **Safari/iOS** secure-context + capture; HTTPS/localhost; low-light skip; mobile 360 px; reduced-motion; privacy (temp/clip deleted); no manager surface reads sessions/readings.
-- [ ] T055 Privacy verification (Principle I / Quality Gate 6): test + smoke that **no raw video persists** (clips + temp deleted in `finally`; buffer cleared on pause/end), **no manager policy** exists on either table, and `label`/`stress_probability` are **unreadable** by the owner (SELECT column whitelist). (SC-009)
+- [ ] T055 Privacy verification (Principle I / Quality Gate 6): test + smoke that **no raw video persists** (the uploaded clip + temp deleted in `finally`; no clip buffer), **no manager policy** exists on either table, and `label`/`stress_probability` are **unreadable** by the owner (SELECT column whitelist). (SC-009)
 - [ ] T056 [P] **Model-owner note** (carry-over, do **not** act in 008): record the `metadata.json` stale `window_eval_config` (30 s) cleanup as a model-owner task — **metadata/doc-only, no `model_version` bump, no anchor invalidation, do not edit the model artifact**. Add to `docs/backlog.md` (or the MODELS.md note) flagged for the model owner. (research R-0)
 - [ ] T057 [P] **Retention follow-up note**: document the 90-day `window_readings` purge (a `pg_cron` job or scheduled task) as a follow-up **not built in 008**; the policy is decided, the job is deferred. (data-model.md § Retention)
-- [ ] T058 Run `quickstart.md` verification (SC-001…SC-010) and the full Principle VII test sweep (pytest `apps/api` + `packages/ml-video`; Vitest `apps/web`; Playwright employee e2e; the multi-clip gate + webm/VFR hardening). Confirm green before review.
+- [ ] T058 Run `quickstart.md` verification (SC-001…SC-010) and the full Principle VII test sweep (pytest `apps/api` + `packages/ml-video`; Vitest `apps/web`; Playwright employee e2e; the tail-window unit test + webm/VFR hardening). Confirm green before review.
 
 ---
 
@@ -178,8 +183,8 @@ description: "Task list — Stress Inference Service (008)"
 ### Phase dependencies
 
 - **Phase 1 (Setup)**: no dependencies — start immediately.
-- **Phase 2 (WINDOWING GATE)**: depends on Setup. **🚦 BLOCKS Phases 3–8 entirely** — the GATE (T009) must pass on Chrome **and** Safari/iOS first. If the fidelity gate (T008) fails, the windowing approach is revisited before any further build.
-- **Phase 3 (Foundational)**: depends on the GATE (T009). Blocks all user stories.
+- **Phase 2 (WINDOWING VALIDATION)**: depends on Setup. Front-loaded; **confirm the continuous path works + keeps up** on Chrome **and** Safari/iOS (T009). It is **no longer a hard fidelity gate** — fidelity can't fail (faithful by construction), so a keep-up breach is a production-deploy note (the deferred rolling buffer), not a build blocker. Still the Safari/iOS pre-production gate.
+- **Phase 3 (Foundational)**: depends on the Phase-2 validation (T009). Blocks all user stories.
 - **Phase 4 (US1, P1)**: depends on Foundational. The MVP.
 - **Phase 5 (US2, P2)**: depends on Foundational; extends US1 surfaces (endpoints/state machine).
 - **Phase 6 (US3, P2)**: depends on Foundational; small branch off US1's create path.
@@ -188,9 +193,9 @@ description: "Task list — Stress Inference Service (008)"
 
 ### Key cross-task dependencies
 
-- T007 (`compute_anchor_multiclip`) → T008 (fidelity gate) and → T020 (inference service).
+- T005 (tail-window option on `compute_anchor`) → T006 (tail-window unit test) and → T020 (inference service).
 - T010/T011 (migration: tables/RLS + `get_my_anchor()`) → T013 (supabase_user) → T020/T021 (service/router).
-- T018 (clip buffer) + T019 (smoothing) → T020 (inference) → T021 (router) → T036 (lifecycle) and T042 (no-anchor finalize).
+- T019 (smoothing) → T020 (inference; **T018 removed — no clip buffer**) → T021 (router) → T036 (lifecycle) and T042 (no-anchor finalize).
 - T025–T031 → T032 (orchestrator) → T033 (page) → T034 (entry).
 - T046 (reads) → T047 (page trend) + T048 (card recap/mini-trend).
 
@@ -205,16 +210,16 @@ description: "Task list — Stress Inference Service (008)"
 ## Parallel Opportunities
 
 - **Setup**: T001, T002, T003 in parallel.
-- **Gate**: T004 + T005 (record fixtures on the two browsers) in parallel; then T006 (capture smoke) and T007→T008 (entry→fidelity) proceed; T009 joins them.
+- **Windowing validation**: T004 (retire B2) and T005→T006 (tail-window + its unit test) proceed; T007 records continuous fixtures on the two browsers; T008 (works-and-keeps-up) depends on T005 + T007; T009 joins them.
 - **Foundational**: T012, T013, T014, T015, T016 in parallel (distinct files); T010→T011 sequential (same migration file); T017 after T012.
-- **US1 backend**: T018 ∥ T019 (then T020→T021); tests T022 ∥ T023.
+- **US1 backend**: T019 (smoothing) then T020→T021 (T018 removed — no clip buffer); tests T022 ∥ T023.
 - **US1 frontend**: T025 ∥ T026 ∥ T027 ∥ T028 ∥ T029 ∥ T030 (distinct files), then T031→T032→T033→T034; T035 in parallel with the page.
 - **Polish**: T051, T052, T053, T054, T056, T057 largely in parallel.
 
 ### Parallel example — US1 frontend leaves
 
 ```bash
-Task: "window-recorder.ts — stop/restart standalone-clip recorder (apps/web/components/monitor/)"
+Task: "window-recorder.ts — continuous recorder, uploads recording-so-far (apps/web/components/monitor/)"
 Task: "use-monitoring-session.ts — reducer/state machine (apps/web/components/monitor/)"
 Task: "bloom.tsx — ambient bloom, band→color (apps/web/components/monitor/)"
 Task: "op-surfaces.tsx — permission/warming-up/blocked/skipped-note (apps/web/components/monitor/)"
@@ -225,11 +230,11 @@ Task: "monitoring-client.ts — typed FastAPI client (apps/web/lib/api/)"
 
 ## Implementation Strategy
 
-### GATE FIRST (non-negotiable ordering)
+### VALIDATION FIRST (front-loaded ordering)
 
-1. Phase 1 Setup → 2. **Phase 2 WINDOWING GATE** → validate B2 on real Chrome + Safari/iOS and pass the multi-clip fidelity HARD GATE (T009). **Do not start Phase 3+ until the gate is green.** A gate failure re-opens the windowing decision before any feature code.
+1. Phase 1 Setup → 2. **Phase 2 WINDOWING VALIDATION** → confirm the continuous capture/upload/tail-extract path **works and keeps up** on real Chrome + Safari/iOS (T009). Front-load it (it stays the Safari/iOS pre-production gate), but it is **not a hard fidelity gate** — fidelity can't fail (faithful by construction); a keep-up breach calls for the deferred rolling-buffer optimization in production, not a re-plan.
 
-### MVP (after the gate)
+### MVP (after the validation)
 
 3. Phase 3 Foundational → 4. Phase 4 **US1** → **STOP and validate** the live read end-to-end (the demoable MVP).
 
@@ -243,9 +248,9 @@ Task: "monitoring-client.ts — typed FastAPI client (apps/web/lib/api/)"
 
 ## Notes
 
-- **B1 is dead**: no container reassembly, no init-segment retention, no timeslice mode anywhere. Every clip is standalone and decoded on its own; the server concatenates **frames**, not containers (B2).
+- **B1 and B2 are dead** (continuous single-stream): no container reassembly, no init-segment retention, no stop/restart, no multi-clip frame concatenation, no clip buffer. The client uploads **one continuous, always-decodable file** (the recording-so-far) and the server **tail-extracts the last 60 s** of it.
 - **No service-role** anywhere in `apps/api`: all DB I/O is RLS-as-the-user via the forwarded JWT + the publishable anon key; the anchor is read only via `get_my_anchor()`. Write-integrity is deliberately deferred (own-data only; upgrade path = a dedicated INSERT-only role — not built here).
 - **No number, ever** (FR-015): the client receives only a `band`; `label`/`stress_probability` are server-only via the SELECT column whitelist.
 - **Operating point 0.53** is read from `metadata.json`, not hard-coded; `t_high=0.70` is a documented display-only product band.
-- **Reuse, not re-copy** (Principle III): shared 2958-d extraction (`compute_anchor` internals via the new `compute_anchor_multiclip`), feature-005 detector/self-view, feature-006 coverage gate + cause vocabulary.
+- **Reuse, not re-copy** (Principle III): the shared 2958-d extraction (`compute_anchor` + a thin **tail-window option** — no new extraction path), feature-005 detector/self-view, feature-006 coverage gate + cause vocabulary.
 - `[P]` = different files, no incomplete-task dependency. Commit after each task or logical group. Stop at any checkpoint to validate a story independently.

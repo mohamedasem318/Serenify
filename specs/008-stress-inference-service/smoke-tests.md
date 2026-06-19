@@ -1,11 +1,22 @@
 # Smoke tests — Stress Inference Service (008)
 
 Human-validated checks (Constitution Principle VII). **This session covers only Phase 1 +
-Phase 2 (the windowing GATE).** The full feature smoke matrix (camera permission on real
+Phase 2 (the windowing validation).** The full feature smoke matrix (camera permission on real
 browsers, mobile 360 px, reduced-motion, privacy, etc.) is added in Phase 8 (task T054)
 once the feature is built.
 
-> **🚦 GATE STATUS: ❌ NOT cleared (2026-06-19) — Phases 3–8 remain blocked.** Two findings,
+> **✅ WINDOWING RESOLVED (2026-06-19) — B2 rejected; continuous single-stream adopted.**
+> The B2 multi-clip fidelity GATE described below is **retired** (B2 is rejected — the
+> single-source finding in **Step F** is *why*). Windowing is now **continuous single-stream
+> upload + server tail-extract of the last 60 s**, which is **faithful by construction** (a
+> real continuous 60 s clip through the already-validated single-clip extraction) — so there
+> is **no fidelity gate**. The remaining real-device check (Phase 2 of the revised `tasks.md`)
+> is light: the continuous capture/upload/tail-extract path **works and keeps up** on real
+> Chrome + Safari/iOS (per-stride server time within the 10 s stride across a 5-min session).
+> See `docs/DECISIONS.md` (2026-06-19 — *feature 008 windowing DECISION*) and `research.md`
+> R-5/R-7. **Steps A–F below are retained as the B2 evidence that drove this decision.**
+
+> **🚦 B2 GATE STATUS (HISTORICAL — superseded by the resolution above): ❌ NOT cleared.** Two findings,
 > both true: **(1)** the original cross-take fixture **was a real flaw** — it compared two
 > independent recordings, so the take-to-take micro-motion/VFR difference (not the assembly)
 > dominated. Re-fixturing to a **single source** (the continuous Chrome clip losslessly
