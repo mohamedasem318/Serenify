@@ -11,11 +11,20 @@ fidelity* with *recording reproducibility* and could not answer the real questio
 This diagnostic isolates the assembly by feeding it ONE source recording two ways:
   * ``continuous``         — the reference clip, scored with :func:`compute_anchor`;
   * ``clips`` (segments)   — the SAME clip losslessly segmented (``ffmpeg -c copy -f segment``,
-                             same frames, no re-encode), scored with
-                             :func:`compute_anchor_multiclip`.
+                             same frames, no re-encode), scored with the local
+                             :func:`_compute_anchor_multiclip` assembly defined below.
 Because the segments are bit-identical frames re-chunked into standalone containers, the ONLY
 remaining difference is the windowing assembly itself (per-clip decode + the 2.5 fps timestamp
 sampler re-phasing from each clip's t=0, plus the handful of frames lost at each seam).
+
+NOTE — the B2 multi-clip assembly was REMOVED from the package source when B2 was rejected
+(feature-008 ``tasks.md`` T004, resolution (a): the active package source carries zero retired
+B2 code). The exact assembly logic the retired ``compute_anchor_multiclip`` +
+``motion_features_seamaware`` contained is **inlined below** (:func:`_compute_anchor_multiclip` /
+:func:`_seamaware_motion`) so this diagnostic — the recorded evidence for *why* B2 was rejected —
+stays runnable without resurrecting any retired symbol on the active package/inference surface.
+It reuses the still-public per-clip building blocks (``extract_landmarks`` → coverage gate →
+``lbp_top_features``), so only the seam-aware motion + frame concat live here.
 
 It prints the GATE metrics (cosine / lbp_maxabs / motion_rel_p99 / frames_lost /
 seam_motion_ratio), a per-block decomposition, and a continuous-vs-multiclip SAMPLED-FRAME
@@ -39,7 +48,13 @@ import sys
 
 import numpy as np
 
-from ml_video import compute_anchor, compute_anchor_multiclip
+from ml_video import (
+    FEATURE_DIM,
+    FeatureExtractionError,
+    assert_usable_face_coverage,
+    compute_anchor,
+    lbp_top_features,
+)
 from ml_video.features import LBP_DIM
 from ml_video.pipeline import (
     _probe_timestamps,
@@ -48,6 +63,67 @@ from ml_video.pipeline import (
     _timestamps_reliable,
     extract_landmarks,
 )
+
+
+def _seamaware_motion(landmark_blocks: list[np.ndarray]) -> np.ndarray:
+    """Seam-aware 2868-d motion block — inlined from the retired ``motion_features_seamaware``.
+
+    Mean/std/max of |frame-to-frame landmark delta|, with the diffs taken **within each clip**
+    and the cross-seam diffs (last frame of clip N → first frame of clip N+1) **excluded** before
+    aggregation. This is the exact B2 behaviour (research.md R-5); kept only here so the diagnostic
+    reproduces B2's per-clip sampling-phase divergence. Reduces to the whole-stack diff for a
+    single clip.
+    """
+    per_clip_diffs = [
+        np.abs(np.diff(block, axis=0)) for block in landmark_blocks if block.shape[0] >= 2
+    ]
+    if not per_clip_diffs:
+        raise FeatureExtractionError(
+            "need at least one clip with >= 2 frames to compute motion features"
+        )
+    motion_abs = np.concatenate(per_clip_diffs, axis=0)  # cross-seam diff rows excluded
+    return np.concatenate(
+        [motion_abs.mean(axis=0), motion_abs.std(axis=0), motion_abs.max(axis=0)]
+    )  # (2868,)
+
+
+def _compute_anchor_multiclip(clip_paths) -> np.ndarray:
+    """Inlined B2 multi-clip assembly — retired from the package, kept here as the diagnostic.
+
+    Reproduces the rejected B2 path so this file can still demonstrate *why* B2 was rejected:
+    per-clip :func:`extract_landmarks` → concat frames + landmark rows → the feature-006 coverage
+    gate on the combined set → :func:`lbp_top_features` ⊕ :func:`_seamaware_motion`. The per-clip
+    decode/sampler, the coverage gate, and the LBP path are the still-public ``compute_anchor``
+    building blocks (Principle III); only the frame concat + seam-aware motion are B2-specific.
+    Raises ``FeatureExtractionError`` on empty input / coverage rejection / malformed shape /
+    non-finite values, matching the retired symbol's contract.
+    """
+    paths = list(clip_paths)
+    if not paths:
+        raise FeatureExtractionError("multi-clip assembly requires at least one clip path")
+
+    frames: list[np.ndarray] = []
+    landmark_blocks: list[np.ndarray] = []
+    for path in paths:
+        clip = extract_landmarks(path)  # reuse the per-clip decode + FaceMesh path
+        frames.extend(clip.frames)
+        landmark_blocks.append(clip.landmarks)
+
+    landmarks = np.concatenate(landmark_blocks, axis=0)  # (sum_i N_i, 956)
+    assert_usable_face_coverage(landmarks)  # gate the ASSEMBLED window (combined set)
+    features = np.concatenate(
+        [
+            lbp_top_features(frames, landmarks),  # (90,) — over the concatenated frames
+            _seamaware_motion(landmark_blocks),  # (2868,) — cross-seam diffs excluded
+        ]
+    )
+    if features.shape != (FEATURE_DIM,):
+        raise FeatureExtractionError(
+            f"expected multiclip anchor shape ({FEATURE_DIM},), got {features.shape}"
+        )
+    if not np.all(np.isfinite(features)):
+        raise FeatureExtractionError("multiclip anchor vector contains non-finite values")
+    return features
 
 
 def _cosine(a: np.ndarray, b: np.ndarray) -> float:
@@ -81,7 +157,7 @@ def main(argv: list[str]) -> int:
 
     # ---- vectors --------------------------------------------------------------------------
     vec_cont = compute_anchor(continuous)
-    vec_multi = compute_anchor_multiclip(clips)
+    vec_multi = _compute_anchor_multiclip(clips)
 
     # ---- kept-frame counts ----------------------------------------------------------------
     kept_cont = extract_landmarks(continuous).landmarks.shape[0]

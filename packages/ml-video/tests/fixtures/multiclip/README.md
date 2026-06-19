@@ -1,45 +1,41 @@
-# Multi-clip windowing GATE fixtures (feature 008, B2)
+# Multi-clip windowing fixtures (feature 008) — B2 **retired**, single-source evidence kept
 
-These back the **multi-clip fidelity HARD GATE** (`tests/test_multiclip_fidelity.py`,
-tasks T006/T008) and the B2 capture validation. They are recorded on **real devices**
-by a human (the agent cannot drive a webcam / a real iPhone) and dropped here.
+> **B2 (stop/restart multi-clip frame-concat) was REJECTED** (windowing D-2 reversed →
+> continuous single-stream upload + server tail-extract; see `docs/DECISIONS.md` 2026-06-19 and
+> `specs/008-stress-inference-service/research.md` R-5/R-7). The multi-clip fidelity HARD GATE
+> (`tests/test_multiclip_fidelity.py`) and the package symbols `compute_anchor_multiclip` /
+> `motion_features_seamaware` are **retired** (feature-008 T004); the assembly logic now lives
+> only in the diagnostic `tests/helpers/singlesource_fidelity.py`.
 
-> **Raw video is NEVER committed.** The repo-level `tests/fixtures/.gitignore` already
-> excludes `*.webm` / `*.mp4` / `*.mov` / `*.avi` / `*.mkv` **recursively**, so anything
-> you drop in `chrome/` or `safari/` stays local and untracked (Constitution Principle
-> I / X). Only this README and the `.gitkeep` files are committed. The fidelity test
-> **skips** with a clear message when the clips are absent (i.e. in CI / a clean tree).
-
-## Expected layout (record the SAME ~60 s of content two ways, per browser)
+Only the **single-source** evidence fixture remains here — it is *why* B2 was rejected:
 
 ```
 multiclip/
-├── chrome/                      # real Chrome — WebM (VP8/VP9)
-│   ├── continuous.webm          # ONE continuous ~60 s recording (the reference)
-│   └── clips/                   # the SAME ~60 s as ~6 stop/restart standalone clips
-│       ├── clip_00.webm
-│       ├── clip_01.webm
-│       ├── clip_02.webm
-│       ├── clip_03.webm
-│       ├── clip_04.webm
-│       └── clip_05.webm
-└── safari/                      # real Safari / iOS — fragmented MP4
-    ├── continuous.mp4
-    └── clips/
-        ├── clip_00.mp4
-        └── … clip_05.mp4
+└── chrome-singlesource/          # the recorded evidence (see its own README.md)
+    ├── continuous.webm           # one continuous ~60 s real-Chrome recording (the reference)
+    └── clips/clip_00..05.webm    # the SAME clip losslessly re-segmented (no re-encode)
 ```
 
-Notes:
-- `continuous.*` and `clips/clip_*.*` must be the **same person, same ~60 s, same
-  framing** — recorded back-to-back. The gate compares the 2958-d vector of the
-  continuous clip vs the concatenation of the stop/restart clips.
-- `clips/` are sorted lexicographically, so zero-pad the index (`clip_00`, `clip_01`, …).
-- Record with the harness at `_scratch-008-b2-spike/` (stop/restart mode for `clips/`,
-  continuous mode for `continuous.*`).
+The retired cross-take dirs (`chrome/`, `safari/`) — two *independent* recordings of "the same"
+~60 s — were removed: they conflated assembly fidelity with recording reproducibility (the wrong
+test). The single-source fixture isolates assembly fidelity and showed the residual per-clip
+sampling-phase divergence that sank B2.
 
-## How the gate reads them
+> **Raw video is NEVER committed.** The repo-level `tests/fixtures/.gitignore` excludes
+> `*.webm` / `*.mp4` / `*.mov` / `*.avi` / `*.mkv` **recursively**, so the clips stay local and
+> untracked (Constitution Principle I / X). Only the READMEs and `.gitkeep` are committed.
 
-`test_multiclip_fidelity.py` discovers each browser dir that has both a `continuous.*`
-and a non-empty `clips/`, and skips the rest. See that file and
-`specs/008-stress-inference-service/smoke-tests.md` (the T006/T009 checklist).
+## How the single-source evidence is read
+
+Run the diagnostic (it reproduces B2's assembly via an **inlined** local helper — no retired
+package symbol):
+
+```bash
+# from packages/ml-video, with its .venv python
+.venv/Scripts/python tests/helpers/singlesource_fidelity.py \
+  tests/fixtures/multiclip/chrome-singlesource/continuous.webm \
+  tests/fixtures/multiclip/chrome-singlesource/clips/clip_*.webm
+```
+
+See `tests/fixtures/multiclip/chrome-singlesource/README.md` for generation + the keyframe-alignment
+caveat, and `specs/008-stress-inference-service/smoke-tests.md` Step F for the recorded numbers.

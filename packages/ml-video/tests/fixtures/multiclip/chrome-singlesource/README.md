@@ -36,9 +36,19 @@ boundaries snap to that grid — segment durations are **not** uniform (13.4 / 1
 13.4 / 10.0 / 8.8 s for `-segment_time 11`). This does not affect the frames (their union is
 the continuous decode); it only means the seams land on keyframes, not at exact 11 s marks.
 
-## How the gate reads it
+## How this evidence is read
 
-`tests/test_multiclip_fidelity.py` auto-discovers this dir (it has a `continuous.*` and a
-non-empty `clips/`) and runs `test_multiclip_fidelity_gate[chrome-singlesource]`. The
-per-frame / per-block decomposition + sampled-frame-timestamp comparison is in
-`tests/helpers/singlesource_fidelity.py`.
+The B2 multi-clip fidelity HARD GATE (`tests/test_multiclip_fidelity.py`) and the package symbols
+`compute_anchor_multiclip` / `motion_features_seamaware` are **retired** (B2 rejected — feature-008
+`tasks.md` T004). The assembly is now reproduced by the diagnostic
+`tests/helpers/singlesource_fidelity.py`, which **inlines** the multi-clip assembly locally and
+prints the per-frame / per-block decomposition + the sampled-frame-timestamp comparison:
+
+```bash
+# from packages/ml-video, with its .venv python
+.venv/Scripts/python tests/helpers/singlesource_fidelity.py \
+  chrome-singlesource/continuous.webm chrome-singlesource/clips/clip_*.webm
+```
+
+This fixture + diagnostic stay as the recorded evidence for *why* B2 was rejected (the per-clip
+sampling-phase divergence); see `specs/008-stress-inference-service/smoke-tests.md` Step F.

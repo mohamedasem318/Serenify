@@ -1,18 +1,20 @@
-"""Decode-smoke helper for the feature-008 B2 windowing GATE (T003/T006).
+"""Decode-smoke helper for the feature-008 continuous windowing validation (T003/T008).
 
-A single tiny utility the human runs (via ``test_multiclip_fidelity.py`` or the
-``__main__`` CLI below) to confirm that a recorded clip is **independently
-decodable** — i.e. the B2 promise that every stop/restart clip carries its own
-container init and opens on its own (unlike a bare B1 timeslice chunk, which
-cannot). It deliberately does NOT touch mediapipe or features; it only opens the
+A single tiny utility the human runs (via the ``__main__`` CLI below) to confirm that
+an uploaded **contiguous recording-so-far** is **decodable** — the *(works)* half of the
+continuous works-and-keeps-up validation (`tasks.md` T008): every stride uploads one
+continuous, always-decodable clip that the server must open before tail-extracting its
+last 60 s. It deliberately does NOT touch mediapipe or features; it only opens the
 container with OpenCV and counts the frames it can decode.
 
-Usage (real-device GATE — run from ``packages/ml-video`` with its ``.venv`` python; it
-has no intra-package imports, so invoke it as a direct script path, not ``-m``):
+Usage (run from ``packages/ml-video`` with its ``.venv`` python; it has no intra-package
+imports, so invoke it as a direct script path, not ``-m``):
 
     .venv/Scripts/python tests/helpers/decode_smoke.py \
-        tests/fixtures/multiclip/chrome/clips/clip_00.webm \
-        tests/fixtures/multiclip/chrome/continuous.webm
+        tests/fixtures/multiclip/chrome-singlesource/continuous.webm
+
+(For the real-device run, point it at the recorded continuous fixtures under
+``tests/fixtures/continuous/{chrome,safari}/`` — see T007.)
 
 Each path prints ``OK <n_frames> <path>`` or ``FAIL <path>`` and the process exits
 non-zero if any clip failed to open or yielded zero frames.
