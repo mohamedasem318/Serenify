@@ -28,9 +28,12 @@ once the feature is built.
 - **Startup contract** (`load_model()`): scaler `n_features_in_ == 2958`, classes `[0, 1]`,
   `model_version == "serenify-video-lbptop-motion-rf-calibrated@2.0.0"` — PASS
   (`tests/test_pipeline_fixtures.py::test_load_model_satisfies_startup_contract`).
-- **Full ml-video suite**: green on the pinned env after the T004 retirement + the T005/T006
-  tail-window work (the `test_multiclip_fidelity.py` skip is gone — that file is retired). Record
-  the current `pytest packages/ml-video/tests` + ruff result on each run below.
+- **Full ml-video suite** (after T004 retirement + T005/T006 tail-window, 2026-06-19):
+  `python -m pytest packages/ml-video/tests` → **32 passed** locally (**31 passed + 1 skipped**
+  in CI — the tail-window *decode-bound* test `test_tail_window.py::…trailing_60s_on_real_continuous_clip`
+  skips when the gitignored continuous fixture is absent; the **synthetic suffix invariant** runs
+  in CI). The retired `test_multiclip_fidelity.py` skip is gone — that file is deleted. Ruff:
+  **all checks passed**.
 
 ---
 
