@@ -1880,3 +1880,31 @@ the 60 s lock, the 0.53 re-threshold, the transport deviation, the seven mock-ga
   not fatal (FR-016 non-blocking; cadence degrades, 5-min cap bounds it). Mitigation = the
   already-deferred **server-side rolling decoded-frame buffer** (decode only the newest
   increment) — kept deferred, built before long droplet sessions in production.
+
+## 2026-06-19 — docs(008-stress-inference-service) — corrective docs/tasks pass before `/speckit-analyze` (no code, no decision reversal)
+
+Closes three gaps found in the re-issued `tasks.md` + `research.md` after the continuous
+single-stream windowing decision. Windowing is **not** reopened; D-1 / D-2 (continuous) / D-3 /
+D-4, the seven mock-gap resolutions, the 0.53 re-threshold, and Principles I/V/VI/VII stand.
+Docs/tasks only — no feature/test/fixture code, no model artifact, no `model_version` bump. Full
+entry: `docs/DECISIONS.md` 2026-06-19 (*corrective docs/tasks pass*).
+
+- **Faithful-by-construction is now enforced, not assumed.** T005 mandates sampling on the
+  **file-global grid (anchored at t=0)** then *filtering* to the trailing 60 s — with an explicit
+  prohibition on the trim/seek-and-resample that re-zeroes `POS_MSEC` (the B2 failure mode). T006
+  adds a deterministic, **CI-runnable integer-index suffix-equality invariant** on synthetic VFR
+  timestamps (no video, no tolerance) that the deferred rolling decoded-frame buffer must keep
+  passing. R-5 ties faithfulness to the preserved grid + this guard.
+- **Keep-up reasoning corrected + completed.** Budget bar tightened to decode within
+  `(10 s − extract)` ≈ 5–7 s / ~43–60× realtime (not the full 10 s / ~30×). Keep-up split into
+  *growing decode-to-tail* (rolling buffer fixes) vs *constant extract* (~10–15 s/window on the
+  droplet — buffer does **not** fix; lever is slower cadence or GPU). T008 now records
+  decode-to-tail and extract times **separately**; T009 diagnoses which component breached.
+  Droplet figures flagged indicative-only (droplet being phased out for Azure / HuggingFace).
+- **B2 retirement made complete + non-breaking (locked to resolution (a) — inline).** T004 now
+  **deletes `compute_anchor_multiclip` + `motion_features_seamaware` from the package source
+  entirely** (active source carries zero retired B2 code) and **inlines** their assembly logic
+  into the kept single-source diagnostic so it stays runnable; plus a repo-wide reference sweep,
+  deletes `_scratch-008-b2-spike/`, and removes the orphaned cross-take fixtures
+  (`multiclip/chrome/`, `multiclip/safari/`) while keeping the single-source fixture
+  (`multiclip/chrome-singlesource/`).

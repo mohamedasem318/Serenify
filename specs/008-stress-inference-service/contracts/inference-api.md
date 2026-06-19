@@ -74,10 +74,12 @@ been recorded). Called ~every 10 s. **Non-blocking**: the handler runs the CPU-b
 decode+tail-extract in a threadpool (FastAPI `def` handler / `run_in_threadpool`) so
 concurrent windows don't serialize on the event loop; the **client** keeps its single
 continuous recorder running and uploads on its own timer regardless of this response
-(FR-016, SC-007). ⚠ The server's decode-to-tail cost **grows with elapsed session
-time** (it re-decodes the growing clip to reach the trailing 60 s; bounded by the 5-min
-cap, negligible on localhost) — see research R-5 for the keep-up flag + the deferred
-rolling decoded-frame buffer.
+(FR-016, SC-007). ⚠ Keep-up has **two** components (research R-5): the server's
+**decode-to-tail** cost **grows with elapsed session time** (it re-decodes the growing
+clip to reach the trailing 60 s; bounded by the 5-min cap, negligible on localhost;
+mitigation = the deferred rolling decoded-frame buffer), and the **constant per-window
+extract** (MediaPipe + LBP) is a separate fixed cost the buffer does **not** touch — see
+research R-5 for the full keep-up flag (and the droplet-phase-out caveat).
 
 **Request**: `multipart/form-data`, field `clip` = the **contiguous recording-so-far**
 (`video/webm` or `video/mp4`), matching the `/anchor` upload shape. It is the literal

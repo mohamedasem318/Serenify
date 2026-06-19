@@ -95,7 +95,7 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
 # Backend + first predict_delta test
 pytest apps/api/tests/test_monitoring_endpoints.py apps/api/tests/test_inference_service.py apps/api/tests/test_smoothing.py
 pytest packages/ml-video/tests/test_predict_delta.py
-pytest packages/ml-video/tests/test_tail_window.py         # pins the tail-window option (last-60 s bound; reduces to compute_anchor for ≤60 s)
+pytest packages/ml-video/tests/test_tail_window.py         # pins the tail-window option: file-global-grid suffix invariant (faithful-by-construction guard) + reduces to compute_anchor for ≤60 s
 pytest packages/ml-video/tests/test_webm_vfr_fidelity.py   # scheduled hardening (not a ship blocker)
 
 # Frontend

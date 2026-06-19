@@ -3598,3 +3598,61 @@ entries).
 
 **Revisit at**: production deployment scale-up (when the deferred rolling decoded-frame buffer /
 WebSocket push becomes worth building).
+
+---
+
+## 2026-06-19 — feature 008 corrective docs/tasks pass: enforce "faithful by construction", complete the keep-up reasoning, make the B2 retirement non-breaking
+
+**Status**: Accepted (docs + `tasks.md` correction; **no code, no decision reversal**). A
+pre-`/speckit-analyze` cleanup of three gaps found in the re-issued `tasks.md` + `research.md`
+after the *continuous single-stream* windowing decision (prior entry). The windowing decision is
+**not** reopened (continuous single-stream stays adopted); **D-1, D-2 (continuous), D-3, D-4, the
+seven mock-gap resolutions, the 0.53 re-threshold, and Principles I/V/VI/VII are untouched.**
+
+**Three gaps closed:**
+
+1. **"Faithful by construction" is now an *enforced* invariant, not an assumption.** The pivot
+   rests on the tail-extract sampling on **one file-global grid (anchored at the file's t=0)** and
+   keeping the trailing 60 s — so the kept tail frames are exactly the *suffix* of the full-file
+   keep-set. B2 failed precisely because the grid was **re-zeroed per segment**
+   (`CAP_PROP_POS_MSEC` reset to 0). Nothing in the task list stopped a future change — most
+   likely the **deferred rolling decoded-frame buffer** (R-5) — from reintroducing that
+   re-zeroing, and T006 only asserted the tail frames fell in the right *range* (a re-zeroed grid
+   satisfies the range while picking the *wrong frames inside it*). **Fix**: `tasks.md` T005 now
+   mandates compute-global-then-filter with an explicit prohibition on trim/seek-and-resample;
+   T006 adds a deterministic, **CI-runnable integer-index suffix-equality invariant** on synthetic
+   VFR timestamps (no video, no tolerance) that any future incremental/buffered decoder must keep
+   passing; `research.md` R-5 ties faithfulness to the preserved global grid + this enforcement.
+   This is **not** the retired multi-clip fidelity gate — it is exact integer-index equality on
+   identical source frames.
+
+2. **Keep-up reasoning corrected and completed.** (a) The budget bar was understated — decode must
+   fit `(10 s − extract)` ≈ **5–7 s / ~43–60× realtime** at the 5-min cap, not the full 10 s /
+   ~30×. (b) Keep-up has **two** components: *growing decode-to-tail* (O(elapsed) — the rolling
+   buffer fixes it) **and** *constant per-window extract* (MediaPipe + LBP, ~10–15 s/window
+   projected on the droplet — the buffer does **not** touch it; an extract-bound breach calls for
+   slower cadence or GPU MediaPipe, not the buffer). `research.md` R-5 + `tasks.md` T008/T009 now
+   split the diagnosis, and T008 records decode-to-tail and extract times **separately**. All
+   droplet figures are flagged **indicative only** — the droplet is being phased out (Azure student
+   credits / HuggingFace), so production keep-up must be re-evaluated against the chosen target.
+
+3. **B2 retirement (T004) made complete and non-breaking.** The kept single-source diagnostic
+   `tests/helpers/singlesource_fidelity.py` **imports `compute_anchor_multiclip`**, so the blind
+   removal the old T004 described would break the very file that records *why* B2 was rejected.
+   T004 now: **deletes `compute_anchor_multiclip` + `motion_features_seamaware` from the package
+   source entirely** (resolution **(a)** — the active source carries **zero** retired B2 code),
+   **inlines** the assembly logic they contained into the kept diagnostic so it stays runnable,
+   runs a **repo-wide reference sweep**, deletes the `_scratch-008-b2-spike/` harness, and removes
+   the **orphaned cross-take** fixtures (`multiclip/chrome/`, `multiclip/safari/`) while keeping
+   the **single-source** fixture (`multiclip/chrome-singlesource/`) as evidence.
+
+**Files changed (docs/tasks only — no feature code, no test/fixture code, no model artifact, no
+`model_version` bump)**: `specs/008-stress-inference-service/tasks.md` (T003, T004, T005, T006,
+T008, T009), `specs/008-stress-inference-service/research.md` (R-5), `docs/DECISIONS.md` (this
+entry), `docs/CHANGELOG.md`.
+
+**References**: the windowing decision (prior entry — *B2 REJECTED; adopt continuous
+single-stream*), research R-5/R-7, the single-source diagnostic finding.
+
+**Revisit at**: `/speckit-analyze`; then at implementation of T005/T006 (the invariant guard) and
+of the deferred rolling decoded-frame buffer (which must pass the T006 invariant).

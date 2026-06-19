@@ -386,6 +386,17 @@ the features. It **reuses** the exact decode + sampler + feature math; for a ≤
 reduces to `compute_anchor` unchanged. This is **smaller** than the retired
 `compute_anchor_multiclip` (no concatenation, no seam-aware motion).
 
+**Faithfulness is grid-dependent — and now enforced, not assumed.** "Faithful by construction"
+holds **only** while the tail-window option preserves the **file-global sampling grid**: it must
+sample the whole decoded stream on the grid anchored at the file's **t=0** and then *filter* to the
+trailing window — it must **never** re-zero `CAP_PROP_POS_MSEC` by seeking/trimming to the last 60 s
+and re-sampling the sub-stream (the per-clip phase reset that sank B2, offsetting samples by up to
+½ the 400 ms period). With the grid preserved, the kept tail frames are **exactly the suffix** of
+the full-file keep-set. This invariant is **enforced by the T006 regression test** (exact
+integer-index suffix-equality on synthetic VFR timestamps — deterministic, CI-runnable, no video),
+which the **deferred rolling decoded-frame buffer** (below) and any future incremental/buffered
+decoder MUST continue to pass — so the optimization can be *validated* rather than *trusted*.
+
 **Retired (B2 artifacts — kept in git history, removed from the active path)**:
 `compute_anchor_multiclip`, `motion_features_seamaware`, `test_multiclip_fidelity.py`, and the
 multi-clip frame-concat **HARD GATE**. The **single-source diagnostic**
@@ -430,17 +441,39 @@ each upload is fire-and-forget; a slow server decode+extract for one window neve
 next upload, and each window is processed independently (threadpool) server-side. (This matters
 more here than under B2 — see the growing-cost flag.)
 
-**⚠ Known cost — growing decode-to-tail (flagged)**: each stride re-uploads + re-decodes the
-**whole recording-so-far**, so upload size and server decode work **grow over the session**,
-bounded by the **5-minute hard cap**. Real Chrome webm is **VFR** and VFR seek is unreliable, so
-reaching the tail means **sequential decode from the start** of the growing file each stride. At
-the 5-min cap that is ~300 s of video decoded per stride; to stay inside the 10 s stride the CPU
-must decode at **≥ ~30× realtime** — plausible for low-res webcam video, **not guaranteed for
-720p VP9 on the DigitalOcean droplet** (the same CPU that makes MediaPipe ~3–5 s/window).
-Late-session strides may exceed 10 s. **Bounded, not fatal**: FR-016 non-blocking means capture
-continues and only the *reading cadence* degrades toward end-of-session; the 5-min cap bounds the
-worst case; **localhost (dev/demo) is unaffected**. The (now lighter) windowing validation
-measures exactly this (R-7).
+**⚠ Known cost — keep-up has TWO components (flagged; arithmetic + diagnosis corrected
+2026-06-19 corrective pass)**: each stride re-uploads + re-decodes the **whole recording-so-far**,
+so the per-stride server time grows over the session, bounded by the **5-minute hard cap**.
+Whether it stays inside the 10 s stride depends on **two distinct costs**, and **only one of them
+is fixed by the deferred buffer** — so a breach must be attributed before reaching for a lever:
+
+- **(a) Growing decode-to-tail — O(elapsed); the rolling buffer fixes this.** Real Chrome webm is
+  **VFR** and VFR seek is unreliable, so reaching the tail means **sequential decode from the
+  start** of the growing file each stride. At the 5-min cap that is ~300 s of video decoded per
+  stride. **The budget bar is tighter than a naïve 10 s**: the same stride must *also* fit the
+  constant per-window extract (~3–5 s MediaPipe + LBP on Kaggle CPU, per MODEL_HANDOFF.md), so
+  decode must complete within `(10 s − extract)` ≈ **5–7 s**, i.e. **~43–60× realtime** at the
+  5-min cap — **not** the ~30× / full-10 s an earlier draft stated (that figure wrongly allocated
+  the entire stride to decode). Plausible for low-res webcam video; **not guaranteed for 720p
+  VP9** on a slow CPU. This is the component the **deferred server-side rolling decoded-frame
+  buffer** removes (decode only the newest increment → O(stride)).
+- **(b) Constant per-window extract — O(1) per window; the buffer does NOT touch this.** MediaPipe
+  + LBP is a fixed per-window cost regardless of session length. MODEL_HANDOFF.md projects
+  **~10–15 s/window** on the DigitalOcean droplet (2–3× the Kaggle CPU) — which **alone exceeds
+  the 10 s stride**, *even with a perfect decode buffer*. On such a target the correct lever is
+  **not** the buffer but a **slower reading cadence** (FR-016 non-blocking + D-3 smoothing already
+  tolerate variable arrival) or **GPU MediaPipe**. An extract-bound breach must **not** be
+  misdiagnosed as "the decode buffer is needed."
+
+**Bounded, not fatal**: FR-016 non-blocking means capture continues and only the *reading cadence*
+degrades toward end-of-session; the 5-min cap bounds the worst case; **localhost (dev/demo) is
+unaffected**. The (now lighter) windowing validation measures **both components separately**
+(R-7, T008) so a breach can be attributed (T009) without re-running the session.
+
+**⚠ Deploy-target caveat**: every number above is pinned to the **DigitalOcean droplet, which is
+being phased out** in favour of **Azure student credits / HuggingFace**. The production keep-up
+question (both components) MUST be **re-evaluated against the actually-chosen deploy target**
+before relying on long sessions — these droplet figures are indicative, not the production budget.
 
 **Deferred optimization (unchanged — not built now)**: a **server-side rolling decoded-frame
 buffer** — retain the trailing 60 s of sampled frames and decode only the **newest increment**
