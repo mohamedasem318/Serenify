@@ -82,6 +82,7 @@ class FakeClient:
         self.anchor_payload = anchor_payload
         self.sessions: dict[str, dict] = {}
         self.inserts: list[dict] = []
+        self.updates: list[dict] = []
         self.rpc_calls: list[str] = []
         self._seq = 0
 
@@ -104,6 +105,15 @@ class FakeClient:
         if table == "monitoring_sessions" and op == "select":
             sid = filters.get("id")
             return _Resp([self.sessions[sid]] if sid in self.sessions else [])
+        if table == "monitoring_sessions" and op == "update":
+            # RLS update-own: only an OWNED (visible) session matches; an unknown OR
+            # another user's id resolves to no row, exactly as the select-own gate does.
+            sid = filters.get("id")
+            if sid not in self.sessions:
+                return _Resp([])
+            self.sessions[sid].update(row)
+            self.updates.append({"table": table, "row": row, "filters": filters})
+            return _Resp([self.sessions[sid]])
         if table == "window_readings" and op == "insert":
             # Mirror the real I/O boundary: window_readings withholds
             # label/stress_probability from the SELECT whitelist, so a representation
@@ -300,3 +310,164 @@ def test_window_wrong_media_type_returns_415(client, monkeypatch):
     )
     assert resp.status_code == 415
     assert resp.json()["error"] == "unsupported_media_type"
+
+
+# ── lifecycle: PATCH status + end (US2 slice / T037) ────────────────────────────
+#
+# Covers the happy-path transitions (pause/resume/out-of-frame, end+reason), the
+# ended-session 409 (both PATCH-on-ended and end-on-ended — a terminal session can't
+# transition), RLS update-own denial of an unknown/another-user's session (→ 404), and
+# the on-end eviction of the per-session in-memory smoothing buffer (no memory leak).
+# Transitions only move `status`/`ended_at`/`end_reason` on the OWNED row under RLS
+# update-own; camera control is client-side. The real router / require_employee /
+# supabase_user / inference buffer run against the fake's RLS-modelled boundary.
+
+
+def _patch_status(client, session_id, status, *, sub=SUB):
+    return client.patch(
+        f"/monitoring/sessions/{session_id}",
+        json={"status": status},
+        headers=_auth(make_token(sub=sub)),
+    )
+
+
+def _end_session(client, session_id, *, reason=None, sub=SUB):
+    body = {"reason": reason} if reason is not None else {}
+    return client.post(
+        f"/monitoring/sessions/{session_id}/end",
+        json=body,
+        headers=_auth(make_token(sub=sub)),
+    )
+
+
+def test_patch_session_pauses_then_resumes(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+
+    paused = _patch_status(client, sid, "paused")
+    assert paused.status_code == 200, paused.text
+    assert paused.json() == {"session_id": sid, "status": "paused"}
+    assert fake.sessions[sid]["status"] == "paused"  # written through RLS update-own
+
+    resumed = _patch_status(client, sid, "active")
+    assert resumed.status_code == 200
+    assert resumed.json() == {"session_id": sid, "status": "active"}
+    assert fake.sessions[sid]["status"] == "active"
+
+
+def test_patch_session_out_of_frame(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    resp = _patch_status(client, sid, "out_of_frame")
+    assert resp.status_code == 200
+    assert resp.json() == {"session_id": sid, "status": "out_of_frame"}
+    assert fake.sessions[sid]["status"] == "out_of_frame"
+
+
+def test_patch_rejects_ended_status_target_422(client, monkeypatch):
+    # 'ended' is /end's job, never a PATCH target — the Pydantic body bars it up front.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    assert _patch_status(client, sid, "ended").status_code == 422
+    assert _patch_status(client, sid, "bogus").status_code == 422
+
+
+def test_patch_ended_session_returns_409(client, monkeypatch):
+    # Cannot transition a terminal (ended) session — clean 409, not a 500.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    assert _end_session(client, sid).status_code == 200
+    resp = _patch_status(client, sid, "paused")
+    assert resp.status_code == 409
+    assert resp.json() == {"error": "ended_session"}
+
+
+def test_patch_unknown_or_foreign_session_returns_404(client, monkeypatch):
+    # RLS update-own: an unknown OR another user's session is not visible → 404 (SC-004 —
+    # a caller can never patch a session that isn't their own).
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    _install_fake(monkeypatch, fake)
+    resp = _patch_status(client, "sess-does-not-exist", "paused")
+    assert resp.status_code == 404
+
+
+def test_patch_non_employee_returns_403(client, monkeypatch):
+    fake = FakeClient(role="team_lead", anchor_payload=_anchor_payload())
+    _install_fake(monkeypatch, fake)
+    resp = _patch_status(client, "sess-1", "paused")
+    assert resp.status_code == 403
+    assert resp.json() == {"error": "forbidden_role"}
+
+
+def test_patch_requires_auth(client):
+    assert client.patch("/monitoring/sessions/sess-1", json={"status": "paused"}).status_code == 401
+
+
+def test_end_session_marks_ended_default_reason_user(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    resp = _end_session(client, sid)  # empty body → default reason="user"
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["session_id"] == sid
+    assert "ended_at" in body
+    assert fake.sessions[sid]["status"] == "ended"
+    assert fake.sessions[sid]["end_reason"] == "user"
+    assert fake.sessions[sid]["ended_at"] is not None
+
+
+def test_end_session_with_auto_absence_reason(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    resp = _end_session(client, sid, reason="auto_absence")
+    assert resp.status_code == 200
+    assert fake.sessions[sid]["status"] == "ended"
+    assert fake.sessions[sid]["end_reason"] == "auto_absence"
+
+
+def test_end_already_ended_session_returns_409(client, monkeypatch):
+    # Ending an already-ended session is a clean 409, not a 500.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    assert _end_session(client, sid).status_code == 200
+    resp = _end_session(client, sid)
+    assert resp.status_code == 409
+    assert resp.json() == {"error": "ended_session"}
+
+
+def test_end_unknown_or_foreign_session_returns_404(client, monkeypatch):
+    # RLS update-own: an unknown OR another user's session is not visible → 404.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    _install_fake(monkeypatch, fake)
+    resp = _end_session(client, "sess-does-not-exist")
+    assert resp.status_code == 404
+
+
+def test_end_evicts_in_memory_smoothing_buffer(client, monkeypatch):
+    # On end the per-session deque(maxlen=4) buffer MUST be evicted so ended sessions
+    # don't leak server memory (the docstring contract on _SessionBuffers.drop).
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 120.0)
+    monkeypatch.setattr(ml_video, "compute_anchor",
+                        lambda _p, tail_seconds=None: np.zeros(FEATURE_DIM))
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=0.10))
+
+    _post_window(client, sid)
+    _post_window(client, sid)
+    assert inference.buffers.scored_count(sid) == 2  # buffer populated by scored windows
+
+    assert _end_session(client, sid).status_code == 200
+    assert inference.buffers.scored_count(sid) == 0  # evicted on end — no leak
+
+
+def test_end_non_employee_returns_403(client, monkeypatch):
+    fake = FakeClient(role="team_lead", anchor_payload=_anchor_payload())
+    _install_fake(monkeypatch, fake)
+    resp = _end_session(client, "sess-1")
+    assert resp.status_code == 403
+    assert resp.json() == {"error": "forbidden_role"}
+
+
+def test_end_requires_auth(client):
+    assert client.post("/monitoring/sessions/sess-1/end").status_code == 401
