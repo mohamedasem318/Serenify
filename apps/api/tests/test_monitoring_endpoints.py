@@ -44,9 +44,10 @@ class _Query:
         self._op = "select"
         return self
 
-    def insert(self, row):
+    def insert(self, row, *, returning="representation"):
         self._op = "insert"
         self._row = row
+        self._returning = returning
         return self
 
     def update(self, fields):
@@ -59,7 +60,10 @@ class _Query:
         return self
 
     def execute(self):
-        return self._fake._execute(self._table, self._op, self._row, self._filters)
+        return self._fake._execute(
+            self._table, self._op, self._row, self._filters,
+            returning=getattr(self, "_returning", "representation"),
+        )
 
 
 class _Rpc:
@@ -87,7 +91,7 @@ class FakeClient:
     def rpc(self, fn):
         return _Rpc(self, fn)
 
-    def _execute(self, table, op, row, filters):
+    def _execute(self, table, op, row, filters, returning="representation"):
         if table == "profiles" and op == "select":
             return _Resp([{"role": self.role}] if self.role else [])
         if table == "monitoring_sessions" and op == "insert":
@@ -101,8 +105,16 @@ class FakeClient:
             sid = filters.get("id")
             return _Resp([self.sessions[sid]] if sid in self.sessions else [])
         if table == "window_readings" and op == "insert":
+            # Mirror the real I/O boundary: window_readings withholds
+            # label/stress_probability from the SELECT whitelist, so a representation
+            # read-back is denied (42501). The score path MUST use return=minimal.
+            if str(returning) != "minimal":
+                raise AssertionError(
+                    "window_readings insert must use return=minimal — a representation "
+                    "read-back is denied by the SELECT column whitelist (42501)"
+                )
             self.inserts.append({"table": table, "row": row})
-            return _Resp([{"id": "reading-x", **row}])
+            return _Resp([])  # minimal → PostgREST returns no representation
         raise AssertionError(f"unexpected DB op: {table}.{op} filters={filters!r}")
 
 

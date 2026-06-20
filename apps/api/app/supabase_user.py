@@ -24,6 +24,7 @@ from typing import Any
 
 import numpy as np
 from ml_video import FEATURE_DIM
+from postgrest import ReturnMethod
 from supabase import Client, create_client
 
 from .config import Settings
@@ -118,13 +119,25 @@ def insert_reading(
     skip_cause: str | None = None,
     label: int | None = None,
     stress_probability: float | None = None,
-) -> dict[str, Any]:
+) -> None:
     """Persist one window reading as the caller (RLS insert-own; the insert WITH
     CHECK also requires an owned `session_id`).
 
     `label` + `stress_probability` are the SERVER-ONLY raw signal: the INSERT grant
     includes them so the API writes them, but the SELECT whitelist withholds them, so
     the owner can never read them back (FR-015 enforced structurally).
+
+    The insert MUST request ``return=minimal``. PostgREST's default (``return=
+    representation``) reads the just-inserted row back with ``INSERT … RETURNING`` over
+    EVERY column, and that read-back is subject to the SELECT column whitelist — which
+    deliberately withholds ``label`` + ``stress_probability`` from ``authenticated``. So
+    the default representation read-back is denied (``42501 permission denied for table
+    window_readings``) on EVERY scored/skipped window, 500-ing the whole score loop. The
+    server never needs the row back (the smoothing buffer is in memory; the raw signal is
+    write-only here), so ``minimal`` is both the correct and the only viable mode — it
+    respects the whitelist rather than fighting it. ``insert_session`` keeps the default
+    because ``monitoring_sessions`` grants SELECT on all columns (its read-back is fine,
+    and the router uses the returned ``id``).
     """
     row: dict[str, Any] = {
         "session_id": session_id,
@@ -136,5 +149,4 @@ def insert_reading(
         "label": label,
         "stress_probability": stress_probability,
     }
-    resp = client.table(READINGS_TABLE).insert(row).execute()
-    return resp.data[0]
+    client.table(READINGS_TABLE).insert(row, returning=ReturnMethod.minimal).execute()

@@ -47,7 +47,17 @@ class _Table:
         self._client = client
         self._name = name
 
-    def insert(self, row):
+    def insert(self, row, *, returning="representation"):
+        # Mirror the real PostgREST I/O boundary: window_readings withholds
+        # label/stress_probability from the SELECT whitelist, so a representation
+        # read-back (INSERT … RETURNING *) is denied with 42501. The score path MUST
+        # insert with return=minimal — this fake fails loudly otherwise, so the bug
+        # (default representation → 500 on every window) can never silently return.
+        if self._name == "window_readings" and str(returning) != "minimal":
+            raise AssertionError(
+                "window_readings insert must use return=minimal — a representation "
+                "read-back is denied by the SELECT column whitelist (42501)"
+            )
         self._client.inserts.append({"table": self._name, "row": row})
         return _InsertExec(row)
 
