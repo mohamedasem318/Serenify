@@ -37,9 +37,9 @@ const isProd = process.env.NODE_ENV === "production";
   }
 })();
 
-// Deny-by-default Permissions-Policy. camera is relaxed to (self) on the two
-// capture routes only (feature 004, DECISION-16); microphone stays denied
-// everywhere — audio is feature 013, not 004.
+// Deny-by-default Permissions-Policy. camera is relaxed to (self) on the capture
+// routes only (feature 004, DECISION-16; + the feature-008 monitoring stage);
+// microphone stays denied everywhere — audio is feature 013, not 004.
 const PERMISSIONS_POLICY_BASE =
   "microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()";
 const PERMISSIONS_POLICY_CAMERA_DENIED = `camera=(), ${PERMISSIONS_POLICY_BASE}`;
@@ -93,8 +93,14 @@ function securityHeaders(permissionsPolicy: string) {
   ];
 }
 
-// The two routes that host the anchor recorder (onboarding step + recalibrate).
-const CAPTURE_ROUTES = ["/onboarding", "/app/calibrate"];
+// The routes that run getUserMedia and therefore need camera=(self): the anchor
+// recorder (onboarding step + recalibrate) and the feature-008 live
+// stress-monitoring stage. Everywhere else stays camera=(). A new capture route
+// MUST be added here AND to the negative-lookahead exclusion below (and to
+// `isCaptureRoute` in proxy.ts for the on-device detector WASM) — feature 008
+// originally registered /app/monitor in none of them, so getUserMedia was rejected
+// by the inherited camera=() policy despite a granted permission.
+const CAPTURE_ROUTES = ["/onboarding", "/app/calibrate", "/app/monitor"];
 
 const nextConfig: NextConfig = {
   // DEV SERVER ONLY — ignored in production builds (`next build` does not read
@@ -120,7 +126,7 @@ const nextConfig: NextConfig = {
       // Everywhere else: camera=(). The negative lookahead excludes the capture
       // routes (and any subpaths) so there is no Permissions-Policy overlap.
       {
-        source: "/((?!onboarding|app/calibrate).*)",
+        source: "/((?!onboarding|app/calibrate|app/monitor).*)",
         headers: securityHeaders(PERMISSIONS_POLICY_CAMERA_DENIED),
       },
     ];
