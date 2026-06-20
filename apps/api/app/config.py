@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 from functools import lru_cache
 
-from pydantic import AliasChoices, Field
+from pydantic import AliasChoices, Field, ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -94,4 +94,29 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    try:
+        return Settings()
+    except ValidationError as exc:
+        # Translate Pydantic's stack trace into one actionable line at boot. This
+        # does NOT relax any requirement (the Phase-3 D-1/D-4 posture stands — every
+        # field below is still required) — it only tells the operator WHICH env var
+        # is missing/invalid and WHERE to set it, instead of a raw `pydantic_core`
+        # ValidationError. Field names map 1:1 to UPPER_SNAKE env vars (.env.example).
+        missing: list[str] = []
+        invalid: list[str] = []
+        for err in exc.errors():
+            env = str(err["loc"][0]).upper() if err.get("loc") else "<unknown>"
+            if err.get("type") == "missing":
+                missing.append(env)
+            else:
+                invalid.append(f"{env} ({err.get('msg', 'invalid')})")
+        lines = ["Serenify API cannot start - its configuration is incomplete."]
+        if missing:
+            lines.append(
+                "Missing required environment variable(s): "
+                + ", ".join(missing)
+                + " - add them to apps/api/.env (see apps/api/.env.example)."
+            )
+        if invalid:
+            lines.append("Invalid value(s): " + "; ".join(invalid) + ".")
+        raise RuntimeError(" ".join(lines)) from exc
