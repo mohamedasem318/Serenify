@@ -98,6 +98,38 @@ describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => 
   });
 });
 
+describe("OpSurfaces — FR-024 reassurance footnote (active reading card)", () => {
+  // The in-product reassurance line (resolves /speckit-analyze U1: FR-024 had no
+  // authoritative placement). Quiet, muted footnote on the live reading card only.
+  const REASSURANCE = /processed just for you\s*—\s*analyzed, then deleted/i;
+
+  it("shows the muted reassurance footnote on every active band and while warming up", () => {
+    for (const state of [
+      { op: "warming-up", band: null, skipCause: null },
+      { op: "active", band: "at_ease", skipCause: null },
+      { op: "active", band: "a_little_tense", skipCause: null },
+      { op: "active", band: "tense", skipCause: null },
+    ] as MonitorState[]) {
+      const { unmount } = render0(state);
+      const line = screen.getByText(REASSURANCE);
+      expect(line).toBeInTheDocument();
+      // The muted/secondary token — NOT a semantic alert colour (amber/foggy/meadow/crimson).
+      expect(line.className).toContain("text-muted");
+      expect(line.className).not.toMatch(/amber|foggy|meadow|crimson|red/);
+      unmount();
+    }
+  });
+
+  it("is absent on the calibrate-first and permission panels", () => {
+    const { rerender } = render0({ op: "calibrate-first", band: null, skipCause: null });
+    expect(screen.queryByText(REASSURANCE)).toBeNull();
+    rerender(
+      <OpSurfaces state={{ op: "permission", band: null, skipCause: null }} onAllow={noop} onRetryBlocked={noop} />,
+    );
+    expect(screen.queryByText(REASSURANCE)).toBeNull();
+  });
+});
+
 describe("OpSurfaces — calibrate-first (no-anchor): foggy attention + meadow 'Start calibration'", () => {
   it("renders the calibrate-first panel and routes its CTA to the calibration entry, no number", () => {
     const { container } = render0({ op: "calibrate-first", band: null, skipCause: null });

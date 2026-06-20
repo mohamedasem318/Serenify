@@ -31,9 +31,13 @@ import {
  *  - amber appears ONLY on the stress bands (a-little-tense / tense statelines).
  * NO number/gauge anywhere — the bloom is ambient and the band is the only signal (FR-015).
  *
- * The FR-024 reassurance line is the permission panel's "Your manager never sees your
- * video." — its copy + placement trace to the mock (it lives on the permission surface;
- * the mock shows no separate reassurance line on the active surface).
+ * FR-024 reassurance has TWO authoritative homes, one per surface:
+ *  - permission panel → "Your manager never sees your video." (who sees it; traces to the mock);
+ *  - active reading card → "Processed just for you — analyzed, then deleted." (what happens to
+ *    it — the Principle I privacy-by-architecture line). This second placement resolves
+ *    /speckit-analyze U1 (FR-024 had no authoritative home on the live surface); the mock is
+ *    intent-only, so the active footnote is a deliberate addition, not a deviation. It is a
+ *    quiet MUTED footnote (never a stress/attention colour) and never a number (FR-015).
  */
 
 const STATELINE_CLASS: Record<StatelineTone, string> = {
@@ -164,6 +168,11 @@ function LiveStage({ state }: { state: MonitorState }) {
       </p>
       <p className="mt-1.5 max-w-[42ch] text-base text-muted">{d.sub}</p>
       {state.skipCause && <SkipNote cause={state.skipCause} />}
+      {/* FR-024 reassurance footnote — bottom of the reading card, below the band (constitution:
+          all text lives in the card, never on the raw video). Quiet MUTED secondary token, small
+          and low-emphasis; mt-8 keeps clear of the band so it reads as a calm footnote, not an
+          alert. Shown on every live state (warming-up + bands) — not on calibrate-first/permission. */}
+      <p className="mt-8 text-xs text-muted">Processed just for you — analyzed, then deleted.</p>
     </div>
   );
 }
