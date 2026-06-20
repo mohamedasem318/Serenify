@@ -89,6 +89,11 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const { op } = state;
 
   const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+  // The live stream is surfaced as STATE (not only the ref) so the srcObject binding is
+  // reactive — it re-binds whenever the element or the stream changes, instead of only at
+  // mount-time via the callback ref (the "pill stuck until alt-tab" bug). The ref is kept
+  // for synchronous reads (stop/recorder), the state drives the bind-and-play effect.
+  const [stream, setStream] = useState<MediaStream | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [elapsed, setElapsed] = useState(0);
@@ -98,6 +103,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const recorderRef = useRef<WindowRecorderHandle | null>(null);
   const sessionIdRef = useRef<string | null>(null);
   const tokenRef = useRef<string | null>(null);
+  // Synchronous in-flight guard for session-create: set BEFORE the first await so two
+  // concurrent acquire attempts (double-click / a re-trigger) can't each pass the
+  // sessionIdRef reuse check and spawn a second session (the "two POST /sessions" bug).
+  const creatingRef = useRef(false);
   const facePresentRef = useRef(false);
   const guideRef = useRef<"loading" | "active" | "unavailable">("loading");
   const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
@@ -121,13 +130,27 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
 
   const attachVideo = useCallback((node: HTMLVideoElement | null) => {
     videoElRef.current = node;
-    if (node && streamRef.current) node.srcObject = streamRef.current;
+    // Surface the element as state so the bind-and-play effect below re-runs on mount; the
+    // effect (not this callback) owns srcObject so a stream that arrives AFTER the element
+    // is also bound (the alt-tab/focus dependency is removed).
     setVideoEl(node);
   }, []);
+
+  // Bind srcObject + start playback REACTIVELY: keyed on both the element and the stream,
+  // so the self-view lights up the instant the stream is ready — no focus/visibility event
+  // needed — and re-binds if either changes. autoPlay alone proved unreliable when
+  // srcObject is assigned during the same commit, so play() is called explicitly.
+  useEffect(() => {
+    if (!videoEl || !stream) return;
+    if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
+    const played = videoEl.play?.();
+    if (played && typeof played.catch === "function") played.catch(() => {});
+  }, [videoEl, stream]);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
+    setStream(null);
   }, []);
 
   // One reading out per (gated) stride. Fire-and-forget: never block the recorder; a
@@ -183,19 +206,30 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     // orphan sessions.
     let sessionId = sessionIdRef.current;
     if (!sessionId) {
-      const session = await deps.getSession();
-      if (!session) {
-        dispatch({ type: "CAMERA_BLOCKED" });
-        return;
+      // Single-create guard: a create is already in flight (a near-simultaneous second
+      // acquire) → bail without starting a second session or opening a second camera. The
+      // first call owns this entry; exactly one session is created per monitoring entry.
+      if (creatingRef.current) return;
+      creatingRef.current = true;
+      try {
+        const session = await deps.getSession();
+        if (!session) {
+          dispatch({ type: "CAMERA_BLOCKED" });
+          return;
+        }
+        tokenRef.current = session.accessToken;
+        const created = await deps.createSession(session.accessToken);
+        if (!created.ok) {
+          dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
+          return;
+        }
+        sessionIdRef.current = created.sessionId;
+        sessionId = created.sessionId;
+      } finally {
+        // Cleared on every exit (success OR an error return) so a later retry can create
+        // again; the in-flight window is only the span of the awaits above.
+        creatingRef.current = false;
       }
-      tokenRef.current = session.accessToken;
-      const created = await deps.createSession(session.accessToken);
-      if (!created.ok) {
-        dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
-        return;
-      }
-      sessionIdRef.current = created.sessionId;
-      sessionId = created.sessionId;
     }
 
     // Only NOW open the camera — after a confirmed 201. A getUserMedia rejection maps by
@@ -211,8 +245,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     }
 
     streamRef.current = stream;
+    setStream(stream); // drive the reactive bind-and-play effect
     telemetryRef.current = emptyTelemetry();
-    setStreaming(true); // mounts the <video>; attachVideo wires srcObject
+    setStreaming(true); // mounts the <video>; the bind-and-play effect wires srcObject + play()
     setPinned(true); // show the self-view at once — the user sees themselves as capture starts
     dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
 

@@ -17,8 +17,8 @@ vi.mock("@/lib/face-detect/use-framing-guide", () => ({
 }));
 
 // happy-dom type-validates HTMLMediaElement.srcObject (a real browser accepts a real
-// MediaStream; our fake stream isn't one). Shim the setter to a no-op for the test env —
-// production assigns a genuine MediaStream and is unaffected.
+// MediaStream; our fake stream isn't one) and ships no real play(). Shim both for the test
+// env — production assigns a genuine MediaStream and calls the real play().
 beforeAll(() => {
   Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
     configurable: true,
@@ -26,6 +26,11 @@ beforeAll(() => {
       return null;
     },
     set() {},
+  });
+  Object.defineProperty(HTMLMediaElement.prototype, "play", {
+    configurable: true,
+    writable: true,
+    value: () => Promise.resolve(),
   });
 });
 
@@ -156,5 +161,73 @@ describe("MonitoringSession orchestrator", () => {
     expect(cta).toHaveAttribute("href", "/app/calibrate");
     // FR-015 holds here too — no number/gauge anywhere on the dead-end recovery.
     expect(container.textContent ?? "").not.toMatch(/[0-9]/);
+  });
+
+  it("creates exactly one session when acquire is triggered twice concurrently (single-create guard)", async () => {
+    // The two-POST /monitoring/sessions bug: a near-simultaneous second acquire (double
+    // click / re-trigger) used to pass the sessionIdRef reuse check before the first create
+    // resolved → two sessions, a leaked second recorder. The in-flight guard must collapse
+    // both triggers onto ONE create and ONE camera open.
+    const { deps } = makeDeps([{ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } }]);
+    render(<MonitoringSession deps={deps} />);
+    const btn = screen.getByRole("button", { name: /allow camera access/i });
+
+    await act(async () => {
+      fireEvent.click(btn);
+      fireEvent.click(btn); // fired before the first create resolves
+    });
+
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect(deps.getUserMedia).toHaveBeenCalledTimes(1); // exactly one camera opened
+  });
+
+  it("binds the self-view srcObject and plays on stream-ready (no focus event needed)", async () => {
+    // The "pill stuck until alt-tab" bug: srcObject was bound only by the mount-time
+    // callback ref and never played, so the preview didn't light up until a focus/visibility
+    // event forced a re-render. The reactive effect must bind the acquired stream and call
+    // play() as soon as the stream is ready.
+    let bound: unknown;
+    const originalSrcObject = Object.getOwnPropertyDescriptor(
+      HTMLMediaElement.prototype,
+      "srcObject",
+    );
+    Object.defineProperty(HTMLMediaElement.prototype, "srcObject", {
+      configurable: true,
+      get() {
+        return bound;
+      },
+      set(v) {
+        bound = v;
+      },
+    });
+    const playSpy = vi.fn(() => Promise.resolve());
+    Object.defineProperty(HTMLMediaElement.prototype, "play", {
+      configurable: true,
+      writable: true,
+      value: playSpy,
+    });
+
+    const fakeStream = { getTracks: () => [{ stop: () => {} }] } as unknown as MediaStream;
+    const { deps } = makeDeps([{ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } }]);
+    deps.getUserMedia = vi.fn(async () => fakeStream);
+
+    try {
+      render(<MonitoringSession deps={deps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+      });
+
+      expect(bound).toBe(fakeStream); // the exact acquired stream is bound to the <video>
+      expect(playSpy).toHaveBeenCalled(); // and playback is started without a focus event
+    } finally {
+      if (originalSrcObject) {
+        Object.defineProperty(HTMLMediaElement.prototype, "srcObject", originalSrcObject);
+      }
+      Object.defineProperty(HTMLMediaElement.prototype, "play", {
+        configurable: true,
+        writable: true,
+        value: () => Promise.resolve(),
+      });
+    }
   });
 });
