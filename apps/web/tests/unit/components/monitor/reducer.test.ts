@@ -13,13 +13,33 @@ import {
 
 describe("monitorReducer — state transitions (US1 op-states)", () => {
   it("starts at permission with no band", () => {
-    expect(initialMonitorState).toEqual({ op: "permission", band: null, skipCause: null });
+    expect(initialMonitorState).toEqual({
+      op: "permission",
+      band: null,
+      skipCause: null,
+      cameraError: null,
+    });
   });
 
   it("camera granted → warming-up; blocked → blocked; no-anchor → calibrate-first", () => {
     expect(monitorReducer(initialMonitorState, { type: "CAMERA_GRANTED" }).op).toBe("warming-up");
     expect(monitorReducer(initialMonitorState, { type: "CAMERA_BLOCKED" }).op).toBe("blocked");
     expect(monitorReducer(initialMonitorState, { type: "NO_ANCHOR" }).op).toBe("calibrate-first");
+  });
+
+  it("CAMERA_ERROR carries the mapped camera-access kind onto the blocked surface", () => {
+    // The mapped getUserMedia rejection (busy / no-device / blocked) drives honest copy —
+    // no generic "blocked" catch-all (FR-022).
+    for (const kind of ["blocked", "busy", "no-device"] as const) {
+      const s = monitorReducer(initialMonitorState, { type: "CAMERA_ERROR", kind });
+      expect(s.op).toBe("blocked");
+      expect(s.cameraError).toBe(kind);
+    }
+    // CAMERA_BLOCKED (secure-context / session-create failure) is the generic "blocked" kind.
+    expect(monitorReducer(initialMonitorState, { type: "CAMERA_BLOCKED" }).cameraError).toBe("blocked");
+    // Re-requesting permission clears the prior camera error.
+    const blocked = monitorReducer(initialMonitorState, { type: "CAMERA_ERROR", kind: "busy" });
+    expect(monitorReducer(blocked, { type: "REQUEST_PERMISSION" }).cameraError).toBeNull();
   });
 
   it("HOLDS warming-up while the server keeps returning warming_up (no band yet)", () => {

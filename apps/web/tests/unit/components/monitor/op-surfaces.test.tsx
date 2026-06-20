@@ -71,6 +71,19 @@ describe("OpSurfaces — blocked (foggy attention)", () => {
     fireEvent.click(screen.getByRole("button", { name: /try again/i }));
     expect(onRetry).toHaveBeenCalled();
   });
+
+  it("shows honest per-cause copy — no generic 'blocked' catch-all (FR-022)", () => {
+    const { rerender } = render(
+      <OpSurfaces state={{ op: "blocked", band: null, skipCause: null, cameraError: "busy" }} onAllow={noop} onRetryBlocked={noop} />,
+    );
+    expect(screen.getByText(/camera.s in use/i)).toBeInTheDocument();
+    expect(screen.queryByText(/camera access is blocked/i)).toBeNull();
+
+    rerender(
+      <OpSurfaces state={{ op: "blocked", band: null, skipCause: null, cameraError: "no-device" }} onAllow={noop} onRetryBlocked={noop} />,
+    );
+    expect(screen.getByText(/no camera found/i)).toBeInTheDocument();
+  });
 });
 
 describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => {

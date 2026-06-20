@@ -105,6 +105,40 @@ describe("MonitoringSession orchestrator", () => {
     expect(await screen.findByText(/camera access is blocked/i)).toBeInTheDocument();
   });
 
+  it("maps the getUserMedia rejection by err.name to honest copy (no generic block)", async () => {
+    const cases = [
+      { name: "NotReadableError", copy: /camera.s in use/i },
+      { name: "NotFoundError", copy: /no camera found/i },
+    ] as const;
+    for (const { name, copy } of cases) {
+      const { deps } = makeDeps([]);
+      deps.getUserMedia = vi.fn(async () => {
+        throw new DOMException(name, name);
+      });
+      const view = render(<MonitoringSession deps={deps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+      });
+      expect(await screen.findByText(copy)).toBeInTheDocument();
+      view.unmount();
+    }
+  });
+
+  it("acquire-late: a no-anchor employee never triggers a camera prompt (getUserMedia not called)", async () => {
+    const { deps } = makeDeps([]);
+    // 409 no_anchor at create-session — BEFORE any getUserMedia (the camera must not open).
+    deps.createSession = vi.fn(async () => ({ ok: false, kind: "no_anchor" }) as const);
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+
+    expect(await screen.findByText(/calibrate first/i)).toBeInTheDocument();
+    // The defining acquire-late property: the camera is never requested without a 201.
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+  });
+
   it("routes a no-anchor employee (create-session 409) to the calibrate-first panel", async () => {
     const { deps } = makeDeps([]);
     // The backend runs the calibrate-first guard UP FRONT: an uncalibrated employee gets

@@ -34,20 +34,37 @@ export type MonitorOp =
   | "blocked" // camera blocked / busy / no device
   | "calibrate-first"; // no_anchor → the calibrate-first panel routes to /app/calibrate (op-surfaces)
 
+/**
+ * Which camera-access failure the blocked surface explains — mapped from the
+ * getUserMedia rejection's `err.name` (mirrors `use-anchor-recorder.cameraErrorKind`,
+ * minus the `camera-` prefix). No generic "blocked" catch-all: each cause gets honest
+ * copy (FR-022). A generic / non-getUserMedia block (secure-context, session-create
+ * failure) is `"blocked"`.
+ */
+export type CameraErrorKind = "blocked" | "busy" | "no-device";
+
 export interface MonitorState {
   op: MonitorOp;
   /** The last smoothed band (kept across a skip so the bloom holds it). Null until the first reading. */
   band: Band | null;
   /** Transient skipped-read cause (refined client-side); cleared on the next reading/warming. */
   skipCause: FailureCause | null;
+  /** Which camera-access failure to explain on the blocked surface; null when not blocked. */
+  cameraError?: CameraErrorKind | null;
 }
 
-export const initialMonitorState: MonitorState = { op: "permission", band: null, skipCause: null };
+export const initialMonitorState: MonitorState = {
+  op: "permission",
+  band: null,
+  skipCause: null,
+  cameraError: null,
+};
 
 export type MonitorAction =
   | { type: "REQUEST_PERMISSION" }
   | { type: "CAMERA_GRANTED" } // camera live AND session created → start warming up
-  | { type: "CAMERA_BLOCKED" }
+  | { type: "CAMERA_BLOCKED" } // generic block (secure-context / session-create failure)
+  | { type: "CAMERA_ERROR"; kind: CameraErrorKind } // mapped getUserMedia rejection (err.name)
   | { type: "NO_ANCHOR" }
   | { type: "WINDOW_OUTCOME"; outcome: WindowOutcome }
   | { type: "WINDOW_SKIPPED"; cause: FailureCause };
@@ -55,13 +72,15 @@ export type MonitorAction =
 export function monitorReducer(state: MonitorState, action: MonitorAction): MonitorState {
   switch (action.type) {
     case "REQUEST_PERMISSION":
-      return { ...state, op: "permission" };
+      return { ...state, op: "permission", cameraError: null };
     case "CAMERA_GRANTED":
-      return { ...state, op: "warming-up" };
+      return { ...state, op: "warming-up", cameraError: null };
     case "CAMERA_BLOCKED":
-      return { ...state, op: "blocked" };
+      return { ...state, op: "blocked", cameraError: "blocked" };
+    case "CAMERA_ERROR":
+      return { ...state, op: "blocked", cameraError: action.kind };
     case "NO_ANCHOR":
-      return { ...state, op: "calibrate-first" };
+      return { ...state, op: "calibrate-first", cameraError: null };
     case "WINDOW_SKIPPED":
       // A skipped window keeps the last band (bloom holds) and shows the foggy skip
       // note; op is unchanged (still warming-up, or still active).

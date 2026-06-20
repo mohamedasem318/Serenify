@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 
 import type { FailureCause } from "@/components/anchor/cause-chip";
+import { cameraErrorKind } from "@/components/anchor/use-anchor-recorder";
 import {
   accumulate,
   dominantCause,
@@ -24,7 +25,7 @@ import { createClient } from "@/lib/supabase/client";
 
 import { CameraPill } from "./camera-pill";
 import { OpSurfaces } from "./op-surfaces";
-import { useMonitoringSession } from "./use-monitoring-session";
+import { type CameraErrorKind, useMonitoringSession } from "./use-monitoring-session";
 import { Viewfinder } from "./viewfinder";
 import {
   createWindowRecorder,
@@ -162,36 +163,57 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   );
 
   const handleAllow = useCallback(async () => {
+    // "Try again" / fresh start: fully release any prior recorder + stream BEFORE
+    // re-requesting, so a lingering track can't make the next getUserMedia fail "busy"
+    // (the stuck-blocked symptom). Mirrors the calibration recorder's acquire/release
+    // discipline (anchor-recorder.tsx).
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    stopStream();
+
     if (!deps.isSecureContext()) {
       dispatch({ type: "CAMERA_BLOCKED" }); // webcam needs HTTPS / localhost
       return;
     }
+
+    // Confirm a SESSION before opening the camera (acquire-late): the calibrate-first
+    // guard runs UP FRONT, so an uncalibrated employee (409 no_anchor) is routed out
+    // WITHOUT ever triggering a camera prompt — never a fabricated/global anchor (SC-004).
+    // Reuse an already-created session on retry so a blocked-camera retry doesn't spawn
+    // orphan sessions.
+    let sessionId = sessionIdRef.current;
+    if (!sessionId) {
+      const session = await deps.getSession();
+      if (!session) {
+        dispatch({ type: "CAMERA_BLOCKED" });
+        return;
+      }
+      tokenRef.current = session.accessToken;
+      const created = await deps.createSession(session.accessToken);
+      if (!created.ok) {
+        dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
+        return;
+      }
+      sessionIdRef.current = created.sessionId;
+      sessionId = created.sessionId;
+    }
+
+    // Only NOW open the camera — after a confirmed 201. A getUserMedia rejection maps by
+    // err.name to honest copy (NotReadableError → busy, NotFound/Overconstrained →
+    // no-device, NotAllowed/Security/else → blocked) — no generic catch-all.
     let stream: MediaStream;
     try {
       stream = await deps.getUserMedia({ video: true, audio: false }); // mic off (audio is feature 013)
-    } catch {
-      dispatch({ type: "CAMERA_BLOCKED" });
+    } catch (err) {
+      const kind = cameraErrorKind(err).replace("camera-", "") as CameraErrorKind;
+      dispatch({ type: "CAMERA_ERROR", kind });
       return;
     }
-    const session = await deps.getSession();
-    if (!session) {
-      stream.getTracks().forEach((t) => t.stop());
-      dispatch({ type: "CAMERA_BLOCKED" });
-      return;
-    }
-    tokenRef.current = session.accessToken;
-    // Calibrate-first guard runs UP FRONT (before any window is recorded): a no-anchor
-    // caller is routed out, never a fabricated/global anchor (SC-004).
-    const created = await deps.createSession(session.accessToken);
-    if (!created.ok) {
-      stream.getTracks().forEach((t) => t.stop());
-      dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
-      return;
-    }
-    sessionIdRef.current = created.sessionId;
+
     streamRef.current = stream;
     telemetryRef.current = emptyTelemetry();
     setStreaming(true); // mounts the <video>; attachVideo wires srcObject
+    setPinned(true); // show the self-view at once — the user sees themselves as capture starts
     dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
 
     const recorder = createWindowRecorder({
@@ -202,11 +224,13 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     });
     recorderRef.current = recorder;
     recorder.start();
-  }, [deps, dispatch, handleWindow]);
+  }, [deps, dispatch, handleWindow, stopStream]);
 
   const handleRetryBlocked = useCallback(() => {
-    dispatch({ type: "REQUEST_PERMISSION" });
-  }, [dispatch]);
+    // Fully release, then re-request: handleAllow stops any prior tracks at its top and
+    // re-acquires getUserMedia (reusing the already-created session).
+    void handleAllow();
+  }, [handleAllow]);
 
   // Session timer (chrome) — ticks once recording begins.
   useEffect(() => {
@@ -216,7 +240,19 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     return () => clearInterval(id);
   }, [op]);
 
-  // Release the camera + recorder on unmount (privacy; no leaked stream).
+  // Release the camera + recorder whenever we leave a live capture state (→ blocked /
+  // calibrate-first / permission): stop every track and null the stream ref, so no camera
+  // light is left on after a calibrate round-trip. (Under acquire-late the camera only
+  // ever opens once op is live, so this is the standing guarantee that a non-live op never
+  // holds the camera — it does not setState, only releases external resources.)
+  useEffect(() => {
+    if (op === "warming-up" || op === "active") return;
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    stopStream();
+  }, [op, stopStream]);
+
+  // Release the camera + recorder on unmount / route navigation (privacy; no leaked stream).
   useEffect(
     () => () => {
       recorderRef.current?.stop();

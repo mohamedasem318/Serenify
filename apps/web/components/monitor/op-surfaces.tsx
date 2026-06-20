@@ -7,7 +7,12 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 import { Bloom } from "./bloom";
-import { liveDisplay, type MonitorState, type StatelineTone } from "./use-monitoring-session";
+import {
+  liveDisplay,
+  type CameraErrorKind,
+  type MonitorState,
+  type StatelineTone,
+} from "./use-monitoring-session";
 
 /**
  * The monitoring stage surfaces — US1 SUBSET (feature 008, T030 + the calibrate-first
@@ -19,9 +24,9 @@ import { liveDisplay, type MonitorState, type StatelineTone } from "./use-monito
  *  - permission = MEADOW — an affirmative "let's start" invitation (meadow icon + the
  *    meadow "Allow camera access" CTA), NOT an error;
  *  - blocked = FOGGY icon (attention), neutral "Try again";
- *  - calibrate-first = FOGGY icon (attention — the mock draws it as a `.panel.blocked`)
- *    with a MEADOW "Start calibration" CTA (the mock's `btn-primary`): a forward,
- *    affirmative next step — never an error, never amber;
+ *  - calibrate-first = MEADOW icon (calm/affirmative — calibration is a forward next
+ *    step, not an error) with a MEADOW "Start calibration" CTA (the mock's `btn-primary`):
+ *    the whole panel reads as an invitation, never an error, never amber/foggy;
  *  - the skipped-read note = FOGGY (a couldn't-read, never amber);
  *  - amber appears ONLY on the stress bands (a-little-tense / tense statelines).
  * NO number/gauge anywhere — the bloom is ambient and the band is the only signal (FR-015).
@@ -56,17 +61,44 @@ function PermissionPanel({ onAllow }: { onAllow: () => void }) {
   );
 }
 
-function BlockedPanel({ onRetry }: { onRetry: () => void }) {
+/**
+ * Honest per-`err.name` copy for the three camera-access failures (FR-022; mirrors the
+ * calibration recorder's CameraAccessState). FOGGY attention, never amber — the camera
+ * isn't a stress signal. No generic "blocked" catch-all: a busy device and a missing
+ * device each get their own gentle fix.
+ */
+const CAMERA_ERROR_COPY: Record<CameraErrorKind, { heading: string; body: string }> = {
+  blocked: {
+    heading: "Camera access is blocked",
+    body:
+      "Serenify can’t start a check-in without it. Re-enable camera access for this site in your browser settings, then try again.",
+  },
+  busy: {
+    heading: "Your camera’s in use",
+    body:
+      "Another app or browser tab may have the camera open. Close it, then try again.",
+  },
+  "no-device": {
+    heading: "No camera found",
+    body: "Serenify couldn’t find a camera. Connect one, then try again.",
+  },
+};
+
+function BlockedPanel({
+  kind,
+  onRetry,
+}: {
+  kind: CameraErrorKind;
+  onRetry: () => void;
+}) {
+  const { heading, body } = CAMERA_ERROR_COPY[kind];
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
       <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
         <CameraOff className="size-7" strokeWidth={1.75} aria-hidden />
       </span>
-      <h2 className="font-display text-2xl text-ink">Camera access is blocked</h2>
-      <p className="text-pretty text-base leading-relaxed text-muted">
-        Serenify can&apos;t start a check-in without it. Re-enable camera access for this site in
-        your browser settings, then try again.
-      </p>
+      <h2 className="font-display text-2xl text-ink">{heading}</h2>
+      <p className="text-pretty text-base leading-relaxed text-muted">{body}</p>
       <div className="mt-5">
         <Button onClick={onRetry} variant="outline" className="h-12 px-6 text-base">
           Try again
@@ -78,15 +110,15 @@ function BlockedPanel({ onRetry }: { onRetry: () => void }) {
 
 /**
  * No stored anchor (create-session 409 `no_anchor`): the employee must calibrate FIRST —
- * no global/fabricated baseline is ever substituted (SC-004). Traced to the mock's
- * `#op-noanchor`: a FOGGY attention icon (its `.panel.blocked` role — you need to act
- * before a read is possible, NOT stress, so never amber) with a MEADOW "Start
- * calibration" CTA (its `btn-primary`) — a forward, affirmative next step.
+ * no global/fabricated baseline is ever substituted (SC-004). Calibration is a forward,
+ * affirmative next step (not stress, not an error), so the icon takes the MEADOW
+ * semantic token (calm/affirmative — matching its MEADOW "Start calibration" CTA), never
+ * a hardcoded hex and never amber/foggy.
  */
 function CalibrateFirstPanel() {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
-      <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
+      <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-meadow/15 text-meadow">
         <CircleDashed className="size-7" strokeWidth={1.75} aria-hidden />
       </span>
       <h2 className="font-display text-2xl text-ink">Calibrate first</h2>
@@ -149,7 +181,7 @@ export function OpSurfaces({
     case "permission":
       return <PermissionPanel onAllow={onAllow} />;
     case "blocked":
-      return <BlockedPanel onRetry={onRetryBlocked} />;
+      return <BlockedPanel kind={state.cameraError ?? "blocked"} onRetry={onRetryBlocked} />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
     default:
