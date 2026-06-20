@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CameraOff } from "lucide-react";
+import { Camera, CameraOff, CircleDashed } from "lucide-react";
 
 import { CauseChip } from "@/components/anchor/cause-chip";
 import { Button } from "@/components/ui/button";
@@ -10,14 +10,18 @@ import { Bloom } from "./bloom";
 import { liveDisplay, type MonitorState, type StatelineTone } from "./use-monitoring-session";
 
 /**
- * The monitoring stage surfaces — US1 SUBSET (feature 008, T030): permission /
- * warming-up / active (live band) / blocked / the skipped-read note. Paused,
- * out-of-frame, and calibrate-first are US2/US3 (T036+/T044) and are NOT built here.
+ * The monitoring stage surfaces — US1 SUBSET (feature 008, T030 + the calibrate-first
+ * patch): permission / warming-up / active (live band) / blocked / the skipped-read
+ * note / calibrate-first (no-anchor). Paused and out-of-frame are US2 (T036+) and are
+ * NOT built here.
  *
- * Colour discipline (Principle V, traced to the approved mock):
+ * Colour discipline (Principle V, roles taken verbatim from the approved mock):
  *  - permission = MEADOW — an affirmative "let's start" invitation (meadow icon + the
  *    meadow "Allow camera access" CTA), NOT an error;
  *  - blocked = FOGGY icon (attention), neutral "Try again";
+ *  - calibrate-first = FOGGY icon (attention — the mock draws it as a `.panel.blocked`)
+ *    with a MEADOW "Start calibration" CTA (the mock's `btn-primary`): a forward,
+ *    affirmative next step — never an error, never amber;
  *  - the skipped-read note = FOGGY (a couldn't-read, never amber);
  *  - amber appears ONLY on the stress bands (a-little-tense / tense statelines).
  * NO number/gauge anywhere — the bloom is ambient and the band is the only signal (FR-015).
@@ -72,6 +76,36 @@ function BlockedPanel({ onRetry }: { onRetry: () => void }) {
   );
 }
 
+/**
+ * No stored anchor (create-session 409 `no_anchor`): the employee must calibrate FIRST —
+ * no global/fabricated baseline is ever substituted (SC-004). Traced to the mock's
+ * `#op-noanchor`: a FOGGY attention icon (its `.panel.blocked` role — you need to act
+ * before a read is possible, NOT stress, so never amber) with a MEADOW "Start
+ * calibration" CTA (its `btn-primary`) — a forward, affirmative next step.
+ */
+function CalibrateFirstPanel() {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
+      <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
+        <CircleDashed className="size-7" strokeWidth={1.75} aria-hidden />
+      </span>
+      <h2 className="font-display text-2xl text-ink">Calibrate first</h2>
+      <p className="text-pretty text-base leading-relaxed text-muted">
+        Serenify needs a quick one-minute baseline before it can read your stress.
+      </p>
+      <div className="mt-5">
+        {/* Plain <a> (NOT next/link): a full document navigation is REQUIRED so
+            /app/calibrate loads under its own `camera=(self)` Permissions-Policy — the
+            same idiom the calibration banner uses. A client-side <Link> would keep the
+            monitor route's camera policy active and break getUserMedia on arrival. */}
+        <Button asChild variant="meadow" className="h-12 px-6 text-base">
+          <a href="/app/calibrate">Start calibration</a>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** A skipped read: the bloom holds the last band; a calm FOGGY note names a likely
  *  cause + gentle fix via the shared CauseChip. Never amber (it's attention, not stress). */
 function SkipNote({ cause }: { cause: React.ComponentProps<typeof CauseChip>["cause"] }) {
@@ -117,9 +151,7 @@ export function OpSurfaces({
     case "blocked":
       return <BlockedPanel onRetry={onRetryBlocked} />;
     case "calibrate-first":
-      // US3 / T044 owns the calibrate-first panel + "Start calibration" routing. US1's
-      // test uses a calibrated account, so this branch is a seam only — not rendered here.
-      return null;
+      return <CalibrateFirstPanel />;
     default:
       // warming-up | active — the live bloom stage.
       return <LiveStage state={state} />;

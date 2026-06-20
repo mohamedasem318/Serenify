@@ -15,7 +15,7 @@ import type { Band, WindowOutcome } from "@/lib/api/monitoring-client";
  *
  *   permission ──camera granted + session created──▶ warming-up
  *   permission ──camera blocked / unavailable─────▶ blocked
- *   permission ──no anchor (409)──────────────────▶ calibrate-first (US3/T044 surface; seam only)
+ *   permission ──no anchor (409)──────────────────▶ calibrate-first (the no-anchor panel; op-surfaces)
  *   warming-up ──server still "warming_up"────────▶ warming-up   (HELD until the server stops)
  *   warming-up ──first "reading"──────────────────▶ active (band shown)
  *   active     ──"reading"────────────────────────▶ active (band updates)
@@ -32,7 +32,7 @@ export type MonitorOp =
   | "warming-up" // recording, no confident band yet (held until the server stops)
   | "active" // a smoothed band is showing
   | "blocked" // camera blocked / busy / no device
-  | "calibrate-first"; // no_anchor — US3/T044 owns the surface; here it is a seam only
+  | "calibrate-first"; // no_anchor → the calibrate-first panel routes to /app/calibrate (op-surfaces)
 
 export interface MonitorState {
   op: MonitorOp;

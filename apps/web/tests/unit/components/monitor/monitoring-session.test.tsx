@@ -104,4 +104,23 @@ describe("MonitoringSession orchestrator", () => {
     });
     expect(await screen.findByText(/camera access is blocked/i)).toBeInTheDocument();
   });
+
+  it("routes a no-anchor employee (create-session 409) to the calibrate-first panel", async () => {
+    const { deps } = makeDeps([]);
+    // The backend runs the calibrate-first guard UP FRONT: an uncalibrated employee gets
+    // 409 no_anchor on create-session, before any window is recorded (SC-004).
+    deps.createSession = vi.fn(async () => ({ ok: false, kind: "no_anchor" }) as const);
+    const { container } = render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+
+    // The seam now renders the panel instead of dead-ending on a blank stage.
+    expect(await screen.findByText(/calibrate first/i)).toBeInTheDocument();
+    const cta = screen.getByRole("link", { name: /start calibration/i });
+    expect(cta).toHaveAttribute("href", "/app/calibrate");
+    // FR-015 holds here too — no number/gauge anywhere on the dead-end recovery.
+    expect(container.textContent ?? "").not.toMatch(/[0-9]/);
+  });
 });

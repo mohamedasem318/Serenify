@@ -85,9 +85,15 @@ describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => 
   });
 });
 
-describe("OpSurfaces — calibrate-first is a US3 seam (not rendered in US1)", () => {
-  it("renders nothing for calibrate-first", () => {
+describe("OpSurfaces — calibrate-first (no-anchor): foggy attention + meadow 'Start calibration'", () => {
+  it("renders the calibrate-first panel and routes its CTA to the calibration entry, no number", () => {
     const { container } = render0({ op: "calibrate-first", band: null, skipCause: null });
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByText(/calibrate first/i)).toBeInTheDocument();
+    expect(screen.getByText(/one-minute baseline/i)).toBeInTheDocument();
+    // The CTA is the existing calibration entry — a plain <a> (full-document nav for the
+    // /app/calibrate camera Permissions-Policy), so it surfaces as a link, not a button.
+    const cta = screen.getByRole("link", { name: /start calibration/i });
+    expect(cta).toHaveAttribute("href", "/app/calibrate");
+    expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
   });
 });
