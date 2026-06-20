@@ -35,6 +35,7 @@ deferred. Recorded in ``docs/DECISIONS.md`` 2026-06-20.)
 
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 from collections import OrderedDict, deque
@@ -48,6 +49,8 @@ from supabase import Client
 from ..schemas import ReadingOutcome, SkippedOutcome, WarmingUpOutcome
 from ..supabase_user import get_my_anchor, insert_reading
 from .smoothing import N, smooth
+
+logger = logging.getLogger(__name__)
 
 # The 60 s window is LOCKED by Constitution Principle II (NON-NEGOTIABLE) / FR-002 — it is
 # not a tunable threshold (unlike the config operating point / tense band), so it is a
@@ -97,6 +100,13 @@ class _SessionBuffers:
             self._store.popitem(last=False)  # evict the least-recently-used session
         return list(buf)
 
+    def scored_count(self, session_id: str) -> int:
+        """How many scored ``proba[1]`` are currently buffered for this session (0 if none).
+
+        Read-only — used by the DEBUG per-window decision log (never reads the DB)."""
+        buf = self._store.get(session_id)
+        return len(buf) if buf is not None else 0
+
     def drop(self, session_id: str) -> None:
         """Forget a session's buffer (call on End — US2 / T036)."""
         self._store.pop(session_id, None)
@@ -118,6 +128,35 @@ def _coarse_cause(exc: FeatureExtractionError) -> str:
     if getattr(exc, "code", None) == "insufficient_face_frames":
         return "insufficient-face"
     return "our-side"
+
+
+def _debug_window(
+    session_id: str, *, probe_s: float, decision: str, reason: str, scored: int
+) -> None:
+    """DEBUG-only, per-window decision trace (quiet by default — emits only when this
+    logger is at DEBUG). SERVER-SIDE ONLY: nothing here reaches the HTTP client.
+
+    The gap that let the live no-reading ship was that only finalized fixtures were
+    exercised through this path, and there was no per-window visibility into what the
+    server actually decided on the live un-finalized stream. This line lets a supervised
+    smoke confirm, per window, whether the server emits ``reading`` / ``warming_up`` /
+    ``skipped`` (and the cold-start ``scored/M`` progress) — so a future no-reading can be
+    pinned on the server vs the frontend without guessing. Wrapped so a logging error can
+    never affect scoring."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        logger.debug(
+            "window: session=%s probe_s=%.2f decision=%s reason=%s scored=%d/%d",
+            session_id,
+            probe_s,
+            decision,
+            reason,
+            scored,
+            N,
+        )
+    except Exception:  # noqa: BLE001 - diagnostics must never affect scoring
+        pass
 
 
 def score_window(
@@ -145,9 +184,18 @@ def score_window(
             fh.write(clip_bytes)
 
         # ── extraction (skipped on any FeatureExtractionError) ───────────────
+        recorded_s = -1.0  # for the DEBUG trace if the probe itself raises
         try:
-            if ml_video.probe_recorded_seconds(tmp_path) < WINDOW_SECONDS:
+            recorded_s = ml_video.probe_recorded_seconds(tmp_path)
+            if recorded_s < WINDOW_SECONDS:
                 # Gate (a): not yet a full 60 s window — no extraction, no persistence.
+                _debug_window(
+                    session_id,
+                    probe_s=recorded_s,
+                    decision="warming_up",
+                    reason="<60s (not scored)",
+                    scored=buffers.scored_count(session_id),
+                )
                 return WarmingUpOutcome(captured_at=captured_at)
             features = ml_video.compute_anchor(tmp_path, tail_seconds=WINDOW_SECONDS)
         except FeatureExtractionError as exc:
@@ -159,6 +207,13 @@ def score_window(
                 captured_at=captured_at.isoformat(),
                 scored=False,
                 skip_cause=cause,
+            )
+            _debug_window(
+                session_id,
+                probe_s=recorded_s,
+                decision="skipped",
+                reason=f"FeatureExtractionError:{cause}",
+                scored=buffers.scored_count(session_id),
             )
             return SkippedOutcome(cause=cause)
 
@@ -192,7 +247,21 @@ def score_window(
         )
 
         if reading.warming_up:
+            _debug_window(
+                session_id,
+                probe_s=recorded_s,
+                decision="warming_up",
+                reason="scored, cold-start buffer < M",
+                scored=len(recent),
+            )
             return WarmingUpOutcome(captured_at=captured_at)
+        _debug_window(
+            session_id,
+            probe_s=recorded_s,
+            decision="reading",
+            reason=f"scored>=M -> band={reading.band}",
+            scored=len(recent),
+        )
         return ReadingOutcome(band=reading.band, captured_at=captured_at)
     finally:
         # Principle I — the raw video never persists, on ANY outcome (reading / warming /
