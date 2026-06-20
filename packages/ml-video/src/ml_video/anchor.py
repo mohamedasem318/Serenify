@@ -17,7 +17,12 @@ from .features import (
     lbp_top_features,
     motion_features,
 )
-from .pipeline import _probe_timestamps, extract_landmarks
+from .pipeline import (
+    _FFmpegUnavailable,
+    _probe_timestamps,
+    extract_landmarks,
+    probe_global_timestamps_fast,
+)
 
 
 def probe_recorded_seconds(video_path) -> float:
@@ -29,19 +34,20 @@ def probe_recorded_seconds(video_path) -> float:
     locked by Constitution Principle II / FR-002 — partial windows are never scored). The
     server measures the duration itself rather than trusting any client-supplied value.
 
-    Reuses the decode pipeline's pass-1 timestamp probe (``_probe_timestamps``) — the same
-    grab-only pass ``extract_landmarks`` already uses — so the VFR ``CAP_PROP_POS_MSEC``
-    handling (reliable + monotonic on real Chrome webm) is shared, not re-copied
-    (Principle III). The span is ``timestamps[-1] - timestamps[0]`` (a near-zero start on a
-    continuous recording), so it measures the actual recorded length regardless of the
-    container's (often garbage) reported fps. Raises ``FeatureExtractionError`` if the clip
-    cannot be opened (the caller maps that to a skipped reading).
+    Uses the **cheap ffprobe packet read** (``probe_global_timestamps_fast`` — demux only, no
+    pixel decode), so the gate does NOT re-decode the whole growing clip every stride: this is
+    half of the feature-008 keep-up fix (the tail decode is the other half). The span is
+    ``timestamps[-1] - timestamps[0]`` (a near-zero start on a continuous recording), so it
+    measures the actual recorded length regardless of the container's (often garbage) reported
+    fps. Raises ``FeatureExtractionError`` if the clip cannot be read (caller → skipped reading).
 
-    (Under continuous upload this probe re-walks the growing clip each stride — an
-    O(elapsed) cost the deferred server-side rolling decoded-frame buffer would remove;
-    negligible on localhost, bounded by the 5-min session cap. See research R-5.)
+    Falls back to the whole-file grab probe (``_probe_timestamps``) only if the ffprobe binary
+    is absent — correct but O(elapsed); the host must install ffmpeg for keep-up (see README).
     """
-    _fps, _frame_count, _width, _height, timestamps_ms = _probe_timestamps(video_path)
+    try:
+        _fps, timestamps_ms = probe_global_timestamps_fast(video_path)
+    except _FFmpegUnavailable:
+        _fps, _frame_count, _width, _height, timestamps_ms = _probe_timestamps(video_path)
     if len(timestamps_ms) < 2:
         return 0.0
     return (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0

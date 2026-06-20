@@ -3768,3 +3768,58 @@ back-pressure. Logged in `docs/BACKLOG.md` (feature 008).
 **Revisit at**: production deploy (choose single-worker / session affinity / shared cache);
 and if write-integrity is ever enforced via the deferred INSERT-only role (the read path is
 unaffected — it never touches the DB for `proba`).
+
+## 2026-06-21 — feature 008 keep-up: SURGICAL O(stride) tail-decode (ffmpeg-CLI), full rolling buffer deferred
+
+**Status**: Accepted. Implements the deferred "server-side rolling decoded-frame buffer"
+keep-up item (plan.md / `docs/BACKLOG.md`) as a *surgical* O(stride) tail decode rather than
+the full per-session rolling buffer. Gated build — both fidelity (GATE 1) and keep-up (GATE 2)
+proven before commit.
+
+**Context (the breach)**: under continuous single-stream upload the server re-decoded the
+**whole growing recording-so-far** every window just to tail-extract its last 60 s — per-window
+decode **O(elapsed)**. The 2026-06-20 supervised smoke measured the live lag *growing* ~9 s/window
+to ~3 min behind (SC-001 missed). Two O(elapsed) walks: the `< 60 s` gate (`probe_recorded_seconds`
+→ whole-file grab) and the tail decode (`compute_anchor(tail_seconds=60)` → whole-file decode).
+
+**Investigation (the prescribed primitive does not exist; a faithful one does)**: "seek to a
+keyframe then decode forward" assumed OpenCV can seek — it **cannot** on an un-finalized
+MediaRecorder webm (no Cues index): `cap.set(POS_MSEC/POS_FRAMES)` returns `True` but is a
+**silent no-op that rewinds to t=0** (decode-after-"seek" reads the whole file). The realizable
+primitive: a cheap **ffprobe packet read** (demux only) for the file-global 2.5 fps grid +
+duration, then decode **only the bounded trailing window** — OpenCV native `cap.set` for mp4
+(seekable), an **`ffmpeg -c copy` lossless tail remux → OpenCV decode** for webm. A direct ffmpeg
+`bgr24` decode is NOT bit-identical to OpenCV (a YUV→BGR colourspace shift, Chrome cosine 0.999055
+— borderline); the `-c copy` remux keeps OpenCV as the decoder → **bit-identical (max|Δ|=0)**.
+
+**Decision**: ship the surgical tail decode in `ml-video` only — `pipeline._extract_landmarks_tail`
++ `probe_global_timestamps_fast`, dispatched from `extract_landmarks(tail_seconds=…)` and
+`anchor.probe_recorded_seconds`. **No change** to the upload contract, `score_window`, the
+smoothing/M=4 cold-start, the `(2958,)` shape check, the skip→`FeatureExtractionError` mapping,
+RLS, the SELECT whitelist, or JWT. **GATE 1**: bit-identical to the whole-file path on the real
+chrome+safari continuous fixtures (`tests/test_tail_seek_keepup.py`, local-only/ffmpeg-gated; CI
+suffix-invariant stays T006). **GATE 2**: per-window total **O(elapsed) 18→55 s (grows 3.1×) →
+O(stride) flat ~9–13 s**; the gate alone 3.2→15.3 s → 0.1–0.8 s.
+
+**Trade-offs (documented)**: (1) adds an **ffmpeg/ffprobe CLI** host dependency (Dockerfile +
+`apps/api/README.md`); **absent → graceful fallback** to the whole-file OpenCV decode (correct,
+O(elapsed)) so CI / degraded deploys keep working, **runs-but-fails on a clip → skipped window**
+(200), never 500. (2) The flat cost is still ~9–13 s on the dev laptop — partly the constant
+MediaPipe+LBP extract (R-5's separate lever: slower cadence / GPU) and partly the bounded decode;
+the **full rolling buffer** (decode only the new ~10 s increment → true O(stride) ~1.5 s) is the
+upgrade to build **only if** keep-up re-measured on the chosen deploy target breaches the stride
+there. Logged in `docs/BACKLOG.md` (feature 008 keep-up entry).
+
+**Rationale (surgical over the rolling buffer)**: bit-identical (GATE 1 at cosine 1.0) and
+**stateless** — no cross-window frame cache, no reused FaceMesh, so it avoids the continuity
+fidelity risk a rolling buffer would introduce and needs no extra fidelity proof; minimal; meets
+GATE 2 here. The rolling buffer's only gain is headroom for a slower deploy target not yet chosen
+or measured — not worth its complexity now.
+
+**References**: `pipeline.py` (`_extract_landmarks_tail`, `_decode_tail`,
+`probe_global_timestamps_fast`), `tests/test_tail_seek_keepup.py`, `tests/test_tail_window.py`
+(T006 CI guard), plan.md deferred-items, `docs/BACKLOG.md` (008 keep-up).
+
+**Revisit at**: production deploy — re-measure keep-up on the real target; build the full rolling
+decoded-frame buffer (and/or read-loop back-pressure) only if the surgical flat cost breaches the
+10 s stride there.
