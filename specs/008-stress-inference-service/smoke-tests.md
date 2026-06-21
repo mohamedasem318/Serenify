@@ -280,6 +280,355 @@ Run the web app over a secure context (`localhost`, or HTTPS via a tunnel for th
 | Date | Device / browser | STs run | Result | Notes |
 |---|---|---|---|---|
 | _pending_ | _e.g. iPhone 13 / Safari 17_ | ST-08-2, ST-08-10, ST-08-11 | _pending_ | run before production sign-off |
+| 2026-06-21 | Desktop · Chrome 149 · Win 11 | ST-08-1, ST-08-4 | PASS (w/ caveats) | operator Mohamed; account `smoke4@smoketest.com` (real anchor). See **Run 1** below. |
+
+### Run 1 — 2026-06-21, desktop Chrome 149 / Windows 11 (operator: Mohamed, agent-facilitated)
+
+Account `smoke4@smoketest.com` (real anchor calibrated with the operator's face). Backend up with
+`LOG_LEVEL=DEBUG` (per-window decision trace). Env: localhost (secure context); web↔API cross-origin
+(`NEXT_PUBLIC_API_URL=http://localhost:8000`), CORS allowed `http://localhost:3000`.
+
+- **ST-08-1 — Camera permission (Chrome, grant path): ✅ PASS.** Meadow "Allow camera access" panel
+  preceded the native prompt; **Allow registered on the first click** (a brief, normal getUserMedia
+  delay before the laptop's physical indicator lit — not a dead-spot); **self-view bound**;
+  **warming-up** ("getting a read on things") shown. Server: `POST /monitoring/sessions → 201`,
+  windows uploading on the ~10 s cadence. _Still to do:_ **deny** path, and Firefox / Edge / Safari.
+- **ST-08-4 — First smoothed reading + drift: ✅ PASS (functional), with a latency caveat.**
+  - **Content timeline correct:** warming-up held through probe_s 10→60 s (`<60s, not scored`), then
+    4 scored windows (`scored 1/4 … 4/4`) → **first band `at_ease` at probe_s ≈ 100 s** — within the
+    spec's 90–105 s **measured against recorded video**.
+  - **Wall-clock caveat (~2 min 33 s to first band):** recording start ≈ 23:43:53; first `reading`
+    response logged 23:46:26. The gap is **server decode lag** with a one-time spike — the first
+    window to cross 60 s triggered MediaPipe init (`TensorFlow Lite XNNPACK delegate`) **+ a full
+    ~70 s decode (~54 s alone)**; thereafter each window tail-decodes in ~10–15 s. **Keep-up is
+    bounded ~20–50 s (not unbounded growth)** — tail-decode holds. This is the documented R-5
+    decode lever / production-deploy concern, **but the first-band latency is real & user-visible
+    even on localhost** (prior notes assumed localhost unaffected). _Logged, not fixed._
+  - **Drift, not flicker: ✅** `at_ease` steady → `a_little_tense` only while the operator
+    deliberately frowned (two clusters, probe ≈ 340–350 s and 420–460 s) → back to `at_ease`;
+    smoothed (N=4), no per-window flipping. Model is **live and responsive** to expression.
+  - **No number/gauge: ✅** (code-confirmed in `session-trend.tsx` + bloom; operator confirmed).
+  - Tally over ~10 min: **54 `at_ease`, 7 `a_little_tense`, 0 `tense`, 0 skipped, 0 errors.**
+
+**Visual findings — `components/monitor/session-trend.tsx` "This session" trend (for the planning
+chat; NOT fixed this session):**
+1. **Oval markers (root cause found).** The SVG is `viewBox="0 0 100 40"` with
+   `preserveAspectRatio="none"` rendered into `h-[88px] w-full` (~830×88 px), so the X/Y scales
+   differ ~3.8×. Every `<circle>` — the n=1 `trend-dot` (r=2.6) **and** the `trend-peak` (r=3.2) —
+   stretches into a **wide horizontal ellipse (~53×14 px)** (`vectorEffect="non-scaling-stroke"`
+   fixes stroke only, not fill geometry). This is the "oval disk" at both the first point and the
+   peak.
+2. **Peak-marker color vs legend.** The peak dot is a fixed `var(--color-amber)` (the legend's
+   **Tense/orange**) whenever any tension (rank ≥ 1) is reached — but here the actual peak was only
+   `a_little_tense` (legend shows that as a blended yellow). **Position is correct** (mid-height for
+   a_little_tense) and the subtitle copy correctly read "A little tension creeping in," yet the
+   **orange dot reads as "Tense"** via the legend → color/legend inconsistency. (Confirmed: the
+   server logged **zero** `tense` bands all session.)
+3. **Line not colored by band.** Band is encoded by **height + legend**; the trend line is always
+   `var(--color-meadow)` (green) and only the peak gets an amber accent. Operator expected per-state
+   spike coloring; current design uses height only (design call — documented).
+
+- **ST-08-8 — End (PARTIAL — Pause/Resume not yet exercised).** Operator clicked End/Stop;
+  `POST …/end → 200`. The model reached genuine **`band=tense`** near the end (probe ≈ 871–961 s) —
+  **full band range confirmed**, and the amber peak marker is *correct* when tense is actually
+  reached. _Pause/Resume + the camera-light-off-on-Pause watch-item still to test (clean re-run
+  next session)._
+- **⚠️ Finding — post-End backlog scoring (correctness nit; planning chat).** After `POST …/end`
+  committed (00:00:25), **4 in-flight window uploads** captured *before* End but delayed by the
+  ~28 s decode backlog (probe 931/941/951/961) were still **scored and persisted** to the now-ended
+  session, **re-creating the smoothing buffer** that End's `buffers.drop()` had just evicted (trace
+  shows `scored 1/4…4/4` again, ending on `band=tense`). Cause: `submit_window`'s `status=="ended"`
+  409 guard runs in the async handler *before* the threadpool, so windows whose not-ended check
+  passed before End committed still run `score_window` — appending `window_readings` rows with
+  `captured_at` **after** `ended_at` and defeating the on-End eviction. Demo-harmless; flag for
+  recap data-integrity + the memory-eviction guarantee. Relates to the known BACKLOG-pileup note.
+- **⚠️ Finding — End shows an empty session container for a few seconds before routing to `/app`.**
+  Operator saw the page sit on an empty stage briefly post-End, then land on the dashboard.
+  `POST …/end` returned 200 quickly, so the lag is **client-side** (camera release + recorder flush +
+  backlog draining). Spec wants End → dashboard recap with no standalone screen; a multi-second empty
+  flash is a UX rough edge. _Capture a screenshot on the clean Pause/Resume/End re-run._
+- **ST-08-13 — privacy, temp-dir part: ✅ PASS.** After a ~16 min / ~90-window session the API temp
+  dir (`%TEMP%`) held **no** session clip files — every per-window `tmp*.webm` was deleted in
+  `finally`. (Only 2 pre-existing `tmp*.mp4` from 2026-06-16 remain — old hard-kill leftovers,
+  unrelated.) The DB-no-video columns + manager-RLS parts (ST-08-13 tables / ST-08-14) still to verify.
+- **⚠️ ST-08-9 — Finding: ended session missing from "today's check-in" at the local-midnight
+  boundary.** After End, the dashboard card showed **no** session. Root cause (DB-confirmed): the
+  session `started_at=2026-06-21T20:43Z` (**23:43 local**, UTC+3) and `ended_at=2026-06-21T21:00Z`
+  (**00:00 local, 06-22**) — it **crossed local midnight**. `getTodayRecap`/`getTodayTrend`
+  (`monitoring-reads.ts → localDayWindow`/`loadToday`) attribute a session to **`started_at`'s local
+  day** and filter `started_at ∈ [local-midnight-today, next-midnight)` using the *viewing* clock.
+  Viewed at ~00:0x on 06-22, a session that **started** 06-21 is outside "today" → excluded. 90
+  readings persisted correctly (59 at_ease / 18 a_little_tense / 7 tense / 6 warming); this is purely
+  a day-attribution edge case (would show fine if viewed before midnight, or for any same-day
+  session). Flag for the planning chat: decide whether a session that *ends* after midnight should
+  still appear under the day it started, or move to the new day. **ST-08-9 expand-in-place / agree /
+  no-number criteria are UNVERIFIED** (the empty card blocked them) — re-run with a fresh same-day
+  session.
+- _Note on the post-End backlog finding above: the late rows' `captured_at` (stamped at score_window
+  start) are just **before** `ended_at`, so ordering is fine — the nit is the **write to a
+  logically-ended session + buffer re-creation after `drop()`**, not future-dated rows._
+
+### Run 2 — 2026-06-22, iOS Safari, real iPhone (operator: Ahmed Sabry, via Mohamed; agent-facilitated)
+
+Env: 3 cloudflared quick tunnels (web / API / Supabase, `--protocol http2`); **dev-only**
+`allowedDevOrigins: "*.trycloudflare.com"` added to `next.config.ts` (**approved 2026-06-22 — to be
+reverted, never committed**); web `.env.local` `NEXT_PUBLIC_API_URL`/`NEXT_PUBLIC_SUPABASE_URL` →
+tunnels; API `.env` `ALLOWED_ORIGINS` += web-tunnel origin. Account `smoke7@smoketest.com`
+(agent-created auto-confirmed, employee, **own-face anchor** calibrated on-device).
+
+- **iOS load + login over the tunnel: ✅ PASS.** Real iPhone Safari loaded, hydrated, and logged in
+  over the HTTPS tunnel — **no dead-page / reload-loop**, so the Next 16 cross-origin dev block is
+  handled by the wildcard, and web↔Supabase-tunnel auth works. Phone hit the API tunnel `/healthz`
+  (200) — CORS OK from the device.
+- **ST-08-5 (calibrate-first) on iOS — partial:** the no-anchor account was routed to calibration
+  (no monitoring camera prompt / no band before an anchor existed). _Operator to confirm exact
+  calibrate-first surface copy._
+- **iOS calibration capture: ✅** `POST /anchor → 200` from the device; **recorded as `webm`**
+  (480×640 portrait/vp9; raw_decoded 1833 / kept 153) → extracted to a 2958-d anchor (`has_anchor=True`).
+  A single ~60 s upload **traversed the tunnel fine**. ⚠️ **This iPhone's Safari records `webm`, so
+  the fMP4 recorder _fallback_ is NOT exercised live** (matches T009; fMP4 only validated offline via
+  `?mime=mp4`). ⚠️ **~2 min processing delay** after recording (one-time MediaPipe XNNPACK init +
+  decode + large upload) — same R-5 / pre-warm lever as Run 1 #4.
+- **ST-08-2 (monitor capture → real readings): ⚠️ INCONCLUSIVE this run** (capture pipeline works;
+  no band reached). 3 sessions created back-to-back (142ac3b3 / 000eb22b / b8323a3d), each ran only
+  ~10–30 s before the operator was **"kicked out → had to sign in again."** All
+  `POST /monitoring/sessions → 201`; windows `POST → 200`, uploaded **as webm**, server-decoded →
+  `warming_up`; but **none reached the 60 s scoring gate → 0 readings** across all three. A band
+  needs ~100 s recorded + ~2 min decode lag, far longer than any session survived. **Neither a
+  WebKit capture failure (capture+upload+decode all worked) nor confirmed transport (the big >60 s
+  uploads were never reached)** — the proximate blocker is the kicked-out/re-login loop. Retry
+  pending (see below).
+- **⚠️ Finding (likely TEST-HARNESS artifact) — Safari "Reduce Protections" / ITP kicked-out.** The
+  device showed Safari's "reduce advanced privacy protections" banner and the session was repeatedly
+  lost (re-login). Likely Safari ITP partitioning our **3-separate-tunnel** setup (web / API /
+  Supabase on **different** domains = cross-site). Probably won't occur with a same-site production
+  topology — **but flag: verify the prod API/Supabase origins don't trip Safari ITP.**
+- **🐛 Finding (REAL product bug) — PATCH lifecycle transitions are CORS-blocked.**
+  `apps/api/app/main.py` `CORSMiddleware(allow_methods=["GET","POST","OPTIONS"])` **omits `PATCH`**, so
+  the browser preflight `OPTIONS /monitoring/sessions/{id}` → **400** (seen twice in the iOS log,
+  lines 21 & 35). The PATCH endpoint (`patch_session` — pause / resume / out-of-frame) therefore
+  **cannot be called from any cross-origin browser** (web→API is always cross-origin). **This breaks
+  ST-08-7 (out-of-frame auto-pause) and ST-08-8 (manual pause/resume) server-side status transitions
+  on EVERY browser, not just iOS.** Flag for fix; verify client behaviour when the PATCH fails.
+- **✅ Read-less honesty (SC-011) on iOS — PASS (incidental).** All 3 sessions were warming-only
+  (0 confident bands) → the dashboard read **"No clear read today,"** never calm/at-ease.
+- **✅ Intraday today-card on iOS — confirms the midnight theory.** A same-day session DID appear in
+  "today's check-in" ("1 check-in"), so the earlier desktop miss was purely the local-midnight cross.
+- **✅ One-active-session-per-user finalize:** session 000eb22b was auto-finalized as `abandoned`
+  when the next create arrived (last-tab-wins logic working).
+- **ST-08-2 retry with "Reduce Protections" ON → still kicked out (session bab80e66, ~30 s, still
+  warming).** Operator reproducibly reports **kicked out _when he frowned._** `patchStatus` catches
+  the CORS error → `{ok:false}` (no throw), so the PATCH bug *alone* shouldn't log a user out — the
+  exact client mechanism (out-of-frame PATCH path vs a downstream navigation vs Safari ITP session
+  loss) needs a fix-session repro. **Hypothesis:** frown → on-device out-of-frame/coverage flag →
+  the CORS-blocked `PATCH(out_of_frame)` → user-visible session loss. **Testable on DESKTOP**
+  (cross-origin PATCH is blocked there too) — fold into ST-08-7 / ST-08-8.
+- **🏁 iOS verdict — ST-08-2 = PENDING (environment + kicked-out-on-frown).** **PROVEN on iOS
+  Safari:** load, login, calibration capture (**webm**) + `/anchor` upload over the tunnel, monitor
+  session create + window upload (**webm**) + server decode (`warming_up`), read-less honesty,
+  intraday recap, one-active-session finalize. **UNPROVEN:** a real band on WebKit, and whether the
+  big >60 s uploads traverse the tunnel (no session survived long enough to test either). Revisit
+  after the PATCH-CORS fix (and ideally a same-site domain topology to remove the ITP variable).
+- **ST-08-2 neutral retries → reproducible ~100 s death; frown theory REFUTED.** Two more sessions
+  (9ade8486, c55b3eb9) with a **perfectly centered, neutral face both died at ~1:40 (100 s
+  wall-clock)**. Across ALL six iOS sessions the recorded content **never exceeded ~30 s** (3 windows)
+  despite ~100 s wall-clock, and window uploads were spaced **~30–44 s apart** (vs the 10 s cadence) —
+  the big webm uploads over the free quick-tunnel **back up**, so the session never reaches the 60 s
+  scoring gate. **Refined diagnosis: transport / environment (the free quick-tunnel can't carry iOS's
+  uploads at cadence) — NOT the frown/PATCH, NOT a WebKit capture failure.** The exact ~100 s death
+  trigger (Safari / tunnel / client fetch timeout) is unidentified; retest on a **real HTTPS deploy**
+  (not a quick-tunnel). Also worth a real-deploy check: whether the iOS **MediaRecorder produces
+  sub-realtime data** (recorded content lagged wall-clock). iPhone released after this.
+
+### Run 3 — 2026-06-22, desktop Chrome / Windows 11 (operator: Mohamed; agent-facilitated)
+
+localhost (reverted from the tunnel env after Run 2); account `smoke4@smoketest.com`. Mid-run the
+laptop **force-restarted under load**; environment rebuilt (Docker → `supabase start` → API + web),
+**DB data persisted intact** (smoke7 + smoke4 anchor survived).
+
+- **ST-08-8 — Pause / Resume: ✅ PASS (visual/lifecycle).** Pause → **camera light OFF + calm paused
+  surface, almost instantly**; Resume → camera re-acquired, warming-up resumed, clean **10 s** upload
+  cadence (vs iOS's 30–44 s). The `PATCH(paused)` / `PATCH(active)` preflights **400 (CORS)** but the
+  client degrades gracefully (camera control is client-side) and **does NOT kick out** (contrast iOS).
+  _End sub-part covered in Run 1._
+- **ST-08-7 — Out-of-frame: ✅ PASS (core).** Walked out ~6:10 → **auto-pause + "show your face"
+  prompt at ~7:39 (~89 s ≈ the 90 s threshold)**; stepping back **auto-resumed instantly**; the
+  session continued and **scored real bands** (DB session e1c3be53: 10 readings — 4 `a_little_tense`,
+  3 `at_ease`, 3 warming). Not kicked out. The out-of-frame `PATCH → 400` (CORS) was handled
+  gracefully → **confirms the iOS kick was transport, not the PATCH.** Camera-stays-on inferred from
+  the instant resume. **Not tested:** stay-out ~5 min → auto-end (the crash interrupted); the dangling
+  session is left `status=active` and self-finalizes as `abandoned` on the next create.
+- **🔎 PATCH-CORS consequence (desktop-confirmed):** pause / resume / out-of-frame all **work in the
+  UI but never persist server-side** (every transition PATCH 400s) — so `monitoring_sessions.status`
+  stays `active` through pauses and the recap/lifecycle can't reflect them. Real bug; the client masks
+  it. (Same root cause as the Run-2 PATCH-CORS finding.)
+- **🐞 New UI finding — un-pinned self-view won't auto-hide on hover-out.** The camera preview is
+  pinned by default; after un-pinning it **stays visible when the pointer leaves and only hides on a
+  click elsewhere** (expected: hide on hover-out). `components/monitor/viewfinder.tsx`. Low severity.
+- **❓ Observation — the session timer counts paused / out-of-frame time.** The top elapsed timer keeps
+  running during Pause and out-of-frame. Design call (total vs active duration) — flag for planning.
+- **⚠️ Environment — same-machine contention.** Backend + frontend + browser + camera + MediaPipe
+  decode on **one laptop** caused a hard lag-out → **forced restart** mid-session, plus the operator's
+  "~couple-seconds lag when inference actually starts" (on top of the allow→start delay). Not a product
+  bug, but reinforces that decode/inference is heavy (Run 1 #4 / R-5); a separate inference host
+  (Azure/GPU) is the mitigation.
+
+- **ST-08-9 — Today recap + expand-in-place: ✅ PASS (functional), with UX/render findings.** The
+  dashboard card recaps **today** ("2 check-ins") and **expands in place** ("View today" → "Hide
+  today"; content opens, no navigation). Collapsed mini-trend and expanded plot **agree** (green dot +
+  descending line). **No numbers** — band words + local times only. **Read-less honesty ✓:** session 1
+  (12:58–1:20 am, warming-only) shows **"no clear read"** (not calm); session 2 (1:20–1:26 am,
+  e1c3be53) shows **"a little tense" / "eased off."** **n=1 ✓:** the lone confident reading is a single
+  dot. Local-time axis ✓ (ticks ~1 am — short span). _Operator to confirm URL stayed `/app` if not
+  already evident._
+  - **🐞 Oval markers on the dashboard trend too** (`components/home/today-view.tsx`) — first dot AND
+    peak render as stretched ovals (same `preserveAspectRatio="none"` root cause as the monitor
+    `session-trend.tsx`). Confirmed in **both** trends now.
+  - **🐞 Peak marker + headline over-state the band.** Peak was **a_little_tense**, but the plot peak
+    marker is **amber/orange** (the "Tense" colour) and the headline reads **"A tense morning"**
+    (`deriveHeadline` renders any stress band as "tense …" at a glance). Timeline row correctly says
+    "a little tense." Same family as Run 1 #2 — the glance level says "tense" when it was only "a
+    little tense."
+  - **🎨 UX — redundant collapse controls.** When expanded there is BOTH "**Hide today**" (top) and a
+    "**Collapse**" link (bottom). Operator: keep "Hide today", drop "Collapse."
+  - **🎨 Copy — "Processed just for you, then deleted." is out of place on the recap card.** Operator:
+    fine on the live recording screen; remove it from the dashboard recap.
+- **🔬 Model observation — a sustained ~3–4 min frown (timer 11:06 → ~14:00–15:00) never reached
+  `tense`** this session (held `a_little_tense`), whereas an earlier smoke4 session (Run 1, af3b113f)
+  DID reach `tense`. The band path works; reaching `tense` from a frown is **inconsistent
+  (model-sensitivity)** — tuning note, not a smoke blocker.
+
+- **ST-08-10 — Mobile/responsive (dashboard): ✅ PASS at 360 px** (phone view stacks cleanly, no
+  overflow). **🎨 Desktop layout finding:** `app/(authed)/app/page.tsx:46` uses
+  `md:grid-cols-[3fr_2fr]`, so the today's-check-in card is the **left column sharing the row** with
+  the Things-that-might-help + Recent-chats stack — instead of its **own full-width row** above them
+  (the agreed design). Result: a tall card with empty space under the trend. _Monitor-stage 360 px
+  still to do in a session._
+- **ST-08-11 — Reduced-motion (dashboard): ✅ PASS** (real Windows setting; expand/collapse +
+  cross-highlight animations suppressed; content stays legible). _Monitor-stage motion (bloom
+  breathing static, camera-pill pulse stop) still to do in a session._
+- **ST-08-12 — Keyboard a11y (dashboard recap): ✅ PASS** (visible focus rings; **cross-highlight
+  works on keyboard focus**, not just hover; no focus trap). _Monitor-stage keyboard (Allow / Pause /
+  Resume / End / pill) still to do in a session._
+
+- **ST-08-11 — Reduced-motion (MONITOR stage): ⚠️ PARTIAL.** Animations ON: bloom/orb breathing ✓,
+  camera pill pulse ✓. Reduce-motion ON: the **bloom/orb correctly goes static ✓**, BUT the
+  **recording indicator blinks _faster_** instead of stopping — it should be suppressed/calmed under
+  `prefers-reduced-motion`. The recording-indicator animation isn't covered by the reduced-motion
+  handling (or falls back to a faster default). Restoring animations returned both to normal. Band +
+  copy stayed legible throughout.
+
+- **ST-08-10 — Mobile/responsive (MONITOR stage): ✅ PASS at 360 px** (stage stacks, controls go
+  full-width, no horizontal overflow). **🎨 Minor finding:** the **"Recording · hover to peek" pill
+  overlaps the bloom** at 360 px (cosmetic overlap, not an overflow).
+- **ST-08-12 — Keyboard (MONITOR stage): ✅ PASS** (visible focus rings on Pause / End / camera pill /
+  self-view toggle; no focus trap). The global chat pill is also in the tab order — expected (it's an
+  interactive control).
+- **Self-view pin/unpin bug re-confirmed on the monitor stage** (un-pinned preview stays until a click
+  elsewhere / alt-tab; no auto-hide on hover-out — see Run 3 finding).
+- Note: a band **did appear on this fresh session** ("You're a little tense" = `a_little_tense`),
+  re-confirming ST-08-4's first-band on a clean run.
+
+- **ST-08-6 — Low-light / skipped read: ⏸️ PENDING (confounded by a 401; retest needed).** Room dark
+  ~2 min: the bloom kept showing "a little tense" and **no low-light note appeared** — but the server
+  log shows the window uploads were returning **401**, not reaching the scoring/skip path. The band was
+  **stale** (frozen at the last good reading, `probe_s=235` / 02:16). The coverage-gate skip was never
+  exercised. Retest after a fresh login + fresh session.
+- **🐞 Finding — stale-token window uploads 401 SILENTLY (frozen band, no error, no refresh).**
+  Mid-session the access token went stale (`jwt_expiry=3600`; refresh chain most likely broken by the
+  earlier crash-recovery `supabase start`) and **every subsequent `POST …/windows` 401'd (22+ in a
+  row)** while the UI kept showing the last band — **no error, no re-auth prompt, and the recorder kept
+  uploading into the 401s.** A **fresh login token works against the API (verified: `POST
+  /monitoring/sessions` → 200)**, so it's the in-page token going stale, not a global verification
+  failure. Immediate trigger is likely the restart (environment), but the **silent-failure behaviour
+  is a real robustness gap**: the monitor client (`monitoring-session.tsx`) captures the token once at
+  session start (`tokenRef`) and neither refreshes it per-upload nor handles a 401 — so any session
+  that outlives its token (or hits an auth blip) **silently stops scoring while looking fine.** Flag.
+
+- **ST-08-6 — Low-light / poor-coverage skip: ✅ PASS** (retest with partial lens cover; room-dark
+  alone wasn't enough — webcam + screen light compensated). Half-covering the lens produced **4
+  consecutive server `skipped: insufficient-face`** decisions (probe 270–300) then **recovered to
+  `reading`** (a_little_tense → at_ease). On screen: the foggy **"Couldn't get a clear read"** note +
+  a **cause/remedy chip** ("Staying roughly centred and still helps"); the bloom **kept the last
+  band** ("a little tense"), never amber, no crash; the loop continued and cleared (~4:56 → 5:42). The
+  session trend correctly showed the skip as a **GAP** (FR-029 honesty — not carried forward).
+  - **🎨 Finding — the "Couldn't get a clear read" note looks off vs the design/mock** (operator);
+    compare the note + cause-chip treatment to `serenify-008-monitoring-mock.html`.
+  - **Nuance — the cause chip gave a framing remedy** ("stay centred") for a lens-occlusion rather
+    than a "too dark"/low-light message; the client refines the cause from on-device telemetry and
+    read the occlusion as a framing issue (reasonable, but not low-light-specific).
+  - The trend's **orange oval peak marker** = the known oval render + amber-for-`a_little_tense`
+    colour issues (Run 1 #1/#2). The privacy line on the **monitor** screen ("Processed just for you —
+    analyzed, then deleted.") is the **accepted** placement (operator only objected to it on the
+    dashboard recap card).
+
+- **ST-08-5 — No-anchor → calibrate-first: ✅ PASS.** Signed in as no-anchor `smoke8`: the dashboard
+  shows the **calibration banner** AND the check-in card's **"Start calibration"** CTA — **no "Start
+  check-in" entry at all**. A no-anchor user cannot start monitoring → **no camera prompt, no stress
+  band, no global/fallback anchor** (SC-004 / FR-011).
+- **End-transition finding — UPDATE: the empty "Camera off" container persists ~1 MINUTE** (not "a few
+  seconds") before routing to the dashboard. Screenshot: an empty stage with only "← Dashboard" + a
+  "● Camera off" pill, held ~60 s+ post-End. A real UX dead-time after End (worse than the Run-2
+  estimate). Likely the client waits on recorder flush / in-flight upload drain / decode backlog
+  before the full-document nav.
+
+- **ST-08-13 — Privacy, no raw video persists: ✅ PASS (both parts, agent-verified).** (a) **Temp
+  dir:** 0 leftover clips after a ~90-window session (`finally` unlink works — Run 1). (b) **DB
+  schema** (`20260619000000_monitoring_sessions_and_readings.sql`): **neither table has any
+  video/blob column** — `monitoring_sessions` = {id, user_id, started_at, ended_at, status,
+  end_reason, model_version, created_at, updated_at}; `window_readings` = {id, session_id, user_id,
+  captured_at, scored, band, skip_cause, label, stress_probability, created_at}. No raw video stored
+  anywhere. Bonus: the `authenticated` **SELECT grant omits `label` + `stress_probability`** → owner
+  can't read a probability (FR-015 structurally enforced). _(The 2 pre-existing `tmp*.mp4` from
+  2026-06-16 are old hard-kill leftovers, unrelated.)_
+- **ST-08-14 — Privacy, no manager surface reads sessions/readings: ✅ PASS (structural + live).**
+  Migration: **no manager/admin RLS policy** on either table (only `ms_select_self` / `wr_select_self`
+  = `auth.uid() = user_id`); **ENABLE + FORCE RLS**; no service-role. **Live test** as a real
+  team-lead (`grady.koch.08`): `SELECT monitoring_sessions` → **0 rows**, `window_readings` → **0
+  rows**, and a direct read of employee smoke4's session `d8e7ff10` (+ its readings) by id → **0
+  rows**. The manager gets nothing.
+
+- **ST-08-1 — Deny path (Firefox + Chrome): ✅ PASS (panel + no crash), 🐞 "Try again" finding.**
+  Denying the camera shows the **foggy blocked panel** with a gentle fix + a "Try again" action, **no
+  crash** ✓. **BUT "Try again" does nothing while the browser permission is sticky-denied** (reproduced
+  on **both Firefox AND Chrome**): a denied permission can't be re-prompted from JS, so getUserMedia
+  silently re-rejects and the button gives no feedback. The operator had to **reset the camera
+  permission in browser settings**, after which "Try again" → prompt → **Allow worked** (grant path
+  confirmed on **Firefox** too — second desktop browser ✓). Fix direction: when permission is
+  persistently denied, the panel should **guide the user to re-enable camera in browser settings**
+  instead of offering a re-prompt that can't fire.
+
+- **ST-08-3 — Insecure-origin (http://LAN-IP) secure-context: ✅ PASS.** Loaded `/app/monitor` over
+  `http://192.168.100.11:3000` (non-secure origin, dev rebound to `0.0.0.0` for the test): the camera
+  **did not open** and the app showed the **"Camera access is blocked"** surface + "Camera off" pill —
+  **no hang, no granted-but-dead camera** ✓. **🎨 Minor finding:** it shows the **generic
+  permission-blocked copy** ("Re-enable camera access … in your browser settings, then try again")
+  rather than a **secure-context/"needs HTTPS"** message — re-enabling the permission can't fix an
+  `http://` origin. Same ineffective "Try again" as the ST-08-1 finding applies. Functionally correct;
+  copy could distinguish "needs HTTPS" from "permission denied."
+
+---
+
+## Phase 8 smoke — FINAL SUMMARY (2026-06-21 → 22, agent-facilitated; operators: Mohamed + Ahmed Sabry on iPhone)
+
+| ST | Desktop | iOS (Safari) | Verdict + key note |
+|---|---|---|---|
+| **ST-08-1** Camera permission | ✅ PASS (Chrome grant; Chrome+Firefox **deny**; Firefox grant) | ⚠️ partial (Safari grant via calibration) | 🐞 **"Try again" is a no-op when the permission is sticky-denied** (Chrome+Firefox) — needs settings guidance |
+| **ST-08-2** Safari/iOS capture → readings | — | ⏸️ **PENDING** | Capture/upload/decode all work on WebKit, but **big webm uploads back up over the free quick-tunnel** → session dies ~100 s, **no band reached**. Retest on a real HTTPS deploy. NOT a WebKit capture failure. |
+| **ST-08-3** Insecure-origin blocked | ✅ PASS | — | Blocked surface, no hang; minor: copy isn't HTTPS-specific |
+| **ST-08-4** First band + drift-not-flicker | ✅ PASS (functional) | — | ⚠️ wall-clock first band ~**2.5 min** (decode lag + 1-time MediaPipe init) — R-5 / Azure concern |
+| **ST-08-5** No-anchor → calibrate-first | ✅ PASS | (also seen on iOS) | No check-in, no band, no camera prompt |
+| **ST-08-6** Low-light / coverage skip | ✅ PASS | — | "couldn't get a clear read" + keeps band + recovers; 🎨 note looks off vs mock |
+| **ST-08-7** Out-of-frame lifecycle | ✅ PASS (core) | — | auto-pause ~89 s + instant resume; **5-min→auto-end not tested**; status PATCH not persisted (see ST-08-8) |
+| **ST-08-8** Pause / Resume / End | ✅ PASS | — | 🐞 **PATCH CORS** → pause/resume/out-of-frame **never persist** (`allow_methods` omits PATCH); 🎨 **End → ~1 min empty "Camera off" screen** before dashboard; ⚠️ post-End backlog scoring |
+| **ST-08-9** Today recap + expand-in-place | ✅ PASS | ✅ read-less + intraday confirmed | 🐞 ovals, "tense" over-stated (marker+headline), 🎨 redundant Hide/Collapse, 🎨 privacy copy on card, ⚠️ **midnight-boundary** drops a session from "today" |
+| **ST-08-10** Mobile ≥360 px | ✅ PASS (dash + monitor) | ✅ phone view good | 🎨 desktop check-in card not its own row (`page.tsx:46`); recording-pill overlaps bloom @360 |
+| **ST-08-11** Reduced-motion | ✅ PASS (dashboard) · ⚠️ PARTIAL (monitor) | — | 🐞 **recording indicator blinks _faster_** under reduce-motion (should stop) |
+| **ST-08-12** Keyboard a11y | ✅ PASS (dash + monitor) | — | focus rings + keyboard cross-highlight + no trap |
+| **ST-08-13** No raw video persists | ✅ PASS | — | temp-dir clean + DB schema has no video column (agent-verified) |
+| **ST-08-14** No manager reads sessions/readings | ✅ PASS | — | no manager RLS policy; live team-lead SELECT → 0 rows (agent-verified) |
+
+**Net:** 13/14 effectively PASS on desktop (several with non-blocking UX/render findings); **ST-08-2 (iOS live readings) PENDING on a real HTTPS deploy** (free quick-tunnel can't carry the uploads). Highest-priority product bugs surfaced: **(1) PATCH CORS** (lifecycle transitions never persist), **(2) silent-401 on stale token** (long sessions stop scoring with a frozen band), **(3) the family of trend-render issues** (ovals via `preserveAspectRatio="none"`; amber/"tense" over-stating `a_little_tense`). Environment caveat: decode/inference is heavy on one laptop (caused a force-restart) — argues for a separate inference host. Full per-run detail in Run 1–3 above.
 
 > **Note**: ST-08-2 / ST-08-3 (real Safari/iOS secure-context + capture) remain the authoritative
 > cross-browser capture gate; the T051 Playwright happy-path does **not** replace them.
