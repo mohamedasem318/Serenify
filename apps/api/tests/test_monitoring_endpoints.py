@@ -17,6 +17,7 @@ import ml_video
 import numpy as np
 import pytest
 from ml_video import FEATURE_DIM, FeatureExtractionError
+from postgrest.exceptions import APIError
 
 from app.services import inference
 from tests.conftest import make_token
@@ -32,6 +33,17 @@ class _Resp:
         self.data = data
 
 
+def _ordered(rows, order, limit):
+    """Apply a PostgREST .order()/.limit() to fake rows (ISO strings sort chronologically)."""
+    rows = list(rows)
+    if order is not None:
+        col, desc = order
+        rows.sort(key=lambda r: r.get(col) or "", reverse=desc)
+    if limit is not None:
+        rows = rows[:limit]
+    return rows
+
+
 class _Query:
     def __init__(self, fake, table):
         self._fake = fake
@@ -39,9 +51,24 @@ class _Query:
         self._op = None
         self._row = None
         self._filters: dict = {}
+        self._is: dict = {}
+        self._order = None
+        self._limit = None
 
     def select(self, _cols):
         self._op = "select"
+        return self
+
+    def is_(self, col, val):
+        self._is[col] = val
+        return self
+
+    def order(self, col, desc=False):
+        self._order = (col, desc)
+        return self
+
+    def limit(self, n):
+        self._limit = n
         return self
 
     def insert(self, row, *, returning="representation"):
@@ -63,6 +90,7 @@ class _Query:
         return self._fake._execute(
             self._table, self._op, self._row, self._filters,
             returning=getattr(self, "_returning", "representation"),
+            is_filters=self._is, order=self._order, limit=self._limit,
         )
 
 
@@ -81,9 +109,13 @@ class FakeClient:
         self.role = role
         self.anchor_payload = anchor_payload
         self.sessions: dict[str, dict] = {}
+        self.readings: list[dict] = []
         self.inserts: list[dict] = []
         self.updates: list[dict] = []
         self.rpc_calls: list[str] = []
+        # One-shot: force the NEXT monitoring_sessions insert to raise a 23505 unique
+        # violation, modelling the one-active-per-user partial unique index losing a race.
+        self.fail_next_session_insert = False
         self._seq = 0
 
     def table(self, name):
@@ -92,10 +124,21 @@ class FakeClient:
     def rpc(self, fn):
         return _Rpc(self, fn)
 
-    def _execute(self, table, op, row, filters, returning="representation"):
+    def _execute(self, table, op, row, filters, returning="representation",
+                 is_filters=None, order=None, limit=None):
+        is_filters = is_filters or {}
         if table == "profiles" and op == "select":
             return _Resp([{"role": self.role}] if self.role else [])
         if table == "monitoring_sessions" and op == "insert":
+            if self.fail_next_session_insert:
+                # Model the partial unique index (one active session per user) rejecting a
+                # second active row — the create route must finalize + retry, not 500.
+                self.fail_next_session_insert = False
+                raise APIError({
+                    "code": "23505", "message": "duplicate key value violates unique "
+                    'constraint "monitoring_sessions_one_active_per_user_idx"',
+                    "hint": None, "details": None,
+                })
             self._seq += 1
             full = {"id": f"sess-{self._seq}", "status": "active", "started_at": None,
                     "ended_at": None, **row}
@@ -104,7 +147,13 @@ class FakeClient:
             return _Resp([full])
         if table == "monitoring_sessions" and op == "select":
             sid = filters.get("id")
-            return _Resp([self.sessions[sid]] if sid in self.sessions else [])
+            if sid is not None:
+                return _Resp([self.sessions[sid]] if sid in self.sessions else [])
+            # Active-session lookup (get_active_session): ended_at IS NULL, newest first.
+            if is_filters.get("ended_at") == "null":
+                rows = [s for s in self.sessions.values() if s.get("ended_at") is None]
+                return _Resp(_ordered(rows, order, limit))
+            return _Resp([])
         if table == "monitoring_sessions" and op == "update":
             # RLS update-own: only an OWNED (visible) session matches; an unknown OR
             # another user's id resolves to no row, exactly as the select-own gate does.
@@ -124,7 +173,13 @@ class FakeClient:
                     "read-back is denied by the SELECT column whitelist (42501)"
                 )
             self.inserts.append({"table": table, "row": row})
+            self.readings.append(row)  # queryable for latest_reading_at
             return _Resp([])  # minimal → PostgREST returns no representation
+        if table == "window_readings" and op == "select":
+            # latest_reading_at: a session's readings, time-ordered (captured_at).
+            sid = filters.get("session_id")
+            rows = [r for r in self.readings if r.get("session_id") == sid]
+            return _Resp(_ordered(rows, order, limit))
         raise AssertionError(f"unexpected DB op: {table}.{op} filters={filters!r}")
 
 
@@ -515,3 +570,89 @@ def test_end_non_employee_returns_403(client, monkeypatch):
 
 def test_end_requires_auth(client):
     assert client.post("/monitoring/sessions/sess-1/end").status_code == 401
+
+
+# ── one active session per user: finalize-prior-active-on-create (T0xx) ─────────
+#
+# Ending is client-driven, so a crash or a second tab can leave a session active
+# (ended_at IS NULL) forever — which also shadows the recap's "most-recent ENDED session"
+# query. Creating a new run FINALIZES any prior active session as 'abandoned' first
+# (last-tab-wins), stamping ended_at at that session's last reading (the honest
+# end-of-activity), or now() if it never scored — so the one-active-per-user partial
+# unique index (migration 20260621000000) always holds. A concurrent insert that loses the
+# index race is recovered with one finalize+retry, never a 500.
+
+
+def _active(fake):
+    return [s for s in fake.sessions.values() if s.get("ended_at") is None]
+
+
+def test_create_finalizes_prior_active_session_at_last_reading(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    # A prior session left active (crash / second tab): ended_at IS NULL, and it scored.
+    fake.sessions["sess-old"] = {
+        "id": "sess-old", "user_id": SUB, "status": "active",
+        "started_at": "2026-06-21T09:55:00+00:00", "ended_at": None,
+        "end_reason": None, "model_version": "m@1",
+    }
+    fake.readings += [
+        {"session_id": "sess-old", "user_id": SUB, "captured_at": "2026-06-21T10:00:00+00:00"},
+        {"session_id": "sess-old", "user_id": SUB, "captured_at": "2026-06-21T10:00:30+00:00"},
+    ]
+    _install_fake(monkeypatch, fake)
+
+    resp = client.post("/monitoring/sessions", headers=_auth(make_token(sub=SUB)))
+    assert resp.status_code == 201, resp.text
+    new_id = resp.json()["session_id"]
+
+    old = fake.sessions["sess-old"]
+    assert old["status"] == "ended"
+    assert old["end_reason"] == "abandoned"
+    assert old["ended_at"] == "2026-06-21T10:00:30+00:00"  # last reading time, NOT now()
+    # exactly one active session remains — the brand-new one
+    active = _active(fake)
+    assert len(active) == 1 and active[0]["id"] == new_id
+
+
+def test_create_finalizes_prior_active_with_no_readings_uses_now(client, monkeypatch):
+    from datetime import datetime as _dt
+
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    fake.sessions["sess-old"] = {  # active but never produced a reading
+        "id": "sess-old", "user_id": SUB, "status": "active",
+        "started_at": "2026-06-21T09:55:00+00:00", "ended_at": None,
+        "end_reason": None, "model_version": "m@1",
+    }
+    _install_fake(monkeypatch, fake)
+
+    resp = client.post("/monitoring/sessions", headers=_auth(make_token(sub=SUB)))
+    assert resp.status_code == 201, resp.text
+
+    old = fake.sessions["sess-old"]
+    assert old["status"] == "ended" and old["end_reason"] == "abandoned"
+    assert old["ended_at"] is not None
+    _dt.fromisoformat(old["ended_at"])  # a real now() timestamp, since it never scored
+    assert len(_active(fake)) == 1  # only the new session is active
+
+
+def test_create_does_not_finalize_when_no_prior_active(client, monkeypatch):
+    # The common path (no orphan): create touches nothing but the new insert.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    _install_fake(monkeypatch, fake)
+    resp = client.post("/monitoring/sessions", headers=_auth(make_token(sub=SUB)))
+    assert resp.status_code == 201, resp.text
+    assert fake.updates == []  # nothing finalized
+    assert len(_active(fake)) == 1
+
+
+def test_create_recovers_from_concurrent_active_insert_conflict(client, monkeypatch):
+    # A concurrent create won the single active slot between our finalize and insert: the
+    # partial unique index rejects ours with 23505. The route finalizes + retries once
+    # (last-tab-wins) rather than 500-ing.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    fake.fail_next_session_insert = True
+    _install_fake(monkeypatch, fake)
+
+    resp = client.post("/monitoring/sessions", headers=_auth(make_token(sub=SUB)))
+    assert resp.status_code == 201, resp.text
+    assert resp.json()["session_id"].startswith("sess-")

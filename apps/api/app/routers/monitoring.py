@@ -35,6 +35,7 @@ from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
+from postgrest.exceptions import APIError
 
 # Reuse the single HTTPBearer scheme so we can build the user-context client from the
 # forwarded token; require_employee has already verified it + gated the role.
@@ -54,6 +55,7 @@ from ..services.inference import (
     score_window,
 )
 from ..supabase_user import (
+    finalize_active_session,
     get_my_anchor,
     get_session,
     insert_session,
@@ -74,12 +76,30 @@ async def create_session(
     """Start a run. ``require_employee`` gates the role (non-employee → 403 forbidden_role).
     The **calibrate-first guard runs up front** (FR-011): if the caller has no anchor →
     **409 ``{"outcome":"no_anchor"}``** before any capture, and **no global/fallback anchor
-    is ever substituted** (SC-004)."""
+    is ever substituted** (SC-004).
+
+    **One active session per user** (DECISIONS 2026-06-21): ending is client-driven, so a
+    crash or a second tab can leave a PRIOR session active (``ended_at IS NULL``) forever —
+    which also shadows the recap's "most-recent ENDED session" read. Before inserting the
+    new run we finalize any prior active session as ``'abandoned'`` (stamped at its last
+    reading, or now() if it never scored), so the one-active-per-user partial unique index
+    always holds — **last-tab-wins**. A concurrent create that loses the index race (23505)
+    is recovered with one finalize+retry, never a 500."""
     client = user_client(settings, credentials.credentials)
     if get_my_anchor(client) is None:
         return JSONResponse(status_code=409, content={"outcome": "no_anchor"})
     model_version = request.app.state.predictor.model_version
-    row = insert_session(client, user_id=user_id, model_version=model_version)
+    finalize_active_session(client, now_iso=datetime.now(UTC).isoformat())
+    try:
+        row = insert_session(client, user_id=user_id, model_version=model_version)
+    except APIError as exc:
+        # The partial unique index rejected our insert: a concurrent create grabbed the
+        # single active slot between our finalize and insert. Finalize that racer and retry
+        # once (last-tab-wins); any other API error propagates unchanged.
+        if getattr(exc, "code", None) != "23505":
+            raise
+        finalize_active_session(client, now_iso=datetime.now(UTC).isoformat())
+        row = insert_session(client, user_id=user_id, model_version=model_version)
     return CreateSessionResponse(session_id=row["id"], model_version=model_version)
 
 
