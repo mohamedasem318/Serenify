@@ -193,7 +193,8 @@ layer has no policy and therefore cannot run these. (The **API** also reads/writ
 these tables, but **as the user** via the forwarded JWT — the same RLS select-own /
 insert-own scope; revised D-1 — not with a broad credential.)
 
-**Session trend (card + page — SC-008 consistency).** A single shared reader:
+**Session trend (monitor page — this live session).** The monitor page's own
+reader, scoped to the one session currently being recorded:
 
 ```ts
 // getSessionTrend(sessionId) → ordered series for ONE session
@@ -203,27 +204,72 @@ where session_id = :sessionId            -- RLS also restricts to auth.uid()
 order by captured_at asc;
 ```
 
-The monitoring page renders the full series; the dashboard card mini-trend
-downsamples the **same** rows. Identical source ⇒ the two trends always agree.
-The page trend area/line maps `band` → height (at_ease low → tense high); skipped
-points (`scored=false`) render as gaps/last-value, never as a fabricated reading.
+The monitoring page renders the full series and maps `band` → height (at_ease low
+→ tense high); skipped points (`scored=false`) render as **gaps only** — never
+carried forward, never a fabricated reading (FR-029).
 
-**Last-session recap (idle card — FR-019 + empty state).**
+**Today recap (dashboard card — FR-019 + empty state).** Today-scoped and
+**retrospective** — *not* a single last session. It returns today's (local-day)
+sessions that are **ended OR stale-active**, **excluding** the currently fresh-live
+session (which stays on the monitor page). This defines the session set the today
+trend also reads:
 
 ```ts
-// getLastSessionRecap(userId) → most recent ENDED session, or null
-select id, started_at, ended_at
-from monitoring_sessions
-where user_id = :userId and status = 'ended'   -- RLS also restricts to auth.uid()
-order by started_at desc
-limit 1;
+// getTodayRecap(userId) → today's ended-or-stale-active sessions (fresh-live excluded), or []
+select s.id, s.started_at, s.ended_at, s.status
+from monitoring_sessions s
+where s.user_id = :userId                       -- RLS also restricts to auth.uid()
+  and s.started_at >= :localDayStart and s.started_at < :localDayEnd   -- start-day attribution, user-local day (A2/A3)
+  and (
+    s.status = 'ended'                          -- ended (incl. end_reason 'abandoned')
+    or coalesce(                                -- …or stale-active: last reading > 5 min old
+         (select max(wr.captured_at) from window_readings wr where wr.session_id = s.id),
+         s.started_at
+       ) < now() - interval '5 minutes'         -- a fresh-active session (reading within 5 min) is the live one → excluded
+  )
+order by s.started_at asc;
 ```
 
-Recap derives **duration** (`ended_at − started_at`) and **overall tenor** (e.g.
-the modal `band`, or fraction `at_ease`, computed from that session's
-`window_readings`). When the query returns nothing (calibrated user, never ran a
-session), the reader returns `null` and the idle card renders the **empty state**
-("Start your first check-in") — never a blank/broken recap. (Mock-gap #7)
+Per session the recap derives **duration** (`ended_at − started_at`, or last
+reading − `started_at` for a stale-active row) and **overall tenor** (e.g. the
+modal `band`, or fraction `at_ease`, from that session's today-trend rows), plus
+the **read-less** flag (zero `scored=true` rows → "no clear read", never calm).
+When the query returns `[]` the card renders the **empty state** ("No check-ins
+yet today" / first-run "Start your first check-in") — branching on `has_anchor` so
+a no-anchor first-run user is routed to calibrate-first instead (E4). (FR-019,
+Mock-gap #7)
+
+**Today trend (dashboard card — SC-008 consistency).** The card's collapsed
+mini-trend and its expanded in-place "today" view read the **same** per-window
+rows from one reader, so they always agree (SC-008). The rows are those of the
+`getTodayRecap` session set, owner-readable columns only:
+
+```ts
+// getTodayTrend(userId) → per-window rows for TODAY's retrospective sessions (the getTodayRecap set)
+select band, captured_at, scored, skip_cause, session_id
+from window_readings
+where user_id = :userId                         -- RLS also restricts to auth.uid()
+  and session_id in (                           -- exactly the getTodayRecap session set
+    select s.id from monitoring_sessions s
+    where s.user_id = :userId
+      and s.started_at >= :localDayStart and s.started_at < :localDayEnd
+      and (
+        s.status = 'ended'
+        or coalesce(
+             (select max(wr.captured_at) from window_readings wr where wr.session_id = s.id),
+             s.started_at
+           ) < now() - interval '5 minutes'
+      )
+  )
+order by captured_at asc;
+```
+
+Owner-readable columns only (`band, captured_at, scored, skip_cause, session_id`)
+— never `label`/`stress_probability` (FR-015; SELECT whitelist). The collapsed
+mini-trend downsamples these rows; the expanded view groups them by `session_id`.
+Where a session also appears live on the monitor page (`getSessionTrend`), the two
+agree (FR-018). Skipped points render as **gaps only** — never carried forward,
+never fabricated (FR-029).
 
 **US4 read-rules — decided 2026-06-21 (008 edge-case pass; see `docs/DECISIONS.md`
 "008 US4 read-path edge-case decisions").** These bind the reads/render above when
@@ -252,10 +298,11 @@ US4 (T046–T050) is built; none is built yet:
 - **Empty-vs-calibrate (E4).** When this recap/empty surface lands on the check-in
   card, branch on **`has_anchor`**: a first-ever **no-anchor** user gets the
   calibrate-first prompt, **not** the "no sessions yet" empty state.
-- **Whitelist (D1) — re-audit on build.** The `getSessionTrend`/`getLastSessionRecap`
-  `.select()` strings must stay on `{id, captured_at, scored, band, skip_cause}` /
-  `{id, started_at, ended_at}` — **never** `label`/`stress_probability`. The DB column
-  GRANT backstops a slip (denies the read, `42501`), but keep the SELECTs honest.
+- **Whitelist (D1) — re-audit on build.** The `getSessionTrend` / `getTodayTrend` /
+  `getTodayRecap` `.select()` strings must stay on `{id, captured_at, scored, band,
+  skip_cause}` / `{band, captured_at, scored, skip_cause, session_id}` /
+  `{id, started_at, ended_at, status}` — **never** `label`/`stress_probability`. The DB
+  column GRANT backstops a slip (denies the read, `42501`), but keep the SELECTs honest.
 
 **FR-020 sustained-tense seam (no trigger built in 008).** Feature 009 detects a
 sustained-tense stretch with a server-side query over the persisted shape, e.g.:
