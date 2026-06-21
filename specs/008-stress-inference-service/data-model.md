@@ -225,6 +225,38 @@ the modal `band`, or fraction `at_ease`, computed from that session's
 session), the reader returns `null` and the idle card renders the **empty state**
 ("Start your first check-in") — never a blank/broken recap. (Mock-gap #7)
 
+**US4 read-rules — decided 2026-06-21 (008 edge-case pass; see `docs/DECISIONS.md`
+"008 US4 read-path edge-case decisions").** These bind the reads/render above when
+US4 (T046–T050) is built; none is built yet:
+
+- **Retrospective-only (B4).** Today/recap show **ended** sessions; a genuinely-live
+  session stays on the monitoring page and is never drawn here (never a fabricated
+  end). "Ended" for the recap means `status = 'ended'` **OR stale-active** — a row
+  still `active` but whose **last reading is > 5 min old** (the existing auto-end
+  window; activity signal = `max(window_readings.captured_at)`, no new column). A
+  **fresh-active** session (a reading within the last 5 min) is the live one and is
+  **excluded** from the retrospective read. (The create route already finalizes a
+  prior active as `'abandoned'`, so in practice a stale-active row is rare; the read
+  rule is the belt to that suspenders.)
+- **Read-less / degenerate session (B1/B2/B3).** A session that produced **zero**
+  readable bands (ended in warming-up, or every window skipped) must render an honest
+  **"checked in, but we didn't get a clear read"** state with a neutral marker —
+  **never** "at ease"/calm. A **single-band** session (n=1) renders as a **dot / short
+  mark**, never a broken or empty SVG path. Distinguish "scored ≥1 band" from
+  "0 bands" by counting `scored = true` rows.
+- **Day attribution (A2).** A session that crosses midnight belongs to its **start
+  day**; no splitting at midnight.
+- **Local time (A3).** Render `captured_at` (stored UTC, ISO-8601) in the **user's
+  local** zone (e.g. `new Date(captured_at)` → `toLocale*`), never a hardcoded
+  UTC/server zone.
+- **Empty-vs-calibrate (E4).** When this recap/empty surface lands on the check-in
+  card, branch on **`has_anchor`**: a first-ever **no-anchor** user gets the
+  calibrate-first prompt, **not** the "no sessions yet" empty state.
+- **Whitelist (D1) — re-audit on build.** The `getSessionTrend`/`getLastSessionRecap`
+  `.select()` strings must stay on `{id, captured_at, scored, band, skip_cause}` /
+  `{id, started_at, ended_at}` — **never** `label`/`stress_probability`. The DB column
+  GRANT backstops a slip (denies the read, `42501`), but keep the SELECTs honest.
+
 **FR-020 sustained-tense seam (no trigger built in 008).** Feature 009 detects a
 sustained-tense stretch with a server-side query over the persisted shape, e.g.:
 
