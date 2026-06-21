@@ -161,7 +161,7 @@ move INSERT to a **dedicated INSERT-only Postgres role** held by the API and
 ## Retention
 
 - **`window_readings`: 90 days, then purge.** Covers the session trend, the
-  last-session recap, the 009 sustained-tense seam, and demo windows, while
+  today recap, the 009 sustained-tense seam, and demo windows, while
   minimizing long-term retention of affective signal data (Principle I).
 - **`monitoring_sessions`: retained longer** (already aggregate-ish — duration +
   tenor; no raw signal).
@@ -278,7 +278,7 @@ US4 (T046–T050) is built; none is built yet:
 - **Retrospective-only (B4).** Today/recap show **ended** sessions; a genuinely-live
   session stays on the monitoring page and is never drawn here (never a fabricated
   end). "Ended" for the recap means `status = 'ended'` **OR stale-active** — a row
-  still `active` but whose **last reading is > 5 min old** (the existing auto-end
+  still `active` but whose **last reading is more than 5 minutes ago** (the existing auto-end
   window; activity signal = `max(window_readings.captured_at)`, no new column). A
   **fresh-active** session (a reading within the last 5 min) is the live one and is
   **excluded** from the retrospective read. (The create route already finalizes a
