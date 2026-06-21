@@ -1908,3 +1908,56 @@ entry: `docs/DECISIONS.md` 2026-06-19 (*corrective docs/tasks pass*).
   deletes `_scratch-008-b2-spike/`, and removes the orphaned cross-take fixtures
   (`multiclip/chrome/`, `multiclip/safari/`) while keeping the single-source fixture
   (`multiclip/chrome-singlesource/`).
+
+## 2026-06-21 — impl(008-stress-inference-service) — keep-up: the flagged O(elapsed) decode breach RESOLVED via surgical O(stride) tail-decode (ffmpeg-CLI)
+
+Implements the "known cost" the continuous single-stream windowing decision flagged
+(the 2026-06-19 windowing-reversal entry above): under continuous upload + server
+tail-extract, the server re-decoded the **whole growing recording-so-far** every window
+just to read its last 60 s — per-window decode **O(elapsed)**. The 2026-06-20 supervised
+live smoke confirmed the breach: live reading lag *grew* ~9 s/window to ~3 min behind
+(SC-001 missed). Full reasoning + numbers in `docs/DECISIONS.md` (2026-06-21 — *feature
+008 keep-up: SURGICAL O(stride) tail-decode*); shipped in commit `1ef0c0c`. **No spec
+FR/SC, plan-decision, contract, or model-artifact change** — the windowing decision
+(continuous single-stream), D-1/D-3/D-4, the 60 s lock, the upload contract,
+`score_window`, the M=4 cold-start, the `(2958,)` shape check, RLS, the SELECT whitelist,
+and JWT all stand. This is an implementation amendment to *how the trailing window is
+decoded*.
+
+- **The prescribed primitive does not exist; a faithful one does.** "Seek to a keyframe
+  then decode forward" assumed OpenCV can seek — it **cannot** on an un-finalized
+  `MediaRecorder` webm (no Cues index): `cap.set(POS_MSEC/POS_FRAMES)` returns `True` but
+  is a **silent no-op that rewinds to t=0**. The realizable primitive: a cheap ffprobe
+  **packet** read (demux only) for the file-global 2.5 fps grid + duration, then decode
+  **only the bounded trailing 60 s** — OpenCV native `cap.set` for mp4 (seekable), an
+  **`ffmpeg -c copy` lossless tail remux → OpenCV decode** for webm. Frames are matched
+  back to the file-global grid, so the kept set is the **identical suffix** the whole-file
+  path keeps. (A direct ffmpeg `bgr24` decode is NOT bit-identical to OpenCV — a YUV→BGR
+  shift, Chrome cosine 0.999055; the `-c copy` remux keeps OpenCV as the decoder.)
+- **Surgical, `packages/ml-video` only.** `pipeline._extract_landmarks_tail` +
+  `probe_global_timestamps_fast`, dispatched from `extract_landmarks(tail_seconds=…)` and
+  `anchor.probe_recorded_seconds`. Stateless (no cross-window frame cache, no reused
+  FaceMesh), so it carries no continuity-fidelity risk and needs no new fidelity proof.
+- **Gated build (both proven before commit).** **GATE 1 (fidelity)**: bit-identical to the
+  whole-file path — max|Δ|=0, cosine=1.0 — on the real chrome+safari continuous fixtures
+  (`tests/test_tail_seek_keepup.py`, local-only/ffmpeg-gated; the CI suffix-invariant
+  stays T006). **GATE 2 (keep-up)**: per-window total **O(elapsed) 18→55 s (grows 3.1×) →
+  O(stride) flat ~9–13 s**; the `<60 s` gate alone 3.2→15.3 s → 0.1–0.8 s.
+- **New host dependency: the ffmpeg/ffprobe CLI** (Dockerfile + `apps/api/README.md`).
+  **Absent → graceful fallback** to the whole-file OpenCV decode (correct, O(elapsed)) so
+  CI / degraded deploys keep working; **runs-but-fails on a clip → skipped window** (200),
+  never a 500. Five CI-runnable robustness tests lock this. (Re-run
+  `test_tail_seek_keepup.py` on the deploy image so an ffmpeg version difference can't
+  silently shift fidelity.)
+- **Re-validated on a representative deploy target.** Re-measured on an **Azure VM
+  (Standard_D2s_v4, 2 vCPU)**: **~7–8 s/window**, comfortably under the 10 s stride, and
+  fidelity stayed bit-identical on the VM's older apt ffmpeg — confirming the surgical fix
+  is sufficient on a realistic CPU target without the heavier rolling buffer.
+- **Option 2 stays deferred.** The full per-session **rolling decoded-frame buffer**
+  (decode only the newest ~10 s increment → true O(stride) ~1.5 s decode) is the upgrade
+  to build **only if** keep-up re-measured on the chosen deploy target breaches the stride
+  there (logged in `docs/BACKLOG.md`, feature-008 keep-up entry). The read loop also still
+  needs back-pressure (no new stride while one is in flight) — same deferral.
+
+No Cloud-dashboard parity items — all changes are in-repo (`packages/ml-video`, Dockerfile,
+`apps/api/README.md`).

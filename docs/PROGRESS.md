@@ -4,20 +4,102 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 008 — Stress Inference Service (planning)
+## Feature 008 — Stress Inference Service (implementation in progress)
 
 **Branch**: `008-stress-inference-service`
-**Status**: **plan complete — awaiting review before `/speckit-tasks`.** Spec
-generated + reviewed; `/speckit-plan` produced `plan.md`, `research.md`,
-`data-model.md`, `contracts/inference-api.md`, `contracts/smoothing-and-banding.md`,
-`quickstart.md`. Constitution Check: **PASS** with one logged, justified deviation
-(per-window HTTP request/response transport instead of WebSocket — the prediction
-is the synchronous response to an upload, not polling). No NON-NEGOTIABLE principle
-violated.
-**Date**: 2026-06-19
+**Status**: **implementation in progress — US1, US2 and US3 complete; US4 + Polish
+open; not yet reviewed or merged.** The live video stress-inference read path (the
+committed `serenify-video-lbptop-motion-rf-calibrated@2.0.0` + `predict_delta` + the
+shared 2958-d extraction) is wired end-to-end: a continuous-capture loop, a
+session-aware `apps/api` endpoint, per-window persistence under RLS, and the
+monitoring UI. **44 of 57 tasks done (T001–T045); 13 open (US4 T046–T050, Polish
+T051–T058).** Constitution Check at plan time: **PASS** with one logged, justified
+deviation (per-window HTTP request/response transport instead of WebSocket — the
+prediction is the synchronous response to an upload, not polling); no NON-NEGOTIABLE
+principle violated.
+**Date**: 2026-06-21 (implementation in progress on the branch above; planning closed 2026-06-19)
 
-**Decisions resolved** (DECISIONS 2026-06-19, as **amended** the same day after
-review): **D-1 (revised)** self-scoped `SECURITY DEFINER` `get_my_anchor()` read in
+**Windowing in force**: **continuous single-stream upload + server tail-extract**.
+One continuous `MediaRecorder` (timeslice for incremental capture only); each stride
+uploads the contiguous recording-so-far, and the server extracts the trailing 60 s
+with the validated single-clip path (`compute_anchor` + the VFR `POS_MSEC` sampler).
+The scored 60 s window is **faithful by construction**, so there is **no fidelity
+gate** — both D-2 windowing fallbacks (B1 container-reassembly, B2 multi-clip
+frame-concat) were rejected during planning (CHANGELOG 2026-06-19).
+
+**Shipped so far**:
+
+- **US1 — live stress read (P1 / MVP).** `submit_window` scores a window (rolling
+  mean of `proba[1]` over the last 4 readings, bands 0.53 / 0.70, ~90–105 s
+  cold-start) and persists `window_readings` **under RLS as the user**, with raw
+  `stress_probability`/`label` held server-only via the SELECT column whitelist; the
+  monitoring UI renders the band as a calm bloom + cause chip, a **warming-up** state
+  before the first smoothed read, and a foggy **"skipped a read"** note on a thin
+  window (never the out-of-frame surface). **FR-024** reassurance footnote —
+  "Processed just for you — analyzed, then deleted." — added to the live reading card
+  (commit `3ac7eeb`, resolving /speckit-analyze U1).
+- **Keep-up SOLVED — Option 1 (surgical O(stride) tail-decode)** (commit `1ef0c0c`).
+  The flagged "known cost" (decode-to-tail grows O(elapsed)) became real: a supervised
+  smoke measured live lag growing ~9 s/window to ~3 min behind. Fixed in
+  `packages/ml-video` only — a cheap ffprobe **packet** read recovers the file-global
+  2.5 fps grid + duration without a full walk, then only the trailing 60 s is decoded
+  (OpenCV native `cap.set` seek for mp4; an **ffmpeg `-c copy`** lossless tail remux for
+  un-finalized webm, whose `cap.set` seek is a silent no-op that rewinds to t=0) and
+  matched back to the file-global grid → the **identical suffix** the whole-file path
+  keeps. GATE 1 fidelity: **bit-identical** (max|Δ|=0, cosine=1.0) on the real
+  chrome+safari continuous fixtures. GATE 2 keep-up: per-window total **O(elapsed)
+  18→55 s → O(stride) flat ~9–13 s**. New host dependency: **ffmpeg/ffprobe CLI**
+  (Dockerfile + `apps/api/README.md`); absent → graceful fallback to the whole-file
+  decode (correct, O(elapsed)); runs-but-fails on a clip → skipped window (200), never a
+  500. **Re-measured on a representative Azure VM (Standard_D2s_v4, 2 vCPU): ~7–8 s/
+  window — comfortably under the 10 s stride — and fidelity stayed bit-identical on the
+  VM's older apt ffmpeg.** **Option 2** (full per-session rolling decoded-frame buffer —
+  decode only the newest ~10 s increment) stays the deferred upgrade, built only if
+  keep-up re-measured on the chosen deploy target breaches the stride there. (DECISIONS
+  2026-06-21; `docs/BACKLOG.md` feature-008 keep-up entry.)
+- **US2 — session control & presence (P2).** Backend lifecycle routes
+  `PATCH /monitoring/sessions/{id}` (pause/active/out_of_frame) + `POST .../end`
+  (ended_at + status + end_reason), RLS update-own, `ended` terminal with a clean
+  **409 (not 500)** on an already-ended session and on-end smoothing-buffer eviction
+  (commit `4c18dec`). Frontend presence machine driven by the **same** feature-005
+  framing signal that gates uploads: 90 s no-face → out-of-frame, 5 min from face-loss →
+  auto-end, manual Pause (releases camera) / Resume (re-acquires, reuses the session) /
+  End, foggy out-of-frame + calm paused surfaces, status-driven pill + forced
+  foggy-bracket self-view, and a re-end race collapsed onto one caller that maps the
+  backend 409 → ok (commit `dbaaae4`).
+- **US3 — calibrate-first guard (P2).** Create-time `no_anchor` 409 (T021) plus the
+  mid-session defensive re-check: `submit_window` catches `MissingAnchorError` and
+  returns the same `409 {"outcome":"no_anchor"}` (never a 500, never a reading without
+  the user's own anchor); the client disambiguates the overloaded 409 by body
+  (`no_anchor` vs `ended_session`) and routes mid-session no-anchor to the existing
+  calibrate-first surface (commit `e49b82e`, SC-004).
+
+**Still open**:
+
+- **US4 (P3, T046–T050)** — retrospective trend (band→height; skipped points render as
+  gap/last-value, never a fabricated reading), idle dashboard recap + "Start your first
+  check-in" empty state, mini-trend/page-trend consistency, and the **FR-020 009-seam**
+  confirmation (the persisted `window_readings` shape supports the 009 sustained-tense
+  query; **no** questionnaire trigger/UI is built in 008). Needs the US4 mocks first.
+- **Polish (T051–T058)** — Playwright employee happy-path e2e (feature-005
+  detector-injection seam), webm/VFR codec fidelity hardening, responsive/a11y sweep
+  (≥360 px stack, reduced-motion, focus, ≥44 px targets), expanded `smoke-tests.md`
+  (real Safari/iOS), privacy-verification test (no raw video persists; no manager
+  policy; `label`/`stress_probability` unreadable by the owner), the model-owner
+  `metadata.json` carry-over note, the 90-day-retention follow-up note, and the full
+  Principle VII test sweep before review.
+- **Cleanup before close** — `npm run lint` is RED on **2 pre-existing errors in
+  `monitoring-session.tsx`** (192:39 reactive-value mutation; 462:5 setState-in-effect
+  cascade) from the camera-lifecycle fix; `tsc --noEmit` is RED on **6 errors in
+  `tests/unit/lib/monitoring-client.test.ts`** (tuple/undefined typing on the fetch-mock
+  assertions). Plus the deferred doc-reconciliation, a final supervised smoke, and the
+  branch close.
+
+**Decisions resolved (planning snapshot)** (DECISIONS 2026-06-19, as **amended** the
+same day after review; **D-2's segmented + B2-fallback windowing was later reversed to
+continuous single-stream upload — see "Windowing in force" above and CHANGELOG
+2026-06-19; the rest stands**): **D-1 (revised)** self-scoped `SECURITY DEFINER`
+`get_my_anchor()` read in
 the caller's RLS context — **no service-role key** (anon key + forwarded JWT);
 sessions/readings written under RLS as the user; write-integrity deferred (upgrade
 path = INSERT-only role). **D-2 (revised)** single-recorder ~10 s segments +
