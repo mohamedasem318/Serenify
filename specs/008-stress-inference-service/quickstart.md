@@ -65,8 +65,10 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
    → auto-end → dashboard recap.
 7. **Slow window non-blocking (SC-007)**: artificially slow one window's
    extraction → the next window still captures/uploads on the 10 s cadence.
-8. **Trend consistency (SC-008)**: the dashboard card mini-trend matches the
-   monitoring-page trend for the same session.
+8. **Trend consistency (SC-008)**: expand the check-in card's **View today** — the
+   collapsed **today mini-trend** and the **expanded today view** render from the
+   **same** persisted rows (one source, no divergence); and a session that is also
+   live on the monitoring page agrees with its row in today.
 9. **Privacy (SC-009)**: confirm no raw video persists (temp file deleted) and no
    manager surface can read sessions/readings.
 10. **All op-states (SC-010)**: permission, warming-up, active, out-of-frame,
