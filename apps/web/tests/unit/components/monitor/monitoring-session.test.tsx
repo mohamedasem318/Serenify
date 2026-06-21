@@ -164,6 +164,44 @@ describe("MonitoringSession orchestrator", () => {
     expect(container.textContent ?? "").not.toMatch(/[0-9]/);
   });
 
+  it("routes a MID-SESSION 409 no_anchor (anchor vanished) to calibrate-first + releases the camera (US3 / T042 / SC-004)", async () => {
+    // The create-time guard passed (anchor present at start) and the session warmed up, but
+    // the anchor then vanished: a scored window returns 409 → kind "no_anchor". The
+    // orchestrator must route to the SAME existing calibrate-first surface the create path
+    // uses (reusing NO_ANCHOR — not a new surface) and stop capture per the standing
+    // lifecycle — never a reading without the user's own anchor.
+    const trackStop = vi.fn();
+    const { deps, fireStride } = makeDeps([
+      { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } },
+      { ok: false, kind: "no_anchor" },
+    ]);
+    deps.getUserMedia = vi.fn(
+      async () => ({ getTracks: () => [{ stop: trackStop }] }) as unknown as MediaStream,
+    );
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/getting a read on things/i)).toBeInTheDocument();
+
+    await act(async () => {
+      fireStride(); // a warming window — still live
+    });
+    await act(async () => {
+      fireStride(); // the mid-session 409 no_anchor window
+    });
+
+    // Routed to the EXISTING calibrate-first panel (NO_ANCHOR), with its calibration CTA.
+    expect(await screen.findByText(/calibrate first/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /start calibration/i })).toHaveAttribute(
+      "href",
+      "/app/calibrate",
+    );
+    // The standing release effect freed the camera once the op left the live set (no regress).
+    expect(trackStop).toHaveBeenCalled();
+  });
+
   it("creates exactly one session when acquire is triggered twice concurrently (single-create guard)", async () => {
     // The two-POST /monitoring/sessions bug: a near-simultaneous second acquire (double
     // click / re-trigger) used to pass the sessionIdRef reuse check before the first create

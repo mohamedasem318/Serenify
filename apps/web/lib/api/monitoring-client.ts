@@ -44,7 +44,8 @@ export type SubmitWindowErrorKind =
   | "unauthorized"
   | "forbidden_role"
   | "not_found" // 404 — unknown / not-owned session (RLS select-own)
-  | "ended" // 409 — the session is ended
+  | "ended" // 409 {"error":"ended_session"} — the session is ended
+  | "no_anchor" // 409 {"outcome":"no_anchor"} — anchor vanished mid-session → calibrate-first (US3 / SC-004)
   | "unsupported_media" // 415
   | "network"
   | "unknown";
@@ -128,8 +129,15 @@ export async function submitWindow(
       return { ok: false, kind: "forbidden_role" };
     case 404:
       return { ok: false, kind: "not_found" };
-    case 409:
+    case 409: {
+      // The windows route 409s in two shapes: the defensive mid-session
+      // {"outcome":"no_anchor"} (the anchor vanished after the create-time guard — route
+      // to calibrate-first, never a reading; US3 / SC-004) and {"error":"ended_session"}
+      // (terminal). Disambiguate by body; an unreadable body falls back to "ended".
+      const body = await res.json().catch(() => null);
+      if (body?.outcome === "no_anchor") return { ok: false, kind: "no_anchor" };
       return { ok: false, kind: "ended" };
+    }
     case 415:
       return { ok: false, kind: "unsupported_media" };
     default:

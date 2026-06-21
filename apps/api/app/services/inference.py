@@ -65,9 +65,10 @@ WINDOW_MEDIA_SUFFIX = {"video/mp4": ".mp4", "video/webm": ".webm"}
 class MissingAnchorError(Exception):
     """The caller's anchor is NULL at scoring time. The create-time guard (T021) ensures
     an anchor exists when a session starts, so this is only reachable if the anchor
-    disappears mid-session. Turning it into a defensive ``409 no_anchor`` is US3 / T042 —
-    out of this scope; it is raised here (rather than fabricating a global/fallback
-    anchor, which SC-004 forbids) so the gap is loud, never silent."""
+    disappears mid-session. It is raised here (rather than fabricating a global/fallback
+    anchor, which SC-004 forbids) so the gap is loud, never silent; the windows route
+    (US3 / T042) catches it and returns the same defensive ``409 no_anchor`` the create
+    route uses — never a 500, never a reading without the user's own anchor."""
 
 
 class _SessionBuffers:

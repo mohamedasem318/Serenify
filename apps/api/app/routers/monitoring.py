@@ -15,7 +15,11 @@ US2 lifecycle (T036):
   ``end_reason``, and **evict the per-session in-memory smoothing buffer** so ended sessions
   don't leak memory. The only invalid transition is touching an **ended** session → 409.
 
-Out of scope here: the defensive mid-session ``409 no_anchor`` re-check (US3 / T042).
+US3 guard (T042):
+- the create route's anchor-presence check 409s a no-anchor employee up front, and
+  ``POST …/windows`` re-checks defensively — if the anchor vanishes mid-session
+  ``score_window`` raises ``MissingAnchorError``, which the route turns into the **same**
+  ``409 {"outcome":"no_anchor"}`` body (never a 500, never a fabricated reading; SC-004).
 
 All DB access is **as the caller** — the user-context client (publishable anon key +
 forwarded JWT), so ``auth.uid()`` resolves to the verified ``sub`` and RLS (select-own /
@@ -43,7 +47,12 @@ from ..schemas import (
     PatchSessionRequest,
     PatchSessionResponse,
 )
-from ..services.inference import WINDOW_MEDIA_SUFFIX, buffers, score_window
+from ..services.inference import (
+    WINDOW_MEDIA_SUFFIX,
+    MissingAnchorError,
+    buffers,
+    score_window,
+)
 from ..supabase_user import (
     get_my_anchor,
     get_session,
@@ -108,17 +117,25 @@ async def submit_window(
     # CPU-bound decode + MediaPipe + LBP + (blocking) supabase I/O — off the event loop so a
     # slow window never serializes the next (FR-016, SC-007). The client keeps its single
     # continuous recorder running and uploads on its own timer regardless of this response.
-    outcome = await run_in_threadpool(
-        score_window,
-        clip_bytes=clip_bytes,
-        content_type=base_type,
-        client=client,
-        predictor=request.app.state.predictor,
-        operating_point=request.app.state.operating_point,
-        tense_band=request.app.state.tense_band,
-        session_id=session_id,
-        user_id=user_id,
-    )
+    try:
+        outcome = await run_in_threadpool(
+            score_window,
+            clip_bytes=clip_bytes,
+            content_type=base_type,
+            client=client,
+            predictor=request.app.state.predictor,
+            operating_point=request.app.state.operating_point,
+            tense_band=request.app.state.tense_band,
+            session_id=session_id,
+            user_id=user_id,
+        )
+    except MissingAnchorError:
+        # Defensive mid-session guard (US3 / T042): the caller's anchor vanished AFTER the
+        # create-time check (T021) — score_window raises rather than fabricating a
+        # global/fallback anchor (SC-004). Surface the EXACT same 409 no_anchor body the
+        # create route uses so the client routes to calibrate-first; never a 500, and never a
+        # reading without the user's own anchor (SC-004, FR-011).
+        return JSONResponse(status_code=409, content={"outcome": "no_anchor"})
     return outcome
 
 

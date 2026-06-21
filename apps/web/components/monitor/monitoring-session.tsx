@@ -213,7 +213,22 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       void deps
         .submitWindow(sessionId, clip, token)
         .then((res) => {
-          if (!res.ok) return;
+          if (!res.ok) {
+            // Defensive mid-session no_anchor (US3 / T042): the user's anchor vanished after
+            // the create-time guard. Route to the SAME calibrate-first surface the create
+            // path uses (reuse NO_ANCHOR) — the standing release effect then stops the
+            // recorder + releases the camera (op leaves the live set). Guard on a live op so
+            // a late in-flight 409 can't reopen calibrate-first over a paused/ended session
+            // (FR-016, mirrors the WINDOW_OUTCOME late-window discipline). Other error kinds
+            // are dropped silently, exactly as before.
+            if (
+              res.kind === "no_anchor" &&
+              (opRef.current === "warming-up" || opRef.current === "active")
+            ) {
+              dispatch({ type: "NO_ANCHOR" });
+            }
+            return;
+          }
           const outcome = res.outcome;
           if (outcome.outcome === "skipped") {
             // The client refines the coarse server cause from on-device telemetry, exactly

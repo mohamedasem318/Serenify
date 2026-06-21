@@ -141,6 +141,16 @@ describe("OpSurfaces — calibrate-first (no-anchor): foggy attention + meadow '
     expect(cta).toHaveAttribute("href", "/app/calibrate");
     expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
   });
+
+  it("renders NO stress band on the no_anchor surface — never a reading (SC-004 / T045)", () => {
+    // The whole point of calibrate-first: a no-anchor user is NEVER shown a stress band.
+    // No bloom (the band's only visual), and none of the band statelines, ever render here.
+    render0({ op: "calibrate-first", band: null, skipCause: null });
+    expect(screen.queryByTestId("bloom")).toBeNull();
+    expect(screen.queryByText(/at ease right now/i)).toBeNull();
+    expect(screen.queryByText(/a little tense/i)).toBeNull();
+    expect(screen.queryByText(/feeling tense/i)).toBeNull();
+  });
 });
 
 /* ── US2 (T039) — out-of-frame + paused surfaces, both FOGGY/neutral, never amber ── */

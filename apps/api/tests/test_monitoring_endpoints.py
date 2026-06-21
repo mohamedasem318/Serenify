@@ -312,6 +312,50 @@ def test_window_wrong_media_type_returns_415(client, monkeypatch):
     assert resp.json()["error"] == "unsupported_media_type"
 
 
+# ── US3 slice (T043): the defensive MID-SESSION no_anchor 409 ───────────────────
+#
+# The create-time no_anchor 409 (a no-anchor employee can never START a session) is the
+# US1 slice above (test_create_session_without_anchor_returns_409_no_anchor). This US3
+# slice covers the OTHER half of SC-004: if the caller's anchor disappears AFTER the
+# create-time guard, a scored window must NEVER fabricate a reading or substitute a
+# global/fallback anchor — it returns the SAME 409 {"outcome":"no_anchor"} shape (a clean
+# 4xx, never a 500), and persists no reading. Injected only at the real I/O boundaries
+# (the ml-video extract + the get_my_anchor RPC payload on the user-context client).
+
+
+def test_window_anchor_vanished_midsession_returns_409_no_anchor(client, monkeypatch):
+    # Create succeeds (anchor present at start), THEN the anchor disappears: the RPC now
+    # returns NULL, so score_window raises MissingAnchorError. The router must turn that
+    # into the same 409 no_anchor the create route uses — never a 500 (SC-004, FR-011).
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 120.0)  # full window
+    monkeypatch.setattr(ml_video, "compute_anchor",
+                        lambda _p, tail_seconds=None: np.zeros(FEATURE_DIM))
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=0.9))
+    fake.anchor_payload = None  # the anchor vanished mid-session (get_my_anchor → NULL)
+
+    resp = _post_window(client, sid)
+    assert resp.status_code == 409
+    # EXACT same body as the create-time 409 — the client routes both to calibrate-first.
+    assert resp.json() == {"outcome": "no_anchor"}
+
+
+def test_window_without_anchor_never_persists_a_reading(client, monkeypatch):
+    # SC-004 the other way round: a window scored without the user's own anchor MUST NOT
+    # write a window_readings row — no reading is ever produced without the user's anchor.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 120.0)
+    monkeypatch.setattr(ml_video, "compute_anchor",
+                        lambda _p, tail_seconds=None: np.zeros(FEATURE_DIM))
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=0.9))
+    fake.anchor_payload = None
+
+    _post_window(client, sid)
+    assert not [i for i in fake.inserts if i["table"] == "window_readings"]
+
+
 # ── lifecycle: PATCH status + end (US2 slice / T037) ────────────────────────────
 #
 # Covers the happy-path transitions (pause/resume/out-of-frame, end+reason), the

@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { endSession, patchStatus } from "@/lib/api/monitoring-client";
+import { endSession, patchStatus, submitWindow } from "@/lib/api/monitoring-client";
 
 /**
  * Feature 008 / US2 — T041: the lifecycle write client. The load-bearing case is the
  * re-end RACE: the backend returns 409 when the session is already ended (auto-end and a
  * manual End both fired), and the client must treat that 409 as success so the frontend
  * goes to the ended state instead of surfacing an error.
+ *
+ * Feature 008 / US3 — T043: submitWindow's 409 is overloaded — the windows route 409s in
+ * TWO shapes ({"error":"ended_session"} and the defensive mid-session {"outcome":"no_anchor"}).
+ * The client must disambiguate by body so the orchestrator can route a vanished anchor to
+ * calibrate-first instead of treating it as an ended session (SC-004).
  */
 
 function stubFetch(impl: () => Partial<Response>) {
@@ -44,6 +49,31 @@ describe("endSession — re-end race", () => {
       }),
     );
     expect((await endSession("sid", "user", "tok")).ok).toBe(false);
+  });
+});
+
+describe("submitWindow — 409 disambiguation (ended vs mid-session no_anchor)", () => {
+  const clip = () => new Blob(["x"], { type: "video/webm" });
+
+  it("maps a 409 {outcome:'no_anchor'} to kind 'no_anchor' (mid-session calibrate-first; SC-004)", async () => {
+    stubFetch(() => ({ ok: false, status: 409, json: async () => ({ outcome: "no_anchor" }) }));
+    expect(await submitWindow("sid", clip(), "tok")).toEqual({ ok: false, kind: "no_anchor" });
+  });
+
+  it("maps a 409 {error:'ended_session'} to kind 'ended'", async () => {
+    stubFetch(() => ({ ok: false, status: 409, json: async () => ({ error: "ended_session" }) }));
+    expect(await submitWindow("sid", clip(), "tok")).toEqual({ ok: false, kind: "ended" });
+  });
+
+  it("a 409 with an unreadable body falls back to 'ended' (never throws)", async () => {
+    stubFetch(() => ({
+      ok: false,
+      status: 409,
+      json: async () => {
+        throw new Error("not json");
+      },
+    }));
+    expect(await submitWindow("sid", clip(), "tok")).toEqual({ ok: false, kind: "ended" });
   });
 });
 
