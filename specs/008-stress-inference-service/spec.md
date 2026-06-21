@@ -88,20 +88,22 @@ An employee who has not completed calibration (no stored anchor) starts a check-
 
 ---
 
-### User Story 4 - Retrospective trend, recap, and the questionnaire seam (Priority: P3)
+### User Story 4 - Today recap, retrospective trend, and the questionnaire seam (Priority: P3)
 
-After (and during) a session, the employee can see a retrospective session trend on both the monitoring page and the dashboard check-in card, so the at-a-glance read is available without opening the page. The idle card shows a recap of the last session. The system also records the persisted signal that a future questionnaire feature (009) will consume when a tense state is sustained — but builds no questionnaire here.
+After a session ends, the employee sees a recap of **today's** check-ins on the dashboard check-in card, and can expand it **in place** to see the full day's trend and a per-session breakdown — without leaving the dashboard or changing route. While a session is live, the monitoring page shows that session's own trend. The system also records the persisted signal a future questionnaire feature (009) will consume when a tense state is sustained — but builds no questionnaire here.
 
-**Why this priority**: The trend and recap are the "proof" surface and the at-a-glance value, and the sustained-tense seam unblocks feature 009. They depend on persistence from US1 and are valuable but not required for the core live read to function.
+**Why this priority**: The recap and the today view are the "proof" surface and the at-a-glance value, and the sustained-tense seam unblocks feature 009. They depend on persistence from US1 and are valuable but not required for the core live read to function.
 
-**Independent Test**: Complete a session with a mix of states, then confirm the monitoring page and the dashboard card both render the same session trend from persisted readings, the idle card shows a last-session recap, and a sustained-tense stretch is represented in the persisted data in a form a downstream consumer can read.
+**Independent Test**: Complete one or more sessions in a day with a mix of states, then confirm: the dashboard card recaps today's check-ins and expands in place to a day trend whose collapsed mini-trend and expanded full view render from the same persisted data; a session that produced no readable band shows honestly as "no clear read" (never as calm); the day's time axis fits the day's actual first-to-last reading; and a sustained-tense stretch is present in the persisted data for a downstream consumer (009) without any questionnaire being triggered or rendered.
 
 **Acceptance Scenarios**:
 
-1. **Given** a session with persisted readings, **When** the monitoring page renders, **Then** it shows a session trend summarizing the run (calm vs. tense stretches) without exposing a precise per-window number as the headline.
-2. **Given** the same persisted readings, **When** the dashboard check-in card renders, **Then** it shows a trend consistent with the monitoring page's trend.
-3. **Given** a completed session, **When** the employee returns to the idle dashboard card, **Then** the card shows a recap of the last session (e.g., duration and overall tenor).
-4. **Given** a sustained-tense stretch within a session, **When** readings are persisted, **Then** the data needed to detect "sustained tense" is available to a downstream consumer (feature 009) without this feature triggering or rendering any questionnaire.
+1. **Given** a day with one or more ended sessions with persisted readings, **When** the dashboard check-in card renders, **Then** it shows a recap of today (a headline plus a today mini-trend) without exposing a precise per-window number as the headline.
+2. **Given** that card, **When** the employee selects "View today", **Then** the card expands in place (no route change) to reveal the full day trend — sessions at their real times on an auto-fit axis, gaps where unmonitored — and a per-session breakdown, all from the same persisted data as the mini-trend.
+3. **Given** a session that produced no readable band (ended while warming up, or every window skipped), **When** today renders, **Then** that session appears honestly as "no clear read" and is never shown as calm/at-ease; a session with a single reading renders as a single point, not a line.
+4. **Given** the employee has no check-ins today, **When** the card renders, **Then** it shows a graceful empty state ("No check-ins yet today" / first-run "Start your first check-in"); and a first-run user with no calibration anchor is routed to calibrate-first rather than an empty recap.
+5. **Given** a sustained-tense stretch within a session, **When** readings are persisted, **Then** the data needed to detect "sustained tense" is available to a downstream consumer (009) without this feature triggering or rendering any questionnaire.
+6. **Given** a session is currently live, **When** the employee opens today, **Then** the live session is not drawn in the retrospective today view (it remains on the monitoring page); today is retrospective over ended (and stale-abandoned) sessions only.
 
 ---
 
@@ -145,9 +147,14 @@ After (and during) a session, the employee can see a retrospective session trend
 **Persistence & analytics**
 
 - **FR-017**: Each per-window reading MUST be persisted, keyed to user + session + timestamp, recording at minimum the label and the probability, so the trend, the session recap, and a future questionnaire trigger can read them.
-- **FR-018**: The dashboard check-in card and the monitoring page MUST both render the session trend from this persisted data, and the two trends MUST be consistent with each other.
-- **FR-019**: The idle dashboard check-in card MUST show a recap of the user's last session, or a graceful **empty state** ("Start your first check-in") when the user has never completed a session. (mock-gap #7)
+- **FR-018**: The dashboard check-in card MUST render **today's** trend, and its collapsed mini-trend and its expanded in-place "today" view MUST render from the **same** persisted data and be consistent with each other. The monitoring page MUST render the **live session's own** trend; where a session appears in both, the two MUST agree.
+- **FR-019**: The dashboard check-in card MUST show a recap of the user's check-ins for **today** (a headline plus a today trend), a graceful **empty state** when there are none ("No check-ins yet today" / first-run "Start your first check-in"), and MUST route a user with **no calibration anchor** to calibrate-first rather than an empty recap. (mock-gap #7)
 - **FR-020**: The system MUST persist readings in a form sufficient for a downstream consumer (feature 009) to detect a sustained-tense signal. This feature defines the seam only and MUST NOT build any questionnaire trigger, UI, or flow.
+- **FR-028**: The full "today" view MUST be reached by expanding the check-in card **in place** on the dashboard; this feature MUST NOT introduce a separate route or page for it.
+- **FR-029**: A session that produced no readable band MUST be shown honestly (e.g. "no clear read") and MUST NEVER be rendered as calm/at-ease. A session with a single reading MUST render as a single point, not a line. Skipped or absent readings MUST render as **gaps** and MUST NEVER be fabricated or carried forward as a last value. (Supersedes the prior "gap/last-value" wording.)
+- **FR-030**: The today trend's time axis MUST auto-fit the day's first-to-last reading so early or late sessions fit, and all reading/session times MUST be formatted in the **user's local timezone**.
+- **FR-031**: The today view MUST be retrospective: a currently-live session MUST NOT be drawn in it.
+- **FR-032**: The system MUST enforce **at most one active (unended) monitoring session per user**. Starting a new check-in MUST finalize any prior active session as ended with end_reason **'abandoned'** (last-tab-wins). The today recap MUST treat a finalized-abandoned session as an ordinary ended session, and MUST NOT surface a fresh, currently-live session as a past recap. (Session-lifecycle invariant — already implemented in migration `583049b` + create route `873c3c5`; see `data-model.md`.)
 
 **Display & design (governed by the approved mock)**
 
@@ -180,9 +187,10 @@ After (and during) a session, the employee can see a retrospective session trend
 - **SC-005**: 100% of no-face periods upload zero windows, and 100% of "couldn't read this window" outcomes produce no reading.
 - **SC-006**: Out-of-frame is detected and the session auto-pauses within 90 seconds of face loss, auto-resumes within one stride (~10 seconds) of the user's return, and auto-ends after 5 minutes of continuous absence.
 - **SC-007**: A slow window never delays the next window's capture; capture cadence stays on its fixed 10-second stride regardless of per-window inference time.
-- **SC-008**: The session trend shown on the dashboard check-in card matches the trend shown on the monitoring page for the same session.
+- **SC-008**: The dashboard card's collapsed mini-trend and its expanded today view render from the **same** source and are consistent; and where a session appears both live on the monitoring page and in today, the two agree.
 - **SC-009**: No raw video leaves the device/backend inference layer toward any manager-facing surface (Principle I invariant holds).
 - **SC-010**: All seven operational states (permission, **warming-up**, active, out-of-frame, paused, blocked, ended) are reachable and visually distinct, using the Principle V color roles (amber = stress only; foggy = attention/error; meadow = calm/affirmative); **"ended" returns to the dashboard with an updated recap, not a standalone monitoring-page screen** (mock-gap #6).
+- **SC-011**: No session that produced no readable band is ever rendered as calm/at-ease in the today view.
 
 ## Assumptions
 
