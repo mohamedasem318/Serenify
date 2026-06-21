@@ -185,8 +185,8 @@ warms up again, consistent with the 60 s contract. (No server-side clip buffer t
 **Response 200**: `{ "session_id": "…", "ended_at": "…" }`
 
 "Ended" is **not** a monitoring-page screen (mock-gap #6): on success the client
-navigates back to the **dashboard**, whose idle check-in card shows the updated
-recap (read via `getLastSessionRecap`). (FR-006, SC-010.)
+navigates back to the **dashboard**, whose check-in card shows the updated
+today recap (read via `getTodayRecap`). (FR-006, SC-010.)
 
 **Outcomes**: `200` · `403` · `404` · `401`.
 
@@ -194,9 +194,10 @@ recap (read via `getLastSessionRecap`). (FR-006, SC-010.)
 
 ## Reads are NOT here
 
-The session trend and the last-session recap are read **by the browser** via
-Supabase RLS (typed client `lib/api/monitoring-reads.ts`, SELECT-own), not via
-this API — see `data-model.md` § Reads. This keeps one typed read path, keeps the
+The session trend and the today recap (today-scoped, retrospective: today's
+ended-or-stale-active sessions, the fresh-live one excluded) are read **by the
+browser** via Supabase RLS (typed client `lib/api/monitoring-reads.ts`,
+SELECT-own), not via this API — see `data-model.md` § Reads. This keeps one typed read path, keeps the
 raw probability server-only via the column whitelist, and gives the manager layer
 no access path at all.
 
