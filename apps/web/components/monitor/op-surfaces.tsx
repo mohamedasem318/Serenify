@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CameraOff, CircleDashed } from "lucide-react";
+import { Camera, CameraOff, CircleDashed, Focus } from "lucide-react";
 
 import { CauseChip } from "@/components/anchor/cause-chip";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 
 import { Bloom } from "./bloom";
 import {
+  heldBloomTone,
   liveDisplay,
   type CameraErrorKind,
   type MonitorState,
@@ -15,10 +16,10 @@ import {
 } from "./use-monitoring-session";
 
 /**
- * The monitoring stage surfaces — US1 SUBSET (feature 008, T030 + the calibrate-first
- * patch): permission / warming-up / active (live band) / blocked / the skipped-read
- * note / calibrate-first (no-anchor). Paused and out-of-frame are US2 (T036+) and are
- * NOT built here.
+ * The monitoring stage surfaces — US1 (T030 + the calibrate-first patch) + US2 (T039):
+ * permission / warming-up / active (live band) / **out-of-frame** / **paused** / blocked /
+ * the skipped-read note / calibrate-first (no-anchor). Plus the lifecycle controls
+ * (Pause / Resume / End) the orchestrator wires.
  *
  * Colour discipline (Principle V, roles taken verbatim from the approved mock):
  *  - permission = MEADOW — an affirmative "let's start" invitation (meadow icon + the
@@ -28,6 +29,10 @@ import {
  *    step, not an error) with a MEADOW "Start calibration" CTA (the mock's `btn-primary`):
  *    the whole panel reads as an invitation, never an error, never amber/foggy;
  *  - the skipped-read note = FOGGY (a couldn't-read, never amber);
+ *  - **out-of-frame = FOGGY** (we've lost sight of you — attention, never amber: a
+ *    coverage/presence cue is not a stress signal, FR-007/FR-022); the bloom dims but holds
+ *    its last colour;
+ *  - **paused = neutral** (a calm break, ink stateline, muted body — never amber/foggy);
  *  - amber appears ONLY on the stress bands (a-little-tense / tense statelines).
  * NO number/gauge anywhere — the bloom is ambient and the band is the only signal (FR-015).
  *
@@ -153,7 +158,49 @@ function SkipNote({ cause }: { cause: React.ComponentProps<typeof CauseChip>["ca
   );
 }
 
-function LiveStage({ state }: { state: MonitorState }) {
+/**
+ * The lifecycle controls (US2 — T038). 44 px-min touch targets; the mock's button roles:
+ * Pause / End are quiet outline ghosts, Resume is the meadow primary (the one affirmative
+ * action on the paused surface). Available on every live-ish state, never on the panels.
+ */
+function LiveControls({ onPause, onEnd }: { onPause: () => void; onEnd: () => void }) {
+  return (
+    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+      <Button onClick={onPause} variant="outline" className="h-11 px-5">
+        Pause
+      </Button>
+      <Button onClick={onEnd} variant="outline" className="h-11 px-5">
+        End session
+      </Button>
+    </div>
+  );
+}
+
+function PausedControls({ onResume, onEnd }: { onResume: () => void; onEnd: () => void }) {
+  return (
+    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
+      <Button onClick={onResume} variant="meadow" className="h-11 px-5">
+        Resume
+      </Button>
+      <Button onClick={onEnd} variant="outline" className="h-11 px-5">
+        End session
+      </Button>
+    </div>
+  );
+}
+
+/** The class that dims the held bloom on out-of-frame / paused (mock `.bloom.dim`). */
+const DIM_BLOOM = "opacity-40 saturate-50 transition-[opacity,filter] duration-700";
+
+function LiveStage({
+  state,
+  onPause,
+  onEnd,
+}: {
+  state: MonitorState;
+  onPause: () => void;
+  onEnd: () => void;
+}) {
   const d = liveDisplay(state);
   return (
     <div className="flex flex-col items-center text-center">
@@ -168,6 +215,7 @@ function LiveStage({ state }: { state: MonitorState }) {
       </p>
       <p className="mt-1.5 max-w-[42ch] text-base text-muted">{d.sub}</p>
       {state.skipCause && <SkipNote cause={state.skipCause} />}
+      <LiveControls onPause={onPause} onEnd={onEnd} />
       {/* FR-024 reassurance footnote — bottom of the reading card, below the band (constitution:
           all text lives in the card, never on the raw video). Quiet MUTED secondary token, small
           and low-emphasis; mt-8 keeps clear of the band so it reads as a calm footnote, not an
@@ -177,14 +225,86 @@ function LiveStage({ state }: { state: MonitorState }) {
   );
 }
 
+/**
+ * Out-of-frame (US2 — T039): the auto-pause surface. The bloom dims but keeps its last
+ * colour; the stateline + the foggy prompt are the attention cue (FOGGY, never amber —
+ * a presence cue is not a stress signal). The self-view (force-revealed by the viewfinder)
+ * is the user's mirror to re-centre; capture auto-resumes the moment they return.
+ */
+function OutOfFrameStage({
+  state,
+  onPause,
+  onEnd,
+}: {
+  state: MonitorState;
+  onPause: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <Bloom tone={heldBloomTone(state)} className={DIM_BLOOM} />
+      <p aria-live="polite" className="mt-6 font-display text-3xl tracking-tight text-foggy">
+        Waiting for you
+      </p>
+      <div
+        role="status"
+        aria-live="polite"
+        className="mt-6 flex w-full max-w-md items-start gap-3 rounded-2xl border border-foggy/40 bg-foggy/10 px-4 py-3.5 text-left"
+      >
+        <Focus className="mt-0.5 size-5 shrink-0 text-foggy" strokeWidth={1.75} aria-hidden />
+        <div>
+          <p className="text-sm font-semibold text-ink">We&apos;ve lost sight of you</p>
+          <p className="mt-0.5 text-sm text-muted">
+            Move back into frame and Serenify picks up where you left off.
+          </p>
+        </div>
+      </div>
+      <LiveControls onPause={onPause} onEnd={onEnd} />
+    </div>
+  );
+}
+
+/**
+ * Paused (US2 — T039): the manual break. Camera off (no self-view), bloom dimmed; a calm,
+ * neutral surface — never amber/foggy (a break is not stress or an error). Resume is the
+ * meadow affirmative; End closes out to the dashboard.
+ */
+function PausedStage({
+  state,
+  onResume,
+  onEnd,
+}: {
+  state: MonitorState;
+  onResume: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <div className="flex flex-col items-center text-center">
+      <Bloom tone={heldBloomTone(state)} className={DIM_BLOOM} />
+      <p className="mt-6 font-display text-3xl tracking-tight text-ink">Paused — taking a break</p>
+      <p className="mt-1.5 max-w-[42ch] text-base text-muted">
+        Your camera is off. Resume whenever you&apos;re ready.
+      </p>
+      <PausedControls onResume={onResume} onEnd={onEnd} />
+    </div>
+  );
+}
+
 export function OpSurfaces({
   state,
   onAllow,
   onRetryBlocked,
+  onPause = () => {},
+  onResume = () => {},
+  onEnd = () => {},
 }: {
   state: MonitorState;
   onAllow: () => void;
   onRetryBlocked: () => void;
+  /** US2 lifecycle handlers (optional so the US1 panels render standalone in tests). */
+  onPause?: () => void;
+  onResume?: () => void;
+  onEnd?: () => void;
 }) {
   switch (state.op) {
     case "permission":
@@ -193,8 +313,16 @@ export function OpSurfaces({
       return <BlockedPanel kind={state.cameraError ?? "blocked"} onRetry={onRetryBlocked} />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
+    case "out-of-frame":
+      return <OutOfFrameStage state={state} onPause={onPause} onEnd={onEnd} />;
+    case "paused":
+      return <PausedStage state={state} onResume={onResume} onEnd={onEnd} />;
+    case "ended":
+      // Terminal — the orchestrator navigates to the dashboard (mock-gap #6: no standalone
+      // ended screen). Render nothing during the brief unmount window.
+      return null;
     default:
       // warming-up | active — the live bloom stage.
-      return <LiveStage state={state} />;
+      return <LiveStage state={state} onPause={onPause} onEnd={onEnd} />;
   }
 }

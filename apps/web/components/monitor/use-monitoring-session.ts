@@ -11,7 +11,7 @@ import type { Band, WindowOutcome } from "@/lib/api/monitoring-client";
  * (`monitoring-session.tsx`) owns every side effect (camera, recorder, the API calls,
  * the face-detector gate). Mirrors the calibration reducer's shape (DECISION-21).
  *
- * US1 operational states only (the locked list — no invented states):
+ * Operational states (the locked list — no invented states):
  *
  *   permission ──camera granted + session created──▶ warming-up
  *   permission ──camera blocked / unavailable─────▶ blocked
@@ -21,7 +21,15 @@ import type { Band, WindowOutcome } from "@/lib/api/monitoring-client";
  *   active     ──"reading"────────────────────────▶ active (band updates)
  *   any-live   ──"skipped"────────────────────────▶ (op unchanged) + transient skip note over the last band
  *
- * Paused / out-of-frame / ended are US2 (T036+) and are deliberately NOT modelled here.
+ * US2 (T038) adds the presence + lifecycle states — the orchestrator owns their side effects
+ * (the 90 s / 5 min absence timers, camera acquire/release, the PATCH/end calls):
+ *
+ *   active|warming-up ──90 s no-face (auto)───────▶ out-of-frame (self-view + foggy prompt; camera STAYS on)
+ *   out-of-frame      ──face returns (auto)───────▶ active|warming-up (auto-resume)
+ *   any-live          ──manual Pause─────────────▶ paused (camera RELEASED)
+ *   paused            ──manual Resume────────────▶ warming-up (fresh recording → warms up again)
+ *   any              ──manual End / 5 min absence─▶ ended (camera released → dashboard)
+ *
  * There is NO numeric field anywhere — the band is the only stress signal (FR-015).
  */
 
@@ -31,8 +39,14 @@ export type MonitorOp =
   | "permission" // need camera access (initial; and after a blocked retry)
   | "warming-up" // recording, no confident band yet (held until the server stops)
   | "active" // a smoothed band is showing
+  | "out-of-frame" // auto-paused on 90 s no-face — self-view + foggy prompt, camera still on (US2)
+  | "paused" // manual break — camera released, resumable (US2)
+  | "ended" // session ended (manual End / auto-end) — orchestrator navigates to the dashboard (US2)
   | "blocked" // camera blocked / busy / no device
   | "calibrate-first"; // no_anchor → the calibrate-first panel routes to /app/calibrate (op-surfaces)
+
+/** The live capture ops (recorder running, a band may show). */
+const LIVE_OPS: ReadonlySet<MonitorOp> = new Set(["warming-up", "active"]);
 
 /**
  * Which camera-access failure the blocked surface explains — mapped from the
@@ -67,7 +81,13 @@ export type MonitorAction =
   | { type: "CAMERA_ERROR"; kind: CameraErrorKind } // mapped getUserMedia rejection (err.name)
   | { type: "NO_ANCHOR" }
   | { type: "WINDOW_OUTCOME"; outcome: WindowOutcome }
-  | { type: "WINDOW_SKIPPED"; cause: FailureCause };
+  | { type: "WINDOW_SKIPPED"; cause: FailureCause }
+  // US2 (T038) — presence + lifecycle
+  | { type: "GO_OUT_OF_FRAME" } // 90 s no-face (auto) — from a live op only
+  | { type: "RETURN_TO_FRAME" } // face returned (auto) — resume from out-of-frame
+  | { type: "PAUSE" } // manual Pause — camera released
+  | { type: "RESUME" } // manual Resume — fresh recording warms up again
+  | { type: "END" }; // manual End or auto-end — terminal
 
 export function monitorReducer(state: MonitorState, action: MonitorAction): MonitorState {
   switch (action.type) {
@@ -83,9 +103,16 @@ export function monitorReducer(state: MonitorState, action: MonitorAction): Moni
       return { ...state, op: "calibrate-first", cameraError: null };
     case "WINDOW_SKIPPED":
       // A skipped window keeps the last band (bloom holds) and shows the foggy skip
-      // note; op is unchanged (still warming-up, or still active).
+      // note; op is unchanged (still warming-up, or still active). Ignored once the
+      // session is no longer live (paused / out-of-frame / ended) — a late in-flight
+      // window must not paint a skip note over a paused/ended surface.
+      if (!LIVE_OPS.has(state.op)) return state;
       return { ...state, skipCause: action.cause };
     case "WINDOW_OUTCOME": {
+      // A reading/warming outcome only acts while live; a window that lands after a
+      // pause/out-of-frame/end (uploads are gated, but one may be in flight) is dropped
+      // so it can't flip a paused/ended session back to active (FR-016 non-blocking).
+      if (!LIVE_OPS.has(state.op)) return state;
       const { outcome } = action;
       if (outcome.outcome === "reading") {
         return { op: "active", band: outcome.band, skipCause: null };
@@ -99,6 +126,26 @@ export function monitorReducer(state: MonitorState, action: MonitorAction): Moni
       // cause from on-device telemetry) via WINDOW_SKIPPED; treated as a no-op here.
       return state;
     }
+    case "GO_OUT_OF_FRAME":
+      // Auto-pause only from a live op (the orchestrator also guards on op before the
+      // PATCH); the held band stays so the dimmed bloom keeps the last colour. Clearing
+      // the skip note so the out-of-frame prompt is the only foggy surface.
+      if (!LIVE_OPS.has(state.op)) return state;
+      return { ...state, op: "out-of-frame", skipCause: null };
+    case "RETURN_TO_FRAME":
+      // Auto-resume: back to active if a band was already showing, else keep warming.
+      if (state.op !== "out-of-frame") return state;
+      return { ...state, op: state.band ? "active" : "warming-up", skipCause: null };
+    case "PAUSE":
+      // Manual break from any live-ish op; terminal states are not pausable.
+      if (state.op === "ended") return state;
+      return { ...state, op: "paused", skipCause: null };
+    case "RESUME":
+      // Fresh recording → warm up again (T036: client restarts the recorder on resume).
+      if (state.op !== "paused") return state;
+      return { ...state, op: "warming-up", skipCause: null };
+    case "END":
+      return { ...state, op: "ended", skipCause: null };
     default:
       return state;
   }
@@ -153,6 +200,15 @@ export const WARMING_DISPLAY: BandDisplay = {
 export function liveDisplay(state: MonitorState): BandDisplay {
   if (state.op === "active" && state.band) return BAND_DISPLAY[state.band];
   return WARMING_DISPLAY;
+}
+
+/**
+ * The bloom tone the out-of-frame / paused surfaces hold while dimmed: the LAST band's
+ * colour if one was showing, else the warming meadow. (The mock dims the bloom but keeps
+ * its colour — it never resets to neutral on a pause/out-of-frame.)
+ */
+export function heldBloomTone(state: MonitorState): BloomTone {
+  return state.band ? BAND_DISPLAY[state.band].tone : "warming";
 }
 
 export function useMonitoringSession() {

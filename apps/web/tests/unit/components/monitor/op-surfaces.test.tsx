@@ -142,3 +142,84 @@ describe("OpSurfaces — calibrate-first (no-anchor): foggy attention + meadow '
     expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
   });
 });
+
+/* ── US2 (T039) — out-of-frame + paused surfaces, both FOGGY/neutral, never amber ── */
+
+describe("OpSurfaces — out-of-frame (FOGGY attention, never amber: FR-007/FR-022)", () => {
+  const render1 = (onPause = noop, onEnd = noop) =>
+    render(
+      <OpSurfaces
+        state={{ op: "out-of-frame", band: "tense", skipCause: null }}
+        onAllow={noop}
+        onRetryBlocked={noop}
+        onPause={onPause}
+        onEnd={onEnd}
+      />,
+    );
+
+  it("shows the foggy lost-sight prompt + the dimmed held bloom, with Pause/End controls", () => {
+    const onPause = vi.fn();
+    const onEnd = vi.fn();
+    const { container } = render1(onPause, onEnd);
+
+    expect(screen.getByText(/waiting for you/i)).toBeInTheDocument();
+    expect(screen.getByText(/lost sight of you/i)).toBeInTheDocument();
+    expect(screen.getByText(/move back into frame/i)).toBeInTheDocument();
+
+    // FOGGY stateline — never amber, even though the HELD band is tense (a presence cue is
+    // not a stress signal; FR-022).
+    const stateline = screen.getByText(/waiting for you/i);
+    expect(stateline.className).toContain("text-foggy");
+    expect(stateline.className).not.toMatch(/amber/);
+
+    // The bloom dims but holds the last (tense) colour (mock `.bloom.dim`).
+    const bloom = screen.getByTestId("bloom");
+    expect(bloom).toHaveAttribute("data-tone", "tense");
+    expect(bloom.className).toContain("opacity-40");
+
+    fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+    expect(onPause).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /end session/i }));
+    expect(onEnd).toHaveBeenCalled();
+
+    expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
+  });
+
+  it("uses NO amber colour token anywhere on the out-of-frame surface (foggy only)", () => {
+    const { container } = render1();
+    expect(container.querySelector(".text-amber, .bg-amber, .border-amber")).toBeNull();
+    // the prompt box is foggy-tinted
+    expect(container.querySelector(".bg-foggy\\/10, .border-foggy\\/40")).not.toBeNull();
+  });
+});
+
+describe("OpSurfaces — paused (calm, neutral; camera off)", () => {
+  it("shows the paused copy with a meadow Resume + End, no amber/foggy stateline", () => {
+    const onResume = vi.fn();
+    const onEnd = vi.fn();
+    render(
+      <OpSurfaces
+        state={{ op: "paused", band: "at_ease", skipCause: null }}
+        onAllow={noop}
+        onRetryBlocked={noop}
+        onResume={onResume}
+        onEnd={onEnd}
+      />,
+    );
+    expect(screen.getByText(/paused — taking a break/i)).toBeInTheDocument();
+    expect(screen.getByText(/your camera is off/i)).toBeInTheDocument();
+    const stateline = screen.getByText(/paused — taking a break/i);
+    expect(stateline.className).toContain("text-ink"); // neutral — not a stress/attention colour
+    expect(stateline.className).not.toMatch(/amber|foggy/);
+
+    fireEvent.click(screen.getByRole("button", { name: /resume/i }));
+    expect(onResume).toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /end session/i }));
+    expect(onEnd).toHaveBeenCalled();
+  });
+
+  it("ended renders nothing — the orchestrator navigates to the dashboard (mock-gap #6)", () => {
+    const { container } = render0({ op: "ended", band: null, skipCause: null });
+    expect(container.textContent ?? "").toBe("");
+  });
+});

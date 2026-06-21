@@ -17,14 +17,23 @@ import type { FramingSignal } from "@/lib/face-detect/framing";
 import { useFramingGuide } from "@/lib/face-detect/use-framing-guide";
 import {
   createSession as defaultCreateSession,
+  endSession as defaultEndSession,
+  patchStatus as defaultPatchStatus,
   submitWindow as defaultSubmitWindow,
   type CreateSessionResult,
+  type EndReason,
+  type SessionStatus,
   type SubmitWindowResult,
 } from "@/lib/api/monitoring-client";
 import { createClient } from "@/lib/supabase/client";
 
-import { CameraPill } from "./camera-pill";
+import { CameraPill, type CameraPillStatus } from "./camera-pill";
 import { OpSurfaces } from "./op-surfaces";
+import {
+  createPresenceMonitor as defaultCreatePresenceMonitor,
+  type PresenceCallbacks,
+  type PresenceMonitorHandle,
+} from "./presence-monitor";
 import { type CameraErrorKind, useMonitoringSession } from "./use-monitoring-session";
 import { Viewfinder } from "./viewfinder";
 import {
@@ -43,9 +52,17 @@ import {
  * calibration recorder's injectable I/O seam (DECISION-26) so honest tests run the REAL
  * orchestration against fakes (happy-dom ships no camera / MediaRecorder).
  *
- * Privacy: the camera is released on unmount; the client receives only the band — no
- * number, no raw video persisted client-side. US1 has no Pause/End controls (US2/T036);
- * the exit is the back-to-dashboard link.
+ * US2 (T038): the full presence + lifecycle — out-of-frame auto-pause (90 s no-face,
+ * self-view kept on, auto-resume on return), manual Pause (camera released) / Resume
+ * (camera re-acquired), auto-end (5 min absence) and manual End → dashboard. The two
+ * absence timers live in the injectable `presence-monitor` controller, fed by the SAME
+ * feature-005 framing signal that gates uploads (FR-003) — no second detector.
+ *
+ * Privacy + camera lifecycle (acquire-late / release-always, unchanged from US1): the
+ * camera opens only after a confirmed session; it is released on manual Pause, on End/
+ * auto-end, and on unmount. Out-of-frame is the deliberate exception — the camera STAYS on
+ * (self-view + return detection) so the session can auto-resume (the mock's self-view-
+ * during-pause). The client receives only the band — no number, no raw video persisted.
  */
 
 export interface MonitoringSession {
@@ -57,8 +74,14 @@ export interface MonitoringDeps {
   getSession: () => Promise<MonitoringSession | null>;
   createSession: (token: string) => Promise<CreateSessionResult>;
   submitWindow: (sessionId: string, clip: Blob, token: string) => Promise<SubmitWindowResult>;
+  endSession: (sessionId: string, reason: EndReason, token: string) => Promise<{ ok: boolean }>;
+  patchStatus: (sessionId: string, status: SessionStatus, token: string) => Promise<{ ok: boolean }>;
   createRecorder?: (stream: MediaStream) => MinimalWindowRecorder;
   createDetector?: (opts?: CreateDetectorOptions) => Promise<DetectorHandle | null>;
+  /** Injectable so US2 tests drive the REAL out-of-frame wiring against a fake monitor. */
+  createPresenceMonitor: (cb: PresenceCallbacks) => PresenceMonitorHandle;
+  /** Leave the monitor (End / auto-end) → dashboard. Full nav by default (fresh recap). */
+  navigate: (path: string) => void;
   isSecureContext: () => boolean;
   strideMs: number;
 }
@@ -75,6 +98,14 @@ function defaultDeps(): MonitoringDeps {
     },
     createSession: defaultCreateSession,
     submitWindow: defaultSubmitWindow,
+    endSession: defaultEndSession,
+    patchStatus: defaultPatchStatus,
+    createPresenceMonitor: defaultCreatePresenceMonitor,
+    // A full document navigation back to the dashboard so the just-ended session's recap
+    // is fetched fresh (mock-gap #6: End returns to the dashboard, no standalone screen).
+    navigate: (path) => {
+      if (typeof window !== "undefined") window.location.assign(path);
+    },
     // createRecorder + createDetector omitted → the real MediaRecorder / self-hosted loader.
     isSecureContext: isSecureContextOk,
     strideMs: DEFAULT_STRIDE_MS,
@@ -110,12 +141,28 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const facePresentRef = useRef(false);
   const guideRef = useRef<"loading" | "active" | "unavailable">("loading");
   const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
+  // US2 presence + lifecycle: the absence-timer controller, the current op (read by the
+  // monitor callbacks without re-creating them), the single-end guard (collapses the
+  // auto-end / manual-End race), and a stable session-start for the elapsed clock.
+  const presenceRef = useRef<PresenceMonitorHandle | null>(null);
+  const opRef = useRef(op);
+  const endingRef = useRef(false);
+  const sessionStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    opRef.current = op;
+  }, [op]);
 
   // Track the latest framing signal: gate uploads on face presence (only when the
-  // detector is actually running) and accumulate telemetry to refine a skip cause.
+  // detector is actually running), accumulate telemetry to refine a skip cause, AND feed
+  // the presence monitor so a continuous 90 s absence auto-pauses and a return auto-resumes
+  // (US2). The SAME signal does all three — no second detection mechanism (FR-003/FR-007).
   const handleSignal = useCallback((signal: FramingSignal) => {
     facePresentRef.current = signal.facePresent;
     accumulate(telemetryRef.current, signal);
+    const monitor = presenceRef.current;
+    if (!monitor) return;
+    if (signal.facePresent) monitor.faceSeen();
+    else monitor.faceLost();
   }, []);
 
   const { guide } = useFramingGuide({
@@ -185,11 +232,101 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     [deps, dispatch],
   );
 
+  // End the session (manual End or the 5-min auto-end) and leave to the dashboard. The
+  // auto-end / manual-End RACE is resolved two ways: (1) `endingRef` so only the FIRST
+  // caller runs the teardown + navigation, and (2) the client maps the backend's 409
+  // "already ended" to ok — so even if both POSTs go out, the loser's 409 is treated as
+  // success and never surfaces an error (the task's explicit re-end requirement).
+  const endAndLeave = useCallback(
+    async (reason: EndReason) => {
+      if (endingRef.current) return;
+      endingRef.current = true;
+      // Release every external resource immediately (privacy + stop the absence clocks)
+      // BEFORE the network round-trip — the camera light goes off at once. End releases
+      // the camera (unlike out-of-frame, which keeps it on for the self-view).
+      presenceRef.current?.stop();
+      presenceRef.current = null;
+      recorderRef.current?.stop();
+      recorderRef.current = null;
+      stopStream();
+      setStreaming(false);
+      dispatch({ type: "END" });
+
+      const sessionId = sessionIdRef.current;
+      const token = tokenRef.current;
+      if (sessionId && token) {
+        await deps.endSession(sessionId, reason, token); // 409 → ok (re-end race resolved silently)
+      }
+      deps.navigate("/app");
+    },
+    [deps, dispatch, stopStream],
+  );
+
+  // Open the camera, start the continuous recorder, and (re)arm the presence monitor.
+  // Shared by first-grant and Resume; the CALLER dispatches the right state action
+  // (CAMERA_GRANTED vs RESUME). Returns false on a getUserMedia rejection (already routed
+  // to blocked). Does NOT create a session — that is the caller's responsibility.
+  const openCameraAndRecord = useCallback(async (): Promise<boolean> => {
+    // A getUserMedia rejection maps by err.name to honest copy (NotReadableError → busy,
+    // NotFound/Overconstrained → no-device, NotAllowed/Security/else → blocked).
+    let stream: MediaStream;
+    try {
+      stream = await deps.getUserMedia({ video: true, audio: false }); // mic off (audio is feature 013)
+    } catch (err) {
+      const kind = cameraErrorKind(err).replace("camera-", "") as CameraErrorKind;
+      dispatch({ type: "CAMERA_ERROR", kind });
+      return false;
+    }
+
+    streamRef.current = stream;
+    setStream(stream); // drive the reactive bind-and-play effect
+    telemetryRef.current = emptyTelemetry();
+    facePresentRef.current = false;
+    setStreaming(true); // mounts the <video> + detector; bind-and-play wires srcObject + play()
+    setPinned(true); // show the self-view at once — the user sees themselves as capture starts
+
+    const recorder = createWindowRecorder({
+      stream,
+      strideMs: deps.strideMs,
+      onWindow: handleWindow,
+      createRecorder: deps.createRecorder,
+    });
+    recorderRef.current = recorder;
+    recorder.start();
+
+    // (Re)arm the absence timers; handleSignal feeds faceSeen() / faceLost(). The callbacks
+    // read opRef so they only act from the right state (auto-pause only from a live op,
+    // auto-resume only from out-of-frame) and PATCH the lifecycle to match.
+    presenceRef.current?.stop();
+    presenceRef.current = deps.createPresenceMonitor({
+      onOutOfFrame: () => {
+        if (opRef.current !== "active" && opRef.current !== "warming-up") return;
+        dispatch({ type: "GO_OUT_OF_FRAME" });
+        const sid = sessionIdRef.current;
+        const tok = tokenRef.current;
+        if (sid && tok) void deps.patchStatus(sid, "out_of_frame", tok);
+      },
+      onReturn: () => {
+        if (opRef.current !== "out-of-frame") return;
+        dispatch({ type: "RETURN_TO_FRAME" });
+        const sid = sessionIdRef.current;
+        const tok = tokenRef.current;
+        if (sid && tok) void deps.patchStatus(sid, "active", tok);
+      },
+      onAutoEnd: () => {
+        void endAndLeave("auto_absence");
+      },
+    });
+    return true;
+  }, [deps, dispatch, endAndLeave, handleWindow]);
+
   const handleAllow = useCallback(async () => {
-    // "Try again" / fresh start: fully release any prior recorder + stream BEFORE
+    // "Try again" / fresh start: fully release any prior recorder + stream + monitor BEFORE
     // re-requesting, so a lingering track can't make the next getUserMedia fail "busy"
     // (the stuck-blocked symptom). Mirrors the calibration recorder's acquire/release
     // discipline (anchor-recorder.tsx).
+    presenceRef.current?.stop();
+    presenceRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
     stopStream();
@@ -232,34 +369,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       }
     }
 
-    // Only NOW open the camera — after a confirmed 201. A getUserMedia rejection maps by
-    // err.name to honest copy (NotReadableError → busy, NotFound/Overconstrained →
-    // no-device, NotAllowed/Security/else → blocked) — no generic catch-all.
-    let stream: MediaStream;
-    try {
-      stream = await deps.getUserMedia({ video: true, audio: false }); // mic off (audio is feature 013)
-    } catch (err) {
-      const kind = cameraErrorKind(err).replace("camera-", "") as CameraErrorKind;
-      dispatch({ type: "CAMERA_ERROR", kind });
-      return;
-    }
-
-    streamRef.current = stream;
-    setStream(stream); // drive the reactive bind-and-play effect
-    telemetryRef.current = emptyTelemetry();
-    setStreaming(true); // mounts the <video>; the bind-and-play effect wires srcObject + play()
-    setPinned(true); // show the self-view at once — the user sees themselves as capture starts
-    dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
-
-    const recorder = createWindowRecorder({
-      stream,
-      strideMs: deps.strideMs,
-      onWindow: handleWindow,
-      createRecorder: deps.createRecorder,
-    });
-    recorderRef.current = recorder;
-    recorder.start();
-  }, [deps, dispatch, handleWindow, stopStream]);
+    // Only NOW open the camera — after a confirmed 201.
+    const opened = await openCameraAndRecord();
+    if (opened) dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
+  }, [deps, dispatch, openCameraAndRecord, stopStream]);
 
   const handleRetryBlocked = useCallback(() => {
     // Fully release, then re-request: handleAllow stops any prior tracks at its top and
@@ -267,29 +380,77 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     void handleAllow();
   }, [handleAllow]);
 
-  // Session timer (chrome) — ticks once recording begins.
-  useEffect(() => {
-    if (op !== "warming-up" && op !== "active") return;
-    const startedAt = performance.now();
-    const id = setInterval(() => setElapsed(Math.floor((performance.now() - startedAt) / 1000)), 1000);
-    return () => clearInterval(id);
-  }, [op]);
+  // Manual Pause (FR-006): stop scoring + RELEASE the camera, then PATCH paused. Resume
+  // re-acquires. The standing release effect also fires on op→paused; releasing here too
+  // turns the camera light off immediately (no wait for the commit).
+  const handlePause = useCallback(() => {
+    presenceRef.current?.stop();
+    presenceRef.current = null;
+    recorderRef.current?.stop();
+    recorderRef.current = null;
+    stopStream();
+    setStreaming(false);
+    dispatch({ type: "PAUSE" });
+    const sessionId = sessionIdRef.current;
+    const token = tokenRef.current;
+    if (sessionId && token) void deps.patchStatus(sessionId, "paused", token);
+  }, [deps, dispatch, stopStream]);
 
-  // Release the camera + recorder whenever we leave a live capture state (→ blocked /
-  // calibrate-first / permission): stop every track and null the stream ref, so no camera
-  // light is left on after a calibrate round-trip. (Under acquire-late the camera only
-  // ever opens once op is live, so this is the standing guarantee that a non-live op never
-  // holds the camera — it does not setState, only releases external resources.)
+  // Manual Resume: re-acquire the camera (re-entering the blocked surface if access was
+  // revoked or the context is no longer secure), reusing the existing session → PATCH
+  // active. A fresh recording warms up again (T036: no server-side buffer to restore).
+  const handleResume = useCallback(async () => {
+    if (!deps.isSecureContext()) {
+      dispatch({ type: "CAMERA_BLOCKED" });
+      return;
+    }
+    const sessionId = sessionIdRef.current;
+    const token = tokenRef.current;
+    if (!sessionId || !token) {
+      dispatch({ type: "CAMERA_BLOCKED" });
+      return;
+    }
+    const opened = await openCameraAndRecord();
+    if (!opened) return; // getUserMedia rejection already routed to blocked
+    dispatch({ type: "RESUME" }); // → warming-up
+    void deps.patchStatus(sessionId, "active", token);
+  }, [deps, dispatch, openCameraAndRecord]);
+
+  const handleEnd = useCallback(() => {
+    void endAndLeave("user");
+  }, [endAndLeave]);
+
+  // Session elapsed clock. Starts once capture first begins and keeps a STABLE origin
+  // across op changes (warming-up → active → out-of-frame → paused), so the timer never
+  // resets mid-session. It stops only once the session is no longer live (ended / blocked).
+  const sessionLive =
+    op === "warming-up" || op === "active" || op === "out-of-frame" || op === "paused";
   useEffect(() => {
-    if (op === "warming-up" || op === "active") return;
+    if (!sessionLive) return;
+    if (sessionStartRef.current === null) sessionStartRef.current = performance.now();
+    const start = sessionStartRef.current;
+    const id = setInterval(() => setElapsed(Math.floor((performance.now() - start) / 1000)), 1000);
+    return () => clearInterval(id);
+  }, [sessionLive]);
+
+  // Release the camera + recorder + monitor whenever we leave a capturing state. NOTE:
+  // out-of-frame KEEPS the camera on (self-view + return detection for auto-resume), so it
+  // is NOT released here — only paused / ended / blocked / calibrate-first / permission do.
+  // Under acquire-late the camera only opens once live, so this is the standing guarantee
+  // that a non-capturing op never holds the camera (releases external resources only).
+  useEffect(() => {
+    if (op === "warming-up" || op === "active" || op === "out-of-frame") return;
+    presenceRef.current?.stop();
+    presenceRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
     stopStream();
   }, [op, stopStream]);
 
-  // Release the camera + recorder on unmount / route navigation (privacy; no leaked stream).
+  // Release the camera + recorder + monitor on unmount / route navigation (privacy).
   useEffect(
     () => () => {
+      presenceRef.current?.stop();
       recorderRef.current?.stop();
       stopStream();
     },
@@ -297,6 +458,8 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   );
 
   const recording = streaming && (op === "warming-up" || op === "active");
+  const pillStatus: CameraPillStatus =
+    op === "out-of-frame" ? "out-of-frame" : op === "paused" ? "paused" : recording ? "recording" : "off";
   const mm = String(Math.floor(elapsed / 60)).padStart(2, "0");
   const ss = String(elapsed % 60).padStart(2, "0");
 
@@ -310,7 +473,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         >
           <span aria-hidden>←</span> Dashboard
         </Link>
-        {recording && (
+        {sessionLive && (
           <span className="ml-auto text-sm tabular-nums text-muted">
             Session · <b className="font-semibold text-ink">{mm}:{ss}</b>
           </span>
@@ -319,9 +482,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
 
       <div className="relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-border bg-surface p-6 shadow-soft sm:min-h-[480px] sm:p-10">
         <div className="group absolute right-4 top-4 z-10">
-          <CameraPill recording={recording} pinned={pinned} onTogglePin={() => setPinned((p) => !p)} />
+          <CameraPill status={pillStatus} pinned={pinned} onTogglePin={() => setPinned((p) => !p)} />
           {streaming && (
-            <Viewfinder pinned={pinned}>
+            <Viewfinder pinned={pinned} outOfFrame={op === "out-of-frame"}>
               <video
                 ref={attachVideo}
                 autoPlay
@@ -333,7 +496,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
           )}
         </div>
 
-        <OpSurfaces state={state} onAllow={handleAllow} onRetryBlocked={handleRetryBlocked} />
+        <OpSurfaces
+          state={state}
+          onAllow={handleAllow}
+          onRetryBlocked={handleRetryBlocked}
+          onPause={handlePause}
+          onResume={handleResume}
+          onEnd={handleEnd}
+        />
       </div>
     </div>
   );

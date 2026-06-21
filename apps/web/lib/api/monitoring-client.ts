@@ -138,8 +138,10 @@ export async function submitWindow(
 }
 
 /**
- * End a session (US2 endpoint — wired in T036). Provided here so the typed client is
- * complete; US1 never calls it (US1 has no End control — exit is via the back link).
+ * End a session (US2 — T038). Manual End and the 5-min auto-end can both fire; the backend
+ * returns **409** when the session is already ended. The end intent is idempotent — an
+ * already-ended session IS the desired terminal state — so a **409 is treated as success**,
+ * resolving the re-end race silently (the caller goes to the ended state, never an error).
  */
 export async function endSession(
   sessionId: string,
@@ -152,7 +154,8 @@ export async function endSession(
       headers: { ...authHeaders(accessToken), "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
     });
-    return { ok: res.ok };
+    // 409 = already ended (the auto-end / manual-End race) → success, not an error.
+    return { ok: res.ok || res.status === 409 };
   } catch {
     return { ok: false };
   }

@@ -2,6 +2,7 @@ import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MonitoringSession, type MonitoringDeps } from "@/components/monitor/monitoring-session";
+import type { PresenceCallbacks } from "@/components/monitor/presence-monitor";
 import type { SubmitWindowResult } from "@/lib/api/monitoring-client";
 import type { MinimalWindowRecorder } from "@/components/monitor/window-recorder";
 
@@ -229,5 +230,174 @@ describe("MonitoringSession orchestrator", () => {
         value: () => Promise.resolve(),
       });
     }
+  });
+});
+
+/**
+ * Feature 008 / US2 — T041: the presence + lifecycle wiring, driven through the orchestrator
+ * against fakes. The absence timing itself is unit-tested in presence-monitor.test.ts; here
+ * we inject a FAKE presence monitor that captures its callbacks, so we can fire the
+ * out-of-frame / return / auto-end EDGES and assert the orchestrator's response (the right
+ * PATCH/end + surface), without a real clock.
+ */
+function makeUs2Deps() {
+  let rec: MinimalWindowRecorder | null = null;
+  let presenceCb: PresenceCallbacks | null = null;
+  const trackStop = vi.fn();
+  const patchStatus = vi.fn(async () => ({ ok: true }));
+  const endSession = vi.fn(async () => ({ ok: true }));
+  const navigate = vi.fn();
+  const presenceStub = { faceSeen: vi.fn(), faceLost: vi.fn(), stop: vi.fn() };
+
+  const deps: Partial<MonitoringDeps> = {
+    isSecureContext: () => true,
+    getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop: trackStop }] }) as unknown as MediaStream),
+    getSession: vi.fn(async () => ({ accessToken: "tok" })),
+    createSession: vi.fn(async () => ({ ok: true, sessionId: "sid", modelVersion: "m" }) as const),
+    submitWindow: vi.fn(
+      async (): Promise<SubmitWindowResult> => ({ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } }),
+    ),
+    patchStatus,
+    endSession,
+    navigate,
+    createPresenceMonitor: (cb) => {
+      presenceCb = cb;
+      return presenceStub;
+    },
+    createRecorder: () => {
+      rec = {
+        state: "inactive",
+        mimeType: "video/webm",
+        ondataavailable: null,
+        onstop: null,
+        start() {
+          this.state = "recording";
+        },
+        stop() {
+          this.state = "inactive";
+        },
+      };
+      return rec;
+    },
+    createDetector: async () => null,
+    strideMs: 10_000,
+  };
+  return {
+    deps,
+    patchStatus,
+    endSession,
+    navigate,
+    trackStop,
+    presence: () => presenceCb as PresenceCallbacks,
+  };
+}
+
+async function startSession(deps: Partial<MonitoringDeps>) {
+  render(<MonitoringSession deps={deps} />);
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+  });
+}
+
+describe("MonitoringSession — US2 presence + lifecycle", () => {
+  it("manual Pause releases the camera and PATCHes paused (FR-006)", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+    expect(screen.getByText(/getting a read on things/i)).toBeInTheDocument(); // warming-up
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+    });
+
+    expect(h.patchStatus).toHaveBeenCalledWith("sid", "paused", "tok");
+    expect(h.trackStop).toHaveBeenCalled(); // camera released on a manual pause
+    expect(screen.getByText(/paused — taking a break/i)).toBeInTheDocument();
+  });
+
+  it("Resume re-acquires the camera and PATCHes active (a fresh recording warms up again)", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /resume/i }));
+    });
+
+    expect(h.deps.getUserMedia).toHaveBeenCalledTimes(2); // re-acquired
+    expect(h.patchStatus).toHaveBeenCalledWith("sid", "active", "tok");
+    expect(screen.getByText(/getting a read on things/i)).toBeInTheDocument(); // warming again
+  });
+
+  it("manual End releases the camera, ends reason=user, and navigates to the dashboard", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /end session/i }));
+    });
+
+    expect(h.endSession).toHaveBeenCalledWith("sid", "user", "tok");
+    expect(h.trackStop).toHaveBeenCalled(); // End releases the camera
+    expect(h.navigate).toHaveBeenCalledWith("/app");
+  });
+
+  it("out-of-frame auto-pause: 90 s no-face → PATCH out_of_frame + foggy surface, camera KEPT on", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+    h.trackStop.mockClear();
+
+    await act(async () => {
+      h.presence().onOutOfFrame(); // the 90 s timer firing
+    });
+
+    expect(h.patchStatus).toHaveBeenCalledWith("sid", "out_of_frame", "tok");
+    expect(screen.getByText(/waiting for you/i)).toBeInTheDocument();
+    // The camera STAYS on for the self-view + return detection (unlike a manual pause/end).
+    expect(h.trackStop).not.toHaveBeenCalled();
+  });
+
+  it("auto-resume: a return from out-of-frame PATCHes active and warms up again (SC-006)", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+    await act(async () => {
+      h.presence().onOutOfFrame();
+    });
+
+    await act(async () => {
+      h.presence().onReturn(); // face came back
+    });
+
+    expect(h.patchStatus).toHaveBeenCalledWith("sid", "active", "tok");
+    expect(screen.getByText(/getting a read on things/i)).toBeInTheDocument();
+  });
+
+  it("auto-end: 5 min absence → end reason=auto_absence + navigate", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+
+    await act(async () => {
+      h.presence().onAutoEnd();
+    });
+
+    expect(h.endSession).toHaveBeenCalledWith("sid", "auto_absence", "tok");
+    expect(h.navigate).toHaveBeenCalledWith("/app");
+  });
+
+  it("re-end race: a manual End and a racing auto-end end + navigate EXACTLY ONCE", async () => {
+    const h = makeUs2Deps();
+    await startSession(h.deps);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /end session/i })); // reason=user
+      h.presence().onAutoEnd(); // the 5-min timer firing in the same tick
+    });
+
+    // The single-end guard collapses the race onto the first caller; the loser is a no-op
+    // (and even if both POSTs went out, the client maps the backend's 409 to success).
+    expect(h.endSession).toHaveBeenCalledTimes(1);
+    expect(h.endSession).toHaveBeenCalledWith("sid", "user", "tok");
+    expect(h.navigate).toHaveBeenCalledTimes(1);
   });
 });

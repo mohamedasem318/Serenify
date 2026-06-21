@@ -78,6 +78,69 @@ describe("monitorReducer — state transitions (US1 op-states)", () => {
   });
 });
 
+describe("monitorReducer — US2 presence + lifecycle transitions", () => {
+  const active: MonitorState = { op: "active", band: "at_ease", skipCause: null };
+
+  it("auto-pause: a live op → out-of-frame, HOLDING the last band (for the dimmed bloom)", () => {
+    const s = monitorReducer(active, { type: "GO_OUT_OF_FRAME" });
+    expect(s.op).toBe("out-of-frame");
+    expect(s.band).toBe("at_ease");
+    // also valid from warming-up (no band yet)
+    const warming = monitorReducer({ op: "warming-up", band: null, skipCause: null }, { type: "GO_OUT_OF_FRAME" });
+    expect(warming.op).toBe("out-of-frame");
+  });
+
+  it("GO_OUT_OF_FRAME is ignored from a non-live op (paused / ended / permission)", () => {
+    for (const op of ["paused", "ended", "permission"] as const) {
+      const s: MonitorState = { op, band: null, skipCause: null };
+      expect(monitorReducer(s, { type: "GO_OUT_OF_FRAME" }).op).toBe(op);
+    }
+  });
+
+  it("auto-resume: out-of-frame → active when a band was showing, warming-up when not", () => {
+    const withBand = monitorReducer(
+      { op: "out-of-frame", band: "tense", skipCause: null },
+      { type: "RETURN_TO_FRAME" },
+    );
+    expect(withBand.op).toBe("active");
+    const noBand = monitorReducer(
+      { op: "out-of-frame", band: null, skipCause: null },
+      { type: "RETURN_TO_FRAME" },
+    );
+    expect(noBand.op).toBe("warming-up");
+    // RETURN_TO_FRAME only acts from out-of-frame
+    expect(monitorReducer(active, { type: "RETURN_TO_FRAME" }).op).toBe("active");
+  });
+
+  it("manual Pause → paused (from any live-ish op); Resume → warming-up (fresh recording)", () => {
+    expect(monitorReducer(active, { type: "PAUSE" }).op).toBe("paused");
+    expect(
+      monitorReducer({ op: "out-of-frame", band: "tense", skipCause: null }, { type: "PAUSE" }).op,
+    ).toBe("paused");
+    const resumed = monitorReducer({ op: "paused", band: "tense", skipCause: null }, { type: "RESUME" });
+    expect(resumed.op).toBe("warming-up"); // a fresh recording warms up again (T036)
+    // RESUME only acts from paused; PAUSE is a no-op once ended
+    expect(monitorReducer(active, { type: "RESUME" }).op).toBe("active");
+    expect(monitorReducer({ op: "ended", band: null, skipCause: null }, { type: "PAUSE" }).op).toBe("ended");
+  });
+
+  it("END is terminal from anywhere (manual End / auto-end)", () => {
+    for (const op of ["warming-up", "active", "out-of-frame", "paused"] as const) {
+      expect(monitorReducer({ op, band: null, skipCause: null }, { type: "END" }).op).toBe("ended");
+    }
+  });
+
+  it("a late in-flight reading never flips a paused / out-of-frame / ended session live (FR-016)", () => {
+    const reading = { type: "WINDOW_OUTCOME", outcome: { outcome: "reading", band: "tense", capturedAt: "t" } } as const;
+    const paused: MonitorState = { op: "paused", band: "at_ease", skipCause: null };
+    expect(monitorReducer(paused, reading)).toEqual(paused); // unchanged — band held, op paused
+    expect(monitorReducer({ op: "out-of-frame", band: "at_ease", skipCause: null }, reading).op).toBe("out-of-frame");
+    expect(monitorReducer({ op: "ended", band: null, skipCause: null }, reading).op).toBe("ended");
+    // a late skip note also cannot paint over a paused surface
+    expect(monitorReducer(paused, { type: "WINDOW_SKIPPED", cause: "low-light" }).skipCause).toBeNull();
+  });
+});
+
 describe("band → display mapping", () => {
   it("maps each band to its bloom tone + stateline colour role", () => {
     expect(BAND_DISPLAY.at_ease.tone).toBe("ease");
