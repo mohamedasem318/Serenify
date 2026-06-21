@@ -3823,3 +3823,67 @@ or measured — not worth its complexity now.
 **Revisit at**: production deploy — re-measure keep-up on the real target; build the full rolling
 decoded-frame buffer (and/or read-loop back-pressure) only if the surgical flat cost breaches the
 10 s stride there.
+
+---
+
+## 2026-06-21 — 008 edge-case pass: one-active-session-per-user fix + US4 read-path decisions
+
+**Status**: Accepted. The session-lifecycle fix is **built** on `008-stress-inference-service`
+(migration `20260621000000` + create-route change, TDD, full `apps/api` suite green and the
+migration applied + the local replay test re-verified against real Postgres). The US4 read
+decisions are **recorded only** — US4 (T046–T050) is deferred/unbuilt; they bind its build.
+
+**Context**: a design-and-logic edge-case sweep over feature 008 (US1–US4), triaged with a
+scoped read-only CC audit. The audit's two findings of substance were both in the **built**
+US1–US3 lifecycle; the rest of the worry surface (timezone, empty/degenerate sessions, n=1
+render, today-boundary) is about the **deferred** US4 read path and resolves to build-time
+constraints. The privacy "watch hardest" item (D1) was found already structural at the DB
+engine (column-GRANT whitelist denies `label`/`stress_probability` even to a `SELECT *`,
+`42501`) — robust as-is, re-audit the US4 `.select()` strings when they land.
+
+**Decision 1 — one active session per user (C1 orphaned-active + C2 concurrency), BUILT.**
+Ending is client-driven (even the 5-min auto-end is a browser timer), so a crash/closed tab
+left a row `active` forever — which also shadowed the recap's "most-recent **ended** session"
+read — and two tabs created two parallel active sessions (the `plan.md` one-per-user
+assumption was unenforced). Fix = make "at most one active (`ended_at IS NULL`) per user" a
+**DB invariant** + **last-tab-wins** create route:
+
+- **Partial unique index** `monitoring_sessions_one_active_per_user_idx (user_id) WHERE
+  ended_at IS NULL` (migration `20260621000000`), preceded by a **backfill** that finalizes
+  pre-existing duplicate actives (keep most-recent `started_at`, end the rest) so the index
+  builds on existing data. New terminal `end_reason = 'abandoned'` (CHECK extended).
+- **Create route** finalizes any prior active session as `'abandoned'` **before** inserting
+  the new run — `ended_at` stamped at that session's **last reading** (the honest
+  end-of-activity), or `now()` if it never scored. Two tabs ⇒ last-tab-wins; the first tab's
+  next window upload hits the existing-already-ended `409` path. A concurrent insert that
+  loses the index race (`23505`) is recovered with one finalize+retry, never a 500.
+- Constraints honored: no service-role (all I/O as the user via the forwarded JWT, RLS the
+  control), RLS + the SELECT column whitelist unchanged, append-only readings unchanged.
+- Files: `supabase/migrations/20260621000000_one_active_session_per_user.sql`,
+  `apps/api/app/supabase_user.py` (`get_active_session` / `latest_reading_at` /
+  `finalize_active_session`), `apps/api/app/routers/monitoring.py` (create route),
+  `apps/api/tests/test_monitoring_endpoints.py` (fake models the index race; 4 new tests).
+
+**Decision 2 — US4 read-path rules (recorded; bind T046–T050 when built).** Mirrored into
+`specs/008-stress-inference-service/data-model.md` § Reads ("US4 read-rules"):
+
+- **Retrospective-only (B4)** — Today/recap show **ended** sessions; a fresh-active session
+  (reading within 5 min) stays on the monitor page and is never drawn. "Ended" for the recap
+  = `status='ended'` **OR stale-active** (active but last reading > 5 min old; activity signal
+  = `max(window_readings.captured_at)`, no new column).
+- **Read-less / degenerate (B1/B2/B3)** — a session with **zero** readable bands renders an
+  honest "checked in, but we didn't get a clear read" + neutral marker, **never** calm; a
+  single-band (n=1) session renders as a **dot**, never a broken/empty path.
+- **Day attribution (A2)** — a midnight-crossing session belongs to its **start day**; no split.
+- **Local time (A3)** — render `captured_at` (stored UTC) in the **user's local** zone.
+- **Empty-vs-calibrate (E4)** — the recap/empty surface on the check-in card must branch on
+  `has_anchor` so a no-anchor first-ever user gets calibrate-first, not "no sessions yet".
+
+**Rationale**: structural-not-disciplinary, matching the rest of 008 — the index enforces the
+invariant even if the route is bypassed or races; the create route makes the common path clean
+(no orphan accumulation). Settling the US4 read rules now keeps the deferred build (and its
+mock) from re-deriving them and prevents a degenerate session ever reading as "at ease".
+
+**Revisit if**: a server-side session reaper is later added (would make the stale-active read
+rule redundant — then the recap could filter strictly on `status='ended'`); or US4's mock
+chooses a different in-progress treatment than retrospective-only (re-open Decision 2/B4).
