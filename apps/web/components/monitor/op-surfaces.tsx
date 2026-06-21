@@ -163,13 +163,19 @@ function SkipNote({ cause }: { cause: React.ComponentProps<typeof CauseChip>["ca
  * Pause / End are quiet outline ghosts, Resume is the meadow primary (the one affirmative
  * action on the paused surface). Available on every live-ish state, never on the panels.
  */
+// Controls stack full-width at narrow widths (≥360 px, big tap targets) and become a
+// centred row at sm+ (Principle VI / FR-025). Layout-only — the handlers are unchanged.
+const CONTROLS_ROW =
+  "mt-7 flex w-full max-w-xs flex-col gap-3 sm:max-w-none sm:flex-row sm:flex-wrap sm:items-center sm:justify-center";
+const CONTROL_BTN = "h-11 w-full px-5 sm:w-auto";
+
 function LiveControls({ onPause, onEnd }: { onPause: () => void; onEnd: () => void }) {
   return (
-    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-      <Button onClick={onPause} variant="outline" className="h-11 px-5">
+    <div className={CONTROLS_ROW}>
+      <Button onClick={onPause} variant="outline" className={CONTROL_BTN}>
         Pause
       </Button>
-      <Button onClick={onEnd} variant="outline" className="h-11 px-5">
+      <Button onClick={onEnd} variant="outline" className={CONTROL_BTN}>
         End session
       </Button>
     </div>
@@ -178,11 +184,11 @@ function LiveControls({ onPause, onEnd }: { onPause: () => void; onEnd: () => vo
 
 function PausedControls({ onResume, onEnd }: { onResume: () => void; onEnd: () => void }) {
   return (
-    <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-      <Button onClick={onResume} variant="meadow" className="h-11 px-5">
+    <div className={CONTROLS_ROW}>
+      <Button onClick={onResume} variant="meadow" className={CONTROL_BTN}>
         Resume
       </Button>
-      <Button onClick={onEnd} variant="outline" className="h-11 px-5">
+      <Button onClick={onEnd} variant="outline" className={CONTROL_BTN}>
         End session
       </Button>
     </div>

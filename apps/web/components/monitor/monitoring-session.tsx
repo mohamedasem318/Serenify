@@ -500,7 +500,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       <div className="mb-3 flex items-center gap-3 px-1">
         <Link
           href="/app"
-          className="inline-flex min-h-11 items-center gap-1.5 text-sm text-muted transition-colors hover:text-ink"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           <span aria-hidden>←</span> Dashboard
         </Link>

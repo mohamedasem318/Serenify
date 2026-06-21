@@ -210,7 +210,7 @@ export function TodayView({
               onClick={onToggle}
               aria-expanded={expanded}
               aria-controls="today-full"
-              className="rounded-control px-1 py-1.5 text-sm font-semibold text-foggy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="inline-flex min-h-11 items-center rounded-control px-1 text-sm font-semibold text-foggy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
               {expanded ? "Hide today ▴" : "View today ▾"}
             </button>
@@ -384,7 +384,7 @@ export function TodayView({
               <button
                 type="button"
                 onClick={onToggle}
-                className="rounded-control px-1 py-1.5 text-sm font-semibold text-foggy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="inline-flex min-h-11 items-center rounded-control px-1 text-sm font-semibold text-foggy hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 Collapse
               </button>
