@@ -73,6 +73,22 @@ frame-concat) were rejected during planning (CHANGELOG 2026-06-19).
   the user's own anchor); the client disambiguates the overloaded 409 by body
   (`no_anchor` vs `ended_session`) and routes mid-session no-anchor to the existing
   calibrate-first surface (commit `e49b82e`, SC-004).
+- **Edge-case pass (2026-06-21) — one active session per user (C1/C2 fix).** A scoped
+  read-only audit over US1–US4 surfaced two real gaps in the **built** lifecycle: an
+  orphaned `active` session (client-driven end → a crash leaves `ended_at` NULL forever,
+  also shadowing the recap's "most-recent ended session" read) and no concurrency guard
+  (two tabs → two parallel active sessions). Fixed structurally: partial unique index
+  `(user_id) WHERE ended_at IS NULL` (migration `20260621000000`, with a backfill that
+  finalizes pre-existing duplicate actives) + a **last-tab-wins** create route that
+  finalizes a prior active session as `'abandoned'` (stamped at its last reading, or now())
+  before starting a new run, with a one-shot finalize+retry on the index race — no
+  service-role, RLS + SELECT whitelist unchanged. TDD; full `apps/api` suite green; the
+  migration applied + the local replay regression re-verified on real Postgres. The
+  remaining audit items (timezone, empty/degenerate sessions, n=1 render, in-progress
+  treatment, has_anchor branching) were **decided** and recorded as **US4 read-rules**
+  (DECISIONS 2026-06-21; `data-model.md` § Reads) — they bind the deferred T046–T050 build,
+  no read-path code today. The privacy "watch hardest" item (D1) was found already
+  structural at the DB engine (column-GRANT whitelist), robust as-is.
 
 **Still open**:
 
