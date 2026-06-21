@@ -73,10 +73,14 @@ Sign in as the calibrated employee → dashboard → **Start check-in**.
     paused, blocked are reachable and visually distinct (meadow=calm,
     amber=stress, foggy=attention); **ended** returns to the dashboard recap (not
     a standalone screen).
-11. **Mobile (Principle VI)**: at 360 px the stage stacks (bloom shrinks, controls
+11. **Read-less honesty (SC-011)**: complete a session that produces **no readable
+    band** (end during warming-up, or keep every window skipped) → in the dashboard
+    **today** view it shows honestly as **"no clear read"** (neutral marker) and is
+    **never** rendered as calm/at-ease; an n=1 session renders as a single point.
+12. **Mobile (Principle VI)**: at 360 px the stage stacks (bloom shrinks, controls
     full-width); **reduced-motion** suppresses the bloom breathing while band +
     trend stay legible.
-12. **Continuous-capture windowing validation (R-7, front-loaded — do this FIRST;
+13. **Continuous-capture windowing validation (R-7, front-loaded — do this FIRST;
     lighter, no fidelity gate)**: on **real Chrome + real Safari/iOS** (Safari → fragmented
     MP4, Chrome → webm), confirm the **one continuous `MediaRecorder`** + **growing
     upload** of the contiguous recording-so-far + **server tail-extract of the last 60 s**
