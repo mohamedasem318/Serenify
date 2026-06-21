@@ -1,9 +1,18 @@
 # Smoke tests — Stress Inference Service (008)
 
-Human-validated checks (Constitution Principle VII). **This session covers only Phase 1 +
-Phase 2 (the windowing validation).** The full feature smoke matrix (camera permission on real
-browsers, mobile 360 px, reduced-motion, privacy, etc.) is added in Phase 8 (task T054)
-once the feature is built.
+Human-validated checks (Constitution Principle VII). This file has **two parts**:
+
+1. **Phase 1 + Phase 2 — the windowing validation** (below, from the `T001` section through the
+   `T009` checkpoint): the continuous capture/upload/tail-extract path **works + keeps up** on real
+   Chrome + Safari/iOS. **Done** (T009 = PASS, 2026-06-19).
+2. **Phase 8 — the feature smoke matrix** (added by **T054**; see the
+   [Phase 8 section](#phase-8--feature-smoke-matrix-t054) below): the human checks the automated
+   suite cannot cover — camera permission on real browsers, Safari/iOS secure-context + capture,
+   HTTPS/localhost, low-light skip, mobile 360 px, reduced-motion, privacy (temp/clip deleted), and
+   that no manager surface can read sessions/readings. These are **operator-run on real devices**
+   (the agent cannot drive a webcam or a real iPhone, and Playwright gives false cross-browser
+   capture confidence — see the e2e-load-timing flake history); the Phase 8 Playwright happy-path
+   (T051) covers the wiring on Chromium/Firefox but is **not** the cross-browser capture gate.
 
 > **✅ WINDOWING RESOLVED (2026-06-19) — B2 rejected; continuous single-stream adopted.**
 > Windowing is **continuous single-stream upload + server tail-extract of the last 60 s**, which
@@ -231,6 +240,49 @@ live**, so the live worst-case is *also* inflated by ~30 concurrent strides cont
 windowing (**faithful by construction** — no fidelity outcome to fail). Localhost/demo is unaffected.
 
 **Checkpoint**: continuous windowing proven on real devices → feature build (Phase 3+) may begin.
+
+---
+
+# Phase 8 — feature smoke matrix (T054)
+
+The operator-run human checks for the built feature, maps to the `quickstart.md` Success Criteria
+(SC-001…SC-011) and Constitution Principle VI. **Run on real devices and real browsers** — the
+agent cannot drive a webcam, a real iPhone, or a permission prompt, and Playwright has repeatedly
+given **false** cross-browser capture/timing confidence. The Phase 8 Playwright happy-path
+(`employee-monitoring.spec.ts`, T051) exercises the start→permission→warming-up→reading→end→recap
+**wiring** on Chromium/Firefox against the feature-005 detector-injection seam — it is **not** the
+cross-browser capture gate; **ST-08-2 / ST-08-3 below are.**
+
+**Setup**: a **calibrated employee** account (has `profiles.anchor_vector`) + a **no-anchor**
+employee (for the calibrate-first checks) + a **manager** (team_lead/admin, for the privacy check).
+Run the web app over a secure context (`localhost`, or HTTPS via a tunnel for the phone). Backend up
+(`/healthz` → ready). Raw video is never committed (the fixtures `.gitignore` excludes video).
+
+| ID | Check (what the operator does) | Pass criterion | SC / FR |
+|---|---|---|---|
+| **ST-08-1** | **Camera permission — real browsers (Chrome, Firefox, Edge, Safari).** Sign in (calibrated employee) → dashboard → **Start check-in** → the browser shows its native camera prompt → **Allow**. | The permission panel (meadow "Allow camera access") precedes the prompt; on grant the stage shows **warming-up** ("getting a read on things"); on **deny** it shows the foggy **blocked** panel with a gentle fix + "Try again", never a crash. | SC-001, SC-010, FR-001/010/031–035 |
+| **ST-08-2** | **Safari/iOS secure-context + capture (real iPhone).** Open the app on a real iPhone Safari over **HTTPS** (a LAN-IP over plain HTTP must be refused by `getUserMedia`) → Start check-in → Allow. | Over HTTPS: the camera opens, warming-up shows, and a smoothed band appears by ~90–105 s. Over a non-secure origin: no camera, the blocked/secure-context surface shows (never a silent dead page). This is the **cross-browser capture gate** (continuous `MediaRecorder` on Safari — webm **or** fMP4, per the T009 finding). | SC-001, SC-010; Principle VI |
+| **ST-08-3** | **HTTPS / localhost requirement.** On desktop, load the monitor page over a plain `http://<LAN-IP>` origin (not localhost). | `getUserMedia` is blocked by the browser; the app routes to the foggy **secure-context/blocked** surface with calm copy — it does **not** appear to "hang" with a granted-but-dead camera. | FR-010; Principle VI |
+| **ST-08-4** | **First smoothed reading + drift-not-flicker.** With the calibrated employee, run a steady ~2-min session. | Warming-up holds until ~90–105 s, then a band (At ease / A little tense / Tense) appears and refreshes ~every 10 s; the band **drifts**, it does not flip every window. **No** percentage/gauge/number anywhere. | SC-001/002/003, FR-015/021 |
+| **ST-08-5** | **No-anchor → calibrate-first.** Sign in as the **no-anchor** employee → Start check-in. | The foggy **calibrate-first** panel with a meadow **Start calibration** action — **no camera prompt is ever triggered** and **no stress band is ever shown** (no global/fallback anchor). | SC-004, FR-011 |
+| **ST-08-6** | **Low-light / skipped-read.** Dim the room or partially cover the lens mid-session so a window fails the coverage gate (but a face is still roughly present). | The **foggy "couldn't get a clear read" note** shows (distinct from out-of-frame), names a likely cause via the shared CauseChip, and the bloom **keeps the last band** — the loop continues; never amber, never a crash. | SC-005, FR-013/022 |
+| **ST-08-7** | **Out-of-frame lifecycle.** Step out of frame > ~90 s, then return; separately, stay out ~5 min. | Out > 90 s → auto-pause + self-view revealed + foggy "move back into frame" (camera stays on); return → auto-resume within ~one stride; stay out ~5 min → auto-end → back to the dashboard recap. | SC-006, FR-004/005/006/007 |
+| **ST-08-8** | **Pause / Resume / End.** Manual **Pause** → **Resume** → **End**. | Pause **releases the camera** (light off) and shows the calm neutral paused surface; Resume re-acquires (re-prompts if access was revoked) and warms up again; End returns to the dashboard whose check-in card shows the updated **today** recap (no standalone "ended" screen). | SC-010, FR-006 |
+| **ST-08-9** | **Today recap + expand-in-place + read-less honesty.** Complete ≥1 session today, return to the dashboard, click **View today**; separately, end one session during warming-up (or keep every window skipped). | The card recaps **today** and **expands in place** (no route change — URL stays `/app`); the collapsed mini-trend and the expanded view come from the **same** rows (agree); an n=1 session is a single dot; a read-less session reads **"no clear read"** (a neutral marker), **never** calm/at-ease; the day axis auto-fits in **local** time; a still-live session is **not** drawn in today. | SC-008, SC-011, FR-018/019/028–032 |
+| **ST-08-10** | **Mobile ≥ 360 px stacking.** Load the monitor page + the dashboard recap at a 360 px viewport (real phone or devtools). | The stage stacks: bloom shrinks, controls go full-width / stack, the pill + viewfinder reposition without overflow; the expanded today view is legible and scrollable; touch targets are ≥ 44 × 44 px. | Principle VI, FR-025 (mock-gap #3) |
+| **ST-08-11** | **Reduced-motion.** Enable the OS "reduce motion" setting, then visit the monitor page (all op-states) + the dashboard recap (expand/collapse + cross-highlight). | The bloom's breathing is suppressed (static), the camera-pill pulse stops, the expand animation + the card↔timeline highlight transitions are reduced — while the band, the trend, and all copy stay legible and the cross-highlight still works on hover **and** keyboard focus. | Principle VI, FR-025 |
+| **ST-08-12** | **Keyboard a11y.** Tab through the monitor stage (Allow / Pause / Resume / End / pill) and the dashboard recap (View today toggle, plot badges, timeline rows). | Every control has a **visible focus ring**; the expand toggle exposes `aria-expanded`; focusing a session's plot badge or timeline row **cross-highlights** its partner (keyboard parity with hover); no focus trap. | Principle VI, FR-025 |
+| **ST-08-13** | **Privacy — no raw video persists (SC-009).** During and after a session, inspect the server: the API's temp dir holds no leftover clip, no per-session clip buffer is retained, and the Supabase tables hold **no** video — only `window_readings` rows (band/captured_at/scored/skip_cause + the server-only label/proba). | The uploaded clip + any temp file are deleted in `finally` (verify the temp dir is empty after each window and after End/crash); **no** column or table stores raw video. Pairs with the automated `test_no_raw_video_persistence` (T055). | SC-009, FR-027; Principle I |
+| **ST-08-14** | **Privacy — no manager surface reads sessions/readings.** As the **manager**, attempt to read `monitoring_sessions` / `window_readings` (via the app's manager surfaces and a direct Supabase RLS SELECT as that manager). | The manager gets **nothing** — there is no manager RLS policy on either table, so the SELECT returns zero rows / is denied; no manager UI exposes another user's sessions or readings. Pairs with the automated RLS assertions (T055). | SC-009; Principle I |
+
+**Operator log** — record the run here (one row per device/browser, or a free-form note):
+
+| Date | Device / browser | STs run | Result | Notes |
+|---|---|---|---|---|
+| _pending_ | _e.g. iPhone 13 / Safari 17_ | ST-08-2, ST-08-10, ST-08-11 | _pending_ | run before production sign-off |
+
+> **Note**: ST-08-2 / ST-08-3 (real Safari/iOS secure-context + capture) remain the authoritative
+> cross-browser capture gate; the T051 Playwright happy-path does **not** replace them.
 
 ---
 
