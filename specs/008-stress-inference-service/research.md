@@ -287,15 +287,16 @@ a dedicated INSERT-only role).
 **Retention**: `window_readings` retained **90 days**, then purged (a scheduled
 cleanup is a documented follow-up — see data-model.md); `monitoring_sessions`
 (already aggregate-ish: duration + tenor) retained longer. Rationale: 90 days
-covers the session trend, the last-session recap, the 009 seam, and demo windows
+covers the session trend, the today recap, the 009 seam, and demo windows
 while minimizing long-term retention of affective signal data (Principle I).
 
-**Aggregation**: Both the dashboard card mini-trend and the monitoring-page trend
-read the **same** `window_readings` rows for the session through a single typed
-reader (`getSessionTrend(sessionId)`) → identical source → guaranteed consistent
-(SC-008). The idle recap reads the most recent **ended** session
-(`getLastSessionRecap(userId)`); when none exists it returns `null` and the card
-shows the empty state.
+**Aggregation**: The dashboard card's collapsed mini-trend and its expanded today
+view read the **same** `window_readings` rows through a single typed reader
+(`getTodayTrend(userId)`) → identical source → guaranteed consistent (SC-008); the
+monitoring page reads its own this-session reader (`getSessionTrend(sessionId)`).
+The today recap (`getTodayRecap(userId)`) is **today-scoped and retrospective** —
+today's **ended-or-stale-active** sessions, the fresh-live one excluded; when there
+are none today it returns empty and the card shows the empty state.
 
 **FR-020 seam (no trigger built)**: `window_readings.band` + `captured_at` +
 `session_id` are sufficient for feature 009 to detect "sustained tense" (a run of
@@ -343,9 +344,9 @@ and add one missed state.
    **dashboard with an updated recap** — no distinct ended screen is built.
    **SC-010 wording adjusted**: "ended" is verified as the
    return-to-dashboard-with-recap transition, not a standalone visual.
-7. **Idle recap empty state** — a calibrated user who has never run a session has
-   no "last session." The idle check-in card shows a graceful empty state ("Start
-   your first check-in") rather than a broken/blank recap.
+7. **Idle recap empty state** — a calibrated user with **no check-ins today** has
+   nothing to recap. The check-in card shows a graceful empty state ("No check-ins
+   yet today" / first-run "Start your first check-in") rather than a broken/blank recap.
 
 ---
 
