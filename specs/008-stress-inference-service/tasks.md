@@ -201,7 +201,7 @@ description: "Task list — Stress Inference Service (008)"
 - [ ] T055 Privacy verification (Principle I / Quality Gate 6): test + smoke that **no raw video persists** (the uploaded clip + temp deleted in `finally`; no clip buffer), **no manager policy** exists on either table, and `label`/`stress_probability` are **unreadable** by the owner (SELECT column whitelist). (SC-009)
 - [ ] T056 [P] **Model-owner note** (carry-over, do **not** act in 008): record the `metadata.json` stale `window_eval_config` (30 s) cleanup as a model-owner task — **metadata/doc-only, no `model_version` bump, no anchor invalidation, do not edit the model artifact**. Add to `docs/backlog.md` (or the MODELS.md note) flagged for the model owner. (research R-0)
 - [ ] T057 [P] **Retention follow-up note**: document the 90-day `window_readings` purge (a `pg_cron` job or scheduled task) as a follow-up **not built in 008**; the policy is decided, the job is deferred. (data-model.md § Retention)
-- [ ] T058 Run `quickstart.md` verification (SC-001…SC-010) and the full Principle VII test sweep (pytest `apps/api` + `packages/ml-video`; Vitest `apps/web`; Playwright employee e2e; the tail-window unit test + webm/VFR hardening). Confirm green before review.
+- [ ] T058 Run `quickstart.md` verification (SC-001…SC-011) and the full Principle VII test sweep (pytest `apps/api` + `packages/ml-video`; Vitest `apps/web`; Playwright employee e2e; the tail-window unit test + webm/VFR hardening). Confirm green before review.
 
 ---
 
