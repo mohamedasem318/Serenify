@@ -25,6 +25,7 @@ import {
   type SessionStatus,
   type SubmitWindowResult,
 } from "@/lib/api/monitoring-client";
+import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-reads";
 import { createClient } from "@/lib/supabase/client";
 
 import { CameraPill, type CameraPillStatus } from "./camera-pill";
@@ -34,6 +35,7 @@ import {
   type PresenceCallbacks,
   type PresenceMonitorHandle,
 } from "./presence-monitor";
+import { SessionTrend } from "./session-trend";
 import { type CameraErrorKind, useMonitoringSession } from "./use-monitoring-session";
 import { Viewfinder } from "./viewfinder";
 import {
@@ -84,6 +86,8 @@ export interface MonitoringDeps {
   navigate: (path: string) => void;
   isSecureContext: () => boolean;
   strideMs: number;
+  /** US4 (T047) injectable loader for the this-session trend; undefined → the real RLS reader. */
+  sessionTrendLoad?: (sessionId: string) => Promise<SessionTrendPoint[]>;
 }
 
 function defaultDeps(): MonitoringDeps {
@@ -128,6 +132,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const [streaming, setStreaming] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [elapsed, setElapsed] = useState(0);
+  // US4 (T047): the live session id surfaced as STATE (alongside sessionIdRef) so the
+  // monitor-page this-session trend re-renders once a session exists. Additive only —
+  // the ref stays the source of truth for the side-effect paths.
+  const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
@@ -376,6 +384,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
           return;
         }
         sessionIdRef.current = created.sessionId;
+        setLiveSessionId(created.sessionId);
         sessionId = created.sessionId;
       } finally {
         // Cleared on every exit (success OR an error return) so a later retry can create
@@ -434,6 +443,13 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const handleEnd = useCallback(() => {
     void endAndLeave("user");
   }, [endAndLeave]);
+
+  // US4 (T047): a STABLE loader for the this-session trend. Reads the (stable) injected dep
+  // at call time, so the render never touches the deps ref; defaults to the real RLS reader.
+  const loadSessionTrend = useCallback(
+    (id: string) => (depsRef.current.sessionTrendLoad ?? getSessionTrend)(id),
+    [],
+  );
 
   // Session elapsed clock. Starts once capture first begins and keeps a STABLE origin
   // across op changes (warming-up → active → out-of-frame → paused), so the timer never
@@ -520,6 +536,17 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
           onEnd={handleEnd}
         />
       </div>
+
+      {/* US4 (T047): the this-session live trend below the stage. Shown once a session
+          exists and is live; polls only while actively capturing (warming-up / active).
+          Reads the SAME persisted rows the dashboard today trend does, so they agree. */}
+      {liveSessionId && sessionLive && (
+        <SessionTrend
+          sessionId={liveSessionId}
+          active={op === "warming-up" || op === "active"}
+          load={loadSessionTrend}
+        />
+      )}
     </div>
   );
 }

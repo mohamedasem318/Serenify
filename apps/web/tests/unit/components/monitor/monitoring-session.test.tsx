@@ -64,6 +64,9 @@ function makeDeps(outcomes: SubmitWindowResult[]) {
     },
     createDetector: async () => null,
     strideMs: 10_000,
+    // US4 (T047): the this-session trend mounts once a session exists; inject a no-op
+    // loader so the orchestrator unit tests never hit the network.
+    sessionTrendLoad: async () => [],
   };
   return { deps, fireStride: () => rec?.ondataavailable?.({ data: new Blob(["x"]) }) };
 }
@@ -319,6 +322,9 @@ function makeUs2Deps() {
     },
     createDetector: async () => null,
     strideMs: 10_000,
+    // US4 (T047): the this-session trend mounts once a session exists; inject a no-op
+    // loader so the orchestrator unit tests never hit the network.
+    sessionTrendLoad: async () => [],
   };
   return {
     deps,
