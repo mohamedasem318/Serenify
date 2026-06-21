@@ -44,7 +44,11 @@ export default async function AppPage() {
         {hasAnchor === false && <CalibrationBanner />}
         <WelcomeBanner fullName={profile.full_name} />
         <div className="grid grid-cols-1 gap-6 md:grid-cols-[3fr_2fr]">
-          <TodaysCheckinCard />
+          {/* US4 (T048): the card recaps TODAY and expands in place. It needs the user id
+              (to run the browser-side RLS reads as the user) + has_anchor (null/error →
+              undefined, treated conservatively as calibrated — matches the banner logic;
+              only an explicit `false` routes to calibrate-first). */}
+          <TodaysCheckinCard userId={user.id} hasAnchor={hasAnchor ?? undefined} />
           <div className="flex flex-col gap-6">
             <ThingsThatMightHelpCard />
             <RecentChatsCard />
