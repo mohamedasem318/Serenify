@@ -108,6 +108,63 @@ def update_session(client: Client, session_id: str, **fields: Any) -> dict[str, 
     return resp.data[0] if resp.data else None
 
 
+def get_active_session(client: Client) -> dict[str, Any] | None:
+    """The caller's currently-active (not-yet-ended) session, or ``None`` (RLS select-own).
+
+    "Active" == ``ended_at IS NULL`` — the predicate of the one-active-per-user partial
+    unique index (migration 20260621000000). Returns the most recent such row (there is at
+    most one once the index holds; ``order``+``limit`` keep a pre-index duplicate
+    deterministic).
+    """
+    resp = (
+        client.table(SESSIONS_TABLE)
+        .select("id, user_id, status, started_at, ended_at")
+        .is_("ended_at", "null")
+        .order("started_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0] if resp.data else None
+
+
+def latest_reading_at(client: Client, session_id: str) -> str | None:
+    """The ``captured_at`` of the session's most recent reading, or ``None`` if it never
+    scored a window (RLS select-own; ``captured_at`` is on the SELECT whitelist)."""
+    resp = (
+        client.table(READINGS_TABLE)
+        .select("captured_at")
+        .eq("session_id", session_id)
+        .order("captured_at", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0]["captured_at"] if resp.data else None
+
+
+def finalize_active_session(client: Client, *, now_iso: str) -> str | None:
+    """End the caller's current active session (if any) as ``'abandoned'`` so a new run can
+    start under the one-active-per-user invariant — the create-route side of the
+    orphaned-active / concurrent-session fix (DECISIONS 2026-06-21).
+
+    ``ended_at`` is stamped at the abandoned session's last reading time (the honest
+    end-of-activity), or ``now_iso`` if it never produced one. Returns the finalized
+    session id, or ``None`` when there was nothing to finalize.
+    """
+    prior = get_active_session(client)
+    if prior is None:
+        return None
+    ended_at = latest_reading_at(client, prior["id"]) or now_iso
+    update_session(
+        client,
+        prior["id"],
+        status="ended",
+        ended_at=ended_at,
+        end_reason="abandoned",
+        updated_at=now_iso,
+    )
+    return prior["id"]
+
+
 def insert_reading(
     client: Client,
     *,
