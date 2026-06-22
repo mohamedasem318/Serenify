@@ -82,7 +82,11 @@ apps/web/
 ├── app/
 │   ├── globals.css                         # MODIFY: add amber sub-tokens (both themes) +
 │   │                                       #   component-local scrollbar/edge-fade utilities
-│   └── (authed)/app/page.tsx               # unchanged (renders the check-in card)
+│   └── (authed)/app/page.tsx               # MODIFY (US2/FR-012): the check-in card becomes its OWN
+│                                           #   full-width row (max-w-6xl); the two secondary cards
+│                                           #   (suggestions, recent chats) move to a row/grid BELOW.
+│                                           #   PREREQUISITE for the US2 plot proportions — a half-width
+│                                           #   column would cramp the lanes and break the ~1104px mock match.
 ├── components/home/
 │   ├── todays-checkin-card.tsx             # unchanged wiring (loads recap+trend, RLS-as-user,
 │   │                                       #   renders <TodayView/>); surface-selection logic kept
@@ -108,7 +112,7 @@ apps/web/tests/e2e/employee-dashboard-shell.spec.ts   # existing role e2e — ex
 specs/009-today-card-trend-redesign/smoke-tests.md     # NEW at implement time (Constitution VII / gate 5)
 ```
 
-**Structure Decision**: Single-app frontend change under `apps/web`. The current `today-view.tsx` rendering (the pre-`[3]` v5-mock build with stretched viewBox + wall-clock x + meadow-only strokes) is **fully replaced**; the orchestrator is split into three presentational children + one pure geometry module so the anti-drift Success Criteria are unit-testable in isolation. The data-loading card (`todays-checkin-card.tsx`) and the read layer are untouched. The backup branch's `today-view.tsx` is consulted as a **structural reference only** (run-collapse logic, lane/run geometry, synced-highlight wiring) — its rendering/proportions (stretched viewBox, totem rects, bottom legend) are the rejected approach and are **not** carried over.
+**Structure Decision**: Single-app frontend change under `apps/web`. The current `today-view.tsx` rendering (the pre-`[3]` v5-mock build with stretched viewBox + wall-clock x + meadow-only strokes) is **fully replaced**; the orchestrator is split into three presentational children + one pure geometry module so the anti-drift Success Criteria are unit-testable in isolation. The data-loading card (`todays-checkin-card.tsx`) and the read layer are untouched. The dashboard page (`app/(authed)/app/page.tsx`) IS modified in US2: the check-in card is promoted to its **own full-width row** (the two secondary cards move below) per FR-012 — a prerequisite for the expanded plot's proportions, since a half-width column would cramp the lanes and break the ~1104px mock match. The backup branch's `today-view.tsx` is consulted as a **structural reference only** (run-collapse logic, lane/run geometry, synced-highlight wiring) — its rendering/proportions (stretched viewBox, totem rects, bottom legend) are the rejected approach and are **not** carried over.
 
 ## Complexity Tracking
 

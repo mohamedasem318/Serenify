@@ -79,9 +79,10 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Implementation
 
-- [ ] T016 [US2] Implement `apps/web/components/home/today-trend-plot.tsx` — **fixed-px** lane plot (DC-001: SVG `width = nLanes × laneWidth`, matching `viewBox`, height ≈200; NO stretched viewBox) + fixed left-axis column with the four level labels (amber-text / meadow-text / muted on the card surface); ~3px step strokes per band token (meadow / amber-soft-line / amber); warm-up + lost-read fades; no-read hollow marker; lane peak from `tenor`. Depends on T006; makes T013 pass.
-- [ ] T017 [US2] Implement `apps/web/components/home/today-timeline.tsx` — state-coloured pill chip rows (amber-tint bg + amber-text; meadow; muted), session number + time identity + range; **omit** the reassurance line. Depends on T014.
-- [ ] T018 [US2] Add the expanded surface to `apps/web/components/home/today-view.tsx` — in-place expand/collapse (height transition gated on `useMediaQuery('(prefers-reduced-motion: reduce)')`), divider, mount `<TodayTrendPlot>` + `<TodayTimeline>`; single "Hide today" toggle. Clean swap — delete the pre-`[3]` expanded rendering. Depends on T012, T016, T017; makes T015 pass.
+- [ ] T016 [US2] Make the today check-in card its own **full-width row** in `apps/web/app/(authed)/app/page.tsx` (spec FR-012): promote `<TodaysCheckinCard>` out of the `md:grid-cols-[3fr_2fr]` column into a full-width row spanning the `max-w-6xl` container, and relocate the two secondary cards (`<ThingsThatMightHelpCard>`, `<RecentChatsCard>`) into a row/grid **below** it. **Prerequisite for the US2 plot proportions** — a half-width column would cramp the lanes and break the mock's ~1104px desktop drawing-area match (DC-002). Verified by the dashboard e2e (T025). Blocks T017.
+- [ ] T017 [US2] Implement `apps/web/components/home/today-trend-plot.tsx` — **fixed-px** lane plot (DC-001: SVG `width = nLanes × laneWidth`, matching `viewBox`, height ≈200; NO stretched viewBox) + fixed left-axis column with the four level labels (amber-text / meadow-text / muted on the card surface); ~3px step strokes per band token (meadow / amber-soft-line / amber); warm-up + lost-read fades; no-read hollow marker; lane peak from `tenor`. Depends on T006 and T016 (the full-width row gives the plot its real ~1104px drawing area); makes T013 pass.
+- [ ] T018 [US2] Implement `apps/web/components/home/today-timeline.tsx` — state-coloured pill chip rows (amber-tint bg + amber-text; meadow; muted), session number + time identity + range; **omit** the reassurance line. Depends on T014.
+- [ ] T019 [US2] Add the expanded surface to `apps/web/components/home/today-view.tsx` — in-place expand/collapse (height transition gated on `useMediaQuery('(prefers-reduced-motion: reduce)')`), divider, mount `<TodayTrendPlot>` + `<TodayTimeline>`; single "Hide today" toggle. Clean swap — delete the pre-`[3]` expanded rendering. Depends on T012, T017, T018; makes T015 pass.
 
 **Checkpoint**: collapsed + expanded both work; graph and timeline agree.
 
@@ -95,11 +96,11 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Tests (write first, must FAIL)
 
-- [ ] T019 [P] [US3] Synced-highlight RTL test in `apps/web/tests/unit/components/home/today-view.highlight.test.tsx`: mouse-enter a lane → matching row gets the active state; mouse-enter a row → matching lane gets it (both directions); focus a plot per-session target (`role=button`, `tabindex=0`, `aria-label` includes the tenor) → visible focus ring + its row active; rows are NOT separate tab stops; with reduced motion, no transition class is applied (SC-005).
+- [ ] T020 [P] [US3] Synced-highlight RTL test in `apps/web/tests/unit/components/home/today-view.highlight.test.tsx`: mouse-enter a lane → matching row gets the active state; mouse-enter a row → matching lane gets it (both directions); focus a plot per-session target (`role=button`, `tabindex=0`, `aria-label` includes the tenor) → visible focus ring + its row active; rows are NOT separate tab stops; with reduced motion, no transition class is applied (SC-005).
 
 ### Implementation
 
-- [ ] T020 [US3] Wire the synced highlight in `apps/web/components/home/today-view.tsx` (single active-session id) across `today-trend-plot.tsx` (focusable per-session targets + focus ring + lane-bg highlight) and `today-timeline.tsx` (row hover highlight); gate all transitions on `useMediaQuery`. Depends on T016, T017, T018, T019.
+- [ ] T021 [US3] Wire the synced highlight in `apps/web/components/home/today-view.tsx` (single active-session id) across `today-trend-plot.tsx` (focusable per-session targets + focus ring + lane-bg highlight) and `today-timeline.tsx` (row hover highlight); gate all transitions on `useMediaQuery`. Depends on T017, T018, T019, T020.
 
 **Checkpoint**: highlight reachable both directions by mouse and by keyboard via the plot targets.
 
@@ -113,11 +114,11 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Tests (write first, must FAIL)
 
-- [ ] T021 [P] [US4] Overflow RTL test in `apps/web/tests/unit/components/home/today-trend-plot.overflow.test.tsx`: busy fixture → plot `W` > wrapper width, every lane ≥ `LANE_MIN` (none crushed), all sessions in the DOM, right edge-fade present and left edge-fade after a simulated scroll (SC-006).
+- [ ] T022 [P] [US4] Overflow RTL test in `apps/web/tests/unit/components/home/today-trend-plot.overflow.test.tsx`: busy fixture → plot `W` > wrapper width, every lane ≥ `LANE_MIN` (none crushed), all sessions in the DOM, right edge-fade present and left edge-fade after a simulated scroll (SC-006).
 
 ### Implementation
 
-- [ ] T022 [US4] Add overflow handling to `apps/web/components/home/today-trend-plot.tsx` — scrollable wrapper with a **component-local** thin styled scrollbar + left/right edge-fade overlays + overflow/scrolled detection; enforce `LANE_MIN`. Add the component-local scrollbar/fade utilities to `apps/web/app/globals.css` (NOT app-wide). Depends on T016, T021.
+- [ ] T023 [US4] Add overflow handling to `apps/web/components/home/today-trend-plot.tsx` — scrollable wrapper with a **component-local** thin styled scrollbar + left/right edge-fade overlays + overflow/scrolled detection; enforce `LANE_MIN`. Add the component-local scrollbar/fade utilities to `apps/web/app/globals.css` (NOT app-wide). Depends on T017, T022.
 
 **Checkpoint**: all four stories independently functional.
 
@@ -125,11 +126,11 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ## Phase 7: Polish & Cross-Cutting
 
-- [ ] T023 [P] Clean-swap audit: remove any orphaned pre-`[3]` rendering from `apps/web/components/home/today-view.tsx`; update/replace `apps/web/tests/unit/components/home/todays-checkin-card.us4.test.tsx` to the new surfaces; confirm `apps/web/components/home/todays-checkin-card.tsx` wiring is unchanged (still loads recap+trend RLS-as-user and renders `<TodayView>`).
-- [ ] T024 [P] Extend employee Playwright e2e `apps/web/tests/e2e/employee-dashboard-shell.spec.ts` — assert the today card expands/collapses and the expanded view shows axis level-labels with **no** bottom legend (happy path; Constitution VII role e2e).
-- [ ] T025 Author `specs/009-today-card-trend-redesign/smoke-tests.md` (Constitution VII / gate 5) — human checks: light+dark amber legibility (flip to light to judge the amber text), 360px no-crush + scroll/edge-fade, keyboard focus ring + reduced-motion, a real multi-session day, warm-up/lost-read/no-read honesty, and that the headline keyword sits on the card surface (never the page bg). Mohamed runs + records results.
-- [ ] T026 [P] Append a 009 implementation entry to `docs/PROGRESS.md`.
-- [ ] T027 Run `apps/web` lint + typecheck + full Vitest + the extended Playwright e2e; walk `quickstart.md` at desktop AND 360px; fix any regression. Confirm SC-001…SC-010 all covered.
+- [ ] T024 [P] Clean-swap audit: remove any orphaned pre-`[3]` rendering from `apps/web/components/home/today-view.tsx`; update/replace `apps/web/tests/unit/components/home/todays-checkin-card.us4.test.tsx` to the new surfaces; confirm `apps/web/components/home/todays-checkin-card.tsx` wiring is unchanged (still loads recap+trend RLS-as-user and renders `<TodayView>`).
+- [ ] T025 [P] Extend employee Playwright e2e `apps/web/tests/e2e/employee-dashboard-shell.spec.ts` — assert the today card expands/collapses and the expanded view shows axis level-labels with **no** bottom legend (happy path; Constitution VII role e2e).
+- [ ] T026 Author `specs/009-today-card-trend-redesign/smoke-tests.md` (Constitution VII / gate 5) — human checks: light+dark amber legibility (flip to light to judge the amber text), 360px no-crush + scroll/edge-fade, keyboard focus ring + reduced-motion, a real multi-session day, warm-up/lost-read/no-read honesty, and that the headline keyword sits on the card surface (never the page bg). Mohamed runs + records results.
+- [ ] T027 [P] Append a 009 implementation entry to `docs/PROGRESS.md`.
+- [ ] T028 Run `apps/web` lint + typecheck + full Vitest + the extended Playwright e2e; walk `quickstart.md` at desktop AND 360px; fix any regression. Confirm SC-001…SC-010 all covered.
 
 ---
 
@@ -138,10 +139,10 @@ description: "Task list — feature 009 today-card stress trend redesign"
 - **Setup (T001–T002)** → no deps.
 - **Foundational (T003–T006)** → after Setup; **blocks all stories**. T003+T004 (amber) and T005+T006 (geometry) are two independent [P] tracks; within each, test precedes/then impl (T004 makes T003 pass; T006 makes T005 pass).
 - **US1 (T007–T012)** → after Foundational. MVP.
-- **US2 (T013–T018)** → after Foundational; reuses the orchestrator from US1 (T018 depends on T012).
-- **US3 (T019–T020)** → after US2 (needs plot + timeline + expanded orchestrator).
-- **US4 (T021–T022)** → after US2 (needs the plot, T016).
-- **Polish (T023–T027)** → after all desired stories.
+- **US2 (T013–T019)** → after Foundational; reuses the orchestrator from US1 (T019 depends on T012). The full-width row (T016) blocks the plot (T017) so the lanes get their real ~1104px drawing area.
+- **US3 (T020–T021)** → after US2 (needs plot + timeline + expanded orchestrator).
+- **US4 (T022–T023)** → after US2 (needs the plot, T017).
+- **Polish (T024–T028)** → after all desired stories.
 
 ### Within each story
 Tests first (must fail) → implementation. Geometry (T006) before any component that renders it. Components before the orchestrator wiring.
@@ -172,16 +173,16 @@ US1 (collapsed MVP) → US2 (expanded + timeline) → US3 (synced highlight) →
 - Tests are TDD (write red first) per Constitution VII; commit after each task or logical group.
 - The backup branch `008-followups-pre-surgery-backup` `today-view.tsx` is a **structural reference only** (run-collapse, lane/run geometry, synced-highlight wiring) — its rendering/proportions are the rejected approach and MUST NOT be carried over.
 - Privacy invariant throughout: no new read, no probability to client, SELECT whitelist + RLS-as-user intact (SC-008/SC-009).
-- `smoke-tests.md` (T025) is the Constitution gate-5 artifact; Mohamed signs it off before merge to `main`.
+- `smoke-tests.md` (T026) is the Constitution gate-5 artifact; Mohamed signs it off before merge to `main`.
 
 ## Success-Criteria coverage map
-- SC-001 axis-not-legend → T013, T024
-- SC-002 shapes-not-bars @ desktop+360px → T005, T013
+- SC-001 axis-not-legend → T013, T025
+- SC-002 shapes-not-bars @ desktop+360px → T005, T013, T016 (full-width row → real drawing area)
 - SC-003 collapsed-is-a-line → T008
 - SC-004 peak == chip → T005, T013
-- SC-005 synced highlight (mouse both-ways + keyboard via plot target) → T019
-- SC-006 overflow / min-lane → T005, T021
+- SC-005 synced highlight (mouse both-ways + keyboard via plot target) → T020
+- SC-006 overflow / min-lane → T005, T022
 - SC-007 amber AA both themes (incl. headline on card surface, not page bg) → T003
 - SC-008 no probability to client → T015
-- SC-009 RLS-as-user / whitelist intact → T015, T023
+- SC-009 RLS-as-user / whitelist intact → T015, T024
 - SC-010 honesty (warm-up/lost-read fade; no-read on own lane; headline never overstates) → T005, T007, T013
