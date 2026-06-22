@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CameraOff, CircleDashed, Focus } from "lucide-react";
+import { Camera, CameraOff, CircleDashed, Focus, LogIn } from "lucide-react";
 
 import { CauseChip } from "@/components/anchor/cause-chip";
 import { Button } from "@/components/ui/button";
@@ -141,6 +141,33 @@ function CalibrateFirstPanel() {
             monitor route's camera policy active and break getUserMedia on arrival. */}
         <Button asChild variant="meadow" className="h-12 px-6 text-base">
           <a href="/app/calibrate">Start calibration</a>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The sign-in expired and could not be refreshed, so window uploads can no longer carry a
+ * valid token (a 401, or an un-refreshable browser session). Scoring STOPS here on an honest
+ * surface rather than freezing a healthy-looking band silently — the recurring "frozen band"
+ * smoke break. FOGGY attention (never amber — an auth lapse is not a stress signal), and the
+ * recovery path is explicit: a full-document `<a>` to /login re-establishes the session (a
+ * client-side <Link> would keep this route's auth-less context). Mirrors BlockedPanel's shape.
+ */
+function SignedOutPanel() {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
+      <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
+        <LogIn className="size-7" strokeWidth={1.75} aria-hidden />
+      </span>
+      <h2 className="font-display text-2xl text-ink">Your sign-in expired</h2>
+      <p className="text-pretty text-base leading-relaxed text-muted">
+        Scoring paused because your sign-in timed out. Sign in again to continue your check-in.
+      </p>
+      <div className="mt-5">
+        <Button asChild variant="outline" className="h-12 px-6 text-base">
+          <a href="/login">Sign in again</a>
         </Button>
       </div>
     </div>
@@ -317,6 +344,8 @@ export function OpSurfaces({
       return <PermissionPanel onAllow={onAllow} />;
     case "blocked":
       return <BlockedPanel kind={state.cameraError ?? "blocked"} onRetry={onRetryBlocked} />;
+    case "signed-out":
+      return <SignedOutPanel />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
     case "out-of-frame":
