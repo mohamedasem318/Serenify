@@ -114,6 +114,21 @@ describe("MonitoringSession orchestrator", () => {
     expect(await screen.findByText(/camera access is blocked/i)).toBeInTheDocument();
   });
 
+  it("routes an insecure origin (no secure context) to the https surface, never opening the camera", async () => {
+    const { deps } = makeDeps([]);
+    deps.isSecureContext = () => false; // not https / localhost
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+
+    expect(
+      await screen.findByText(/this page needs a secure \(https\) connection to use your camera/i),
+    ).toBeInTheDocument();
+    expect(deps.getUserMedia).not.toHaveBeenCalled(); // never prompts the camera on an insecure origin
+  });
+
   it("maps the getUserMedia rejection by err.name to honest copy (no generic block)", async () => {
     const cases = [
       { name: "NotReadableError", copy: /camera.s in use/i },
@@ -517,6 +532,47 @@ describe("MonitoringSession — US2 presence + lifecycle", () => {
  * — non-negotiable — a residual 401 / un-refreshable session is surfaced honestly, never
  * silently. These tests force those conditions through the injected seam.
  */
+describe("MonitoringSession — session timer excludes paused time (008-followups)", () => {
+  it("freezes the elapsed clock while paused and continues from there on resume", async () => {
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "performance", "Date"],
+    });
+    try {
+      const h = makeUs2Deps();
+      render(<MonitoringSession deps={h.deps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+      });
+
+      // 30 s of live capture → counts
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(30_000);
+      });
+      expect(screen.getByTestId("session-timer").textContent).toBe("00:30");
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+      });
+      // 60 s paused → must NOT be counted
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+      expect(screen.getByTestId("session-timer").textContent).toBe("00:30"); // frozen, not 01:30
+
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /resume/i }));
+      });
+      // 10 s more live → 40 s total counted, never the 100 s of wall-clock
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(10_000);
+      });
+      expect(screen.getByTestId("session-timer").textContent).toBe("00:40");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
 describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", () => {
   it("each window upload carries a FRESH token, not the one captured at session create (A)", async () => {
     // getSession rotates the token (the SDK refreshes near expiry). The upload must use the
