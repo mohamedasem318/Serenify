@@ -429,6 +429,67 @@ describe("MonitoringSession — US2 presence + lifecycle", () => {
     expect(h.navigate).toHaveBeenCalledWith("/app");
   });
 
+  // L2 (008-followups): the pause / resume / end lifecycle calls must acquire a FRESH token
+  // per call (via the same getSession() seam the uploads use), not reuse the cached token that
+  // is only kept warm by uploads. A session paused past the token lifetime (no uploads → no
+  // refresh) would otherwise resume/end with a STALE token and patchStatus/endSession would
+  // swallow the {ok:false} → the status silently fails to persist. Here getSession ROTATES the
+  // token (the SDK auto-refresh): the create call consumes tok-1, so any lifecycle call that
+  // reused the cached token would carry tok-1 — proving the fix means it must NOT.
+  it("Pause acquires a fresh token (never the stale create-time token) and persists", async () => {
+    const h = makeUs2Deps();
+    let n = 0;
+    h.deps.getSession = vi.fn(async () => ({ accessToken: `tok-${++n}` }));
+    await startSession(h.deps); // create consumes tok-1; no uploads fired → cache stays tok-1
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+    });
+
+    expect(h.patchStatus).toHaveBeenCalledWith("sid", "paused", expect.stringMatching(/^tok-\d+$/));
+    expect(h.patchStatus).not.toHaveBeenCalledWith("sid", "paused", "tok-1"); // not the stale one
+  });
+
+  it("End acquires a fresh token (never the stale create-time token) and persists", async () => {
+    const h = makeUs2Deps();
+    let n = 0;
+    h.deps.getSession = vi.fn(async () => ({ accessToken: `tok-${++n}` }));
+    await startSession(h.deps);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /end session/i }));
+    });
+
+    expect(h.endSession).toHaveBeenCalledWith("sid", "user", expect.stringMatching(/^tok-\d+$/));
+    expect(h.endSession).not.toHaveBeenCalledWith("sid", "user", "tok-1"); // not the stale one
+    expect(h.navigate).toHaveBeenCalledWith("/app");
+  });
+
+  it("Resume on an un-refreshable session surfaces the honest signed-out state (no stale PATCH)", async () => {
+    // After a long pause, if the browser session can't be refreshed (getSession → null), Resume
+    // must NOT PATCH a stale token nor reopen the camera — it routes to the honest signed-out
+    // surface, mirroring the upload path. (deps is snapshotted at mount, so the test flips a
+    // closure flag the mounted getSession reads, rather than reassigning the dep.)
+    const h = makeUs2Deps();
+    let sessionGone = false;
+    h.deps.getSession = vi.fn(async () => (sessionGone ? null : { accessToken: "tok" }));
+    await startSession(h.deps); // create succeeds (getSession → "tok")
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^pause$/i }));
+    });
+    h.patchStatus.mockClear();
+    (h.deps.getUserMedia as ReturnType<typeof vi.fn>).mockClear();
+    sessionGone = true; // the browser session is now gone (refresh fails)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /resume/i }));
+    });
+
+    expect(await screen.findByText(/your sign-in expired/i)).toBeInTheDocument();
+    expect(h.patchStatus).not.toHaveBeenCalled(); // no stale-token PATCH
+    expect(h.deps.getUserMedia).not.toHaveBeenCalled(); // camera not reopened
+  });
+
   it("re-end race: a manual End and a racing auto-end end + navigate EXACTLY ONCE", async () => {
     const h = makeUs2Deps();
     await startSession(h.deps);
