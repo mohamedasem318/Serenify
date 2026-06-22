@@ -193,3 +193,47 @@
     }
   }
 }
+
+/* ── Feature 009 / US4 — today-card trend plot, COMPONENT-LOCAL only ──────────────────────
+ * Scoped to the lane strip via the `today-plot-*` class names; NOT an app-wide scrollbar
+ * restyle (that is a separate chore, out of scope here — tasks.md Scope). The thin styled
+ * scrollbar + the edge-fade overlays match serenify-008followups-trend-FINAL.html (.lanes /
+ * .fade). The fade's opacity TRANSITION is added by the component only when reduced motion is
+ * not preferred (FR-015); the global reduced-motion rule above is the belt to this suspenders. */
+.today-plot-scroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-muted) 45%, transparent) transparent;
+}
+.today-plot-scroll::-webkit-scrollbar {
+  height: 9px;
+}
+.today-plot-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+.today-plot-scroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-muted) 45%, transparent);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.today-plot-fade {
+  position: absolute;
+  top: 0;
+  width: 36px;
+  pointer-events: none;
+  opacity: 0;
+}
+.today-plot-fade.is-on {
+  opacity: 1;
+}
+.today-plot-fade--right {
+  right: 0;
+  background: linear-gradient(90deg, transparent, var(--color-card));
+}
+.today-plot-fade--left {
+  left: 0;
+  background: linear-gradient(270deg, transparent, var(--color-card));
+}

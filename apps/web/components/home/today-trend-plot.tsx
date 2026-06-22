@@ -225,6 +225,8 @@ export function TodayTrendPlot({
   const [measured, setMeasured] = useState<number | null>(null);
   // Focus ring shows on keyboard focus only (US3); the lane/row wash shows on hover OR focus.
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  // Whether the strip has been scrolled away from the start — drives the LEFT edge-fade (US4).
+  const [scrolled, setScrolled] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Measure the scroll wrapper so lanes fill a wide screen and clamp on a narrow one. The ref
@@ -256,6 +258,14 @@ export function TodayTrendPlot({
   const { width: W, height: H, laneWidth, lanes } = buildLanePlot(seqs, avail);
   const bandKeys: Tenor[] = ["tense", "a_little_tense", "at_ease", "no_read"];
 
+  // Overflow is a property of the GEOMETRY, not a DOM read: the lanes hold LANE_MIN, so once the
+  // fixed-px width exceeds the lane area the strip MUST scroll (DC-001 — never crush). Deriving it
+  // here keeps it correct at the same instant the SVG renders (no measure-after-paint lag) and
+  // unit-testable in jsdom. The right fade signals more-to-the-right; the left fade appears once
+  // the user has scrolled off the start.
+  const overflowing = W > avail;
+  const fadeTransition = reduceMotion ? "" : " transition-opacity duration-150";
+
   return (
     <div data-testid="today-plot" className="mt-4 flex">
       {/* fixed left axis — the four level labels (NO bottom legend) */}
@@ -272,9 +282,16 @@ export function TodayTrendPlot({
         ))}
       </div>
 
-      {/* scrollable lane strip — fixed-px (US4 adds the styled scrollbar + edge fades) */}
+      {/* scrollable lane strip — fixed-px; component-local styled scrollbar + edge fades (US4) */}
       <div ref={attachWrap} className="relative min-w-0 flex-1">
-        <div className="overflow-x-auto overflow-y-hidden">
+        <div
+          data-testid="plot-scroll"
+          className="today-plot-scroll"
+          onScroll={(e) => {
+            const next = e.currentTarget.scrollLeft > 4;
+            setScrolled((prev) => (prev === next ? prev : next));
+          }}
+        >
           <svg
             data-testid="plot-svg"
             width={W}
@@ -387,6 +404,22 @@ export function TodayTrendPlot({
             ))}
           </svg>
         </div>
+        {/* edge-fade affordances — purely decorative, never intercept pointer/scroll. Left appears
+            once scrolled off the start; right appears whenever there's more strip to the right. */}
+        <div
+          data-testid="plot-fade-left"
+          aria-hidden="true"
+          className={`today-plot-fade today-plot-fade--left${
+            overflowing && scrolled ? " is-on" : ""
+          }${fadeTransition}`}
+          style={{ height: H }}
+        />
+        <div
+          data-testid="plot-fade-right"
+          aria-hidden="true"
+          className={`today-plot-fade today-plot-fade--right${overflowing ? " is-on" : ""}${fadeTransition}`}
+          style={{ height: H }}
+        />
       </div>
     </div>
   );

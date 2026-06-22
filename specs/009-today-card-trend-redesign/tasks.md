@@ -114,11 +114,11 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Tests (write first, must FAIL)
 
-- [ ] T022 [P] [US4] Overflow RTL test in `apps/web/tests/unit/components/home/today-trend-plot.overflow.test.tsx`: busy fixture → plot `W` > wrapper width, every lane ≥ `LANE_MIN` (none crushed), all sessions in the DOM, right edge-fade present and left edge-fade after a simulated scroll (SC-006).
+- [X] T022 [P] [US4] Overflow RTL test in `apps/web/tests/unit/components/home/today-trend-plot.overflow.test.tsx`: busy fixture → plot `W` > wrapper width, every lane ≥ `LANE_MIN` (none crushed), all sessions in the DOM, right edge-fade present and left edge-fade after a simulated scroll (SC-006).
 
 ### Implementation
 
-- [ ] T023 [US4] Add overflow handling to `apps/web/components/home/today-trend-plot.tsx` — scrollable wrapper with a **component-local** thin styled scrollbar + left/right edge-fade overlays + overflow/scrolled detection; enforce `LANE_MIN`. Add the component-local scrollbar/fade utilities to `apps/web/app/globals.css` (NOT app-wide). Depends on T017, T022.
+- [X] T023 [US4] Add overflow handling to `apps/web/components/home/today-trend-plot.tsx` — scrollable wrapper with a **component-local** thin styled scrollbar + left/right edge-fade overlays + overflow/scrolled detection; enforce `LANE_MIN`. Add the component-local scrollbar/fade utilities to `apps/web/app/globals.css` (NOT app-wide). Depends on T017, T022.
 
 **Checkpoint**: all four stories independently functional.
 
