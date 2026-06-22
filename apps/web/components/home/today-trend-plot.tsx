@@ -1,10 +1,308 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+
+import {
+  BAND_LINE,
+  BAND_Y,
+  STROKE,
+  buildLanePlot,
+  type Lane,
+  type SessionSeq,
+  type Tenor,
+} from "@/lib/trend-geometry";
+
 /**
- * Feature 009 — the expanded today card's fixed-px lane plot (DC-001) + left axis.
- * Built in User Story 2 (tasks T013/T016). Placeholder skeleton for now so the
- * orchestrator's import surface is stable; US1 ships only the collapsed surface.
+ * Feature 009 / US2 — the expanded today card's lane plot + left axis.
+ *
+ * THE LOAD-BEARING RULE (DC-001 / SC-002 — the totem fix): this renders at FIXED PIXEL SCALE.
+ * The geometry sets the SVG `width` AND a matching `viewBox` width to `nLanes × laneWidth`
+ * (1 unit = 1 px). There is NO `preserveAspectRatio="none"` stretch of a small viewBox — that
+ * stretch was the prior build's totem bug. A few sessions FILL the width; many CLAMP to
+ * LANE_MIN and overflow (the strip scrolls — styled scrollbar + edge fades are US4).
+ *
+ * Height AND colour encode the band (axis on the left, never a bottom legend). Confident runs
+ * are solid step lines; warm-up and lost-read stretches are FADED (never a solid bridge at a
+ * fixed level, FR-007); a fully read-less session is a hollow marker on its own low lane; a
+ * single confident reading is a filled dot. Each lane's peak == its `tenor` (the chip value),
+ * so the plot and the timeline can never disagree (SC-004).
+ *
+ * Visual source of truth: serenify-008followups-trend-FINAL.html.
+ *
+ * SMOKE-AUTHOR CARRY-FORWARD (T026): the no-stretch rule is asserted here only at the SVG
+ * attribute level (jsdom has no layout). A browser could still visually stretch via CSS, which
+ * a unit test can't catch — so smoke-tests.md MUST include a human check that at 360px the plot
+ * renders at its intrinsic width and SCROLLS (never stretches/crushes) with an edge-fade.
  */
-export function TodayTrendPlot() {
-  return null;
+
+const AXIS_W = 96;
+// ~max-w-6xl (1152) − 2×24px card padding − 96px axis ≈ 1008; used until the wrapper is measured.
+const DEFAULT_AVAIL = 1008;
+const LANE_BG_Y = 14;
+const LANE_BG_H = 172;
+
+const AXIS_LABELS: { key: Tenor; text: string; className: string }[] = [
+  { key: "tense", text: "tense", className: "text-amber-text" },
+  { key: "a_little_tense", text: "a little tense", className: "text-amber-text opacity-90" },
+  { key: "at_ease", text: "at ease", className: "text-meadow-text" },
+  { key: "no_read", text: "no read", className: "text-muted" },
+];
+
+const bandAtY = (y: number): Tenor =>
+  y === BAND_Y.tense
+    ? "tense"
+    : y === BAND_Y.a_little_tense
+      ? "a_little_tense"
+      : y === BAND_Y.at_ease
+        ? "at_ease"
+        : "no_read";
+
+const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
+
+/** Map one lane's geometry to SVG marks — solid runs, rounded step risers, faded fades. */
+function laneMarks(lane: Lane, laneWidth: number): ReactNode[] {
+  const els: ReactNode[] = [];
+
+  // a fully read-less session → a hollow muted marker on its OWN low lane, never the calm line
+  if (lane.noRead) {
+    els.push(
+      <circle
+        key="noread"
+        data-testid="noread-marker"
+        cx={lane.x0 + laneWidth / 2}
+        cy={BAND_Y.no_read}
+        r={4}
+        fill="none"
+        stroke="var(--color-muted)"
+        strokeWidth={1.2}
+      />,
+    );
+    return els;
+  }
+
+  // a single confident reading → a filled dot in its band colour (≠ the hollow no-read ring)
+  if (lane.singleDot && lane.dot) {
+    els.push(
+      <circle
+        key="dot"
+        data-testid="dot"
+        cx={lane.dot.x}
+        cy={lane.dot.y}
+        r={4}
+        fill={BAND_LINE[bandAtY(lane.dot.y)]}
+      />,
+    );
+    return els;
+  }
+
+  // warm-up (leading absent reads) — a faded eased lead-in at the first band's level
+  if (lane.warmup) {
+    els.push(
+      <line
+        key="warmup"
+        data-testid="warmup"
+        x1={lane.warmup.x1}
+        y1={lane.warmup.y}
+        x2={lane.warmup.x2}
+        y2={lane.warmup.y}
+        stroke={BAND_LINE[bandAtY(lane.warmup.y)]}
+        strokeWidth={STROKE}
+        strokeOpacity={0.4}
+        strokeLinecap="round"
+      />,
+    );
+  }
+
+  // solid confident runs + a rounded right-angle step into the next run (FR-002 corners),
+  // unless a lost-read stretch separates them (then the faded span below carries the gap).
+  lane.runs.forEach((run, i) => {
+    els.push(
+      <line
+        key={`run-${i}`}
+        data-testid="run"
+        data-band={run.band}
+        x1={run.x1}
+        y1={run.y}
+        x2={run.x2}
+        y2={run.y}
+        stroke={BAND_LINE[run.band]}
+        strokeWidth={STROKE}
+        strokeLinecap="round"
+      />,
+    );
+    const next = lane.runs[i + 1];
+    if (next) {
+      const bridgedByFade = lane.lostReads.some((f) => near(f.x1, run.x2) && near(f.x2, next.x1));
+      if (!bridgedByFade) {
+        els.push(
+          <polyline
+            key={`step-${i}`}
+            data-testid="step"
+            points={`${run.x2},${run.y} ${next.x1},${run.y} ${next.x1},${next.y}`}
+            fill="none"
+            stroke={BAND_LINE[next.band]}
+            strokeWidth={STROKE}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />,
+        );
+      }
+    }
+  });
+
+  // lost reads (interior / trailing absent stretches) — faded at the last-known level, then a
+  // faded riser into the next confident run (never a solid bridge across the gap).
+  lane.lostReads.forEach((f, i) => {
+    els.push(
+      <line
+        key={`lost-${i}`}
+        data-testid="lostread"
+        x1={f.x1}
+        y1={f.y}
+        x2={f.x2}
+        y2={f.y}
+        stroke={BAND_LINE[bandAtY(f.y)]}
+        strokeWidth={STROKE}
+        strokeOpacity={0.4}
+        strokeLinecap="round"
+      />,
+    );
+    const after = lane.runs.find((r) => near(r.x1, f.x2));
+    if (after && after.y !== f.y) {
+      els.push(
+        <line
+          key={`lost-riser-${i}`}
+          data-testid="lostread-riser"
+          x1={f.x2}
+          y1={f.y}
+          x2={f.x2}
+          y2={after.y}
+          stroke={BAND_LINE[after.band]}
+          strokeWidth={STROKE}
+          strokeOpacity={0.4}
+          strokeLinecap="round"
+        />,
+      );
+    }
+  });
+
+  return els;
+}
+
+export interface TodayTrendPlotProps {
+  /** One source of geometry — same per-session tenor the timeline chip uses (SC-004). */
+  seqs: SessionSeq[];
+  /** Explicit lane-area width (px). Tests pass this; the live app measures the wrapper. */
+  availableWidth?: number;
+}
+
+export function TodayTrendPlot({ seqs, availableWidth }: TodayTrendPlotProps) {
+  const [measured, setMeasured] = useState<number | null>(null);
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+
+  // Measure the scroll wrapper so lanes fill a wide screen and clamp on a narrow one. The ref
+  // callback seeds it on mount (lint-safe vs setState-in-effect); a ResizeObserver tracks resize.
+  const attachWrap = useCallback(
+    (el: HTMLDivElement | null) => {
+      wrapRef.current = el;
+      if (el && availableWidth == null) {
+        const w = el.clientWidth;
+        setMeasured((prev) => (prev === w ? prev : w));
+      }
+    },
+    [availableWidth],
+  );
+
+  useEffect(() => {
+    if (availableWidth != null) return;
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      setMeasured((prev) => (prev === w ? prev : w));
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [availableWidth]);
+
+  const avail = availableWidth ?? measured ?? DEFAULT_AVAIL;
+  const { width: W, height: H, laneWidth, lanes } = buildLanePlot(seqs, avail);
+  const bandKeys: Tenor[] = ["tense", "a_little_tense", "at_ease", "no_read"];
+
+  return (
+    <div data-testid="today-plot" className="mt-4 flex">
+      {/* fixed left axis — the four level labels (NO bottom legend) */}
+      <div className="relative flex-none" style={{ width: AXIS_W, height: H }} aria-hidden="true">
+        {AXIS_LABELS.map((l) => (
+          <span
+            key={l.key}
+            data-testid="axis-label"
+            className={`absolute right-2.5 -translate-y-1/2 whitespace-nowrap text-[11px] leading-none ${l.className}`}
+            style={{ top: BAND_Y[l.key] }}
+          >
+            {l.text}
+          </span>
+        ))}
+      </div>
+
+      {/* scrollable lane strip — fixed-px (US4 adds the styled scrollbar + edge fades) */}
+      <div ref={attachWrap} className="relative min-w-0 flex-1">
+        <div className="overflow-x-auto overflow-y-hidden">
+          <svg
+            data-testid="plot-svg"
+            width={W}
+            height={H}
+            viewBox={`0 0 ${W} ${H}`}
+            className="block"
+            role="img"
+            aria-label={`${seqs.length} ${seqs.length === 1 ? "session" : "sessions"} as step shapes by stress level`}
+          >
+            {/* lane highlight surfaces — full plot height, carry NO band meaning (US3 toggles) */}
+            {lanes.map((lane) => (
+              <rect
+                key={`bg-${lane.sessionId}`}
+                data-lane-bg=""
+                data-session-id={lane.sessionId}
+                x={lane.x0 + 2}
+                y={LANE_BG_Y}
+                width={laneWidth - 4}
+                height={LANE_BG_H}
+                rx={9}
+                fill="transparent"
+              />
+            ))}
+            {/* faint band gridlines */}
+            {bandKeys.map((k) => (
+              <line
+                key={`grid-${k}`}
+                x1={6}
+                y1={BAND_Y[k]}
+                x2={W - 6}
+                y2={BAND_Y[k]}
+                stroke="var(--color-border)"
+                strokeWidth={0.5}
+              />
+            ))}
+            {/* session ordinal numbers */}
+            {lanes.map((lane) => (
+              <text
+                key={`num-${lane.sessionId}`}
+                x={lane.x0 + laneWidth / 2}
+                y={10}
+                fontSize={10}
+                fill="var(--color-muted)"
+                textAnchor="middle"
+              >
+                {lane.index + 1}
+              </text>
+            ))}
+            {/* the step shapes */}
+            {lanes.map((lane) => (
+              <g key={`lane-${lane.sessionId}`}>{laneMarks(lane, laneWidth)}</g>
+            ))}
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
 }

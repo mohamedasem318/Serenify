@@ -2,21 +2,26 @@
 
 import { Button } from "@/components/ui/button";
 import { TodayMiniTrend } from "@/components/home/today-mini-trend";
+import { TodayTimeline } from "@/components/home/today-timeline";
+import { TodayTrendPlot } from "@/components/home/today-trend-plot";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import type { TodayRecap, TodayTrendRow } from "@/lib/api/monitoring-reads";
 import { toSeqs } from "@/lib/trend-geometry";
 
 /**
- * Feature 009 / US1 — the today check-in card's COLLAPSED (glanceable) surface: an honest
- * three-level headline + a wide-short mini step-line + a single in-place toggle.
+ * Feature 009 — the today check-in card orchestrator.
  *
- * The headline keyword (`recap.headline.hot`) is rendered in `--amber-head` at weight 700 on
- * the CARD SURFACE — that is where #BC7A2A clears the 3:1 large-text bar (it would fail 2.95:1
- * on the page background, DC-007). `hot` is null on a calm day (no amber keyword); the
- * data-layer `deriveHeadline` only says "tense" when the tense band was actually reached
- * (FR-002), and "a little tense" otherwise.
+ * COLLAPSED (US1, glanceable): an honest three-level headline + a wide-short mini step-line +
+ * a single in-place toggle. The headline keyword (`recap.headline.hot`) renders in
+ * `--amber-head` at weight 700 on the CARD SURFACE — that is where #BC7A2A clears the 3:1
+ * large-text bar (it would fail 2.95:1 on the page background, DC-007). `hot` is null on a calm
+ * day; `deriveHeadline` only says "tense" when the tense band was actually reached (FR-002).
  *
- * The EXPANDED detail (fixed-px lane plot + left axis + timeline + synced highlight) is User
- * Story 2/3 — for now the expand reveals a placeholder that keeps the `today-plot` contract.
+ * EXPANDED (US2, in place): the fixed-px lane plot + left axis (no legend) and the
+ * state-coloured timeline, revealed by a reduced-motion-gated height transition (the card grows
+ * in place — no route change). The plot and the timeline read ONE source of geometry (`seqs`,
+ * built from the same per-session tenor), so they can never disagree (SC-004). Synced highlight
+ * between a lane and its row is User Story 3.
  */
 
 export interface TodayViewProps {
@@ -34,12 +39,15 @@ export function TodayView({
   onToggle,
   startHref = "/app/monitor",
 }: TodayViewProps) {
-  // One source of geometry for the mini-trend (and, in US2, the lane plot) — built from the
-  // same per-session tenor the timeline chip uses, so the surfaces can never disagree (SC-004).
+  // One source of geometry for the mini-trend AND the expanded lane plot — built from the same
+  // per-session tenor the timeline chip uses, so the surfaces can never disagree (SC-004).
   const seqs = toSeqs(
     recap.sessions.map((s) => ({ sessionId: s.sessionId, tenor: s.tenor })),
     trendRows.map((r) => ({ sessionId: r.sessionId, band: r.band, capturedAt: r.capturedAt })),
   );
+
+  // The in-place expand grows the card height; honor the user's reduced-motion preference.
+  const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   return (
     <div className="flex flex-col">
@@ -87,14 +95,29 @@ export function TodayView({
         </button>
       </div>
 
-      {/* expanded detail — US2 builds the fixed-px lane plot + axis + timeline here */}
-      {expanded && (
-        <div id="today-full" className="mt-5 border-t border-border pt-5">
-          <div data-testid="today-plot" className="text-sm text-muted">
-            The detailed day view is coming next.
+      {/* expanded detail — a reduced-motion-gated height transition (grid 0fr → 1fr grows the
+          card in place, no measurement). Content stays mounted; it's collapsed + hidden when
+          closed. Synced highlight (US3) will make the plot's lanes focusable. */}
+      <div
+        id="today-full"
+        aria-hidden={!expanded}
+        className={`grid ${expanded ? "grid-rows-[1fr]" : "grid-rows-[0fr]"} ${
+          reduceMotion ? "" : "transition-[grid-template-rows] duration-300 ease-out"
+        }`}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <div className="mt-5 border-t border-border pt-5">
+            <p className="text-xs text-muted">
+              Each check-in&apos;s shape across today — height and colour show the level.
+            </p>
+            <TodayTrendPlot seqs={seqs} />
+            <div className="mt-4 border-t border-border" />
+            <div className="mt-2">
+              <TodayTimeline sessions={recap.sessions} />
+            </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }
