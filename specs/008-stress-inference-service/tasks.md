@@ -213,6 +213,50 @@ description: "Task list — Stress Inference Service (008)"
 
 ---
 
+## Branch close-out (2026-06-22) — pre-merge fixes complete; deferred items honest
+
+> Recorded for traceability: feature-complete on `008-stress-inference-service`. The Phase 8
+> smoke (T054) ran on real Chrome / Firefox / iPhone Safari; the two **silent** breaks it surfaced
+> were fixed **in-branch before merge** and **server-side-verified** (visible/cosmetic findings go
+> to `008-followups`). Tests green at close: **apps/api 90, apps/web 575 (Vitest), packages/ml-video 55**;
+> `tsc --noEmit` green. (DECISIONS 2026-06-22; CHANGELOG 2026-06-22.)
+
+- [x] T060 **PATCH-CORS — lifecycle transitions now persist.** The API CORS config did not allow
+  `PATCH`, so the browser preflight for the monitoring lifecycle PATCH (pause/resume/out_of_frame)
+  failed and the status transition never reached the DB — with no error surfaced. Fixed (commit
+  `7c1c1f4`, `apps/api/app/main.py`) + a preflight regression guard (`241b296`); verified
+  server-side by walking the DB status `active → paused → active → out_of_frame → ended`, with the
+  409-on-ended terminal and the one-active-session finalize intact.
+- [x] T061 **Stale-token 401 — long sessions keep scoring; no silent frozen band.** A window upload
+  on a cached, expired token got a `401` the client swallowed → the bloom silently froze. Fixed via
+  **approach A** (commits `c434942`, `5b2d6ff`, `62d387f`, `40771fc`): a fresh token per upload via
+  the `deps.getSession()` seam (the Supabase browser client auto-refreshes near expiry) + an honest
+  signed-out surface (`SESSION_EXPIRED` → re-auth, never a frozen band) on an un-refreshable session.
+  RLS-as-the-user unchanged (the user's own token, just current). (DECISIONS 2026-06-22 — *approach A*.)
+
+**Deferred (not built in 008 — honest pointers):**
+
+- **ST-08-2 (iOS live readings): PENDING a real HTTPS deploy.** Capture / upload / decode are proven
+  on a real iPhone (device gate T009); the free quick-tunnel can't carry the growing continuous
+  uploads, so the *live cross-session reading* cell is unconfirmed — a transport limit, **not** a
+  capture failure. Re-run on the deploy target.
+- **Perf (R-5): deferred.** The full per-session rolling decoded-frame buffer + startup pre-warm + a
+  dedicated inference host stay deferred; the surgical O(stride) tail-decode (commit `1ef0c0c`) meets
+  the 10 s stride on a representative Azure VM. Build only if keep-up re-measured on the chosen deploy
+  target breaches the stride there. (`docs/BACKLOG.md` feature-008 keep-up entry.)
+- **Known followup L1 — live cross-expiry smoke retest.** "A live session crosses a token expiry and
+  keeps scoring" is proven by composition (SDK refresh + server accepts fresh token + per-upload fresh
+  fetch); the silent freeze is gone, but the live cross-expiry continuation goes on the next smoke
+  checklist. (DECISIONS 2026-06-22 — *Known followup L1*.)
+- **Known followup L2 (→ `008-followups`).** The pause/resume/end lifecycle PATCH calls still read the
+  cached token (a narrower instance of the stale-token class); route them through the same fresh-token
+  helper. (DECISIONS 2026-06-22 — *Known followup L2*.)
+- **Lint (non-blocking).** `npm run lint` is RED on **2 pre-existing errors in `monitoring-session.tsx`**
+  (200:39 reactive-value mutation; 492:5 setState-in-effect cascade) from the camera-lifecycle fix;
+  `tsc --noEmit` is green. Routed to `008-followups`.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies
