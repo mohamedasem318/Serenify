@@ -48,7 +48,11 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        # PATCH is required: the only PATCH route is the monitoring lifecycle transition
+        # (pause / resume / out-of-frame). web→API is always cross-origin, so omitting PATCH
+        # made the browser's preflight 400 and every transition silently never persisted.
+        # Kept an EXPLICIT allow-list (no "*") to avoid any wildcard-vs-credentials interaction.
+        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
     app.add_exception_handler(ForbiddenRoleError, _forbidden_role_handler)
