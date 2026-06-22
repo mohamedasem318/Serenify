@@ -4,10 +4,11 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 008 — Stress Inference Service (feature-complete — merge pending)
+## Feature 008 — Stress Inference Service (merged to main)
 
 **Branch**: `008-stress-inference-service`
-**Status**: **feature-complete — merge pending (not yet merged).** The live video
+**Status**: **merged to `main`** via **PR #23** (squash `6ae3b1e`, 2026-06-22); feature branch
+deleted (local + remote). Feature-complete and human-validated before the merge. The live video
 stress-inference read path (the committed
 `serenify-video-lbptop-motion-rf-calibrated@2.0.0` + `predict_delta` + the shared 2958-d
 extraction) is wired end-to-end: **continuous capture → server tail-extract of the last 60 s →
@@ -22,9 +23,11 @@ apps/web 575, ml-video 55** (`tsc --noEmit` green). Security posture untouched (
 key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no probability on the wire,
 explicit non-wildcard CORS). Constitution Check at plan time: **PASS** with one logged, justified
 deviation (per-window HTTP request/response transport instead of WebSocket — the prediction is the
-synchronous response to an upload, not polling); no NON-NEGOTIABLE principle violated. Pending:
-push / PR / squash-merge; then `008-followups`.
-**Date**: 2026-06-22 (branch close-out; implementation spanned the 008 cycle; planning closed 2026-06-19)
+synchronous response to an upload, not polling); no NON-NEGOTIABLE principle violated. Remaining
+work tracked on `008-followups` (L1 live cross-expiry smoke retest, L2 lifecycle-PATCH fresh-token,
+ST-08-2 iOS live readings on an HTTPS deploy, R-5 perf, the 2 non-blocking `monitoring-session.tsx`
+lint errors).
+**Date**: 2026-06-22 (merged to `main`; implementation spanned the 008 cycle; planning closed 2026-06-19)
 
 **Windowing in force**: **continuous single-stream upload + server tail-extract**.
 One continuous `MediaRecorder` (timeslice for incremental capture only); each stride
@@ -132,9 +135,8 @@ fixed **in-branch before merge** (visible/cosmetic findings routed to `008-follo
   on any un-refreshable session. RLS-as-user posture unchanged (still the user's own token, just
   current). (DECISIONS 2026-06-22 — *approach A*.)
 
-**Still pending**:
+**Deferred to `008-followups`** (the merge is done — PR #23, squash `6ae3b1e`):
 
-- **Push / PR / squash-merge**, then open `008-followups`.
 - **ST-08-2 (iOS live readings): PENDING a real HTTPS deploy.** Capture / upload / decode are
   proven on a real iPhone (device gate T009); the free quick-tunnel can't carry the growing
   continuous uploads, so the *live cross-session reading* cell is unconfirmed — a transport limit,
