@@ -161,6 +161,9 @@ export async function endSession(
       method: "POST",
       headers: { ...authHeaders(accessToken), "Content-Type": "application/json" },
       body: JSON.stringify({ reason }),
+      // End navigates to the dashboard immediately (008-followups: no empty "Camera off"
+      // wait), so the request must survive the page unload to reliably end the session.
+      keepalive: true,
     });
     // 409 = already ended (the auto-end / manual-End race) → success, not an error.
     return { ok: res.ok || res.status === 409 };
