@@ -316,15 +316,23 @@ function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
       ? b
       : a,
   );
-  // amber: any stress band reads as "tense" at a glance (FR-022 amber = the stress signal);
-  // the timeline carries the "a little tense" nuance.
-  const hot = `tense ${partOfDay(peak.startedAt)}`;
+  // 009 FR-002 / SC-010 — name the REAL peak honestly (supersedes 008 FR-022 "any stress reads
+  // as tense at a glance"): the standalone "tense" descriptor appears ONLY when the tense band
+  // was reached; an a-little-tense peak says exactly "a little tense". The amber keyword colour
+  // (--amber-head) covers any tension peak; the timeline carries the per-session nuance.
+  const isTense = peak.tenor === "tense";
+  const level = isTense ? "tense" : "a little tense";
+  const pod = partOfDay(peak.startedAt);
 
   const calmBefore = readable.find((s) => s.tenor === "at_ease" && ms(s.startedAt) < ms(peak.startedAt));
   if (calmBefore) {
-    return { pre: `A calm ${partOfDay(calmBefore.startedAt)}, then a `, hot, post: "." };
+    // "A calm morning, then a tense afternoon." / "…, then a little tense afternoon."
+    const connector = isTense ? "then a " : "then ";
+    return { pre: `A calm ${partOfDay(calmBefore.startedAt)}, ${connector}`, hot: `${level} ${pod}`, post: "." };
   }
-  return { pre: "A ", hot, post: "." };
+  // no calm session before the peak — the amber phrase leads, capitalised
+  if (isTense) return { pre: "A ", hot: `tense ${pod}`, post: "." };
+  return { pre: "", hot: `A little tense ${pod}`, post: "." };
 }
 
 // ── deriveRecap ──────────────────────────────────────────────────────────────────────

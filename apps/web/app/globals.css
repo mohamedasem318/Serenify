@@ -40,6 +40,16 @@
   --color-meadow-text: #346A56;                 /* small meadow TEXT on light bg (FR-017); swaps per mode */
   --color-scrim:       rgba(28, 32, 35, 0.60);  /* Graphite ink @ 60% — fixed in both modes (R-2) */
 
+  /* Amber stress-signal sub-tokens (feature 009 / constitution v1.5.1 Amendment 5).
+     --color-amber-text is AA-safe SMALL text (chip + axis tension labels) and swaps per
+     mode via :root.dark. --amber-tint / --amber-soft-line / --amber-head are graphic/role
+     values consumed via inline style or arbitrary values. The bright --color-amber stays on
+     graph lines/markers ONLY — never small text (it fails small-text AA at 2.77:1). */
+  --color-amber-text:  #8A580F;                 /* chip + axis tension TEXT (light); ~4.78:1 on the tint */
+  --amber-tint:        #F4E3C6;                 /* tension chip background (light) */
+  --amber-soft-line:   #D49A4A;                 /* "a little tense" graph line (light) */
+  --amber-head:        #BC7A2A;                 /* headline keyword, weight 700, large text (light) */
+
   --radius-card:    12px;
   --radius-control: 8px;
   --shadow-soft:    0 1px 2px rgba(0, 0, 0, 0.04);
@@ -145,6 +155,12 @@
 
     /* meadow-as-text swaps to the dark meadow; on-accent + scrim do NOT swap */
     --color-meadow-text: #63B292;
+
+    /* Amber sub-tokens — dark (constitution v1.5.1 Amendment 5) */
+    --color-amber-text: #E6C386;   /* chip + axis tension text (dark); ~7.79:1 on the tint */
+    --amber-tint:       #3B2F19;
+    --amber-soft-line:  #E8BC7A;
+    --amber-head:       #E4AE5C;
 
     /* Dark elevation: deeper alpha so the single soft shadow still reads
        against the near-black bg (FR-020 / research.md R-3.5). */

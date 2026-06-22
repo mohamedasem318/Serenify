@@ -158,6 +158,32 @@ describe("monitoring-reads — templated headline is band + time only (no probab
     expect(headline.hot).toBeNull();
     expect(`${headline.pre}${headline.post}`).not.toMatch(/[0-9]/);
   });
+
+  // 009 FR-002 / SC-010 — honest THREE-LEVEL headline (supersedes 008's FR-022
+  // "any stress reads as tense at a glance"). "tense" wording ONLY when the tense band
+  // is reached. NOTE: "a little tense" contains the substring "tense", so we assert the
+  // EXACT level phrase — never a bare `.toContain("tense")`.
+  it("a day peaking only at 'a little tense' uses that exact phrase, never the standalone 'tense'", () => {
+    const sessions = [sess("a", 13, 30, "ended", iso(14, 18))];
+    const rows = [wr("a", "at_ease", 13, 35), wr("a", "a_little_tense", 14, 10)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    expect(headline.hot).toBeTruthy();
+    const full = `${headline.pre}${headline.hot}${headline.post}`.toLowerCase();
+    expect(full).toContain("a little tense");
+    // the only occurrence of "tense" must be the one inside "a little tense"
+    expect(full.replace(/a little tense/g, "")).not.toContain("tense");
+    expect(full).not.toMatch(/[0-9]/);
+  });
+
+  it("a day reaching 'tense' uses the standalone 'tense' descriptor (not 'a little tense')", () => {
+    const sessions = [sess("a", 13, 30, "ended", iso(14, 18))];
+    const rows = [wr("a", "at_ease", 13, 35), wr("a", "tense", 14, 10)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    expect(headline.hot).toBeTruthy();
+    const full = `${headline.pre}${headline.hot}${headline.post}`.toLowerCase();
+    expect(full).toContain("tense");
+    expect(full).not.toContain("a little tense");
+  });
 });
 
 describe("monitoring-reads — deriveRecap integration (mock parity + read-rules)", () => {
