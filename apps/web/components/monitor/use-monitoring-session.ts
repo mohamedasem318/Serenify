@@ -29,6 +29,7 @@ import type { Band, WindowOutcome } from "@/lib/api/monitoring-client";
  *   any-live          ──manual Pause─────────────▶ paused (camera RELEASED)
  *   paused            ──manual Resume────────────▶ warming-up (fresh recording → warms up again)
  *   any              ──manual End / 5 min absence─▶ ended (camera released → dashboard)
+ *   any-live         ──upload 401 / un-refreshable─▶ signed-out (scoring stops, re-auth needed; camera released)
  *
  * There is NO numeric field anywhere — the band is the only stress signal (FR-015).
  */
@@ -43,6 +44,7 @@ export type MonitorOp =
   | "paused" // manual break — camera released, resumable (US2)
   | "ended" // session ended (manual End / auto-end) — orchestrator navigates to the dashboard (US2)
   | "blocked" // camera blocked / busy / no device
+  | "signed-out" // the sign-in expired and couldn't be refreshed → scoring stops, re-auth needed
   | "calibrate-first"; // no_anchor → the calibrate-first panel routes to /app/calibrate (op-surfaces)
 
 /** The live capture ops (recorder running, a band may show). */
@@ -80,6 +82,7 @@ export type MonitorAction =
   | { type: "CAMERA_BLOCKED" } // generic block (secure-context / session-create failure)
   | { type: "CAMERA_ERROR"; kind: CameraErrorKind } // mapped getUserMedia rejection (err.name)
   | { type: "NO_ANCHOR" }
+  | { type: "SESSION_EXPIRED" } // upload couldn't carry a valid token (401 / un-refreshable) — never silent
   | { type: "WINDOW_OUTCOME"; outcome: WindowOutcome }
   | { type: "WINDOW_SKIPPED"; cause: FailureCause }
   // US2 (T038) — presence + lifecycle
@@ -101,6 +104,12 @@ export function monitorReducer(state: MonitorState, action: MonitorAction): Moni
       return { ...state, op: "blocked", cameraError: action.kind };
     case "NO_ANCHOR":
       return { ...state, op: "calibrate-first", cameraError: null };
+    case "SESSION_EXPIRED":
+      // The upload path could not carry a valid token (a 401, or the browser session could
+      // not be refreshed). Scoring cannot continue as the user, so we STOP on an honest
+      // surface (the standing release effect then frees the camera) — never a silent frozen
+      // band. The orchestrator guards on a live op before dispatching, mirroring NO_ANCHOR.
+      return { ...state, op: "signed-out", cameraError: null, skipCause: null };
     case "WINDOW_SKIPPED":
       // A skipped window keeps the last band (bloom holds) and shows the foggy skip
       // note; op is unchanged (still warming-up, or still active). Ignored once the
