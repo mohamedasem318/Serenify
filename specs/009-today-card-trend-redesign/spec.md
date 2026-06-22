@@ -59,7 +59,7 @@ The employee expands the today card in place. They see each of today's sessions 
 
 ### User Story 3 - Cross-highlight a session and its row (Priority: P3)
 
-The employee hovers, or keyboard-focuses, a session's run/lane in the plot and its corresponding timeline row highlights; and conversely, hovering or focusing a timeline row highlights its run/lane in the plot. A visible focus ring marks the keyboard-focused target. Users who prefer reduced motion see the highlight without animated transitions.
+By mouse, the employee hovers a session's run/lane in the plot or its corresponding timeline row, and its partner highlights — **both** directions. For keyboard users, the plot's per-session targets are focusable: focusing one shows a visible focus ring and highlights its timeline row (timeline rows are not separate tab stops). Users who prefer reduced motion see the highlight without animated transitions.
 
 **Why this priority**: An accessibility and legibility enhancement layered on the expanded view. Valuable but not required for the day summary to be useful.
 
@@ -68,7 +68,7 @@ The employee hovers, or keyboard-focuses, a session's run/lane in the plot and i
 **Acceptance Scenarios**:
 
 1. **Given** the expanded view with a mouse, **When** the employee hovers a session lane, **Then** the matching timeline row highlights; on hovering a timeline row, the matching lane highlights (both directions).
-2. **Given** the expanded view with a keyboard, **When** the employee focuses a session target, **Then** a visible focus ring appears on it and its partner highlights.
+2. **Given** the expanded view with a keyboard, **When** the employee focuses a **plot session target**, **Then** a visible focus ring appears on it and its **timeline row** highlights. (Timeline rows are not separate keyboard tab stops; keyboard access to the highlight is via the plot targets.)
 3. **Given** a user with "prefers-reduced-motion: reduce", **When** highlights toggle, **Then** no transition animation plays (state changes are instant).
 
 ---
@@ -114,7 +114,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
 - **FR-008**: The horizontal axis MUST be **sequence within a session, ordinal between sessions** (not wall-clock). Sessions MUST occupy **equal-width lanes**.
 - **FR-009**: Each session's drawn **peak band MUST equal its timeline chip** (both derived from the same session tenor), so the graph and the timeline can never disagree.
 - **FR-010**: The expanded view MUST show **level labels on the left axis** (tense / a little tense / at ease / no read) and MUST NOT show a bottom colour legend.
-- **FR-011**: A bidirectional **synced highlight** MUST link a session's run/lane and its timeline row: hovering or keyboard-focusing either one highlights the other, in both directions, for both mouse and keyboard. A visible focus ring MUST mark the keyboard-focused target.
+- **FR-011**: A **synced highlight** MUST link a session's run/lane and its timeline row. By **mouse**, hovering either one highlights the other (**both** directions, lane↔row). By **keyboard**, the plot's per-session targets MUST be focusable: focusing one MUST show a visible focus ring and highlight its partner timeline row. Timeline rows are **not** required to be separate keyboard tab stops. In short, the synced highlight is reachable **both directions by mouse, and by keyboard via the plot session targets**.
 - **FR-012**: The timeline MUST list sessions as rows, each with a **state-coloured chip** (calm/meadow, tension/amber, no-read/muted tones). The check-in card MUST stand as its own row/section, and there MUST be exactly one "Hide today" toggle.
 - **FR-013**: The recap MUST NOT display the "processed, then deleted" reassurance line (that messaging stays on the live monitor).
 - **FR-014**: The expanded view MUST show **all** of today's sessions. When they exceed the available width, lanes MUST hold a **minimum width** and the session strip MUST **scroll horizontally** with an **edge-fade affordance** (right edge when more remains; left edge once scrolled) — lanes MUST never be crushed into thin bars.
@@ -140,7 +140,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
   | Mid-level line (`--amber-soft-line`) | `#D49A4A` | `#E8BC7A` | "a little tense" graph line only |
   | Chip/label tint (`--amber-tint`) | `#F4E3C6` | `#3B2F19` | chip background for tension rows |
   | Chip/label text (`--color-amber-text`, **new**) | `#8A580F` | `#E6C386` | chip text + axis tension labels |
-  | Headline keyword (`--amber-head`) | `#BC7A2A` | `#E4AE5C` | the headline tense word (large + bold) |
+  | Headline keyword (`--amber-head`) | `#BC7A2A` | `#E4AE5C` | the headline tense word — rendered at **font-weight 700 (bold)** at the 22px display size, so it qualifies as WCAG large text |
 
 - **DC-007 — Verified AA ratios (measured, locked)**: All text passes WCAG AA in both themes; recorded here so the build can be checked, not assumed:
 
@@ -150,12 +150,12 @@ On a day with more sessions than fit the card width, the employee still sees **a
   | Chip text on tint (dark) | `#E6C386` on `#3B2F19` | 7.79:1 | 4.5 (normal) | ✅ |
   | Axis tension label on card surface (light) | `#8A580F` on `#F4F5F6` | 5.52:1 | 4.5 (normal) | ✅ |
   | Axis tension label on card surface (dark) | `#E6C386` on `#181B1E` | 10.31:1 | 4.5 (normal) | ✅ |
-  | Headline keyword (light) | `#BC7A2A` on card surface `#F4F5F6` | 3.23:1 | 3.0 (large+bold) | ✅ |
-  | Headline keyword (dark) | `#E4AE5C` on `#181B1E` | 8.65:1 | 3.0 (large+bold) | ✅ |
+  | Headline keyword (light) | `#BC7A2A` on card surface `#F4F5F6` | 3.23:1 | 3.0 (large text ≥18.66px **at weight 700**) | ✅ |
+  | Headline keyword (dark) | `#E4AE5C` on `#181B1E` | 8.65:1 | 3.0 (large text ≥18.66px **at weight 700**) | ✅ |
   | At-ease label (light / dark) | `#346A56` on `#F4F5F6` / `#63B292` on `#181B1E` | 5.76 / 6.85:1 | 4.5 | ✅ |
   | No-read label (light / dark) | `#585D61` on `#F4F5F6` / `#939A9F` on `#181B1E` | 6.10 / 6.06:1 | 4.5 | ✅ |
 
-  Notes: the light headline keyword MUST render on the **card surface** `#F4F5F6` (where it is 3.23:1); against the page background `#EAEBEC` it is 2.95:1 and would fail. The bright graphic amber `#C98637` measures 2.77:1 as small text on the light surface — confirming it is reserved for lines/markers only.
+  Notes: the light headline keyword MUST render on the **card surface** `#F4F5F6` (where it is 3.23:1); against the page background `#EAEBEC` it is 2.95:1 and would fail. The bright graphic amber `#C98637` measures 2.77:1 as small text on the light surface — confirming it is reserved for lines/markers only. The 3:1 basis for the headline keyword is valid **only** because it is bold (weight 700) at 22px (WCAG large text); if the weight is ever reduced below bold, the **4.5:1 normal-text** bar applies and these headline values fail (the light keyword at 3.23:1 would no longer pass).
 
 ### Key Entities *(data already modeled in the existing read layer; described here without implementation)*
 
@@ -172,7 +172,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
 - **SC-002**: Sessions render as thin horizontal step strokes, not filled vertical bars: the plot drawing area is wider than it is tall, stroke weight is ~3px, and **no** band is represented by a filled rectangle. Verifiable at both the desktop width and the 360px mobile floor.
 - **SC-003**: The collapsed view renders a connected step-line (at least one connecting segment across sessions that have readings), not a set of disconnected dots; the expanded card stays within a sensible height budget (plot region ≈200px tall) and does not read as oversized.
 - **SC-004**: For 100% of sessions, the peak band drawn in the graph equals the band represented by that session's timeline chip (no disagreement across any session in any test fixture).
-- **SC-005**: The synced highlight works in **both** directions (lane→row and row→lane) and via **both** mouse and keyboard; a focus ring is visible on the keyboard-focused target; with reduced motion enabled, no transition animation occurs.
+- **SC-005**: The synced highlight works in **both** directions by **mouse** (lane→row and row→lane); by **keyboard**, focusing a plot session target shows a visible focus ring and highlights its timeline row (rows are not separate tab stops); with reduced motion enabled, no transition animation occurs.
 - **SC-006**: With more sessions than fit the width, 100% of sessions remain present and reachable by horizontal scrolling, every lane is at least the minimum width (none crushed), and an edge fade is shown at the overflowing edge (and at the left once scrolled).
 - **SC-007**: Amber chip text, axis tension labels, and the headline keyword meet WCAG AA in both light and dark themes, at the measured ratios recorded in DC-007 (re-verified at build time, not assumed).
 - **SC-008**: No stress-probability value is present anywhere in the client (network payloads, DOM text, or attributes); the only numeric digits shown are clock times.
@@ -185,9 +185,9 @@ On a day with more sessions than fit the card width, the employee still sees **a
 - **A-002**: The within-session live monitoring graph (`components/monitor/session-trend.tsx`) is untouched; the "processed, then deleted" reassurance and any legend remain there, not on the today card.
 - **A-003**: The data layer is consumed as-is from `main` (`getSessionTrend` / `getTodayTrend` / `getTodayRecap`, the column-whitelist constants, `deriveRecap`, `sessionTenor`). The backup branch's prior `today-view.tsx` may serve as a structural reference for run/lane geometry and the synced-highlight wiring, but its **rendering approach is the rejected one** and is not reused.
 - **A-004**: The dark headline keyword colour was not specified in the brief; per the approved mock it reuses the existing graphic amber `#E4AE5C` (`--amber-head` dark), which measures 8.65:1 on the dark surface (passes large+bold and even normal-text AA).
-- **A-005**: Graph **line** colours are graphical objects, and because state is encoded redundantly by height/position they are not held to the 4.5:1 text rule. In the light theme the mid line (`#D49A4A`, 2.26:1) and tense line (`#C98637`, 2.77:1) measure below the 3:1 non-text guideline against the card surface; this is accepted (the mock is the visual authority and height also encodes state) and recorded for awareness.
+- **A-005**: Graph **line** colours are graphical objects, and because state is encoded redundantly by height/position they are not held to the 4.5:1 text rule. In the light theme the mid line (`#D49A4A`, 2.26:1) and tense line (`#C98637`, 2.77:1) measure below the 3:1 non-text guideline against the card surface; this is accepted (the mock is the visual authority and height also encodes state) and recorded for awareness. Because graph **line** colours are graphical (not text), they MAY be deepened in a later visual pass to improve light-theme legibility **without** any AA-text penalty — the current values are the mock's, not a hard floor.
 - **A-006**: The horizontal session strip carries **its own** thin, styled scrollbar and edge fades as part of this component. App-wide scrollbar restyling is a separate chore and is out of scope.
-- **A-007**: Keyboard reachability of the synced highlight is provided via a focusable per-session target in the plot that highlights its timeline partner; timeline rows highlight their lane on hover. The requirement is "highlight reachable both directions, by mouse and by keyboard," not a specific number of tab stops.
+- **A-007**: This records the resolved FR-011 (not a relaxation of a stricter rule). The synced highlight is reachable **both directions by mouse** (hover a lane or a row); **keyboard** access is via the plot's focusable per-session targets, which show a focus ring and highlight their timeline partner. Timeline rows are intentionally **not** separate keyboard tab stops — this avoids per-row tab-stop bloat and is the accessible design choice.
 - **A-008**: "Sessions" are today's monitoring sessions for the signed-in employee, in the user's local day window, as already computed by the existing recap reader.
 
 ## Out of Scope
