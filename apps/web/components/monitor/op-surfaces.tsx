@@ -78,9 +78,10 @@ function PermissionPanel({ onAllow }: { onAllow: () => void }) {
  */
 const CAMERA_ERROR_COPY: Record<CameraErrorKind, { heading: string; body: string }> = {
   blocked: {
+    // Sticky-denied camera (008-followups copy): heading + body read as the full sentence
+    // "Camera access is blocked. Turn it back on in your browser's site settings, then try again."
     heading: "Camera access is blocked",
-    body:
-      "Serenify can’t start a check-in without it. Re-enable camera access for this site in your browser settings, then try again.",
+    body: "Turn it back on in your browser's site settings, then try again.",
   },
   busy: {
     heading: "Your camera’s in use",
@@ -90,6 +91,11 @@ const CAMERA_ERROR_COPY: Record<CameraErrorKind, { heading: string; body: string
   "no-device": {
     heading: "No camera found",
     body: "Serenify couldn’t find a camera. Connect one, then try again.",
+  },
+  insecure: {
+    // Non-secure origin (008-followups copy): the camera needs an https context.
+    heading: "A secure connection is needed",
+    body: "This page needs a secure (https) connection to use your camera.",
   },
 };
 
