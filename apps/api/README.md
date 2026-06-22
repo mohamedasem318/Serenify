@@ -13,11 +13,28 @@ session client. Raw video is deleted server-side immediately (Principle I).
 | GET    | `/healthz` | none        | `{status:"ready", model_version}` — readiness pre-check (FR-048) |
 | POST   | `/anchor`  | Bearer JWT  | multipart `clip` (video/mp4 \| video/webm) -> 200 `{model_version, dim, vector_b64}`; 401 / 415 / 422 |
 
+## System dependency: the `ffmpeg` CLI (`ffmpeg` + `ffprobe`)
+
+The feature-008 live-read keep-up path decodes only the **trailing 60 s** of the growing
+recording each window instead of re-decoding the whole clip (per-window cost O(stride), not
+O(elapsed)). It uses the **ffmpeg CLI** for the part OpenCV cannot do on an un-finalized
+MediaRecorder webm — a cheap `ffprobe` packet probe for the file-global sampling grid + the
+`< 60 s` gate, and an `ffmpeg -c copy` lossless tail remux (OpenCV `cap.set` seek is a silent
+no-op on those files, though it works natively for mp4). Install it on every host that runs
+the service (the Docker image already does — `apt-get install ffmpeg`). If the binary is
+**absent** the read path still works but **degrades to the whole-file decode** (O(elapsed) —
+the lag the fix removes); a binary that **runs-but-fails** on a clip skips that window (200),
+never 500s. Run `packages/ml-video/tests/test_tail_seek_keepup.py` on the deploy target — it
+asserts the tail decode is **bit-identical** to the whole-file path, so an ffmpeg version
+difference can't silently shift fidelity.
+
 ## Run locally
 
 ```sh
 cd apps/api
 cp .env.example .env          # SUPABASE_JWT_SECRET + ALLOWED_ORIGINS (dev: http://localhost:3000)
+# ffmpeg/ffprobe on PATH (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`;
+# Debian/Ubuntu: `apt-get install ffmpeg`) — see "System dependency" above.
 uv sync
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl localhost:8000/healthz

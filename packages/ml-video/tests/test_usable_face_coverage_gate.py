@@ -193,7 +193,8 @@ def test_gate_does_not_loosen_existing_floors(monkeypatch):
         frames=[np.full((128, 128, 3), 127, dtype=np.uint8)],
         landmarks=_landmarks([True]),  # (1, 956), non-zero
     )
-    monkeypatch.setattr(anchor_mod, "extract_landmarks", lambda _p: clip)
+    # stub accepts the additive tail_seconds kwarg (feature-008 T005); this test ignores it.
+    monkeypatch.setattr(anchor_mod, "extract_landmarks", lambda _p, tail_seconds=None: clip)
     monkeypatch.setattr(coverage, "MIN_USABLE_FRAMES", 1)
     monkeypatch.setattr(coverage, "MIN_COVERAGE_FRACTION", 0.5)
     with pytest.raises(FeatureExtractionError) as exc:

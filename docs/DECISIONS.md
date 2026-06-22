@@ -3072,3 +3072,908 @@ screen reassuring and reserves foggy as the genuine attention/error signal
 icon (meadow-text on `meadow/10`) 4.69:1 light / 6.45:1 dark; shield (meadow on bg)
 4.22:1 light / 7.43:1 dark. This is a targeted refinement, **not** a blanket
 foggy→meadow swap.
+
+---
+
+## 2026-06-19 — feature 008 (stress-inference-service) plan decisions (D-1…D-4 + transport deviation)
+
+Resolves the four Deferred Decisions in `specs/008-stress-inference-service/spec.md`
+and records the one Constitution deviation the plan carries. Full reasoning in
+`specs/008-stress-inference-service/research.md` and `plan.md`. The seven mock-gap
+resolutions handed down by the mock owner are recorded as spec deltas in
+`docs/CHANGELOG.md` (2026-06-19), not here (they are spec amendments, not
+architectural decisions).
+
+**D-1 — Anchor read path: server-side service-role read (option a).** Status:
+Accepted. `apps/api` gains a scoped Supabase service-role client
+(`app/supabase_admin.py`) that reads `profiles.anchor_vector` keyed to the
+JWT-verified `user_id`, and performs the server-side session/reading writes. The
+anchor never enters an authenticated client SELECT.
+*Rationale*: only the server reads the anchor (for inference) and the API already
+operates server-side, so (a) avoids a new DB-function surface (maintainer's lean).
+This is **not** an override of feature 004's DECISION-9 ("the anchor-extract
+service holds no DB credentials") — feature 004 **explicitly deferred** this path
+to the inference feature: `supabase/migrations/20260527000000_anchor_columns.sql`
+states *"service_role (seed, future 005 server-side read) is untouched,"* and the
+004 decision block notes *"feature 005's inference read path for `anchor_vector`
+(server-side service-role read, or a self-scoped SECURITY DEFINER function) is
+still 005's decision"* ("005" = now-008 after the ordering reshuffle). Server-side
+reading also enables server-side **writes** of `window_readings`, required for
+integrity because those rows feed feature 009's sustained-tense detection and the
+client must not be able to fabricate them.
+*Guardrails (Principle IX)*: `SUPABASE_SERVICE_ROLE_KEY` is env-only (platform
+panel in prod; mirrors `apps/web` `serverEnv` + the existing `SUPABASE_JWT_SECRET`);
+the service-role client is used only to read own anchor, read own role (employee
+gate), and write/read own sessions+readings; **every query is keyed by the verified
+JWT `sub`** (service role bypasses RLS, so this keying discipline is the control)
+and is unit-tested.
+*Rejected*: (b) self-scoped SECURITY DEFINER returning the anchor — adds a DB-
+function surface and, if called from the browser, delivers the 2958-d anchor to the
+client (against "keep the anchor out of any authenticated client SELECT").
+
+**D-2 — Endpoint shape + upload/buffer model: session-aware, client-assembled 60 s
+window per stride, server-side smoothing.** Status: Accepted. Three endpoints —
+`POST /monitoring/sessions` (create + calibrate-first guard), `…/{id}/windows`
+(score one window, ~every 10 s), `…/{id}/end`, plus `PATCH …/{id}` for lifecycle
+status. The client assembles the full 60 s window and uploads it per 10 s stride
+(consecutive windows overlap 50 s); the server holds no rolling buffer. Smoothing,
+banding, and the cold-start gate are computed **server-side** in the window
+endpoint and the band is returned, so the first displayed reading is already
+smoothed and the card/page trends agree (SC-008). Reads (trend/recap) are
+browser-side Supabase RLS SELECTs, not API endpoints.
+*Rationale*: session-aware grouping makes the trend/recap and the 009 seam trivial
+and lets a rolling buffer move server-side later without a UI change; client-
+assembled windows reuse the proven `/anchor` multipart path and are negligible on
+localhost.
+*Documented future item (not built now)*: on real deployment this uploads ~6× the
+bytes and re-runs MediaPipe on ~6× overlapping frames; the optimization is a
+**server-side rolling-feature cache** (client sends only the new ~10 s; the server
+reuses overlapping extraction), which the session-aware shape already enables and
+which pairs with the WebSocket transport in the deviation below.
+*Rejected*: a single stateless per-window endpoint (no clean grouping/lifecycle);
+a server rolling buffer now (efficient end state, but stateful complexity before
+it is needed).
+
+**D-3 — Smoothing, banding, cold-start.** Status: Accepted. Smoothing = rolling
+mean of `proba[1]` over the last **N = 4 scored** readings (skipped windows
+excluded). Bands on the **smoothed** value: `< 0.53` At ease, `0.53 ≤ x < 0.70` A
+little tense, `≥ 0.70` Tense. `t_low = 0.53` is the metadata operating point
+(config `STRESS_OPERATING_POINT`, default read from `metadata.json`, never a
+literal — FR-012); `t_high = 0.70` is a **display-only** product split (config
+`STRESS_TENSE_BAND`) because the model carries only the single stress/not-stress
+operating point and `predict_proba` is not probability-calibrated. Cold-start
+**M = 4** scored readings before any band → first band at ~90–105 s (matches
+updated SC-001); the display holds warming-up until then. The internal 0.5 label
+from `predict_delta` is ignored. No numeric value is ever shown (FR-015).
+*Rationale*: 60 s windows overlap 50 s, so readings are already correlated; a
+4-reading trailing mean drifts rather than flickers (SC-003) while staying
+responsive. Details + tests in `contracts/smoothing-and-banding.md`.
+
+**D-4 — Readings persistence schema.** Status: Accepted. Two tables —
+`monitoring_sessions` (lifecycle: active/paused/out_of_frame/ended + end_reason +
+bounds + model_version) and `window_readings` (per window, keyed user+session+
+`captured_at`, with `scored`, `band`, `skip_cause`, and the **server-only** raw
+`label` + `stress_probability`). RLS = SELECT-own for the owner via a column
+whitelist that **excludes the raw probability/label** (the `anchor_vector`
+mechanism); **no manager policy** on either table (Principle I); all writes are
+service-role keyed to the verified `sub`. Retention: `window_readings` 90 days then
+purge (purge job is a documented follow-up); sessions kept longer. The persisted
+`band` + `captured_at` + `session_id` are the FR-020 seam — sufficient for feature
+009 to detect sustained-tense by query; **008 builds no questionnaire trigger**.
+Full schema in `data-model.md`.
+
+**Constitution deviation — per-window HTTP request/response transport (not
+WebSocket).** Status: Accepted (justified, logged). The Architecture-Constraints
+rule "real-time prediction streams … travel over WebSockets, not polling" is
+deviated from: inference is upload-bound (the client must send a 60 s window each
+stride; the reading is the synchronous response), and the live signal-quality
+indicator (framing/out-of-frame) is computed **on-device**, so nothing is polled.
+A WebSocket carrying 60 s video blobs every 10 s adds reconnect/backpressure
+complexity with no benefit while inference is upload-bound; it is **reserved** for a
+future server-push streaming optimization paired with the deferred server-side
+rolling-feature cache (D-2). Recorded in `plan.md` Complexity Tracking.
+
+**Revisit if**: the backend moves to hosted deployment (the D-2 bandwidth/compute
+cost becomes real → build the server-side rolling-feature cache + WebSocket
+transport); or `metadata.json`'s stale `window_eval_config` (30 s) is ever
+mistaken for the production window (it is not — 60 s is locked by Principle II +
+`docs/MODELS.md`; research R-0 flags the cleanup).
+
+---
+
+## 2026-06-19 — feature 008 plan AMENDMENT: D-1 and D-2 reopened (maintainer review)
+
+Amends the **2026-06-19 — feature 008 plan decisions** entry above. After review,
+the maintainer flipped D-1 and D-2 having weighed the honestly-flagged trade-offs.
+Both prior decisions are **superseded** by the ones here; everything else in the
+original entry (D-3, D-4 shape, the transport deviation, the 60 s lock) stands.
+Plan artifacts updated on the `008-stress-inference-service` branch (`plan.md`,
+`research.md`, `data-model.md`, `contracts/inference-api.md`, `quickstart.md`).
+
+**D-1 (REVISED) — self-scoped `SECURITY DEFINER` read; NO service-role key.** The
+API must **not** gain a broad DB credential; DECISION-9's "no DB credentials in
+`apps/api`" posture is preserved. The anchor is read by `public.get_my_anchor()` (a
+`SECURITY DEFINER` function filtering strictly on `auth.uid()`, returning only the
+caller's own anchor; EXECUTE to `authenticated` only; mirrors `has_anchor()`). The
+API calls it **as the user** — forwarding the verified access token + the
+**publishable anon key** (RLS-respecting), never a service credential — so the
+anchor flows Supabase → API only and never enters a browser SELECT. Sessions/
+readings are written **under RLS as the user** (insert-own/select-own/update-own;
+still no manager policy). The raw `stress_probability`/`label` stay server-only via
+the SELECT column whitelist (so the **API**, not the browser, writes the reading
+row).
+*Rationale*: strongest secrets posture — **no new secret** in `apps/api` (the anon
+key is publishable, already in the browser bundle; grants nothing beyond RLS),
+strictly stronger than the original service-role design (Principle IX). `auth.uid()`
+resolves via the forwarded JWT — the established working pattern (DECISION-9 note:
+SECURITY DEFINER RPCs are called via the caller's token, not service-role). Feature
+004 named **both** options for this path; this is the safer one.
+*Verified alignment + flagged divergence*: the `/anchor` router does **zero** DB I/O
+(browser writes the anchor via its own RLS client). 008 preserves that *credential
+posture* (no broad credential; user-context RLS) but the **API itself** now does the
+DB I/O via forwarded JWT — a new pattern for `apps/api` (the forwarded-JWT-RPC
+pattern already exists in the **web** invite handler). 008 cannot push writes to the
+browser because the raw probability must stay server-side. Recorded as a deliberate
+divergence, not a contradiction.
+*Write-integrity — deliberately deferred (low stakes)*: under RLS-as-the-user
+writes, a user could fabricate **their own** readings. Accepted: own data only;
+managers never see raw readings (no manager policy); privacy invariant unchanged.
+**Upgrade path (not built now)**: a **dedicated INSERT-only Postgres role** (a narrow
+write credential, far less than service-role) held by the API, with INSERT revoked
+from `authenticated`.
+*Superseded*: original D-1 (server-side **service-role** read). Reason: it
+introduced a broad DB credential / new secret into `apps/api`.
+
+**D-2 + R-5 (REVISED) — single-recorder ~10 s segments + server-side 60 s
+assembly.** The client no longer assembles 60 s windows (no staggered
+`MediaRecorder` pool). It records with a **single** `MediaRecorder` (timeslice
+~10 s) and uploads only the newest segment; the **server** keeps a transient
+per-session buffer (last 6 segments + the init segment) and assembles the rolling
+60 s window for the existing single-path extraction. The session-aware endpoint
+shape is unchanged; the "deferred rolling buffer" becomes the **primary** design.
+*Rationale*: one client encoder instead of ~6 (far lighter on CPU/mobile), ~6× less
+upload bandwidth, and materially better cross-browser robustness — **WebKit/Safari
+`MediaRecorder` is the fragile case and Safari/iOS is a hard pre-production gate**,
+so the single-encoder path is the defensible choice. Buffer lifecycle: append; keep
+last 6 clusters; assemble per stride; **clear on pause/end**; segments + assembled
+window deleted in `finally` (Principle I — transient, never persisted).
+*⚠ FLAGGED contradiction (per the instruction to flag, not work around)*: the
+brief's preferred "decode each segment and concatenate sampled frames (not mux
+containers)" is **not directly feasible**. Verified: (1) timeslice chunks are **not
+independently decodable** — only the first webm/fMP4 chunk carries the init segment;
+(2) the shared extraction entry (`extract_landmarks`/`compute_anchor`) is
+**single-file/path-based** (`cv2.VideoCapture`, no frame-sequence entry). So the
+realistic path is **container-level reassembly** (`[init + recent clusters]` → one
+temp container → existing decode) — exactly the container concatenation the brief
+said to flag. Recommended path **B1** (container reassembly) with the R-7 early
+Safari spike de-risking decodability across Chrome webm + Safari fMP4; **B2
+fallback** = stop/restart standalone segments + a **new multi-clip extraction entry**
+in `packages/ml-video` (a package change) if B1 fails on Safari.
+*Superseded*: original D-2 client-assembled 60 s windows / R-5 staggered recorder
+pool.
+
+**Change 3 — Safari/WebKit early validation (carried into the plan, front-loaded).**
+The segment + server-assembly path MUST be validated on **WebKit/Safari (incl. iOS)
+early** — a small spike before the full build, among the first `/speckit-tasks`
+items — not discovered late. Rationale: Playwright has given false cross-browser
+capture/timing confidence (see the e2e-load-timing flake history), so the real
+Safari/iOS smoke gate is prioritized. Recorded as research R-7 + a plan test-plan
+item.
+
+**Change 4 — `metadata.json` hygiene (small, separate).** The stale
+`window_eval_config` (30 s) block should be removed or annotated (production contract
+is the 60 s LOSO block). This is **metadata/doc only** — no model/feature-space
+change, so **no `model_version` bump and no anchor invalidation**; the model artifact
+is **not** edited as part of this plan. Recorded as a backlog/task note + flagged for
+the model owner (research R-0).
+
+**Constitution Check delta**: Principle IX now has **no new secret** (publishable
+anon key only) — stronger than before; the original service-role Complexity-Tracking
+row is **removed**. Principle I still holds (managers read nothing; raw
+probability/label server-only via the SELECT whitelist; anchor server-side only) —
+the only change is writes now run as the user under RLS (write-integrity deferred as
+above). The transport-deviation entry is unchanged.
+
+## 2026-06-19 — feature 008 plan AMENDMENT: B1 windowing NO-GO → B2 (standalone clips + multi-clip frame concat)
+
+Amends the **D-2 + R-5 (REVISED)** decision in the *2026-06-19 — feature 008 plan
+AMENDMENT* entry above. The R-7 windowing spike returned a **structural NO-GO on B1**
+(single timeslice recorder + server-side **container reassembly**). **B2** is adopted
+as the windowing approach. Everything else in the prior amendment stands (D-1, D-3,
+D-4 shape, the 60 s lock, the transport deviation). Plan artifacts updated on the
+`008-stress-inference-service` branch (`research.md` R-5/R-7/R-6/D-2, `plan.md`,
+`contracts/inference-api.md`, `quickstart.md`; `data-model.md` needs no change — it
+describes no assembly).
+
+**B1 (container reassembly) is REJECTED — NO-GO (structural; accepted as-is, real-
+device confirmation optional/non-blocking).** Three reasons:
+1. **`[chunk0 + recent tail]` is not a clean trailing 60 s.** The first timeslice
+   blob is the init segment **plus ~10 s of media**, so stitching chunk0 onto a recent
+   tail is not a clean trailing 60 s **without container surgery**.
+2. **Silent `motion_features` corruption.** A spliced container has a **time
+   discontinuity** at the splice; `motion_features` is a frame-to-frame diff, so the
+   **spurious diff at the splice inflates max/std across the 2868 motion dims** — the
+   decode can **"succeed" and still be wrong** (no error raised). This silent feature
+   corruption is the disqualifying failure mode.
+3. **webm timeslice boundaries aren't guaranteed cluster-aligned**, so a reassembled
+   webm can be structurally invalid (cut mid-cluster) — decodability itself is
+   unreliable across browsers.
+
+A B1 harness exists at **`_scratch-008-b1-spike/`** for optional empirical
+confirmation; **the decision does not wait on it.**
+
+**B2 (ADOPTED) — standalone clips + server-side frame concatenation.** The client
+**stops/restarts** the `MediaRecorder` every ~10–12 s so each clip is a **complete,
+independently-decodable** standalone clip (its own init), uploading only the newest.
+The server buffers the **last ~6 clips**, **decodes each via the existing extraction
+path**, and **concatenates the sampled frames** into one ~150-frame / ~60 s set, then
+runs LBP-TOP + motion on that set. No shared-init surgery, no mid-cluster splice, no
+intra-file discontinuity. Privacy unchanged: clips are **transient, in-memory,
+cleared on pause/end, deleted in `finally`** — never persisted.
+*Package change (Principle III)*: B2 adds **one new public entry** to
+`packages/ml-video`, `compute_anchor_multiclip(clip_paths) -> (2958,)`, that **reuses**
+the existing per-clip `extract_landmarks` + `lbp_top_features`/`motion_features` and
+only adds frame-array concatenation — **not a second copy** of extraction. (B1 had
+kept ml-video untouched by reassembling containers in `apps/api`; that path is gone.)
+*Why B2 resolves the blockers the prior amendment flagged*: stop/restart makes every
+clip independently decodable (removes blocker 1), and the new multi-clip entry gives
+ml-video a multi-clip path (removes blocker 2). The cost — a recorder stop/restart
+each stride (a few frames lost per seam) and a package change — is accepted, and the
+**frames-lost-per-seam + per-seam `motion_features` diff are now measurable, bounded
+quantities** validated by a **hard fidelity gate**, not B1's silent corruption.
+
+**Front-loaded, gating validation (R-7).** The first two `/speckit-tasks` items, both
+gating the rest of the build:
+1. **B2 capture validation on real Chrome + real Safari/iOS (NOT Playwright)** — each
+   clip independently decodable; frames-lost-per-restart within budget; no glitches
+   across the ~5 seams of a 60 s window. The Safari/iOS pre-production gate.
+2. **Multi-clip extraction fidelity HARD GATE (`packages/ml-video`)** — the same ~60 s
+   as **one continuous clip** vs as **~6 stop/restart standalone clips** must agree
+   **within tolerance** (measuring the per-seam `motion_features` diff + frames lost
+   per restart). If it fails, the windowing approach is revisited before the rest of
+   the feature is built.
+
+*Superseded*: B1 (single timeslice recorder + server-side container reassembly), the
+D-2/R-5 decision of the prior 2026-06-19 amendment. The R-6 webm/VFR **codec** check
+remains scheduled hardening; its **assembly** dimension is now the R-7 multi-clip
+gate.
+
+---
+
+## 2026-06-19 — Multi-clip motion assembly made seam-aware; B2 fidelity gate still FAILS on Chrome (divergence beyond the seams)
+
+**Status**: Accepted (code change kept). **GATE NOT cleared — Phases 3–8 remain blocked.**
+
+**Context**: The first real-fixture run of the R-7 multi-clip fidelity HARD GATE
+(T008) on the recorded **Chrome** fixtures FAILED. Measured before vs after the fix:
+
+| | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤12) | seam_motion_ratio |
+|---|---|---|---|---|---|
+| **Before (seam-contaminated)** | **0.9010** ❌ | 0.0089 ✅ | **1.2923** ❌ | 3 ✅ | 5.72 |
+| **After (seam-aware)** | **0.8958** ❌ | 0.0089 ✅ | **0.6998** ❌ | 3 ✅ | 5.72 |
+
+The accepted diagnosis was that the only divergence was the motion block's
+frame-to-frame `np.diff` taken **across the stop/restart clip seams** (~0.5–2 s
+recorder gap → a spurious ~5.7× jump per seam, ~5 seams dominating the 2868-d motion
+block). The prescribed fix: compute motion diffs **per clip** and **exclude the
+cross-seam diffs** before the mean/std/max aggregation.
+
+**Decision**: The multi-clip motion assembly is now **seam-aware**. New
+`ml_video.features.motion_features_seamaware(landmark_blocks)` computes `|np.diff|`
+**within each clip** and concatenates the per-clip diffs (cross-seam rows excluded)
+before mean/std/max; `compute_anchor_multiclip` calls it instead of running
+`motion_features` over the fully-concatenated stack. The **single-clip
+`compute_anchor` / `motion_features` path** (which extracts the continuous reference)
+is **untouched**; the LBP/texture path, the coverage gate, and frame concatenation are
+unchanged; no gate threshold was loosened. For a single clip the seam-aware path
+reduces **exactly** to `motion_features`.
+
+**Outcome — the fix is correct but does NOT clear the gate; the seams were not the
+dominant divergence.** The fix did exactly what it should to the motion block —
+**motion-block cosine 0.861 → 0.956**, **motion_rel_p99 1.29 → 0.70** — confirming the
+seams *were* contributing to the tail. But the gate's headline **full-vector cosine
+barely moved (0.901 → 0.896, slightly worse)**: removing the spurious seam spikes shrank
+the multi-clip motion magnitude (l2 ratio multi/continuous: mean 0.79, std 0.55,
+**max 0.43**), rebalancing the full vector toward the near-perfectly-aligned LBP block
+(cosine 0.9997) and incurring a magnitude-mismatch penalty that cancelled the
+directional gain.
+
+The decisive evidence is the **relative motion-error distribution** after the fix:
+**p50 = 0.41, p90 = 0.64, p99 = 0.70** — ~41% error *at the median*, broadly distributed
+across **all** motion dims. A seam-localized problem is low-median / high-tail; this is
+**broadband**. Tighter seam handling cannot close a 41%-median broadband gap. The
+residual is **divergence beyond the seams**: the continuous clip and the 6 standalone
+clips are **two independent back-to-back recordings**, and the motion block captures
+exactly the involuntary micro-motion (blinks, sway, breathing, VFR sampling) that does
+**not** reproduce take-to-take. As fixtured, the gate conflates **assembly fidelity**
+with **recording reproducibility**, and the latter dominates the motion block (97% of
+the 2958 dims).
+
+**Consequence**:
+- The gate is **NOT cleared**. Per T009 / the plan, **STOP — do not start Phases 3–8.**
+  Safari/iOS was never reached (no fixtures recorded) and is independently still required.
+- The seam-aware code is **kept** (it is the correct multi-clip implementation and a real
+  improvement) but it is **not** sufficient, and **no threshold was changed**.
+- Windowing fidelity goes to a **design session**. Items for it: (1) re-fixture the gate
+  to isolate assembly fidelity from recording variance — compare one continuous decode vs
+  the **same decoded frames** programmatically re-chunked into N standalone clips, so the
+  only difference is assembly; (2) reconsider whether a 0.999 full-vector cosine is even
+  achievable on the take-irreproducible motion block, or whether the fidelity contract
+  needs a motion-aware / magnitude-normalized metric; (3) only then re-judge B2.
+
+**Numbers recorded in**: `specs/008-stress-inference-service/smoke-tests.md` (T009 table,
+before + after) and `research.md` R-5. The gate catching this before any build is the gate
+working as intended (Principle VII).
+
+**Revisit at**: the windowing design session (next 008 work session).
+
+---
+
+## 2026-06-19 — B2 windowing design session: cross-take fixture was a real flaw; single-source re-fixture isolates a residual per-clip sampling-phase divergence (gate still NOT cleared)
+
+**Status**: Accepted (analysis + test re-fixture; **no code/threshold change**). Amends the
+diagnosis of the **2026-06-19 — Multi-clip motion assembly made seam-aware** entry above.
+**GATE still NOT cleared — Phases 3–8 remain blocked.**
+
+**Context**: The prior entry diagnosed the seam-aware fix's residual as "broadband divergence
+beyond the seams" and sent windowing to a design session with the first action: *re-fixture to
+isolate assembly fidelity from recording variance — compare one continuous decode vs the **same
+decoded frames** re-chunked.* This entry executes that action and reports the result.
+
+**What was done (fix the test, not the budget)**: The Step E `chrome` fixture compared **two
+independent recordings** (a continuous take and a separate 6-clip take of "the same" ~60 s).
+Involuntary micro-motion (blinks, breathing, sway) and VFR sampling do not reproduce
+take-to-take, so the motion block (97% of the 2958-d vector) diverged for reasons unrelated to
+the **assembly** — the fixture conflated *assembly fidelity* with *recording reproducibility*.
+A new **single-source** fixture removes the confound with **no new recording**: the existing
+`chrome/continuous.webm` is **losslessly segmented** (`ffmpeg -c copy -f segment
+-segment_time 11 -reset_timestamps 1` — same VP9 frames, no re-encode) into 6 standalone clips.
+Verified same take: the 6 segments decode to **1984** frames, **exactly** `continuous.webm`'s
+1984. `-reset_timestamps 1` makes each segment restart at `t≈0`, modelling a real B2
+stop/restart clip. (Lossless cuts snap to the ~3.36 s keyframe grid, so segment durations are
+non-uniform — 13.4/10.0/10.0/13.4/10.0/8.8 s; this does not change the frames.) New artifacts:
+`tests/fixtures/multiclip/chrome-singlesource/` (README + `.gitkeep`; raw webm gitignored) and
+the diagnostic `tests/helpers/singlesource_fidelity.py`. The production gate
+(`test_multiclip_fidelity.py`) auto-discovers the fixture; **no threshold was loosened**.
+
+**Measured (production gate `_measure`, cross-checked by the diagnostic):**
+
+| Fixture | cosine (≥0.999) | lbp_maxabs (≤0.05) | motion_rel_p99 (≤0.25) | frames_lost (≤12) | seam_ratio |
+|---|---|---|---|---|---|
+| `chrome` (cross-take) | 0.8958 ❌ | 0.0089 ✅ | 0.6998 ❌ | 3 ✅ | 5.72 |
+| `chrome-singlesource` (lossless segments) | **0.9910** ❌ | 0.0025 ✅ | **0.3336** ❌ | **0** ✅ | 1.52 |
+
+**Finding 1 — the cross-take fixture WAS a real flaw (the prior "broadband" read was a fixture
+artifact).** Isolating to one source moves cosine **0.896 → 0.991**, median relative motion
+error **0.41 → 0.05**, LBP-block cosine to **0.99997**, and removes the broadband take-to-take
+noise. Most of Step E's failure was **recording reproducibility, not assembly**. The
+single-source (lossless-segment) fixture is the **correct test going forward**; the cross-take
+`chrome` fixture is retired as the wrong test (kept on disk only as a contrast row).
+
+**Finding 2 — but B2's assembly is still not faithful enough; a real, smaller divergence remains
+and is localized.** The single-source gate **still fails**: cosine **0.991 < 0.999**,
+motion_rel_p99 **0.334 > 0.25**. The residual is **motion-only** (LBP cosine 0.99997) and
+**localized to the per-clip sampling phase**:
+- `frames_lost = 0` (165 = 165) → not frame loss but frame **substitution**;
+- only **31.5%** of the 2.5 fps-sampled frames coincide (52/165); the other 113 picks are
+  offset from the continuous pick by **median 79 ms / p90 175 ms / max 195 ms** — up to ~½ the
+  400 ms sampling period;
+- **mechanism**: each standalone clip re-applies the 200 ms-phased 2.5 fps timestamp grid
+  (`_timestamp_keep_indices`) from its own `t≈0` (`CAP_PROP_POS_MSEC` resets per clip), and the
+  clip start offsets are not multiples of 400 ms, so each clip samples a **different set of
+  frames** than continuous sampling. Different frames → different landmark diffs → motion
+  magnitude ~14% lower (l2 ratio 0.864). LBP texture is phase-insensitive (averaged), so it is
+  unaffected.
+
+**Why this likely cannot be patched server-side for *real* B2 clips**: the lossless fixture has
+knowable global offsets, but a **real** stop/restart clip carries **no global clock** — its
+`POS_MSEC` genuinely starts at 0 and the server cannot know the (variable) recorder
+stop→restart wall-clock gaps, so the continuous sampling phase cannot be reconstructed from
+standalone clips. A **continuous single-stream upload** sidesteps re-phasing entirely.
+
+**Decision / consequence**:
+- **GATE still NOT cleared.** Per T009 / the plan, **STOP — do not start Phases 3–8.** No
+  threshold loosened; no production code changed.
+- The **single-source fixture is adopted as the canonical windowing fidelity test**; the
+  cross-take comparison is retired. Safari/iOS must be validated with the **same single-source
+  method** before any build (still independently required; no Safari fixture recorded yet).
+- The windowing-approach choice is the **maintainer's call, now with numbers in hand**: (a) make
+  per-clip decode+sample phase-faithful (appears intractable for real standalone clips — see
+  above), or (b) switch B2 to a **continuous single-stream upload**. This entry deliberately
+  **does not** make that change.
+
+**Numbers recorded in**: `specs/008-stress-inference-service/smoke-tests.md` (Step F) and
+`tests/fixtures/multiclip/chrome-singlesource/README.md`. Lint nit fixed in passing
+(`tests/helpers/decode_smoke.py` E501) so the T001 "ruff passed" record is accurate.
+
+**Revisit at**: the windowing-approach decision (continuous upload vs phase-faithful per-clip
+sampling) — the next 008 work session.
+
+---
+
+## 2026-06-19 — feature 008 windowing DECISION: B2 REJECTED; adopt continuous single-stream upload + server tail-extract (D-2 reversed)
+
+**Status**: Accepted (windowing approach changed). **Reverses the D-2 + R-5 (B2)
+windowing decision** of the three 2026-06-19 amendment entries above, and resolves the
+maintainer's open call recorded in the *B2 windowing design session* entry. **Unchanged**:
+D-1 (self-scoped `SECURITY DEFINER` `get_my_anchor()`, no service-role, RLS-as-user
+writes), D-3 (smoothing/banding/cold-start), D-4 (schema), the 60 s window lock, the 0.53
+re-threshold, the transport deviation, and the seven mock-gap resolutions. Plan artifacts
+updated on `008-stress-inference-service`: `research.md` (D-2/R-5/R-6/R-7), `plan.md`,
+`contracts/inference-api.md`, `quickstart.md`, `spec.md`, and `tasks.md` re-issued;
+`data-model.md` is **unchanged** (it describes no assembly).
+
+**Why B2 is rejected — the single-source numbers settled it.** The single-source
+re-fixture (prior entry) removed the recording-reproducibility confound with **no new
+recording**: the existing continuous Chrome clip was **losslessly re-segmented** (same VP9
+frames, no re-encode) into 6 standalone clips. With **identical source content**, B2's
+multi-clip frame-concat assembly reached only:
+- **cosine 0.991 (< the 0.999 budget)**, with
+- a systematic **~14% motion-magnitude shortfall** (l2 ratio 0.864) and **motion_rel_p99
+  0.334 (> 0.25)**;
+- the divergence is **not** the seams and **not** frame loss (`frames_lost = 0`): it is a
+  **per-clip sampling-phase reset** — only **31.5%** of the 2.5 fps-sampled frames coincide
+  with continuous sampling (52/165); the rest are offset by up to ~½ the 400 ms sampling
+  period, because each standalone clip re-applies the timestamp grid from its **own `t≈0`**
+  (`CAP_PROP_POS_MSEC` resets per clip).
+
+Two things are both true and both recorded:
+1. **The earlier cross-take fixture was a real flaw** — it compared two *independent*
+   recordings, so take-to-take micro-motion / VFR noise (not assembly) dominated (cosine
+   0.896, motion p50 0.41). The **single-source fixture is the correct test** and is kept as
+   the canonical windowing-fidelity diagnostic.
+2. **Even with the correct test, B2 cannot reach fidelity, and the residual is not patchable
+   for real clips.** A real stop/restart clip carries **no global clock** — its `POS_MSEC`
+   genuinely starts at 0, and the server cannot know the variable recorder stop→restart
+   wall-clock gaps, so continuous sampling phase **cannot be reconstructed** from standalone
+   clips. (The lossless fixture only slips through by *accident* of having knowable global
+   offsets; real separately-recorded clips lose variable time at each restart.)
+
+**Decision — adopt continuous single-stream upload.**
+- **Client**: **one continuous `MediaRecorder`** (timeslice only for *incremental capture*,
+  never stop/restart). Each stride uploads the **contiguous recording-so-far** — the init
+  segment + all chunks **in order**, i.e. the literal growing file, which is **always
+  decodable** (the case already proven reliable; no surgery, no clip stitching, no
+  init-segment retention). No stop/restart, no per-clip containers.
+- **Server**: decode the uploaded continuous clip and extract the **last 60 s** with the
+  **existing, validated single-clip extraction path** (`compute_anchor` + the VFR
+  timestamp / `POS_MSEC` sampler) **bounded to the trailing window** — sample frames whose
+  timestamp ≥ `duration − 60 s`. **No multi-clip assembly.** The only ml-video change is a
+  thin **tail-window option** on the existing extraction (reuses the exact decode + sampler +
+  features; it only bounds *which* frames feed the features) — strictly smaller than
+  `compute_anchor_multiclip`.
+- **Faithful by construction.** The scored window is a **genuine continuous 60 s segment
+  sampled by one continuous grid** — no stop/restart seams, no per-clip phase resets — i.e.
+  exactly the single-clip input the extraction path is **already validated on** (the notebook
+  fidelity gate + the existing webm/VFR sampler). **There is therefore no new feature-fidelity
+  gate to pass.** (Residual: only a ≤200 ms *global* phase offset between the window grid and
+  a standalone clip's grid — within ordinary recording-to-recording sampling variation, **not**
+  the per-stride re-phasing that sank B2.)
+
+**Retired (kept in git history; removed from the active path).** `compute_anchor_multiclip`,
+`test_multiclip_fidelity.py`, the seam-aware `motion_features_seamaware` helper, and the
+multi-clip frame-concat **HARD GATE** are retired — the assembly step they validated no longer
+exists. The **single-source diagnostic** (`tests/helpers/singlesource_fidelity.py`), the
+single-source fixture, and the finding above **stay recorded** (they are *why* B2 was rejected).
+*(Code retirement is a task in the re-issued `tasks.md`; this session records the decision and
+does not edit code past the docs.)*
+
+**Known cost — accepted, with one flag.** Upload size and the server's decode-to-tail work
+**grow over the session** (each stride re-uploads the whole recording-so-far, and the server
+re-decodes it to reach the tail). Both are **bounded by the 5-minute hard cap** and
+**negligible on localhost** (the dev/demo target).
+- **⚠ Flag — growing per-stride decode could breach the 10 s stride within a 5-min session on
+  the droplet.** Real Chrome webm is VFR and VFR seek is unreliable, so reaching the tail means
+  **sequential decode from the start of the growing file** each stride. At the 5-min cap that
+  is ~300 s of video decoded per stride; to stay inside the 10 s stride the CPU must decode at
+  **≥ ~30× realtime** — plausible for low-res webcam video, **not guaranteed for 720p VP9 on
+  the DigitalOcean droplet** (the same CPU that makes MediaPipe ~3–5 s/window). Late-session
+  strides may exceed 10 s. **Bounded, not fatal**: FR-016 non-blocking means the client keeps
+  capturing and uploads are fire-and-forget, so only the *reading cadence* degrades toward
+  end-of-session; the 5-min cap caps the worst case. The keep-up check is exactly what the (now
+  lighter) windowing validation measures.
+- **Deferred optimization (unchanged — still deferred, not built now)**: a **server-side
+  rolling decoded-frame buffer** — retain the trailing 60 s of sampled frames and decode only
+  the **newest increment** each stride — collapses per-stride decode from O(elapsed) to
+  O(stride) and removes the growth. This is the **same** optimization already deferred (pairs
+  with the future WebSocket transport). **Build it before relying on long droplet sessions in
+  production**; localhost/demo does not need it.
+
+**Windowing validation is now much lighter (no fidelity gate).** The heavy multi-clip fidelity
+question is gone (faithful by construction). The remaining real-device check is only:
+**continuous recording + growing upload + last-60 s tail-extract works on real Chrome and real
+Safari/iOS, and per-stride server time stays within the 10 s stride across a 5-minute session.**
+It largely **reuses the proven `/anchor` single-clip upload+extract path**. The
+**real-Safari/iOS check stays the pre-production gate** — but it is now a *"does the continuous
+capture/upload/tail-extract work and keep up"* check, **not** a fidelity gate. A failure means
+"the deferred rolling-buffer optimization is needed for production," **not** "re-open the
+windowing approach."
+
+**Superseded**: B2 (standalone stop/restart clips + multi-clip frame-concat assembly + the
+multi-clip fidelity HARD GATE) and `compute_anchor_multiclip`. B1 remains rejected (prior
+entries).
+
+**Numbers recorded in**: this entry + `specs/008-stress-inference-service/smoke-tests.md`
+(Step F) + `tests/fixtures/multiclip/chrome-singlesource/README.md`.
+
+**Revisit at**: production deployment scale-up (when the deferred rolling decoded-frame buffer /
+WebSocket push becomes worth building).
+
+---
+
+## 2026-06-19 — feature 008 corrective docs/tasks pass: enforce "faithful by construction", complete the keep-up reasoning, make the B2 retirement non-breaking
+
+**Status**: Accepted (docs + `tasks.md` correction; **no code, no decision reversal**). A
+pre-`/speckit-analyze` cleanup of three gaps found in the re-issued `tasks.md` + `research.md`
+after the *continuous single-stream* windowing decision (prior entry). The windowing decision is
+**not** reopened (continuous single-stream stays adopted); **D-1, D-2 (continuous), D-3, D-4, the
+seven mock-gap resolutions, the 0.53 re-threshold, and Principles I/V/VI/VII are untouched.**
+
+**Three gaps closed:**
+
+1. **"Faithful by construction" is now an *enforced* invariant, not an assumption.** The pivot
+   rests on the tail-extract sampling on **one file-global grid (anchored at the file's t=0)** and
+   keeping the trailing 60 s — so the kept tail frames are exactly the *suffix* of the full-file
+   keep-set. B2 failed precisely because the grid was **re-zeroed per segment**
+   (`CAP_PROP_POS_MSEC` reset to 0). Nothing in the task list stopped a future change — most
+   likely the **deferred rolling decoded-frame buffer** (R-5) — from reintroducing that
+   re-zeroing, and T006 only asserted the tail frames fell in the right *range* (a re-zeroed grid
+   satisfies the range while picking the *wrong frames inside it*). **Fix**: `tasks.md` T005 now
+   mandates compute-global-then-filter with an explicit prohibition on trim/seek-and-resample;
+   T006 adds a deterministic, **CI-runnable integer-index suffix-equality invariant** on synthetic
+   VFR timestamps (no video, no tolerance) that any future incremental/buffered decoder must keep
+   passing; `research.md` R-5 ties faithfulness to the preserved global grid + this enforcement.
+   This is **not** the retired multi-clip fidelity gate — it is exact integer-index equality on
+   identical source frames.
+
+2. **Keep-up reasoning corrected and completed.** (a) The budget bar was understated — decode must
+   fit `(10 s − extract)` ≈ **5–7 s / ~43–60× realtime** at the 5-min cap, not the full 10 s /
+   ~30×. (b) Keep-up has **two** components: *growing decode-to-tail* (O(elapsed) — the rolling
+   buffer fixes it) **and** *constant per-window extract* (MediaPipe + LBP, ~10–15 s/window
+   projected on the droplet — the buffer does **not** touch it; an extract-bound breach calls for
+   slower cadence or GPU MediaPipe, not the buffer). `research.md` R-5 + `tasks.md` T008/T009 now
+   split the diagnosis, and T008 records decode-to-tail and extract times **separately**. All
+   droplet figures are flagged **indicative only** — the droplet is being phased out (Azure student
+   credits / HuggingFace), so production keep-up must be re-evaluated against the chosen target.
+
+3. **B2 retirement (T004) made complete and non-breaking.** The kept single-source diagnostic
+   `tests/helpers/singlesource_fidelity.py` **imports `compute_anchor_multiclip`**, so the blind
+   removal the old T004 described would break the very file that records *why* B2 was rejected.
+   T004 now: **deletes `compute_anchor_multiclip` + `motion_features_seamaware` from the package
+   source entirely** (resolution **(a)** — the active source carries **zero** retired B2 code),
+   **inlines** the assembly logic they contained into the kept diagnostic so it stays runnable,
+   runs a **repo-wide reference sweep**, deletes the `_scratch-008-b2-spike/` harness, and removes
+   the **orphaned cross-take** fixtures (`multiclip/chrome/`, `multiclip/safari/`) while keeping
+   the **single-source** fixture (`multiclip/chrome-singlesource/`) as evidence.
+
+**Files changed (docs/tasks only — no feature code, no test/fixture code, no model artifact, no
+`model_version` bump)**: `specs/008-stress-inference-service/tasks.md` (T003, T004, T005, T006,
+T008, T009), `specs/008-stress-inference-service/research.md` (R-5), `docs/DECISIONS.md` (this
+entry), `docs/CHANGELOG.md`.
+
+**References**: the windowing decision (prior entry — *B2 REJECTED; adopt continuous
+single-stream*), research R-5/R-7, the single-source diagnostic finding.
+
+**Revisit at**: `/speckit-analyze`; then at implementation of T005/T006 (the invariant guard) and
+of the deferred rolling decoded-frame buffer (which must pass the T006 invariant).
+
+---
+
+## 2026-06-19 — Feature 008 windowing device gate (T009): PASS on real Chrome + Safari/iOS
+
+**Status**: Accepted. Resolves the Phase-2 windowing validation checkpoint (T009).
+
+**Decision**: The continuous single-stream path — one continuous `MediaRecorder` → upload the
+**contiguous recording-so-far** each stride → server **tail-extract** the last 60 s
+(`compute_anchor(clip, tail_seconds=60)`) — **works on real devices**. **Phase 3+ is unblocked.**
+
+**Evidence (real browsers, not Playwright; full detail in `smoke-tests.md`):**
+
+- **Chrome 149 (webm/vp9), ~5-min continuous session, 30 strides:** every stride decodable; every
+  framed stride (t≥30 s) → `(2958,)`. Offline re-confirm on the saved fixtures: `decode_smoke` OK
+  ×5, `compute_anchor(_301, tail_seconds=60)` → `(2958,)` all-finite.
+- **Safari/iOS — works PASS on BOTH containers it can produce:**
+  - **Notable finding:** this iOS Safari **supports WebM/VP9 MediaRecorder** (contradicting the
+    spec's "Safari emits fragmented MP4" assumption). With the harness's webm-first `pickMime`, the
+    **default** iOS capture is **webm/vp9** — decodable + `(2958,)` (decode 19.4 s / extract 3.9 s).
+  - **Fragmented MP4 explicitly exercised** (the gate's named unknown): forcing `?mime=mp4` pushed
+    iOS into its genuine **fragmented-MP4 / CMAF** encoder (`major_brand=iso5`, `…cmfc`, **59 `moof`
+    fragments**, handler `Core Media Video`, 9.4 Mbps / 68 MB — not a re-encode). It **decodes +
+    tail-extracts to `(2958,)`** — the "fragile encoder" fear is dispelled (it decoded *faster* than
+    the webm: 7.0 s vs 19.4 s).
+
+**Keep-up — breaches, expected, NOT a windowing failure (production-deploy concern only).** Per-
+stride server time exceeds the 10 s stride well before the 5-min cap. The breach is **decode-to-tail-
+dominated and grows with session length** (Chrome live: decode-to-tail 30→122→134 s vs extract
+bounded ~5–24 s on a constant ~150-frame tail; at t=300 s decode ≈ 25× extract) ⇒ the lever is the
+**deferred server-side rolling decoded-frame buffer** (decode only the newest increment; research
+R-5) — the *decode* side, not extract. The live worst-case is additionally inflated by ~30 concurrent
+strides contending on one machine (the same 60 s clip: **9.7 s standalone vs 30 s live**) — a
+cadence/back-pressure concern orthogonal to clip size. Localhost/demo is unaffected; the build
+proceeds.
+
+**Transport note (scaffolding, not a gate finding):** iOS records ~4× larger than Chrome (~12 MB/10
+s), so the contiguous uploads reach 20–110 MB; a free cloudflared tunnel from a phone uplink could
+not carry them (only the first ~10 s stride uploaded live, decodable, `skipped` on face-coverage —
+the QUIC default also had to be switched to `--protocol http2` to carry even the mid-size POSTs). The
+Safari works + per-component split were therefore measured by processing the **saved** recording-so-
+far fixtures through the **same** `compute_anchor`/`measure` building blocks the live server uses —
+faithful (identical extraction), since whether the bytes arrive by upload or file transfer does not
+change whether they decode. (One transfer attempt via WhatsApp-as-*video* silently **re-encoded** the
+clip to a 6.5 MB H.264-Baseline `mp42isom` MP4 — discarded; the real 68 MB CMAF fMP4 was re-sent as a
+WhatsApp *document*.)
+
+**Faithful by construction still holds** — there is **no fidelity outcome to fail**; the gate only
+confirmed *works* + characterized *keep-up*. The T006 file-global-grid suffix invariant remains the
+CI guard.
+
+**Files changed (docs/smoke-tests/tasks only — no feature code, no model artifact, no `model_version`
+bump):** `specs/008-stress-inference-service/smoke-tests.md` (T007/T008/T009 results),
+`specs/008-stress-inference-service/tasks.md` (T007/T008/T009 → done), `docs/DECISIONS.md` (this
+entry). The disposable harness `_scratch-008-continuous-spike/` gained per-stride works/keeps-up
+logging, a markdown export, a `?mime=mp4` force, and the device-gate RUNBOOK.
+
+**References**: the prior windowing decision (*B2 REJECTED; adopt continuous single-stream*) and the
+windowing-refinements entry (R-5 keep-up split); `smoke-tests.md` § Windowing validation (continuous).
+
+**Revisit at**: Phase 3 build (T010+); production keep-up must be re-measured against the chosen
+deploy target (the rolling decoded-frame buffer is the decode-side lever if it breaches there).
+
+---
+
+## 2026-06-20 — feature 008: server-side smoothing reads an IN-MEMORY buffer, not the DB
+
+**Status**: Accepted. Resolves a read-path gap left open by the D-1 flip (see
+*2026-06-19 — feature 008 plan AMENDMENT: D-1 and D-2 reopened*).
+
+**Context (the gap)**: D-3 smooths the band over the **last N=4 scored `proba[1]`**,
+computed **server-side**. The *original* D-4 keyed all writes to the **service-role**, so
+the API would have read `stress_probability` back with that broad credential, bypassing
+the column whitelist. The **D-1 flip removed the service-role** (all DB I/O as the user via
+the forwarded JWT) but only reconciled the *anchor read* (`get_my_anchor()`) and the
+*writes* — it never specified how the server-side smoother reads prior `proba` back. With
+no service-role **and** the `window_readings` SELECT column whitelist deliberately
+**excluding `stress_probability` / `label`** from the `authenticated` role, the API (acting
+as the user) **cannot** read those columns — a plain `select("stress_probability")` is
+column-level permission-denied at runtime.
+
+**Decision**: keep the rolling smoothing buffer **in server memory**, never in the DB.
+- `smoothing.py` (T019) stays a **pure** function: given the recent scored `proba[1]` + the
+  config thresholds (`STRESS_OPERATING_POINT` / `STRESS_TENSE_BAND`), return mean → band.
+- `inference.py` (T020) holds a **per-session in-memory buffer** (`{session_id:
+  deque(maxlen=4)}`, LRU-capped on session count). Each window: extract → `predict_delta` →
+  the raw `proba[1]` is appended **only for scored windows** (skipped + `< 60 s` warming-up
+  windows are excluded from both the buffer and the M=4 count) → smooth → band → persist the
+  row (server-only `label` + `stress_probability` via the INSERT grant; `band` for the
+  trend). **The raw `stress_probability` is never read back from the DB**; the SELECT
+  whitelist stays exactly as committed (T010), and **no read RPC / read role is added**.
+- Per-session cleanup on End is wired in US2 / T036 (`buffers.drop(session_id)`); the LRU cap
+  bounds memory for abandoned sessions until then.
+
+**Rationale**: preserves every committed privacy invariant — managers get nothing, the
+owner still cannot SELECT a probability, no service-role, no new RPC that would expose the
+raw `proba` to a browser (the alternative `SECURITY DEFINER recent_scored_proba()` would, like
+`get_my_anchor()`, be callable by the owner's browser). The buffer is the natural home for
+overlapping-window smoothing state and matches the server-authoritative-band design (SC-008).
+
+**Trade-off (documented; deferred)**: the in-memory buffer assumes a **single worker** (or
+session affinity / a shared cache such as Redis) and is **lost on API restart** → that
+session simply **re-warms** (≤ ~90 s). Acceptable for the MVP / localhost demo; it is a
+production-deploy concern in the same class as the deferred rolling decoded-frame buffer and
+back-pressure. Logged in `docs/BACKLOG.md` (feature 008).
+
+**References**: `contracts/smoothing-and-banding.md`, `contracts/inference-api.md` §2 step 8,
+`data-model.md` (the `window_readings` SELECT whitelist), the D-1 flip entry above.
+
+**Revisit at**: production deploy (choose single-worker / session affinity / shared cache);
+and if write-integrity is ever enforced via the deferred INSERT-only role (the read path is
+unaffected — it never touches the DB for `proba`).
+
+## 2026-06-21 — feature 008 keep-up: SURGICAL O(stride) tail-decode (ffmpeg-CLI), full rolling buffer deferred
+
+**Status**: Accepted. Implements the deferred "server-side rolling decoded-frame buffer"
+keep-up item (plan.md / `docs/BACKLOG.md`) as a *surgical* O(stride) tail decode rather than
+the full per-session rolling buffer. Gated build — both fidelity (GATE 1) and keep-up (GATE 2)
+proven before commit.
+
+**Context (the breach)**: under continuous single-stream upload the server re-decoded the
+**whole growing recording-so-far** every window just to tail-extract its last 60 s — per-window
+decode **O(elapsed)**. The 2026-06-20 supervised smoke measured the live lag *growing* ~9 s/window
+to ~3 min behind (SC-001 missed). Two O(elapsed) walks: the `< 60 s` gate (`probe_recorded_seconds`
+→ whole-file grab) and the tail decode (`compute_anchor(tail_seconds=60)` → whole-file decode).
+
+**Investigation (the prescribed primitive does not exist; a faithful one does)**: "seek to a
+keyframe then decode forward" assumed OpenCV can seek — it **cannot** on an un-finalized
+MediaRecorder webm (no Cues index): `cap.set(POS_MSEC/POS_FRAMES)` returns `True` but is a
+**silent no-op that rewinds to t=0** (decode-after-"seek" reads the whole file). The realizable
+primitive: a cheap **ffprobe packet read** (demux only) for the file-global 2.5 fps grid +
+duration, then decode **only the bounded trailing window** — OpenCV native `cap.set` for mp4
+(seekable), an **`ffmpeg -c copy` lossless tail remux → OpenCV decode** for webm. A direct ffmpeg
+`bgr24` decode is NOT bit-identical to OpenCV (a YUV→BGR colourspace shift, Chrome cosine 0.999055
+— borderline); the `-c copy` remux keeps OpenCV as the decoder → **bit-identical (max|Δ|=0)**.
+
+**Decision**: ship the surgical tail decode in `ml-video` only — `pipeline._extract_landmarks_tail`
++ `probe_global_timestamps_fast`, dispatched from `extract_landmarks(tail_seconds=…)` and
+`anchor.probe_recorded_seconds`. **No change** to the upload contract, `score_window`, the
+smoothing/M=4 cold-start, the `(2958,)` shape check, the skip→`FeatureExtractionError` mapping,
+RLS, the SELECT whitelist, or JWT. **GATE 1**: bit-identical to the whole-file path on the real
+chrome+safari continuous fixtures (`tests/test_tail_seek_keepup.py`, local-only/ffmpeg-gated; CI
+suffix-invariant stays T006). **GATE 2**: per-window total **O(elapsed) 18→55 s (grows 3.1×) →
+O(stride) flat ~9–13 s**; the gate alone 3.2→15.3 s → 0.1–0.8 s.
+
+**Trade-offs (documented)**: (1) adds an **ffmpeg/ffprobe CLI** host dependency (Dockerfile +
+`apps/api/README.md`); **absent → graceful fallback** to the whole-file OpenCV decode (correct,
+O(elapsed)) so CI / degraded deploys keep working, **runs-but-fails on a clip → skipped window**
+(200), never 500. (2) The flat cost is still ~9–13 s on the dev laptop — partly the constant
+MediaPipe+LBP extract (R-5's separate lever: slower cadence / GPU) and partly the bounded decode;
+the **full rolling buffer** (decode only the new ~10 s increment → true O(stride) ~1.5 s) is the
+upgrade to build **only if** keep-up re-measured on the chosen deploy target breaches the stride
+there. Logged in `docs/BACKLOG.md` (feature 008 keep-up entry).
+
+**Rationale (surgical over the rolling buffer)**: bit-identical (GATE 1 at cosine 1.0) and
+**stateless** — no cross-window frame cache, no reused FaceMesh, so it avoids the continuity
+fidelity risk a rolling buffer would introduce and needs no extra fidelity proof; minimal; meets
+GATE 2 here. The rolling buffer's only gain is headroom for a slower deploy target not yet chosen
+or measured — not worth its complexity now.
+
+**References**: `pipeline.py` (`_extract_landmarks_tail`, `_decode_tail`,
+`probe_global_timestamps_fast`), `tests/test_tail_seek_keepup.py`, `tests/test_tail_window.py`
+(T006 CI guard), plan.md deferred-items, `docs/BACKLOG.md` (008 keep-up).
+
+**Revisit at**: production deploy — re-measure keep-up on the real target; build the full rolling
+decoded-frame buffer (and/or read-loop back-pressure) only if the surgical flat cost breaches the
+10 s stride there.
+
+---
+
+## 2026-06-21 — 008 edge-case pass: one-active-session-per-user fix + US4 read-path decisions
+
+**Status**: Accepted. The session-lifecycle fix is **built** on `008-stress-inference-service`
+(migration `20260621000000` + create-route change, TDD, full `apps/api` suite green and the
+migration applied + the local replay test re-verified against real Postgres). The US4 read
+decisions are **recorded only** — US4 (T046–T050) is deferred/unbuilt; they bind its build.
+
+**Context**: a design-and-logic edge-case sweep over feature 008 (US1–US4), triaged with a
+scoped read-only CC audit. The audit's two findings of substance were both in the **built**
+US1–US3 lifecycle; the rest of the worry surface (timezone, empty/degenerate sessions, n=1
+render, today-boundary) is about the **deferred** US4 read path and resolves to build-time
+constraints. The privacy "watch hardest" item (D1) was found already structural at the DB
+engine (column-GRANT whitelist denies `label`/`stress_probability` even to a `SELECT *`,
+`42501`) — robust as-is, re-audit the US4 `.select()` strings when they land.
+
+**Decision 1 — one active session per user (C1 orphaned-active + C2 concurrency), BUILT.**
+Ending is client-driven (even the 5-min auto-end is a browser timer), so a crash/closed tab
+left a row `active` forever — which also shadowed the recap's "most-recent **ended** session"
+read — and two tabs created two parallel active sessions (the `plan.md` one-per-user
+assumption was unenforced). Fix = make "at most one active (`ended_at IS NULL`) per user" a
+**DB invariant** + **last-tab-wins** create route:
+
+- **Partial unique index** `monitoring_sessions_one_active_per_user_idx (user_id) WHERE
+  ended_at IS NULL` (migration `20260621000000`), preceded by a **backfill** that finalizes
+  pre-existing duplicate actives (keep most-recent `started_at`, end the rest) so the index
+  builds on existing data. New terminal `end_reason = 'abandoned'` (CHECK extended).
+- **Create route** finalizes any prior active session as `'abandoned'` **before** inserting
+  the new run — `ended_at` stamped at that session's **last reading** (the honest
+  end-of-activity), or `now()` if it never scored. Two tabs ⇒ last-tab-wins; the first tab's
+  next window upload hits the existing-already-ended `409` path. A concurrent insert that
+  loses the index race (`23505`) is recovered with one finalize+retry, never a 500.
+- Constraints honored: no service-role (all I/O as the user via the forwarded JWT, RLS the
+  control), RLS + the SELECT column whitelist unchanged, append-only readings unchanged.
+- Files: `supabase/migrations/20260621000000_one_active_session_per_user.sql`,
+  `apps/api/app/supabase_user.py` (`get_active_session` / `latest_reading_at` /
+  `finalize_active_session`), `apps/api/app/routers/monitoring.py` (create route),
+  `apps/api/tests/test_monitoring_endpoints.py` (fake models the index race; 4 new tests).
+
+**Decision 2 — US4 read-path rules (recorded; bind T046–T050 when built).** Mirrored into
+`specs/008-stress-inference-service/data-model.md` § Reads ("US4 read-rules"):
+
+- **Retrospective-only (B4)** — Today/recap show **ended** sessions; a fresh-active session
+  (reading within 5 min) stays on the monitor page and is never drawn. "Ended" for the recap
+  = `status='ended'` **OR stale-active** (active but last reading > 5 min old; activity signal
+  = `max(window_readings.captured_at)`, no new column).
+- **Read-less / degenerate (B1/B2/B3)** — a session with **zero** readable bands renders an
+  honest "checked in, but we didn't get a clear read" + neutral marker, **never** calm; a
+  single-band (n=1) session renders as a **dot**, never a broken/empty path.
+- **Day attribution (A2)** — a midnight-crossing session belongs to its **start day**; no split.
+- **Local time (A3)** — render `captured_at` (stored UTC) in the **user's local** zone.
+- **Empty-vs-calibrate (E4)** — the recap/empty surface on the check-in card must branch on
+  `has_anchor` so a no-anchor first-ever user gets calibrate-first, not "no sessions yet".
+
+**Rationale**: structural-not-disciplinary, matching the rest of 008 — the index enforces the
+invariant even if the route is bypassed or races; the create route makes the common path clean
+(no orphan accumulation). Settling the US4 read rules now keeps the deferred build (and its
+mock) from re-deriving them and prevents a degenerate session ever reading as "at ease".
+
+**Revisit if**: a server-side session reaper is later added (would make the stale-active read
+rule redundant — then the recap could filter strictly on `status='ended'`); or US4's mock
+chooses a different in-progress treatment than retrospective-only (re-open Decision 2/B4).
+
+---
+
+## 2026-06-22 — 008 merge gate: ships its own spec, not polish; the two silent breaks were spec violations fixed in-branch
+
+**Status**: Accepted.
+
+**Decision**: Feature 008 merges when it delivers **its own spec**, not when it is polished. The
+two silent breaks the Phase 8 smoke surfaced — **PATCH-CORS** (lifecycle transitions never
+persisted) and **stale-token-401** (long sessions silently stopped scoring) — are **spec
+violations**, not polish: persisting the lifecycle transition is a US2 deliverable, and "keeps
+scoring across a long session" is the US1 read path. Both were fixed **in-branch before merge** and
+verified server-side (CHANGELOG 2026-06-22; the *approach A* decision below). **Visible or cosmetic**
+smoke findings (copy, spacing, animation tweaks) are **not** merge blockers and go to
+`008-followups`.
+
+**Rationale**: The merge gate is "does it do what the spec says," kept distinct from "is it
+polished." A silent **wrong** result (a frozen band; an un-persisted status) breaks the spec's
+promise and stays in-branch; a visible-but-correct rough edge does not, and deferring it keeps the
+merge boundary clean. This is the same structural-not-disciplinary posture as the rest of 008.
+
+**Revisit if**: a later smoke finds another **silent-wrong** break — by this gate it is in-branch,
+not a followup.
+
+---
+
+## 2026-06-22 — stale-token fix = approach A (fresh token per upload via the browser client) + honest signed-out surface
+
+**Status**: Accepted.
+
+**Decision**: Fix the stale-token-401 by fetching a **fresh access token from the Supabase browser
+client per window upload** (the SDK auto-refreshes near expiry — confirmed in the installed SDK
+source), through the existing `deps.getSession()` seam at the upload call site; plus an **honest
+signed-out surface** (a new `SESSION_EXPIRED` signed-out op → re-authenticate) whenever a session is
+genuinely un-refreshable. Chosen over **approach B (reactive 401-retry: catch the 401, refresh,
+replay the upload)**.
+
+**Rationale**: The browser client was already cleanly available at the upload call site, so a
+per-upload fresh token removes the expiry case **entirely** (proactive) rather than recovering from
+it after the fact (reactive). It is less code in the fragile US2 async-timing area, and it fails
+honest — an un-refreshable session can no longer present as a frozen-but-live band. RLS posture is
+unchanged: still the **user's own** token, just **current**.
+
+**Revisit if**: a future change moves the upload off the browser client (e.g. a server-proxied
+upload), at which point the token can no longer be refreshed at the call site and a reactive retry
+(or a server-side refresh) becomes the right shape.
+
+---
+
+## 2026-06-22 — Known followup L1: live cross-expiry continuation proven by composition, not yet demonstrated live (next smoke)
+
+**Status**: Accepted (followup recorded).
+
+**Decision**: The happy path "a live session crosses a token expiry and keeps scoring" is
+established **by composition** — (1) the Supabase SDK refreshes the JWT near expiry, (2) the server
+accepts a fresh current token under RLS, and (3) the client now fetches a fresh token per upload
+(approach A) — **not** yet demonstrated live against an actually-aged session. The **silent freeze
+is definitively gone** (that was the in-branch fix). The **live cross-expiry continuation** goes on
+the next smoke checklist.
+
+**Rationale**: Composition proves the freeze can't recur (each leg is independently verified), but a
+live run against a >1 h aged session is the honest end-to-end confirmation. It is a smoke-retest
+item, not a code gap — nothing is known-broken.
+
+**Revisit at**: the next supervised smoke — run a session across a real token expiry and confirm
+scoring continues uninterrupted.
+
+---
+
+## 2026-06-22 — Known followup L2 (→ `008-followups`): lifecycle PATCH calls still read the cached token
+
+**Status**: Accepted (deferred to `008-followups`).
+
+**Decision**: A **narrower instance of the same bug class** as the fixed stale-token break remains
+and is deferred out of 008. The pause/resume/end lifecycle PATCH calls still read the **cached**
+token (kept current by uploads, but **not** refreshed while paused). A manual pause longer than the
+token lifetime (~1 h) followed by resume/end could send one stale token on that PATCH, which
+`patchStatus` swallows as `{ok:false}` → silent status non-persistence again (the same class as the
+two fixed breaks). **Followup**: route the lifecycle calls through the same fresh-token helper as the
+window upload; while doing it, confirm whether a manual pause **auto-ends** (which would shrink this
+to near-zero).
+
+**Rationale (why deferred, not in-008)**: it is far **narrower** than the fixed bug — it needs a
+manual pause held past the full token lifetime, where the fixed bug hit **every** long session — and
+the fix lands in the **fragile US2 async-timing area right at merge time**, exactly where late
+changes are riskiest. Approach A already removes the common, every-long-session case; this residual
+edge is a clean, scoped followup.
+
+**Revisit at**: `008-followups` — route pause/resume/end through the fresh-token helper; first
+confirm the auto-end-on-pause behaviour (it may make this moot).

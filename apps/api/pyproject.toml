@@ -14,6 +14,11 @@ dependencies = [
     # ES256 access tokens (JWKS); PyJWT cannot do EC verification without it.
     "pyjwt[crypto]>=2.9",
     "pydantic-settings>=2.4",
+    # Feature 008 (revised D-1): a USER-CONTEXT PostgREST client only —
+    # create_client(url, anon_key) + per-request postgrest.auth(<forwarded JWT>).
+    # Uses the publishable anon key (RLS-respecting, not a secret); there is NO
+    # service-role key. supabase-py pulls postgrest/gotrue/etc.; we use postgrest.
+    "supabase>=2.6",
     "ml-video",
 ]
 
@@ -25,8 +30,10 @@ dev = [
     "ruff>=0.6",
 ]
 
-# ml-video is consumed as a local editable path dep — the API holds NO Supabase
-# DB credentials (DECISION-9); it only verifies a JWT and returns the vector.
+# ml-video is consumed as a local editable path dep. Revised D-1 (feature 008): the
+# API holds NO service-role / broad DB credential — DB I/O is RLS-as-the-user via the
+# forwarded JWT + the publishable anon key (preserving DECISION-9's no-broad-credential
+# posture). It still verifies the JWT and extracts the anchor vector as before.
 [tool.uv.sources]
 ml-video = { path = "../../packages/ml-video", editable = true }
 

@@ -1714,3 +1714,295 @@ foggy (OTP wrong-code, calibration failure banners, the off-center nudge,
 camera-access-denied, backend-down, auth error `role="alert"` notices, and the
 home calibration attention banner). No unit test pinned these classes, so none
 needed changing.
+
+## 2026-06-19 — spec(008-stress-inference-service) — mock-gap resolutions + one missed state (folded into the plan)
+
+Seven decisions handed down by the mock owner after spec review, folded into
+`specs/008-stress-inference-service/plan.md` (and `research.md`). They resolve the
+spec's three Mock-Gap open questions (MG-1/2/3) and add one operational state the
+spec missed. Per Constitution Principle VIII, the committed `spec.md` is **not**
+retroactively edited; the deltas are recorded here and the updated mock
+`serenify-008-monitoring-mock.html` is the visual contract.
+
+1. **Warming-up is a 7th operational state.** Before the first window completes
+   there is no reading. A calm, neutral-bloom **warming-up** state ("getting a read
+   on things") shows until the smoothing buffer holds enough readings (plan D-3
+   cold-start). **FR-004 delta** — the operational-state list becomes: permission,
+   **warming-up**, active, out-of-frame, paused, blocked, ended (plus the transient
+   skipped-read note and the calibrate-first surface).
+2. **First displayed reading at ~90 s, not ~60 s.** The first state the user sees
+   must already be smoothed, so the display holds warming-up until the cold-start
+   gate clears. **SC-001 delta** — first smoothed reading within **~90–105 s** (was
+   ~60–75 s), then ~every 10 s.
+3. **"Couldn't read this window" gets its own affordance** — a quiet **foggy
+   "skipped a read" note**, NOT the out-of-frame surface (a coverage failure can
+   occur while the user is plainly in frame — glare/low light — so "move back into
+   frame" would be wrong). It names the likely cause + a gentle fix, reusing the
+   feature 005/006 cause vocabulary (`dominantCause`); the bloom keeps the last
+   smoothed state underneath and capture continues. **FR-013 clarified** (it no
+   longer reuses the out-of-frame surface verbatim). Resolves **MG-2**.
+4. **Calibrate-first surface (no-anchor, US3)** — a **foggy** attention panel (not
+   stress) with a short line and a **"Start calibration"** action routing to the
+   calibration flow (forward button is **meadow** per Principle V). Resolves
+   **MG-1** (FR-011 / SC-004 visual).
+5. **Mobile (≥ 360 px) monitoring stage stacks** — bloom shrinks, controls go
+   full-width and stack, pill/viewfinder reposition (Principle VI). Resolves
+   **MG-3** (FR-025).
+6. **"Ended" is not a monitoring-page screen.** Ending returns the user to the
+   **dashboard with an updated recap**; no standalone ended screen is built.
+   **SC-010 delta** — "ended" is verified as the return-to-dashboard-with-recap
+   transition, not a distinct visual.
+7. **Idle recap empty state.** A calibrated user who has never run a session has no
+   "last session"; the idle check-in card shows a graceful empty state ("Start your
+   first check-in") rather than a blank/broken recap. (FR-019 refinement.)
+
+Also recorded in the plan (not a spec gap, but a contract clarification):
+`metadata.json` carries a stale `window_eval_config` (30 s) alongside the
+authoritative 60 s `loso_metrics_60s_calibrated` block — the production window is
+**60 s** per Constitution Principle II + `docs/MODELS.md`; the 30 s block is not
+used (research R-0 flags it for cleanup).
+
+## 2026-06-19 — plan(008-stress-inference-service) — D-1 + D-2 reopened after review (amendment)
+
+Two plan decisions were changed by the maintainer after review (full reasoning in
+`docs/DECISIONS.md` 2026-06-19 amendment). Plan artifacts updated on the
+`008-stress-inference-service` branch: `plan.md`, `research.md`, `data-model.md`,
+`contracts/inference-api.md`, `quickstart.md`. No spec FR/SC wording changes; this
+is a plan-level amendment.
+
+- **D-1 (revised) — no service-role; self-scoped `SECURITY DEFINER` read.**
+  `apps/api` gains **no** broad DB credential (DECISION-9 posture preserved). The
+  anchor is read by `public.get_my_anchor()` (filters on `auth.uid()`, EXECUTE to
+  `authenticated` only), called by the API **as the user** via the forwarded access
+  token + the **publishable anon key**. Sessions/readings are written **under RLS as
+  the user** (insert-own/select-own/update-own); raw `stress_probability`/`label`
+  stay server-only via the SELECT column whitelist (so the API, not the browser,
+  writes the row). **Constitution Check delta**: Principle IX now has **no new
+  secret** (publishable anon key only) — stronger than the original; the service-role
+  Complexity-Tracking row is removed. **Write-integrity deferred** (a user could
+  fabricate their *own* readings; managers see nothing; upgrade path = a dedicated
+  INSERT-only role, not built now). *Superseded*: original service-role read.
+- **D-2 + R-5 (revised) — single-recorder ~10 s segments + server-side 60 s
+  assembly.** The client streams ~10 s segments from a **single** `MediaRecorder`
+  (timeslice); the **server** buffers the last 6 and assembles the rolling 60 s
+  window (transient, in-memory, cleared on pause/end, deleted in `finally`). One
+  encoder instead of ~6 → lighter on mobile, ~6× less bandwidth, defensible for
+  fragile Safari `MediaRecorder`. **⚠ Flagged**: the preferred frame-level
+  concatenation is **not directly feasible** (timeslice chunks aren't independently
+  decodable; the shared extraction is single-file/path-based), so **container-level
+  reassembly** is required — recommended path B1, with the R-7 Safari spike de-risking
+  decodability (Chrome webm + Safari fMP4) and a B2 fallback (standalone segments + a
+  new multi-clip extraction entry, a package change) if it fails. *Superseded*:
+  client-assembled windows / staggered recorder pool.
+- **Safari/WebKit early validation (R-7)** is front-loaded as one of the first
+  `/speckit-tasks` items (real Safari/iOS, not Playwright-only).
+- **`metadata.json` hygiene** confirmed as metadata/doc-only — **no `model_version`
+  bump, no anchor invalidation**, model artifact not edited (backlog/task note,
+  flagged for the model owner).
+
+### 008 windowing amendment (2026-06-19) — B1 NO-GO → B2 (supersedes the D-2/R-5 bullet above)
+
+- **B1 (single timeslice recorder + server-side container reassembly) is REJECTED —
+  R-7 structural NO-GO.** Reasons: `[chunk0 + recent tail]` isn't a clean trailing
+  60 s without container surgery; the splice's time discontinuity **silently corrupts
+  `motion_features`** (spurious diff inflates max/std across the 2868 motion dims — a
+  decode can "succeed" yet be wrong); webm timeslice boundaries aren't guaranteed
+  cluster-aligned. Verdict accepted as-is; a B1 harness at `_scratch-008-b1-spike/`
+  allows optional confirmation but the decision doesn't wait on it.
+- **B2 is ADOPTED — standalone clips + server-side frame concatenation.** The client
+  **stops/restarts** the recorder every ~10–12 s so each clip is standalone and
+  independently decodable; the server buffers the last ~6 clips, **decodes each and
+  concatenates the sampled frames** into one ~150-frame / ~60 s set for LBP-TOP +
+  motion. Privacy unchanged (transient, in-memory, cleared on pause/end, deleted in
+  `finally`). Adds **one new public `ml-video` entry** `compute_anchor_multiclip`
+  (reuses the per-clip internals — not a second copy; Principle III).
+- **R-7 is now two front-loaded, gating checks**: (1) B2 capture validation on real
+  Chrome + Safari/iOS (not Playwright); (2) a multi-clip extraction **fidelity HARD
+  GATE** (continuous clip vs ~6 stop/restart clips within tolerance). The R-6
+  webm/VFR **codec** check stays scheduled hardening. *Superseded*: the B1 path in the
+  bullet above.
+
+### 008 spec back-ported to the resolved decisions (2026-06-19)
+
+- **`spec.md` reconciled** (it had been left stale while the plan amended decisions
+  late; `/speckit-analyze` flagged the drift). The spec now matches — never reverts —
+  the authoritative plan resolutions: **SC-001/US1 timing 60–75 s → ~90–105 s**;
+  **`warming-up` added as the 7th operational state** (FR-004, SC-010); **FR-013 / the
+  thin-window edge case → a distinct foggy "skipped a read" note** (not the out-of-frame
+  surface); **FR-014 → D-3 resolved** (trailing mean of 4, bands 0.53/0.70, 4-reading
+  cold-start, server-side); **FR-019 → recap empty state**; **Deferred Decisions D-1…D-4
+  and Mock Gaps MG-1/2/3 annotated RESOLVED** (D-1 = self-scoped `get_my_anchor()`, no
+  service-role; D-2 = session-aware + B2 windowing; ended→dashboard; idle empty state);
+  Test Plan Notes + Principle VII note the **B2 multi-clip fidelity HARD GATE**. A
+  reconciliation note at the top of the spec records this.
+
+## 2026-06-19 — plan(008-stress-inference-service) — windowing D-2 REVERSED: B2 rejected → continuous single-stream upload
+
+Reverses the **D-2 + B2** windowing decision (the "B1 NO-GO → B2" amendment above). Full
+reasoning + numbers in `docs/DECISIONS.md` (2026-06-19 — *feature 008 windowing DECISION*).
+Plan artifacts updated on the `008-stress-inference-service` branch: `research.md` (D-2,
+R-5/R-6/R-7), `plan.md`, `contracts/inference-api.md`, `quickstart.md`, `spec.md`, `tasks.md`
+re-issued; `data-model.md` unchanged (no assembly). **Everything else stands**: D-1, D-3, D-4,
+the 60 s lock, the 0.53 re-threshold, the transport deviation, the seven mock-gap resolutions.
+
+- **B2 is REJECTED.** The single-source re-fixture (identical source content, losslessly
+  re-segmented — no new recording) showed B2's multi-clip frame-concat assembly reaching only
+  **cosine 0.991 (< 0.999)**, with a **~14% motion-magnitude shortfall** and **only 31.5% of
+  sampled frames coinciding** with continuous sampling — a **per-clip sampling-phase reset**
+  (each standalone clip re-applies the 2.5 fps grid from its own `t≈0`; `POS_MSEC` resets per
+  clip). The earlier **cross-take fixture was a real flaw** (it conflated assembly fidelity with
+  recording reproducibility) and is corrected — the single-source fixture is the right test —
+  but **even corrected, B2 cannot hit fidelity**, and the residual is **not patchable** for real
+  clips (a real stop/restart clip has no global clock; the variable restart gaps are lost).
+- **Continuous single-stream upload is ADOPTED.** *Client*: **one continuous `MediaRecorder`**
+  (timeslice for incremental capture only — no stop/restart); each stride uploads the
+  **contiguous recording-so-far** (init + all chunks in order — always decodable, the proven
+  reliable case), no clip stitching. *Server*: decode the uploaded continuous clip and extract
+  the **last 60 s** with the **existing validated single-clip path** (`compute_anchor` + the
+  VFR `POS_MSEC` sampler) bounded to the trailing window (frames with timestamp ≥
+  `duration − 60 s`); **no multi-clip assembly**. The only ml-video change is a thin
+  **tail-window option** on the existing extraction.
+- **Faithful by construction → no new fidelity gate.** The scored window is a genuine
+  continuous 60 s segment sampled by one continuous grid — exactly the single-clip input the
+  extraction is already validated on. **`compute_anchor_multiclip`, `test_multiclip_fidelity.py`,
+  the seam-aware motion helper, and the multi-clip HARD GATE are retired** (kept in git history;
+  the single-source diagnostic + finding stay recorded).
+- **Windowing validation is now much lighter.** No fidelity gate. The remaining real-device
+  check (reusing the proven `/anchor` upload+extract path): continuous capture + growing upload
+  + last-60 s tail-extract **works** on real Chrome + real Safari/iOS and **keeps up** (per-stride
+  server time within the 10 s stride across a 5-min session). **Real Safari/iOS stays the
+  pre-production gate** but as a *works-and-keeps-up* check, not a fidelity gate.
+- **⚠ Known cost (flagged)**: upload size + the server's decode-to-tail work **grow over the
+  session** (bounded by the 5-min cap; negligible on localhost). VFR seek is unreliable, so
+  reaching the tail means sequential decode of the growing file — at the 5-min cap ~300 s/stride,
+  needing ≥ ~30× realtime decode to stay inside the 10 s stride; **plausible at low res, not
+  guaranteed for 720p VP9 on the droplet**, so late-session strides may exceed 10 s. Bounded,
+  not fatal (FR-016 non-blocking; cadence degrades, 5-min cap bounds it). Mitigation = the
+  already-deferred **server-side rolling decoded-frame buffer** (decode only the newest
+  increment) — kept deferred, built before long droplet sessions in production.
+
+## 2026-06-19 — docs(008-stress-inference-service) — corrective docs/tasks pass before `/speckit-analyze` (no code, no decision reversal)
+
+Closes three gaps found in the re-issued `tasks.md` + `research.md` after the continuous
+single-stream windowing decision. Windowing is **not** reopened; D-1 / D-2 (continuous) / D-3 /
+D-4, the seven mock-gap resolutions, the 0.53 re-threshold, and Principles I/V/VI/VII stand.
+Docs/tasks only — no feature/test/fixture code, no model artifact, no `model_version` bump. Full
+entry: `docs/DECISIONS.md` 2026-06-19 (*corrective docs/tasks pass*).
+
+- **Faithful-by-construction is now enforced, not assumed.** T005 mandates sampling on the
+  **file-global grid (anchored at t=0)** then *filtering* to the trailing 60 s — with an explicit
+  prohibition on the trim/seek-and-resample that re-zeroes `POS_MSEC` (the B2 failure mode). T006
+  adds a deterministic, **CI-runnable integer-index suffix-equality invariant** on synthetic VFR
+  timestamps (no video, no tolerance) that the deferred rolling decoded-frame buffer must keep
+  passing. R-5 ties faithfulness to the preserved grid + this guard.
+- **Keep-up reasoning corrected + completed.** Budget bar tightened to decode within
+  `(10 s − extract)` ≈ 5–7 s / ~43–60× realtime (not the full 10 s / ~30×). Keep-up split into
+  *growing decode-to-tail* (rolling buffer fixes) vs *constant extract* (~10–15 s/window on the
+  droplet — buffer does **not** fix; lever is slower cadence or GPU). T008 now records
+  decode-to-tail and extract times **separately**; T009 diagnoses which component breached.
+  Droplet figures flagged indicative-only (droplet being phased out for Azure / HuggingFace).
+- **B2 retirement made complete + non-breaking (locked to resolution (a) — inline).** T004 now
+  **deletes `compute_anchor_multiclip` + `motion_features_seamaware` from the package source
+  entirely** (active source carries zero retired B2 code) and **inlines** their assembly logic
+  into the kept single-source diagnostic so it stays runnable; plus a repo-wide reference sweep,
+  deletes `_scratch-008-b2-spike/`, and removes the orphaned cross-take fixtures
+  (`multiclip/chrome/`, `multiclip/safari/`) while keeping the single-source fixture
+  (`multiclip/chrome-singlesource/`).
+
+## 2026-06-21 — impl(008-stress-inference-service) — keep-up: the flagged O(elapsed) decode breach RESOLVED via surgical O(stride) tail-decode (ffmpeg-CLI)
+
+Implements the "known cost" the continuous single-stream windowing decision flagged
+(the 2026-06-19 windowing-reversal entry above): under continuous upload + server
+tail-extract, the server re-decoded the **whole growing recording-so-far** every window
+just to read its last 60 s — per-window decode **O(elapsed)**. The 2026-06-20 supervised
+live smoke confirmed the breach: live reading lag *grew* ~9 s/window to ~3 min behind
+(SC-001 missed). Full reasoning + numbers in `docs/DECISIONS.md` (2026-06-21 — *feature
+008 keep-up: SURGICAL O(stride) tail-decode*); shipped in commit `1ef0c0c`. **No spec
+FR/SC, plan-decision, contract, or model-artifact change** — the windowing decision
+(continuous single-stream), D-1/D-3/D-4, the 60 s lock, the upload contract,
+`score_window`, the M=4 cold-start, the `(2958,)` shape check, RLS, the SELECT whitelist,
+and JWT all stand. This is an implementation amendment to *how the trailing window is
+decoded*.
+
+- **The prescribed primitive does not exist; a faithful one does.** "Seek to a keyframe
+  then decode forward" assumed OpenCV can seek — it **cannot** on an un-finalized
+  `MediaRecorder` webm (no Cues index): `cap.set(POS_MSEC/POS_FRAMES)` returns `True` but
+  is a **silent no-op that rewinds to t=0**. The realizable primitive: a cheap ffprobe
+  **packet** read (demux only) for the file-global 2.5 fps grid + duration, then decode
+  **only the bounded trailing 60 s** — OpenCV native `cap.set` for mp4 (seekable), an
+  **`ffmpeg -c copy` lossless tail remux → OpenCV decode** for webm. Frames are matched
+  back to the file-global grid, so the kept set is the **identical suffix** the whole-file
+  path keeps. (A direct ffmpeg `bgr24` decode is NOT bit-identical to OpenCV — a YUV→BGR
+  shift, Chrome cosine 0.999055; the `-c copy` remux keeps OpenCV as the decoder.)
+- **Surgical, `packages/ml-video` only.** `pipeline._extract_landmarks_tail` +
+  `probe_global_timestamps_fast`, dispatched from `extract_landmarks(tail_seconds=…)` and
+  `anchor.probe_recorded_seconds`. Stateless (no cross-window frame cache, no reused
+  FaceMesh), so it carries no continuity-fidelity risk and needs no new fidelity proof.
+- **Gated build (both proven before commit).** **GATE 1 (fidelity)**: bit-identical to the
+  whole-file path — max|Δ|=0, cosine=1.0 — on the real chrome+safari continuous fixtures
+  (`tests/test_tail_seek_keepup.py`, local-only/ffmpeg-gated; the CI suffix-invariant
+  stays T006). **GATE 2 (keep-up)**: per-window total **O(elapsed) 18→55 s (grows 3.1×) →
+  O(stride) flat ~9–13 s**; the `<60 s` gate alone 3.2→15.3 s → 0.1–0.8 s.
+- **New host dependency: the ffmpeg/ffprobe CLI** (Dockerfile + `apps/api/README.md`).
+  **Absent → graceful fallback** to the whole-file OpenCV decode (correct, O(elapsed)) so
+  CI / degraded deploys keep working; **runs-but-fails on a clip → skipped window** (200),
+  never a 500. Five CI-runnable robustness tests lock this. (Re-run
+  `test_tail_seek_keepup.py` on the deploy image so an ffmpeg version difference can't
+  silently shift fidelity.)
+- **Re-validated on a representative deploy target.** Re-measured on an **Azure VM
+  (Standard_D2s_v4, 2 vCPU)**: **~7–8 s/window**, comfortably under the 10 s stride, and
+  fidelity stayed bit-identical on the VM's older apt ffmpeg — confirming the surgical fix
+  is sufficient on a realistic CPU target without the heavier rolling buffer.
+- **Option 2 stays deferred.** The full per-session **rolling decoded-frame buffer**
+  (decode only the newest ~10 s increment → true O(stride) ~1.5 s decode) is the upgrade
+  to build **only if** keep-up re-measured on the chosen deploy target breaches the stride
+  there (logged in `docs/BACKLOG.md`, feature-008 keep-up entry). The read loop also still
+  needs back-pressure (no new stride while one is in flight) — same deferral.
+
+No Cloud-dashboard parity items — all changes are in-repo (`packages/ml-video`, Dockerfile,
+`apps/api/README.md`).
+
+## 2026-06-22 — feat(008-stress-inference-service) — feature complete; two pre-merge silent breaks fixed (PATCH-CORS + stale-token-401)
+
+Feature 008 reaches **feature-complete, merge-pending**. What ships is the live video
+stress-inference read path: **continuous single-stream capture → server tail-extract of the last
+60 s → per-user-calibrated RandomForest on LBP-TOP + motion → a smoothed three-band read
+(At ease / A little tense / Tense), with no probability ever on the wire** — plus the session
+lifecycle (pause/resume/out-of-frame/end, one-active-session-per-user, auto-pause after 90 s
+no-face / auto-end after 5 min absence), the calibrate-first gate (no anchor → a foggy
+calibrate-first surface, never a fabricated reading), the retrospective **today** recap that
+expands in place from the **same** persisted rows (SC-008), and the FR-020 009 seam (the persisted
+`window_readings` shape supports 009's sustained-tense query; **no** questionnaire built in 008).
+Privacy posture: **no service-role key** anywhere in `apps/api` (all DB I/O is RLS-as-the-user via
+the forwarded JWT + the publishable anon key), the SELECT column whitelist holds `label` +
+`stress_probability` server-only, **no manager policy** on either table, and the uploaded clip +
+temp file are deleted in a `finally`. US1–US4 + Phase 8 polish complete; the Phase 8 smoke matrix
+(T054) ran on real Chrome / Firefox / iPhone Safari. **No spec FR/SC, plan-decision, contract, or
+model-artifact change** in this entry — it records completion + the two pre-merge fixes; full
+decisions in `docs/DECISIONS.md` 2026-06-22.
+
+The smoke surfaced two **silent** breaks (a wrong result with no error shown to the user); both
+were fixed **in-branch before merge** and **verified server-side**. Visible/cosmetic smoke findings
+are routed to `008-followups`.
+
+- **PATCH-CORS — lifecycle transitions silently never persisted** (commit `7c1c1f4` fix +
+  `241b296` preflight regression test). The API CORS config did not allow `PATCH`, so the browser
+  preflight for the monitoring lifecycle PATCH (pause/resume/out_of_frame) failed and the status
+  transition never reached the DB — with no surfaced error. Fixed by allowing `PATCH` in the CORS
+  method list (`apps/api/app/main.py`); **server-side-verified** by walking the DB status
+  `active → paused → active → out_of_frame → ended`, with the `409`-on-ended terminal and the
+  one-active-session finalize intact.
+- **Stale-token 401 — long sessions silently stopped scoring** (commits `c434942`, `5b2d6ff`,
+  `62d387f`, `40771fc`). A window upload that reused a cached, expired access token received a
+  `401` the client swallowed, so the ambient bloom silently froze on its last band for the rest of
+  the session. Fixed via **approach A**: the client fetches a **fresh token per window upload**
+  through the `deps.getSession()` seam (the Supabase browser client auto-refreshes the JWT near
+  expiry — confirmed in the installed SDK source), removing the expiry case entirely; and any
+  **un-refreshable** session now drops to an **honest signed-out surface** (re-authenticate — never
+  a frozen band) carried by a new `SESSION_EXPIRED` signed-out op. RLS-as-the-user posture unchanged
+  — still the user's own token, just current.
+
+Tests green at close: **apps/api 90, apps/web 575 (Vitest), packages/ml-video 55**. Security posture
+untouched (no service-role key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no
+probability on the wire, explicit non-wildcard CORS). No Cloud-dashboard parity items — all changes
+are in-repo (`apps/api` CORS config, `apps/web` monitoring client + session surfaces, tests).

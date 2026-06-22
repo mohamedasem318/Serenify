@@ -8,7 +8,11 @@ loading mediapipe's native runtime, and so that importing this module is cheap.
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import subprocess
+import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,6 +27,39 @@ logger = logging.getLogger(__name__)
 
 TARGET_FPS = 5
 FRAME_SKIP_MOD = 2
+
+# ── feature-008 O(stride) tail decode (keep-up fix) ───────────────────────────────────
+# The live read path uploads the whole growing recording-so-far each window; the server
+# scores its last 60 s. The original implementation re-decoded the WHOLE clip every window
+# (O(elapsed)) so readings fell behind and the lag grew. The surgical fix decodes only the
+# bounded TAIL: it re-derives the file-global sampling grid from a cheap ffprobe PACKET read
+# (demux only, no pixel decode) and decodes only the trailing window via a seek — OpenCV's
+# native ``cap.set`` for mp4/finalized clips, and (because ``cap.set`` is a SILENT NO-OP on
+# un-finalized MediaRecorder webm — it rewinds to t=0) an ffmpeg ``-c copy`` lossless tail
+# remux for webm. Proven bit-identical to the whole-file path (``test_tail_seek_keepup.py``).
+# Requires the ffmpeg/ffprobe CLI on the host (see README / docs/BACKLOG.md); if the binary
+# is ABSENT the tail path falls back to the whole-file OpenCV decode (correct, O(elapsed)) so
+# CI / degraded deploys keep working — only a binary that RUNS-BUT-FAILS skips the window.
+_TAIL_SEEK_MARGIN_S = 3.0   # seek this far before (duration-60) so the trailing bucket reps
+                            # are decoded from before their first frame (else B2 phase reset)
+_MIN_SEEK_MS = 8_000.0      # below this trailing offset the clip is short enough that a
+                            # whole-file decode is already bounded — skip the seek machinery
+_NATIVE_SEEK_TOL_MS = 2_000.0   # a real forward seek lands near the target; a webm no-op
+                                # rewinds to ~0 — used to detect the un-seekable webm case
+_TS_MATCH_TOL_MS = 10.0     # file-global grid ts ↔ decoded tail ts must align this tightly
+                            # (proven 0 ms); a larger gap means a mis-seek -> skip the window
+_FF_TIMEOUT_S = 30.0        # hard cap on any ffmpeg/ffprobe subprocess
+_FFMPEG_BIN = "ffmpeg"
+_FFPROBE_BIN = "ffprobe"
+
+
+class _FFmpegUnavailable(Exception):
+    """The ffmpeg/ffprobe BINARY is not installed (vs. present-but-failed-on-this-clip).
+
+    Absence is a host/deploy condition, not a bad upload: the tail path degrades to the
+    whole-file OpenCV decode (correct, O(elapsed)) rather than skipping every window, which
+    also keeps the synthetic CI tests (no ffmpeg) green. A binary that RUNS but fails or
+    times out on a specific clip raises ``FeatureExtractionError`` instead -> skipped window."""
 
 # Effective kept rate after Step 1 (5 fps) + Step 2 (%2): 2.5 fps -> one frame every
 # 400 ms. The 200 ms phase (half the period) is the time of the FIRST frame the legacy
@@ -92,7 +129,9 @@ def _index_keep_indices(n_frames: int, fps: float) -> list[int]:
     return [idx for k, idx in enumerate(five, start=1) if k % FRAME_SKIP_MOD == 0]
 
 
-def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
+def _timestamp_keep_indices(
+    timestamps_ms: Sequence[float], tail_seconds: float | None = None
+) -> list[int]:
     """Keep the first frame that lands in each 1/2.5 s timestamp bucket.
 
     Driven by the frames' ACTUAL timestamps (CAP_PROP_POS_MSEC) instead of the reported
@@ -101,6 +140,14 @@ def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
     constant-rate stream (timestamps i*1000/fps), it selects exactly the frames the
     legacy index path keeps — preserving validated CFR fidelity. A large gap simply
     leaves intervening buckets empty (no catch-up clustering).
+
+    ``tail_seconds`` (feature-008 tail-window option): the kept set is first computed on
+    the WHOLE stream's **file-global grid** (anchored at the file's t=0, exactly as with no
+    bound) and only THEN filtered to frames whose timestamp ``>= timestamps_ms[-1] -
+    tail_seconds*1000`` — i.e. the *suffix* of the full-file selection. This is **never** a
+    re-sample of the trailing sub-stream: re-zeroing the grid to the sub-stream's t=0 would
+    offset every bucket by up to ½ the 400 ms period (the per-clip phase reset that sank B2;
+    see :func:`_filter_to_tail` and ``research.md`` R-5).
     """
     kept: list[int] = []
     last_bucket = -1
@@ -109,7 +156,31 @@ def _timestamp_keep_indices(timestamps_ms: Sequence[float]) -> list[int]:
         if bucket >= 0 and bucket > last_bucket:
             kept.append(idx)
             last_bucket = bucket
+    if tail_seconds is not None:
+        kept = _filter_to_tail(kept, timestamps_ms, tail_seconds)
     return kept
+
+
+def _filter_to_tail(
+    kept_indices: list[int], timestamps_ms: Sequence[float], tail_seconds: float
+) -> list[int]:
+    """Filter a FILE-GLOBAL keep-set down to its trailing ``tail_seconds`` window.
+
+    The cutoff is ``timestamps_ms[-1] - tail_seconds*1000`` (POS_MSEC is in ms). Because the
+    input indices were selected on the file-global grid anchored at the file's t=0, the
+    returned indices are **exactly the suffix** of that selection — the property that makes
+    the feature-008 tail-window "faithful by construction". This filtering MUST NOT be
+    replaced by trimming/seeking to the last ``tail_seconds`` and re-running the sampler:
+    that re-zeroes ``CAP_PROP_POS_MSEC`` to the sub-stream's t=0 and offsets every bucket by
+    up to ½ the 400 ms sampling period (the exact per-clip phase reset that sank B2 — see
+    ``research.md`` R-5 / ``smoke-tests.md`` Step F). On an empty keep-set it is a no-op; on
+    a clip shorter than ``tail_seconds`` the cutoff falls before t=0 so every kept frame
+    survives (reduces to the un-bounded selection).
+    """
+    if not kept_indices:
+        return kept_indices
+    cutoff_ms = timestamps_ms[-1] - tail_seconds * 1000.0
+    return [i for i in kept_indices if timestamps_ms[i] >= cutoff_ms]
 
 
 def _timestamps_reliable(timestamps_ms: Sequence[float]) -> bool:
@@ -148,33 +219,89 @@ def _reported_fps_trustworthy(fps: float, timestamps_ms: Sequence[float]) -> boo
     return abs(fps - true_fps) <= _FPS_REL_TOL * true_fps
 
 
-def _select_keep_indices(n_frames: int, fps: float, timestamps_ms: Sequence[float]) -> list[int]:
+def _select_keep_indices(
+    n_frames: int,
+    fps: float,
+    timestamps_ms: Sequence[float],
+    tail_seconds: float | None = None,
+) -> list[int]:
     """Choose which raw-frame indices to keep, robust to unreliable container metadata.
 
     - broken timestamps (non-monotonic / zero span) -> legacy index path (no regression);
     - CFR with metadata matching the timestamps -> legacy index path (bit-identical mp4);
     - otherwise (VFR webm, garbage reported fps) -> timestamp sampler (~2.5 fps).
+
+    ``tail_seconds`` (feature-008 tail-window option) bounds the result to the trailing window.
+    It is applied **after** the file-global selection above (regardless of which path is taken),
+    so the kept tail frames are exactly the *suffix* of the full-file selection — never a
+    re-sampled sub-stream (the B2 phase reset; see :func:`_filter_to_tail`). ``None`` (or a clip
+    shorter than ``tail_seconds``) leaves the selection unchanged — reducing exactly to the
+    un-bounded path.
     """
     if not _timestamps_reliable(timestamps_ms):
-        return _index_keep_indices(n_frames, fps)
-    if _reported_fps_trustworthy(fps, timestamps_ms):
-        return _index_keep_indices(n_frames, fps)
-    return _timestamp_keep_indices(timestamps_ms)
+        kept = _index_keep_indices(n_frames, fps)
+    elif _reported_fps_trustworthy(fps, timestamps_ms):
+        kept = _index_keep_indices(n_frames, fps)
+    else:
+        kept = _timestamp_keep_indices(timestamps_ms)
+    if tail_seconds is not None:
+        kept = _filter_to_tail(kept, timestamps_ms, tail_seconds)
+    return kept
 
 
-def extract_landmarks(video_path) -> DecodedClip:
+def extract_landmarks(video_path, tail_seconds: float | None = None) -> DecodedClip:
     """Decode ``video_path``, downsample to ~2.5 fps, and run FaceMesh per frame.
 
     Frame selection is driven by the frames' actual timestamps (CAP_PROP_POS_MSEC), not
     the container's reported fps, so a variable-frame-rate webm with unreliable metadata
     (observed fps=1000) samples at the same ~2.5 fps as a CFR mp4 — without changing the
     bit-exact selection on the CFR clips the model was validated on. See
-    ``_select_keep_indices``. Decode is two-pass: pass 1 collects per-frame timestamps
-    (grab only, no pixel copy) to choose the keep set; pass 2 retrieves just those frames.
+    ``_select_keep_indices``.
+
+    ``tail_seconds`` (feature-008 tail-window option) bounds the kept frames to the trailing
+    window. With ``None`` the WHOLE clip is decoded (``_extract_landmarks_wholefile`` — the
+    anchor/calibration path, unchanged). With ``tail_seconds`` set the read path uses the
+    **O(stride) tail decode** (``_extract_landmarks_tail``): it never walks (decodes) the whole
+    growing clip — the file-global grid comes from a cheap ffprobe packet read and only the
+    bounded trailing window is decoded. Both yield the *identical* (file-global-grid) suffix of
+    frames — proven bit-identical in ``test_tail_seek_keepup.py``.
+    """
+    if tail_seconds is None:
+        return _extract_landmarks_wholefile(video_path, tail_seconds=None)
+    return _extract_landmarks_tail(video_path, tail_seconds)
+
+
+def _landmarks_for_frames(frames: list[np.ndarray]) -> np.ndarray:
+    """Run FaceMesh over an ordered frame list (BGR→RGB) → (N, 956) landmark rows.
+
+    A FRESH FaceMesh per call, fed the kept frames in order — so the same kept-frame
+    sequence yields identical landmarks whether the frames came from the whole-file decode
+    or the bounded tail decode (the motion block's faithfulness rests on this)."""
+    face_mesh = _build_face_mesh()
+    rows: list[np.ndarray] = []
+    try:
+        for frame in frames:
+            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            rows.append(_landmarks_from_result(face_mesh.process(rgb)))
+    finally:
+        close = getattr(face_mesh, "close", None)
+        if callable(close):
+            close()
+    return np.asarray(rows, dtype=np.float64)
+
+
+def _extract_landmarks_wholefile(video_path, tail_seconds: float | None = None) -> DecodedClip:
+    """The whole-file decode path (unchanged): pass-1 grab probes per-frame timestamps to
+    choose the keep set, pass-2 retrieves just those frames, then FaceMesh.
+
+    This is the anchor/calibration path (``tail_seconds=None``) AND the fidelity REFERENCE +
+    graceful FALLBACK for the tail path (a clip ``<= tail`` or a host without the ffmpeg CLI).
+    Decode is O(elapsed) — fine for a fixed-size anchor clip, but the reason the live read
+    path uses ``_extract_landmarks_tail`` instead.
     """
     fps, frame_count, width, height, timestamps_ms = _probe_timestamps(video_path)
     n_decoded = len(timestamps_ms)
-    keep_set = set(_select_keep_indices(n_decoded, fps, timestamps_ms))
+    keep_set = set(_select_keep_indices(n_decoded, fps, timestamps_ms, tail_seconds=tail_seconds))
 
     # Pass 2 - retrieve only the selected frames (sequential decode; no seeking, which is
     # unreliable on VFR webm). Stop once the last kept frame is read.
@@ -182,19 +309,7 @@ def extract_landmarks(video_path) -> DecodedClip:
     if not kept:
         raise FeatureExtractionError("no frames left after downsample")
 
-    # Step 3 - FaceMesh per kept frame (BGR -> RGB).
-    face_mesh = _build_face_mesh()
-    rows: list[np.ndarray] = []
-    try:
-        for frame in kept:
-            rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            rows.append(_landmarks_from_result(face_mesh.process(rgb)))
-    finally:
-        close = getattr(face_mesh, "close", None)
-        if callable(close):
-            close()
-
-    landmarks = np.asarray(rows, dtype=np.float64)
+    landmarks = _landmarks_for_frames(kept)
 
     # DEBUG observability (quiet by default — emits only when this logger is at DEBUG):
     # one line per decode recording the chosen sampling path and frame counts, to diagnose
@@ -230,6 +345,230 @@ def extract_landmarks(video_path) -> DecodedClip:
             pass
 
     return DecodedClip(frames=kept, landmarks=landmarks)
+
+
+def _extract_landmarks_tail(video_path, tail_seconds: float) -> DecodedClip:
+    """O(stride) tail decode — the live read path (feature-008 keep-up fix).
+
+    Never walks the whole growing clip: (1) a cheap ffprobe PACKET read gives the file-global
+    per-frame timestamps + reported fps (demux only, no pixel decode); (2) the file-global
+    2.5 fps keep-set is computed exactly as the whole-file path would (``_select_keep_indices``
+    — both samplers, faithful by construction); (3) only the bounded trailing window is decoded
+    (native seek for mp4, ffmpeg ``-c copy`` remux for un-seekable webm); (4) each kept
+    file-global timestamp is matched to its decoded tail frame. The result is the *identical*
+    suffix of frames the whole-file path keeps (bit-identical — ``test_tail_seek_keepup.py``).
+
+    Falls back to ``_extract_landmarks_wholefile`` when the ffmpeg CLI is absent or the clip is
+    short enough that a whole-file decode is already bounded. A binary that RUNS but fails or
+    times out raises ``FeatureExtractionError`` (the caller maps it to a skipped window)."""
+    try:
+        fps, all_ts = probe_global_timestamps_fast(video_path)
+    except _FFmpegUnavailable:
+        return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
+
+    if not all_ts:
+        raise FeatureExtractionError("ffprobe returned no frame timestamps")
+    duration_ms = all_ts[-1]
+    global_keep = _select_keep_indices(len(all_ts), fps, all_ts, tail_seconds=tail_seconds)
+    if not global_keep:
+        raise FeatureExtractionError("no frames left after downsample")
+
+    seek_ms = duration_ms - (tail_seconds + _TAIL_SEEK_MARGIN_S) * 1000.0
+    if seek_ms < _MIN_SEEK_MS:
+        # The whole clip is (about) the window — a whole-file decode is already bounded, and
+        # reduces EXACTLY to the tail selection (cutoff falls at/before the clip start).
+        return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
+
+    try:
+        tail_ts, tail_frames = _decode_tail(video_path, seek_ms, duration_ms)
+    except _FFmpegUnavailable:
+        return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
+
+    want_ts = [all_ts[g] for g in global_keep]
+    kept = _pick_frames_by_timestamp(tail_ts, tail_frames, want_ts)
+    landmarks = _landmarks_for_frames(kept)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        try:
+            logger.debug(
+                "tail-decode: container=%s duration=%.1fs seek=%.1fs global_decoded=%d "
+                "tail_decoded=%d kept=%d",
+                Path(str(video_path)).suffix or "?",
+                duration_ms / 1000.0,
+                seek_ms / 1000.0,
+                len(all_ts),
+                len(tail_frames),
+                len(kept),
+            )
+        except Exception:  # noqa: BLE001 - logging must never affect extraction
+            pass
+
+    return DecodedClip(frames=kept, landmarks=landmarks)
+
+
+def _run_ff(cmd: list[str]) -> subprocess.CompletedProcess:
+    """Run an ffmpeg/ffprobe subprocess with a hard timeout.
+
+    A missing BINARY (``FileNotFoundError``) raises ``_FFmpegUnavailable`` so the caller can
+    fall back to the whole-file decode; a timeout raises ``FeatureExtractionError`` (the
+    window is skipped). stdout/stderr are captured so ffmpeg never writes to the API's logs."""
+    try:
+        return subprocess.run(cmd, capture_output=True, timeout=_FF_TIMEOUT_S)
+    except FileNotFoundError as exc:
+        raise _FFmpegUnavailable(f"{cmd[0]} not found on PATH") from exc
+    except subprocess.TimeoutExpired as exc:
+        raise FeatureExtractionError(f"{cmd[0]} timed out after {_FF_TIMEOUT_S:.0f}s") from exc
+
+
+def probe_global_timestamps_fast(video_path) -> tuple[float, list[float]]:
+    """File-global per-frame timestamps (ms, sorted) + reported fps via an ffprobe PACKET
+    read — demux only, NO pixel decode, so it does not grow with the recording the way the
+    whole-file grab probe does (the O(stride) replacement for the ``< 60 s`` gate + the grid).
+
+    Reported fps is the stream's ``avg_frame_rate`` (``r_frame_rate`` fallback), or ``0.0``
+    when the container reports none — the same routing input ``_select_keep_indices`` already
+    handles (webm's garbage rate → timestamp sampler; a true CFR rate → legacy index path).
+    Raises ``FeatureExtractionError`` on an unreadable clip / empty stream; ``_FFmpegUnavailable``
+    if the ffprobe binary is absent (caller falls back to the whole-file probe)."""
+    proc = _run_ff([
+        _FFPROBE_BIN, "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "packet=pts_time",
+        "-show_entries", "stream=avg_frame_rate,r_frame_rate",
+        "-of", "json", str(video_path),
+    ])
+    if proc.returncode != 0:
+        raise FeatureExtractionError(f"ffprobe failed on {video_path}")
+    try:
+        data = json.loads(proc.stdout or b"{}")
+    except json.JSONDecodeError as exc:
+        raise FeatureExtractionError("ffprobe returned invalid JSON") from exc
+
+    ts = sorted(
+        float(p["pts_time"]) * 1000.0
+        for p in data.get("packets", [])
+        if p.get("pts_time") not in (None, "N/A")
+    )
+    stream = (data.get("streams") or [{}])[0]
+    rate = stream.get("avg_frame_rate") or stream.get("r_frame_rate") or "0/1"
+    try:
+        num, den = rate.split("/")
+        fps = float(num) / float(den) if float(den) else 0.0
+    except (ValueError, ZeroDivisionError):
+        fps = 0.0
+    return fps, ts
+
+
+def _decode_tail(video_path, seek_ms: float, duration_ms: float) -> tuple[list[float], list]:
+    """Decode only the trailing window. Return ``(abs_ts_ms, frames)`` on the file-global
+    clock so the caller can match frames to the file-global keep-set.
+
+    Tries OpenCV's native seek first (works for mp4/finalized clips — POS_MSEC is absolute);
+    if the seek is a no-op rewind to ~0 (the un-finalized webm case) it falls back to an
+    ffmpeg ``-c copy`` lossless tail remux + OpenCV decode, anchored to the duration."""
+    native = _decode_tail_native_seek(video_path, seek_ms)
+    if native is not None:
+        return native
+    return _decode_tail_ffmpeg_remux(video_path, seek_ms, duration_ms)
+
+
+def _decode_tail_native_seek(video_path, seek_ms: float):
+    """OpenCV native seek tail decode (mp4/finalized). Returns ``(abs_ts, frames)`` if the
+    seek actually moved forward, else ``None`` (an un-finalized webm rewinds to ~0 — caller
+    falls back to ffmpeg). POS_MSEC after a real seek is the absolute file-global time."""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FeatureExtractionError(f"could not open video: {video_path}")
+    try:
+        cap.set(cv2.CAP_PROP_POS_MSEC, seek_ms)
+        if not cap.grab():
+            return None
+        first = cap.get(cv2.CAP_PROP_POS_MSEC)
+        # A genuine forward seek lands near the target (a keyframe at/just before it); an
+        # un-finalized webm ignores the seek and rewinds to ~0. seek_ms >= _MIN_SEEK_MS here.
+        if first < seek_ms - _NATIVE_SEEK_TOL_MS and first < _NATIVE_SEEK_TOL_MS:
+            return None
+        ts: list[float] = []
+        frames: list = []
+        ok, frame = cap.retrieve()
+        ts.append(first)
+        frames.append(frame if ok else None)
+        while cap.grab():
+            ts.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+            ok, frame = cap.retrieve()
+            frames.append(frame if ok else None)
+        return ts, frames
+    finally:
+        cap.release()
+
+
+def _decode_tail_ffmpeg_remux(video_path, seek_ms: float, duration_ms: float):
+    """ffmpeg ``-c copy`` lossless tail remux (un-seekable webm) → OpenCV decode.
+
+    ``-ss <seek> -c copy`` copies the VP8/VP9 packets unchanged from the keyframe at/before
+    the seek to EOF, so OpenCV decodes them to bit-identical pixels (same decoder). OpenCV
+    re-zeroes the remux's POS_MSEC, so the file-global clock is recovered by anchoring the
+    remux's LAST frame to the known duration (its last frame IS the file's last frame)."""
+    suffix = Path(str(video_path)).suffix or ".webm"
+    fd, tmp = tempfile.mkstemp(suffix=suffix)
+    os.close(fd)
+    try:
+        proc = _run_ff([
+            _FFMPEG_BIN, "-hide_banner", "-v", "error", "-ss", f"{seek_ms / 1000.0:.3f}",
+            "-i", str(video_path), "-c", "copy", "-y", tmp,
+        ])
+        if proc.returncode != 0 or not os.path.getsize(tmp):
+            raise FeatureExtractionError("ffmpeg tail remux failed")
+        cap = cv2.VideoCapture(tmp)
+        if not cap.isOpened():
+            raise FeatureExtractionError("could not open remuxed tail clip")
+        rel_ts: list[float] = []
+        frames: list = []
+        try:
+            while cap.grab():
+                rel_ts.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+                ok, frame = cap.retrieve()
+                frames.append(frame if ok else None)
+        finally:
+            cap.release()
+        if not rel_ts:
+            raise FeatureExtractionError("remuxed tail clip decoded no frames")
+        # Anchor to the file-global clock: the remux's last frame == the file's last frame,
+        # at absolute time ``duration_ms``. POS_MSEC deltas are preserved by the lossless copy.
+        offset = duration_ms - rel_ts[-1]
+        abs_ts = [offset + t for t in rel_ts]
+        return abs_ts, frames
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+
+
+def _pick_frames_by_timestamp(
+    tail_ts: list[float], tail_frames: list, want_ts: list[float]
+) -> list:
+    """Pick, for each wanted file-global timestamp, the decoded tail frame at that time.
+
+    The wanted timestamps are the file-global keep-set; the tail frames carry the same
+    file-global clock, so each match is exact (proven 0 ms). A gap beyond ``_TS_MATCH_TOL_MS``
+    means the seek did not cover that frame (a mis-seek) → ``FeatureExtractionError`` so the
+    window is skipped rather than scored on the wrong frames."""
+    arr = np.asarray(tail_ts, dtype=np.float64)
+    if arr.size == 0:
+        raise FeatureExtractionError("tail decode produced no frames")
+    out: list = []
+    for wt in want_ts:
+        i = int(np.argmin(np.abs(arr - wt)))
+        if abs(arr[i] - wt) > _TS_MATCH_TOL_MS:
+            raise FeatureExtractionError(
+                f"tail frame for file-global ts {wt:.1f}ms missing (nearest off "
+                f"{abs(arr[i] - wt):.1f}ms) — seek did not cover the window"
+            )
+        frame = tail_frames[i]
+        if frame is None:
+            raise FeatureExtractionError("tail frame retrieve failed")
+        out.append(frame)
+    return out
 
 
 def _probe_timestamps(video_path) -> tuple[float, float, float, float, list[float]]:

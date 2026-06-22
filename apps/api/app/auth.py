@@ -30,6 +30,13 @@ _UNAUTHORIZED = HTTPException(
     headers={"WWW-Authenticate": "Bearer"},
 )
 
+
+class ForbiddenRoleError(Exception):
+    """Raised by ``require_employee`` when an authenticated non-employee calls an
+    employees-only endpoint. Rendered as ``403 {"error":"forbidden_role"}`` by a
+    handler registered in ``app.main`` (matching the ``/anchor`` error-body shape,
+    not FastAPI's default ``{"detail": …}`` wrapper). (FR-010)"""
+
 # Asymmetric algorithms Supabase may sign access tokens with (ES256 today). The
 # list is pinned here and never derived from the token header (algorithm-
 # confusion guard); the symmetric secret and asymmetric public keys are used on
@@ -82,3 +89,30 @@ def verify_jwt(
     if not user_id:
         raise _UNAUTHORIZED
     return str(user_id)
+
+
+def require_employee(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    user_id: str = Depends(verify_jwt),
+    settings: Settings = Depends(get_settings),
+) -> str:
+    """Employees-only gate (FR-010): verify the JWT, then confirm the caller's role
+    is ``employee`` by reading **their own** ``profiles.role`` as the user (forwarded
+    JWT, RLS select-self — ``role`` is in the profiles SELECT whitelist). Team
+    leads / admins do not calibrate and MUST NOT run inference.
+
+    Uses the user-context client (publishable anon key + forwarded JWT) — **no
+    service-role**. Non-employee → ``ForbiddenRoleError`` → 403
+    ``{"error":"forbidden_role"}``. Returns the verified ``user_id`` on success.
+    """
+    # verify_jwt already validated the token (it 401s otherwise), so credentials is
+    # present here; reuse the raw token to act as the caller against PostgREST.
+    from .supabase_user import user_client
+
+    assert credentials is not None  # narrows the Optional; verify_jwt guarantees it
+    client = user_client(settings, credentials.credentials)
+    resp = client.table("profiles").select("role").eq("id", user_id).execute()
+    role = resp.data[0]["role"] if resp.data else None
+    if role != "employee":
+        raise ForbiddenRoleError()
+    return user_id

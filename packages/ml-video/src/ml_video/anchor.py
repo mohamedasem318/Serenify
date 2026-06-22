@@ -12,11 +12,48 @@ import numpy as np
 
 from .coverage import assert_usable_face_coverage
 from .errors import FeatureExtractionError
-from .features import FEATURE_DIM, lbp_top_features, motion_features
-from .pipeline import extract_landmarks
+from .features import (
+    FEATURE_DIM,
+    lbp_top_features,
+    motion_features,
+)
+from .pipeline import (
+    _FFmpegUnavailable,
+    _probe_timestamps,
+    extract_landmarks,
+    probe_global_timestamps_fast,
+)
 
 
-def compute_anchor(video_path) -> np.ndarray:
+def probe_recorded_seconds(video_path) -> float:
+    """Recorded duration (seconds) of ``video_path`` — the server-side ``< 60 s``
+    warming-up gate for the feature-008 continuous single-stream read path.
+
+    The continuous recorder uploads the whole contiguous recording-so-far each stride;
+    the server must NOT score a window until a full 60 s has accrued (the 60 s window is
+    locked by Constitution Principle II / FR-002 — partial windows are never scored). The
+    server measures the duration itself rather than trusting any client-supplied value.
+
+    Uses the **cheap ffprobe packet read** (``probe_global_timestamps_fast`` — demux only, no
+    pixel decode), so the gate does NOT re-decode the whole growing clip every stride: this is
+    half of the feature-008 keep-up fix (the tail decode is the other half). The span is
+    ``timestamps[-1] - timestamps[0]`` (a near-zero start on a continuous recording), so it
+    measures the actual recorded length regardless of the container's (often garbage) reported
+    fps. Raises ``FeatureExtractionError`` if the clip cannot be read (caller → skipped reading).
+
+    Falls back to the whole-file grab probe (``_probe_timestamps``) only if the ffprobe binary
+    is absent — correct but O(elapsed); the host must install ffmpeg for keep-up (see README).
+    """
+    try:
+        _fps, timestamps_ms = probe_global_timestamps_fast(video_path)
+    except _FFmpegUnavailable:
+        _fps, _frame_count, _width, _height, timestamps_ms = _probe_timestamps(video_path)
+    if len(timestamps_ms) < 2:
+        return 0.0
+    return (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0
+
+
+def compute_anchor(video_path, tail_seconds: float | None = None) -> np.ndarray:
     """Decode + extract -> (2958,) float64. Raises ``FeatureExtractionError``.
 
     Raised when the usable-face-coverage gate rejects the capture
@@ -27,8 +64,27 @@ def compute_anchor(video_path) -> np.ndarray:
 
     The coverage gate runs FIRST — immediately after extraction, before the feature
     floors — so it is additive and strictly stricter, never loosening them.
+
+    ``tail_seconds`` (feature-008 continuous single-stream tail-extract): when set, only the
+    trailing ``tail_seconds`` of the clip is scored — the server uploads the whole contiguous
+    recording-so-far each stride and scores its last 60 s.
+
+    **Implementation contract (load-bearing — this is what makes the window "faithful by
+    construction").** With ``tail_seconds`` set, extraction MUST sample the keep-indices on the
+    **whole decoded stream's file-global grid (anchored at the file's t=0)** and then **filter**
+    that global index set to frames whose timestamp ``>= duration - tail_seconds``. It MUST NOT
+    trim/seek to the last ``tail_seconds`` and re-run the sampler on the sub-stream — that
+    re-zeroes ``CAP_PROP_POS_MSEC`` to the sub-stream's t=0 and offsets every bucket by up to ½
+    the 400 ms sampling period (the per-clip phase reset that sank B2; ``research.md`` R-5).
+    Because the grid is preserved, the kept tail frames are **exactly the suffix** of the frames
+    the full-file extraction would keep, so a continuous 60 s window scores identically to the
+    equivalent single clip (no fidelity gate needed). This is enforced downstream in
+    ``pipeline._select_keep_indices`` → ``_filter_to_tail`` (reusing the existing decode + sampler
+    + features — not a second copy, Principle III) and guarded by ``tests/test_tail_window.py``.
+    For ``tail_seconds=None``, or a clip shorter than ``tail_seconds``, this **reduces exactly to**
+    the un-bounded ``compute_anchor``.
     """
-    clip = extract_landmarks(video_path)
+    clip = extract_landmarks(video_path, tail_seconds=tail_seconds)
     assert_usable_face_coverage(clip.landmarks)
     features = np.concatenate(
         [

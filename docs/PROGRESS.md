@@ -4,6 +4,179 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 008 — Stress Inference Service (feature-complete — merge pending)
+
+**Branch**: `008-stress-inference-service`
+**Status**: **feature-complete — merge pending (not yet merged).** The live video
+stress-inference read path (the committed
+`serenify-video-lbptop-motion-rf-calibrated@2.0.0` + `predict_delta` + the shared 2958-d
+extraction) is wired end-to-end: **continuous capture → server tail-extract of the last 60 s →
+per-user-calibrated RandomForest on LBP-TOP + motion → a smoothed three-band read (no probability
+exposed)**, with a session-aware `apps/api` lifecycle, per-window persistence under RLS, a
+calibrate-first gate, and the monitoring + dashboard UI. **All 57 tasks done (T001–T059; T018
+removed under continuous single-stream); US1–US4 + Phase 8 polish complete.** The Phase 8 smoke
+matrix (T054) ran on real Chrome / Firefox / iPhone Safari; the **two silent breaks it surfaced
+were fixed in-branch and server-side-verified before merge** (PATCH-CORS persistence +
+stale-token-401 — see "Pre-merge fixes (server-side-verified)" below). Tests green: **apps/api 90,
+apps/web 575, ml-video 55** (`tsc --noEmit` green). Security posture untouched (no service-role
+key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no probability on the wire,
+explicit non-wildcard CORS). Constitution Check at plan time: **PASS** with one logged, justified
+deviation (per-window HTTP request/response transport instead of WebSocket — the prediction is the
+synchronous response to an upload, not polling); no NON-NEGOTIABLE principle violated. Pending:
+push / PR / squash-merge; then `008-followups`.
+**Date**: 2026-06-22 (branch close-out; implementation spanned the 008 cycle; planning closed 2026-06-19)
+
+**Windowing in force**: **continuous single-stream upload + server tail-extract**.
+One continuous `MediaRecorder` (timeslice for incremental capture only); each stride
+uploads the contiguous recording-so-far, and the server extracts the trailing 60 s
+with the validated single-clip path (`compute_anchor` + the VFR `POS_MSEC` sampler).
+The scored 60 s window is **faithful by construction**, so there is **no fidelity
+gate** — both D-2 windowing fallbacks (B1 container-reassembly, B2 multi-clip
+frame-concat) were rejected during planning (CHANGELOG 2026-06-19).
+
+**Shipped so far**:
+
+- **US1 — live stress read (P1 / MVP).** `submit_window` scores a window (rolling
+  mean of `proba[1]` over the last 4 readings, bands 0.53 / 0.70, ~90–105 s
+  cold-start) and persists `window_readings` **under RLS as the user**, with raw
+  `stress_probability`/`label` held server-only via the SELECT column whitelist; the
+  monitoring UI renders the band as a calm bloom + cause chip, a **warming-up** state
+  before the first smoothed read, and a foggy **"skipped a read"** note on a thin
+  window (never the out-of-frame surface). **FR-024** reassurance footnote —
+  "Processed just for you — analyzed, then deleted." — added to the live reading card
+  (commit `3ac7eeb`, resolving /speckit-analyze U1).
+- **Keep-up SOLVED — Option 1 (surgical O(stride) tail-decode)** (commit `1ef0c0c`).
+  The flagged "known cost" (decode-to-tail grows O(elapsed)) became real: a supervised
+  smoke measured live lag growing ~9 s/window to ~3 min behind. Fixed in
+  `packages/ml-video` only — a cheap ffprobe **packet** read recovers the file-global
+  2.5 fps grid + duration without a full walk, then only the trailing 60 s is decoded
+  (OpenCV native `cap.set` seek for mp4; an **ffmpeg `-c copy`** lossless tail remux for
+  un-finalized webm, whose `cap.set` seek is a silent no-op that rewinds to t=0) and
+  matched back to the file-global grid → the **identical suffix** the whole-file path
+  keeps. GATE 1 fidelity: **bit-identical** (max|Δ|=0, cosine=1.0) on the real
+  chrome+safari continuous fixtures. GATE 2 keep-up: per-window total **O(elapsed)
+  18→55 s → O(stride) flat ~9–13 s**. New host dependency: **ffmpeg/ffprobe CLI**
+  (Dockerfile + `apps/api/README.md`); absent → graceful fallback to the whole-file
+  decode (correct, O(elapsed)); runs-but-fails on a clip → skipped window (200), never a
+  500. **Re-measured on a representative Azure VM (Standard_D2s_v4, 2 vCPU): ~7–8 s/
+  window — comfortably under the 10 s stride — and fidelity stayed bit-identical on the
+  VM's older apt ffmpeg.** **Option 2** (full per-session rolling decoded-frame buffer —
+  decode only the newest ~10 s increment) stays the deferred upgrade, built only if
+  keep-up re-measured on the chosen deploy target breaches the stride there. (DECISIONS
+  2026-06-21; `docs/BACKLOG.md` feature-008 keep-up entry.)
+- **US2 — session control & presence (P2).** Backend lifecycle routes
+  `PATCH /monitoring/sessions/{id}` (pause/active/out_of_frame) + `POST .../end`
+  (ended_at + status + end_reason), RLS update-own, `ended` terminal with a clean
+  **409 (not 500)** on an already-ended session and on-end smoothing-buffer eviction
+  (commit `4c18dec`). Frontend presence machine driven by the **same** feature-005
+  framing signal that gates uploads: 90 s no-face → out-of-frame, 5 min from face-loss →
+  auto-end, manual Pause (releases camera) / Resume (re-acquires, reuses the session) /
+  End, foggy out-of-frame + calm paused surfaces, status-driven pill + forced
+  foggy-bracket self-view, and a re-end race collapsed onto one caller that maps the
+  backend 409 → ok (commit `dbaaae4`).
+- **US3 — calibrate-first guard (P2).** Create-time `no_anchor` 409 (T021) plus the
+  mid-session defensive re-check: `submit_window` catches `MissingAnchorError` and
+  returns the same `409 {"outcome":"no_anchor"}` (never a 500, never a reading without
+  the user's own anchor); the client disambiguates the overloaded 409 by body
+  (`no_anchor` vs `ended_session`) and routes mid-session no-anchor to the existing
+  calibrate-first surface (commit `e49b82e`, SC-004).
+- **Edge-case pass (2026-06-21) — one active session per user (C1/C2 fix).** A scoped
+  read-only audit over US1–US4 surfaced two real gaps in the **built** lifecycle: an
+  orphaned `active` session (client-driven end → a crash leaves `ended_at` NULL forever,
+  also shadowing the recap's "most-recent ended session" read) and no concurrency guard
+  (two tabs → two parallel active sessions). Fixed structurally: partial unique index
+  `(user_id) WHERE ended_at IS NULL` (migration `20260621000000`, with a backfill that
+  finalizes pre-existing duplicate actives) + a **last-tab-wins** create route that
+  finalizes a prior active session as `'abandoned'` (stamped at its last reading, or now())
+  before starting a new run, with a one-shot finalize+retry on the index race — no
+  service-role, RLS + SELECT whitelist unchanged. TDD; full `apps/api` suite green; the
+  migration applied + the local replay regression re-verified on real Postgres. The
+  remaining audit items (timezone, empty/degenerate sessions, n=1 render, in-progress
+  treatment, has_anchor branching) were **decided** and recorded as **US4 read-rules**
+  (DECISIONS 2026-06-21; `data-model.md` § Reads) — they bind the deferred T046–T050 build,
+  no read-path code today. The privacy "watch hardest" item (D1) was found already
+  structural at the DB engine (column-GRANT whitelist), robust as-is.
+
+**Shipped (US4 + Polish — completing the build)**:
+
+- **US4 — retrospective trend, recap & 009 seam (P3, T046–T050).** The dashboard check-in card
+  recaps **today** and **expands in place** (no route change) to a day trend + per-session
+  breakdown from the **same** persisted rows (SC-008); skipped points render as a **gap** (never a
+  fabricated or carried-forward reading), a read-less session reads **"no clear read"** (never
+  calm), an n=1 session renders as a **single dot**, the axis **auto-fits in local time**, the
+  live session is excluded (retrospective-only), and the empty/calibrate-first states branch on
+  `has_anchor`. The **FR-020 009-seam** is confirmed (persisted `window_readings` carries
+  `band`+`captured_at`+`session_id` for 009's sustained-tense query; **no** questionnaire
+  trigger/UI built in 008).
+- **Polish (T051–T058).** Playwright employee happy-path e2e (feature-005 detector-injection
+  seam), webm/VFR codec fidelity hardening, responsive/a11y sweep (≥360 px stack, reduced-motion,
+  visible focus, ≥44 px targets), expanded `smoke-tests.md` (real Safari/iOS), the
+  privacy-verification test (no raw video persists; no manager policy; `label`/`stress_probability`
+  unreadable by the owner), the model-owner `metadata.json` carry-over note, the 90-day-retention
+  follow-up note, and the full Principle VII sweep — **all done**.
+
+**Pre-merge fixes (server-side-verified)** — the two **silent** breaks the Phase 8 smoke surfaced,
+fixed **in-branch before merge** (visible/cosmetic findings routed to `008-followups`):
+
+- **PATCH-CORS — lifecycle transitions now persist** (commits `7c1c1f4` fix + `241b296`
+  regression). The API CORS config did not allow `PATCH`, so the browser preflight for the
+  monitoring lifecycle PATCH (pause/resume/out_of_frame) failed and the status transition never
+  reached the DB — with no error surfaced. Verified server-side: the DB status now walks
+  `active → paused → active → out_of_frame → ended`, with the 409-on-ended terminal and the
+  one-active-session finalize intact.
+- **Stale-token 401 — long sessions keep scoring; no silent frozen band** (commits `c434942`,
+  `5b2d6ff`, `62d387f`, `40771fc`). A window upload on a cached, expired access token got a 401 the
+  client swallowed → the bloom silently froze. Fixed via **approach A**: a fresh token per window
+  upload through the `deps.getSession()` seam (the Supabase browser client auto-refreshes near
+  expiry), plus an **honest signed-out surface** (`SESSION_EXPIRED` → re-auth, never a frozen band)
+  on any un-refreshable session. RLS-as-user posture unchanged (still the user's own token, just
+  current). (DECISIONS 2026-06-22 — *approach A*.)
+
+**Still pending**:
+
+- **Push / PR / squash-merge**, then open `008-followups`.
+- **ST-08-2 (iOS live readings): PENDING a real HTTPS deploy.** Capture / upload / decode are
+  proven on a real iPhone (device gate T009); the free quick-tunnel can't carry the growing
+  continuous uploads, so the *live cross-session reading* cell is unconfirmed — a transport limit,
+  **not** a capture failure.
+- **Known followup L1 — live cross-expiry smoke retest.** The cross-expiry continuation is proven
+  by composition (SDK refresh + server accepts fresh token + per-upload fresh fetch); the silent
+  freeze is gone, but the live run against an aged session goes on the next smoke checklist.
+- **Known followup L2 (→ `008-followups`).** The pause/resume/end lifecycle PATCH calls still read
+  the cached token (a narrower instance of the stale-token class) — route them through the same
+  fresh-token helper. (DECISIONS 2026-06-22 — *Known followup L2*.)
+- **Perf (R-5): deferred.** The full per-session rolling decoded-frame buffer + startup pre-warm +
+  a dedicated inference host stay deferred; the surgical O(stride) tail-decode (`1ef0c0c`) meets the
+  10 s stride on a representative Azure VM. Build only if keep-up re-measured on the chosen deploy
+  target breaches the stride there.
+- **Lint (non-blocking).** `npm run lint` is RED on **2 pre-existing errors in
+  `monitoring-session.tsx`** (200:39 reactive-value mutation; 492:5 setState-in-effect cascade)
+  from the camera-lifecycle fix; `tsc --noEmit` is green (the prior 6 `monitoring-client.test`
+  errors were fixed in `e461385`). Routed to `008-followups`.
+
+**Decisions resolved (planning snapshot)** (DECISIONS 2026-06-19, as **amended** the
+same day after review; **D-2's segmented + B2-fallback windowing was later reversed to
+continuous single-stream upload — see "Windowing in force" above and CHANGELOG
+2026-06-19; the rest stands**): **D-1 (revised)** self-scoped `SECURITY DEFINER`
+`get_my_anchor()` read in
+the caller's RLS context — **no service-role key** (anon key + forwarded JWT);
+sessions/readings written under RLS as the user; write-integrity deferred (upgrade
+path = INSERT-only role). **D-2 (revised)** single-recorder ~10 s segments +
+**server-side** rolling 60 s assembly (flagged: container-level reassembly required;
+Safari spike de-risks it; B2 = multi-clip extraction fallback). **D-3** rolling mean
+of `proba[1]` over last 4 scored readings, bands at 0.53 / 0.70 (operating point
+from metadata; tense-split a display-only config), cold-start 4 → first band
+~90–105 s. **D-4** `monitoring_sessions` + `window_readings`, owner SELECT-own with
+raw probability/label held server-only, no manager policy, 90-day retention, FR-020
+seam for 009. Seven mock-gap resolutions folded in (CHANGELOG 2026-06-19):
+warming-up 7th state, ~90 s first read, distinct foggy skipped-read note,
+calibrate-first panel, mobile stacking, ended→dashboard recap, idle recap empty
+state. Front-loaded: **Safari/WebKit early-validation spike (R-7)**. Flagged:
+`metadata.json`'s stale `window_eval_config` (30 s) is not the production window
+(60 s locked; doc-only cleanup, no model-version bump / no anchor invalidation).
+
+---
+
 ## Feature 007 — Visual Redesign (Graphite) (merged to main)
 
 **Branch**: `007-visual-redesign`

@@ -15,6 +15,11 @@ os.environ.setdefault("ALLOWED_ORIGINS", "http://127.0.0.1:3000")
 # A JWKS source so the asymmetric (ES256) branch is exercised; the tests stub the
 # JWK client so no network is touched. HS256 tokens ignore this and use the secret.
 os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
+# Feature 008 (revised D-1): SUPABASE_ANON_KEY is now a required setting (the
+# publishable key used as the PostgREST apikey with the forwarded JWT — not a
+# secret, not the service-role key). Seed a placeholder so settings validate; the
+# Phase-3 tests never touch the network.
+os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-publishable-key")
 
 import cv2  # noqa: E402
 import jwt  # noqa: E402

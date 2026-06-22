@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>serenify · feature 008 mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#101214; --surface:#181B1E; --ink:#E2E5E8; --muted:#939A9F;
+    --meadow:#63B292; --foggy:#74B6CE; --amber:#E4AE5C; --crimson:#C98589;
+    --border:#23272B; --on-accent:#101214;
+    --amber-tint:#3B2F19; --amber-text:#E6C386; --meadow-text:#63B292; --foggy-text:#9BD0E2;
+    --bloom-ease:#63B292; --bloom-little:#B0A86A; --bloom-tense:#E4AE5C;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 30px rgba(0,0,0,.35);
+  }
+  [data-theme="light"]{
+    --bg:#EAEBEC; --surface:#F4F5F6; --ink:#1C2023; --muted:#585D61;
+    --meadow:#3E7A63; --foggy:#356E88; --amber:#C98637; --crimson:#894A4E;
+    --border:#D7D9DC; --on-accent:#F8F9FA;
+    --amber-tint:#F4E3C6; --amber-text:#7E5310; --meadow-text:#346A56; --foggy-text:#2C5A72;
+    --bloom-ease:#3E7A63; --bloom-little:#97824A; --bloom-tense:#C98637;
+    --shadow:0 1px 2px rgba(20,24,28,.06), 0 10px 34px rgba(20,24,28,.10);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{font-family:'Inter',system-ui,sans-serif; background:var(--bg); color:var(--ink); font-size:17px; line-height:1.5; -webkit-font-smoothing:antialiased;}
+  h1,h2,h3{font-family:'Outfit',sans-serif; letter-spacing:-.01em;}
+  a{color:inherit;}
+  :focus-visible{outline:2px solid var(--foggy); outline-offset:2px;}
+
+  /* mock controls */
+  .mockbar{position:sticky; top:0; z-index:50; display:flex; flex-wrap:wrap; gap:12px 20px; align-items:center; padding:10px 18px; background:var(--surface); border-bottom:1px solid var(--border); font-size:12.5px; color:var(--muted);}
+  .mockbar .lbl{text-transform:uppercase; letter-spacing:.09em; font-weight:600; font-size:11px; opacity:.7;}
+  .seg{display:inline-flex; border:1px solid var(--border); border-radius:9px; overflow:hidden; background:var(--bg);}
+  .seg button{font:inherit; font-size:12px; border:0; background:transparent; color:var(--muted); padding:5px 10px; cursor:pointer;}
+  .seg button[aria-pressed="true"]{background:var(--ink); color:var(--bg); font-weight:600;}
+  .grp{display:flex; align-items:center; gap:7px;}
+
+  .app{max-width:1080px; margin:0 auto; padding:0 22px 80px;}
+  .appbar{display:flex; align-items:center; justify-content:space-between; padding:24px 2px 8px;}
+  .wordmark{font-family:'Outfit',sans-serif; font-weight:600; font-size:21px; letter-spacing:-.02em;}
+  .who{font-size:13px; color:var(--muted);}
+
+  .view{display:none;}
+  .view.active{display:block; animation:fade .4s ease;}
+  @keyframes fade{from{opacity:0; transform:translateY(6px);}to{opacity:1; transform:none;}}
+
+  /* dashboard */
+  .ctx-note{font-size:12.5px; color:var(--muted); margin:18px 2px 18px; max-width:66ch; line-height:1.6;}
+  .ctx-note b{color:var(--ink); font-weight:600;}
+  .grid{display:grid; grid-template-columns:1.55fr 1fr; gap:18px;}
+  @media (max-width:760px){.grid{grid-template-columns:1fr;}}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:24px; box-shadow:var(--shadow); position:relative;}
+  .ctitle{font-family:'Outfit',sans-serif; font-weight:600; font-size:19px; margin:0;}
+  .csub{color:var(--muted); font-size:14.5px; margin:7px 0 0;}
+  .card.placeholder{background:transparent; border-style:dashed; box-shadow:none; opacity:.72;}
+  .card.placeholder .ctitle{font-size:16px;}
+  .ph-tag{display:inline-block; font-size:10.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); border:1px solid var(--border); border-radius:6px; padding:2px 7px; margin-bottom:10px;}
+
+  .checkin{grid-row:1 / span 2; display:flex; flex-direction:column; min-height:330px;}
+  .checkin .body{flex:1; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center; padding:10px 0;}
+  .mini-bloom{width:120px; height:120px; position:relative; margin:2px 0 16px;}
+  .checkin h2{font-size:22px; font-weight:600; margin:0 0 8px;}
+  .checkin .line{color:var(--muted); max-width:34ch; margin:0 auto; font-size:15px;}
+
+  .statechip{display:inline-flex; align-items:center; gap:8px; padding:6px 13px; border-radius:999px; font-size:13px; font-weight:600; border:1px solid var(--border);}
+  .statechip .dot{width:8px; height:8px; border-radius:50%; background:var(--cur-bloom);}
+  .chip-ease{color:var(--meadow-text); background:color-mix(in srgb,var(--meadow) 12%, transparent);}
+  .chip-little,.chip-tense{color:var(--amber-text); background:var(--amber-tint);}
+
+  .btn{font:inherit; font-weight:600; font-size:15px; border-radius:11px; padding:11px 20px; cursor:pointer; border:1px solid transparent; transition:transform .12s ease, filter .12s ease;}
+  .btn:active{transform:translateY(1px);}
+  .btn-primary{background:var(--meadow); color:var(--on-accent); border-color:var(--meadow);}
+  .btn-primary:hover{filter:brightness(1.05);}
+  .btn-ghost{background:transparent; color:var(--ink); border-color:var(--border);}
+  .btn-ghost:hover{background:color-mix(in srgb,var(--ink) 6%, transparent);}
+  .btn-row{display:flex; gap:10px; justify-content:center; margin-top:20px; flex-wrap:wrap;}
+  .meta{display:flex; align-items:center; gap:10px; justify-content:center; color:var(--muted); font-size:13.5px; margin-top:14px;}
+  .sep{opacity:.4;}
+  .open-link{font-size:14px; color:var(--foggy); font-weight:600; text-decoration:none;}
+
+  /* mini trend inside the card */
+  .mini-trend{width:100%; max-width:300px; margin:16px auto 0;}
+  .mini-trend .mt-label{display:flex; justify-content:space-between; font-size:11.5px; color:var(--muted); margin-bottom:5px;}
+  .mini-trend svg{width:100%; height:46px; display:block;}
+
+  /* monitoring page */
+  .mon-top{display:flex; align-items:center; gap:12px; margin:14px 2px 6px;}
+  .backlink{font-size:14px; color:var(--muted); text-decoration:none; display:inline-flex; gap:6px; align-items:center;}
+  .backlink:hover{color:var(--ink);}
+  .session-timer{margin-left:auto; font-size:13.5px; color:var(--muted); font-variant-numeric:tabular-nums;}
+  .session-timer b{color:var(--ink); font-weight:600;}
+
+  .stage{position:relative; border:1px solid var(--border); border-radius:24px; background:var(--surface); padding:54px 24px 40px; overflow:hidden; min-height:480px; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; box-shadow:var(--shadow);}
+
+  .bloom{position:relative; width:300px; height:300px; transition:opacity .8s ease, filter .8s ease;}
+  .bloom.dim{opacity:.4; filter:saturate(.5);}
+  .bloom .core{position:absolute; inset:0; border-radius:50%; background:radial-gradient(circle at 50% 46%, color-mix(in srgb,var(--cur-bloom) 92%, white 8%) 0%, var(--cur-bloom) 34%, color-mix(in srgb,var(--cur-bloom) 30%, transparent) 70%, transparent 76%); transition:background 1.3s ease; animation:breathe 6.5s ease-in-out infinite;}
+  .bloom .halo{position:absolute; inset:-28%; border-radius:50%; background:radial-gradient(circle, color-mix(in srgb,var(--cur-bloom) 40%, transparent) 0%, transparent 62%); filter:blur(26px); transition:background 1.3s ease; animation:breatheHalo 6.5s ease-in-out infinite;}
+  .bloom .grain{position:absolute; inset:14%; border-radius:50%; background:conic-gradient(from 0deg, transparent 0 70%, color-mix(in srgb,var(--cur-bloom) 26%, transparent) 78%, transparent 86%); filter:blur(10px); mix-blend-mode:screen; opacity:.8; animation:spin 22s linear infinite;}
+  @keyframes breathe{0%,100%{transform:scale(.93);}50%{transform:scale(1.02);}}
+  @keyframes breatheHalo{0%,100%{transform:scale(.9); opacity:.7;}50%{transform:scale(1.06); opacity:1;}}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .stateline{font-family:'Outfit',sans-serif; font-weight:600; font-size:29px; margin:18px 0 6px; letter-spacing:-.015em; transition:color .8s ease;}
+  .substate{color:var(--muted); font-size:15px; max-width:42ch; margin:0 auto;}
+  .controls{display:flex; gap:12px; margin-top:28px;}
+
+  /* foggy out-of-frame instruction */
+  .oof-note{display:flex; align-items:flex-start; gap:12px; margin-top:22px; max-width:460px; background:color-mix(in srgb,var(--foggy) 13%, transparent); color:var(--ink); border:1px solid color-mix(in srgb,var(--foggy) 38%, transparent); border-radius:14px; padding:14px 16px; text-align:left;}
+  .oof-note .ic{flex:none; margin-top:1px; color:var(--foggy); font-size:18px;}
+  .oof-note .nt{font-weight:600; font-size:14.5px; margin:0;}
+  .oof-note .nb{font-size:13.5px; margin:3px 0 0; color:var(--muted);}
+
+  /* permission / blocked panels */
+  .panel{max-width:440px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:6px;}
+  .panel .picon{width:64px; height:64px; border-radius:18px; display:grid; place-items:center; font-size:26px; margin-bottom:8px;}
+  .panel.perm .picon{background:color-mix(in srgb,var(--meadow) 14%, transparent); color:var(--meadow);}
+  .panel.blocked .picon{background:color-mix(in srgb,var(--foggy) 14%, transparent); color:var(--foggy);}
+  .panel h2{font-size:24px; font-weight:600; margin:0;}
+  .panel p{color:var(--muted); font-size:15px; margin:6px 0 0;}
+  .panel .btn-row{margin-top:22px;}
+
+  /* camera pill — state driven */
+  .pill-wrap{position:absolute; top:18px; right:18px; z-index:6;}
+  .pill{display:inline-flex; align-items:center; gap:9px; padding:8px 14px 8px 12px; background:color-mix(in srgb,var(--bg) 80%, transparent); border:1px solid var(--border); border-radius:999px; font-size:13px; color:var(--ink); cursor:pointer; backdrop-filter:blur(8px); user-select:none;}
+  .pill .rec{width:9px; height:9px; border-radius:50%; background:var(--muted);}
+  .pill.recording .rec{background:var(--meadow); box-shadow:0 0 0 0 color-mix(in srgb,var(--meadow) 60%, transparent); animation:pulse 2.4s ease-out infinite;}
+  .pill.outofframe .rec{background:var(--foggy);}
+  .pill.paused .rec, .pill.off .rec{background:var(--muted);}
+  .pill .pin-hint{color:var(--muted); font-size:11px;}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--meadow) 55%, transparent);}70%{box-shadow:0 0 0 9px transparent;}100%{box-shadow:0 0 0 0 transparent;}}
+
+  .viewfinder{--bracket:var(--meadow); position:absolute; top:46px; right:0; width:230px; height:150px; border-radius:14px; overflow:hidden; border:1px solid var(--border); box-shadow:var(--shadow); opacity:0; transform:translateY(-6px) scale(.98); pointer-events:none; transition:opacity .18s ease, transform .18s ease; background:radial-gradient(120% 90% at 50% 35%, #2a3138 0%, #171b1f 60%, #0e1113 100%);}
+  .pill-wrap:hover .viewfinder, .viewfinder.pinned, .viewfinder.force{opacity:1; transform:none; pointer-events:auto;}
+  .viewfinder.oof{--bracket:var(--foggy);}
+  .vf-frame{position:absolute; inset:16px;}
+  .vf-c{position:absolute; width:24px; height:24px; border:2px solid var(--bracket); opacity:.9; transition:border-color .4s ease;}
+  .vf-c.tl{top:0; left:0; border-right:0; border-bottom:0; border-radius:6px 0 0 0;}
+  .vf-c.tr{top:0; right:0; border-left:0; border-bottom:0; border-radius:0 6px 0 0;}
+  .vf-c.bl{bottom:0; left:0; border-right:0; border-top:0; border-radius:0 0 0 6px;}
+  .vf-c.br{bottom:0; right:0; border-left:0; border-top:0; border-radius:0 0 6px 0;}
+  .vf-sil{position:absolute; left:50%; top:52%; transform:translate(-50%,-50%); width:64px; height:64px; border-radius:50%; background:radial-gradient(circle at 50% 40%, #3b444c, #222a30); box-shadow:0 14px 30px rgba(0,0,0,.4);}
+  .vf-sil2{position:absolute; left:50%; top:98%; transform:translate(-50%,-50%); width:120px; height:74px; border-radius:60px 60px 0 0; background:#2b333a;}
+  .vf-dot{position:absolute; top:8px; left:50%; transform:translateX(-50%); width:8px; height:8px; border-radius:50%; background:var(--bracket); transition:background .4s ease;}
+  .vf-tag{position:absolute; bottom:7px; right:9px; font-size:10px; color:var(--muted);}
+
+  /* page trend */
+  .trend{margin-top:22px; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:20px 22px; box-shadow:var(--shadow);}
+  .trend h3{font-size:16px; font-weight:600; margin:0;}
+  .trend .tsub{color:var(--muted); font-size:13.5px; margin:5px 0 14px;}
+  .trend svg{width:100%; height:88px; display:block;}
+  .legend{display:flex; gap:18px; margin-top:12px; font-size:12px; color:var(--muted);}
+  .legend i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:-1px;}
+  .note{font-size:12.5px; color:var(--muted); margin:26px 2px 0; line-height:1.6;}
+  .note b{color:var(--ink); font-weight:600;}
+
+  @media (max-width:480px){
+    .stage{padding:46px 14px 30px; min-height:auto;}
+    .bloom{width:220px; height:220px;}
+    .stateline{font-size:24px;}
+    .pill-wrap{top:12px; right:12px;}
+    .viewfinder{width:200px; height:130px;}
+    .controls{flex-direction:column; width:100%; max-width:280px;}
+    .controls .btn{width:100%;}
+    .panel{max-width:100%;}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .bloom .core,.bloom .halo,.bloom .grain,.pill .rec{animation:none;}
+    .view.active{animation:none;}
+  }
+</style>
+</head>
+<body>
+
+<div class="mockbar">
+  <span class="lbl">Mock controls</span>
+  <div class="grp"><span>View</span>
+    <div class="seg" id="seg-view">
+      <button data-view="dashboard" aria-pressed="true">Dashboard</button>
+      <button data-view="monitoring" aria-pressed="false">Monitoring page</button>
+    </div></div>
+  <div class="grp"><span>Session state</span>
+    <div class="seg" id="seg-op">
+      <button data-op="permission" aria-pressed="false">Permission</button>
+      <button data-op="warmup" aria-pressed="false">Warming up</button>
+      <button data-op="active" aria-pressed="true">Active</button>
+      <button data-op="skipped" aria-pressed="false">Skipped read</button>
+      <button data-op="outofframe" aria-pressed="false">Out of frame</button>
+      <button data-op="paused" aria-pressed="false">Paused</button>
+      <button data-op="blocked" aria-pressed="false">Blocked</button>
+      <button data-op="noanchor" aria-pressed="false">Calibrate-first</button>
+    </div></div>
+  <div class="grp"><span>Reading</span>
+    <div class="seg" id="seg-state">
+      <button data-state="ease" aria-pressed="true">At ease</button>
+      <button data-state="little" aria-pressed="false">A little tense</button>
+      <button data-state="tense" aria-pressed="false">Tense</button>
+    </div></div>
+  <div class="grp"><span>Check-in card</span>
+    <div class="seg" id="seg-card">
+      <button data-card="idle" aria-pressed="true">Idle</button>
+      <button data-card="monitoring" aria-pressed="false">Monitoring</button>
+      <button data-card="paused" aria-pressed="false">Paused</button>
+    </div></div>
+  <div class="grp">
+    <div class="seg" id="seg-theme">
+      <button data-theme="dark" aria-pressed="true">Dark</button>
+      <button data-theme="light" aria-pressed="false">Light</button>
+    </div></div>
+</div>
+
+<div class="app">
+  <div class="appbar">
+    <div class="wordmark">serenify</div>
+    <div class="who">Mohamed · Employee</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+    <p class="ctx-note">Dashboard chrome (greeting, header) is existing feature-003 design — not redrawn here. This mock only shows what feature 008 adds: the <b>check-in card's session states</b> and the <b>monitoring page</b>.</p>
+    <div class="grid">
+      <div class="card checkin" id="checkin-card">
+        <!-- idle -->
+        <div class="ci-state" data-ci="idle">
+          <div class="body">
+            <div class="mini-bloom"><div class="bloom" style="width:120px;height:120px;"><div class="halo"></div><div class="core"></div><div class="grain"></div></div></div>
+            <h2>Start a check-in</h2>
+            <p class="line">Watches for signs of stress while you work and checks in if something comes up.</p>
+            <div class="btn-row"><button class="btn btn-primary" id="go-monitor">Start check-in</button></div>
+            <div class="mini-trend">
+              <div class="mt-label"><span>Last session · mostly at ease</span><span>34 min</span></div>
+              <svg viewBox="0 0 300 46" preserveAspectRatio="none" id="card-trend-idle"></svg>
+            </div>
+          </div>
+        </div>
+        <!-- monitoring -->
+        <div class="ci-state" data-ci="monitoring" hidden>
+          <div class="body">
+            <div class="mini-bloom"><div class="bloom" style="width:120px;height:120px;"><div class="halo"></div><div class="core"></div><div class="grain"></div></div></div>
+            <span class="statechip" id="ci-chip"><span class="dot"></span><span id="ci-chip-label">At ease</span></span>
+            <h2 style="margin-top:14px;" id="ci-head">You're at ease right now</h2>
+            <div class="meta"><span>Monitoring</span><span class="sep">·</span><span>12 min</span></div>
+            <div class="mini-trend">
+              <div class="mt-label"><span>This session so far</span><span>12 min</span></div>
+              <svg viewBox="0 0 300 46" preserveAspectRatio="none" id="card-trend-live"></svg>
+            </div>
+            <div class="btn-row">
+              <a class="btn btn-ghost" href="#" id="open-monitor">Open</a>
+              <button class="btn btn-ghost" id="ci-pause">Pause</button>
+            </div>
+          </div>
+        </div>
+        <!-- paused -->
+        <div class="ci-state" data-ci="paused" hidden>
+          <div class="body">
+            <div class="mini-bloom dim"><div class="bloom" style="width:120px;height:120px;"><div class="halo"></div><div class="core"></div></div></div>
+            <span class="statechip" style="color:var(--muted);"><span class="dot" style="background:var(--muted);"></span>Paused</span>
+            <h2 style="margin-top:14px;">Taking a break</h2>
+            <p class="line">Monitoring is paused and your camera is off. Pick it back up whenever you're ready.</p>
+            <div class="btn-row"><button class="btn btn-primary" id="ci-resume">Resume</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card placeholder">
+        <span class="ph-tag">existing · feature 010</span>
+        <h3 class="ctitle">Talk it through</h3>
+        <p class="csub">Chat surface — its own card, unchanged by 008. Shown for context.</p>
+      </div>
+      <div class="card placeholder">
+        <span class="ph-tag">existing · feature 011</span>
+        <h3 class="ctitle">For you</h3>
+        <p class="csub">Recommendations surface — its own card, unchanged by 008. Shown for context.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- MONITORING PAGE -->
+  <section class="view" id="view-monitoring">
+    <div class="mon-top">
+      <a class="backlink" href="#" id="back-dash">← Dashboard</a>
+      <span class="session-timer" id="timer-wrap">Session · <b id="timer">14:22</b></span>
+    </div>
+
+    <div class="stage">
+      <div class="pill-wrap" id="pill-wrap">
+        <div class="pill recording" id="cam-pill" tabindex="0" role="button" aria-label="Camera state. Click to pin the preview.">
+          <span class="rec"></span><span id="pill-label">Recording</span><span class="pin-hint" id="pin-hint">· hover to peek</span>
+        </div>
+        <div class="viewfinder" id="viewfinder">
+          <div class="vf-frame"><span class="vf-c tl"></span><span class="vf-c tr"></span><span class="vf-c bl"></span><span class="vf-c br"></span></div>
+          <div class="vf-sil2"></div><div class="vf-sil"></div>
+          <div class="vf-dot"></div>
+          <div class="vf-tag" id="vf-tag"></div>
+        </div>
+      </div>
+
+      <!-- LIVE container (active / outofframe / paused) -->
+      <div id="op-live" style="display:flex; flex-direction:column; align-items:center;">
+        <div class="bloom" id="main-bloom"><div class="halo"></div><div class="core"></div><div class="grain"></div></div>
+        <div class="stateline" id="stateline">You're at ease right now</div>
+        <p class="substate" id="substate">Steady and settled — nothing to do.</p>
+        <div class="oof-note" id="oof-note" style="display:none;">
+          <span class="ic">◎</span>
+          <div>
+            <p class="nt">We've lost sight of you</p>
+            <p class="nb">Move back into frame and Serenify picks up where you left off.</p>
+          </div>
+        </div>
+        <div class="oof-note" id="skip-note" style="display:none;">
+          <span class="ic">◐</span>
+          <div>
+            <p class="nt">Couldn't get a clear read</p>
+            <p class="nb">The light is making your face hard to see. Try facing a window or adding a lamp — Serenify will keep trying.</p>
+          </div>
+        </div>
+        <div class="controls" id="controls"></div>
+      </div>
+
+      <!-- PERMISSION -->
+      <div class="panel perm" id="op-permission" style="display:none;">
+        <div class="picon">▣</div>
+        <h2>Serenify needs your camera</h2>
+        <p>Reads facial cues to gauge stress while you work. Your manager never sees your video.</p>
+        <div class="btn-row"><button class="btn btn-primary" id="perm-allow">Allow camera access</button></div>
+      </div>
+
+      <!-- BLOCKED -->
+      <div class="panel blocked" id="op-blocked" style="display:none;">
+        <div class="picon">⃠</div>
+        <h2>Camera access is blocked</h2>
+        <p>Serenify can't start a check-in without it. Re-enable camera access for this site in your browser settings, then try again.</p>
+        <div class="btn-row"><button class="btn btn-ghost" id="blocked-retry">Try again</button></div>
+      </div>
+
+      <!-- CALIBRATE-FIRST (no anchor) -->
+      <div class="panel blocked" id="op-noanchor" style="display:none;">
+        <div class="picon">◔</div>
+        <h2>Calibrate first</h2>
+        <p>Serenify needs a quick one-minute baseline before it can read your stress.</p>
+        <div class="btn-row"><button class="btn btn-primary" id="noanchor-go">Start calibration</button></div>
+      </div>
+    </div>
+
+    <!-- trend -->
+    <div class="trend" id="page-trend">
+      <h3>This session</h3>
+      <p class="tsub">Mostly at ease, with a tense stretch around the 8-minute mark.</p>
+      <svg viewBox="0 0 600 88" preserveAspectRatio="none">
+        <defs><linearGradient id="tgrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--amber)" stop-opacity=".22"/>
+          <stop offset="100%" stop-color="var(--meadow)" stop-opacity=".02"/>
+        </linearGradient></defs>
+        <path id="trend-area" fill="url(#tgrad)"></path>
+        <path id="trend-line" fill="none" stroke="var(--meadow)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path>
+      </svg>
+      <div class="legend">
+        <span><i style="background:var(--meadow)"></i>At ease</span>
+        <span><i style="background:var(--bloom-little)"></i>A little tense</span>
+        <span><i style="background:var(--amber)"></i>Tense</span>
+      </div>
+    </div>
+
+    <p class="note">Live reading is <b>smoothed</b>, so it drifts rather than flickers. There's deliberately no big live number — a confident verdict you watch all day is itself stressful and would put the model's noise on display. The <b>bloom</b> carries the feel; the <b>trend</b> carries the proof. The same trend appears on the dashboard check-in card so you get the at-a-glance read without opening this page.</p>
+  </section>
+</div>
+
+<script>
+  const STATES = {
+    ease:   {bloom:'--bloom-ease',  chip:'chip-ease',   chipLabel:'At ease',       head:"You're at ease right now",  sub:"Steady and settled — nothing to do.", warm:true},
+    little: {bloom:'--bloom-little', chip:'chip-little', chipLabel:'A little tense', head:"You're a little tense",      sub:"A bit of an edge lately. Maybe a slow breath.", warm:false},
+    tense:  {bloom:'--bloom-tense',  chip:'chip-tense',  chipLabel:'Tense',          head:"You're feeling tense",       sub:"This has held a while. Serenify can check in when you're ready.", warm:false}
+  };
+
+  let cur = {view:'dashboard', op:'active', state:'ease', card:'idle'};
+
+  function setBloom(){
+    document.documentElement.style.setProperty('--cur-bloom', `var(${STATES[cur.state].bloom})`);
+  }
+
+  function renderMonitor(){
+    const s = STATES[cur.state];
+    const live=document.getElementById('op-live');
+    const perm=document.getElementById('op-permission');
+    const blocked=document.getElementById('op-blocked');
+    const noanchor=document.getElementById('op-noanchor');
+    const bloom=document.getElementById('main-bloom');
+    const oof=document.getElementById('oof-note');
+    const skip=document.getElementById('skip-note');
+    const controls=document.getElementById('controls');
+    const stateline=document.getElementById('stateline');
+    const substate=document.getElementById('substate');
+    const pill=document.getElementById('cam-pill');
+    const pillLabel=document.getElementById('pill-label');
+    const pinHint=document.getElementById('pin-hint');
+    const vf=document.getElementById('viewfinder');
+    const trend=document.getElementById('page-trend');
+
+    const liveOps=['active','outofframe','paused','warmup','skipped'];
+    live.style.display = liveOps.includes(cur.op)?'flex':'none';
+    perm.style.display = cur.op==='permission'?'flex':'none';
+    blocked.style.display = cur.op==='blocked'?'flex':'none';
+    noanchor.style.display = cur.op==='noanchor'?'flex':'none';
+    trend.style.display = ['active','outofframe','paused','skipped'].includes(cur.op)?'block':'none';
+
+    const pillMap={active:'recording',skipped:'recording',warmup:'recording',outofframe:'outofframe',paused:'paused',permission:'off',blocked:'off',noanchor:'off'};
+    const pillTxt={active:'Recording',skipped:'Recording',warmup:'Recording',outofframe:'Out of frame',paused:'Paused',permission:'Camera off',blocked:'Camera off',noanchor:'Camera off'};
+    pill.className='pill '+pillMap[cur.op];
+    pillLabel.textContent=pillTxt[cur.op];
+    pinHint.style.display = cur.op==='active'?'':'none';
+
+    vf.classList.toggle('force', cur.op==='outofframe');
+    vf.classList.toggle('oof', cur.op==='outofframe');
+    if(cur.op!=='active' && cur.op!=='outofframe'){ vf.classList.remove('pinned'); document.getElementById('vf-tag').textContent=''; }
+
+    oof.style.display='none'; skip.style.display='none';
+
+    if(cur.op==='active' || cur.op==='skipped'){
+      bloom.className='bloom'; setBloom();
+      stateline.textContent=s.head;
+      stateline.style.color=s.warm?'var(--meadow-text)':'var(--amber-text)';
+      substate.textContent=s.sub; substate.style.display='';
+      if(cur.op==='skipped') skip.style.display='flex';
+      controls.innerHTML='<button class="btn btn-ghost" id="m-pause">Pause</button><button class="btn btn-ghost" id="m-end">End session</button>';
+    } else if(cur.op==='warmup'){
+      bloom.className='bloom'; document.documentElement.style.setProperty('--cur-bloom','var(--meadow)');
+      stateline.textContent='Getting a read on things';
+      stateline.style.color='var(--muted)';
+      substate.textContent='Your first reading lands in a moment. Sit comfortably.'; substate.style.display='';
+      controls.innerHTML='<button class="btn btn-ghost" id="m-pause">Pause</button><button class="btn btn-ghost" id="m-end">End session</button>';
+    } else if(cur.op==='outofframe'){
+      bloom.className='bloom dim';
+      stateline.textContent='Waiting for you';
+      stateline.style.color='var(--foggy-text)';
+      substate.style.display='none';
+      oof.style.display='flex';
+      controls.innerHTML='<button class="btn btn-ghost" id="m-pause">Pause</button><button class="btn btn-ghost" id="m-end">End session</button>';
+    } else if(cur.op==='paused'){
+      bloom.className='bloom dim';
+      stateline.textContent='Paused — taking a break';
+      stateline.style.color='var(--ink)';
+      substate.textContent="Your camera is off. Resume whenever you're ready."; substate.style.display='';
+      controls.innerHTML='<button class="btn btn-primary" id="m-resume">Resume</button><button class="btn btn-ghost" id="m-end">End session</button>';
+    }
+    wireControls();
+  }
+
+  function wireControls(){
+    const p = document.getElementById('m-pause'); if(p) p.onclick=()=>{cur.op='paused'; pressOp(); renderMonitor();};
+    const r = document.getElementById('m-resume'); if(r) r.onclick=()=>{cur.op='active'; pressOp(); renderMonitor();};
+    const e = document.getElementById('m-end'); if(e) e.onclick=()=>{cur.card='idle'; applyCard(); pressCard(); gotoDash();};
+  }
+
+  function renderCard(){
+    const s = STATES[cur.state];
+    const chip = document.getElementById('ci-chip');
+    chip.className = 'statechip ' + s.chip;
+    document.getElementById('ci-chip-label').textContent = s.chipLabel;
+    document.getElementById('ci-head').textContent = s.head;
+  }
+  function applyCard(){
+    document.querySelectorAll('#checkin-card .ci-state').forEach(el=> el.hidden = el.dataset.ci !== cur.card);
+  }
+  function applyView(){
+    document.getElementById('view-dashboard').classList.toggle('active', cur.view==='dashboard');
+    document.getElementById('view-monitoring').classList.toggle('active', cur.view==='monitoring');
+  }
+
+  function pressGroup(id,key,val){ document.querySelectorAll('#'+id+' button').forEach(b=> b.setAttribute('aria-pressed', b.dataset[key]===val?'true':'false')); }
+  function pressOp(){ pressGroup('seg-op','op',cur.op); }
+  function pressCard(){ pressGroup('seg-card','card',cur.card); }
+
+  document.getElementById('seg-view').onclick=e=>{ if(e.target.dataset.view){cur.view=e.target.dataset.view; applyView(); pressGroup('seg-view','view',cur.view);}};
+  document.getElementById('seg-op').onclick=e=>{ if(e.target.dataset.op){cur.op=e.target.dataset.op; renderMonitor(); pressOp();}};
+  document.getElementById('seg-state').onclick=e=>{ if(e.target.dataset.state){cur.state=e.target.dataset.state; setBloom(); renderMonitor(); renderCard(); pressGroup('seg-state','state',cur.state);}};
+  document.getElementById('seg-card').onclick=e=>{ if(e.target.dataset.card){cur.card=e.target.dataset.card; applyCard(); pressCard();}};
+  document.getElementById('seg-theme').onclick=e=>{ if(e.target.dataset.theme){document.documentElement.setAttribute('data-theme',e.target.dataset.theme); pressGroup('seg-theme','theme',e.target.dataset.theme);}};
+
+  function gotoMonitor(){cur.view='monitoring'; applyView(); pressGroup('seg-view','view','monitoring');}
+  function gotoDash(){cur.view='dashboard'; applyView(); pressGroup('seg-view','view','dashboard');}
+
+  // start check-in → goes to permission first (we don't assume access)
+  document.getElementById('go-monitor').onclick=e=>{e.preventDefault(); cur.op='permission'; pressOp(); renderMonitor(); gotoMonitor();};
+  document.getElementById('open-monitor').onclick=e=>{e.preventDefault(); gotoMonitor();};
+  document.getElementById('back-dash').onclick=e=>{e.preventDefault(); gotoDash();};
+  document.getElementById('ci-pause').onclick=()=>{cur.card='paused'; applyCard(); pressCard();};
+  document.getElementById('ci-resume').onclick=()=>{cur.card='monitoring'; applyCard(); pressCard();};
+  document.getElementById('perm-allow').onclick=()=>{cur.op='active'; cur.card='monitoring'; applyCard(); pressCard(); pressOp(); renderMonitor();};
+  document.getElementById('blocked-retry').onclick=()=>{cur.op='permission'; pressOp(); renderMonitor();};
+  document.getElementById('noanchor-go').onclick=()=>{ gotoDash(); };
+
+  // viewfinder pin
+  const vf=document.getElementById('viewfinder'), pill=document.getElementById('cam-pill');
+  function togglePin(){ if(cur.op!=='active') return; const pinned=vf.classList.toggle('pinned'); document.getElementById('vf-tag').textContent=pinned?'pinned':''; document.getElementById('pin-hint').textContent=pinned?'· pinned':'· hover to peek'; }
+  pill.onclick=togglePin;
+  pill.onkeydown=e=>{ if(e.key==='Enter'||e.key===' '){e.preventDefault(); togglePin();}};
+
+  // trend path builder
+  function buildPath(lineId, areaId, pts, W, H, max){
+    const n=pts.length, x=i=>i*(W/(n-1)), y=v=>H-5-(v/max)*(H-12);
+    let d='M '+x(0)+' '+y(pts[0]);
+    for(let i=1;i<n;i++){ const cx=(x(i-1)+x(i))/2; d+=` C ${cx} ${y(pts[i-1])} ${cx} ${y(pts[i])} ${x(i)} ${y(pts[i])}`; }
+    document.getElementById(lineId).setAttribute('d', d);
+    if(areaId) document.getElementById(areaId).setAttribute('d', d+` L ${W} ${H} L 0 ${H} Z`);
+  }
+  const sessionPts=[12,14,11,13,18,22,20,17,30,52,68,60,40,26,19,16,15,17,14,13];
+  buildPath('trend-line','trend-area', sessionPts, 600, 88, 80);
+
+  // mini card trends (line only, meadow)
+  function miniTrend(id, pts){
+    const svg=document.getElementById(id); if(!svg) return;
+    const n=pts.length, W=300,H=46,max=80, x=i=>i*(W/(n-1)), y=v=>H-4-(v/max)*(H-10);
+    let d='M '+x(0)+' '+y(pts[0]);
+    for(let i=1;i<n;i++){ const cx=(x(i-1)+x(i))/2; d+=` C ${cx} ${y(pts[i-1])} ${cx} ${y(pts[i])} ${x(i)} ${y(pts[i])}`; }
+    const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d',d); path.setAttribute('fill','none'); path.setAttribute('stroke','var(--meadow)'); path.setAttribute('stroke-width','2'); path.setAttribute('stroke-linecap','round'); path.setAttribute('stroke-linejoin','round');
+    svg.appendChild(path);
+  }
+  miniTrend('card-trend-idle', [12,15,13,16,14,18,15,13,14,12,11,13]);
+  miniTrend('card-trend-live', sessionPts.slice(0,12));
+
+  setBloom(); renderMonitor(); renderCard(); applyCard(); applyView(); pressOp();
+</script>
+</body>
+</html>

@@ -59,14 +59,19 @@ function buildCsp(nonce: string, pathname: string): string {
   // NEXT_PUBLIC_API_URL origin. The recorder POSTs the clip + GETs /healthz here.
   const apiOrigin = new URL(clientEnv.apiUrl).origin;
   // Capture routes load the in-browser MediaPipe face detector (feature 005,
-  // 📌 DECISION-20). Compiling its WASM needs 'wasm-unsafe-eval' (a keyword source,
+  // 📌 DECISION-20; feature 008's monitoring stage reuses the SAME detector via
+  // useFramingGuide). Compiling its WASM needs 'wasm-unsafe-eval' (a keyword source,
   // honoured alongside 'strict-dynamic'); the runtime may spin a blob-URL worker
-  // → worker-src blob:. Both are SCOPED to the two capture routes only; everywhere
+  // → worker-src blob:. Both are SCOPED to the capture routes only; everywhere
   // else keeps the stricter policy unchanged. The minimal set is validated by the
   // securitypolicyviolation sweep (T004) before this ships to users. The
   // self-hosted wasm/model are same-origin, so connect-src 'self' already covers
-  // them — no new connect-src host. COEP stays unset.
-  const isCaptureRoute = pathname === "/onboarding" || pathname === "/app/calibrate";
+  // them — no new connect-src host. COEP stays unset. Keep this set in lockstep with
+  // CAPTURE_ROUTES in next.config.ts (feature 008 must register /app/monitor in both).
+  const isCaptureRoute =
+    pathname === "/onboarding" ||
+    pathname === "/app/calibrate" ||
+    pathname === "/app/monitor";
   const directives = [
     "default-src 'self'",
     // Nonce covers the 2 app inline scripts (theme-migration IIFE, next-themes

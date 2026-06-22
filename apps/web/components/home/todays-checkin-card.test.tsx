@@ -3,9 +3,11 @@ import { render, screen } from "@testing-library/react";
 
 import { TodaysCheckinCard } from "@/components/home/todays-checkin-card";
 
+// "stress" / "stressed" were dropped from this blocklist in feature 008 (T034): this
+// card is now the entry to a stress check-in, so the neutral subject word is apt and the
+// idle line traces verbatim to the approved 008 mock. Genuinely ALARMIST / clinical words
+// stay forbidden (the calm-voice rubric still holds).
 const ALARMIST_BLOCKLIST = [
-  "stress",
-  "stressed",
   "warning",
   "alert",
   "alarm",
@@ -28,6 +30,12 @@ describe("TodaysCheckinCard", () => {
     render(<TodaysCheckinCard />);
     const body = document.body.textContent ?? "";
     expect(body.length).toBeGreaterThan(0);
+  });
+
+  it("offers Start check-in routing to the monitoring page (T034, FR-001)", () => {
+    render(<TodaysCheckinCard />);
+    const link = screen.getByRole("link", { name: /start check-in/i });
+    expect(link).toHaveAttribute("href", "/app/monitor");
   });
 
   it("uses no exclamation marks (calm-voice rubric)", () => {

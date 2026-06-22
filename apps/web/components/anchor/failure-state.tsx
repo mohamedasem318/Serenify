@@ -1,35 +1,26 @@
 "use client";
 
-import { CloudOff, MoveDiagonal, RefreshCw, ScanFace, Sun } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+
+import { CauseChip, type FailureCause } from "./cause-chip";
 
 /**
  * The post-recording failure state (feature 005, FR-027–030) — a calm sibling of
  * success, for when the minute recorded but processing couldn't set the baseline.
- * FOGGY (never red, never amber), honest, no self-blame. A small cause chip names
- * the actual reason and adapts to it; "our side" owns our own failures and gives
- * no "do better" tip. After several attempts, a gentle escape appears.
+ * FOGGY (never red, never amber), honest, no self-blame. A small cause chip (the
+ * shared `CauseChip`, T029) names the actual reason and adapts to it; "our side" owns
+ * our own failures and gives no "do better" tip. After several attempts, a gentle
+ * escape appears.
  *
  * Colour rule: this is a FOGGY screen, so the primary "Try again" / "Try once
  * more" is a FOGGY-filled CTA (not meadow); the "Not now" / "Maybe later" exit
  * stays a quiet text link.
  */
 
-export type FailureCause = "low-light" | "out-of-frame" | "our-side" | "insufficient-face";
-
-const CAUSE: Record<FailureCause, { Icon: LucideIcon; line: string }> = {
-  "low-light": { Icon: Sun, line: "Facing a little more light usually helps." },
-  "out-of-frame": { Icon: MoveDiagonal, line: "Staying roughly centred and still helps." },
-  "our-side": { Icon: CloudOff, line: "This one was on our side." },
-  // feature 006 — the server-authoritative face-absence cause (DECISION-31). Calm,
-  // foggy, non-blaming: states what happened and offers a gentle retry (Principle V).
-  "insufficient-face": {
-    Icon: ScanFace,
-    line: "We couldn’t see your face for enough of that recording.",
-  },
-};
+// Re-exported so existing importers keep `@/components/anchor/failure-state`'s FailureCause.
+export type { FailureCause } from "./cause-chip";
 
 export function FailureState({
   cause,
@@ -44,8 +35,6 @@ export function FailureState({
   onNotNow: () => void;
   onPause: () => void;
 }) {
-  const { Icon, line } = CAUSE[cause];
-
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-5 px-2 py-6 text-center">
       <span className="grid size-14 place-items-center rounded-full bg-foggy/15 text-foggy">
@@ -58,11 +47,8 @@ export function FailureState({
         </p>
       </div>
 
-      {/* adaptive cause chip — icon + one line, foggy */}
-      <p className="flex items-center gap-2 rounded-control border border-foggy/40 bg-foggy/10 px-3 py-2 text-sm text-ink">
-        <Icon className="size-4 shrink-0 text-foggy" strokeWidth={1.75} aria-hidden />
-        {line}
-      </p>
+      {/* adaptive cause chip — the shared CauseChip (icon + one foggy line) */}
+      <CauseChip cause={cause} />
 
       {escapeVisible ? (
         <div className="w-full max-w-xs space-y-2">
