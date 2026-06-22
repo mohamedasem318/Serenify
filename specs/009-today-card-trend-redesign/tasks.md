@@ -96,11 +96,11 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Tests (write first, must FAIL)
 
-- [ ] T020 [P] [US3] Synced-highlight RTL test in `apps/web/tests/unit/components/home/today-view.highlight.test.tsx`: mouse-enter a lane → matching row gets the active state; mouse-enter a row → matching lane gets it (both directions); focus a plot per-session target (`role=button`, `tabindex=0`, `aria-label` includes the tenor) → visible focus ring + its row active; rows are NOT separate tab stops; with reduced motion, no transition class is applied (SC-005).
+- [X] T020 [P] [US3] Synced-highlight RTL test in `apps/web/tests/unit/components/home/today-view.highlight.test.tsx`: mouse-enter a lane → matching row gets the active state; mouse-enter a row → matching lane gets it (both directions); focus a plot per-session target (`role=button`, `tabindex=0`, `aria-label` includes the tenor) → visible focus ring + its row active; rows are NOT separate tab stops; with reduced motion, no transition class is applied (SC-005).
 
 ### Implementation
 
-- [ ] T021 [US3] Wire the synced highlight in `apps/web/components/home/today-view.tsx` (single active-session id) across `today-trend-plot.tsx` (focusable per-session targets + focus ring + lane-bg highlight) and `today-timeline.tsx` (row hover highlight); gate all transitions on `useMediaQuery`. Depends on T017, T018, T019, T020.
+- [X] T021 [US3] Wire the synced highlight in `apps/web/components/home/today-view.tsx` (single active-session id) across `today-trend-plot.tsx` (focusable per-session targets + focus ring + lane-bg highlight) and `today-timeline.tsx` (row hover highlight); gate all transitions on `useMediaQuery`. Depends on T017, T018, T019, T020.
 
 **Checkpoint**: highlight reachable both directions by mouse and by keyboard via the plot targets.
 

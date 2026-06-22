@@ -5,6 +5,8 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import {
   BAND_LINE,
   BAND_Y,
+  FOCUS_RING,
+  HIGHLIGHT_FILL,
   STROKE,
   buildLanePlot,
   type Lane,
@@ -47,6 +49,14 @@ const AXIS_LABELS: { key: Tenor; text: string; className: string }[] = [
   { key: "at_ease", text: "at ease", className: "text-meadow-text" },
   { key: "no_read", text: "no read", className: "text-muted" },
 ];
+
+/** Spoken tenor for the per-session keyboard target's aria-label (FR-011). */
+const TENOR_PHRASE: Record<Tenor, string> = {
+  tense: "tense",
+  a_little_tense: "a little tense",
+  at_ease: "at ease",
+  no_read: "no clear read",
+};
 
 const bandAtY = (y: number): Tenor =>
   y === BAND_Y.tense
@@ -194,10 +204,27 @@ export interface TodayTrendPlotProps {
   seqs: SessionSeq[];
   /** Explicit lane-area width (px). Tests pass this; the live app measures the wrapper. */
   availableWidth?: number;
+  /** The synced-highlight active session id (US3) — lifted to TodayView, shared with the timeline. */
+  activeId?: string | null;
+  /** Set/clear the active session on hover + focus (US3). */
+  onActivate?: (id: string | null) => void;
+  /** Drop transition classes when the user prefers reduced motion (FR-015 / SC-005). */
+  reduceMotion?: boolean;
+  /** Whether the per-session targets are in the tab order — false while the card is collapsed. */
+  interactive?: boolean;
 }
 
-export function TodayTrendPlot({ seqs, availableWidth }: TodayTrendPlotProps) {
+export function TodayTrendPlot({
+  seqs,
+  availableWidth,
+  activeId = null,
+  onActivate,
+  reduceMotion = false,
+  interactive = true,
+}: TodayTrendPlotProps) {
   const [measured, setMeasured] = useState<number | null>(null);
+  // Focus ring shows on keyboard focus only (US3); the lane/row wash shows on hover OR focus.
+  const [focusedId, setFocusedId] = useState<string | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
   // Measure the scroll wrapper so lanes fill a wide screen and clamp on a narrow one. The ref
@@ -257,20 +284,26 @@ export function TodayTrendPlot({ seqs, availableWidth }: TodayTrendPlotProps) {
             role="img"
             aria-label={`${seqs.length} ${seqs.length === 1 ? "session" : "sessions"} as step shapes by stress level`}
           >
-            {/* lane highlight surfaces — full plot height, carry NO band meaning (US3 toggles) */}
-            {lanes.map((lane) => (
-              <rect
-                key={`bg-${lane.sessionId}`}
-                data-lane-bg=""
-                data-session-id={lane.sessionId}
-                x={lane.x0 + 2}
-                y={LANE_BG_Y}
-                width={laneWidth - 4}
-                height={LANE_BG_H}
-                rx={9}
-                fill="transparent"
-              />
-            ))}
+            {/* lane highlight surfaces — full plot height, carry NO band meaning. Toggled by the
+                synced highlight (US3): a faint neutral wash when the lane (or its row) is active. */}
+            {lanes.map((lane) => {
+              const active = activeId === lane.sessionId;
+              return (
+                <rect
+                  key={`bg-${lane.sessionId}`}
+                  data-lane-bg=""
+                  data-session-id={lane.sessionId}
+                  data-active={active ? "true" : "false"}
+                  className={reduceMotion ? undefined : "transition-[fill] duration-150"}
+                  x={lane.x0 + 2}
+                  y={LANE_BG_Y}
+                  width={laneWidth - 4}
+                  height={LANE_BG_H}
+                  rx={9}
+                  fill={active ? HIGHLIGHT_FILL : "transparent"}
+                />
+              );
+            })}
             {/* faint band gridlines */}
             {bandKeys.map((k) => (
               <line
@@ -299,6 +332,58 @@ export function TodayTrendPlot({ seqs, availableWidth }: TodayTrendPlotProps) {
             {/* the step shapes */}
             {lanes.map((lane) => (
               <g key={`lane-${lane.sessionId}`}>{laneMarks(lane, laneWidth)}</g>
+            ))}
+            {/* focus rings — visible only on keyboard focus of the matching lane target (US3) */}
+            {lanes.map((lane) => {
+              const visible = focusedId === lane.sessionId;
+              return (
+                <rect
+                  key={`ring-${lane.sessionId}`}
+                  data-lane-focusring=""
+                  data-session-id={lane.sessionId}
+                  data-visible={visible ? "true" : "false"}
+                  className={reduceMotion ? undefined : "transition-opacity duration-150"}
+                  x={lane.x0 + 2}
+                  y={LANE_BG_Y}
+                  width={laneWidth - 4}
+                  height={LANE_BG_H}
+                  rx={9}
+                  fill="none"
+                  stroke={FOCUS_RING}
+                  strokeWidth={1.5}
+                  opacity={visible ? 1 : 0}
+                  pointerEvents="none"
+                />
+              );
+            })}
+            {/* per-session keyboard + pointer targets, on top so they catch the events. A lane is
+                a button-roled hit (FR-011): hover OR focus sets the shared active id (lane bg +
+                row wash), focus additionally raises the ring. Rows are NOT tab stops. */}
+            {lanes.map((lane) => (
+              <rect
+                key={`hit-${lane.sessionId}`}
+                data-lane-hit=""
+                data-session-id={lane.sessionId}
+                role="button"
+                tabIndex={interactive ? 0 : -1}
+                aria-label={`Session ${lane.index + 1}, ${TENOR_PHRASE[lane.tenor]}`}
+                x={lane.x0}
+                y={LANE_BG_Y}
+                width={laneWidth}
+                height={LANE_BG_H}
+                fill="transparent"
+                className="cursor-pointer outline-none"
+                onMouseEnter={() => onActivate?.(lane.sessionId)}
+                onMouseLeave={() => onActivate?.(null)}
+                onFocus={() => {
+                  onActivate?.(lane.sessionId);
+                  setFocusedId(lane.sessionId);
+                }}
+                onBlur={() => {
+                  onActivate?.(null);
+                  setFocusedId(null);
+                }}
+              />
             ))}
           </svg>
         </div>

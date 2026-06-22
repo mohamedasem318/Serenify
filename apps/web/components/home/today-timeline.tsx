@@ -3,6 +3,7 @@
 import type { CSSProperties } from "react";
 
 import type { ChipTone, RecapSession } from "@/lib/api/monitoring-reads";
+import { HIGHLIGHT_FILL } from "@/lib/trend-geometry";
 
 /**
  * Feature 009 / US2 — the expanded today card's session timeline (FR-012 / FR-013).
@@ -35,19 +36,37 @@ const CHIP: Record<ChipTone, { className: string; style: CSSProperties }> = {
 
 export interface TodayTimelineProps {
   sessions: RecapSession[];
+  /** The synced-highlight active session id (US3) — shared with the lane plot. */
+  activeId?: string | null;
+  /** Set/clear the active session on row hover (US3). Rows are NOT keyboard tab stops. */
+  onActivate?: (id: string | null) => void;
+  /** Drop the row's background transition when reduced motion is preferred (FR-015 / SC-005). */
+  reduceMotion?: boolean;
 }
 
-export function TodayTimeline({ sessions }: TodayTimelineProps) {
+export function TodayTimeline({
+  sessions,
+  activeId = null,
+  onActivate,
+  reduceMotion = false,
+}: TodayTimelineProps) {
   return (
     <ul className="flex flex-col">
       {sessions.map((s) => {
         const chip = CHIP[s.chipTone];
+        const active = activeId === s.sessionId;
         return (
           <li
             key={s.sessionId}
             data-testid="timeline-row"
             data-session-id={s.sessionId}
-            className="flex items-center gap-3 rounded-[10px] px-2 py-[7px]"
+            data-active={active ? "true" : "false"}
+            onMouseEnter={() => onActivate?.(s.sessionId)}
+            onMouseLeave={() => onActivate?.(null)}
+            className={`flex items-center gap-3 rounded-[10px] px-2 py-[7px] ${
+              reduceMotion ? "" : "transition-colors duration-150"
+            }`}
+            style={{ backgroundColor: active ? HIGHLIGHT_FILL : undefined }}
           >
             <span className="w-[18px] flex-none text-center text-[13px] text-muted">{s.number}</span>
             <span className="flex-1 text-[15px] text-ink">{s.timeIdentity}</span>

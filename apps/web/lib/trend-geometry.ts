@@ -41,6 +41,17 @@ export const BAND_LINE: Record<Tenor, string> = {
   no_read: "var(--color-muted)",
 };
 
+/**
+ * The synced-highlight fill (US3) — a faint, theme-aware wash shared by the lane background
+ * (SVG fill) and the timeline row (CSS background) so a lane and its row read as one surface.
+ * Neutral by design (mixes the ink token, not a band colour) so the highlight never collides
+ * with a band's meaning: subtle dark tint in light mode, subtle light tint in dark mode.
+ */
+export const HIGHLIGHT_FILL = "color-mix(in srgb, var(--color-ink) 6%, transparent)";
+
+/** Keyboard focus-ring stroke (US3) — the foggy/info blue, distinct from the band palette. */
+export const FOCUS_RING = "var(--color-foggy)";
+
 // Collapsed mini step-line canvas — a wide-short thin line (horizontal stretch is fine here).
 export const MINI_W = 1000;
 export const MINI_H = 48;

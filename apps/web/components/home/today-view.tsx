@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { TodayMiniTrend } from "@/components/home/today-mini-trend";
 import { TodayTimeline } from "@/components/home/today-timeline";
@@ -47,7 +49,13 @@ export function TodayView({
   );
 
   // The in-place expand grows the card height; honor the user's reduced-motion preference.
+  // The same flag gates every highlight/fade transition in the children (US3/US4 / FR-015).
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  // One active-session id for the bidirectional synced highlight (US3): a lane hover/focus and
+  // a row hover both write here, and both the plot lane bg and the timeline row read it — so a
+  // lane and its row can never highlight out of step.
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col">
@@ -110,10 +118,21 @@ export function TodayView({
             <p className="text-xs text-muted">
               Each check-in&apos;s shape across today — height and colour show the level.
             </p>
-            <TodayTrendPlot seqs={seqs} />
+            <TodayTrendPlot
+              seqs={seqs}
+              activeId={activeId}
+              onActivate={setActiveId}
+              reduceMotion={reduceMotion}
+              interactive={expanded}
+            />
             <div className="mt-4 border-t border-border" />
             <div className="mt-2">
-              <TodayTimeline sessions={recap.sessions} />
+              <TodayTimeline
+                sessions={recap.sessions}
+                activeId={activeId}
+                onActivate={setActiveId}
+                reduceMotion={reduceMotion}
+              />
             </div>
           </div>
         </div>
