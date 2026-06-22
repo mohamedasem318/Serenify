@@ -215,42 +215,56 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       // FR-003: a no-face window is never uploaded — but only gate when the detector is
       // actually running (unavailable/loading → let the server's coverage gate decide).
       if (guideRef.current === "active" && !facePresentRef.current) return;
-      const token = tokenRef.current;
       const sessionId = sessionIdRef.current;
-      if (!token || !sessionId) return;
-      void deps
-        .submitWindow(sessionId, clip, token)
-        .then((res) => {
-          if (!res.ok) {
-            // Defensive mid-session no_anchor (US3 / T042): the user's anchor vanished after
-            // the create-time guard. Route to the SAME calibrate-first surface the create
-            // path uses (reuse NO_ANCHOR) — the standing release effect then stops the
-            // recorder + releases the camera (op leaves the live set). Guard on a live op so
-            // a late in-flight 409 can't reopen calibrate-first over a paused/ended session
-            // (FR-016, mirrors the WINDOW_OUTCOME late-window discipline). Other error kinds
-            // are dropped silently, exactly as before.
-            if (
-              res.kind === "no_anchor" &&
-              (opRef.current === "warming-up" || opRef.current === "active")
-            ) {
-              dispatch({ type: "NO_ANCHOR" });
-            }
+      if (!sessionId) return;
+      // Only act on an auth failure while a session is live — mirrors the WINDOW_OUTCOME
+      // late-window discipline so a window that lands after pause/end can't reopen a surface
+      // over a paused/ended session.
+      const liveNow = () => opRef.current === "warming-up" || opRef.current === "active";
+      void (async () => {
+        // Approach A — a FRESH token per upload from the Supabase browser client. The SDK
+        // auto-refreshes a near/expired token, so every window carries a valid token instead
+        // of the once-captured one that went stale after ~1 h (the silent-401 smoke break).
+        // Still the USER's own token (RLS-as-the-user; no service credential) — just current.
+        const session = await deps.getSession();
+        const token = session?.accessToken ?? null;
+        if (!token) {
+          // The browser session couldn't be refreshed (signed out / refresh failed). Don't
+          // upload a stale token and don't skip silently — surface the honest re-auth state.
+          if (liveNow()) dispatch({ type: "SESSION_EXPIRED" });
+          return;
+        }
+        tokenRef.current = token; // keep the cached token current for the lifecycle calls too
+        const res = await deps.submitWindow(sessionId, clip, token);
+        if (!res.ok) {
+          // A 401 even with a freshly-minted token is a genuine auth loss — NEVER silent (the
+          // frozen-band break): stop on the honest re-auth surface (the standing release
+          // effect then frees the camera as the op leaves the live set).
+          if (res.kind === "unauthorized") {
+            if (liveNow()) dispatch({ type: "SESSION_EXPIRED" });
             return;
           }
-          const outcome = res.outcome;
-          if (outcome.outcome === "skipped") {
-            // The client refines the coarse server cause from on-device telemetry, exactly
-            // as calibration does (low-light vs out-of-frame); "our-side" owns our failures.
-            const cause: FailureCause =
-              outcome.cause === "insufficient-face"
-                ? dominantCause(telemetryRef.current)
-                : "our-side";
-            dispatch({ type: "WINDOW_SKIPPED", cause });
-          } else {
-            dispatch({ type: "WINDOW_OUTCOME", outcome });
+          // Defensive mid-session no_anchor (US3 / T042): the user's anchor vanished after the
+          // create-time guard → route to the SAME calibrate-first surface the create path uses
+          // (reuse NO_ANCHOR). Guarded on a live op (FR-016). Other error kinds drop silently.
+          if (res.kind === "no_anchor" && liveNow()) {
+            dispatch({ type: "NO_ANCHOR" });
           }
-        })
-        .catch(() => {});
+          return;
+        }
+        const outcome = res.outcome;
+        if (outcome.outcome === "skipped") {
+          // The client refines the coarse server cause from on-device telemetry, exactly
+          // as calibration does (low-light vs out-of-frame); "our-side" owns our failures.
+          const cause: FailureCause =
+            outcome.cause === "insufficient-face"
+              ? dominantCause(telemetryRef.current)
+              : "our-side";
+          dispatch({ type: "WINDOW_SKIPPED", cause });
+        } else {
+          dispatch({ type: "WINDOW_OUTCOME", outcome });
+        }
+      })().catch(() => {});
     },
     [deps, dispatch],
   );
