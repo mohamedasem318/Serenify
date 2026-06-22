@@ -4,20 +4,27 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 008 — Stress Inference Service (implementation in progress)
+## Feature 008 — Stress Inference Service (feature-complete — merge pending)
 
 **Branch**: `008-stress-inference-service`
-**Status**: **implementation in progress — US1, US2 and US3 complete; US4 + Polish
-open; not yet reviewed or merged.** The live video stress-inference read path (the
-committed `serenify-video-lbptop-motion-rf-calibrated@2.0.0` + `predict_delta` + the
-shared 2958-d extraction) is wired end-to-end: a continuous-capture loop, a
-session-aware `apps/api` endpoint, per-window persistence under RLS, and the
-monitoring UI. **44 of 57 tasks done (T001–T045); 13 open (US4 T046–T050, Polish
-T051–T058).** Constitution Check at plan time: **PASS** with one logged, justified
-deviation (per-window HTTP request/response transport instead of WebSocket — the
-prediction is the synchronous response to an upload, not polling); no NON-NEGOTIABLE
-principle violated.
-**Date**: 2026-06-21 (implementation in progress on the branch above; planning closed 2026-06-19)
+**Status**: **feature-complete — merge pending (not yet merged).** The live video
+stress-inference read path (the committed
+`serenify-video-lbptop-motion-rf-calibrated@2.0.0` + `predict_delta` + the shared 2958-d
+extraction) is wired end-to-end: **continuous capture → server tail-extract of the last 60 s →
+per-user-calibrated RandomForest on LBP-TOP + motion → a smoothed three-band read (no probability
+exposed)**, with a session-aware `apps/api` lifecycle, per-window persistence under RLS, a
+calibrate-first gate, and the monitoring + dashboard UI. **All 57 tasks done (T001–T059; T018
+removed under continuous single-stream); US1–US4 + Phase 8 polish complete.** The Phase 8 smoke
+matrix (T054) ran on real Chrome / Firefox / iPhone Safari; the **two silent breaks it surfaced
+were fixed in-branch and server-side-verified before merge** (PATCH-CORS persistence +
+stale-token-401 — see "Pre-merge fixes (server-side-verified)" below). Tests green: **apps/api 90,
+apps/web 575, ml-video 55** (`tsc --noEmit` green). Security posture untouched (no service-role
+key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no probability on the wire,
+explicit non-wildcard CORS). Constitution Check at plan time: **PASS** with one logged, justified
+deviation (per-window HTTP request/response transport instead of WebSocket — the prediction is the
+synchronous response to an upload, not polling); no NON-NEGOTIABLE principle violated. Pending:
+push / PR / squash-merge; then `008-followups`.
+**Date**: 2026-06-22 (branch close-out; implementation spanned the 008 cycle; planning closed 2026-06-19)
 
 **Windowing in force**: **continuous single-stream upload + server tail-extract**.
 One continuous `MediaRecorder` (timeslice for incremental capture only); each stride
@@ -90,26 +97,62 @@ frame-concat) were rejected during planning (CHANGELOG 2026-06-19).
   no read-path code today. The privacy "watch hardest" item (D1) was found already
   structural at the DB engine (column-GRANT whitelist), robust as-is.
 
-**Still open**:
+**Shipped (US4 + Polish — completing the build)**:
 
-- **US4 (P3, T046–T050)** — retrospective trend (band→height; skipped points render as
-  gap/last-value, never a fabricated reading), idle dashboard recap + "Start your first
-  check-in" empty state, mini-trend/page-trend consistency, and the **FR-020 009-seam**
-  confirmation (the persisted `window_readings` shape supports the 009 sustained-tense
-  query; **no** questionnaire trigger/UI is built in 008). Needs the US4 mocks first.
-- **Polish (T051–T058)** — Playwright employee happy-path e2e (feature-005
-  detector-injection seam), webm/VFR codec fidelity hardening, responsive/a11y sweep
-  (≥360 px stack, reduced-motion, focus, ≥44 px targets), expanded `smoke-tests.md`
-  (real Safari/iOS), privacy-verification test (no raw video persists; no manager
-  policy; `label`/`stress_probability` unreadable by the owner), the model-owner
-  `metadata.json` carry-over note, the 90-day-retention follow-up note, and the full
-  Principle VII test sweep before review.
-- **Cleanup before close** — `npm run lint` is RED on **2 pre-existing errors in
-  `monitoring-session.tsx`** (192:39 reactive-value mutation; 462:5 setState-in-effect
-  cascade) from the camera-lifecycle fix; `tsc --noEmit` is RED on **6 errors in
-  `tests/unit/lib/monitoring-client.test.ts`** (tuple/undefined typing on the fetch-mock
-  assertions). Plus the deferred doc-reconciliation, a final supervised smoke, and the
-  branch close.
+- **US4 — retrospective trend, recap & 009 seam (P3, T046–T050).** The dashboard check-in card
+  recaps **today** and **expands in place** (no route change) to a day trend + per-session
+  breakdown from the **same** persisted rows (SC-008); skipped points render as a **gap** (never a
+  fabricated or carried-forward reading), a read-less session reads **"no clear read"** (never
+  calm), an n=1 session renders as a **single dot**, the axis **auto-fits in local time**, the
+  live session is excluded (retrospective-only), and the empty/calibrate-first states branch on
+  `has_anchor`. The **FR-020 009-seam** is confirmed (persisted `window_readings` carries
+  `band`+`captured_at`+`session_id` for 009's sustained-tense query; **no** questionnaire
+  trigger/UI built in 008).
+- **Polish (T051–T058).** Playwright employee happy-path e2e (feature-005 detector-injection
+  seam), webm/VFR codec fidelity hardening, responsive/a11y sweep (≥360 px stack, reduced-motion,
+  visible focus, ≥44 px targets), expanded `smoke-tests.md` (real Safari/iOS), the
+  privacy-verification test (no raw video persists; no manager policy; `label`/`stress_probability`
+  unreadable by the owner), the model-owner `metadata.json` carry-over note, the 90-day-retention
+  follow-up note, and the full Principle VII sweep — **all done**.
+
+**Pre-merge fixes (server-side-verified)** — the two **silent** breaks the Phase 8 smoke surfaced,
+fixed **in-branch before merge** (visible/cosmetic findings routed to `008-followups`):
+
+- **PATCH-CORS — lifecycle transitions now persist** (commits `7c1c1f4` fix + `241b296`
+  regression). The API CORS config did not allow `PATCH`, so the browser preflight for the
+  monitoring lifecycle PATCH (pause/resume/out_of_frame) failed and the status transition never
+  reached the DB — with no error surfaced. Verified server-side: the DB status now walks
+  `active → paused → active → out_of_frame → ended`, with the 409-on-ended terminal and the
+  one-active-session finalize intact.
+- **Stale-token 401 — long sessions keep scoring; no silent frozen band** (commits `c434942`,
+  `5b2d6ff`, `62d387f`, `40771fc`). A window upload on a cached, expired access token got a 401 the
+  client swallowed → the bloom silently froze. Fixed via **approach A**: a fresh token per window
+  upload through the `deps.getSession()` seam (the Supabase browser client auto-refreshes near
+  expiry), plus an **honest signed-out surface** (`SESSION_EXPIRED` → re-auth, never a frozen band)
+  on any un-refreshable session. RLS-as-user posture unchanged (still the user's own token, just
+  current). (DECISIONS 2026-06-22 — *approach A*.)
+
+**Still pending**:
+
+- **Push / PR / squash-merge**, then open `008-followups`.
+- **ST-08-2 (iOS live readings): PENDING a real HTTPS deploy.** Capture / upload / decode are
+  proven on a real iPhone (device gate T009); the free quick-tunnel can't carry the growing
+  continuous uploads, so the *live cross-session reading* cell is unconfirmed — a transport limit,
+  **not** a capture failure.
+- **Known followup L1 — live cross-expiry smoke retest.** The cross-expiry continuation is proven
+  by composition (SDK refresh + server accepts fresh token + per-upload fresh fetch); the silent
+  freeze is gone, but the live run against an aged session goes on the next smoke checklist.
+- **Known followup L2 (→ `008-followups`).** The pause/resume/end lifecycle PATCH calls still read
+  the cached token (a narrower instance of the stale-token class) — route them through the same
+  fresh-token helper. (DECISIONS 2026-06-22 — *Known followup L2*.)
+- **Perf (R-5): deferred.** The full per-session rolling decoded-frame buffer + startup pre-warm +
+  a dedicated inference host stay deferred; the surgical O(stride) tail-decode (`1ef0c0c`) meets the
+  10 s stride on a representative Azure VM. Build only if keep-up re-measured on the chosen deploy
+  target breaches the stride there.
+- **Lint (non-blocking).** `npm run lint` is RED on **2 pre-existing errors in
+  `monitoring-session.tsx`** (200:39 reactive-value mutation; 492:5 setState-in-effect cascade)
+  from the camera-lifecycle fix; `tsc --noEmit` is green (the prior 6 `monitoring-client.test`
+  errors were fixed in `e461385`). Routed to `008-followups`.
 
 **Decisions resolved (planning snapshot)** (DECISIONS 2026-06-19, as **amended** the
 same day after review; **D-2's segmented + B2-fallback windowing was later reversed to
