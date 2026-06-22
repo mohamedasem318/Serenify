@@ -3887,3 +3887,93 @@ mock) from re-deriving them and prevents a degenerate session ever reading as "a
 **Revisit if**: a server-side session reaper is later added (would make the stale-active read
 rule redundant — then the recap could filter strictly on `status='ended'`); or US4's mock
 chooses a different in-progress treatment than retrospective-only (re-open Decision 2/B4).
+
+---
+
+## 2026-06-22 — 008 merge gate: ships its own spec, not polish; the two silent breaks were spec violations fixed in-branch
+
+**Status**: Accepted.
+
+**Decision**: Feature 008 merges when it delivers **its own spec**, not when it is polished. The
+two silent breaks the Phase 8 smoke surfaced — **PATCH-CORS** (lifecycle transitions never
+persisted) and **stale-token-401** (long sessions silently stopped scoring) — are **spec
+violations**, not polish: persisting the lifecycle transition is a US2 deliverable, and "keeps
+scoring across a long session" is the US1 read path. Both were fixed **in-branch before merge** and
+verified server-side (CHANGELOG 2026-06-22; the *approach A* decision below). **Visible or cosmetic**
+smoke findings (copy, spacing, animation tweaks) are **not** merge blockers and go to
+`008-followups`.
+
+**Rationale**: The merge gate is "does it do what the spec says," kept distinct from "is it
+polished." A silent **wrong** result (a frozen band; an un-persisted status) breaks the spec's
+promise and stays in-branch; a visible-but-correct rough edge does not, and deferring it keeps the
+merge boundary clean. This is the same structural-not-disciplinary posture as the rest of 008.
+
+**Revisit if**: a later smoke finds another **silent-wrong** break — by this gate it is in-branch,
+not a followup.
+
+---
+
+## 2026-06-22 — stale-token fix = approach A (fresh token per upload via the browser client) + honest signed-out surface
+
+**Status**: Accepted.
+
+**Decision**: Fix the stale-token-401 by fetching a **fresh access token from the Supabase browser
+client per window upload** (the SDK auto-refreshes near expiry — confirmed in the installed SDK
+source), through the existing `deps.getSession()` seam at the upload call site; plus an **honest
+signed-out surface** (a new `SESSION_EXPIRED` signed-out op → re-authenticate) whenever a session is
+genuinely un-refreshable. Chosen over **approach B (reactive 401-retry: catch the 401, refresh,
+replay the upload)**.
+
+**Rationale**: The browser client was already cleanly available at the upload call site, so a
+per-upload fresh token removes the expiry case **entirely** (proactive) rather than recovering from
+it after the fact (reactive). It is less code in the fragile US2 async-timing area, and it fails
+honest — an un-refreshable session can no longer present as a frozen-but-live band. RLS posture is
+unchanged: still the **user's own** token, just **current**.
+
+**Revisit if**: a future change moves the upload off the browser client (e.g. a server-proxied
+upload), at which point the token can no longer be refreshed at the call site and a reactive retry
+(or a server-side refresh) becomes the right shape.
+
+---
+
+## 2026-06-22 — Known followup L1: live cross-expiry continuation proven by composition, not yet demonstrated live (next smoke)
+
+**Status**: Accepted (followup recorded).
+
+**Decision**: The happy path "a live session crosses a token expiry and keeps scoring" is
+established **by composition** — (1) the Supabase SDK refreshes the JWT near expiry, (2) the server
+accepts a fresh current token under RLS, and (3) the client now fetches a fresh token per upload
+(approach A) — **not** yet demonstrated live against an actually-aged session. The **silent freeze
+is definitively gone** (that was the in-branch fix). The **live cross-expiry continuation** goes on
+the next smoke checklist.
+
+**Rationale**: Composition proves the freeze can't recur (each leg is independently verified), but a
+live run against a >1 h aged session is the honest end-to-end confirmation. It is a smoke-retest
+item, not a code gap — nothing is known-broken.
+
+**Revisit at**: the next supervised smoke — run a session across a real token expiry and confirm
+scoring continues uninterrupted.
+
+---
+
+## 2026-06-22 — Known followup L2 (→ `008-followups`): lifecycle PATCH calls still read the cached token
+
+**Status**: Accepted (deferred to `008-followups`).
+
+**Decision**: A **narrower instance of the same bug class** as the fixed stale-token break remains
+and is deferred out of 008. The pause/resume/end lifecycle PATCH calls still read the **cached**
+token (kept current by uploads, but **not** refreshed while paused). A manual pause longer than the
+token lifetime (~1 h) followed by resume/end could send one stale token on that PATCH, which
+`patchStatus` swallows as `{ok:false}` → silent status non-persistence again (the same class as the
+two fixed breaks). **Followup**: route the lifecycle calls through the same fresh-token helper as the
+window upload; while doing it, confirm whether a manual pause **auto-ends** (which would shrink this
+to near-zero).
+
+**Rationale (why deferred, not in-008)**: it is far **narrower** than the fixed bug — it needs a
+manual pause held past the full token lifetime, where the fixed bug hit **every** long session — and
+the fix lands in the **fragile US2 async-timing area right at merge time**, exactly where late
+changes are riskiest. Approach A already removes the common, every-long-session case; this residual
+edge is a clean, scoped followup.
+
+**Revisit at**: `008-followups` — route pause/resume/end through the fresh-token helper; first
+confirm the auto-end-on-pause behaviour (it may make this moot).
