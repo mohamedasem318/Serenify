@@ -9,8 +9,11 @@ import { BAND_LINE, MINI_H, MINI_W, buildMini, type SessionSeq } from "@/lib/tre
  * A no-read session is a hollow muted marker on its own low lane — never on the calm line.
  *
  * This strip is a thin 1-D line, so the horizontal stretch of a `preserveAspectRatio="none"`
- * viewBox is fine here (it can't produce totem bars). The fixed-px discipline (DC-001) is the
- * EXPANDED lane plot's rule, not the mini's.
+ * viewBox is fine for the LINES (a stretched line is still a line). It is NOT fine for a
+ * round marker: a `<circle>` under non-uniform scale becomes a squished ellipse and a lone
+ * hollow ring reads as a stray "0" — so the no-read marker is a short muted dash on the low
+ * lane (a horizontal segment, distortion-proof), not a circle. The hollow-circle treatment
+ * belongs to the EXPANDED lane plot, which is fixed-px (DC-001) and so doesn't distort.
  */
 export function TodayMiniTrend({ seqs }: { seqs: SessionSeq[] }) {
   const peaks = buildMini(seqs);
@@ -20,16 +23,18 @@ export function TodayMiniTrend({ seqs }: { seqs: SessionSeq[] }) {
   let prev: { x: number; y: number } | null = null;
   for (const p of peaks) {
     if (p.noRead) {
+      // a short, muted, faded dash on the low no-read lane — never a (distorting) ring
+      const half = segW * 0.4;
       els.push(
-        <circle
+        <polyline
           key={`n-${p.sessionId}`}
           data-testid={`mini-noread-${p.sessionId}`}
-          cx={p.cx}
-          cy={p.y}
-          r={3}
+          points={`${p.cx - half},${p.y} ${p.cx + half},${p.y}`}
           fill="none"
           stroke="var(--color-muted)"
-          strokeWidth={1}
+          strokeWidth={2.4}
+          strokeOpacity={0.5}
+          strokeLinecap="round"
           vectorEffect="non-scaling-stroke"
         />,
       );

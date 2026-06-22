@@ -18,6 +18,9 @@ const seq = (sessionId: string, tenor: SessionSeq["tenor"]): SessionSeq => ({
 
 const DAY: SessionSeq[] = [seq("m", "at_ease"), seq("a", "tense"), seq("late", "no_read")];
 
+// the y of a polyline marker's first point ("x1,y x2,y" → y)
+const markerY = (el: Element) => Number(el.getAttribute("points")?.trim().split(/\s+/)[0]?.split(",")[1]);
+
 describe("TodayMiniTrend — connected step-line, not floating dots (SC-003)", () => {
   it("draws at least one connector segment between session peaks", () => {
     render(<TodayMiniTrend seqs={DAY} />);
@@ -32,12 +35,28 @@ describe("TodayMiniTrend — connected step-line, not floating dots (SC-003)", (
 });
 
 describe("TodayMiniTrend — no-read honesty (SC-010: never the calm line)", () => {
-  it("a no-read session is a hollow marker on the low lane, never on the calm line", () => {
+  it("a no-read session is a muted dash on its own low lane, never on the calm line", () => {
     render(<TodayMiniTrend seqs={DAY} />);
     const marker = screen.getByTestId("mini-noread-late");
-    expect(marker.getAttribute("fill")).toBe("none"); // hollow
-    expect(Number(marker.getAttribute("cy"))).toBe(MINI_Y.no_read); // its own low lane
-    expect(Number(marker.getAttribute("cy"))).not.toBe(MINI_Y.at_ease);
-    expect(screen.queryByTestId("mini-seg-late")).toBeNull(); // not on the calm line
+    expect(marker.tagName.toLowerCase()).toBe("polyline"); // a dash, not a (distorting) ring
+    expect(marker.getAttribute("stroke")).toBe("var(--color-muted)");
+    expect(markerY(marker)).toBe(MINI_Y.no_read); // its own low lane
+    expect(markerY(marker)).not.toBe(MINI_Y.at_ease);
+    expect(screen.queryByTestId("mini-seg-late")).toBeNull(); // not a confident segment
+  });
+});
+
+describe("TodayMiniTrend — single no-read session renders cleanly (regression)", () => {
+  it("draws one muted dash on the low lane, with NO ring/'0' and no text", () => {
+    const { container } = render(
+      <TodayMiniTrend seqs={[{ sessionId: "late", tenor: "no_read", bands: [null] }]} />,
+    );
+    // a lone hollow ring reads as a stray "0" and distorts under the stretched viewBox — so none:
+    expect(container.querySelector("circle")).toBeNull();
+    expect(container.querySelector("text")).toBeNull();
+    const marker = screen.getByTestId("mini-noread-late");
+    expect(marker.tagName.toLowerCase()).toBe("polyline");
+    expect(markerY(marker)).toBe(MINI_Y.no_read);
+    expect(screen.queryByTestId("mini-connector")).toBeNull(); // a single session connects to nothing
   });
 });
