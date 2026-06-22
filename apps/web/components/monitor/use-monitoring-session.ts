@@ -54,10 +54,10 @@ const LIVE_OPS: ReadonlySet<MonitorOp> = new Set(["warming-up", "active"]);
  * Which camera-access failure the blocked surface explains — mapped from the
  * getUserMedia rejection's `err.name` (mirrors `use-anchor-recorder.cameraErrorKind`,
  * minus the `camera-` prefix). No generic "blocked" catch-all: each cause gets honest
- * copy (FR-022). A generic / non-getUserMedia block (secure-context, session-create
- * failure) is `"blocked"`.
+ * copy (FR-022). `"insecure"` is the non-secure-origin case (needs https), surfaced with
+ * its own copy; any other non-getUserMedia block (session-create failure) stays `"blocked"`.
  */
-export type CameraErrorKind = "blocked" | "busy" | "no-device";
+export type CameraErrorKind = "blocked" | "busy" | "no-device" | "insecure";
 
 export interface MonitorState {
   op: MonitorOp;

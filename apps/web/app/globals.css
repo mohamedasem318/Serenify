@@ -163,11 +163,17 @@
     font-size: var(--text-base);
   }
 
-  /* Respect prefers-reduced-motion per Constitution Principle VI. */
+  /* Respect prefers-reduced-motion per Constitution Principle VI. Capping the iteration
+     count is load-bearing: shortening only the duration leaves an INFINITE animation
+     (e.g. the recording pill's animate-pulse) looping every 0.01ms — i.e. flickering
+     *faster*. Pinning iteration-count to 1 makes such loops run once and stop, so the
+     indicator goes static rather than blinking. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
       animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
       transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
     }
   }
 }

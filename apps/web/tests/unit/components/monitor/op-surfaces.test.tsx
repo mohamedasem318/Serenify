@@ -84,6 +84,26 @@ describe("OpSurfaces — blocked (foggy attention)", () => {
     );
     expect(screen.getByText(/no camera found/i)).toBeInTheDocument();
   });
+
+  it("sticky-denied camera: the exact 008-followups guidance copy", () => {
+    render(
+      <OpSurfaces state={{ op: "blocked", band: null, skipCause: null, cameraError: "blocked" }} onAllow={noop} onRetryBlocked={noop} />,
+    );
+    expect(screen.getByText("Camera access is blocked")).toBeInTheDocument();
+    expect(
+      screen.getByText("Turn it back on in your browser's site settings, then try again."),
+    ).toBeInTheDocument();
+  });
+
+  it("insecure origin: its own surface, the exact https copy (not a generic block)", () => {
+    render(
+      <OpSurfaces state={{ op: "blocked", band: null, skipCause: null, cameraError: "insecure" }} onAllow={noop} onRetryBlocked={noop} />,
+    );
+    expect(
+      screen.getByText("This page needs a secure (https) connection to use your camera."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/camera access is blocked/i)).toBeNull();
+  });
 });
 
 describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => {

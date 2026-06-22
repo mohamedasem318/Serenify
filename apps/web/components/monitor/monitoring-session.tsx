@@ -116,6 +116,21 @@ function defaultDeps(): MonitoringDeps {
   };
 }
 
+/**
+ * Whether a focus event is a KEYBOARD focus (so the self-view peeks for keyboard users) vs a
+ * mouse-click focus — which must NOT keep the preview pinned open once the pointer leaves (the
+ * old `group-focus-within` did exactly that, so an un-pinned preview wouldn't auto-hide on
+ * hover-out). Guarded for non-browser test envs that don't implement `:focus-visible`.
+ */
+function isKeyboardFocus(target: EventTarget | null): boolean {
+  if (!(target instanceof Element) || typeof target.matches !== "function") return false;
+  try {
+    return target.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
 export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<MonitoringDeps> }) {
   const depsRef = useRef<MonitoringDeps>({ ...defaultDeps(), ...depsOverride });
   const deps = depsRef.current;
@@ -131,6 +146,11 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [pinned, setPinned] = useState(false);
+  // Self-view peek (008-followups): the preview reveals on pointer-hover OR keyboard focus of
+  // the pill and AUTO-HIDES when the pointer leaves / focus blurs — so an un-pinned preview
+  // no longer sticks open after a mouse click (which leaves the pill focused).
+  const [selfViewHover, setSelfViewHover] = useState(false);
+  const [selfViewKbFocus, setSelfViewKbFocus] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   // US4 (T047): the live session id surfaced as STATE (alongside sessionIdRef) so the
   // monitor-page this-session trend re-renders once a session exists. Additive only —
@@ -155,7 +175,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const presenceRef = useRef<PresenceMonitorHandle | null>(null);
   const opRef = useRef(op);
   const endingRef = useRef(false);
-  const sessionStartRef = useRef<number | null>(null);
+  // Elapsed clock accounting: `elapsedAccumRef` banks counted (non-paused) ms across pause
+  // breaks; `runStartRef` marks the current counting run's origin (null while not counting).
+  const elapsedAccumRef = useRef(0);
+  const runStartRef = useRef<number | null>(null);
   useEffect(() => {
     opRef.current = op;
   }, [op]);
@@ -207,6 +230,20 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     streamRef.current = null;
     setStream(null);
   }, []);
+
+  // L2 (008-followups): a CURRENT token for a lifecycle call (pause / resume / end), mirroring
+  // the per-upload refresh in handleWindow. The cached `tokenRef` is only kept fresh by uploads,
+  // so a session paused longer than the token lifetime (~1 h, no uploads → no refresh) would
+  // otherwise carry a STALE token on resume/end — patchStatus/endSession swallow the {ok:false}
+  // and the status silently fails to persist (the 008 bug class, narrower trigger). The SDK
+  // auto-refreshes near expiry, so this returns a valid token; it stays the USER's own token
+  // (RLS-as-the-user; no service credential) — just current. Also keeps tokenRef warm.
+  const freshToken = useCallback(async (): Promise<string | null> => {
+    const session = await deps.getSession();
+    const token = session?.accessToken ?? null;
+    if (token) tokenRef.current = token;
+    return token;
+  }, [deps]);
 
   // One reading out per (gated) stride. Fire-and-forget: never block the recorder; a
   // transient transport error just skips this reading and the loop continues (FR-016).
@@ -290,13 +327,18 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       dispatch({ type: "END" });
 
       const sessionId = sessionIdRef.current;
-      const token = tokenRef.current;
-      if (sessionId && token) {
-        await deps.endSession(sessionId, reason, token); // 409 → ok (re-end race resolved silently)
+      if (sessionId) {
+        // L2: end with a FRESH token — a long-paused session's cached token may be stale.
+        const token = await freshToken();
+        // End routes STRAIGHT to the dashboard recap (008-followups): fire the end POST
+        // (keepalive in the client, so it still lands as the page unloads) and navigate at
+        // once, instead of blocking on the round-trip and leaving an empty "Camera off"
+        // stage. The backend's 409-as-ok keeps the re-end race silent.
+        if (token) void deps.endSession(sessionId, reason, token);
       }
       deps.navigate("/app");
     },
-    [deps, dispatch, stopStream],
+    [deps, dispatch, stopStream, freshToken],
   );
 
   // Open the camera, start the continuous recorder, and (re)arm the presence monitor.
@@ -369,7 +411,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     stopStream();
 
     if (!deps.isSecureContext()) {
-      dispatch({ type: "CAMERA_BLOCKED" }); // webcam needs HTTPS / localhost
+      dispatch({ type: "CAMERA_ERROR", kind: "insecure" }); // webcam needs HTTPS / localhost
       return;
     }
 
@@ -430,29 +472,42 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     setStreaming(false);
     dispatch({ type: "PAUSE" });
     const sessionId = sessionIdRef.current;
-    const token = tokenRef.current;
-    if (sessionId && token) void deps.patchStatus(sessionId, "paused", token);
-  }, [deps, dispatch, stopStream]);
+    if (!sessionId) return;
+    // Pause the UI instantly (above); persist the status with a FRESH token (L2) without
+    // blocking the surface — the cached token may already be stale at pause time.
+    void (async () => {
+      const token = await freshToken();
+      if (token) await deps.patchStatus(sessionId, "paused", token);
+    })();
+  }, [deps, dispatch, stopStream, freshToken]);
 
   // Manual Resume: re-acquire the camera (re-entering the blocked surface if access was
   // revoked or the context is no longer secure), reusing the existing session → PATCH
   // active. A fresh recording warms up again (T036: no server-side buffer to restore).
   const handleResume = useCallback(async () => {
     if (!deps.isSecureContext()) {
-      dispatch({ type: "CAMERA_BLOCKED" });
+      dispatch({ type: "CAMERA_ERROR", kind: "insecure" });
       return;
     }
     const sessionId = sessionIdRef.current;
-    const token = tokenRef.current;
-    if (!sessionId || !token) {
+    if (!sessionId) {
       dispatch({ type: "CAMERA_BLOCKED" });
+      return;
+    }
+    // L2: resume with a FRESH token. After a long pause (no uploads) the cached token may be
+    // stale; fetch the current one BEFORE re-acquiring the camera. If the browser session is
+    // gone (refresh failed), surface the honest signed-out state rather than a misleading
+    // camera-blocked — the user can't score as themselves without a valid token.
+    const token = await freshToken();
+    if (!token) {
+      dispatch({ type: "SESSION_EXPIRED" });
       return;
     }
     const opened = await openCameraAndRecord();
     if (!opened) return; // getUserMedia rejection already routed to blocked
     dispatch({ type: "RESUME" }); // → warming-up
     void deps.patchStatus(sessionId, "active", token);
-  }, [deps, dispatch, openCameraAndRecord]);
+  }, [deps, dispatch, openCameraAndRecord, freshToken]);
 
   const handleEnd = useCallback(() => {
     void endAndLeave("user");
@@ -465,18 +520,31 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     [],
   );
 
-  // Session elapsed clock. Starts once capture first begins and keeps a STABLE origin
-  // across op changes (warming-up → active → out-of-frame → paused), so the timer never
-  // resets mid-session. It stops only once the session is no longer live (ended / blocked).
+  // Session elapsed clock. `sessionLive` decides whether the timer is shown at all;
+  // `timerRunning` decides whether it COUNTS — a manual Pause excludes its duration from the
+  // elapsed time (008-followups): on pause we bank the current run and stop ticking, so the
+  // display freezes; Resume continues from the banked total. out-of-frame still counts (the
+  // session is monitoring presence, not on a manual break). setElapsed is only called inside
+  // the interval (never synchronously in the effect body), so the timer adds no new lint.
   const sessionLive =
     op === "warming-up" || op === "active" || op === "out-of-frame" || op === "paused";
+  const timerRunning = op === "warming-up" || op === "active" || op === "out-of-frame";
   useEffect(() => {
-    if (!sessionLive) return;
-    if (sessionStartRef.current === null) sessionStartRef.current = performance.now();
-    const start = sessionStartRef.current;
-    const id = setInterval(() => setElapsed(Math.floor((performance.now() - start) / 1000)), 1000);
+    if (!timerRunning) {
+      // Paused / not-live: bank the elapsed run so Resume continues from here, then idle.
+      if (runStartRef.current !== null) {
+        elapsedAccumRef.current += performance.now() - runStartRef.current;
+        runStartRef.current = null;
+      }
+      return;
+    }
+    if (runStartRef.current === null) runStartRef.current = performance.now();
+    const id = setInterval(() => {
+      const running = runStartRef.current === null ? 0 : performance.now() - runStartRef.current;
+      setElapsed(Math.floor((elapsedAccumRef.current + running) / 1000));
+    }, 1000);
     return () => clearInterval(id);
-  }, [sessionLive]);
+  }, [timerRunning]);
 
   // Release the camera + recorder + monitor whenever we leave a capturing state. NOTE:
   // out-of-frame KEEPS the camera on (self-view + return detection for auto-resume), so it
@@ -520,16 +588,31 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         </Link>
         {sessionLive && (
           <span className="ml-auto text-sm tabular-nums text-muted">
-            Session · <b className="font-semibold text-ink">{mm}:{ss}</b>
+            Session ·{" "}
+            <b data-testid="session-timer" className="font-semibold text-ink">
+              {mm}:{ss}
+            </b>
           </span>
         )}
       </div>
 
-      <div className="relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-border bg-surface p-6 shadow-soft sm:min-h-[480px] sm:p-10">
-        <div className="group absolute right-4 top-4 z-10">
+      {/* Top padding (pt-16) reserves clearance for the absolute camera pill so the centered
+          bloom never rides up under it on a tall live stage at 360 px (008-followups). */}
+      <div className="relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden rounded-3xl border border-border bg-surface px-6 pb-6 pt-16 shadow-soft sm:min-h-[480px] sm:px-10 sm:pb-10">
+        <div
+          className="absolute right-4 top-4 z-10"
+          onPointerEnter={() => setSelfViewHover(true)}
+          onPointerLeave={() => setSelfViewHover(false)}
+          onFocus={(e) => setSelfViewKbFocus(isKeyboardFocus(e.target))}
+          onBlur={() => setSelfViewKbFocus(false)}
+        >
           <CameraPill status={pillStatus} pinned={pinned} onTogglePin={() => setPinned((p) => !p)} />
           {streaming && (
-            <Viewfinder pinned={pinned} outOfFrame={op === "out-of-frame"}>
+            <Viewfinder
+              pinned={pinned}
+              peek={selfViewHover || selfViewKbFocus}
+              outOfFrame={op === "out-of-frame"}
+            >
               <video
                 ref={attachVideo}
                 autoPlay

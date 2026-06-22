@@ -21,7 +21,10 @@ import { cn } from "@/lib/utils";
 export type CameraPillStatus = "recording" | "out-of-frame" | "paused" | "off";
 
 const DOT_CLASS: Record<CameraPillStatus, string> = {
-  recording: "animate-pulse bg-meadow",
+  // The pulse is suppressed under prefers-reduced-motion: the global rule caps the
+  // iteration count AND `motion-reduce:animate-none` removes it locally, so the dot is
+  // static (not blinking) when reduced motion is requested.
+  recording: "animate-pulse motion-reduce:animate-none bg-meadow",
   "out-of-frame": "bg-foggy",
   paused: "bg-muted",
   off: "bg-muted",

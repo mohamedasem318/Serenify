@@ -72,7 +72,7 @@ baseline is set"**; **Back to home** lands on `/app` with **no banner**.
 | 1.2 | Firefox — desktop | Pass | MA 2026-06-01 |
 | 1.3 | Safari — desktop (macOS; emits MP4, backend accepts) | N-A | No macOS hardware available |
 | 1.4 | Chrome — Android (front camera) | N-A | Deferred to post-deploy — camera API requires HTTPS, not available over LAN |
-| 1.5 | Safari — iOS (front camera; emits MP4) | N-A | Deferred to post-deploy — camera API requires HTTPS, not available over LAN |
+| 1.5 | Safari — iOS (front camera; emits MP4) | Pass | iOS-verified in **008-followups smoke Run 4 (2026-06-22), real iPhone Safari over an HTTPS (cloudflared) tunnel** — full calibration happy path end-to-end: grant → ~60 s record → upload → `POST /anchor → 200` → anchor persisted → returns to `/app` with no banner. (Was: N-A, deferred-to-post-deploy because the camera API needs HTTPS, unavailable over LAN — Run 4's HTTPS tunnel retired that exact blocker.) Codec note: this iPhone's Safari emitted **WebM/VP9**, not MP4; the finalized one-shot clip decoded cleanly. (The iOS *monitoring* un-finalized-webm decode gap is a separate, still-open bug — see specs/008 Run 4 + BACKLOG.) |
 | 1.6 | Firefox — Android | N-A | Deferred to post-deploy — camera API requires HTTPS, not available over LAN |
 
 ## 2. The three real camera-access conditions
