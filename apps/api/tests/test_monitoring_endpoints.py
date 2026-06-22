@@ -656,3 +656,42 @@ def test_create_recovers_from_concurrent_active_insert_conflict(client, monkeypa
     resp = client.post("/monitoring/sessions", headers=_auth(make_token(sub=SUB)))
     assert resp.status_code == 201, resp.text
     assert resp.json()["session_id"].startswith("sess-")
+
+
+# ── CORS: the PATCH lifecycle route must survive the browser preflight ──────────
+#
+# web→API is always cross-origin, so every PATCH (pause / resume / out-of-frame) is
+# preceded by an OPTIONS preflight. If PATCH is not in the CORS allow_methods, Starlette
+# answers the preflight 400 ("Disallowed CORS method") and the real PATCH never leaves the
+# browser — the lifecycle transition silently never persists. This guards that regression.
+
+# An allowed origin (matches conftest's ALLOWED_ORIGINS=http://127.0.0.1:3000).
+_ALLOWED_ORIGIN = "http://127.0.0.1:3000"
+
+
+def _preflight(client, method):
+    return client.options(
+        "/monitoring/sessions/sess-1",
+        headers={
+            "Origin": _ALLOWED_ORIGIN,
+            "Access-Control-Request-Method": method,
+        },
+    )
+
+
+def test_cors_preflight_allows_patch(client):
+    # The PATCH route (pause/resume/out-of-frame) must pass preflight, or the transition
+    # never reaches the server (the CORS-blocked lifecycle bug).
+    resp = _preflight(client, "PATCH")
+    assert resp.status_code == 200, resp.text
+    allowed = resp.headers.get("access-control-allow-methods", "")
+    assert "PATCH" in allowed, f"PATCH missing from allow-methods: {allowed!r}"
+
+
+def test_cors_preflight_allows_the_other_methods_the_web_uses(client):
+    # The frontend monitoring client also issues POST (create / window / end); confirm those
+    # were not regressed while adding PATCH. (GET is used by the RLS trend reads.)
+    for method in ("POST", "GET"):
+        resp = _preflight(client, method)
+        assert resp.status_code == 200, f"{method} preflight: {resp.text}"
+        assert method in resp.headers.get("access-control-allow-methods", "")
