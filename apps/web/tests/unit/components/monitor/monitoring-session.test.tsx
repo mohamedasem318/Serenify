@@ -445,3 +445,97 @@ describe("MonitoringSession — US2 presence + lifecycle", () => {
     expect(h.navigate).toHaveBeenCalledTimes(1);
   });
 });
+
+/**
+ * Fix 2 — token freshness + honest auth failure (no silent frozen band).
+ *
+ * The smoke break: the access token was captured ONCE at session start and reused for every
+ * window upload, so a session that outlived its 1 h token started 401-ing on every upload
+ * while the band stayed frozen and the UI looked healthy. The fix (approach A) takes a FRESH
+ * token from the Supabase browser client per upload (the SDK auto-refreshes near expiry), and
+ * — non-negotiable — a residual 401 / un-refreshable session is surfaced honestly, never
+ * silently. These tests force those conditions through the injected seam.
+ */
+describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", () => {
+  it("each window upload carries a FRESH token, not the one captured at session create (A)", async () => {
+    // getSession rotates the token (the SDK refreshes near expiry). The upload must use the
+    // CURRENT token; reusing the create-time token is exactly what 401'd after an hour.
+    let n = 0;
+    const { deps, fireStride } = makeDeps([
+      { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } },
+    ]);
+    deps.getSession = vi.fn(async () => ({ accessToken: `tok-${++n}` }));
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/getting a read on things/i)).toBeInTheDocument();
+
+    await act(async () => {
+      fireStride();
+    });
+
+    const calls = (deps.submitWindow as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls.length).toBeGreaterThan(0);
+    // create consumed tok-1; the upload must use a LATER, freshly-fetched token (not tok-1).
+    const tokenUsed = calls[0]?.[2];
+    expect(tokenUsed).toBeDefined();
+    expect(tokenUsed).not.toBe("tok-1");
+    expect(deps.getSession).toHaveBeenCalledTimes(2); // once at create, once per upload
+  });
+
+  it("a 401 on a window upload surfaces an honest re-auth state — never a silent frozen band", async () => {
+    const { deps, fireStride } = makeDeps([
+      { ok: true, outcome: { outcome: "reading", band: "at_ease", capturedAt: "t" } },
+      { ok: false, kind: "unauthorized" }, // the fresh token was rejected → genuine auth loss
+    ]);
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    await act(async () => {
+      fireStride(); // first reading → a healthy-looking band
+    });
+    expect(await screen.findByText(/at ease right now/i)).toBeInTheDocument();
+
+    await act(async () => {
+      fireStride(); // the 401 — must NOT be swallowed into a frozen band
+    });
+
+    expect(await screen.findByText(/your sign-in expired/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /sign in again/i })).toHaveAttribute("href", "/login");
+    // the healthy-looking band is gone — the illusion is broken, the state is truthful.
+    expect(screen.queryByText(/at ease right now/i)).not.toBeInTheDocument();
+  });
+
+  it("when the browser session can't be refreshed (getSession → null), scoring stops honestly, not silently", async () => {
+    const { deps, fireStride } = makeDeps([
+      { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } },
+    ]);
+    // create succeeds (token present), then the browser session is gone (refresh failed).
+    let first = true;
+    deps.getSession = vi.fn(async () => {
+      if (first) {
+        first = false;
+        return { accessToken: "tok" };
+      }
+      return null;
+    });
+    render(<MonitoringSession deps={deps} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/getting a read on things/i)).toBeInTheDocument();
+
+    await act(async () => {
+      fireStride(); // no fresh token → must surface the honest state, not skip silently
+    });
+
+    expect(await screen.findByText(/your sign-in expired/i)).toBeInTheDocument();
+    // without a valid token we never upload a window (no stale-token POST is attempted).
+    expect(deps.submitWindow).not.toHaveBeenCalled();
+  });
+});
