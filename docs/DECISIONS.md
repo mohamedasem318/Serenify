@@ -3977,3 +3977,61 @@ edge is a clean, scoped followup.
 
 **Revisit at**: `008-followups` — route pause/resume/end through the fresh-token helper; first
 confirm the auto-end-on-pause behaviour (it may make this moot).
+
+## 2026-06-22 — 009 today-card trend redesign: fork resolutions (R-2 headline, R-3 amber, radius, SVG)
+
+**Status**: Accepted.
+
+These resolve the two forks + two governance notes raised in
+`specs/009-today-card-trend-redesign/plan.md` (Complexity Tracking) and
+`research.md` (R-2, R-3). Docs/governance only; the code edits land during
+`/speckit-implement`.
+
+**Decision 1 — Honest three-level headline (R-2).** 009 FR-002 / SC-010 supersede
+feature 008's `FR-022` "any stress reads as 'tense' at a glance" copy rule. The
+today-card headline names the real peak in **three** levels: **at ease** (calm
+wording, no amber keyword), **a little tense** (amber keyword), **tense** (amber
+keyword). The "tense" wording appears **only** when the tense band is actually
+reached; an a-little-tense-only day reads "a little tense", not "tense". Headline
+keyword colour: `--amber-head` for any tension peak (a little tense or tense);
+calm/meadow treatment for at-ease. **Scope (Step-1 grep outcome):** `deriveHeadline`
+is private and feeds **only** the today card — `deriveHeadline` → (only)
+`deriveRecap` → (only) `getTodayRecap` → (only) `todays-checkin-card.tsx` →
+`today-view.tsx`. It is **not** shared with the live monitor (separate
+`SessionTrend`/`getSessionTrend` subtitle), notifications, or any other surface, so
+the fix applies **directly to `deriveHeadline`** with no scoping needed and no risk
+to other surfaces. **Presentation copy only** — no read, RLS, SELECT-whitelist, or
+probability change.
+
+**Decision 2 — Amber palette tokens (R-3).** The light amber **text** token value is
+**`#8A580F`** (approved-mock choice; measured ~4.78:1 on the amber tint, 5.52:1 on the
+card surface — passes WCAG AA), **superseding** the constitution's previously-documented
+`#7E5310`. Register the new amber sub-tokens (light / dark): `--color-amber-text`
+`#8A580F` / `#E6C386` (chip text + axis tension labels); `--amber-tint` `#F4E3C6` /
+`#3B2F19` (tension chip background); `--amber-soft-line` `#D49A4A` / `#E8BC7A`
+("a little tense" graph line — graphic, not text); `--amber-head` `#BC7A2A` / `#E4AE5C`
+(headline keyword, weight 700, large text). Bright graphic amber (`--color-amber`,
+`#C98637` / `#E4AE5C`) stays on graph lines/markers only, **never** small text (2.77:1
+fails). Codified by constitution Amendment 5 (MINOR).
+
+**Decision 3 — Card radius 20px accepted.** The today card (and its plot region) use a
+20px (`rounded-2xl`) radius, matching the approved mock and the already-shipped cards on
+`main` (e.g. `session-trend.tsx`). Pre-existing drift from the 007 visual redesign;
+codified by constitution Amendment 6 (PATCH) — range widened 8–16px → 8–20px.
+
+**Decision 4 — Inline SVG, not Recharts, for the trend.** The fixed-px lane plot (DC-001:
+1 SVG unit = 1 screen pixel) is hand-authored inline SVG. Recharts' `ResponsiveContainer`
+stretches to `width:100%` — structurally the totem mechanism DC-001 forbids — so the
+stack's charts library is unsuitable for this bespoke affective micro-visualization.
+Precedent exists on `main` (`today-view.tsx`, `session-trend.tsx`). The stack table is
+unchanged; Recharts remains the default for ordinary data charts.
+
+**Rationale**: (1) the feature's central promise is an honest header — emitting "tense"
+for a non-tense day would reintroduce the dishonesty the redesign removes; (2) bright
+amber fails small-text AA, so a dedicated AA-safe text token is mandatory, and `#8A580F`
+is the warmest value that still clears AA on the tint; (3)/(4) match what is already
+shipped and the non-negotiable anti-totem requirement.
+
+**Revisit if**: a future surface needs the today headline copy (it would then be shared
+and require re-scoping); or a visual pass deepens the amber line colours (graphic-only,
+no AA-text penalty — spec A-005).
