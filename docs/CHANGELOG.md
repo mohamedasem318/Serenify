@@ -1961,3 +1961,48 @@ decoded*.
 
 No Cloud-dashboard parity items — all changes are in-repo (`packages/ml-video`, Dockerfile,
 `apps/api/README.md`).
+
+## 2026-06-22 — feat(008-stress-inference-service) — feature complete; two pre-merge silent breaks fixed (PATCH-CORS + stale-token-401)
+
+Feature 008 reaches **feature-complete, merge-pending**. What ships is the live video
+stress-inference read path: **continuous single-stream capture → server tail-extract of the last
+60 s → per-user-calibrated RandomForest on LBP-TOP + motion → a smoothed three-band read
+(At ease / A little tense / Tense), with no probability ever on the wire** — plus the session
+lifecycle (pause/resume/out-of-frame/end, one-active-session-per-user, auto-pause after 90 s
+no-face / auto-end after 5 min absence), the calibrate-first gate (no anchor → a foggy
+calibrate-first surface, never a fabricated reading), the retrospective **today** recap that
+expands in place from the **same** persisted rows (SC-008), and the FR-020 009 seam (the persisted
+`window_readings` shape supports 009's sustained-tense query; **no** questionnaire built in 008).
+Privacy posture: **no service-role key** anywhere in `apps/api` (all DB I/O is RLS-as-the-user via
+the forwarded JWT + the publishable anon key), the SELECT column whitelist holds `label` +
+`stress_probability` server-only, **no manager policy** on either table, and the uploaded clip +
+temp file are deleted in a `finally`. US1–US4 + Phase 8 polish complete; the Phase 8 smoke matrix
+(T054) ran on real Chrome / Firefox / iPhone Safari. **No spec FR/SC, plan-decision, contract, or
+model-artifact change** in this entry — it records completion + the two pre-merge fixes; full
+decisions in `docs/DECISIONS.md` 2026-06-22.
+
+The smoke surfaced two **silent** breaks (a wrong result with no error shown to the user); both
+were fixed **in-branch before merge** and **verified server-side**. Visible/cosmetic smoke findings
+are routed to `008-followups`.
+
+- **PATCH-CORS — lifecycle transitions silently never persisted** (commit `7c1c1f4` fix +
+  `241b296` preflight regression test). The API CORS config did not allow `PATCH`, so the browser
+  preflight for the monitoring lifecycle PATCH (pause/resume/out_of_frame) failed and the status
+  transition never reached the DB — with no surfaced error. Fixed by allowing `PATCH` in the CORS
+  method list (`apps/api/app/main.py`); **server-side-verified** by walking the DB status
+  `active → paused → active → out_of_frame → ended`, with the `409`-on-ended terminal and the
+  one-active-session finalize intact.
+- **Stale-token 401 — long sessions silently stopped scoring** (commits `c434942`, `5b2d6ff`,
+  `62d387f`, `40771fc`). A window upload that reused a cached, expired access token received a
+  `401` the client swallowed, so the ambient bloom silently froze on its last band for the rest of
+  the session. Fixed via **approach A**: the client fetches a **fresh token per window upload**
+  through the `deps.getSession()` seam (the Supabase browser client auto-refreshes the JWT near
+  expiry — confirmed in the installed SDK source), removing the expiry case entirely; and any
+  **un-refreshable** session now drops to an **honest signed-out surface** (re-authenticate — never
+  a frozen band) carried by a new `SESSION_EXPIRED` signed-out op. RLS-as-the-user posture unchanged
+  — still the user's own token, just current.
+
+Tests green at close: **apps/api 90, apps/web 575 (Vitest), packages/ml-video 55**. Security posture
+untouched (no service-role key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no
+probability on the wire, explicit non-wildcard CORS). No Cloud-dashboard parity items — all changes
+are in-repo (`apps/api` CORS config, `apps/web` monitoring client + session surfaces, tests).
