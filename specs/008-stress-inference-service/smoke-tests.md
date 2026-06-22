@@ -281,6 +281,7 @@ Run the web app over a secure context (`localhost`, or HTTPS via a tunnel for th
 |---|---|---|---|---|
 | _pending_ | _e.g. iPhone 13 / Safari 17_ | ST-08-2, ST-08-10, ST-08-11 | _pending_ | run before production sign-off |
 | 2026-06-21 | Desktop · Chrome 149 · Win 11 | ST-08-1, ST-08-4 | PASS (w/ caveats) | operator Mohamed; account `smoke4@smoketest.com` (real anchor). See **Run 1** below. |
+| 2026-06-22 | Desktop Chrome (localhost) + iPhone Safari (cloudflared) | A1–A5 (desktop `[1]`/`[2]`); ST-08-2 (iOS) | Desktop ✅ PASS · iOS ❌ FAIL | `[1]`+`[2]`+PATCH-CORS verified on desktop; iOS dies on a server-side **iOS-webm decode** failure (`our-side`), **not** a kickout. See **Run 4** below. |
 
 ### Run 1 — 2026-06-21, desktop Chrome 149 / Windows 11 (operator: Mohamed, agent-facilitated)
 
@@ -607,6 +608,32 @@ laptop **force-restarted under load**; environment rebuilt (Docker → `supabase
   `http://` origin. Same ineffective "Try again" as the ST-08-1 finding applies. Functionally correct;
   copy could distinguish "needs HTTPS" from "permission denied."
 
+### Run 4 — 2026-06-22, desktop Chrome (localhost) + iOS Safari (cloudflared), agent-supervised (operators: Mohamed on desktop; Enjy + Nada Mohamed on iPhone)
+
+Purpose: validate the **008-followups** deliverables — **`[1]`** stale-token lifecycle (a *fresh* token on pause / resume / end), **`[2]`** monitor-stage polish, and the **PATCH-CORS** fix — and re-run the iOS monitoring gate (**ST-08-2**) that was PENDING after Run 2. Desktop on `localhost` (secure context). iOS over **cloudflared** quick-tunnels (web / API / Supabase); web `.env.local` + `next.config.ts allowedDevOrigins` + API `ALLOWED_ORIGINS` were pointed at the tunnels for the run and **reverted afterward (never committed)**. Accounts: `smoke4` (desktop, real anchor); `smoke9` = Enjy / `smoke10` = Nada Mohamed (new iOS testers, on-device calibration). `LOG_LEVEL=DEBUG`.
+
+**Code-level regression (agent-run):** web `monitoring-session` suite **23/23 PASS** (incl. the L2 fresh-token lifecycle assertions); api `test_monitoring_endpoints.py` **all PASS** (incl. `test_cors_preflight_allows_patch`).
+
+**🔧 PATCH-CORS — FIXED & live-confirmed.** `app/main.py` is now `allow_methods=["GET","POST","PATCH","OPTIONS"]` (the Run-2/3 CORS bug is closed). Live desktop: `PATCH …→ 200` on pause + resume and `POST …/end → 200` — the lifecycle transitions **persist server-side** (was impossible before this fix).
+
+**Desktop (Chrome, localhost) — ✅ PASS — the `[1]` gate + the remaining `[2]` polish:**
+- **`[1]` no kickout / no silent-401 / status persists (THE check): ✅.** A ~10-min session: **30 window POSTs, 0 × 401**, readings flowing on cadence; **Pause → Resume → End all `PATCH`/`end` 200**; DB session `2b601f4f` ends **`status=ended, end_reason=user, ended_at` stamped** (i.e. **active→paused→active→ended persisted**); **35 scored readings** across the full range (`a_little_tense / at_ease / tense`), drift-not-flicker. _Note: the literal "let the token expire mid-session" path was **not** forced live (kept the realistic 3600 s expiry to start quickly); the stale→fresh refresh is covered by the **23 passing unit tests** + this live lifecycle-persists evidence._
+- **`[2]` reduced-motion stops the recording indicator (Run-3 bug): ✅** — now static/calm under reduce-motion (was *blinking faster*).
+- **`[2]` self-view auto-hide (Run-3 bug): ✅** — hides on hover-out.
+- **`[2]` 360 px recording-pill clearance (Run-3 finding): ✅** — clears the bloom, no overlap.
+- **`[2]` paused-timer exclusion: ✅** — elapsed timer freezes during Pause.
+- **`[2]` End → recap dead-time: ✅** — now **< 1 s** to the dashboard (was ~1 min in Run 3; the keepalive-`endSession` fix).
+- **`[2]` denied-camera copy: ✅** — exact calm blocked copy, no crash.
+
+**🏁 iOS Safari (real iPhone, over cloudflared) — ❌ ST-08-2 FAIL — a separate, pre-existing iOS-webm *decode* gap; NOT a kickout, NOT `[1]`/`[2]`.**
+- Load + sign-in + on-device **calibration ✅** (`POST /anchor → 200`, anchor persisted; a single ~60 s upload traversed the tunnel cleanly). One calibration aborted because the tester **backgrounded Safari mid-record** → iOS suspends the capture tab (a real iOS behavior note).
+- The monitoring session **died ~3.5 min in** with the client surface **"This one was on our side."** Server trace (session `02a60299`): windows `probe_s = 9 → 19 → 29 → 39 s` `warming_up`, then **`probe_s = -1.00 … FeatureExtractionError:our-side`** repeated → **0 readings**.
+- **Root cause (precise):** `probe_recorded_seconds()` — the ffprobe duration probe in the O(stride) tail-decode — **throws on the iOS un-finalized growing webm** past ~40 s → coarse cause **`our-side`** → window skipped → the session **never reaches the 60 s scoring gate**. **NOT auth:** every window upload returned **200**, **0 × 401, no re-login** — the session stayed authenticated the whole time (so `[1]`/the token-lifecycle held on iOS). Chrome's un-finalized webm decodes fine (desktop scored 35 today); **iOS's webm is the problem child** — the same container **T009** flagged. iOS also records **sub-realtime** (`probe_s = 39` at ~75 s wall-clock).
+- **On the original "kicked out" report:** what reproduces on iOS is this **`our-side` decode death**, not a re-login/auth kickout — so `[1]` (stale-token) was never the fix for it (wrong layer); and a true ITP/re-login kickout did **not** reproduce this run (auth was stable for ~3.5 min). _(Two new iOS testers, neither Ahmed; both attempts produced 0 readings.)_
+- **Fix direction (a separate 008-core decode task — not this branch):** (1) **prefer fMP4/CMAF on the iOS monitor recorder** (T009 proved iOS fMP4 decodes cleanly where webm chokes), and/or (2) **harden `probe_recorded_seconds`** to degrade gracefully on an un-finalized iOS webm instead of throwing `our-side`. Then re-run ST-08-2.
+
+**Net (Run 4):** the desktop `[0][1][2]` deliverables **PASS** (lifecycle persists, no silent-401, polish fixed, PATCH-CORS closed); **iOS monitoring ST-08-2 = FAIL** on a *pre-existing* iOS-webm decode gap **unrelated to this branch**. Recommendation: the followups branch's own scope is sound and desktop-verified; the iOS gate stays blocked until the decode-path fix lands — whether that blocks **this** merge is a planning-chat call (this branch neither introduced nor claims to fix the iOS decode path). **Not merged.**
+
 ---
 
 ## Phase 8 smoke — FINAL SUMMARY (2026-06-21 → 22, agent-facilitated; operators: Mohamed + Ahmed Sabry on iPhone)
@@ -614,7 +641,7 @@ laptop **force-restarted under load**; environment rebuilt (Docker → `supabase
 | ST | Desktop | iOS (Safari) | Verdict + key note |
 |---|---|---|---|
 | **ST-08-1** Camera permission | ✅ PASS (Chrome grant; Chrome+Firefox **deny**; Firefox grant) | ⚠️ partial (Safari grant via calibration) | 🐞 **"Try again" is a no-op when the permission is sticky-denied** (Chrome+Firefox) — needs settings guidance |
-| **ST-08-2** Safari/iOS capture → readings | — | ⏸️ **PENDING** | Capture/upload/decode all work on WebKit, but **big webm uploads back up over the free quick-tunnel** → session dies ~100 s, **no band reached**. Retest on a real HTTPS deploy. NOT a WebKit capture failure. |
+| **ST-08-2** Safari/iOS capture → readings | — | ❌ **FAIL** (Run 4) | **Run 4 root-caused it:** the session dies on a **server-side iOS-webm decode failure** — `probe_recorded_seconds()` throws on the iOS un-finalized webm past ~40 s → `our-side` skip → never reaches the 60 s gate → **0 readings**. **NOT** auth/transport (all uploads `200`, `0 × 401`, no re-login) and **NOT** a kickout. Pre-existing 008-core gap; fix = prefer fMP4 on iOS (T009) / harden the probe. (Run 2's "transport backup" read is superseded by this decode root cause.) |
 | **ST-08-3** Insecure-origin blocked | ✅ PASS | — | Blocked surface, no hang; minor: copy isn't HTTPS-specific |
 | **ST-08-4** First band + drift-not-flicker | ✅ PASS (functional) | — | ⚠️ wall-clock first band ~**2.5 min** (decode lag + 1-time MediaPipe init) — R-5 / Azure concern |
 | **ST-08-5** No-anchor → calibrate-first | ✅ PASS | (also seen on iOS) | No check-in, no band, no camera prompt |
