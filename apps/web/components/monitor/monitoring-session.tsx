@@ -208,6 +208,20 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     setStream(null);
   }, []);
 
+  // L2 (008-followups): a CURRENT token for a lifecycle call (pause / resume / end), mirroring
+  // the per-upload refresh in handleWindow. The cached `tokenRef` is only kept fresh by uploads,
+  // so a session paused longer than the token lifetime (~1 h, no uploads → no refresh) would
+  // otherwise carry a STALE token on resume/end — patchStatus/endSession swallow the {ok:false}
+  // and the status silently fails to persist (the 008 bug class, narrower trigger). The SDK
+  // auto-refreshes near expiry, so this returns a valid token; it stays the USER's own token
+  // (RLS-as-the-user; no service credential) — just current. Also keeps tokenRef warm.
+  const freshToken = useCallback(async (): Promise<string | null> => {
+    const session = await deps.getSession();
+    const token = session?.accessToken ?? null;
+    if (token) tokenRef.current = token;
+    return token;
+  }, [deps]);
+
   // One reading out per (gated) stride. Fire-and-forget: never block the recorder; a
   // transient transport error just skips this reading and the loop continues (FR-016).
   const handleWindow = useCallback(
@@ -290,13 +304,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       dispatch({ type: "END" });
 
       const sessionId = sessionIdRef.current;
-      const token = tokenRef.current;
-      if (sessionId && token) {
-        await deps.endSession(sessionId, reason, token); // 409 → ok (re-end race resolved silently)
+      if (sessionId) {
+        // L2: end with a FRESH token — a long-paused session's cached token may be stale.
+        const token = await freshToken();
+        if (token) await deps.endSession(sessionId, reason, token); // 409 → ok (re-end race silent)
       }
       deps.navigate("/app");
     },
-    [deps, dispatch, stopStream],
+    [deps, dispatch, stopStream, freshToken],
   );
 
   // Open the camera, start the continuous recorder, and (re)arm the presence monitor.
@@ -430,9 +445,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     setStreaming(false);
     dispatch({ type: "PAUSE" });
     const sessionId = sessionIdRef.current;
-    const token = tokenRef.current;
-    if (sessionId && token) void deps.patchStatus(sessionId, "paused", token);
-  }, [deps, dispatch, stopStream]);
+    if (!sessionId) return;
+    // Pause the UI instantly (above); persist the status with a FRESH token (L2) without
+    // blocking the surface — the cached token may already be stale at pause time.
+    void (async () => {
+      const token = await freshToken();
+      if (token) await deps.patchStatus(sessionId, "paused", token);
+    })();
+  }, [deps, dispatch, stopStream, freshToken]);
 
   // Manual Resume: re-acquire the camera (re-entering the blocked surface if access was
   // revoked or the context is no longer secure), reusing the existing session → PATCH
@@ -443,16 +463,24 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       return;
     }
     const sessionId = sessionIdRef.current;
-    const token = tokenRef.current;
-    if (!sessionId || !token) {
+    if (!sessionId) {
       dispatch({ type: "CAMERA_BLOCKED" });
+      return;
+    }
+    // L2: resume with a FRESH token. After a long pause (no uploads) the cached token may be
+    // stale; fetch the current one BEFORE re-acquiring the camera. If the browser session is
+    // gone (refresh failed), surface the honest signed-out state rather than a misleading
+    // camera-blocked — the user can't score as themselves without a valid token.
+    const token = await freshToken();
+    if (!token) {
+      dispatch({ type: "SESSION_EXPIRED" });
       return;
     }
     const opened = await openCameraAndRecord();
     if (!opened) return; // getUserMedia rejection already routed to blocked
     dispatch({ type: "RESUME" }); // → warming-up
     void deps.patchStatus(sessionId, "active", token);
-  }, [deps, dispatch, openCameraAndRecord]);
+  }, [deps, dispatch, openCameraAndRecord, freshToken]);
 
   const handleEnd = useCallback(() => {
     void endAndLeave("user");
