@@ -75,6 +75,12 @@ pnpm-debug.log*
 # Project-specific
 specs/.staging/
 
+# Disposable spike scaffolding + dev mocks — never commit. Two such artifacts
+# (the _scratch-008-continuous-spike/ harness + serenify-008-*mock*.html) rode into
+# main via the 008 squash; these guards stop that class of scratch from recurring.
+_scratch-*/
+serenify-008-*mock*.html
+
 # Model-artifact staging drop (committed artifacts live in packages/ml-*/models/)
 tmp/
 
