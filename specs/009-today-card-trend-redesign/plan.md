@@ -4,7 +4,7 @@
 
 **Input**: Feature specification from `specs/009-today-card-trend-redesign/spec.md`
 
-**Visual authority**: `serenify-008followups-trend-FINAL.html` (repo root). **Constitution**: v1.4.0 governs.
+**Visual authority**: `serenify-008followups-trend-FINAL.html` (repo root). **Constitution**: v1.5.2 governs.
 
 ## Summary
 
@@ -14,7 +14,7 @@ The technical core — and the place the prior build failed — is the **fixed-p
 
 State encodes by **height AND colour** via amber-family sub-tokens added to `globals.css` (`--color-amber-text`, `--amber-tint`, `--amber-soft-line`, `--amber-head`), with all text re-verified against WCAG AA in both themes. Bright graphic amber stays on lines/markers only.
 
-**Two decision forks surfaced (need Mohamed before implement)** — see [research.md](./research.md) R-2 and R-3:
+**Two decision forks surfaced — both RESOLVED** (Mohamed signed off 2026-06-22; see `docs/DECISIONS.md` 2026-06-22 "009 fork resolutions" and Constitution Amendments 5–7). Original forks — see [research.md](./research.md) R-2 and R-3:
 1. **Headline honesty**: the existing `deriveHeadline` emits "tense" wording for *any* stress band, conflicting with FR-002/SC-010 (tense wording only when the tense band is reached).
 2. **Amber palette governance**: new amber sub-tokens + the light amber-text value (`#8A580F` per mock vs `#7E5310` per constitution) need a `docs/DECISIONS.md` entry and likely a MINOR constitution amendment.
 
@@ -40,7 +40,7 @@ State encodes by **height AND colour** via amber-family sub-tokens added to `glo
 
 ## Constitution Check
 
-*GATE: evaluated against constitution v1.4.0. Re-checked after Phase 1 (unchanged — no new violations introduced by the design).*
+*GATE: evaluated against constitution v1.5.2. Re-checked after Phase 1 (unchanged — no new violations introduced by the design).*
 
 | Principle | Verdict | Notes |
 |---|---|---|
@@ -116,7 +116,7 @@ specs/009-today-card-trend-redesign/smoke-tests.md     # NEW at implement time (
 
 ## Complexity Tracking
 
-> Governance items that need a `docs/DECISIONS.md` entry (and, where noted, a MINOR constitution amendment). None block the plan; all need Mohamed's decision before implement. Severity is informational — the patches happen regardless of label.
+> Governance items, **all RESOLVED 2026-06-22** (Mohamed's sign-off; `docs/DECISIONS.md` 2026-06-22 "009 fork resolutions"): **V-c** → Decision 4 + Constitution **Amendment 7** (inline-SVG carve-out ratified; Recharts stays the locked default); **V-a** → Decision 2 + **Amendment 5** (amber sub-tokens; light amber-text `#8A580F` adopted); **V-b** → Decision 3 + **Amendment 6** (card-radius range widened 8–16px → 8–20px); **R-2** → Decision 1 (honest three-level `deriveHeadline`). None blocked the plan. Severity is informational — the patches happen regardless of label.
 
 | Item | Why needed | Simpler alternative & why insufficient |
 |---|---|---|
