@@ -2,7 +2,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import { TodayTrendPlot } from "@/components/home/today-trend-plot";
-import { LANE_MIN, type SessionSeq } from "@/lib/trend-geometry";
+import { LANE_MIN, PLOT_H, type SessionSeq } from "@/lib/trend-geometry";
 
 /**
  * Feature 009 / US4 — busy-day overflow (FR-014 / SC-006). All of today's sessions render; lanes
@@ -52,6 +52,28 @@ describe("TodayTrendPlot — busy-day overflow (SC-006)", () => {
     render(<TodayTrendPlot seqs={BUSY.slice(0, 2)} availableWidth={1008} />);
     expect(fadeRight().className).not.toMatch(/is-on/);
     expect(fadeLeft().className).not.toMatch(/is-on/);
+  });
+});
+
+describe("TodayTrendPlot — the strip height stays bounded to the plot (DC-002 / SC-003 — no dead space)", () => {
+  it("pins the SVG to PLOT_H and keeps the edge-fades as out-of-flow overlays", () => {
+    render(<TodayTrendPlot seqs={BUSY} availableWidth={420} />);
+
+    // The drawing height is pinned to PLOT_H — the plot region can never balloon past ~200px.
+    expect(svgOf().getAttribute("height")).toBe(String(PLOT_H));
+
+    // REGRESSION (the dead-space bug): the fades carry their LOAD-BEARING positioning as
+    // utilities (`absolute` + `pointer-events-none`), so even if the component-local
+    // `.today-plot-fade` rule is absent/stale they stay ZERO-LAYOUT overlays — never two
+    // in-flow PLOT_H blocks stacking below the strip (which ballooned the plot to ~3× height).
+    for (const fade of [fadeLeft(), fadeRight()]) {
+      expect(fade.className).toMatch(/(^|\s)absolute(\s|$)/);
+      expect(fade.className).toMatch(/pointer-events-none/);
+    }
+
+    // The load-bearing horizontal scroll is a utility too (not only the styled-scrollbar rule),
+    // so the fixed-px strip scrolls instead of spilling the page if that rule is missing.
+    expect(scroller().className).toMatch(/overflow-x-auto/);
   });
 });
 

@@ -284,9 +284,13 @@ export function TodayTrendPlot({
 
       {/* scrollable lane strip — fixed-px; component-local styled scrollbar + edge fades (US4) */}
       <div ref={attachWrap} className="relative min-w-0 flex-1">
+        {/* The LOAD-BEARING `overflow-x: auto` lives in a Tailwind utility (not only the
+            component-local `.today-plot-scroll` rule): if that rule is ever absent/stale, the
+            fixed-px SVG must STILL scroll within the strip rather than spill the page. The
+            `today-plot-scroll` class then only carries the styled-scrollbar cosmetics. */}
         <div
           data-testid="plot-scroll"
-          className="today-plot-scroll"
+          className="today-plot-scroll overflow-x-auto overflow-y-hidden"
           onScroll={(e) => {
             const next = e.currentTarget.scrollLeft > 4;
             setScrolled((prev) => (prev === next ? prev : next));
@@ -405,11 +409,16 @@ export function TodayTrendPlot({
           </svg>
         </div>
         {/* edge-fade affordances — purely decorative, never intercept pointer/scroll. Left appears
-            once scrolled off the start; right appears whenever there's more strip to the right. */}
+            once scrolled off the start; right appears whenever there's more strip to the right.
+            The LOAD-BEARING `absolute` (overlay, zero layout cost) + edge offset + width live in
+            Tailwind utilities, NOT only in the component-local `.today-plot-fade` rule. If that
+            rule is ever absent/stale, each fade must STILL be an out-of-flow overlay — otherwise
+            two 200px in-flow blocks stack below the strip and balloon the plot region (the
+            dead-space bug). `.today-plot-fade*` then only carries the gradient + the is-on opacity. */}
         <div
           data-testid="plot-fade-left"
           aria-hidden="true"
-          className={`today-plot-fade today-plot-fade--left${
+          className={`today-plot-fade today-plot-fade--left pointer-events-none absolute left-0 top-0 w-9${
             overflowing && scrolled ? " is-on" : ""
           }${fadeTransition}`}
           style={{ height: H }}
@@ -417,7 +426,7 @@ export function TodayTrendPlot({
         <div
           data-testid="plot-fade-right"
           aria-hidden="true"
-          className={`today-plot-fade today-plot-fade--right${overflowing ? " is-on" : ""}${fadeTransition}`}
+          className={`today-plot-fade today-plot-fade--right pointer-events-none absolute right-0 top-0 w-9${overflowing ? " is-on" : ""}${fadeTransition}`}
           style={{ height: H }}
         />
       </div>
