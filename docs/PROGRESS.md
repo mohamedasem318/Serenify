@@ -4,15 +4,22 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 009 — Today-Card Stress Trend Redesign (Polish complete; pre-merge)
+## Feature 009 — Today-Card Stress Trend Redesign (merged to main)
 
 **Branch**: `009-today-card-trend-redesign`
-**Status**: **Polish phase complete on branch — not yet merged.** Frontend-only redesign of the
-employee dashboard today check-in card's collapsed + expanded stress-trend surfaces + session
-timeline, consuming the existing read layer unchanged (no data-layer / RLS / SELECT-whitelist
-change; no probability to the client). US1–US4 + the Phase 8 headline rework shipped earlier in the
-cycle; **this entry records the Phase 7 Polish run (T024–T028 + T031)**. Awaiting Mohamed's hand-run
-smoke gate (`smoke-tests.md`), then `/speckit-analyze`, then squash-merge to `main`.
+**Status**: **merged to `main`** via **PR #25** (squash `4e51c8f`, 2026-06-23); feature branch
+deleted (local + remote). Frontend-only redesign of the employee dashboard today check-in card's
+collapsed + expanded stress-trend surfaces + session timeline, consuming the existing read layer
+unchanged (no data-layer / RLS / SELECT-whitelist change; no probability to the client). Shipped:
+the **collapsed** glanceable mini-trend + the **expanded** axis-labelled lane plot (no legend) on
+**fixed-pixel SVG rendering** (DC-001: 1 SVG unit = 1 screen pixel, no stretched viewBox — the
+totem bug the prior build hit); an **honest three-level headline** ("at ease" / "a little tense" /
+"tense") with a recovery branch + **partial-easing honesty** ("eased a little" when recovery never
+reaches calm); and the **T031** first-paint width-flash fix (measure-then-render, zero CLS). US1–US4
++ the Phase 8 headline rework + the Phase 7 Polish run (T024–T028 + T031) all landed. Governance:
+Mohamed's hand-run smoke gate PASSED (ST-1…ST-6); `/speckit-analyze` findings C1/C2/C3 resolved
+on-branch — **constitution v1.5.2 / Amendment 7** ratifies the inline-SVG carve-out for bespoke
+affective micro-viz (Recharts stays the locked default for standard dashboard charts).
 **Date**: 2026-06-23
 
 **Polish run shipped (T024–T028 + T031)**:
@@ -54,9 +61,11 @@ smoke gate (`smoke-tests.md`), then `/speckit-analyze`, then squash-merge to `ma
 - ✅ Lint — `npm run lint` reports the **2 known pre-existing** `monitoring-session.tsx` errors
   (223:39 reactive-srcObject, 560:5 setState-in-effect), **0 new** from this run.
 - ✅ Typecheck / Vitest / test:layout / e2e — all green (counts above).
-- ⏳ Smoke gate — `smoke-tests.md` authored (T026); **Mohamed runs it by hand** before merge (gate 5).
-  The T028 quickstart desktop+360px visual walk is carried by that smoke checklist.
-- ⏳ `/speckit-analyze` + squash-merge — pending after the smoke gate (NOT run in this Polish run).
+- ✅ Smoke gate — `smoke-tests.md` **signed off by Mohamed (PASS, ST-1…ST-6)** (gate 5). The T028
+  quickstart desktop+360px visual walk is carried by that smoke checklist.
+- ✅ `/speckit-analyze` + squash-merge — analyze findings C1/C2/C3 resolved on-branch (plan.md →
+  v1.5.2, spec.md status flipped, constitution **Amendment 7** + CHANGELOG catch-up); **squash-merged
+  via PR #25** (`4e51c8f`, 2026-06-23); feature branch deleted (local + remote).
 
 **Privacy invariant**: untouched — frontend-only; no new read, no probability on the wire, SELECT
 whitelist + RLS-as-user intact (SC-008/SC-009).
