@@ -23,7 +23,12 @@ ALLOWED_ORIGINS=http://localhost:3000
 # STRESS_OPERATING_POINT unset → default read from metadata.json (0.53)
 # STRESS_TENSE_BAND unset → default 0.70
 
-uvicorn app.main:app --reload      # boots: loads model (fail-fast), wires monitoring router
+# Watcher scoped to source only (--reload-dir app) so cache/test writes + branch
+# checkouts don't restart the worker and drop the live smoothing buffer. For a clean
+# live-read pass run WITHOUT --reload, and don't edit app/ source mid-session — any
+# worker restart re-warms the band (~90 s). See apps/api/README.md "Live-monitor
+# testing" + docs/BACKLOG.md (live-monitor readings stability).
+uvicorn app.main:app --reload --reload-dir app   # boots: loads model (fail-fast), wires monitoring router
 curl localhost:8000/healthz        # {"status":"ready","model_version":"...@2.0.0"}
 ```
 

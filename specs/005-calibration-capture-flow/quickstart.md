@@ -9,7 +9,7 @@ the full backend setup).
 
 ```bash
 # from apps/api/  (Python 3.12 venv via uv)
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --reload-dir app --port 8000   # watch source only (avoids churn restarts)
 # GET http://127.0.0.1:8000/healthz → {"status":"ready", ...}
 ```
 
