@@ -2030,3 +2030,16 @@ the 009 today card. Documentation catch-up to existing practice; no new rule. Tr
 feature 009, DECISIONS.md Decision 3.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 6; `docs/DECISIONS.md` 2026-06-22.
+
+## 2026-06-23 — constitution 1.5.1 → 1.5.2 (PATCH): inline-SVG carve-out for bespoke affective micro-viz
+
+Technology Stack (Locked), Charts row: ratifies a narrow carve-out — bespoke affective
+micro-visualizations (feature 009's today-card stress trend) MAY use hand-authored inline
+SVG. The load-bearing reason is bespoke lane-geometry (run-collapsed lanes, custom
+stress-band-to-Y encoding, no-read markers, step-line) that is not a standard Recharts
+chart type; pixel-exact, non-stretched rendering (DC-001: 1 SVG unit = 1 screen pixel) is
+secondary. Recharts stays the locked default for standard dashboard data charts; this does
+not authorize a general charting-library substitution. Documentation catch-up formalizing
+an existing decision; no new rule. Triggered by feature 009, DECISIONS.md Decision 4.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 7; `docs/DECISIONS.md` 2026-06-22.
