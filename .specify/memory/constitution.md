@@ -233,6 +233,29 @@ feature numbers, so no template edit is required.
 Cross-references:
 - docs/DECISIONS.md entry 2026-06-23
 - docs/CHANGELOG.md entry 2026-06-23
+
+Amendment 9: 1.6.0 → 1.7.0 (2026-06-24, MINOR)
+Bump rationale: Principle VIII gains a backlog-governance bullet (grouped with the
+existing DECISIONS/PROGRESS/CHANGELOG logging bullets): follow-up items deferred from
+features live in `docs/BACKLOG.md` (the source of truth) and are mirrored 1:1 to GitHub
+Issues — opened when a follow-up is logged, closed when it is fixed, both in the same
+change; Issues never diverge from BACKLOG, and BACKLOG wins on conflict. Label taxonomy
+and operational detail live in `docs/DECISIONS.md`. Triggered by the BACKLOG.md → GitHub
+Issues migration prep (the BACKLOG↔Issues mirror contract). MINOR bump: new guidance added
+to an existing principle; no principle removed or restructured, no other section changed.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for any reference to Principle VIII's content (BACKLOG, GitHub
+Issues, the DECISIONS/PROGRESS/CHANGELOG logging rules) — zero matches; the templates
+reference principles by number, not by these literal logging-doc rules, so no template
+edit is required (consistent with the Amendment 8 audit).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-24
+- docs/CHANGELOG.md entry 2026-06-24
+- CLAUDE.md "Backlog ↔ Issues" section
+- docs/BACKLOG.md (cleanup ride-along: stale headers flipped to merged, status
+  normalizations, manager-visibility item merge, feature-number remap)
 -->
 
 # Serenify Constitution
@@ -504,6 +527,11 @@ implement, in that order. Implementation without a spec is forbidden.
 - Spec amendments (deviations from an approved spec discovered during
   implementation) are logged in `docs/CHANGELOG.md`, since SpecKit itself
   has no formal amendment mechanism.
+- Follow-up items deferred from features live in `docs/BACKLOG.md` (the source
+  of truth) and are mirrored 1:1 to GitHub Issues — opened when the follow-up is
+  logged, closed when it is fixed, both in the same change. Issues never diverge
+  from BACKLOG; on conflict, BACKLOG wins. Label taxonomy and operational detail
+  are recorded in `docs/DECISIONS.md`.
 - Claude Code MAY commit and push its own work directly to feature
   branches. Mohamed reviews PRs/commits before merging branches to `main`.
 - Provisional feature ordering (subject to change; record changes in
@@ -707,4 +735,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.6.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-23
+**Version**: 1.7.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-24

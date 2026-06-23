@@ -16,3 +16,12 @@ Graphite tokens). Two forks await Mohamed before implement: headline-honesty
 (`deriveHeadline` "tense" wording vs FR-002) and the amber-text light value
 (`#8A580F` mock vs `#7E5310` constitution) — see `plan.md` Complexity Tracking.
 <!-- SPECKIT END -->
+
+## Backlog ↔ Issues
+
+`docs/BACKLOG.md` is the source of truth and is mirrored 1:1 to GitHub Issues. When you log
+a new follow-up to BACKLOG, open its issue in the same change and record `(#NN)` on the entry.
+When you fix a follow-up, mark its BACKLOG entry resolved (date + commit/PR) **and** close the
+matching issue in the same change. Never update one without the other; on conflict, BACKLOG
+wins. Full rules: constitution Principle VIII; operational detail + label taxonomy:
+`docs/DECISIONS.md`.

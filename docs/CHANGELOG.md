@@ -2059,3 +2059,26 @@ features plus a reorder materially change the guidance; no new/removed principle
 change.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 8; `docs/DECISIONS.md` 2026-06-23.
+
+## 2026-06-24 — constitution 1.6.0 → 1.7.0 (MINOR): Principle VIII — BACKLOG↔Issues mirror discipline (Amendment 9)
+
+Principle VIII gains a backlog-governance bullet (grouped with the existing
+DECISIONS/PROGRESS/CHANGELOG logging bullets): follow-up items deferred from features live in
+`docs/BACKLOG.md` (the source of truth) and are mirrored 1:1 to GitHub Issues — opened when a
+follow-up is logged, closed when it is fixed, both in the same change; Issues never diverge from
+BACKLOG, and BACKLOG wins on conflict. Label taxonomy and operational detail live in
+`docs/DECISIONS.md`. Triggered by the BACKLOG.md → GitHub Issues migration prep. MINOR bump: new
+guidance added to an existing principle; no new/removed principle, no structural change. Template
+audit: none (templates reference principles by number, not by these logging-doc rules).
+
+Accompanying `docs/BACKLOG.md` cleanup (no constitution impact): the five stale `## From feature …
+— in progress` headers (003 / 004 / 005 / 008 / 009) flipped to `— merged <date>` (2026-05-25 /
+2026-05-29 / 2026-06-08 / 2026-06-22 / 2026-06-23); three status normalizations (welcome-banner
+timezone `deferred-bug → bug`; onboarding-name-step `deferred-bug → bug`; "Before the 005 detector
+ships" launch gate `deferred → resolved`); the two manager-visibility items merged into one entry
+numbered to feature 016 (team-lead dashboard); and a feature-number remap correcting stale roadmap
+references (team-lead `→ 016`, admin `→ 017`, stress-inference `006 → 008`, chatbot `→ 010`,
+privacy-controls `→ 014`).
+
+Cross-references: `.specify/memory/constitution.md` Amendment 9; `docs/DECISIONS.md` 2026-06-24;
+`CLAUDE.md` "Backlog ↔ Issues".
