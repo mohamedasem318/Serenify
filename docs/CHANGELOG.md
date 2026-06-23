@@ -2043,3 +2043,19 @@ not authorize a general charting-library substitution. Documentation catch-up fo
 an existing decision; no new rule. Triggered by feature 009, DECISIONS.md Decision 4.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 7; `docs/DECISIONS.md` 2026-06-22.
+
+## 2026-06-23 — constitution 1.5.2 → 1.6.0 (MINOR): Principle VIII roadmap reorder + renumber (Amendment 8)
+
+Principle VIII's provisional ordering is reconciled to built reality and reordered, and two
+new planned features are added. `009` is realized as `009-today-card-trend-redesign` (the
+slot formerly reserved for the questionnaire) and `008-followups` was an unslotted follow-up
+branch; `010-llm-client-and-chatbot` moves ahead of `011-questionnaire` / `012-recommendations`
+because the LLM client is a shared dependency for both the chatbot and recommendations. Two new
+slots added — `013-personalization-onboarding` (personal de-stress preferences feeding
+recommendations, which ship generic-first behind a defined preferences seam) and
+`015-preferences-hub` (language, theme, default camera, timezone). Cross-references renumbered:
+Principle IV audio `015 → 018`, Principle III fusion `017 → 020`. MINOR bump: two new planned
+features plus a reorder materially change the guidance; no new/removed principle, no structural
+change.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 8; `docs/DECISIONS.md` 2026-06-23.

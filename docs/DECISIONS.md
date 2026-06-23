@@ -4118,3 +4118,48 @@ PARTIAL/FULL easing tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts`.
 **Revisit if**: the "a little tense" band label is collapsed to a single word (backlogged copy
 pass) — the partial-easing clause "eased a little" should be re-phrased alongside it; or product
 asks for the cross-pod easing pod to be named (backlogged), which would touch the same clause.
+
+---
+
+## 2026-06-23 — Constitution Amendment 8 — roadmap reorder + renumber (1.5.2 → 1.6.0)
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.5.2 → 1.6.0`).
+
+Principle VIII's provisional feature ordering is reconciled with built reality and
+reordered, and two new planned features are added. Docs/governance only — no code, no
+spec, no `specs/NNN/` folder.
+
+**Reconciliation.** `009` is reconciled to its built reality, the today-card trend
+redesign (`009-today-card-trend-redesign`) — the slot the provisional list had reserved
+for the questionnaire. `008-followups` is noted as an unslotted follow-up branch (a
+follow-up to feature 008 that never held a provisional slot of its own).
+
+**Reorder.** `010-llm-client-and-chatbot` is placed ahead of `011-questionnaire` and
+`012-recommendations`. Rationale: the LLM client is a shared dependency for both the
+chatbot and the recommendations engine, so building it first unblocks both.
+
+**New — `013-personalization-onboarding`.** Captures personal de-stress preferences that
+feed recommendations.
+
+**Decision (generic-first recommendations + preferences seam).** Recommendations (`012`)
+ships generic-first; personalization is an additive layer. The recommendations spec MUST
+define a preferences "seam" — a preferences source the engine reads, defaulted in v1 — so
+`013-personalization-onboarding` plugs in later without reworking the engine.
+
+**New — `015-preferences-hub`.** App/locale settings: language, theme, default camera,
+timezone. Timezone is grouped here as a locale/display setting (NOT in the personalization
+profile); because timezone needs no i18n infrastructure, it may ship ahead of the deferred
+language work.
+
+**Cross-references updated.** Principle IV audio `015 → 018`; Principle III fusion
+`017 → 020`. Downstream slots shift accordingly.
+
+**Amendment artifacts**: `.specify/memory/constitution.md` — Principle VIII ordering list,
+Principle III + IV feature-number cross-references, the version line (`1.5.2 → 1.6.0`), and
+the Sync Impact Report Amendment 8 entry; `docs/CHANGELOG.md` 2026-06-23. Template audit:
+**none** — the `.specify/templates/{plan,spec,tasks}-template.md` files reference principles
+by number, not by slug or feature number, so no template edit is required.
+
+**Revisit if**: a later feature is realized in a different slot than the provisional list
+reserves (reconcile as done here for `009`); or the recommendations engine needs a
+preferences shape richer than the v1 default seam anticipates.
