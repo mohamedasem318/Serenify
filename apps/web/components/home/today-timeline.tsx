@@ -63,22 +63,33 @@ export function TodayTimeline({
             data-active={active ? "true" : "false"}
             onMouseEnter={() => onActivate?.(s.sessionId)}
             onMouseLeave={() => onActivate?.(null)}
-            className={`flex items-center gap-3 rounded-[10px] px-2 py-[7px] ${
+            // Mobile-first (DC-002/DC-005): stack number+label over chip+time so a narrow row never
+            // crushes the label into a mid-phrase wrap. At sm: it collapses to the locked one-line
+            // layout (number · label · chip · time-range). py-2 keeps the stacked row ≥44px.
+            className={`flex flex-col gap-1.5 rounded-[10px] px-2 py-2 sm:flex-row sm:items-center sm:gap-3 sm:py-[7px] ${
               reduceMotion ? "" : "transition-colors duration-150"
             }`}
             style={{ backgroundColor: active ? HIGHLIGHT_FILL : undefined }}
           >
-            <span className="w-[18px] flex-none text-center text-[13px] text-muted">{s.number}</span>
-            <span className="flex-1 text-[15px] text-ink">{s.timeIdentity}</span>
-            <span
-              data-testid="timeline-chip"
-              data-tone={s.chipTone}
-              className={`flex-none whitespace-nowrap rounded-full px-3 py-[3px] text-[13px] font-semibold ${chip.className}`}
-              style={chip.style}
-            >
-              {s.chipLabel}
-            </span>
-            <span className="w-[120px] flex-none text-right text-[13px] text-muted">{s.timeRange}</span>
+            {/* number + label — full width on mobile; `truncate` guarantees one line (no mid-phrase wrap) */}
+            <div className="flex min-w-0 items-center gap-3 sm:flex-1">
+              <span className="w-[18px] flex-none text-center text-[13px] text-muted">{s.number}</span>
+              <span className="min-w-0 flex-1 truncate text-[15px] text-ink">{s.timeIdentity}</span>
+            </div>
+            {/* chip + time-range — a second line under the label on mobile, inline-right on desktop */}
+            <div className="flex items-center justify-between gap-3 pl-[30px] sm:flex-none sm:justify-end sm:pl-0">
+              <span
+                data-testid="timeline-chip"
+                data-tone={s.chipTone}
+                className={`flex-none whitespace-nowrap rounded-full px-3 py-[3px] text-[13px] font-semibold ${chip.className}`}
+                style={chip.style}
+              >
+                {s.chipLabel}
+              </span>
+              <span className="flex-none whitespace-nowrap text-[13px] text-muted sm:w-[120px] sm:text-right">
+                {s.timeRange}
+              </span>
+            </div>
           </li>
         );
       })}

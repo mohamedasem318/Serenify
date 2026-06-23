@@ -67,6 +67,18 @@ describe("TodayTimeline — one state-coloured pill row per session (FR-012)", (
   });
 });
 
+describe("TodayTimeline — narrow-width rows never wrap the label mid-phrase (DC-005)", () => {
+  it("keeps each session label on a single line via truncate (no mid-phrase wrap at any width)", () => {
+    render(<TodayTimeline sessions={SESSIONS} />);
+    // jsdom can't measure wrapping; `truncate` (white-space: nowrap + ellipsis) is the structural
+    // guarantee that "Morning check-in" can never break across lines when the row is narrow. The
+    // smoke confirms the stacked 2-line row by eye at 360px (number+label, then chip+time).
+    for (const s of SESSIONS) {
+      expect(screen.getByText(s.timeIdentity).className).toMatch(/truncate/);
+    }
+  });
+});
+
 describe("TodayTimeline — drops the live-monitor reassurance line (FR-013)", () => {
   it('renders no "processed, then deleted" copy', () => {
     const { container } = render(<TodayTimeline sessions={SESSIONS} />);
