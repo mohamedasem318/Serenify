@@ -177,6 +177,29 @@ Affected templates: none.
 Cross-references:
 - docs/DECISIONS.md entry 2026-06-22
 - docs/CHANGELOG.md entry 2026-06-22
+
+Amendment 7: 1.5.1 → 1.5.2 (2026-06-23, PATCH)
+Bump rationale: Technology Stack (Locked), Charts row — ratify a narrow,
+already-decided carve-out (`docs/DECISIONS.md` 2026-06-22, Decision 4): bespoke
+affective micro-visualizations — specifically feature 009's employee today-card
+stress trend — MAY use hand-authored inline SVG. Recharts' `ResponsiveContainer`
+stretches to `width:100%`, which is structurally the "totem" stretch that feature
+009's fixed-pixel rendering (DC-001: 1 SVG unit = 1 screen pixel) exists to
+forbid, so the locked charts library is unsuitable for this one surface. The
+carve-out is narrow: Recharts remains the locked default for standard dashboard
+data charts, and a general charting-library substitution still requires its own
+amendment. Precedent already exists on `main` (`today-view.tsx`,
+`session-trend.tsx`). PATCH bump: documents an existing decision and scopes one
+locked-stack row; no new/removed principle, no structural change, and no library
+substitution for standard charts.
+
+Affected templates: none. The .specify/templates/{plan,spec,tasks}-template.md
+reference the locked stack by section, not by the "Recharts" literal; no template
+edit is required.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-22 (Decision 4)
+- specs/009-today-card-trend-redesign/{plan.md V-c, research.md}
 -->
 
 # Serenify Constitution
@@ -535,6 +558,15 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Type system (FE)     | TypeScript strict mode                                    |
 | Type system (BE)     | Python type hints + Pydantic                              |
 
+**Charting carve-out (Amendment 7):** Recharts is the locked default for standard
+dashboard data charts. A narrow exception applies to bespoke affective
+micro-visualizations — specifically feature 009's employee today-card stress
+trend — which MAY use hand-authored inline SVG where Recharts' stretch-to-fit
+`ResponsiveContainer` cannot satisfy a fixed-pixel, non-stretched rendering
+requirement (DC-001: 1 SVG unit = 1 screen pixel). This exception does NOT
+authorize a general charting-library substitution, which still requires its own
+amendment. Origin: `docs/DECISIONS.md` 2026-06-22 (Decision 4).
+
 TypeScript strict mode and Python type hints are mandatory across all
 application code. `any` (TS) and untyped `Any`/`dict` (Python) MUST be
 justified in code review if introduced.
@@ -637,4 +669,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.5.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-22
+**Version**: 1.5.2 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-23
