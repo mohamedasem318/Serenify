@@ -305,10 +305,13 @@ function phraseFor(rows: TodayTrendRow[], tenor: SessionTenor): string {
  *   • Honesty (T010, kept): the standalone "tense" word appears ONLY when the tense band was
  *     reached; an a-little-tense peak says exactly "a little tense"; a calm day carries no amber.
  *   • Recovery (FR-002 / SC-010 extension): when the day reached a tension peak but the most
- *     recent CONFIDENT session sits below it (the user eased), surface that recovery ("…then
- *     eased") rather than the peak alone. A trailing read-less session is a measurement gap, not
- *     a recovery — it is excluded from `readable`, so recovery keys off the most recent *band*.
- *     Recovery never upgrades a sub-tense day to "tense" (`level` is the real peak).
+ *     recent CONFIDENT session sits below it (the user eased), surface that recovery rather than
+ *     the peak alone. HONESTY (009 follow-up §3): bare "…then eased" reads as "back to fine", so
+ *     it is reserved for a step-down that REACHES calm (at_ease); a peak that only stepped down to
+ *     a-little-tense (still elevated) gets the qualified "…then eased a little". A trailing
+ *     read-less session is a measurement gap, not a recovery — it is excluded from `readable`, so
+ *     recovery keys off the most recent *band*. Recovery never upgrades a sub-tense day to "tense"
+ *     (`level` is the real peak).
  *   • Voice: second-person, no trailing period. Amber `hot` is the BARE descriptor only — the
  *     part-of-day moves to `pre`/`post`. Calm→tension arcs name both parts of day when they
  *     differ, and collapse to a time-neutral second clause when they share one part of day.
@@ -343,7 +346,11 @@ function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
   // so a trailing no-read tail can't masquerade as easing). Honesty intact: `level` is the real peak.
   const mostRecent = readable[readable.length - 1]!;
   if (BAND_RANK[mostRecent.tenor as Band] < BAND_RANK[peak.tenor as Band]) {
-    return { pre: `Your ${peakPod} turned `, hot: level, post: ", then eased" };
+    // Honest easing (009 follow-up §3): bare "eased" reads as "back to fine", so reserve it for a
+    // step-down that REACHES calm. A peak that only stepped down to a-little-tense (still elevated)
+    // gets the qualified "eased a little" — never the unqualified relief word.
+    const easedToCalm = mostRecent.tenor === "at_ease";
+    return { pre: `Your ${peakPod} turned `, hot: level, post: easedToCalm ? ", then eased" : ", then eased a little" };
   }
 
   // calm→tension arc — a calm session precedes the peak

@@ -227,6 +227,29 @@ describe("monitoring-reads — headline rework: recovery + voice/copy (FR-002 / 
     expect(s.replace(/a little tense/g, "")).not.toContain("tense");
   });
 
+  // HONESTY (009 follow-up §3): PARTIAL easing must not borrow the full-relief word. A day that
+  // peaked TENSE and stepped down only to A LITTLE TENSE (never reached calm) must NOT claim a bare
+  // "…eased" — a reader takes that as "back to fine". Bare "eased" is reserved for reaching at_ease.
+  it("PARTIAL easing — tense peak that only steps down to a-little-tense does NOT claim bare 'eased'", () => {
+    const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
+    const rows = [wr("a", "tense", 13, 30), wr("e", "a_little_tense", 18, 10)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(headline.hot!.trim()).toBe("tense"); // honest: the real peak is still tense
+    // the dishonest render is "…then eased" (a terminal claim of relief). Must be qualified.
+    expect(s.trim()).not.toMatch(/eased$/);
+    expect(s).toContain("eased a little"); // honest partial-easing clause
+  });
+
+  it("FULL easing — bare '…eased' stays reserved for a step-down that REACHES calm (at_ease)", () => {
+    const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
+    const rows = [wr("a", "tense", 13, 30), wr("e", "at_ease", 18, 10)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(s.trim()).toMatch(/eased$/); // reached calm → bare "eased" is honest here
+    expect(s).not.toContain("eased a little");
+  });
+
   it("a TRAILING NO-READ session is NOT recovery — recovery keys off the most-recent CONFIDENT band", () => {
     // calm morning, tense afternoon, then a fully read-less evening (a measurement gap, not easing)
     const sessions = [
