@@ -1011,7 +1011,7 @@ subscription/probe scoped to `auth.uid()` only (Principle I — a user may only
 observe their own anchor state, mirroring the `has_anchor` scope guard).
 
 **Address by**: whichever feature first needs genuine cross-device live updates.
-Features 007/008 (stress detection / chat interrupts) may introduce Supabase
+Features 008/010 (stress detection / chat interrupts) may introduce Supabase
 Realtime for live notifications anyway — bundle the anchor/auth realtime sync
 into that workstream rather than standing up Realtime solely for the banner. Not
 blocking 004: the manual-refresh fallback is acceptable for the thesis/demo
