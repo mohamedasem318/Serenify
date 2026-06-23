@@ -161,7 +161,7 @@ description: "Task list — feature 009 today-card stress trend redesign"
 - **US2 (T013–T019)** → after Foundational; reuses the orchestrator from US1 (T019 depends on T012). The full-width row (T016) blocks the plot (T017) so the lanes get their real ~1104px drawing area.
 - **US3 (T020–T021)** → after US2 (needs plot + timeline + expanded orchestrator).
 - **US4 (T022–T023)** → after US2 (needs the plot, T017).
-- **Polish (T024–T028)** → after all desired stories.
+- **Polish (T024–T028, T031)** → after all desired stories. T031 (first-paint flash) depends on the US2 plot (T017) + the a7be539 layout guard; runs in the Polish wave alongside T024–T028.
 - **Headline rework (T029–T030)** → follow-up after US1 (extends the shipped T007/T010). TDD: test (T029) precedes impl (T030). Independent of US2–US4 — touches only `deriveHeadline` + its unit test; can land any time after US1.
 
 ### Within each story
@@ -197,7 +197,7 @@ US1 (collapsed MVP) → US2 (expanded + timeline) → US3 (synced highlight) →
 
 ## Success-Criteria coverage map
 - SC-001 axis-not-legend → T013, T025
-- SC-002 shapes-not-bars @ desktop+360px → T005, T013, T016 (full-width row → real drawing area)
+- SC-002 shapes-not-bars @ desktop+360px → T005, T013, T016 (full-width row → real drawing area), T031 (no first-paint width flash; fixed-px holds from first paint)
 - SC-003 collapsed-is-a-line → T008
 - SC-004 peak == chip → T005, T013
 - SC-005 synced highlight (mouse both-ways + keyboard via plot target) → T020
