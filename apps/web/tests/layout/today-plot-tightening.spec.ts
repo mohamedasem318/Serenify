@@ -144,3 +144,58 @@ test.describe("TodayTrendPlot — fixed-px width responds to the viewport (DC-00
     expect(wide.laneWidthFromAttr).toBeGreaterThan(narrow.laneWidthFromAttr);
   });
 });
+
+/**
+ * Feature 009 / T031 — no first-paint width flash. Before the wrapper is measured (SSR + the very
+ * first client paint), `avail` falls back to DEFAULT_AVAIL (1008); on a 360px phone the fixed-px SVG
+ * would paint at ~1008 and overflow for the paint(s) before measurement snaps it to n×LANE_MIN.
+ * The fix is measure-then-render: hold the slot with a height-reserving placeholder (= PLOT_H, so
+ * NO vertical layout shift) and render the SVG only once the width is known.
+ *
+ * Why JS-disabled rather than a throttled single-frame capture: with scripting off there is no
+ * hydration and no ResizeObserver, so the page is frozen at its un-measured server output — a
+ * DETERMINISTIC snapshot of "first paint" (no frame-timing flake). If the wide SVG can ever exist
+ * pre-measurement it exists here; asserting its absence (and a correctly-sized placeholder) proves
+ * the flash is gone. The settled half ("then correct") stays covered by the DC-001 tests above.
+ */
+test.describe("TodayTrendPlot — no first-paint width flash (T031 / SC-002)", () => {
+  test("first paint (JS disabled): no wide SVG exists; a placeholder reserves the plot height", async ({
+    browser,
+  }) => {
+    const context = await browser.newContext({ javaScriptEnabled: false });
+    try {
+      const page = await context.newPage();
+      await page.setViewportSize({ width: 360, height: 800 });
+      await page.goto(HARNESS);
+
+      // the 1008-derived (overflowing) SVG must NEVER exist in the un-measured first-paint DOM
+      await expect(page.locator('[data-testid="plot-svg"]')).toHaveCount(0);
+
+      // instead, a placeholder holds the slot at the eventual plot height → no horizontal flash
+      const placeholder = page.locator('[data-testid="plot-placeholder"]');
+      await expect(placeholder).toHaveCount(1);
+      const phBox = await placeholder.boundingBox();
+      expect(phBox).not.toBeNull();
+      expect(Math.abs((phBox?.height ?? 0) - PLOT_H)).toBeLessThanOrEqual(1);
+
+      // the reserved plot region equals PLOT_H — the same height the settled SVG occupies (no CLS)
+      const containerBox = await page.locator('[data-testid="today-plot"]').boundingBox();
+      expect(Math.abs((containerBox?.height ?? 0) - PLOT_H)).toBeLessThanOrEqual(1);
+    } finally {
+      await context.close();
+    }
+  });
+
+  test("no vertical layout shift: the settled plot occupies the same height the placeholder reserved", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto(HARNESS);
+    await waitForSettled(page);
+
+    // after hydrate+measure the SVG renders; the plot region is STILL exactly PLOT_H — identical to
+    // the placeholder's reserved height, so swapping placeholder → SVG moves nothing vertically.
+    const containerBox = await page.locator('[data-testid="today-plot"]').boundingBox();
+    expect(Math.abs((containerBox?.height ?? 0) - PLOT_H)).toBeLessThanOrEqual(1);
+  });
+});

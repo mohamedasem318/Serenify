@@ -254,6 +254,12 @@ export function TodayTrendPlot({
     return () => ro.disconnect();
   }, [availableWidth]);
 
+  // Measure-then-render gate (T031): the live app only knows the true lane width AFTER the wrapper
+  // is measured. Until then `avail` falls back to DEFAULT_AVAIL and the fixed-px SVG would paint
+  // wide (overflowing a phone) for the first paint(s) before measurement snaps it — so we render
+  // the SVG only once the width is known (an explicit `availableWidth` from tests counts as known)
+  // and hold the slot with a height-reserving placeholder meanwhile.
+  const ready = availableWidth != null || measured != null;
   const avail = availableWidth ?? measured ?? DEFAULT_AVAIL;
   const { width: W, height: H, laneWidth, lanes } = buildLanePlot(seqs, avail);
   const bandKeys: Tenor[] = ["tense", "a_little_tense", "at_ease", "no_read"];
@@ -282,8 +288,11 @@ export function TodayTrendPlot({
         ))}
       </div>
 
-      {/* scrollable lane strip — fixed-px; component-local styled scrollbar + edge fades (US4) */}
+      {/* scrollable lane strip — fixed-px; component-local styled scrollbar + edge fades (US4).
+          The wrapper ALWAYS mounts so `attachWrap` can measure it; only its CONTENTS wait (T031). */}
       <div ref={attachWrap} className="relative min-w-0 flex-1">
+        {ready ? (
+          <>
         {/* The LOAD-BEARING `overflow-x: auto` lives in a Tailwind utility (not only the
             component-local `.today-plot-scroll` rule): if that rule is ever absent/stale, the
             fixed-px SVG must STILL scroll within the strip rather than spill the page. The
@@ -429,6 +438,13 @@ export function TodayTrendPlot({
           className={`today-plot-fade today-plot-fade--right pointer-events-none absolute right-0 top-0 w-9${overflowing ? " is-on" : ""}${fadeTransition}`}
           style={{ height: H }}
         />
+          </>
+        ) : (
+          // height-reserving placeholder (T031): reserves exactly H (= PLOT_H) so swapping in the
+          // measured SVG causes NO vertical layout shift; deliberately static — no spinner/shimmer
+          // (calm per Graphite), just a held slot.
+          <div data-testid="plot-placeholder" aria-hidden="true" style={{ height: H }} />
+        )}
       </div>
     </div>
   );
