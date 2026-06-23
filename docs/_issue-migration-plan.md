@@ -41,7 +41,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | 1 | 001 · `/login` `?error=expired_link` notice | `/login` does not render the `expired_link` notice | type:bug | area:web | — | CLOSED (fixed) | 2026-05-19, `hotfix/login-expired-link-notice` (login/page.tsx; tests login-page.test.tsx + login-expired-link.spec.ts) | → 001 | PKCE-callback failure redirected to `/login?error=expired_link` but no calm notice rendered; now awaits searchParams + shows amber `role=status`. |
 | 2 | 001 · Auth form components inlined, not extracted | Extract auth form primitives out of page files | type:tech-debt | area:web | — | CLOSED (fixed) | 2026-05-20, feature 003 Phase 2 (T004–T010 auth-primitive extraction sweep) | → 003 | Bespoke form primitives lived inside (auth) page files; extracted to `components/ui/auth/` so shadcn swap touched one place. *(type inferred — struck status was only "resolved")* |
-| 3 | 001 · Cross-tab auth state sync | Cross-tab auth state sync (sign-in/out propagation) | type:feature | area:web | — | CLOSED (fixed) | 2026-05-22, feature 003 Phase 11 (T059–T063; Decision N amendment commit `0e4637f`) | → 003 | Confirming in a new tab didn't update the original tab; `CrossTabAuth` + `auth-broadcast.ts` now propagate via storage events. *(type judgment — feature vs bug; see Flag B)* |
+| 3 | 001 · Cross-tab auth state sync | Cross-tab auth state sync (sign-in/out propagation) | type:bug | area:web | — | CLOSED (fixed) | 2026-05-22, feature 003 Phase 11 (T059–T063; Decision N amendment commit `0e4637f`) | → 003 | Confirming in a new tab didn't update the original tab; `CrossTabAuth` + `auth-broadcast.ts` now propagate via storage events. *(type:bug — corrected a defect; see Flag B)* |
 | 4 | 001 · Supabase email templates carry unused OTP block | Customize Supabase email templates to Serenify voice | type:polish | area:db | — | OPEN | — | → 017 / first real-email env | Confirmation + recovery emails ship generic Supabase boilerplate (magic link + OTP); author `supabase/templates/*.html` + wire via `config.toml`. *(area: Supabase-config, see Flag C)* |
 | 5 | 001 · OTP submit transient-stale-render flake | OTP submit button transient stale-render flake | type:bug | area:web | status:watch | OPEN | — | monitor | First-attempt OTP submit stayed disabled despite valid input; suspected Strict-Mode/HMR dev race; escalate to bug on reproduction. |
 | 6 | 001 · Node 22.11 forces happy-dom + .mts config | Revert to jsdom + `.ts` Vitest config after Node upgrade | type:tech-debt | area:web | — | OPEN | — | → before 005 (overdue — see Flag F) | Node 22.11 can't `require(esm)`; forces `vitest.config.mts` + happy-dom. Upgrade Node 22.13+, revert to jsdom + `.ts`. |
@@ -49,14 +49,14 @@
 | 8 | 001 · HMR WebSocket console spam at 127.0.0.1 | HMR WebSocket failures spam console at 127.0.0.1:3000 | type:polish | area:web | status:watch | OPEN | — | optional | Loading dev at `127.0.0.1` (not `localhost`) breaks HMR WS; optional `allowedDevOrigins` fix. |
 | 9 | 001 · Force re-sign-in after password reset | Optional force re-sign-in after password reset | type:feature | area:web | — | OPEN | — | revisit if corporate deploy needs | Auto-sign-in after PKCE reset today; some security postures prefer forced re-auth; per-deployment config later. |
 | 10 | 001 · Dedicated `/verify-otp` route | Dedicated `/verify-otp` route | type:feature | area:web | — | OPEN | — | only if use case emerges | OTP entry is inline on signup/forgot panels; a dedicated route would make it linkable/first-class. |
-| 11 | 001 · Password strength meter (entropy-based) | Password strength meter (entropy-based) — kept-as-rejected | type:feature | area:web | — | OPEN | — | keep listed, do-not-action | OWASP-discouraged; rejected in favour of the requirements checklist; logged so it isn't re-proposed. *(rejected/keep-listed; `wontfix` not created — see Flag K)* |
+| 11 | 001 · Password strength meter (entropy-based) | Password strength meter (entropy-based) — kept-as-rejected | type:feature | area:web | — | CLOSED (not planned) | decided — requirements-checklist approach chosen, entropy meter intentionally not implemented | keep listed, do-not-action | OWASP-discouraged; rejected in favour of the requirements checklist; logged so it isn't re-proposed. *(closed-as-not-planned; `wontfix` not created — see Flag K)* |
 
 ## From feature 002 (demo-seed-data) — merged 2026-05-18
 
 | # | BACKLOG anchor | Proposed title | type | area(s) | priority/status | State | Resolution (if closed) | Target feature | One-line body summary |
 |---|---|---|---|---|---|---|---|---|---|
 | 12 | 002 · CI integration for `test:seed:integration` | Wire `test:seed:integration` into CI (Supabase-in-CI) | type:feature | area:infra, area:db | — | OPEN | — | → 008 CI setup | Seed integration suite runs only on Mohamed's laptop (no `.github/workflows/` yet); pair with feature 008's Supabase-in-CI need. *(deferred-feature per status, though CI-tooling-flavored)* |
-| 13 | 002 · Cleaner error when Supabase unreachable | Friendly error when local Supabase is unreachable | type:polish | area:db | — | OPEN | — | any polish pass / pre-016 seed work | Seed script surfaces raw `ECONNREFUSED` stack; wrap first call to print a one-line friendly message + clean exit. *(area: seed/Supabase, see Flag C)* |
+| 13 | 002 · Cleaner error when Supabase unreachable | Friendly error when local Supabase is unreachable | type:polish | area:infra | — | OPEN | — | any polish pass / pre-016 seed work | Seed script surfaces raw `ECONNREFUSED` stack; wrap first call to print a one-line friendly message + clean exit. *(area:infra — seed/dev-tooling, not DB schema; see Flag C)* |
 
 ## From feature 003 (employee-dashboard-shell) — merged 2026-05-25
 
@@ -80,14 +80,14 @@
 | 29 | 003 · "Send a new confirmation" link contrast | "Send a new confirmation" link contrast underweight (light) | type:polish | area:web | — | OPEN | — | → design-system pass | Sign-in resend link falls short of AA in light mode; single-token review to ≥4.5:1. |
 | 30 | 003 · Extend ST-9 recovery e2e end-to-end | Extend ST-9 to assert recovery submits password update e2e | type:tech-debt | area:web | — | OPEN | — | → testing/e2e-quality pass | ST-9 checks recovery navigation only, not the actual password-submit; a `config.toml [auth]` change could silently break recovery. |
 
-## From security slice 3 (privileged-endpoints-and-input-validation) — in progress
+## From security slice 3 (privileged-endpoints-and-input-validation) — merged 2026-05-25
 
 | # | BACKLOG anchor | Proposed title | type | area(s) | priority/status | State | Resolution (if closed) | Target feature | One-line body summary |
 |---|---|---|---|---|---|---|---|---|---|
 | 31 | sec-3 · Invite audit log | Invite audit log — record who invited whom | type:feature | area:web, area:db | — | OPEN | — | → 017 | `POST /api/admin/invite` writes no audit trail; add a structured log or `invite_audit` table (+ RLS) for provenance. |
 | 32 | sec-3 · Concurrent-duplicate-invite idempotency | Concurrent-duplicate-invite idempotency | type:tech-debt | area:web | — | OPEN | — | → 017 | Two parallel invites for one email yield one 201 + one 500; add an idempotency key so concurrent dupes collapse to 200/409. |
 
-## From security slice 7 (rate-limits-and-parity) — in progress
+## From security slice 7 (rate-limits-and-parity) — merged 2026-05-26
 
 | # | BACKLOG anchor | Proposed title | type | area(s) | priority/status | State | Resolution (if closed) | Target feature | One-line body summary |
 |---|---|---|---|---|---|---|---|---|---|
@@ -111,7 +111,7 @@
 | # | BACKLOG anchor | Proposed title | type | area(s) | priority/status | State | Resolution (if closed) | Target feature | One-line body summary |
 |---|---|---|---|---|---|---|---|---|---|
 | 42 | recon · Store extraction/pipeline-version per anchor | Store `anchor_extraction_version` for auto-invalidation | type:tech-debt | area:db, area:ml-video, area:api | — | OPEN | — | → before prod / next ml-video extraction change | Anchors track only `model_version`; an extraction-only change (LBP hotfix) didn't auto-invalidate; add a stored extraction version. |
-| 43 | recon · End-to-end extraction-vs-notebook fidelity | End-to-end extraction-vs-notebook fidelity check (real clip) | type:tech-debt | area:ml-video, area:api | — | OPEN | — | → 008 go/no-go gate | Full chain never run end-to-end on a real StressID clip vs the notebook within float tolerance. **⚠ may be resolved by feature-008 fidelity validation (2026-06-20) but BACKLOG entry is un-struck — see Flag R.** |
+| 43 | recon · End-to-end extraction-vs-notebook fidelity | End-to-end extraction-vs-notebook fidelity check (real clip) | type:tech-debt | area:ml-video, area:api | — | OPEN | — | → 008 go/no-go gate | Full chain never run end-to-end on a real StressID clip vs the notebook within float tolerance. **V1 verdict 2026-06-24 — stays OPEN: checked specs/008, PROGRESS, DECISIONS, CHANGELOG, MODELS + git log; no committed StressID-vs-notebook full-chain validation found. 008's "bit-identical (max\|Δ\|=0) GATE 1" is the keep-up tail-decode vs whole-file decode (a different check), and 008 treats single-clip extraction as faithful-by-construction citing only the isolated LBP-TOP guard `test_lbp_interpolation_fidelity.py` — exactly what #43 says is NOT the end-to-end check. Not closeable on committed evidence; see Flag R.** |
 
 ## From feature 005 (calibration-capture-flow) — merged 2026-06-08
 
@@ -136,7 +136,7 @@
 | 50 | 008 · In-memory smoothing buffer multi-worker | Smoothing buffer needs session affinity / shared cache (multi-worker) | type:tech-debt | area:api | status:watch | OPEN | — | → production-deploy target | Per-session in-memory `_SessionBuffers`; >1 worker needs affinity/Redis; restart re-warms (~90s). Fine for single-worker MVP. |
 | 51 | 008 · Dev `--reload` leaves bloom stuck | Dev `--reload` leaves live bloom permanently "getting a read" | type:tech-debt | area:api, area:docs | status:watch | OPEN | — | → dev-diagnostic (recorded) | Recorded dev fingerprint: `--reload` worker restarts drop the smoothing buffer, re-warming each time; use `--reload-dir app`, don't edit `app/` mid-session. |
 | 52 | 008 · Live-monitor readings stability | Live-bloom durability (decouple from live-response delivery) | type:bug | area:api, area:web | status:watch | OPEN | — | → production-deploy (stability first) | Make the bloom latch off the durable `window_readings` poll, not the live response; buffer restart-resilience; investigate 166s upload cessation + mid-session auth event. *(self-suggested: type:bug, area:api +area:web)* |
-| 53 | 008 · Feature-016 coarse-aggregate read path + time ranges | Team-lead coarse-aggregate read path + multi-range time selection | type:feature | area:db, area:web | — | OPEN | — | → 016 (and 017 for org-wide) | 016 must expose manager visibility via a tightly-scoped SECURITY DEFINER rollup (coarse bands only, no raw readings, no service-role) + a 1wk–1yr time-range selector. **"merged 2026-06-24" = a BACKLOG-entry merge (absorbed the 001 manager-visibility item), NOT work-done — state OPEN; see Flag X.** |
+| 53 | 008 · Feature-016 coarse-aggregate read path + time ranges | Team-lead coarse-aggregate read path + multi-range time selection | type:feature | area:db, area:web | — | OPEN | — | → 016 (and 017 for org-wide) | 016 must expose manager visibility via a tightly-scoped SECURITY DEFINER rollup (coarse bands only, no raw readings, no service-role) + a 1wk–1yr time-range selector. **"consolidated 2026-06-24" = a BACKLOG-entry consolidation (absorbed the feature-001 manager-visibility item), NOT work-done — state OPEN; see Flag X.** |
 | 54 | 008 · Camera route must register in every PP/CSP touchpoint | Capture route must register in all 3 camera-policy touchpoints | type:tech-debt | area:web | status:watch | OPEN | — | → pre-build (guard would retire the class) | A `getUserMedia` route must be in `CAPTURE_ROUTES` + the `camera=()` negative-lookahead + `isCaptureRoute`; a lint/test guard would prevent the silent-dead-camera regression. |
 | 55 | 008 · US4 ambient "weather of the day" view | US4 ambient trend view + feel/precise toggle | type:feature | area:web | — | OPEN | — | → post-demo, after 010 | A second, lower-precision ambient trend representation + toggle; revisit must use Serenify band vocabulary, not weather iconography. |
 | 56 | 008 · Stale `window_eval_config` (30s) in metadata.json | Annotate/remove stale 30s `window_eval_config` in model metadata | type:tech-debt | area:ml-video, area:docs | — | OPEN | — | → next model-owner maintenance | Model artifact carries a stale 30s eval block (prod is 60s/10s); model-owner doc-note only — NO model_version bump / NO artifact-hash change. |
@@ -160,15 +160,17 @@
 | Metric | Count |
 |---|---|
 | **Total issues** | **63** |
-| OPEN | 59 |
+| OPEN | 58 |
 | CLOSED (created-then-closed as fixed) | 4 |
+| CLOSED (not planned) | 1 |
 | `priority:blocker` | 2 |
 | `status:watch` | 9 |
 
 - **CLOSED-as-fixed (4):** #1, #2, #3 (feature 001), #44 (feature 005).
+- **CLOSED-as-not-planned (1):** #11 (password strength meter — decided do-not-implement).
 - **`priority:blocker` (2):** #33 (`/signup` open self-serve), #46 (ToS/Privacy/consent gate).
 - **`status:watch` (9):** #5, #7, #8, #48, #49, #50, #51, #52, #54.
-- **`type:` distribution:** bug 12 · tech-debt 18 · polish 10 · feature 18 · tooling 5.
+- **`type:` distribution:** bug 13 · tech-debt 18 · polish 10 · feature 17 · tooling 5.
 - **`area:` usage:** web (most), api, ml-video, db, infra, docs. **`area:ml-audio` is unused** by any current item (no audio-modality backlog items yet) — created per the taxonomy for forward use (feature 018).
 
 ---
@@ -207,36 +209,42 @@ each a `type:` from its nature (the 008 watch bullets self-suggest one, e.g. #52
 says `type:bug`). **Decision:** keep `status:watch` + a `type:` on each (current
 proposal), or `status:watch`-only? Recommend keeping both for filterability.
 
-**Flag R — #43 fidelity check: OPEN or already CLOSED?**
-The BACKLOG entry is **un-struck** (so I left it OPEN, BACKLOG-wins), but feature
-008's served-path fidelity was validated bit-for-bit vs the notebook on a real
-StressID clip (2026-06-20). This may already be satisfied. **Decide:** confirm
-whether #43 should migrate as CLOSED (with the 2026-06-20 validation as
-resolution) — and if so, **fix the BACKLOG entry first** (BACKLOG is source of
-truth), then create-and-close. Until confirmed I leave it OPEN.
+**Flag R — #43 fidelity check: RESOLVED 2026-06-24 → stays OPEN (NOT-COVERED).**
+Investigated whether feature-008's *reported* 2026-06-20 served-path validation
+covers #43's ask (a real StressID clip through the full `ml_video` chain vs the
+notebook's `compute_anchor_from_video` / `extract_full_feature_vector` within float
+tolerance). Checked specs/008, PROGRESS, DECISIONS, CHANGELOG, MODELS + git log:
+**no committed end-to-end StressID-vs-notebook validation exists.** 008's
+"bit-identical (max|Δ|=0, cosine=1.0) GATE 1" is the keep-up tail-decode vs the
+whole-file decode — a *different* comparison; 008 treats single-clip extraction as
+faithful-by-construction, citing only the isolated LBP-TOP golden
+(`test_lbp_interpolation_fidelity.py`) — exactly the isolated guard #43 says is NOT
+the end-to-end check. Not closeable on committed evidence → **migrate OPEN.**
 
-**Flag B — #3 Cross-tab auth sync: `type:feature` vs `type:bug`?**
-Framed in BACKLOG as a smoke-test defect ("original tab did not update") but
-delivered as net-new cross-tab propagation capability. I chose `type:feature`.
-Confirm, or down-classify to `type:bug`.
+**Flag B — #3 Cross-tab auth sync: RESOLVED 2026-06-24 → `type:bug`.**
+Framed in BACKLOG as a smoke-test defect ("original tab did not update"); though
+delivered as cross-tab propagation, it **corrected a defect**, so it migrates as
+`type:bug` (down-classified from the earlier `type:feature` proposal). Already
+CLOSED (fixed) either way — this is a tidy consistency call.
 
-**Flag C — #4 / #13 area for `supabase/` config + repo-root seed?**
-#4 (email templates under `supabase/templates/` + `config.toml`) and #13 (seed
-script reachability) have no clean `area:` — `area:db` is "Supabase/migrations/
-RLS", which these aren't strictly. I used `area:db` as the closest Supabase
-umbrella. Confirm, or prefer `area:infra` / a new `area:` (not recommended in v1).
+**Flag C — #4 area for `supabase/` config? (#13 RESOLVED → `area:infra`.)**
+#4 (email templates under `supabase/templates/` + `config.toml`) has no clean
+`area:` — `area:db` is "Supabase/migrations/RLS", which it isn't strictly; kept as
+the closest Supabase umbrella (confirm, or prefer `area:infra`). **#13 RESOLVED
+2026-06-24 → `area:infra`** (the seed-reachability friendly-error is seed/dev-tooling,
+not DB schema — a label call, no BACKLOG change).
 
 **Flag G — #7 postcss advisory: no `type:security` label.**
 A dependency/security-advisory watch item. The taxonomy has no security type; I
 used `type:tech-debt` + `status:watch`. Confirm that's acceptable (vs adding a
 `type:security`, which would be a taxonomy change).
 
-**Flag K — #11 Password strength meter: rejected-but-kept.**
-Explicitly rejected ("keep listed; not a follow-up to action") — effectively
-`wontfix`, but `wontfix` is intentionally not created. Per the "all items
-migrate" rule it migrates as `type:feature` OPEN, with the body stating it's a
-rejected/do-not-implement record. Confirm this handling (vs creating `wontfix`
-after all, or closing it immediately as "not planned").
+**Flag K — #11 Password strength meter: RESOLVED 2026-06-24 → CLOSED (not planned).**
+Decided: migrate as `type:feature` but **created-then-closed as "not planned"**
+(GitHub `state_reason: not_planned`), the body recording the decided
+do-not-implement rationale (requirements-checklist approach chosen; entropy meter
+OWASP-discouraged). `wontfix` label still not created. BACKLOG entry updated to a
+decided do-not-implement record.
 
 **Flag P — #41 Feature-005 scope pointer: partial resolution.**
 2 of 3 sub-items are DONE (anchor read-path via 008; calibration UX via 005 PR
