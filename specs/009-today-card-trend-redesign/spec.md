@@ -95,6 +95,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
 - **Single session, single reading**: renders as a single dot in both the mini-trend and the expanded plot (a one-point "run").
 - **Entire session is no-read**: hollow marker on the dedicated no-read lane in both surfaces; never placed on the calm line; its chip tone is the muted "no clear read".
 - **Day peaked below tense**: headline keyword reflects the true peak (meadow/calm or "a little tense") and must not use the amber "tense" wording.
+- **Day peaked then recovered**: when the day reached a tension peak (tense or a-little-tense) and the most recent session sits at a lower band, the headline surfaces the recovery (e.g. "…then eased") rather than reporting the peak alone; recovery wording never upgrades a sub-tense day to "tense".
 - **Warm-up at session start and lost-read mid-session co-occur**: both render as faded/eased stretches; neither bridges at a fixed level.
 - **Many sessions (overflow)**: horizontal scroll with min-lane-width and edge fades; all sessions reachable.
 - **Reduced motion**: all transitions (expand, highlight, fades) are suppressed.
@@ -105,7 +106,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
 ### Functional Requirements
 
 - **FR-001**: The collapsed today card MUST present a glanceable summary: an honest templated headline that names the day's real peak, plus a wide-short **mini step-line** carrying the day's shape (each session's peak band over the day), with the headline keyword colour echoing the day's peak band.
-- **FR-002**: The headline MUST use the amber "tense" wording **only** when the day actually reached the tense band; otherwise it MUST reflect the true (lower) peak.
+- **FR-002**: The headline MUST use the amber "tense" wording **only** when the day actually reached the tense band; otherwise it MUST reflect the true (lower) peak. **Recovery honesty**: when the day reached a tension peak (tense or a-little-tense) but the **most recent** session sits at a **lower** band than that peak (the user has eased/recovered), the headline MUST surface that recovery (e.g. "…then eased") rather than reporting the peak alone. Recovery wording MUST NOT upgrade a sub-tense day to "tense" — the tense word still appears only when the tense band was actually reached.
 - **FR-003**: The collapsed mini-trend MUST render as a connected step-line, never as isolated/floating dots. A no-read session within it MUST appear as a hollow marker on its own low lane, never on the calm line.
 - **FR-004**: The card MUST expand and collapse **in place** via a single toggle ("View today" ↔ "Hide today"); the toggle MUST be keyboard-operable and expose its expanded/collapsed state to assistive technology.
 - **FR-005**: In the expanded view, each session MUST be drawn as a **step shape** with subtly rounded corners across discrete bands; consecutive same-band windows MUST collapse into one run and only transitions are drawn. A session with a single confident reading MUST render as a single dot.
@@ -178,7 +179,7 @@ On a day with more sessions than fit the card width, the employee still sees **a
 - **SC-007**: Amber chip text, axis tension labels, and the headline keyword meet WCAG AA in both light and dark themes, at the measured ratios recorded in DC-007 (re-verified at build time, not assumed).
 - **SC-008**: No stress-probability value is present anywhere in the client (network payloads, DOM text, or attributes); the only numeric digits shown are clock times.
 - **SC-009**: All reads remain owner-scoped and run as the signed-in user, honoring the existing SELECT column whitelist; no read surface is broadened by this feature.
-- **SC-010**: The honesty rules hold across fixtures: warm-up and lost-read stretches fade rather than bridge; a fully no-read session shows a hollow marker on its own lane and never on the calm line; the headline never uses the "tense" wording for a day that did not reach tense.
+- **SC-010**: The honesty rules hold across fixtures: warm-up and lost-read stretches fade rather than bridge; a fully no-read session shows a hollow marker on its own lane and never on the calm line; the headline never uses the "tense" wording for a day that did not reach tense; and a day that reached a tension peak but whose most recent session sits at a lower band surfaces the recovery (e.g. "…then eased") rather than reporting the peak alone.
 
 ## Assumptions
 

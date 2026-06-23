@@ -4035,3 +4035,56 @@ shipped and the non-negotiable anti-totem requirement.
 **Revisit if**: a future surface needs the today headline copy (it would then be shared
 and require re-scoping); or a visual pass deepens the amber line colours (graphic-only,
 no AA-text penalty — spec A-005).
+
+---
+
+## 2026-06-23 — 009 headline rework: recovery behavior (spec) + copy/voice decisions (presentation)
+
+**Status**: Accepted.
+
+The today-card headline is being reworked. **One part is a behavior change** (recorded
+in the spec — the FR-002 / SC-010 recovery extension); **the rest is presentation copy**
+and is recorded here so `/speckit-analyze` stays consistent and the implementer has the
+contract. This refines the 2026-06-22 "Honest three-level headline (R-2)" decision — the
+three-level honesty is unchanged — and adds the recovery branch plus the wording shape.
+Docs/governance only; the `deriveHeadline` code + tests land in a separate follow-up.
+
+**Behavior change (spec, not copy) — surface recovery, not just the peak.** A day that
+reached a tension peak (tense or a-little-tense) but whose **most recent** session sits at
+a **lower** band (the user eased/recovered) MUST surface that recovery (e.g. "…then eased")
+rather than reporting the peak alone. The existing honesty rule is preserved: "tense"
+wording appears **only** when the tense band was actually reached, and recovery wording
+never upgrades a sub-tense day to "tense". This is the WHAT — recorded as the 009 FR-002 /
+SC-010 extension; the exact strings are the follow-up's to propose for a final eyeball.
+
+**Copy decisions (presentation-only; no spec change):**
+
+- **Voice**: second-person ("your morning…"). **No trailing period** on any headline.
+- **Amber scope narrowed**: the amber `hot` keyword span (rendered `--amber-head`, weight
+  700) is the **bare state descriptor only** — "tense" / "a little tense". The part-of-day
+  is **NOT** inside the amber span; it moves to `pre` / `post`. (The headline data shape
+  stays `pre` + `hot` + `post`; only what falls inside `hot` narrows.)
+- **Part-of-day rule for calm→tension arcs**: name **both** parts of day when the calm
+  phase and the peak phase are **different** parts of day ("Your morning started calm, then
+  you had a tense afternoon"); **collapse** to a time-neutral second clause when they are
+  the **same** part of day ("Your morning started calm, then turned tense"), to avoid
+  repeating the part-of-day word.
+- **"No clear read today"** stays **impersonal** — no "your", no period. It describes a
+  measurement gap, not the user's state.
+- **Honesty preserved throughout**: the tense word appears only when tense was reached;
+  "a little tense" for an a-little-tense peak; calm wording (no amber `hot`) otherwise.
+
+**Rationale**: the recovery branch is the honest read of a day that improved — reporting
+only the peak would overstate the user's *current* state, the same dishonesty the redesign
+exists to remove. The copy rules (second-person, no period, amber = bare descriptor,
+same-part-of-day collapse, impersonal no-read) are presentation choices with no AA or
+read-surface implication, so they are logged here rather than as spec requirements — but
+they are binding on the implementer and on `/speckit-analyze`.
+
+**Source**: 009 spec FR-002 / SC-010 (recovery extension); 009 tasks T029 / T030 (headline
+rework + recovery branch and its tests), which extend the now-shipped T007 / T010
+three-level honesty. Accompanies the 2026-06-22 009 fork-resolution entry.
+
+**Revisit if**: a future surface needs the today headline copy (it would then be shared and
+require re-scoping — same caveat as the 2026-06-22 entry); or product decides recovery
+should also be surfaced in the collapsed mini-trend colour (today it is headline copy only).

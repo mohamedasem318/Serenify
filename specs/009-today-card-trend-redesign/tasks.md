@@ -6,7 +6,7 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 **Input**: Design documents from `specs/009-today-card-trend-redesign/`
 **Branch**: `009-today-card-trend-redesign`
-**Prerequisites**: plan.md, spec.md (amended `c990b45`), research.md (forks resolved), data-model.md, contracts/today-trend-ui.md. Decisions: `docs/DECISIONS.md` 2026-06-22; constitution v1.5.1 (Amendments 5+6).
+**Prerequisites**: plan.md, spec.md (amended `c990b45`; FR-002/SC-010 recovery extension), research.md (forks resolved), data-model.md, contracts/today-trend-ui.md. Decisions: `docs/DECISIONS.md` 2026-06-22 + 2026-06-23 (headline rework — recovery + copy/voice); constitution v1.5.1 (Amendments 5+6).
 
 **Tests**: INCLUDED — Constitution VII mandates tests per PR and the spec/research request TDD with a Success-Criteria map. Write tests first; ensure they FAIL before implementing.
 
@@ -51,13 +51,13 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ### Tests (write first, must FAIL)
 
-- [x] T007 [P] [US1] Honest three-level headline unit tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts` (update existing headline cases): a day peaking at **a_little_tense** → `hot` reflects "a little tense" and MUST NOT contain "tense" as the level word; a day reaching **tense** → `hot` says "tense"; a **calm** day → `hot` is null (no amber keyword); the chosen peak names the real tensest session (FR-002/SC-010).
+- [x] T007 [P] [US1] Honest three-level headline unit tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts` (update existing headline cases): a day peaking at **a_little_tense** → `hot` reflects "a little tense" and MUST NOT contain "tense" as the level word; a day reaching **tense** → `hot` says "tense"; a **calm** day → `hot` is null (no amber keyword); the chosen peak names the real tensest session (FR-002/SC-010). *(Three-level honesty shipped; the headline **rework** — recovery branch + copy/voice — is added in T029/T030.)*
 - [x] T008 [P] [US1] `today-mini-trend` RTL test in `apps/web/tests/unit/components/home/today-mini-trend.test.tsx`: renders a connected step-line (≥1 connector segment), **not** isolated dots (SC-003); a no-read session → hollow marker on the low lane, never the calm line; per-session peak colour matches `tenor`.
 - [x] T009 [P] [US1] `today-view` collapsed RTL test in `apps/web/tests/unit/components/home/today-view.test.tsx` (rewrite): headline renders `pre`+`hot`+`post` with `hot` wrapped in the `--amber-head` (weight 700) keyword on the **card surface** (assert it is inside the card, not on the page background); calm day → no amber keyword; mini-trend present; single "View today" toggle exposes `aria-expanded`.
 
 ### Implementation
 
-- [x] T010 [US1] Honest three-level copy change in `deriveHeadline` (`apps/web/lib/api/monitoring-reads.ts`) — emit calm wording (no `hot`) for at-ease, "a little tense …" for an a-little-tense peak, "tense …" only when the tense band is reached; supersedes the old FR-022 "any stress reads as tense". **Presentation copy only** — no read/RLS/whitelist/probability change. Makes T007 pass. (Confirmed single-surface: feeds only the today card.)
+- [x] T010 [US1] Honest three-level copy change in `deriveHeadline` (`apps/web/lib/api/monitoring-reads.ts`) — emit calm wording (no `hot`) for at-ease, "a little tense …" for an a-little-tense peak, "tense …" only when the tense band is reached; supersedes the old FR-022 "any stress reads as tense". **Presentation copy only** — no read/RLS/whitelist/probability change. Makes T007 pass. (Confirmed single-surface: feeds only the today card.) *(↘ Extended by T030 (headline rework): recovery "…then eased" branch + second-person voice + no-period + amber-bare-descriptor + same-part-of-day collapse + impersonal no-read.)*
 - [x] T011 [US1] Implement `apps/web/components/home/today-mini-trend.tsx` — wide-short mini step-line from `trend-geometry`; per-session peak markers + faded connectors; colour per band token; no-read hollow marker. Depends on T006; makes T008 pass.
 - [x] T012 [US1] Implement the collapsed surface in `apps/web/components/home/today-view.tsx` — eyebrow (check-in count + last-read), honest headline render (`--amber-head` weight 700, on card surface), actions (Start check-in full-nav `<a>` + single toggle), mount `<TodayMiniTrend>`. Clean swap — delete the pre-`[3]` collapsed rendering. Depends on T010, T011; makes T009 pass.
 
@@ -134,6 +134,24 @@ description: "Task list — feature 009 today-card stress trend redesign"
 
 ---
 
+## Phase 8: US1 headline rework (follow-up — copy/voice + recovery branch)
+
+**Goal**: rework the today-card headline on top of the now-shipped three-level honesty (T007/T010): add the recovery branch and lock the copy/voice. **Behavior + presentation**: the recovery ("…then eased") branch is a **behavior** change (009 FR-002 / SC-010 extension); voice / no-period / amber-scope / same-part-of-day / impersonal-no-read are **presentation copy** (`docs/DECISIONS.md` 2026-06-23). Single-surface (`deriveHeadline` → today card only); no read / RLS / SELECT-whitelist / probability change.
+
+**Independent Test**: feed `deriveHeadline` a recovered day (a tension peak followed by a lower most-recent band) → the headline surfaces the recovery, not the peak alone, and never says "tense" unless tense was actually reached; a same-part-of-day calm→tension day collapses the second clause to time-neutral wording; every headline is second-person with no trailing period; the no-read line stays impersonal.
+
+### Tests (write first, must FAIL)
+
+- [ ] T029 [P] [US1] Headline rework unit tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts` (extend T007's cases — TDD, write red first): **recovery** — a day that reached a tension peak (tense or a-little-tense) whose **most recent** session is at a **lower** band surfaces the recovery (an "…then eased"-style trailing clause) rather than reporting the peak alone, and recovery wording **never** upgrades a sub-tense day to "tense" (FR-002 / SC-010 extension); **voice** — headlines are second-person and carry **no trailing period**; **amber scope** — the `hot` span is the bare state descriptor only ("tense" / "a little tense"), with the part-of-day in `pre`/`post`, never inside `hot`; **same-part-of-day collapse** — when the calm phase and the peak phase share a part of day the second clause is time-neutral (no repeated part-of-day word), and both parts are named only when they differ; **no-read** — "No clear read today" stays impersonal (no "your", no period). Behavior-level assertions; do not pin exact strings beyond these invariants.
+
+### Implementation
+
+- [ ] T030 [US1] Headline rework in `deriveHeadline` (`apps/web/lib/api/monitoring-reads.ts`) — extend the honest three-level copy (T010) with: the **recovery branch** ("…then eased" when the most-recent band is below the day's tension peak), **second-person voice**, **no trailing period**, the **amber `hot` = bare-descriptor** narrowing (part-of-day moves to `pre`/`post`), the **same-part-of-day collapse** for calm→tension arcs, and the **impersonal** no-read line. **Presentation copy + recovery behavior only** — no read / RLS / SELECT-whitelist / probability change; still single-surface (today card only). Depends on T029; refines T010. **Report the final exact strings for Mohamed's last eyeball before close-out.**
+
+**Checkpoint**: headline reworked — recovery surfaced, voice / period / amber-scope / same-part-of-day copy locked, honesty intact; final strings reported for sign-off.
+
+---
+
 ## Dependencies & Execution Order
 
 - **Setup (T001–T002)** → no deps.
@@ -143,6 +161,7 @@ description: "Task list — feature 009 today-card stress trend redesign"
 - **US3 (T020–T021)** → after US2 (needs plot + timeline + expanded orchestrator).
 - **US4 (T022–T023)** → after US2 (needs the plot, T017).
 - **Polish (T024–T028)** → after all desired stories.
+- **Headline rework (T029–T030)** → follow-up after US1 (extends the shipped T007/T010). TDD: test (T029) precedes impl (T030). Independent of US2–US4 — touches only `deriveHeadline` + its unit test; can land any time after US1.
 
 ### Within each story
 Tests first (must fail) → implementation. Geometry (T006) before any component that renders it. Components before the orchestrator wiring.
@@ -185,4 +204,4 @@ US1 (collapsed MVP) → US2 (expanded + timeline) → US3 (synced highlight) →
 - SC-007 amber AA both themes (incl. headline on card surface, not page bg) → T003
 - SC-008 no probability to client → T015
 - SC-009 RLS-as-user / whitelist intact → T015, T024
-- SC-010 honesty (warm-up/lost-read fade; no-read on own lane; headline never overstates) → T005, T007, T013
+- SC-010 honesty (warm-up/lost-read fade; no-read on own lane; headline never overstates; recovery surfaced) → T005, T007, T013, T029
