@@ -42,7 +42,6 @@ venv/
 .coverage.*
 htmlcov/
 .pytest_cache/
-.ruff_cache/
 
 # Editors / OS
 .vscode/
@@ -93,14 +92,12 @@ fix-notice-light.png
 st1-*.js
 st1-shots/
 
-# 008 live-smoke / validation / keep-up local scratch — probe scripts, run logs,
-# env backups, pid files. Machine-generated; never commit (would otherwise ride a
-# squash-merge to main). NOTE: loose 008 reference .html files are intentionally
-# NOT ignored — they are design references (incl. serenify-008followups-trend-FINAL.html,
-# the visual authority); leave those decisions to a human.
+# 008/009 smoke + validation + keep-up scratch dirs (machine-generated probe/timing
+# harnesses, env .bak backups, pid files, results.jsonl) — never commit; without this
+# they'd ride a squash-merge onto main like the 008 _scratch-* spike did.
 .smoke_*/
-.azure_keepup_*/
 .validation_*/
+.azure_keepup_*/
 
 # Claude Code: per-user local settings only; track everything else under .claude/
 # See 7a7beff (PR #3) and DECISIONS.md @ 512c1d6 — never broaden back to `.claude/`
