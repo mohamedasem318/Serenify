@@ -296,17 +296,36 @@ function phraseFor(rows: TodayTrendRow[], tenor: SessionTenor): string {
 
 // ── headline (band + time only) ──────────────────────────────────────────────────────
 
+/**
+ * The today-card headline. Rendered `{pre}<amber weight-700>{hot}</amber>{post}` — `hot` is
+ * null on a calm/no-read day. Band + time only (never a probability); single-surface (this
+ * feeds only the today card via deriveRecap → getTodayRecap → todays-checkin-card).
+ *
+ * Copy contract (009 Phase 8 — FR-002 / SC-010 + DECISIONS 2026-06-23 "headline rework"):
+ *   • Honesty (T010, kept): the standalone "tense" word appears ONLY when the tense band was
+ *     reached; an a-little-tense peak says exactly "a little tense"; a calm day carries no amber.
+ *   • Recovery (FR-002 / SC-010 extension): when the day reached a tension peak but the most
+ *     recent CONFIDENT session sits below it (the user eased), surface that recovery ("…then
+ *     eased") rather than the peak alone. A trailing read-less session is a measurement gap, not
+ *     a recovery — it is excluded from `readable`, so recovery keys off the most recent *band*.
+ *     Recovery never upgrades a sub-tense day to "tense" (`level` is the real peak).
+ *   • Voice: second-person, no trailing period. Amber `hot` is the BARE descriptor only — the
+ *     part-of-day moves to `pre`/`post`. Calm→tension arcs name both parts of day when they
+ *     differ, and collapse to a time-neutral second clause when they share one part of day.
+ *   • "No clear read today" stays impersonal (no "your", no period) — it describes a gap.
+ */
 function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
   if (!sessions.length) return { pre: "", hot: null, post: "" };
 
   const readable = sessions.filter((s) => !s.readLess);
-  if (!readable.length) return { pre: "No clear read today.", hot: null, post: "" };
+  // impersonal — a measurement gap, not the user's state (no "your", no period)
+  if (!readable.length) return { pre: "No clear read today", hot: null, post: "" };
 
   const stressed = readable.filter((s) => s.tenor === "a_little_tense" || s.tenor === "tense");
   if (!stressed.length) {
-    // a calm day — no amber clause (calm recedes; Principle V)
-    if (readable.length === 1) return { pre: `A calm ${partOfDay(readable[0]!.startedAt)}.`, hot: null, post: "" };
-    return { pre: "A calm day so far.", hot: null, post: "" };
+    // a calm day — no amber clause (calm recedes; Principle V). Second-person, no period.
+    if (readable.length === 1) return { pre: `Your ${partOfDay(readable[0]!.startedAt)} was calm`, hot: null, post: "" };
+    return { pre: "Your day has been calm so far", hot: null, post: "" };
   }
 
   // pick the tensest session (tie → the later one) as the eye-catch
@@ -316,23 +335,33 @@ function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
       ? b
       : a,
   );
-  // 009 FR-002 / SC-010 — name the REAL peak honestly (supersedes 008 FR-022 "any stress reads
-  // as tense at a glance"): the standalone "tense" descriptor appears ONLY when the tense band
-  // was reached; an a-little-tense peak says exactly "a little tense". The amber keyword colour
-  // (--amber-head) covers any tension peak; the timeline carries the per-session nuance.
   const isTense = peak.tenor === "tense";
-  const level = isTense ? "tense" : "a little tense";
-  const pod = partOfDay(peak.startedAt);
+  const level = isTense ? "tense" : "a little tense"; // bare descriptor → amber `hot`
+  const peakPod = partOfDay(peak.startedAt);
 
+  // recovery — the most recent CONFIDENT session is below the peak (readable excludes read-less,
+  // so a trailing no-read tail can't masquerade as easing). Honesty intact: `level` is the real peak.
+  const mostRecent = readable[readable.length - 1]!;
+  if (BAND_RANK[mostRecent.tenor as Band] < BAND_RANK[peak.tenor as Band]) {
+    return { pre: `Your ${peakPod} turned `, hot: level, post: ", then eased" };
+  }
+
+  // calm→tension arc — a calm session precedes the peak
   const calmBefore = readable.find((s) => s.tenor === "at_ease" && ms(s.startedAt) < ms(peak.startedAt));
   if (calmBefore) {
-    // "A calm morning, then a tense afternoon." / "…, then a little tense afternoon."
-    const connector = isTense ? "then a " : "then ";
-    return { pre: `A calm ${partOfDay(calmBefore.startedAt)}, ${connector}`, hot: `${level} ${pod}`, post: "." };
+    const calmPod = partOfDay(calmBefore.startedAt);
+    if (calmPod === peakPod) {
+      // same part of day → collapse the second clause (no repeated part-of-day word)
+      return { pre: `Your ${calmPod} started calm, then turned `, hot: level, post: "" };
+    }
+    // different parts of day → name both. Article rides in `pre` for "tense"; "a little tense"
+    // already carries its own article.
+    const article = isTense ? "a " : "";
+    return { pre: `Your ${calmPod} started calm, then you had ${article}`, hot: level, post: ` ${peakPod}` };
   }
-  // no calm session before the peak — the amber phrase leads, capitalised
-  if (isTense) return { pre: "A ", hot: `tense ${pod}`, post: "." };
-  return { pre: "", hot: `A little tense ${pod}`, post: "." };
+
+  // plain peak — stressed, but no calm phase before it and no easing after
+  return { pre: `Your ${peakPod} was `, hot: level, post: "" };
 }
 
 // ── deriveRecap ──────────────────────────────────────────────────────────────────────

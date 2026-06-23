@@ -145,7 +145,10 @@ describe("monitoring-reads — templated headline is band + time only (no probab
     const { headline } = deriveRecap(sessions, rows, NOW);
     expect(headline.hot).toBeTruthy();
     expect(headline.hot!).toMatch(/tense/i);
-    expect(headline.hot!).toMatch(/afternoon/i);
+    // amber `hot` is the BARE descriptor only — part-of-day moved to pre/post
+    // (DECISIONS 2026-06-23: amber scope narrowed). The afternoon word lives outside `hot`.
+    expect(headline.hot!).not.toMatch(/morning|afternoon|evening|night/i);
+    expect(`${headline.pre}${headline.hot}${headline.post}`).toMatch(/afternoon/i);
     expect(headline.pre).toMatch(/calm/i);
     expect(headline.pre).toMatch(/morning/i);
     expect(`${headline.pre}${headline.hot}${headline.post}`).not.toMatch(/[0-9]/);
@@ -183,6 +186,125 @@ describe("monitoring-reads — templated headline is band + time only (no probab
     const full = `${headline.pre}${headline.hot}${headline.post}`.toLowerCase();
     expect(full).toContain("tense");
     expect(full).not.toContain("a little tense");
+  });
+});
+
+// 009 Phase 8 — T029 (headline REWORK). Extends the three-level honesty (T007/T010) with the
+// recovery branch (FR-002 / SC-010 extension) + the locked copy/voice (DECISIONS 2026-06-23):
+// second-person, no trailing period, amber `hot` = bare descriptor (part-of-day in pre/post),
+// same-part-of-day collapse for calm→tension arcs, impersonal no-clear-read. Behaviour-level
+// assertions (invariants), not pinned exact strings.
+describe("monitoring-reads — headline rework: recovery + voice/copy (FR-002 / SC-010)", () => {
+  // 20:00 local — leaves room for morning / afternoon / evening sessions in one day.
+  const NOW = new Date(2026, 5, 21, 20, 0);
+  const full = (h: { pre: string; hot: string | null; post: string }) =>
+    `${h.pre}${h.hot ?? ""}${h.post}`;
+
+  it("recovery — a day that reached tense whose most-recent session sits lower surfaces the recovery", () => {
+    // tense in the afternoon, then an at-ease evening (most recent, lower band) → eased
+    const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
+    const rows = [
+      wr("a", "at_ease", 13, 5),
+      wr("a", "tense", 13, 30),
+      wr("e", "at_ease", 18, 10),
+      wr("e", "at_ease", 18, 30),
+    ];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(headline.hot).toBeTruthy();
+    expect(s).toContain("tense"); // honest: tense WAS reached
+    expect(s).toContain("eased"); // recovery surfaced, not the peak alone
+  });
+
+  it("recovery — an a-little-tense peak that eased never upgrades to the standalone 'tense'", () => {
+    const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
+    const rows = [wr("a", "a_little_tense", 13, 30), wr("e", "at_ease", 18, 10)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(s).toContain("a little tense");
+    expect(s).toContain("eased");
+    // the only "tense" is the one inside "a little tense" — recovery never overstates
+    expect(s.replace(/a little tense/g, "")).not.toContain("tense");
+  });
+
+  it("a TRAILING NO-READ session is NOT recovery — recovery keys off the most-recent CONFIDENT band", () => {
+    // calm morning, tense afternoon, then a fully read-less evening (a measurement gap, not easing)
+    const sessions = [
+      sess("m", 8, 40, "ended", iso(9, 30)),
+      sess("a", 13, 0, "ended", iso(13, 40)),
+      sess("late", 18, 0, "ended", iso(18, 40)),
+    ];
+    const rows = [
+      wr("m", "at_ease", 9, 0),
+      wr("a", "tense", 13, 30),
+      wr("late", null, 18, 5, false, "low-light"),
+      wr("late", null, 18, 20, false, "out-of-frame"),
+    ];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(s).toContain("tense"); // still reports the real peak
+    expect(s).not.toContain("eased"); // the read-less tail must NOT read as a recovery
+  });
+
+  it("amber scope — the `hot` span is the bare state descriptor only; part-of-day lives in pre/post", () => {
+    const sessions = [sess("m", 8, 40, "ended", iso(9, 30)), sess("a", 13, 0, "ended", iso(13, 40))];
+    const rows = [wr("m", "at_ease", 9, 0), wr("a", "tense", 13, 30)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    expect(headline.hot).toBeTruthy();
+    expect(["tense", "a little tense"]).toContain(headline.hot!.trim().toLowerCase());
+    expect(headline.hot!).not.toMatch(/morning|afternoon|evening|night/i);
+  });
+
+  it("voice — every non-empty headline is second-person and carries no trailing period", () => {
+    const stressed = deriveRecap(
+      [sess("m", 8, 40, "ended", iso(9, 30)), sess("a", 13, 0, "ended", iso(13, 40))],
+      [wr("m", "at_ease", 9, 0), wr("a", "tense", 13, 30)],
+      NOW,
+    ).headline;
+    const calm = deriveRecap(
+      [sess("m", 8, 40, "ended", iso(9, 30))],
+      [wr("m", "at_ease", 9, 0), wr("m", "at_ease", 9, 20)],
+      NOW,
+    ).headline;
+    for (const h of [stressed, calm]) {
+      const s = full(h);
+      expect(s).toMatch(/\byour\b/i); // second-person
+      expect(s.trim()).not.toMatch(/\.$/); // no trailing period
+    }
+  });
+
+  it("same part of day — a calm→tension arc within one part of day collapses the second clause", () => {
+    // both the calm phase and the peak phase are in the afternoon → no repeated part-of-day word
+    const sessions = [sess("a1", 13, 0, "ended", iso(13, 30)), sess("a2", 15, 30, "ended", iso(16, 0))];
+    const rows = [wr("a1", "at_ease", 13, 10), wr("a2", "at_ease", 15, 40), wr("a2", "tense", 15, 55)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(s).toContain("tense");
+    expect(s).toContain("calm");
+    expect((s.match(/afternoon/g) ?? []).length).toBeLessThanOrEqual(1);
+  });
+
+  it("different parts of day — a calm→tension arc across parts of day names both", () => {
+    const sessions = [sess("m", 8, 40, "ended", iso(9, 30)), sess("a", 13, 0, "ended", iso(13, 40))];
+    const rows = [wr("m", "at_ease", 9, 0), wr("a", "tense", 13, 30)];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline).toLowerCase();
+    expect(s).toContain("morning");
+    expect(s).toContain("afternoon");
+  });
+
+  it("no clear read — stays impersonal: no 'your', no trailing period, no amber keyword", () => {
+    const sessions = [sess("x", 13, 0, "ended", iso(13, 30))];
+    const rows = [
+      wr("x", null, 13, 5, false, "low-light"),
+      wr("x", null, 13, 20, false, "out-of-frame"),
+    ];
+    const { headline } = deriveRecap(sessions, rows, NOW);
+    const s = full(headline);
+    expect(s.toLowerCase()).toContain("no clear read");
+    expect(headline.hot).toBeNull();
+    expect(s).not.toMatch(/your/i);
+    expect(s.trim()).not.toMatch(/\.$/);
   });
 });
 
