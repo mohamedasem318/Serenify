@@ -49,7 +49,7 @@ describe("TodayTrendPlot — busy-day overflow (SC-006)", () => {
   });
 
   it("shows no edge-fades when the lanes fit the wrapper", () => {
-    render(<TodayTrendPlot seqs={BUSY.slice(0, 2)} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={BUSY.slice(0, 2)} availableWidth={1000} />);
     expect(fadeRight().className).not.toMatch(/is-on/);
     expect(fadeLeft().className).not.toMatch(/is-on/);
   });

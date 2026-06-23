@@ -27,11 +27,12 @@ const svgOf = (testid = "today-plot") => within(screen.getByTestId(testid)).getB
 
 describe("TodayTrendPlot — fixed-px, no totem (DC-001 / SC-002)", () => {
   it("at a desktop width: svg width === viewBox width === nLanes × laneWidth, no stretch", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const svg = svgOf();
-    // 4 lanes, 1008 / 4 = 252 ≥ 112 → fills; W = 4 × 252 = 1008
-    expect(svg.getAttribute("width")).toBe("1008");
-    expect(svg.getAttribute("viewBox")).toBe("0 0 1008 200");
+    // 4 lanes, 1000 / 4 = 250 ≥ 112 → fills; W = 4 × 250 = 1000. The input (1000) is deliberately
+    // NOT DEFAULT_AVAIL (1008), so a width of 1000 proves the prop drives the geometry, not the fallback.
+    expect(svg.getAttribute("width")).toBe("1000");
+    expect(svg.getAttribute("viewBox")).toBe("0 0 1000 200");
     expect(svg.getAttribute("preserveAspectRatio")).not.toBe("none");
   });
 
@@ -48,7 +49,7 @@ describe("TodayTrendPlot — fixed-px, no totem (DC-001 / SC-002)", () => {
   });
 
   it("no <rect> encodes a band height — lane backgrounds span the full plot, carry no band meaning", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const rects = svgOf().querySelectorAll("rect");
     expect(rects.length).toBeGreaterThan(0); // highlight surfaces exist…
     rects.forEach((r) => expect(r.getAttribute("height")).toBe("172")); // …but none is a band-tall bar
@@ -57,7 +58,7 @@ describe("TodayTrendPlot — fixed-px, no totem (DC-001 / SC-002)", () => {
 
 describe("TodayTrendPlot — axis, not legend (SC-001)", () => {
   it("renders exactly four left-axis level labels and zero legend swatches", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const labels = screen.getAllByTestId("axis-label").map((n) => n.textContent?.trim().toLowerCase());
     expect(labels).toEqual(["tense", "a little tense", "at ease", "no read"]);
     expect(screen.queryByTestId("plot-legend")).toBeNull();
@@ -66,7 +67,7 @@ describe("TodayTrendPlot — axis, not legend (SC-001)", () => {
 
 describe("TodayTrendPlot — height + colour per band (SC-004 / SC-010)", () => {
   it("each confident run draws a ~3px line at its band Y in the band's token colour", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const runs = screen.getAllByTestId("run");
     const byBand = (b: string) => runs.find((r) => r.getAttribute("data-band") === b)!;
 
@@ -84,7 +85,7 @@ describe("TodayTrendPlot — height + colour per band (SC-004 / SC-010)", () => 
   });
 
   it("warm-up and lost-read render faded — never a solid bridge at a fixed level", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const warmup = screen.getByTestId("warmup");
     const lost = screen.getByTestId("lostread");
     expect(Number(warmup.getAttribute("stroke-opacity"))).toBeLessThan(1);
@@ -92,7 +93,7 @@ describe("TodayTrendPlot — height + colour per band (SC-004 / SC-010)", () => 
   });
 
   it("a fully read-less session is a hollow marker on its own low lane (no_read), never the calm line", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const marker = screen.getByTestId("noread-marker");
     expect(marker.tagName.toLowerCase()).toBe("circle");
     expect(marker.getAttribute("fill")).toBe("none"); // hollow
@@ -101,7 +102,7 @@ describe("TodayTrendPlot — height + colour per band (SC-004 / SC-010)", () => 
   });
 
   it("a single confident reading is a filled dot in its band colour, not a line", () => {
-    render(<TodayTrendPlot seqs={DAY} availableWidth={1008} />);
+    render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const dot = screen.getByTestId("dot");
     expect(dot.tagName.toLowerCase()).toBe("circle");
     expect(dot.getAttribute("fill")).toBe(BAND_LINE.at_ease); // calm dot, filled (≠ hollow no-read)
