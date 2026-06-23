@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-22
 
-**Status**: Draft
+**Status**: Draft — implemented & merged 2026-06-23
 
 **Input**: User description: "Today-card stress trend visualization (redesign) — the dashboard check-in card's collapsed (glanceable) and expanded (detailed) today stress-trend surface plus the session timeline. A prior build was rejected for visual-quality failures (legend instead of axis, oversized card, totem bars, bare-dots collapsed view) and dropped; this is the corrected redesign. Visual authority: `serenify-008followups-trend-FINAL.html`."
 
