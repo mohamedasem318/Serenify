@@ -36,6 +36,11 @@ cp .env.example .env          # SUPABASE_JWT_SECRET + ALLOWED_ORIGINS (dev: http
 # ffmpeg/ffprobe on PATH (Windows: `winget install Gyan.FFmpeg`; macOS: `brew install ffmpeg`;
 # Debian/Ubuntu: `apt-get install ffmpeg`) — see "System dependency" above.
 uv sync
+# Dev with auto-reload — watcher scoped to source only (`--reload-dir app`), so
+# cache/test-file writes and branch checkouts don't restart the worker:
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir app
+# Clean live-monitor test pass — NO reload (never drops the in-memory band buffer;
+# see "Live-monitor testing" below):
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 curl localhost:8000/healthz
 ```
@@ -47,6 +52,28 @@ curl localhost:8000/healthz
 > calibration readiness gate (`GET /healthz`, FR-048) reports "temporarily
 > unavailable" and **recording never starts**. Binding `0.0.0.0` is harmless for
 > localhost dev and required for LAN access.
+
+### Live-monitor testing: don't run under bare `--reload`
+
+The feature-008 live read path keeps a **per-session in-memory smoothing buffer**
+(`_SessionBuffers` in `app/services/inference.py`); the smoothed band only latches
+after ~4 scored windows (~90 s). Any uvicorn **worker restart drops that buffer**,
+forcing a fresh ~90 s re-warm. Under **bare `--reload`** the watcher restarts on
+*any* file change in the tree — a cache write, a test-file save, a `git checkout` —
+so during a live session the bloom can stay stuck on **"getting a read on things"**
+for the whole run, even though the recap afterward shows a normal band line (the
+persisted DB rows survive each restart; only the in-memory buffer doesn't). For the
+full empirical fingerprint and the production fix, see `docs/BACKLOG.md` (the
+live-monitor readings-stability / in-memory smoothing-buffer items).
+
+So for a live-monitor test pass:
+
+- Run with **no `--reload`** (the plain `--host 0.0.0.0 --port 8000` command above)
+  for the cleanest pass, **or** scope the watcher with **`--reload --reload-dir app`**
+  so only `app/` source — not cache/test churn — can trigger a restart.
+- Either way, **don't edit `app/` source mid-session** — even under
+  `--reload-dir app`, saving a watched source file restarts the worker and drops the
+  buffer, re-warming the bloom from scratch.
 
 The service refuses to start unless the model artifacts load and pass the
 contract check (`scaler.n_features_in_ == 2958`, `model.classes_ == [0, 1]`).

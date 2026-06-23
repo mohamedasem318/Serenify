@@ -30,7 +30,7 @@ select has_column_privilege('authenticated','public.profiles','anchor_vector','U
 cd apps/api
 uv sync --frozen                     # installs from uv.lock (incl. editable ../../packages/ml-video)
 cp .env.example .env                 # then fill SUPABASE_JWT_SECRET + ALLOWED_ORIGIN (never commit .env)
-uv run uvicorn app.main:app --reload --port 8000
+uv run uvicorn app.main:app --reload --reload-dir app --port 8000   # watch source only (avoids churn restarts)
 ```
 
 - `SUPABASE_JWT_SECRET` — the local Supabase JWT secret (from `supabase status`
