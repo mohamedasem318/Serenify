@@ -182,16 +182,18 @@ Amendment 7: 1.5.1 → 1.5.2 (2026-06-23, PATCH)
 Bump rationale: Technology Stack (Locked), Charts row — ratify a narrow,
 already-decided carve-out (`docs/DECISIONS.md` 2026-06-22, Decision 4): bespoke
 affective micro-visualizations — specifically feature 009's employee today-card
-stress trend — MAY use hand-authored inline SVG. Recharts' `ResponsiveContainer`
-stretches to `width:100%`, which is structurally the "totem" stretch that feature
-009's fixed-pixel rendering (DC-001: 1 SVG unit = 1 screen pixel) exists to
-forbid, so the locked charts library is unsuitable for this one surface. The
-carve-out is narrow: Recharts remains the locked default for standard dashboard
-data charts, and a general charting-library substitution still requires its own
-amendment. Precedent already exists on `main` (`today-view.tsx`,
-`session-trend.tsx`). PATCH bump: documents an existing decision and scopes one
-locked-stack row; no new/removed principle, no structural change, and no library
-substitution for standard charts.
+stress trend — MAY use hand-authored inline SVG. The load-bearing reason is
+bespoke geometry: the trend is a custom lane-geometry visualization
+(run-collapsed lanes, a custom stress-band-to-Y encoding, no-read markers, a
+step-line) that is not one of Recharts' standard chart types, so building it in
+Recharts would mean working against the library's chart abstractions rather than
+with them. It also requires pixel-exact, non-stretched rendering (DC-001: 1 SVG
+unit = 1 screen pixel). The carve-out is narrow: Recharts remains the locked
+default for standard dashboard data charts, and a general charting-library
+substitution still requires its own amendment. Precedent already exists on `main`
+(`today-view.tsx`, `session-trend.tsx`). PATCH bump: documents an existing
+decision and scopes one locked-stack row; no new/removed principle, no structural
+change, and no library substitution for standard charts.
 
 Affected templates: none. The .specify/templates/{plan,spec,tasks}-template.md
 reference the locked stack by section, not by the "Recharts" literal; no template
@@ -561,11 +563,14 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 **Charting carve-out (Amendment 7):** Recharts is the locked default for standard
 dashboard data charts. A narrow exception applies to bespoke affective
 micro-visualizations — specifically feature 009's employee today-card stress
-trend — which MAY use hand-authored inline SVG where Recharts' stretch-to-fit
-`ResponsiveContainer` cannot satisfy a fixed-pixel, non-stretched rendering
-requirement (DC-001: 1 SVG unit = 1 screen pixel). This exception does NOT
-authorize a general charting-library substitution, which still requires its own
-amendment. Origin: `docs/DECISIONS.md` 2026-06-22 (Decision 4).
+trend — which MAY use hand-authored inline SVG. The reason is bespoke geometry:
+the trend is a custom lane-geometry visualization (run-collapsed lanes, a custom
+stress-band-to-Y encoding, no-read markers, a step-line) that is not a standard
+Recharts chart type, so expressing it in Recharts would mean working against the
+library's chart abstractions; it also requires pixel-exact, non-stretched
+rendering (DC-001: 1 SVG unit = 1 screen pixel). This exception does NOT authorize
+a general charting-library substitution, which still requires its own amendment.
+Origin: `docs/DECISIONS.md` 2026-06-22 (Decision 4).
 
 TypeScript strict mode and Python type hints are mandatory across all
 application code. `any` (TS) and untyped `Any`/`dict` (Python) MUST be
