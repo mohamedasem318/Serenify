@@ -202,6 +202,37 @@ edit is required.
 Cross-references:
 - docs/DECISIONS.md entry 2026-06-22 (Decision 4)
 - specs/009-today-card-trend-redesign/{plan.md V-c, research.md}
+
+Amendment 8: 1.5.2 → 1.6.0 (2026-06-23, MINOR)
+Bump rationale: Principle VIII's provisional ordering is reconciled with built
+reality and reordered, and two new planned features are added. (1) `009` is
+realized as `009-today-card-trend-redesign` — the slot previously reserved for
+the questionnaire — and `008-followups` was a follow-up branch that held no slot
+of its own. (2) `010-llm-client-and-chatbot` moves ahead of the questionnaire
+and recommendations because the LLM client is a shared dependency for both the
+chatbot and the recommendations engine — building it first unblocks both.
+(3) Two new planned features are added: `013-personalization-onboarding`
+(captures personal de-stress preferences that feed recommendations;
+recommendations v1 ships generic behind a defined preferences seam, so this
+lands as an additive layer) and `015-preferences-hub` (app/locale settings:
+language, theme, default camera, timezone). Downstream slots shift accordingly,
+and two feature-number cross-references are updated: Principle IV audio
+`015 → 018`, Principle III fusion `017 → 020`. MINOR bump: two new planned
+features plus a reorder of the provisional ordering materially change the
+guidance; no new or removed principle, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-
+template.md for the touched strings — the old slugs (`009-questionnaire`,
+`010-llm-client-and-chatbot`, `011-recommendations`,
+`012-privacy-controls-and-transparency`, `013-team-lead-dashboard`,
+`014-admin-dashboard`, `015-audio-modality`, `016-physio-modality`,
+`017-fusion`) and the literals `feature 015` / `feature 017` — zero matches;
+the templates reference principles by number, not by these literal slugs or
+feature numbers, so no template edit is required.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-23
+- docs/CHANGELOG.md entry 2026-06-23
 -->
 
 # Serenify Constitution
@@ -298,7 +329,7 @@ Each package MUST expose the same inference contract (input shape, output
 schema, confidence/quality signal). Adding a new modality MUST be a config
 change in the inference service plus a new package — never a rewrite of
 shared code. Cross-modality fusion lives in a separate fusion layer (see
-feature 017) and consumes the common interface only.
+feature 020) and consumes the common interface only.
 
 **Rationale**: Modalities arrive at different times (video first, then
 audio, then physio, then fusion). Coupling them would force every modality
@@ -324,7 +355,7 @@ directly.
   N turns) that reconciles with the physiological signal stream.
 
 **Fine-tuning clause (open decision, must close before audio modality lands
-in feature 015):** Default is prompting-only. If the team chooses to
+in feature 018):** Default is prompting-only. If the team chooses to
 fine-tune later, the fine-tuned model MUST (a) be served behind the same
 `LLMProvider` interface so app code does not change, (b) be evaluated on a
 documented held-out set with metrics published in `docs/MODELS.md`, and
@@ -481,10 +512,12 @@ implement, in that order. Implementation without a spec is forbidden.
   `003-employee-dashboard-shell`, `004-onboarding-video-anchor`,
   `005-per-user-calibration`, `006-calibration-capture-quality`,
   `007-visual-redesign`, `008-stress-inference-service`,
-  `009-questionnaire`, `010-llm-client-and-chatbot`,
-  `011-recommendations`, `012-privacy-controls-and-transparency`,
-  `013-team-lead-dashboard`, `014-admin-dashboard`,
-  `015-audio-modality`, `016-physio-modality`, `017-fusion`.
+  `009-today-card-trend-redesign`, `010-llm-client-and-chatbot`,
+  `011-questionnaire`, `012-recommendations`,
+  `013-personalization-onboarding`, `014-privacy-controls-and-transparency`,
+  `015-preferences-hub`, `016-team-lead-dashboard`,
+  `017-admin-dashboard`, `018-audio-modality`,
+  `019-physio-modality`, `020-fusion`.
 
 **Rationale**: A four-person team building an ML product needs a single
 source of truth per feature. Spec-driven development makes scope explicit,
@@ -674,4 +707,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.5.2 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-23
+**Version**: 1.6.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-23
