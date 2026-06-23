@@ -4,6 +4,65 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 009 — Today-Card Stress Trend Redesign (Polish complete; pre-merge)
+
+**Branch**: `009-today-card-trend-redesign`
+**Status**: **Polish phase complete on branch — not yet merged.** Frontend-only redesign of the
+employee dashboard today check-in card's collapsed + expanded stress-trend surfaces + session
+timeline, consuming the existing read layer unchanged (no data-layer / RLS / SELECT-whitelist
+change; no probability to the client). US1–US4 + the Phase 8 headline rework shipped earlier in the
+cycle; **this entry records the Phase 7 Polish run (T024–T028 + T031)**. Awaiting Mohamed's hand-run
+smoke gate (`smoke-tests.md`), then `/speckit-analyze`, then squash-merge to `main`.
+**Date**: 2026-06-23
+
+**Polish run shipped (T024–T028 + T031)**:
+
+- **T031 — first-paint width-flash fix (the one runtime change).** The fixed-px lane plot fell back
+  to `DEFAULT_AVAIL` (1008) until the wrapper was measured, so on a narrow viewport the SVG painted
+  wide/overflowing for the paint(s) before measurement snapped it. Fix is **measure-then-render**
+  (`today-trend-plot.tsx`): the measuring wrapper always mounts (so `attachWrap` still reads its
+  width) but the SVG renders only once the width is known (`availableWidth != null || measured != null`);
+  until then a **height-reserving placeholder (= PLOT_H)** holds the slot, so the swap shifts nothing
+  vertically (**zero CLS**). Guarded by two new `test:layout` assertions — a **JS-disabled SSR-state
+  check** (no `plot-svg` exists; placeholder reserves PLOT_H) + a settled no-CLS height check. The
+  JS-disabled approach freezes the un-measured first paint deterministically (no hydration /
+  ResizeObserver), avoiding a flaky single-frame capture.
+- **T024 — clean-swap audit.** `today-view.tsx` confirmed orphan-free (single render path, no
+  pre-`[3]` remnants); `todays-checkin-card.tsx` wiring unchanged (still loads recap+trend
+  RLS-as-user → renders `<TodayView>`); the us4 card-branch slice strengthened to assert the
+  redesigned surfaces (collapsed mini-trend → expanded axis-labelled plot, no legend).
+- **T025 — role e2e.** New `employee-dashboard-shell.spec.ts` case seeds a calibrated employee +
+  retrospective session and asserts the today card expands in place to the four-label left axis with
+  **no** bottom legend (SC-001), then collapses — verified green on chromium.
+- **T026 — `smoke-tests.md` authored** (Mohamed's hand-run visual gate: amber tokens, 360px
+  no-stretch scroll, no first-paint flash, keyboard a11y, reduced motion, day-honesty).
+- **Fold-in** — plot unit tests pass `availableWidth={1000}` (≠ the 1008 default) so the width reads
+  as an input, not the fallback.
+
+**Test results** (apps/web, 2026-06-23):
+
+- Vitest: **641 passed / 69 files**, 0 failed.
+- `test:layout` (real chromium, no DB): **5 passed** — the DC-001 360px-tighten guards + the two new
+  T031 first-paint / no-CLS guards.
+- e2e `employee-dashboard-shell.spec.ts`: **3/3 passed on chromium** (incl. the new T025 recap case).
+  Chromium-only this run (local Supabase up); firefox/webkit not run to avoid the documented
+  suite-wide load-timing flakes (not this diff).
+- `tsc --noEmit`: **green**.
+
+**Gates**:
+
+- ✅ Lint — `npm run lint` reports the **2 known pre-existing** `monitoring-session.tsx` errors
+  (223:39 reactive-srcObject, 560:5 setState-in-effect), **0 new** from this run.
+- ✅ Typecheck / Vitest / test:layout / e2e — all green (counts above).
+- ⏳ Smoke gate — `smoke-tests.md` authored (T026); **Mohamed runs it by hand** before merge (gate 5).
+  The T028 quickstart desktop+360px visual walk is carried by that smoke checklist.
+- ⏳ `/speckit-analyze` + squash-merge — pending after the smoke gate (NOT run in this Polish run).
+
+**Privacy invariant**: untouched — frontend-only; no new read, no probability on the wire, SELECT
+whitelist + RLS-as-user intact (SC-008/SC-009).
+
+---
+
 ## Feature 008 — Stress Inference Service (merged to main)
 
 **Branch**: `008-stress-inference-service`

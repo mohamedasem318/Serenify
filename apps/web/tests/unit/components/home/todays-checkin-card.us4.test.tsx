@@ -11,6 +11,11 @@ import { deriveRecap, type SessionRow, type TodayTrendRow } from "@/lib/api/moni
  * routed to calibrate-first (never an empty recap), a calibrated user with no check-ins
  * today sees the empty state, and a calibrated user with check-ins sees the recap that
  * expands in place.
+ *
+ * Feature 009 / T024 (clean-swap audit) — the recap branch now drives the REDESIGNED
+ * surfaces: the collapsed honest headline + wide-short mini step-line, expanding in place
+ * to the fixed-px lane plot with a LEFT AXIS (four level labels, NO bottom legend). The
+ * card→TodayView wiring is unchanged; this slice pins that the new surfaces actually mount.
  */
 
 const iso = (h: number, m: number) => new Date(2026, 5, 21, h, m).toISOString();
@@ -74,7 +79,7 @@ describe("TodaysCheckinCard — calibrate-first (no anchor; FR-019 / E4)", () =>
 });
 
 describe("TodaysCheckinCard — recap that expands in place (FR-028)", () => {
-  it("renders the templated headline and expands the today view on toggle", async () => {
+  it("renders the redesigned 009 surfaces: honest headline + mini-trend, expanding to the axis-labelled plot (no legend)", async () => {
     render(
       <TodaysCheckinCard
         userId="u1"
@@ -82,9 +87,18 @@ describe("TodaysCheckinCard — recap that expands in place (FR-028)", () => {
         deps={{ loadRecap: async () => DAY_RECAP, loadTrend: async () => DAY_ROWS }}
       />,
     );
+    // collapsed: the honest headline keyword (DAY peaks at tense) + the wide-short mini step-line
     expect(await screen.findByTestId("headline-hot")).toHaveTextContent(/tense/i);
+    expect(screen.getByTestId("today-mini-trend")).toBeInTheDocument();
+
+    // expand in place → the fixed-px lane plot with FOUR left-axis labels and NO bottom legend
     fireEvent.click(screen.getByRole("button", { name: /view today/i }));
     expect(await screen.findByRole("button", { name: /hide today/i })).toBeInTheDocument();
+    expect(screen.getByTestId("today-plot")).toBeInTheDocument();
+    expect(
+      screen.getAllByTestId("axis-label").map((n) => n.textContent?.trim().toLowerCase()),
+    ).toEqual(["tense", "a little tense", "at ease", "no read"]);
+    expect(screen.queryByTestId("plot-legend")).toBeNull();
   });
 });
 

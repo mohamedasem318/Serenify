@@ -92,6 +92,13 @@ fix-notice-light.png
 st1-*.js
 st1-shots/
 
+# 008/009 smoke + validation + keep-up scratch dirs (machine-generated probe/timing
+# harnesses, env .bak backups, pid files, results.jsonl) — never commit; without this
+# they'd ride a squash-merge onto main like the 008 _scratch-* spike did.
+.smoke_*/
+.validation_*/
+.azure_keepup_*/
+
 # Claude Code: per-user local settings only; track everything else under .claude/
 # See 7a7beff (PR #3) and DECISIONS.md @ 512c1d6 — never broaden back to `.claude/`
 .claude/settings.local.json

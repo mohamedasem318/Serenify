@@ -43,16 +43,17 @@ export default async function AppPage() {
       <div className="mx-auto w-full max-w-6xl space-y-10 pb-12">
         {hasAnchor === false && <CalibrationBanner />}
         <WelcomeBanner fullName={profile.full_name} />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-[3fr_2fr]">
-          {/* US4 (T048): the card recaps TODAY and expands in place. It needs the user id
-              (to run the browser-side RLS reads as the user) + has_anchor (null/error →
-              undefined, treated conservatively as calibrated — matches the banner logic;
-              only an explicit `false` routes to calibrate-first). */}
-          <TodaysCheckinCard userId={user.id} hasAnchor={hasAnchor ?? undefined} />
-          <div className="flex flex-col gap-6">
-            <ThingsThatMightHelpCard />
-            <RecentChatsCard />
-          </div>
+        {/* 009 / FR-012: the check-in card is its OWN full-width row so the expanded lane plot
+            gets the real ~1104px desktop drawing area (DC-002) — a half-width column would
+            cramp the lanes into the rejected totem proportions. The two secondary cards move
+            to a grid BELOW. US4 (008 T048): the card recaps TODAY and expands in place; it
+            needs the user id (to run the browser-side RLS reads as the user) + has_anchor
+            (null/error → undefined, treated conservatively as calibrated — matches the banner
+            logic; only an explicit `false` routes to calibrate-first). */}
+        <TodaysCheckinCard userId={user.id} hasAnchor={hasAnchor ?? undefined} />
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <ThingsThatMightHelpCard />
+          <RecentChatsCard />
         </div>
       </div>
     );

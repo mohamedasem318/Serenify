@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { createCalibratedEmployee, signInToApp } from "./anchor-helpers";
+import { seedRetrospectiveSession } from "./monitoring-helpers";
 import { createAdminClient } from "./setup/admin-client";
 import { randomEmail } from "./helpers";
 
@@ -228,4 +230,50 @@ test("employee shell at 360px: hamburger menu, single-column cards, icon-only ch
   // sr-only at ≤768px (`sr-only md:not-sr-only`); the testid + the
   // aria-label survive both viewports as the stable anchor.
   await expect(page.getByTestId("chat-pill")).toBeVisible();
+});
+
+/**
+ * Feature 009 / T025 — the today check-in card expands IN PLACE to the redesigned trend surface
+ * (Constitution VII role e2e, happy path). The two shell tests above use a fresh employee whose
+ * card sits on the empty state (no check-ins → nothing to expand); this seeds the RECAP branch —
+ * a calibrated employee (real anchor → has_anchor true, so the card never lands on calibrate-first)
+ * plus one ended session earlier today — then asserts the expanded view's load-bearing US2 contract:
+ * the level scale is the LEFT AXIS (exactly four labels), never a bottom legend (SC-001), and the
+ * whole thing expands and collapses in place on /app (no separate /app/today route). Reuses the
+ * proven anchor + retrospective-session seams from employee-monitoring.spec.ts.
+ */
+test("employee dashboard: today recap expands in place to the axis-labelled plot (no legend) and collapses", async ({
+  page,
+}) => {
+  const emp = await createCalibratedEmployee("Recap Reader");
+  await seedRetrospectiveSession(emp.id);
+  await signInToApp(page, emp);
+  await expect(page).toHaveURL(/\/app$/);
+
+  // collapsed: a single toggle exposes aria-expanded=false.
+  const viewToday = page.getByRole("button", { name: /View today/ });
+  await expect(viewToday).toBeVisible({ timeout: 30_000 });
+  await expect(viewToday).toHaveAttribute("aria-expanded", "false");
+
+  // expand IN PLACE → the fixed-px lane plot is shown with FOUR left-axis level labels and NO
+  // bottom legend (SC-001: axis, not legend). The toggle flips to Hide today / aria-expanded=true.
+  await viewToday.click();
+  const hideToday = page.getByRole("button", { name: /Hide today/ });
+  await expect(hideToday).toHaveAttribute("aria-expanded", "true");
+  await expect(page.getByTestId("today-plot")).toBeVisible();
+
+  const axisLabels = page.getByTestId("axis-label");
+  await expect(axisLabels).toHaveCount(4);
+  await expect(axisLabels).toHaveText(["tense", "a little tense", "at ease", "no read"]);
+  await expect(page.getByTestId("plot-legend")).toHaveCount(0);
+
+  // expanded in place — still on the dashboard, not a separate today page.
+  await expect(page).toHaveURL(/\/app$/);
+
+  // collapse back in place → the toggle flips back to View today / aria-expanded=false.
+  await hideToday.click();
+  await expect(page.getByRole("button", { name: /View today/ })).toHaveAttribute(
+    "aria-expanded",
+    "false",
+  );
 });

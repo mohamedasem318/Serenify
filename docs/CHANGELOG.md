@@ -2006,3 +2006,40 @@ Tests green at close: **apps/api 90, apps/web 575 (Vitest), packages/ml-video 55
 untouched (no service-role key, RLS-as-user, SELECT whitelist hides `label`/`stress_probability`, no
 probability on the wire, explicit non-wildcard CORS). No Cloud-dashboard parity items — all changes
 are in-repo (`apps/api` CORS config, `apps/web` monitoring client + session surfaces, tests).
+
+## 2026-06-22 — constitution 1.4.0 → 1.5.0 (MINOR): amber sub-tokens + amber-text value
+
+Principle V (Calm-First Design) palette: registered four amber sub-tokens for the
+stress-signal role and updated the light amber-text value. Triggered by feature 009
+(today-card trend redesign), research R-3 / DECISIONS.md Decision 2.
+
+- New tokens (light / dark): `--color-amber-text` `#8A580F` / `#E6C386`; `--amber-tint`
+  `#F4E3C6` / `#3B2F19`; `--amber-soft-line` `#D49A4A` / `#E8BC7A`; `--amber-head`
+  `#BC7A2A` / `#E4AE5C`.
+- Light amber-text value updated `#7E5310` → `#8A580F` (approved-mock warmth, ~4.78:1 on
+  the tint — passes AA). Dark amber-text `#E6C386` unchanged.
+- Bright graphic amber (`--color-amber`) reaffirmed as lines/markers only.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 5; `docs/DECISIONS.md` 2026-06-22.
+
+## 2026-06-22 — constitution 1.5.0 → 1.5.1 (PATCH): card-radius range includes 20px
+
+Principle V (Calm-First Design) visual finish: corner-radius range widened 8–16px → 8–20px
+to match the 20px (`rounded-2xl`) cards shipped since the 007 visual redesign and used by
+the 009 today card. Documentation catch-up to existing practice; no new rule. Triggered by
+feature 009, DECISIONS.md Decision 3.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 6; `docs/DECISIONS.md` 2026-06-22.
+
+## 2026-06-23 — constitution 1.5.1 → 1.5.2 (PATCH): inline-SVG carve-out for bespoke affective micro-viz
+
+Technology Stack (Locked), Charts row: ratifies a narrow carve-out — bespoke affective
+micro-visualizations (feature 009's today-card stress trend) MAY use hand-authored inline
+SVG. The load-bearing reason is bespoke lane-geometry (run-collapsed lanes, custom
+stress-band-to-Y encoding, no-read markers, step-line) that is not a standard Recharts
+chart type; pixel-exact, non-stretched rendering (DC-001: 1 SVG unit = 1 screen pixel) is
+secondary. Recharts stays the locked default for standard dashboard data charts; this does
+not authorize a general charting-library substitution. Documentation catch-up formalizing
+an existing decision; no new rule. Triggered by feature 009, DECISIONS.md Decision 4.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 7; `docs/DECISIONS.md` 2026-06-22.

@@ -3977,3 +3977,144 @@ edge is a clean, scoped followup.
 
 **Revisit at**: `008-followups` — route pause/resume/end through the fresh-token helper; first
 confirm the auto-end-on-pause behaviour (it may make this moot).
+
+## 2026-06-22 — 009 today-card trend redesign: fork resolutions (R-2 headline, R-3 amber, radius, SVG)
+
+**Status**: Accepted.
+
+These resolve the two forks + two governance notes raised in
+`specs/009-today-card-trend-redesign/plan.md` (Complexity Tracking) and
+`research.md` (R-2, R-3). Docs/governance only; the code edits land during
+`/speckit-implement`.
+
+**Decision 1 — Honest three-level headline (R-2).** 009 FR-002 / SC-010 supersede
+feature 008's `FR-022` "any stress reads as 'tense' at a glance" copy rule. The
+today-card headline names the real peak in **three** levels: **at ease** (calm
+wording, no amber keyword), **a little tense** (amber keyword), **tense** (amber
+keyword). The "tense" wording appears **only** when the tense band is actually
+reached; an a-little-tense-only day reads "a little tense", not "tense". Headline
+keyword colour: `--amber-head` for any tension peak (a little tense or tense);
+calm/meadow treatment for at-ease. **Scope (Step-1 grep outcome):** `deriveHeadline`
+is private and feeds **only** the today card — `deriveHeadline` → (only)
+`deriveRecap` → (only) `getTodayRecap` → (only) `todays-checkin-card.tsx` →
+`today-view.tsx`. It is **not** shared with the live monitor (separate
+`SessionTrend`/`getSessionTrend` subtitle), notifications, or any other surface, so
+the fix applies **directly to `deriveHeadline`** with no scoping needed and no risk
+to other surfaces. **Presentation copy only** — no read, RLS, SELECT-whitelist, or
+probability change.
+
+**Decision 2 — Amber palette tokens (R-3).** The light amber **text** token value is
+**`#8A580F`** (approved-mock choice; measured ~4.78:1 on the amber tint, 5.52:1 on the
+card surface — passes WCAG AA), **superseding** the constitution's previously-documented
+`#7E5310`. Register the new amber sub-tokens (light / dark): `--color-amber-text`
+`#8A580F` / `#E6C386` (chip text + axis tension labels); `--amber-tint` `#F4E3C6` /
+`#3B2F19` (tension chip background); `--amber-soft-line` `#D49A4A` / `#E8BC7A`
+("a little tense" graph line — graphic, not text); `--amber-head` `#BC7A2A` / `#E4AE5C`
+(headline keyword, weight 700, large text). Bright graphic amber (`--color-amber`,
+`#C98637` / `#E4AE5C`) stays on graph lines/markers only, **never** small text (2.77:1
+fails). Codified by constitution Amendment 5 (MINOR).
+
+**Decision 3 — Card radius 20px accepted.** The today card (and its plot region) use a
+20px (`rounded-2xl`) radius, matching the approved mock and the already-shipped cards on
+`main` (e.g. `session-trend.tsx`). Pre-existing drift from the 007 visual redesign;
+codified by constitution Amendment 6 (PATCH) — range widened 8–16px → 8–20px.
+
+**Decision 4 — Inline SVG, not Recharts, for the trend.** The fixed-px lane plot (DC-001:
+1 SVG unit = 1 screen pixel) is hand-authored inline SVG. Recharts' `ResponsiveContainer`
+stretches to `width:100%` — structurally the totem mechanism DC-001 forbids — so the
+stack's charts library is unsuitable for this bespoke affective micro-visualization.
+Precedent exists on `main` (`today-view.tsx`, `session-trend.tsx`). The stack table is
+unchanged; Recharts remains the default for ordinary data charts.
+
+**Rationale**: (1) the feature's central promise is an honest header — emitting "tense"
+for a non-tense day would reintroduce the dishonesty the redesign removes; (2) bright
+amber fails small-text AA, so a dedicated AA-safe text token is mandatory, and `#8A580F`
+is the warmest value that still clears AA on the tint; (3)/(4) match what is already
+shipped and the non-negotiable anti-totem requirement.
+
+**Revisit if**: a future surface needs the today headline copy (it would then be shared
+and require re-scoping); or a visual pass deepens the amber line colours (graphic-only,
+no AA-text penalty — spec A-005).
+
+---
+
+## 2026-06-23 — 009 headline rework: recovery behavior (spec) + copy/voice decisions (presentation)
+
+**Status**: Accepted.
+
+The today-card headline is being reworked. **One part is a behavior change** (recorded
+in the spec — the FR-002 / SC-010 recovery extension); **the rest is presentation copy**
+and is recorded here so `/speckit-analyze` stays consistent and the implementer has the
+contract. This refines the 2026-06-22 "Honest three-level headline (R-2)" decision — the
+three-level honesty is unchanged — and adds the recovery branch plus the wording shape.
+Docs/governance only; the `deriveHeadline` code + tests land in a separate follow-up.
+
+**Behavior change (spec, not copy) — surface recovery, not just the peak.** A day that
+reached a tension peak (tense or a-little-tense) but whose **most recent** session sits at
+a **lower** band (the user eased/recovered) MUST surface that recovery (e.g. "…then eased")
+rather than reporting the peak alone. The existing honesty rule is preserved: "tense"
+wording appears **only** when the tense band was actually reached, and recovery wording
+never upgrades a sub-tense day to "tense". This is the WHAT — recorded as the 009 FR-002 /
+SC-010 extension; the exact strings are the follow-up's to propose for a final eyeball.
+
+**Copy decisions (presentation-only; no spec change):**
+
+- **Voice**: second-person ("your morning…"). **No trailing period** on any headline.
+- **Amber scope narrowed**: the amber `hot` keyword span (rendered `--amber-head`, weight
+  700) is the **bare state descriptor only** — "tense" / "a little tense". The part-of-day
+  is **NOT** inside the amber span; it moves to `pre` / `post`. (The headline data shape
+  stays `pre` + `hot` + `post`; only what falls inside `hot` narrows.)
+- **Part-of-day rule for calm→tension arcs**: name **both** parts of day when the calm
+  phase and the peak phase are **different** parts of day ("Your morning started calm, then
+  you had a tense afternoon"); **collapse** to a time-neutral second clause when they are
+  the **same** part of day ("Your morning started calm, then turned tense"), to avoid
+  repeating the part-of-day word.
+- **"No clear read today"** stays **impersonal** — no "your", no period. It describes a
+  measurement gap, not the user's state.
+- **Honesty preserved throughout**: the tense word appears only when tense was reached;
+  "a little tense" for an a-little-tense peak; calm wording (no amber `hot`) otherwise.
+
+**Rationale**: the recovery branch is the honest read of a day that improved — reporting
+only the peak would overstate the user's *current* state, the same dishonesty the redesign
+exists to remove. The copy rules (second-person, no period, amber = bare descriptor,
+same-part-of-day collapse, impersonal no-read) are presentation choices with no AA or
+read-surface implication, so they are logged here rather than as spec requirements — but
+they are binding on the implementer and on `/speckit-analyze`.
+
+**Source**: 009 spec FR-002 / SC-010 (recovery extension); 009 tasks T029 / T030 (headline
+rework + recovery branch and its tests), which extend the now-shipped T007 / T010
+three-level honesty. Accompanies the 2026-06-22 009 fork-resolution entry.
+
+**Revisit if**: a future surface needs the today headline copy (it would then be shared and
+require re-scoping — same caveat as the 2026-06-22 entry); or product decides recovery
+should also be surfaced in the collapsed mini-trend colour (today it is headline copy only).
+
+## 2026-06-23 — 009 partial-easing honesty: "eased a little" when a recovery never reaches calm
+
+**Status**: Accepted.
+
+Partial-easing honesty for the today-card headline recovery clause. **Bare "…then eased" is
+reserved for a recovery that returns to calm (`at_ease`)**; a peak that only steps down to
+**a-little-tense** (still elevated, never reaching calm) renders **"…then eased a little"**. A
+reader takes an unqualified "eased" as "back to fine", which a tense→a-little-tense day has not
+earned — the prior recovery branch rendered an identical bare "…then eased" for both, conflating a
+full recovery with a partial one. This extends the recovery copy contract from the 2026-06-23
+"headline rework" decision (66bd2d7); implemented in `deriveHeadline` at 52c2b2d.
+
+The amber peak word and the three-level honesty are unchanged — `level` still reports the real
+peak; only the easing clause is qualified, keyed off whether the most-recent confident band is
+`at_ease`. Full bare "…then eased" was verified still correct for both **tense→calm** and
+**a-little-tense→calm** recoveries (both reach `at_ease`).
+
+**Rationale**: surfacing recovery must not overstate it. Reporting "eased" for a day that only
+stepped from tense to a-little-tense claims a return to calm that didn't happen — the same class of
+dishonesty (overstating the user's *current* state) the redesign exists to remove.
+
+**Source**: 009 headline-rework follow-up §3 (partial-easing honesty verification); implemented at
+52c2b2d — the `deriveHeadline` recovery branch in `apps/web/lib/api/monitoring-reads.ts` plus the
+PARTIAL/FULL easing tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts`. Extends the
+2026-06-23 "headline rework" decision (66bd2d7) and the now-shipped T029 / T030 recovery branch.
+
+**Revisit if**: the "a little tense" band label is collapsed to a single word (backlogged copy
+pass) — the partial-easing clause "eased a little" should be re-phrased alongside it; or product
+asks for the cross-pod easing pod to be named (backlogged), which would touch the same clause.

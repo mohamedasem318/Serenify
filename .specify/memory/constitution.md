@@ -142,6 +142,66 @@ Cross-references:
 - docs/DECISIONS.md entries 2026-06-17
 - docs/CHANGELOG.md entry 2026-06-17
 - specs/007-visual-redesign/ (spec to follow)
+
+Amendment 5: 1.4.0 → 1.5.0 (2026-06-22, MINOR)
+Bump rationale: Principle V palette — register four amber sub-tokens for the
+stress-signal role used by feature 009's today-card trend visualization:
+`--color-amber-text` (light `#8A580F` / dark `#E6C386`), `--amber-tint`
+(`#F4E3C6` / `#3B2F19`), `--amber-soft-line` (`#D49A4A` / `#E8BC7A`), and
+`--amber-head` (`#BC7A2A` / `#E4AE5C`). The documented light amber-text value is
+updated `#7E5310` → `#8A580F` (the approved-mock warmth; measured ~4.78:1 on the
+tint, passes WCAG AA; dark `#E6C386` unchanged). Bright graphic `--color-amber`
+remains lines/markers only (fails small-text AA at 2.77:1). The amber semantic
+role is unchanged — these are sub-values within the locked amber family for
+AA-safe text and multi-level graph encoding. MINOR bump: additive tokens + one
+value refinement; no new/removed principle, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-
+template.md for amber hex literals — zero matches; templates reference Principle
+V by number, not by literal palette values.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-22
+- docs/CHANGELOG.md entry 2026-06-22
+- specs/009-today-card-trend-redesign/{plan.md, research.md R-3}
+
+Amendment 6: 1.5.0 → 1.5.1 (2026-06-22, PATCH)
+Bump rationale: Principle V visual finish — corner-radius range widened
+8–16px → 8–20px to match the 20px (`rounded-2xl`) cards shipped since the 007
+visual redesign and used by feature 009's today card. Documentation catch-up to
+existing practice; no behavioral rule change. PATCH bump: clarification only; no
+new/removed principle, no structural change.
+
+Affected templates: none.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-22
+- docs/CHANGELOG.md entry 2026-06-22
+
+Amendment 7: 1.5.1 → 1.5.2 (2026-06-23, PATCH)
+Bump rationale: Technology Stack (Locked), Charts row — ratify a narrow,
+already-decided carve-out (`docs/DECISIONS.md` 2026-06-22, Decision 4): bespoke
+affective micro-visualizations — specifically feature 009's employee today-card
+stress trend — MAY use hand-authored inline SVG. The load-bearing reason is
+bespoke geometry: the trend is a custom lane-geometry visualization
+(run-collapsed lanes, a custom stress-band-to-Y encoding, no-read markers, a
+step-line) that is not one of Recharts' standard chart types, so building it in
+Recharts would mean working against the library's chart abstractions rather than
+with them. It also requires pixel-exact, non-stretched rendering (DC-001: 1 SVG
+unit = 1 screen pixel). The carve-out is narrow: Recharts remains the locked
+default for standard dashboard data charts, and a general charting-library
+substitution still requires its own amendment. Precedent already exists on `main`
+(`today-view.tsx`, `session-trend.tsx`). PATCH bump: documents an existing
+decision and scopes one locked-stack row; no new/removed principle, no structural
+change, and no library substitution for standard charts.
+
+Affected templates: none. The .specify/templates/{plan,spec,tasks}-template.md
+reference the locked stack by section, not by the "Recharts" literal; no template
+edit is required.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-22 (Decision 4)
+- specs/009-today-card-trend-redesign/{plan.md V-c, research.md}
 -->
 
 # Serenify Constitution
@@ -298,9 +358,16 @@ and every documented pairing meets WCAG AA:
   tints (e.g. a `foggy/10` attention banner) keep ink-token text.
 - **Amber stress signal:** the amber role is a soft-tint notice treatment — a
   light amber tint background with deep same-family text (light: tint `#F4E3C6`
-  / text `#7E5310`; dark: tint `#3B2F19` / text `#E6C386`), alongside amber as
+  / text `#8A580F`; dark: tint `#3B2F19` / text `#E6C386`), alongside amber as
   a graphic/indicator hue (values above). Dark ink on a solid-amber fill is
-  forbidden (fails AA and reads muddy).
+  forbidden (fails AA and reads muddy). The amber family is tokenized for the
+  stress-signal role (Amendment 5): `--color-amber-text` (chip + label text;
+  light `#8A580F` / dark `#E6C386`; AA-safe small text on the tint and the card
+  surface), `--amber-tint` (chip background; `#F4E3C6` / `#3B2F19`),
+  `--amber-soft-line` (the mid "a little tense" graph line; `#D49A4A` /
+  `#E8BC7A`), and `--amber-head` (headline keyword at weight 700 — large text;
+  `#BC7A2A` / `#E4AE5C`). The bright graphic `--color-amber` is for graph
+  lines/markers ONLY, never small text (it fails small-text AA at 2.77:1).
 - **Red is forbidden on affective and ambient surfaces** — stress detection
   states, physiological indicators, charts, status badges, notifications, and
   any in-product affective copy or imagery. Stress signals use the amber role
@@ -318,8 +385,9 @@ and every documented pairing meets WCAG AA:
 - No glassmorphism anywhere — not in cards, modals, navs, or overlays.
 - Elevation MUST use 0.5px borders and a soft `0 1px 2px rgba(0,0,0,0.04)`
   shadow. Aggressive lifts and large drop shadows are forbidden.
-- Corner radii are 8–16px. Sharp corners (≤4px) are forbidden on
-  interactive surfaces.
+- Corner radii are 8–20px (the 20px `rounded-2xl` card radius was admitted in
+  Amendment 6 to match the 007 redesign and shipped cards). Sharp corners
+  (≤4px) are forbidden on interactive surfaces.
 - Whitespace is generous; cramming is a violation. White space signals
   calm.
 
@@ -492,6 +560,18 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Type system (FE)     | TypeScript strict mode                                    |
 | Type system (BE)     | Python type hints + Pydantic                              |
 
+**Charting carve-out (Amendment 7):** Recharts is the locked default for standard
+dashboard data charts. A narrow exception applies to bespoke affective
+micro-visualizations — specifically feature 009's employee today-card stress
+trend — which MAY use hand-authored inline SVG. The reason is bespoke geometry:
+the trend is a custom lane-geometry visualization (run-collapsed lanes, a custom
+stress-band-to-Y encoding, no-read markers, a step-line) that is not a standard
+Recharts chart type, so expressing it in Recharts would mean working against the
+library's chart abstractions; it also requires pixel-exact, non-stretched
+rendering (DC-001: 1 SVG unit = 1 screen pixel). This exception does NOT authorize
+a general charting-library substitution, which still requires its own amendment.
+Origin: `docs/DECISIONS.md` 2026-06-22 (Decision 4).
+
 TypeScript strict mode and Python type hints are mandatory across all
 application code. `any` (TS) and untyped `Any`/`dict` (Python) MUST be
 justified in code review if introduced.
@@ -594,4 +674,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.4.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-17
+**Version**: 1.5.2 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-23
