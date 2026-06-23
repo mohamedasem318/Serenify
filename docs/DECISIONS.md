@@ -4163,3 +4163,75 @@ by number, not by slug or feature number, so no template edit is required.
 **Revisit if**: a later feature is realized in a different slot than the provisional list
 reserves (reconcile as done here for `009`); or the recommendations engine needs a
 preferences shape richer than the v1 default seam anticipates.
+
+---
+
+## 2026-06-24 — BACKLOG ↔ GitHub Issues mirror contract (constitution Amendment 9)
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.6.0 → 1.7.0`). Establishes the
+rules for an upcoming `docs/BACKLOG.md` → GitHub Issues migration. **This decision opens no
+issues** — the migration itself is a separate, later step; this entry + the constitution
+amendment + the `CLAUDE.md` rule only establish the contract.
+
+**Approach — BACKLOG.md is the source of truth; GitHub Issues are a 1:1 mirror.** Chosen over
+making Issues the source of truth, because the rich in-repo record (full descriptions, fix
+scopes, cross-references, the chronological "deferred-from" log) is read by both Claude Code and
+planning-Claude during specs/plans; GitHub Issues are the collaboration/visibility surface, not
+the canonical store. On any conflict, **BACKLOG wins** and the issue is reconciled to it.
+
+**Scope — *all* backlog items migrate, including already-fixed ones.** Resolved / struck-through
+entries become issues that are **created and then immediately closed**, with the real resolution
+date + commit/PR recorded in the issue body (GitHub stamps every issue "opened today", so the
+honest history must live in the body, not GitHub's timestamps). `watch` items migrate as **open**
+issues (monitor-only). Nothing in BACKLOG is deleted — it remains the append-only log; the issues
+are the mirror.
+
+**The 4-rule contract (the steady-state flow for future work):**
+1. **BACKLOG is the source of truth; Issues mirror it; BACKLOG wins on conflict.**
+2. **New follow-up → open its issue in the same change** and record `(#NN)` on the BACKLOG entry.
+3. **Fixed follow-up → mark the BACKLOG entry resolved (date + commit/PR) AND close the matching
+   issue in the same change.**
+4. **The link is two-way** — the BACKLOG entry carries `(#NN)`; the issue links back to BACKLOG.
+Never update one side without the other.
+
+**Label taxonomy** (to be created in the later migration via `gh label create`; milestones are
+intentionally skipped for now to avoid overhead):
+
+| Label | Hex | Applies to |
+|---|---|---|
+| `type:bug` | `#d73a4a` | known-wrong behavior |
+| `type:tech-debt` | `#845422` | structural cleanup |
+| `type:polish` | `#bfdadc` | UX nicety, non-blocking |
+| `type:feature` | `#0e8a16` | new capability |
+| `type:tooling` | `#5319e7` | harness/CI/dev-tooling |
+| `area:web` | `#1d76db` | `apps/web` |
+| `area:api` | `#006b75` | `apps/api` |
+| `area:ml-video` | `#8250df` | `packages/ml-video` |
+| `area:ml-audio` | `#a371f7` | audio modality |
+| `area:db` | `#fbca04` | Supabase/migrations/RLS |
+| `area:infra` | `#5a6772` | Azure/CI/cloudflared |
+| `area:docs` | `#0075ca` | docs only |
+| `priority:blocker` | `#b60205` | pre-production deploy blockers |
+| `status:watch` | `#fef2c0` | monitor-only, no work yet |
+
+**Status mapping** (BACKLOG status → label/state): `bug` → `type:bug`; `polish` → `type:polish`;
+`tech-debt` → `type:tech-debt`; `deferred-feature` → `type:feature`; `deferred-tooling` →
+`type:tooling`; `deferred-bug` → `type:bug` (legacy mislabel, being normalized to `bug` in
+BACKLOG); `watch` → `status:watch` + **open**; `resolved` → **closed**. The `type:` and
+`priority:` / `status:` labels are the governed set; `wontfix` is intentionally **NOT** created
+(no current items qualify).
+
+**Amendment artifacts** (files this change touched): `.specify/memory/constitution.md` (Principle
+VIII new bullet + version line `1.6.0 → 1.7.0` + Sync Impact Report Amendment 9 entry); `CLAUDE.md`
+("Backlog ↔ Issues" section, placed outside the SpecKit-managed block so `/speckit-*`
+regeneration cannot clobber it); `docs/BACKLOG.md` (cleanup ride-along — five stale `— in
+progress` headers flipped to `— merged <date>`; three status normalizations; the manager-visibility
+item merge into feature 016; the feature-number remap); `docs/CHANGELOG.md` (2026-06-24 line); this
+`docs/DECISIONS.md` entry.
+
+**Cross-references**: constitution Amendment 9 (`.specify/memory/constitution.md`); `docs/CHANGELOG.md`
+2026-06-24; `CLAUDE.md` "Backlog ↔ Issues".
+
+**Revisit if**: the team decides a different store should be canonical (would require re-deciding
+rule 1 and re-rating BACKLOG vs Issues); or the label taxonomy needs a new `type:`/`area:` as new
+packages/surfaces land (add the label, record it here).
