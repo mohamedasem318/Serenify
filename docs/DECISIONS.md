@@ -4088,3 +4088,33 @@ three-level honesty. Accompanies the 2026-06-22 009 fork-resolution entry.
 **Revisit if**: a future surface needs the today headline copy (it would then be shared and
 require re-scoping — same caveat as the 2026-06-22 entry); or product decides recovery
 should also be surfaced in the collapsed mini-trend colour (today it is headline copy only).
+
+## 2026-06-23 — 009 partial-easing honesty: "eased a little" when a recovery never reaches calm
+
+**Status**: Accepted.
+
+Partial-easing honesty for the today-card headline recovery clause. **Bare "…then eased" is
+reserved for a recovery that returns to calm (`at_ease`)**; a peak that only steps down to
+**a-little-tense** (still elevated, never reaching calm) renders **"…then eased a little"**. A
+reader takes an unqualified "eased" as "back to fine", which a tense→a-little-tense day has not
+earned — the prior recovery branch rendered an identical bare "…then eased" for both, conflating a
+full recovery with a partial one. This extends the recovery copy contract from the 2026-06-23
+"headline rework" decision (66bd2d7); implemented in `deriveHeadline` at 52c2b2d.
+
+The amber peak word and the three-level honesty are unchanged — `level` still reports the real
+peak; only the easing clause is qualified, keyed off whether the most-recent confident band is
+`at_ease`. Full bare "…then eased" was verified still correct for both **tense→calm** and
+**a-little-tense→calm** recoveries (both reach `at_ease`).
+
+**Rationale**: surfacing recovery must not overstate it. Reporting "eased" for a day that only
+stepped from tense to a-little-tense claims a return to calm that didn't happen — the same class of
+dishonesty (overstating the user's *current* state) the redesign exists to remove.
+
+**Source**: 009 headline-rework follow-up §3 (partial-easing honesty verification); implemented at
+52c2b2d — the `deriveHeadline` recovery branch in `apps/web/lib/api/monitoring-reads.ts` plus the
+PARTIAL/FULL easing tests in `apps/web/tests/unit/lib/monitoring-reads.test.ts`. Extends the
+2026-06-23 "headline rework" decision (66bd2d7) and the now-shipped T029 / T030 recovery branch.
+
+**Revisit if**: the "a little tense" band label is collapsed to a single word (backlogged copy
+pass) — the partial-easing clause "eased a little" should be re-phrased alongside it; or product
+asks for the cross-pod easing pod to be named (backlogged), which would touch the same clause.
