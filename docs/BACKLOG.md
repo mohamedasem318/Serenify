@@ -15,7 +15,7 @@ Status values:
 
 ## From feature 001 (auth-and-roles) — merged 2026-05-17
 
-### ~~`/login` page does not render the `?error=expired_link` notice~~ — resolved
+### ~~`/login` page does not render the `?error=expired_link` notice~~ — resolved (#30)
 **Status**: resolved
 **Resolved**: 2026-05-19 on `hotfix/login-expired-link-notice` — `login/page.tsx` now
 awaits `searchParams` and renders a calm amber `role="status"` notice above the form
@@ -33,7 +33,7 @@ the error param matches a known value. Add to the (auth) shell's error-alert com
 one exists.
 **Address by**: feature 003 start or sooner.
 
-### ~~Auth form components inlined in page files, not extracted~~ — resolved
+### ~~Auth form components inlined in page files, not extracted~~ — resolved (#31)
 **Status**: resolved
 **Resolved**: 2026-05-20 on `003-employee-dashboard-shell` Phase 2 (T004–T010 +
 commits surrounding the auth-primitive extraction sweep). `PasswordInput`,
@@ -51,7 +51,7 @@ wrappers) lived inside the (auth) page files. When shadcn/ui was introduced in
 feature 003, retrofitting would have required touching every page rather than
 swapping primitives in one location — hence the Phase 2 extraction.
 
-### ~~Cross-tab auth state sync~~ — resolved
+### ~~Cross-tab auth state sync~~ — resolved (#32)
 **Status**: resolved
 **Resolved**: 2026-05-22 on `003-employee-dashboard-shell` Phase 11 (T059–T063 +
 the Decision N amendment in commit 0e4637f). `CrossTabAuth` listener mounts at
@@ -71,7 +71,7 @@ the now-authed state — user had to refresh manually. Resolution above covers t
 plus the symmetric sign-out propagation (sign out in one tab → sibling tabs
 navigate to /login).
 
-### Supabase default email templates include unused 6-digit OTP block
+### Supabase default email templates include unused 6-digit OTP block (#33)
 **Status**: polish
 **Observed**: smoke test ST-1 of feature 001
 **Description**: Both confirmation and password-reset emails ship with a magic link AND
@@ -83,7 +83,7 @@ wire via `supabase/config.toml` `[auth.email.template.*]`.
 **Address by**: feature 017 (admin-dashboard) or whichever feature first ships to a
 real environment with real email.
 
-### OTP submit button transient-stale-render flake
+### OTP submit button transient-stale-render flake (#34)
 **Status**: watch
 **Observed**: once during smoke test ST-1 of feature 001; not reproducible afterward
 **Description**: On first OTP entry attempt of a session, the submit button stayed
@@ -92,7 +92,7 @@ React Strict Mode + hot-reload race during dev. If it appears in production or r
 in CI, escalate to bug.
 **Address by**: monitor; act only on reproduction.
 
-### Node 22.11 forces happy-dom + .mts Vitest config
+### Node 22.11 forces happy-dom + .mts Vitest config (#35)
 **Status**: tech-debt
 **Observed**: during feature 001 plan
 **Description**: Node 22.11 cannot `require(esm)` (landed in 22.12). This forces
@@ -103,7 +103,7 @@ change `environment: "happy-dom"` to `"jsdom"`, run tests, remove `happy-dom` fr
 devDependencies and add `jsdom`.
 **Address by**: any time before feature 005 (the FastAPI/ML feature) starts.
 
-### postcss XSS advisory in transitive dep
+### postcss XSS advisory in transitive dep (#36)
 **Status**: watch
 **Observed**: `npm audit` during feature 001
 **Description**: GHSA-qx2v-qp2m-jg93 (PostCSS XSS via CSS Stringify with `</style>`).
@@ -112,7 +112,7 @@ stringification at runtime). `npm audit fix --force` would downgrade Next to 9.3
 which is not viable.
 **Address by**: re-run `npm audit` and re-triage at every Next.js major version bump.
 
-### HMR WebSocket failures spam the console at 127.0.0.1:3000
+### HMR WebSocket failures spam the console at 127.0.0.1:3000 (#37)
 **Status**: watch / polish
 **Observed**: during feature 001 development
 **Description**: Loading the dev server at `http://127.0.0.1:3000` (instead of
@@ -124,7 +124,7 @@ the underlying HMR failure remains).
 if you want to support both hostnames in dev.
 **Address by**: optional; not blocking.
 
-### Force re-sign-in after password reset (security alternative)
+### Force re-sign-in after password reset (security alternative) (#38)
 **Status**: deferred-feature
 **Observed**: design discussion during feature 001
 **Description**: Current behavior auto-signs-in the user after a successful PKCE password
@@ -132,7 +132,7 @@ reset (industry standard for SaaS). Some workplace security postures prefer forc
 re-sign-in with the new password. Could be made a per-deployment config later.
 **Address by**: revisit if a corporate deployment requires it.
 
-### Dedicated `/verify-otp` route (instead of inline panels)
+### Dedicated `/verify-otp` route (instead of inline panels) (#39)
 **Status**: deferred-feature
 **Observed**: design discussion during feature 001
 **Description**: OTP entry is currently inline on the signup "check email" and
@@ -141,7 +141,7 @@ auth surface that can be linked-to directly (e.g., from a help article). Not nee
 for current scope.
 **Address by**: only if a use case emerges.
 
-### Password strength meter (entropy-based)
+### Password strength meter (entropy-based) (#40)
 **Status**: closed — not planned (decided; do-not-implement)
 **Decided**: Addressed via the password **requirements checklist** (OWASP-aligned:
 ✓ 8 characters, ✓ letter, ✓ number) — that is the chosen approach. The entropy-based
@@ -159,7 +159,7 @@ here only so a future Claude doesn't re-propose it without context.
 
 ## From feature 002 (demo-seed-data) — merged 2026-05-18
 
-### CI integration for `npm run test:seed:integration`
+### CI integration for `npm run test:seed:integration` (#41)
 **Status**: deferred-feature
 **Observed**: scope decision during /speckit.implement of feature 002
 **Description**: The seed integration test suite (`scripts/__tests__/seed-demo.integration.test.ts`)
@@ -184,7 +184,7 @@ need Supabase in CI anyway.
 **Address by**: feature 008 (stress-inference-service) CI setup, or sooner if PRs to
 `scripts/` start landing without integration coverage.
 
-### Cleaner error output when local Supabase is unreachable
+### Cleaner error output when local Supabase is unreachable (#42)
 **Status**: polish
 **Observed**: smoke test ST-10, feature 002
 **Description**: When the seed script encounters a fetch failure
@@ -205,7 +205,7 @@ script (e.g. the signal-event seeding follow-up before feature 016).
 
 ## From feature 003 (employee-dashboard-shell) — merged 2026-05-25
 
-### Onboarding visual regression untestable on completed accounts
+### Onboarding visual regression untestable on completed accounts (#43)
 **Status**: deferred-tooling
 **Observed**: ST-1 / T014 of feature 003
 **Description**: ST-1's visual matrix includes `/onboarding`, but the
@@ -225,7 +225,7 @@ asserted against in role-trio specs.
 state" option — natural pairing with the CI integration work logged
 above against feature 008.
 
-### Avatar disc reads "out of character" in dark mode
+### Avatar disc reads "out of character" in dark mode (#44)
 **Status**: polish
 **Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
 **Description**: After the 515984c contrast fix the AvatarFallback
@@ -245,7 +245,7 @@ all contrast thresholds.
 **Address by**: token-tuning pass alongside the muted-on-bg item
 above; not blocking any feature.
 
-### Mobile / tablet typography bump
+### Mobile / tablet typography bump (#45)
 **Status**: polish
 **Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
 **Description**: At 360px and tablet widths (~600–900px) the body
@@ -264,7 +264,7 @@ adding tokens to the M&M `@theme` block.
 **Address by**: alongside the M&M token-tuning pass — typography
 and color rhythm belong in the same review.
 
-### Token tune — `--color-muted` underweight on light bg (WCAG AA)
+### Token tune — `--color-muted` underweight on light bg (WCAG AA) (#46)
 **Status**: bug
 **Observed**: 2026-05-20, feature 003 T020 visual sweep
 **Description**: M&M `--color-muted` at `#6E7572` against light bg
@@ -284,7 +284,7 @@ in feature implementation work; deserves its own task.
 reads fine and WCAG AA-large threshold (3:1) is satisfied. Belongs
 in a deliberate token-tuning pass, not in active feature work.
 
-### Button-system character pass — semantic-weight differentiation + variant cleanup
+### Button-system character pass — semantic-weight differentiation + variant cleanup (#47)
 **Status**: polish
 **Observed**: 2026-05-21, feature 003 Phase 6 polish re-eyeball
 **Description**: Post-Phase-6, `button.tsx` ships three production
@@ -346,7 +346,7 @@ Specifics the future pass should evaluate:
 three existing token-tuning entries above. Not blocking any
 in-progress feature; deferred polish.
 
-### Card heading typography — fresh design read needed
+### Card heading typography — fresh design read needed (#48)
 **Status**: polish
 **Observed**: 2026-05-22, feature 003 Phase 7 eyeball (T045 re-look)
 **Description**: The three home cards ship with their headings in
@@ -417,7 +417,7 @@ contrast). Card heading typography belongs in the same revision
 because it touches the same family/weight/scale decisions the
 mobile-typography-bump entry already names.
 
-### Cursor pointer on Link-wrapped anchors and other clickable surfaces
+### Cursor pointer on Link-wrapped anchors and other clickable surfaces (#49)
 **Status**: polish
 **Observed**: 2026-05-22, feature 003 Phase 8 eyeball (T048 re-look)
 **Description**: Mohamed confirmed the cursor-pointer treatment
@@ -474,7 +474,7 @@ contrast, card heading typography). Cursor affordance is part
 of the same UX-polish revision. Not blocking any in-progress
 phase.
 
-### CI guard for speckit skills + gitignore rule
+### CI guard for speckit skills + gitignore rule (#50)
 **Status**: tech-debt
 **Observed**: 2026-05-22, feature 003 — second regression of
 `.claude/skills/speckit-*/SKILL.md` going missing on disk,
@@ -555,7 +555,7 @@ workflow (currently empty per repo structure, so this may also
 be the first CI workflow file — in which case scope grows to
 "medium" to include the workflow scaffolding itself).
 
-### Dynamic welcome banner subtitle variants
+### Dynamic welcome banner subtitle variants (#51)
 **Status**: deferred-feature
 **Observed**: feature 003 plan (Decision M) and FR-009 deferral
 **Description**: The welcome banner on `/app` for employees renders
@@ -576,7 +576,7 @@ layer on top.
 data exists). NOT before — variants without signal would just be
 random copy churn.
 
-### Notifications-section live controls on /app/account
+### Notifications-section live controls on /app/account (#52)
 **Status**: deferred-feature
 **Observed**: feature 003 plan (FR-021 placeholder)
 **Description**: The Notifications section on `/app/account` is a
@@ -595,7 +595,7 @@ whichever feature first generates user-controllable notifications.
 users (likely feature 010 / chatbot interrupts, or feature 014 /
 privacy controls if those reuse the notification surface).
 
-### Welcome banner timezone awareness (server-rendered greeting)
+### Welcome banner timezone awareness (server-rendered greeting) (#53)
 **Status**: bug
 **Observed**: feature 003 T040 (welcome-banner.tsx implementation)
 **Description**: `apps/web/components/home/welcome-banner.tsx`
@@ -619,7 +619,7 @@ comment names this trade-off and points here.
 needs per-user timezone awareness (signal aggregation in
 feature 005 may need this anyway).
 
-### Playwright local matrix run: pipe-buffering deadlock with `tail`
+### Playwright local matrix run: pipe-buffering deadlock with `tail` (#54)
 **Status**: deferred-tooling
 **Observed**: feature 003 T066 (full Playwright matrix run on
 chromium + firefox + webkit)
@@ -655,7 +655,7 @@ and the working invocation pattern.
 whoever first sets up CI (the streaming filter is also the right
 pattern for CI logs that may be captured non-interactively).
 
-### Dev-server memory bloat + monotonic slowdown across stacked full-suite runs
+### Dev-server memory bloat + monotonic slowdown across stacked full-suite runs (#55)
 **Status**: tech-debt
 **Observed**: 2026-05-25, feature 003 smoke verification (the webkit
 timeout-flake fix on `reset-password.spec.ts:87`). Three consecutive full
@@ -693,7 +693,7 @@ reusing) or an upstream Next/Supabase mitigation.
 matrix run: pipe-buffering deadlock" tooling entry above — both are about
 making the local matrix run reliably.
 
-### Non-dismissible confirmation notifications (stress-detection prompts)
+### Non-dismissible confirmation notifications (stress-detection prompts) (#56)
 **Status**: deferred-feature
 **Observed**: 2026-05-25, feature 003 ST-2 review (Notification component)
 **Description**: A stress-detection confirmation notification — e.g.
@@ -728,7 +728,7 @@ routes.
 **Address by**: whichever consumer feature (008 / 010 / 014) builds the
 first non-dismissible confirmation notification.
 
-### Auth-broadcast audit needs a forward-looking guard, not a one-time snapshot
+### Auth-broadcast audit needs a forward-looking guard, not a one-time snapshot (#57)
 **Status**: tech-debt
 **Observed**: 2026-05-25, feature 003 — the ST-8 fix (commit c8c182c) and
 the OTP follow-up (commit bdf1463)
@@ -761,7 +761,7 @@ Possible approaches:
 pass, not mid-feature work.
 **Address by**: a future security / quality hardening pass.
 
-### "Send a new confirmation" link contrast underweight in light mode
+### "Send a new confirmation" link contrast underweight in light mode (#58)
 **Status**: polish
 **Observed**: 2026-05-25, feature 003 smoke review (sign-in screen)
 **Description**: On the sign-in screen, the "send a new confirmation"
@@ -779,7 +779,7 @@ stays clean after the change.
 contrast entries above (muted-on-bg under AA, button-system character).
 Same workstream; not blocking any in-progress feature.
 
-### Extend ST-9 to assert recovery flow submits password update end-to-end
+### Extend ST-9 to assert recovery flow submits password update end-to-end (#59)
 **Status**: tech-debt
 **Category**: testing / e2e quality
 **Observed**: 2026-05-25, security slice 2 (Finding 7 verification)
@@ -812,7 +812,7 @@ suite against silent regressions.
 
 ## From security slice 3 (privileged-endpoints-and-input-validation) — merged 2026-05-25
 
-### Invite audit log — record who invited whom
+### Invite audit log — record who invited whom (#60)
 **Status**: deferred-feature
 **Category**: observability / admin
 **Observed**: 2026-05-25, security slice 3 (Out-of-scope note + Finding 2 review)
@@ -835,7 +835,7 @@ to answer "which admin invited this user, and when." For an admin dashboard
 needs invite history. Decide (a) vs (b) there; (b) is the durable answer if the
 dashboard surfaces invite provenance.
 
-### Concurrent-duplicate-invite idempotency
+### Concurrent-duplicate-invite idempotency (#61)
 **Status**: tech-debt
 **Category**: handler design / correctness
 **Observed**: 2026-05-25, security slice 3 (Finding 2 empirical — concurrent race)
@@ -862,7 +862,7 @@ the invite partial-success / transactional-semantics handler-design item.
 
 ## From security slice 7 (rate-limits-and-parity) — merged 2026-05-26
 
-### `/signup` is open self-serve — gate to invite-only (posture) — ⛔ PRE-PRODUCTION DEPLOY BLOCKER
+### `/signup` is open self-serve — gate to invite-only (posture) — ⛔ PRE-PRODUCTION DEPLOY BLOCKER (#62)
 **Status**: deferred-feature
 **Category**: auth posture / tenancy
 **⛔ Deploy-blocker** (adjudicated 2026-05-26): a real-tenant production launch with
@@ -902,7 +902,7 @@ launch** — this MUST be re-rated to High and resolved at that gate. Not blocki
 the thesis/demo stage. Likely pairs with feature 017 (admin-dashboard), which
 owns the invite UX.
 
-### App-layer rate limiting (durable limiter for invite + profile writes)
+### App-layer rate limiting (durable limiter for invite + profile writes) (#63)
 **Status**: tech-debt
 **Category**: hardening / abuse-resistance
 **Adjudicated 2026-05-26**: the `/api/admin/invite` per-admin throttle is **held for
@@ -943,7 +943,7 @@ client and abuse becomes reachable in practice.
 
 ## From feature 004 (onboarding-video-anchor) — merged 2026-05-29
 
-### Onboarding name step is redundant with signup full_name collection
+### Onboarding name step is redundant with signup full_name collection (#64)
 **Status**: bug
 **Observed**: 2026-05-27, feature 004 planning
 **Description**: The signup form at `apps/web/app/(auth)/signup/` collects
@@ -979,7 +979,7 @@ per the 2026-05-27 chat decision), since that feature redesigns
 onboarding for demographics + preferences anyway and will rebuild the
 flow from scratch.
 
-### Cross-browser / cross-device anchor + auth sync (realtime push)
+### Cross-browser / cross-device anchor + auth sync (realtime push) (#65)
 **Status**: deferred-feature
 **Observed**: 2026-05-29, feature 004 manual check — calibrating in one browser
 left the banner up in another browser signed into the same account
@@ -1022,7 +1022,7 @@ into that workstream rather than standing up Realtime solely for the banner. Not
 blocking 004: the manual-refresh fallback is acceptable for the thesis/demo
 stage, and same-browser multi-tab sync already works.
 
-### Post-deploy mobile camera → upload → anchor verification (real devices, HTTPS)
+### Post-deploy mobile camera → upload → anchor verification (real devices, HTTPS) (#66)
 **Status**: deferred-feature (verification, post-deploy)
 **Observed**: 2026-05-29, feature 004 smoke matrix (ST-22 / ST-23 camera portions)
 **Description**: The full mobile capture path — camera permission prompt → 60s
@@ -1062,7 +1062,7 @@ the anchor row is written. ST-24 (iOS) pairs here once Apple hardware is availab
 **Address by**: first deploy to an HTTPS environment (staging or production), before
 relying on mobile capture in the field.
 
-### Safari desktop + iOS Safari smoke cells (ST-21 / ST-24) — pending Apple hardware
+### Safari desktop + iOS Safari smoke cells (ST-21 / ST-24) — pending Apple hardware (#67)
 **Status**: deferred-tooling (hardware access)
 **Observed**: 2026-05-29, feature 004 smoke matrix
 **Description**: ST-21 (Safari desktop, expect MP4) and ST-24 (iOS Safari mobile,
@@ -1095,7 +1095,7 @@ gate guards is the reference every later delta-from-baseline reading is measured
 (Principle II), so a Safari-specific gate miscalibration would silently poison or wrongly
 block real baselines.
 
-### Camera device selection not always written back to localStorage (ST-05)
+### Camera device selection not always written back to localStorage (ST-05) (#68)
 **Status**: bug
 **Observed**: 2026-05-29, feature 004 smoke ST-05 (remembered device + fallback)
 **Description**: The recorder remembers the last camera in
@@ -1114,7 +1114,7 @@ choose. Add a Vitest/e2e assertion that an explicit pick is persisted.
 **Address by**: feature 005 (the calibration UX revamp touches the recorder anyway)
 or whoever next touches `apps/web/components/anchor/` device handling.
 
-### e2e test-hardening pass — mock-driven coverage masked real 004 bugs
+### e2e test-hardening pass — mock-driven coverage masked real 004 bugs (#69)
 **Status**: tech-debt
 **Category**: testing / e2e quality
 **Observed**: 2026-05-29, feature 004 smoke gate (multiple bugs slipped past green e2e)
@@ -1137,7 +1137,7 @@ Permissions-Policy entry rule (a non-capture → capture link must be a hard nav
 forward-looking guard" and "extend ST-9 recovery e2e" entries — all harden the suite
 against silent regressions.
 
-### Feature 005 scope pointer — calibration UX revamp + anchor read path + design pass
+### Feature 005 scope pointer — calibration UX revamp + anchor read path + design pass (#70)
 **Status**: deferred-feature (pointer)
 **Observed**: 2026-05-29, feature 004 ship
 **Description**: Consolidation pointer so feature 005 planning pulls these together
@@ -1161,7 +1161,7 @@ cosmetics, ST-15).
 
 ## From hotfix/lbp-roi-interpolation (feature 005 recon) — 2026-05-29
 
-### Store an extraction/pipeline-version alongside each anchor (auto-invalidation)
+### Store an extraction/pipeline-version alongside each anchor (auto-invalidation) (#71)
 **Status**: tech-debt
 **Category**: schema / anchor invalidation
 **Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon)
@@ -1190,7 +1190,7 @@ in the `authenticated` SELECT whitelist).
 `packages/ml-video` extraction code changes — whichever comes first. Pairs with
 feature 005's anchor read-path decision and feature 008's live inference.
 
-### End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 008)
+### End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 008) (#72)
 **Status**: tech-debt
 **Category**: testing / fidelity verification
 **Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon — check #4)
@@ -1221,7 +1221,7 @@ Treat as a go/no-go gate on feature-space fidelity, not optional polish.
 
 ## From feature 005 (calibration-capture-flow) — merged 2026-06-08
 
-### ~~Before the 005 detector ships — outstanding launch blockers~~ — resolved
+### ~~Before the 005 detector ships — outstanding launch blockers~~ — resolved (#73)
 **Status**: resolved
 **Category**: deploy gate / pre-launch verification
 **Resolved**: 2026-06-22 — all three pre-launch blockers cleared (confirmed by 2026-06-24
@@ -1284,7 +1284,7 @@ human/device-dependent runs, not code.
 **Address by**: all three BEFORE the detector ships to any real (HTTPS, real-tenant)
 environment. T004 specifically must precede the detector's first production call.
 
-### Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate
+### Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate (#74)
 **Status**: bug
 **Category**: backend / extraction quality (anchor validity)
 **Observed**: 2026-06-01, feature 005 smoke — a 60 s baseline recording in which the
@@ -1428,7 +1428,7 @@ These two items were not deferred from a single feature; they are product-wide
 concerns surfaced during the feature 007 / 008 window and logged here so the
 roadmap pulls them in at the right gate rather than re-deriving them.
 
-### Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction) — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE
+### Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction) — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#75)
 **Status**: deferred-feature
 **Category**: legal / compliance / consent
 **Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
@@ -1468,7 +1468,7 @@ the security-slice-7 "`/signup` is open self-serve — gate to invite-only — �
 PRE-PRODUCTION DEPLOY BLOCKER" entry (both are binding pre-real-data gates on the signup
 surface) and with the `/app/account` Privacy placeholder that feature 014 fills in.
 
-### Internationalization — Arabic (RTL) and possibly French
+### Internationalization — Arabic (RTL) and possibly French (#76)
 **Status**: deferred-feature
 **Category**: i18n / localization / layout
 **Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
@@ -1506,24 +1506,24 @@ even if the actual Arabic translation + RTL pass ships later.
 
 ## From feature 008 (stress-inference-service) — merged 2026-06-22
 
-- **T026 recorder mime — feature-detect and support BOTH containers (webm-preferred, fMP4 fallback), do not hard-code one** (`watch` / pre-build, from 008 device gate): the T009 gate proved both webm and fMP4 decode to `(2958,)`, but on a single iOS device, and iOS WebM-capture support is recent/uneven — so `window-recorder.ts` (T026) must `pickMime` webm-first with an fMP4 fallback rather than assume either container.
-- **Keep-up — surgical O(stride) tail-decode SHIPPED (2026-06-21); the full per-session rolling buffer is now only a *conditional* upgrade, and the read loop still needs back-pressure** (`watch` / production-deploy, from 008 device gate + the 2026-06-20 supervised smoke; pairs with research R-5 / T009): the supervised smoke measured the live lag *growing* ~9 s/window to ~3 min behind, because the server **re-decoded the whole growing recording-so-far every window** (per-window decode O(elapsed)). **Fixed surgically** in `ml-video` (`pipeline._extract_landmarks_tail` + `probe_global_timestamps_fast`, wired through `compute_anchor(tail_seconds=60)` + `probe_recorded_seconds`): both the `< 60 s` gate and the tail decode now touch only the **bounded trailing 60 s** (ffprobe packet grid + native-seek/ffmpeg-`-c copy`-remux), **bit-identical** to the whole-file path (`tests/test_tail_seek_keepup.py`). Measured before→after on the chrome continuous fixtures: per-window total **18 s→13 s, 30 s→11 s, 34 s→9 s, 51 s→11 s, 55 s→9 s** — i.e. BEFORE *grew* 3.1× with elapsed (O(elapsed), lag climbs), AFTER is **flat ~9–13 s** (O(stride), independent of elapsed). The growing-lag breach is removed. **TWO things remain** (decide alongside the chosen deploy target): **(a)** the *absolute* flat cost is still ~9–13 s on the dev laptop — partly the constant MediaPipe+LBP extract (R-5's separate, decode-independent cost; lever = slower reading cadence or GPU MediaPipe) and partly the bounded tail decode — so on a slower target it may still sit near/over the 10 s stride; the **full per-session rolling decoded-frame buffer** (decode only the **new ~10 s increment** each window → ~1.5 s decode, true O(stride) not O(window)) is the upgrade to build **only if** keep-up is re-measured on the real deploy target and the surgical flat cost breaches there (Option 2 of the 2026-06-21 design choice). **(b)** the read loop must still not fire a new stride while one is in flight (or must coalesce) — the per-stride-decode fix does not prevent overlap. Also: the surgical fix adds an **ffmpeg/ffprobe CLI** dependency on the API host (Dockerfile + `apps/api/README.md`); absent → degrades to whole-file decode (O(elapsed)), runs-but-fails on a clip → skipped window (200), never 500. Run `test_tail_seek_keepup.py` **on the deploy image** so an ffmpeg version difference can't silently shift fidelity.
-- **In-memory smoothing buffer needs single-worker / session affinity / a shared cache in a multi-worker deploy** (`watch` / production-deploy, from 008 US1 T020; see DECISIONS 2026-06-20): the D-3 server-side smoother reads the last N=4 scored `proba[1]` from a **per-session in-memory buffer** (`inference.py` `_SessionBuffers`), NOT from the DB — because revised D-1 removed the service-role and the `window_readings` SELECT whitelist withholds `stress_probability` from `authenticated`, so the API can't read the raw probability back. Consequences for production: (a) with **>1 worker** the per-stride windows for a session must land on the **same** worker (session affinity) or share state via an external store (e.g. Redis), else the buffer is split and the band warms up erratically; (b) an **API restart drops all buffers**, so each active session **re-warms** (~90 s) — harmless but visible. Acceptable for MVP / localhost (single worker). Same class as the deferred rolling decoded-frame buffer + the read-loop back-pressure item above — decide alongside the chosen deploy target. The explicit per-session `buffers.drop()` on End is wired in US2 / T036; an LRU cap bounds memory until then.
-- **Dev-side manifestation of the smoothing-buffer drop: running live-monitor under bare `--reload` leaves the bloom *permanently* stuck on "getting a read on things"** (`watch` / dev-diagnostic, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item above): empirically-confirmed dev fingerprint, recorded so it isn't re-debugged. **Symptom:** the live bloom is stuck on **"getting a read on things"** for an entire session, while the **recap afterward shows a normal band line**. **Cause:** running the inference service under `--reload`; a uvicorn **worker restart** — triggered by *any* watched-file change (source save, cache write, `git checkout`) — drops the per-session in-memory smoothing buffer (`_SessionBuffers` in `app/services/inference.py`), forcing a fresh **~90 s / 4-window re-warm** each time. Persisted bands survive (the `window_readings` inserts are already committed) → the **recap is fine** but the **live bloom never latches**. **Fingerprint in `window_readings`:** band→warming-up regressions + a band appearing **before** 4 scored windows + an upload gap — a combination **impossible under one stable buffer**. **Dev workaround:** `--reload --reload-dir app` (or no `--reload`) for live-monitor testing, and **don't edit `app/` source mid-session** (even under `--reload-dir app`, saving a watched source file restarts the worker) — see `apps/api/README.md` "Live-monitor testing" + the 008/004/005 quickstarts. **Relation to the buffer note above:** that item covers the **multi-worker / intentional-restart** re-warm (a one-time, visible warm-up); this is the **single-worker dev** manifestation — under `--reload` the restart is **involuntary and repeated**, so the bloom looks *permanently* stuck rather than re-warming once.
-- **Live-monitor readings stability (live-bloom durability)** (`watch` / production-deploy, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item + the dev fingerprint above): make the live bloom durable so it latches whenever a band has actually been computed/persisted, independent of worker lifecycle and live-response delivery. **Scope (from the read-only diagnostic):** **(a)** make the cold-start smoothing buffer **restart/worker-resilient** — single-worker + session affinity, or a shared cache (e.g. Redis), decided with the chosen deploy target; this is the existing buffer-durability concern, now shown to bite in **dev** too (the fingerprint above). **(b) decouple the live bloom from live-response delivery** — drive it partly from the `getSessionTrend` poll (the same durable `window_readings` rows the recap + the monitor "This session" card already read via `apps/web/lib/api/monitoring-reads.ts`), so a band that reached the DB shows even if its live scoring response was lost or late; this removes the recap-vs-bloom inconsistency at its root. **(c) investigate (needs live logs):** the final **~166 s upload cessation** (face-gate vs server-side upload failure) and the **"sign in again" mid-session auth event** seen in the 2026-06-23 run — Mohamed has the backend logs; attach when this branch opens. Same `production-deploy` class as the keep-up tail-decode + multi-worker buffer-affinity + read-loop back-pressure items above — do **stability first**. Fix scope: medium, split across `area:api` (buffer durability) + `area:web` (bloom driven off the durable poll). **Suggested issue labels:** `type:bug`, `area:api` (+ `area:web` for the bloom-delivery half).
-- **Feature 016 (team-lead dashboard) must add a tightly-scoped coarse-aggregate read path with multi-range time selection — NOT reach for the service-role key** (`deferred-feature` / blocks-016, **consolidated 2026-06-24 (absorbed the feature-001 "Manager dashboard time-range insights" manager-visibility item)** + the 008-foundational read-path constraint, T010–T011): **(read-path constraint — from 008)** 008 deliberately denies any manager access to `monitoring_sessions` / `window_readings` — owner-only RLS (select/insert/update-own), **no manager policy at all**, and `apps/api` holds **no service-role key** (revised D-1). When 016 needs managers to see team stress at a glance, it MUST satisfy that with a **tightly-scoped `SECURITY DEFINER` rollup function or a manager-readable aggregate view** that exposes **coarse bands only** (e.g. counts/fractions per band over a window, or a team tenor) and **never raw individual `window_readings`, never `stress_probability`/`label`, never per-employee point data** — mirroring `get_my_anchor()`'s self-scoping but widened to a manager's direct reports under the existing `profiles` manager relationship, with its own privacy review. It must **not** introduce a service-role key into `apps/api` to bypass RLS — the whole 008 posture is that the manager layer gets *nothing* by default, and any manager visibility is an explicit, coarse, separately-reviewed addition. **(time-range UX — from the feature-001 wrap-up)** The team-lead (and, for org-wide aggregates, the admin / feature 017) dashboards must support multiple time ranges for viewing stress trends — **1 week, 1 month, 1 quarter, 6 months, 1 year** — via a time-range selector control that re-aggregates the underlying daily data into weekly/monthly bars as appropriate. This is *compatible with* the read-path posture above, and the two reinforce each other: broader windows are **more** privacy-preserving (less granular), not less. **Fix scope**: medium — the `SECURITY DEFINER` rollup / manager-readable aggregate view + RLS + privacy review (read-path half), plus the time-range UI control, query-side aggregation, and Recharts charting (UX half). Suggested issue labels: `type:feature`, `area:db` (+ `area:web` for the selector UI). **Address by**: feature 016 (team-lead-dashboard) spec — must include BOTH the coarse-aggregate read-path constraint AND the time-range selector as acceptance scenarios; feature 017 (admin-dashboard) likewise for org-wide aggregates.
-- **A new camera/capture route must be registered in EVERY camera-policy touchpoint, or `getUserMedia` silently dies under the inherited `camera=()`** (`watch` / pre-build, from 008 US1 — `/app/monitor` originally shipped registered in none of them, so a granted permission still yielded no stream): a route that calls `getUserMedia` must be added to **(1)** `CAPTURE_ROUTES` in `apps/web/next.config.ts` (the `camera=(self)` Permissions-Policy header map) **AND (2)** the negative-lookahead exclusion in that same file's site-wide `camera=()` rule (`/((?!onboarding|app/calibrate|app/monitor).*)`) — these two spots MUST move together, because a path matched by *both* PP rules emits a *combined* `camera=() ∩ camera=(self) = denied` header that breaks the camera — **AND (3)** `isCaptureRoute` in `apps/web/proxy.ts`, which scopes the on-device MediaPipe detector's CSP (`script-src 'wasm-unsafe-eval'` + `worker-src 'self' blob:`); without it the detector WASM is CSP-blocked and the capture stage renders blank. The route's API origin must also stay reachable via the proxy `connect-src` (sourced from `NEXT_PUBLIC_API_URL`), so keep that env requirement **discoverable in the relevant `.env.example`** — the same discoverability discipline as the `SUPABASE_ANON_KEY` fix in `apps/api/.env.example`. Symptom of a miss: a granted camera permission still yields no stream (PP denied) or a blank stage (CSP-blocked WASM). A lint/test guard asserting these three lists stay in lockstep would retire the regression class.
-- **US4 trend: ambient "weather of the day" view + feel/precise toggle** (`deferred-feature` / post-demo (after feature 010), from 008 US4 trend design): while designing the US4 trend we explored an ambient, lower-precision "weather of the day" representation (soft colour fields across the day rather than the precise soft-line trend), and a feel-vs-precise toggle between it and the approved soft area+line trend. Deferred from 008 to keep a single trend visual language and avoid doubling the build/test/a11y surface in a branch closing clean. Note for any revisit: the literal sun/cloud icons + weather wording read off-voice for Serenify — a future ambient view should use Serenify's own band vocabulary (at ease / a little tense / tense) and abstract soft colour, not weather iconography. Fix scope: medium — a second trend representation, a toggle control, persisted toggle preference, plus its own a11y/responsive/test coverage. Address by: post-demo, after feature 010 — optional dashboard flourish; only if there's appetite for an ambient view.
-- **Model-owner: remove/annotate the stale `window_eval_config` (30 s) block in `metadata.json`** (`tech-debt` / model-owner, from 008 T056 carry-over; research R-0): the committed model artifact's `metadata.json` carries a stale `window_eval_config` of **30 s** that is **NOT** the production window — the production contract is **60 s / 10 s**, locked by Constitution Principle II + FR-002 + `docs/MODELS.md`, and the operating point 0.53 is read from `loso_metrics_60s_calibrated`. The 30 s block is a leftover from an earlier eval and could mislead a future reader into shortening the window. **This is a model-owner task, deliberately NOT actioned in 008.** When picked up it is **metadata/doc-only**: annotate or delete the stale block — **NO `model_version` bump, NO anchor invalidation, and DO NOT edit the model artifact or re-touch `metadata.json` in a way that changes the artifact hash** (touching it would invalidate the verified anchor + the bit-for-bit fidelity established for `@2.0.0`). Safest shape is a `docs/MODELS.md` clarifying note that the 30 s block is stale and ignored, leaving the artifact byte-untouched; only the model owner should decide whether to also edit the artifact's metadata under a controlled re-publish. Fix scope: small (doc note) / medium (controlled artifact re-publish, owner-only). Address by: the next model-owner maintenance pass; not blocking 008.
-- **Retention: 90-day `window_readings` purge job (policy decided, job deferred)** (`deferred-feature` / data-retention, from 008 T057; `data-model.md` § Retention): 008 decides the retention **policy** — `window_readings` is kept **90 days then purged** (it carries the affective per-window signal; `monitoring_sessions` is retained longer as it holds no raw signal) — but **does not build the purge job**. The job is a small additive `pg_cron` task (or an external scheduled task) running e.g. `DELETE FROM public.window_readings WHERE created_at < now() - interval '90 days';`. No 008 surface reads a reading older than today's recap / the 009 sustained-tense window, so the job's absence has **no functional effect in 008** beyond unbounded storage growth on a long-lived deployment. Fix scope: small — one `pg_cron` schedule (or a cron'd server task) + a migration if using `pg_cron`; pair with whichever feature first provisions scheduled DB jobs. Address by: before any long-running production deployment accumulates >90 days of readings; deferred from 008.
-- **Two pre-existing eslint errors in `components/monitor/monitoring-session.tsx` (NOT US4/Phase-8-introduced; deliberately not fixed in polish)** (`tech-debt` / from 008 T058 sweep, pre-dates US4): `npm run lint` reports exactly two errors, both pre-existing from the camera-lifecycle fix and **left untouched on purpose** in the Phase 8 polish pass because they sit on the camera `srcObject`/release lifecycle and are risky to refactor in a polish task: **(1)** `react-hooks/immutability` at **L200** — the reactive bind-and-play effect assigns `videoEl.srcObject = stream` (eslint flags mutating a value returned from `useState()`); this is the deliberate fix for the "self-view stuck until alt-tab" bug (the effect, not the callback ref, owns `srcObject` so a stream arriving after the element mounts still binds). **(2)** `react-hooks/set-state-in-effect` at **L478** — the standing release effect calls `stopStream()` (which `setStream(null)`) when leaving a capturing op; this is the privacy guarantee that a non-capturing op never holds the camera. Both are functionally correct and load-bearing for the camera lifecycle; "fixing" them risks regressing the self-view/release behaviour. `tsc` and Vitest are green; this is the only expected non-green in the lint sweep. Fix scope: medium — a careful camera-lifecycle refactor (e.g. an imperative ref-callback for `srcObject`, an external-store subscription for release) with the full monitor unit + e2e suite as the guard. Address by: a dedicated camera-lifecycle refactor, not a polish pass.
-- **Preferences hub + device selection (feature-sized, ~009 range — not a polish chore)** (`deferred-feature` / `area:web`, from 008 US1 monitoring "allow camera" moment): give users a settings home for the choices that make the app feel finished — default camera, theme, and (later) language — replacing the bare "allow camera" prompt in monitoring with a proper device picker. **Scope (three parts):** **(1) Monitoring device selector** — reuse the calibration step's camera selector instead of the bare allow-camera prompt. Note: camera labels / the full device list are only exposed *after* `getUserMedia` permission, so the picker populates **post-permission** (flow: allow → `enumerateDevices` → pick → start, or pick-triggers-allow). **(2) Account → Preferences section** holding: **Default camera** — persisted **per user** as a `deviceId`, with a **graceful fallback when the saved device isn't present** (deviceIds vary across machines/browsers — don't hard-fail); **Theme** — three-state light / dark / **system** (system follows `prefers-color-scheme` via the existing `useMediaQuery` hook, driving the `.dark` class); **Language** — UI slot added now, wired only when i18n lands (currently backlogged) and **must not block the rest**. **Constraints:** per-user settings persistence must stay **RLS-as-user, no service-role key** (existing security posture); the theme + camera parts are **independent of i18n** and can ship before the Arabic/RTL targeting decision. Suggested issue labels (for the future issues migration): `type:feature`, `area:web`. Fix scope: feature-sized. Address by: ~feature 009.
-- **iOS Safari *monitoring* produces 0 readings — a server-side decode death on the iOS un-finalized webm (`probe_recorded_seconds` throws → `our-side`); NOT the resolved kickout** (`bug` / suggested labels `type:bug` + `area:ml-video` (decode/probe lives there; caller in `apps/api`) + **not demo-blocking**; from 008 device gate T009 + smoke **Run 4, 2026-06-22**): On a **real iPhone Safari over HTTPS** (Run 4, cloudflared tunnel) app load + sign-in + on-device **calibration all worked**, but a **monitoring** session produced **0 readings** and died ~3.5 min in showing the client surface **"This one was on our side."** **Symptom:** the session fails partway in with the "our side" server error and never scores. **Root cause (precise):** `probe_recorded_seconds()` — the ffprobe duration probe in the O(stride) tail-decode path (**defined in `packages/ml-video/src/ml_video/anchor.py`**, called from `apps/api/app/services/inference.py`) — **throws on iOS Safari's un-finalized *growing* webm past the early-seconds mark (~40 s)**, tripping the scoring gate. Server trace (session `02a60299`): windows `probe_s = 9 → 19 → 29 → 39 s` `warming_up`, then **`probe_s = -1.00 … FeatureExtractionError:our-side`** repeated → every window skipped → the session **never reaches the 60 s scoring gate** → 0 readings. iOS also records **sub-realtime** (`probe_s = 39` at ~75 s wall-clock). **NOT auth / NOT the kickout (which is resolved):** every window upload returned **200**, **0 × 401, no re-login** — auth held the whole ~3.5 min (so the 008-followups `[1]` stale-token fix held on iOS and was the wrong layer for this); a true ITP/re-login kickout did **not** reproduce. Chrome's un-finalized webm decodes fine (desktop scored **35 readings** across the full band range the same day) — **iOS's webm is the problem child**, the same container **T009** flagged. **Impact — disproves the old assumption:** this is **NOT** the old "iOS live-readings are blocked until a real HTTPS deploy" read — Run 4 *had* HTTPS and load/sign-in/calibration all passed; it is a **capture/decode** failure, not a transport/HTTPS one. **Likely fix direction — same problem class as the known un-finalized-`MediaRecorder`-webm issue** (there the fix was an **`ffmpeg -c copy` remux** to a finalized/cued container *before* OpenCV decode, because `cap.set()` is a silent no-op on un-cued webm): **(1) prefer fMP4/CMAF on the iOS *monitor* recorder** — **T009 proved this iPhone's fMP4/CMAF decodes cleanly to `(2958,)` where its webm chokes** (the recorder's `pickMime` already needs webm-first-with-fMP4-fallback per the T026 backlog item above) — and/or **(2) harden `probe_recorded_seconds`** to degrade gracefully on an un-finalized iOS webm (remux-then-probe, or fall back to a timestamp estimate) instead of throwing `our-side`. Then **re-run ST-08-2**. Full evidence: `specs/008-stress-inference-service/smoke-tests.md` **Run 4** (commit `34c951b`). Fix scope: small-to-medium (recorder-mime preference + a probe-hardening guard + a T009 fMP4 re-validation on the deploy image). **Non-blocking for the desktop demo; required for real iOS monitoring support.** Address by: before any real-iOS monitoring sign-off; pairs with the **T026 recorder-mime** + the **keep-up tail-decode** items above (same decode path).
+- **T026 recorder mime — feature-detect and support BOTH containers (webm-preferred, fMP4 fallback), do not hard-code one** (#77) (`watch` / pre-build, from 008 device gate): the T009 gate proved both webm and fMP4 decode to `(2958,)`, but on a single iOS device, and iOS WebM-capture support is recent/uneven — so `window-recorder.ts` (T026) must `pickMime` webm-first with an fMP4 fallback rather than assume either container.
+- **Keep-up — surgical O(stride) tail-decode SHIPPED (2026-06-21); the full per-session rolling buffer is now only a *conditional* upgrade, and the read loop still needs back-pressure** (#78) (`watch` / production-deploy, from 008 device gate + the 2026-06-20 supervised smoke; pairs with research R-5 / T009): the supervised smoke measured the live lag *growing* ~9 s/window to ~3 min behind, because the server **re-decoded the whole growing recording-so-far every window** (per-window decode O(elapsed)). **Fixed surgically** in `ml-video` (`pipeline._extract_landmarks_tail` + `probe_global_timestamps_fast`, wired through `compute_anchor(tail_seconds=60)` + `probe_recorded_seconds`): both the `< 60 s` gate and the tail decode now touch only the **bounded trailing 60 s** (ffprobe packet grid + native-seek/ffmpeg-`-c copy`-remux), **bit-identical** to the whole-file path (`tests/test_tail_seek_keepup.py`). Measured before→after on the chrome continuous fixtures: per-window total **18 s→13 s, 30 s→11 s, 34 s→9 s, 51 s→11 s, 55 s→9 s** — i.e. BEFORE *grew* 3.1× with elapsed (O(elapsed), lag climbs), AFTER is **flat ~9–13 s** (O(stride), independent of elapsed). The growing-lag breach is removed. **TWO things remain** (decide alongside the chosen deploy target): **(a)** the *absolute* flat cost is still ~9–13 s on the dev laptop — partly the constant MediaPipe+LBP extract (R-5's separate, decode-independent cost; lever = slower reading cadence or GPU MediaPipe) and partly the bounded tail decode — so on a slower target it may still sit near/over the 10 s stride; the **full per-session rolling decoded-frame buffer** (decode only the **new ~10 s increment** each window → ~1.5 s decode, true O(stride) not O(window)) is the upgrade to build **only if** keep-up is re-measured on the real deploy target and the surgical flat cost breaches there (Option 2 of the 2026-06-21 design choice). **(b)** the read loop must still not fire a new stride while one is in flight (or must coalesce) — the per-stride-decode fix does not prevent overlap. Also: the surgical fix adds an **ffmpeg/ffprobe CLI** dependency on the API host (Dockerfile + `apps/api/README.md`); absent → degrades to whole-file decode (O(elapsed)), runs-but-fails on a clip → skipped window (200), never 500. Run `test_tail_seek_keepup.py` **on the deploy image** so an ffmpeg version difference can't silently shift fidelity.
+- **In-memory smoothing buffer needs single-worker / session affinity / a shared cache in a multi-worker deploy** (#79) (`watch` / production-deploy, from 008 US1 T020; see DECISIONS 2026-06-20): the D-3 server-side smoother reads the last N=4 scored `proba[1]` from a **per-session in-memory buffer** (`inference.py` `_SessionBuffers`), NOT from the DB — because revised D-1 removed the service-role and the `window_readings` SELECT whitelist withholds `stress_probability` from `authenticated`, so the API can't read the raw probability back. Consequences for production: (a) with **>1 worker** the per-stride windows for a session must land on the **same** worker (session affinity) or share state via an external store (e.g. Redis), else the buffer is split and the band warms up erratically; (b) an **API restart drops all buffers**, so each active session **re-warms** (~90 s) — harmless but visible. Acceptable for MVP / localhost (single worker). Same class as the deferred rolling decoded-frame buffer + the read-loop back-pressure item above — decide alongside the chosen deploy target. The explicit per-session `buffers.drop()` on End is wired in US2 / T036; an LRU cap bounds memory until then.
+- **Dev-side manifestation of the smoothing-buffer drop: running live-monitor under bare `--reload` leaves the bloom *permanently* stuck on "getting a read on things"** (#80) (`watch` / dev-diagnostic, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item above): empirically-confirmed dev fingerprint, recorded so it isn't re-debugged. **Symptom:** the live bloom is stuck on **"getting a read on things"** for an entire session, while the **recap afterward shows a normal band line**. **Cause:** running the inference service under `--reload`; a uvicorn **worker restart** — triggered by *any* watched-file change (source save, cache write, `git checkout`) — drops the per-session in-memory smoothing buffer (`_SessionBuffers` in `app/services/inference.py`), forcing a fresh **~90 s / 4-window re-warm** each time. Persisted bands survive (the `window_readings` inserts are already committed) → the **recap is fine** but the **live bloom never latches**. **Fingerprint in `window_readings`:** band→warming-up regressions + a band appearing **before** 4 scored windows + an upload gap — a combination **impossible under one stable buffer**. **Dev workaround:** `--reload --reload-dir app` (or no `--reload`) for live-monitor testing, and **don't edit `app/` source mid-session** (even under `--reload-dir app`, saving a watched source file restarts the worker) — see `apps/api/README.md` "Live-monitor testing" + the 008/004/005 quickstarts. **Relation to the buffer note above:** that item covers the **multi-worker / intentional-restart** re-warm (a one-time, visible warm-up); this is the **single-worker dev** manifestation — under `--reload` the restart is **involuntary and repeated**, so the bloom looks *permanently* stuck rather than re-warming once.
+- **Live-monitor readings stability (live-bloom durability)** (#81) (`watch` / production-deploy, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item + the dev fingerprint above): make the live bloom durable so it latches whenever a band has actually been computed/persisted, independent of worker lifecycle and live-response delivery. **Scope (from the read-only diagnostic):** **(a)** make the cold-start smoothing buffer **restart/worker-resilient** — single-worker + session affinity, or a shared cache (e.g. Redis), decided with the chosen deploy target; this is the existing buffer-durability concern, now shown to bite in **dev** too (the fingerprint above). **(b) decouple the live bloom from live-response delivery** — drive it partly from the `getSessionTrend` poll (the same durable `window_readings` rows the recap + the monitor "This session" card already read via `apps/web/lib/api/monitoring-reads.ts`), so a band that reached the DB shows even if its live scoring response was lost or late; this removes the recap-vs-bloom inconsistency at its root. **(c) investigate (needs live logs):** the final **~166 s upload cessation** (face-gate vs server-side upload failure) and the **"sign in again" mid-session auth event** seen in the 2026-06-23 run — Mohamed has the backend logs; attach when this branch opens. Same `production-deploy` class as the keep-up tail-decode + multi-worker buffer-affinity + read-loop back-pressure items above — do **stability first**. Fix scope: medium, split across `area:api` (buffer durability) + `area:web` (bloom driven off the durable poll). **Suggested issue labels:** `type:bug`, `area:api` (+ `area:web` for the bloom-delivery half).
+- **Feature 016 (team-lead dashboard) must add a tightly-scoped coarse-aggregate read path with multi-range time selection — NOT reach for the service-role key** (#82) (`deferred-feature` / blocks-016, **consolidated 2026-06-24 (absorbed the feature-001 "Manager dashboard time-range insights" manager-visibility item)** + the 008-foundational read-path constraint, T010–T011): **(read-path constraint — from 008)** 008 deliberately denies any manager access to `monitoring_sessions` / `window_readings` — owner-only RLS (select/insert/update-own), **no manager policy at all**, and `apps/api` holds **no service-role key** (revised D-1). When 016 needs managers to see team stress at a glance, it MUST satisfy that with a **tightly-scoped `SECURITY DEFINER` rollup function or a manager-readable aggregate view** that exposes **coarse bands only** (e.g. counts/fractions per band over a window, or a team tenor) and **never raw individual `window_readings`, never `stress_probability`/`label`, never per-employee point data** — mirroring `get_my_anchor()`'s self-scoping but widened to a manager's direct reports under the existing `profiles` manager relationship, with its own privacy review. It must **not** introduce a service-role key into `apps/api` to bypass RLS — the whole 008 posture is that the manager layer gets *nothing* by default, and any manager visibility is an explicit, coarse, separately-reviewed addition. **(time-range UX — from the feature-001 wrap-up)** The team-lead (and, for org-wide aggregates, the admin / feature 017) dashboards must support multiple time ranges for viewing stress trends — **1 week, 1 month, 1 quarter, 6 months, 1 year** — via a time-range selector control that re-aggregates the underlying daily data into weekly/monthly bars as appropriate. This is *compatible with* the read-path posture above, and the two reinforce each other: broader windows are **more** privacy-preserving (less granular), not less. **Fix scope**: medium — the `SECURITY DEFINER` rollup / manager-readable aggregate view + RLS + privacy review (read-path half), plus the time-range UI control, query-side aggregation, and Recharts charting (UX half). Suggested issue labels: `type:feature`, `area:db` (+ `area:web` for the selector UI). **Address by**: feature 016 (team-lead-dashboard) spec — must include BOTH the coarse-aggregate read-path constraint AND the time-range selector as acceptance scenarios; feature 017 (admin-dashboard) likewise for org-wide aggregates.
+- **A new camera/capture route must be registered in EVERY camera-policy touchpoint, or `getUserMedia` silently dies under the inherited `camera=()`** (#83) (`watch` / pre-build, from 008 US1 — `/app/monitor` originally shipped registered in none of them, so a granted permission still yielded no stream): a route that calls `getUserMedia` must be added to **(1)** `CAPTURE_ROUTES` in `apps/web/next.config.ts` (the `camera=(self)` Permissions-Policy header map) **AND (2)** the negative-lookahead exclusion in that same file's site-wide `camera=()` rule (`/((?!onboarding|app/calibrate|app/monitor).*)`) — these two spots MUST move together, because a path matched by *both* PP rules emits a *combined* `camera=() ∩ camera=(self) = denied` header that breaks the camera — **AND (3)** `isCaptureRoute` in `apps/web/proxy.ts`, which scopes the on-device MediaPipe detector's CSP (`script-src 'wasm-unsafe-eval'` + `worker-src 'self' blob:`); without it the detector WASM is CSP-blocked and the capture stage renders blank. The route's API origin must also stay reachable via the proxy `connect-src` (sourced from `NEXT_PUBLIC_API_URL`), so keep that env requirement **discoverable in the relevant `.env.example`** — the same discoverability discipline as the `SUPABASE_ANON_KEY` fix in `apps/api/.env.example`. Symptom of a miss: a granted camera permission still yields no stream (PP denied) or a blank stage (CSP-blocked WASM). A lint/test guard asserting these three lists stay in lockstep would retire the regression class.
+- **US4 trend: ambient "weather of the day" view + feel/precise toggle** (#84) (`deferred-feature` / post-demo (after feature 010), from 008 US4 trend design): while designing the US4 trend we explored an ambient, lower-precision "weather of the day" representation (soft colour fields across the day rather than the precise soft-line trend), and a feel-vs-precise toggle between it and the approved soft area+line trend. Deferred from 008 to keep a single trend visual language and avoid doubling the build/test/a11y surface in a branch closing clean. Note for any revisit: the literal sun/cloud icons + weather wording read off-voice for Serenify — a future ambient view should use Serenify's own band vocabulary (at ease / a little tense / tense) and abstract soft colour, not weather iconography. Fix scope: medium — a second trend representation, a toggle control, persisted toggle preference, plus its own a11y/responsive/test coverage. Address by: post-demo, after feature 010 — optional dashboard flourish; only if there's appetite for an ambient view.
+- **Model-owner: remove/annotate the stale `window_eval_config` (30 s) block in `metadata.json`** (#85) (`tech-debt` / model-owner, from 008 T056 carry-over; research R-0): the committed model artifact's `metadata.json` carries a stale `window_eval_config` of **30 s** that is **NOT** the production window — the production contract is **60 s / 10 s**, locked by Constitution Principle II + FR-002 + `docs/MODELS.md`, and the operating point 0.53 is read from `loso_metrics_60s_calibrated`. The 30 s block is a leftover from an earlier eval and could mislead a future reader into shortening the window. **This is a model-owner task, deliberately NOT actioned in 008.** When picked up it is **metadata/doc-only**: annotate or delete the stale block — **NO `model_version` bump, NO anchor invalidation, and DO NOT edit the model artifact or re-touch `metadata.json` in a way that changes the artifact hash** (touching it would invalidate the verified anchor + the bit-for-bit fidelity established for `@2.0.0`). Safest shape is a `docs/MODELS.md` clarifying note that the 30 s block is stale and ignored, leaving the artifact byte-untouched; only the model owner should decide whether to also edit the artifact's metadata under a controlled re-publish. Fix scope: small (doc note) / medium (controlled artifact re-publish, owner-only). Address by: the next model-owner maintenance pass; not blocking 008.
+- **Retention: 90-day `window_readings` purge job (policy decided, job deferred)** (#86) (`deferred-feature` / data-retention, from 008 T057; `data-model.md` § Retention): 008 decides the retention **policy** — `window_readings` is kept **90 days then purged** (it carries the affective per-window signal; `monitoring_sessions` is retained longer as it holds no raw signal) — but **does not build the purge job**. The job is a small additive `pg_cron` task (or an external scheduled task) running e.g. `DELETE FROM public.window_readings WHERE created_at < now() - interval '90 days';`. No 008 surface reads a reading older than today's recap / the 009 sustained-tense window, so the job's absence has **no functional effect in 008** beyond unbounded storage growth on a long-lived deployment. Fix scope: small — one `pg_cron` schedule (or a cron'd server task) + a migration if using `pg_cron`; pair with whichever feature first provisions scheduled DB jobs. Address by: before any long-running production deployment accumulates >90 days of readings; deferred from 008.
+- **Two pre-existing eslint errors in `components/monitor/monitoring-session.tsx` (NOT US4/Phase-8-introduced; deliberately not fixed in polish)** (#87) (`tech-debt` / from 008 T058 sweep, pre-dates US4): `npm run lint` reports exactly two errors, both pre-existing from the camera-lifecycle fix and **left untouched on purpose** in the Phase 8 polish pass because they sit on the camera `srcObject`/release lifecycle and are risky to refactor in a polish task: **(1)** `react-hooks/immutability` at **L200** — the reactive bind-and-play effect assigns `videoEl.srcObject = stream` (eslint flags mutating a value returned from `useState()`); this is the deliberate fix for the "self-view stuck until alt-tab" bug (the effect, not the callback ref, owns `srcObject` so a stream arriving after the element mounts still binds). **(2)** `react-hooks/set-state-in-effect` at **L478** — the standing release effect calls `stopStream()` (which `setStream(null)`) when leaving a capturing op; this is the privacy guarantee that a non-capturing op never holds the camera. Both are functionally correct and load-bearing for the camera lifecycle; "fixing" them risks regressing the self-view/release behaviour. `tsc` and Vitest are green; this is the only expected non-green in the lint sweep. Fix scope: medium — a careful camera-lifecycle refactor (e.g. an imperative ref-callback for `srcObject`, an external-store subscription for release) with the full monitor unit + e2e suite as the guard. Address by: a dedicated camera-lifecycle refactor, not a polish pass.
+- **Preferences hub + device selection (feature-sized, ~009 range — not a polish chore)** (#88) (`deferred-feature` / `area:web`, from 008 US1 monitoring "allow camera" moment): give users a settings home for the choices that make the app feel finished — default camera, theme, and (later) language — replacing the bare "allow camera" prompt in monitoring with a proper device picker. **Scope (three parts):** **(1) Monitoring device selector** — reuse the calibration step's camera selector instead of the bare allow-camera prompt. Note: camera labels / the full device list are only exposed *after* `getUserMedia` permission, so the picker populates **post-permission** (flow: allow → `enumerateDevices` → pick → start, or pick-triggers-allow). **(2) Account → Preferences section** holding: **Default camera** — persisted **per user** as a `deviceId`, with a **graceful fallback when the saved device isn't present** (deviceIds vary across machines/browsers — don't hard-fail); **Theme** — three-state light / dark / **system** (system follows `prefers-color-scheme` via the existing `useMediaQuery` hook, driving the `.dark` class); **Language** — UI slot added now, wired only when i18n lands (currently backlogged) and **must not block the rest**. **Constraints:** per-user settings persistence must stay **RLS-as-user, no service-role key** (existing security posture); the theme + camera parts are **independent of i18n** and can ship before the Arabic/RTL targeting decision. Suggested issue labels (for the future issues migration): `type:feature`, `area:web`. Fix scope: feature-sized. Address by: ~feature 009.
+- **iOS Safari *monitoring* produces 0 readings — a server-side decode death on the iOS un-finalized webm (`probe_recorded_seconds` throws → `our-side`); NOT the resolved kickout** (#89) (`bug` / suggested labels `type:bug` + `area:ml-video` (decode/probe lives there; caller in `apps/api`) + **not demo-blocking**; from 008 device gate T009 + smoke **Run 4, 2026-06-22**): On a **real iPhone Safari over HTTPS** (Run 4, cloudflared tunnel) app load + sign-in + on-device **calibration all worked**, but a **monitoring** session produced **0 readings** and died ~3.5 min in showing the client surface **"This one was on our side."** **Symptom:** the session fails partway in with the "our side" server error and never scores. **Root cause (precise):** `probe_recorded_seconds()` — the ffprobe duration probe in the O(stride) tail-decode path (**defined in `packages/ml-video/src/ml_video/anchor.py`**, called from `apps/api/app/services/inference.py`) — **throws on iOS Safari's un-finalized *growing* webm past the early-seconds mark (~40 s)**, tripping the scoring gate. Server trace (session `02a60299`): windows `probe_s = 9 → 19 → 29 → 39 s` `warming_up`, then **`probe_s = -1.00 … FeatureExtractionError:our-side`** repeated → every window skipped → the session **never reaches the 60 s scoring gate** → 0 readings. iOS also records **sub-realtime** (`probe_s = 39` at ~75 s wall-clock). **NOT auth / NOT the kickout (which is resolved):** every window upload returned **200**, **0 × 401, no re-login** — auth held the whole ~3.5 min (so the 008-followups `[1]` stale-token fix held on iOS and was the wrong layer for this); a true ITP/re-login kickout did **not** reproduce. Chrome's un-finalized webm decodes fine (desktop scored **35 readings** across the full band range the same day) — **iOS's webm is the problem child**, the same container **T009** flagged. **Impact — disproves the old assumption:** this is **NOT** the old "iOS live-readings are blocked until a real HTTPS deploy" read — Run 4 *had* HTTPS and load/sign-in/calibration all passed; it is a **capture/decode** failure, not a transport/HTTPS one. **Likely fix direction — same problem class as the known un-finalized-`MediaRecorder`-webm issue** (there the fix was an **`ffmpeg -c copy` remux** to a finalized/cued container *before* OpenCV decode, because `cap.set()` is a silent no-op on un-cued webm): **(1) prefer fMP4/CMAF on the iOS *monitor* recorder** — **T009 proved this iPhone's fMP4/CMAF decodes cleanly to `(2958,)` where its webm chokes** (the recorder's `pickMime` already needs webm-first-with-fMP4-fallback per the T026 backlog item above) — and/or **(2) harden `probe_recorded_seconds`** to degrade gracefully on an un-finalized iOS webm (remux-then-probe, or fall back to a timestamp estimate) instead of throwing `our-side`. Then **re-run ST-08-2**. Full evidence: `specs/008-stress-inference-service/smoke-tests.md` **Run 4** (commit `34c951b`). Fix scope: small-to-medium (recorder-mime preference + a probe-hardening guard + a T009 fMP4 re-validation on the deploy image). **Non-blocking for the desktop demo; required for real iOS monitoring support.** Address by: before any real-iOS monitoring sign-off; pairs with the **T026 recorder-mime** + the **keep-up tail-decode** items above (same decode path).
 
 ---
 
 ## From feature 009 (today-card-trend-redesign) — merged 2026-06-23
 
-- **Headline escalation arc (a-little-tense → tense) collapses to the plain peak** (`deferred-feature` / `area:web`, from 009 headline rework + the follow-up §1 verification): an escalation that opens *a little tense* (confident band) and climbs to *tense* renders the plain peak ("Your afternoon was tense") and **silently drops the opening a-little-tense band** — asymmetric with the calm→tense arc, which names both pods. The most-recent band *is* the peak so the recovery branch doesn't fire, and there is no `at_ease` opener so the calm→tension arc doesn't fire either; it falls through to peak-only. Deferred by decision (009). Revisit: either add an escalation branch that narrates the climb, or formally bless peak-only as the intended shape. Not demo-blocking.
-- **Cross-pod recovery clause is time-neutral** (`polish` / `area:web`, from 009 follow-up §2 verification): when the easing band sits in a **different** pod from the peak, the recovery clause ("…then eased" / "…then eased a little") names the peak's pod but **never names the easing pod** — the second clause is time-neutral. It does not mis-pod (the peak attribution is correct), but a cross-pod recovery could read "…then eased in the evening". Minor polish, not a correctness issue.
-- **Copy: collapse "a little tense" to a single word** (`polish` / `area:web`, from 009 follow-up §3): the two-word mid-tense descriptor is the only multi-word band label; a single word would tighten the headline and simplify the partial-easing clause ("eased a little"). Future copy pass — needs the word chosen first.
+- **Headline escalation arc (a-little-tense → tense) collapses to the plain peak** (#90) (`deferred-feature` / `area:web`, from 009 headline rework + the follow-up §1 verification): an escalation that opens *a little tense* (confident band) and climbs to *tense* renders the plain peak ("Your afternoon was tense") and **silently drops the opening a-little-tense band** — asymmetric with the calm→tense arc, which names both pods. The most-recent band *is* the peak so the recovery branch doesn't fire, and there is no `at_ease` opener so the calm→tension arc doesn't fire either; it falls through to peak-only. Deferred by decision (009). Revisit: either add an escalation branch that narrates the climb, or formally bless peak-only as the intended shape. Not demo-blocking.
+- **Cross-pod recovery clause is time-neutral** (#91) (`polish` / `area:web`, from 009 follow-up §2 verification): when the easing band sits in a **different** pod from the peak, the recovery clause ("…then eased" / "…then eased a little") names the peak's pod but **never names the easing pod** — the second clause is time-neutral. It does not mis-pod (the peak attribution is correct), but a cross-pod recovery could read "…then eased in the evening". Minor polish, not a correctness issue.
+- **Copy: collapse "a little tense" to a single word** (#92) (`polish` / `area:web`, from 009 follow-up §3): the two-word mid-tense descriptor is the only multi-word band label; a single word would tighten the headline and simplify the partial-easing clause ("eased a little"). Future copy pass — needs the word chosen first.
