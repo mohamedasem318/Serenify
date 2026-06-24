@@ -220,6 +220,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // srcObject is assigned during the same commit, so play() is called explicitly.
   useEffect(() => {
     if (!videoEl || !stream) return;
+    // eslint-disable-next-line react-hooks/immutability -- a live MediaStream is attached to a <video> by imperatively assigning .srcObject; React has no declarative API for a camera feed, so this is load-bearing for the self-view (guarded by the !== check so it only writes when the stream actually changes).
     if (videoEl.srcObject !== stream) videoEl.srcObject = stream;
     const played = videoEl.play?.();
     if (played && typeof played.catch === "function") played.catch(() => {});
@@ -557,6 +558,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     presenceRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time state reset during camera teardown: when the op leaves a capturing state, stopStream() calls setStream(null) once to release the live stream — not the per-render cascade this rule guards against.
     stopStream();
   }, [op, stopStream]);
 
