@@ -4,6 +4,48 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Tooling — Phase-1 CI (unit-test layer) + lint baseline cleared
+
+**Branch**: `chore/ci-unit-test-layer` → **merged to `main`** via **PR #94** (squash `3ee89a3`, 2026-06-24);
+branch deleted (local + remote). The BACKLOG/issue sync (this entry included) followed on a companion docs
+branch.
+**Status**: **merged**; first CI run **green**.
+**Date**: 2026-06-25
+
+Stood up the **first CI** for the repo — a single phase-1 GitHub Actions workflow (`.github/workflows/ci.yml`)
+running the cheap, hermetic layer (lint + typecheck + unit tests) on every PR into `main` + push to `main`
+(+ `workflow_dispatch`) — and cleared the 2-error ESLint baseline that would otherwise have made the first run red.
+
+- **web job** — Ubuntu, Node **22.11.0** (pinned for the Vitest happy-dom `<22.12` workaround) + npm cache →
+  `npm ci` at root → `apps/web` **lint / typecheck / Vitest** as separate steps (later steps gated on
+  `!cancelled()` so every failure surfaces in one run).
+- **python job** — Ubuntu, `uv` (cached) @ Python **3.12** → `uv sync --locked` for `packages/ml-video` then
+  `apps/api` (editable `ml-video`) → **`ruff` + `pytest`** for each. Minimal `libGL`/glib libs for the
+  `opencv-python` import (defensive — already pre-present on the current `ubuntu-latest` runner, so the apt step
+  was a no-op; kept as a guard per Mohamed); **ffmpeg deliberately not installed**, so the ffmpeg/fixture-gated
+  tests `skipif`-skip (the intended CI behavior).
+- **Lint baseline cleared** — the 2 known errors in `components/monitor/monitoring-session.tsx` (reactive
+  `srcObject` assign; `stopStream()` in the standing release effect) got documented, targeted
+  `eslint-disable-next-line` suppressions; both rules stay **globally active** (a fresh probe violation of each
+  still errored). `npm run -w apps/web lint` → true zero.
+
+**Excluded (by design)**: no coverage gate, no `next build`, no Playwright/e2e, no Supabase service container, no
+secrets. Ref-keyed concurrency (cancel-in-progress) + least-privilege `contents: read`. **Not marked required** —
+landed non-blocking to confirm green first; branch protection untouched.
+
+**First-run results**: web — lint 0, `tsc --noEmit` clean, **Vitest 641 passed / 69 files**; python — `ruff`
+clean in both workspaces, **pytest 0 failures** with the expected skips (`ml-video` 4 ffmpeg/fixture, `apps/api`
+1 local-only Supabase replay).
+
+**Governance / BACKLOG↔Issues (Amendment 9)**: opened + closed **#95** (CI standup) 1:1; closed **#87** (lint
+baseline) **as not-planned / by-design** — we documented the intentional suppressions rather than doing the scoped
+camera-lifecycle refactor. Both mirrored in `docs/BACKLOG.md`.
+
+**Next (out of scope here)**: Dependabot triage; the stale DECISION-20 correction; promoting the checks to required
+once trusted; phase-2 CI (app build / Playwright e2e / Supabase-backed integration).
+
+---
+
 ## Feature 009 — Today-Card Stress Trend Redesign (merged to main)
 
 **Branch**: `009-today-card-trend-redesign`
