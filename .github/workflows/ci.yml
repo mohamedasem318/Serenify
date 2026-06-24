@@ -1,0 +1,122 @@
+name: CI
+
+# Phase-1 CI: the cheap, hermetic layer only — lint, typecheck, unit tests.
+# No secrets, no Supabase, no Playwright, no `next build`. Runs on every PR into
+# main and on push to main (so main keeps a green baseline). These checks are
+# intentionally NOT marked required yet — we land non-blocking and watch them go
+# green first.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One in-flight run per ref; a newer push to the same branch/PR cancels the older run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Least privilege: the jobs only read the checkout and post nothing back.
+permissions:
+  contents: read
+
+jobs:
+  # --- apps/web — the only JS/TS workspace: lint + typecheck + Vitest ---------
+  web:
+    name: web (lint · typecheck · vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Pinned to 22.11.0: the Vitest config uses happy-dom to dodge an
+          # ESM/CJS require() conflict that only bites on Node < 22.12 — bumping
+          # past 22.11 would defeat that workaround. Keep in lockstep with local.
+          node-version: 22.11.0
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies (npm ci, hoisted root lockfile)
+        run: npm ci
+
+      - name: Lint
+        run: npm run -w apps/web lint
+
+      # `!cancelled()` so typecheck + tests still run after an earlier failure —
+      # every failure in this cheap layer surfaces in a single CI run.
+      - name: Typecheck
+        if: ${{ !cancelled() }}
+        run: npm run -w apps/web typecheck
+
+      - name: Unit tests (Vitest)
+        if: ${{ !cancelled() }}
+        run: npm run -w apps/web test
+
+  # --- Python — apps/api + packages/ml-video: ruff + pytest ------------------
+  python:
+    name: python (ruff · pytest)
+    runs-on: ubuntu-latest
+    env:
+      # Force a 3.12 interpreter for every uv resolve/sync/run (the mediapipe
+      # 0.10.13 ceiling; DECISION-1). Both pyprojects allow >=3.10,<3.13.
+      UV_PYTHON: "3.12"
+    steps:
+      - uses: actions/checkout@v4
+
+      # opencv-python (non-headless, pinned 4.13.0.92) loads libGL.so.1 + glib at
+      # import. A bare runner lacks them, so `import cv2` — and thus the WHOLE
+      # apps/api suite, whose conftest imports cv2 + ml_video at collection —
+      # would ImportError before a single test runs. Minimal runtime libs only;
+      # the *t64 names are 24.04, the plain names the 22.04 fallback.
+      - name: Install OpenCV system libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0t64 \
+            || sudo apt-get install -y --no-install-recommends libgl1 libglib2.0-0
+
+      - name: Set up uv (with cache)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "**/uv.lock"
+
+      - name: Ensure Python 3.12 is available
+        run: uv python install 3.12
+
+      # ml-video first: apps/api consumes it as an editable path dep. `--locked`
+      # asserts each uv.lock is in sync with its pyproject and fails on drift, so
+      # the load-bearing pins (scikit-learn 1.6.1 / numpy 2.0.2 / opencv 4.13.0.92
+      # / mediapipe 0.10.13) used for joblib unpickling are reproduced exactly.
+      - name: Install ml-video deps
+        run: uv sync --locked
+        working-directory: packages/ml-video
+
+      - name: Install apps/api deps (pulls editable ml-video)
+        if: ${{ !cancelled() }}
+        run: uv sync --locked
+        working-directory: apps/api
+
+      - name: Ruff — ml-video
+        if: ${{ !cancelled() }}
+        run: uv run ruff check .
+        working-directory: packages/ml-video
+
+      # ffmpeg is deliberately NOT installed: the ffmpeg/fixture-gated tests
+      # skipif-skip without it (the intended CI behavior). Expect "0 failed".
+      - name: Pytest — ml-video
+        if: ${{ !cancelled() }}
+        run: uv run pytest tests/ -q
+        working-directory: packages/ml-video
+
+      - name: Ruff — apps/api
+        if: ${{ !cancelled() }}
+        run: uv run ruff check .
+        working-directory: apps/api
+
+      - name: Pytest — apps/api
+        if: ${{ !cancelled() }}
+        run: uv run pytest tests/ -q
+        working-directory: apps/api
