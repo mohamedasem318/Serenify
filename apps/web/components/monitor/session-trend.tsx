@@ -1,34 +1,32 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-reads";
+import { HALO_R_MAX, NOW_R, STROKE, buildSessionTrend } from "@/lib/session-trend-geometry";
 
 /**
- * The monitor-page **this-session** live trend (feature 008, US4 — T047). The mock's
- * "This session" card (serenify-008-monitoring-mock.html): band → height, a meadow line,
- * the three-band legend. Reads through the shared `getSessionTrend` RLS reader (FR-018:
- * where this session also appears in the dashboard today trend, the two agree because
- * both read the SAME persisted rows). It carries NO number (FR-015).
+ * The monitor-page **this-session** live trend (feature 010 / 009b redesign). Visual source
+ * of truth: `serenify-live-session-graph-mock.html` ("match this"). All honesty-critical
+ * geometry + state derivation lives in the pure `lib/session-trend-geometry.ts`; this
+ * component only measures its container width and renders the derived view-model.
  *
- * Honesty rules (FR-029): a skipped/warming window (no confident band) is a GAP — the
- * line breaks across it, never carried-forward or fabricated. A session with a single
- * confident reading renders as a single dot, not a line.
+ * FIXED-PX (DC-001 / FR-001): the SVG `width` AND its `viewBox` width are both the measured
+ * container width — NO `preserveAspectRatio` stretch — so the now marker is a TRUE circle at
+ * any width (replacing the old `viewBox="0 0 100 40"` + `preserveAspectRatio="none"` that
+ * ovalled every marker). It carries NO number (FR-017) and reuses `getSessionTrend` unchanged.
  *
- * `load` + `active` + `pollMs` are injectable so the rules are unit-testable without a
- * Supabase round-trip and without real timers.
+ * Build order: US1 = step-line + live now-marker + band legend (this file's current scope).
+ * US2 (no-read treatments + foggy gate + legend gating) and US3 (popup + parked refinements
+ * + keyboard/reduced-motion + ≥44px touch target) layer on top.
+ *
+ * `load` / `active` / `pollMs` / `showOutOfFrameFoggy` / `now` are injectable so the rules are
+ * unit-testable without a Supabase round-trip, real timers, real layout, or a real clock.
  */
 
-const Y: Record<NonNullable<SessionTrendPoint["band"]>, number> = {
-  at_ease: 32,
-  a_little_tense: 20,
-  tense: 8,
-};
-const RANK: Record<NonNullable<SessionTrendPoint["band"]>, number> = {
-  at_ease: 0,
-  a_little_tense: 1,
-  tense: 2,
-};
+const DOT_R = 4; // isolated-confident dot (smaller than the now marker)
+const STATIC_HALO_R = 8; // reduced-motion now-marker halo (mock)
 
 export interface SessionTrendProps {
   sessionId: string;
@@ -38,6 +36,10 @@ export interface SessionTrendProps {
   load?: (sessionId: string) => Promise<SessionTrendPoint[]>;
   /** Poll cadence in ms (default ≈ one stride). */
   pollMs?: number;
+  /** FR-015 foggy gate — default OFF at launch (out-of-frame → muted no-clear-read). */
+  showOutOfFrameFoggy?: boolean;
+  /** Injectable clock for deterministic tests (defaults to Date.now). */
+  now?: () => number;
 }
 
 export function SessionTrend({
@@ -45,8 +47,12 @@ export function SessionTrend({
   active = true,
   load = getSessionTrend,
   pollMs = 12_000,
+  showOutOfFrameFoggy = false,
+  now = Date.now,
 }: SessionTrendProps) {
   const [points, setPoints] = useState<SessionTrendPoint[]>([]);
+  const [width, setWidth] = useState(0);
+
   const loadRef = useRef(load);
   useEffect(() => {
     loadRef.current = load;
@@ -71,47 +77,28 @@ export function SessionTrend({
     };
   }, [sessionId, active, pollMs]);
 
-  const n = points.length;
-  const xAt = (i: number) => (n <= 1 ? 50 : 4 + (i / (n - 1)) * 92);
-
-  // Runs of CONSECUTIVE confident-band points; a gap (skip/warming) ends a run.
-  const runs: { x: number; y: number }[][] = [];
-  let cur: { x: number; y: number }[] = [];
-  points.forEach((p, i) => {
-    if (p.band != null) {
-      cur.push({ x: xAt(i), y: Y[p.band] });
-    } else if (cur.length) {
-      runs.push(cur);
-      cur = [];
+  // ── T009a: measure the rendered container width ──
+  // A callback ref measures the instant the node mounts (handles mount-before-observer and
+  // 0-width-on-mount), and a ResizeObserver keeps it in sync on resize. setState lives in the
+  // ref/observer callback (not an effect body), so it never trips react-hooks/set-state-in-effect.
+  const roRef = useRef<ResizeObserver | null>(null);
+  const setNode = useCallback((el: HTMLDivElement | null) => {
+    roRef.current?.disconnect();
+    roRef.current = null;
+    if (!el) return;
+    const measure = () => setWidth(el.getBoundingClientRect().width || el.clientWidth || 0);
+    measure();
+    if (typeof ResizeObserver !== "undefined") {
+      const ro = new ResizeObserver(measure);
+      ro.observe(el);
+      roRef.current = ro;
     }
-  });
-  if (cur.length) runs.push(cur);
+  }, []);
 
-  const drawableCount = runs.reduce((sum, r) => sum + r.length, 0);
-
-  // Peak (tensest) point — an amber marker, only when stress was actually reached.
-  let peakIdx = -1;
-  let peakRank = 0;
-  points.forEach((p, i) => {
-    if (p.band == null) return;
-    const r = RANK[p.band];
-    if (r > peakRank) {
-      peakRank = r;
-      peakIdx = i;
-    }
-  });
-  const peakPoint = peakIdx >= 0 ? points[peakIdx] : undefined;
-  const peak =
-    peakRank >= 1 && peakPoint?.band != null
-      ? { x: xAt(peakIdx), y: Y[peakPoint.band] }
-      : null;
-
-  const subtitle =
-    peakRank >= 2
-      ? "A tense stretch in here."
-      : peakRank === 1
-        ? "A little tension creeping in."
-        : "Settled so far.";
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const view = buildSessionTrend(points, { width, nowMs: now(), showOutOfFrameFoggy });
+  const marker = view.nowMarker;
+  const pulsing = marker.state === "live" && marker.pulse && !reducedMotion;
 
   return (
     <section
@@ -121,78 +108,115 @@ export function SessionTrend({
     >
       <h3 className="font-display text-base font-semibold text-ink">This session</h3>
 
-      {drawableCount === 0 ? (
+      {view.isEmpty ? (
         <p data-testid="session-trend-empty" className="mt-1.5 text-sm text-muted">
           Your trend builds as readings come in.
         </p>
       ) : (
         <>
-          <p className="mt-1.5 text-sm text-muted">{subtitle}</p>
-          <svg
-            className="mt-3.5 block h-[88px] w-full"
-            viewBox="0 0 100 40"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label="Band trend for this check-in: higher means tenser; gaps are windows without a clear read."
-          >
-            <line
-              x1="4"
-              y1="32"
-              x2="96"
-              y2="32"
-              stroke="var(--color-border)"
-              vectorEffect="non-scaling-stroke"
-            />
-            {runs.map((run, ri) =>
-              run.length >= 2 ? (
-                <path
-                  key={ri}
-                  data-testid="trend-seg"
-                  d={`M ${run.map((q) => `${q.x},${q.y}`).join(" L ")}`}
-                  fill="none"
-                  stroke="var(--color-meadow)"
-                  strokeWidth={2.5}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  vectorEffect="non-scaling-stroke"
-                />
-              ) : (
-                <circle
-                  key={ri}
-                  data-testid="trend-dot"
-                  cx={run[0]!.x}
-                  cy={run[0]!.y}
-                  r={2.6}
-                  fill="var(--color-meadow)"
-                  vectorEffect="non-scaling-stroke"
-                />
-              ),
-            )}
-            {peak && (
-              <circle
-                data-testid="trend-peak"
-                cx={peak.x}
-                cy={peak.y}
-                r={3.2}
-                fill="var(--color-amber)"
-                vectorEffect="non-scaling-stroke"
-              />
-            )}
-          </svg>
+          <p data-testid="session-trend-subtitle" className="mt-1.5 text-sm text-muted">
+            {view.subtitle.text}
+          </p>
 
+          {/* the measured container — the SVG fills it 1:1 (matched pair with the camera card) */}
+          <div ref={setNode} className="mt-3.5 w-full">
+            {width > 0 && (
+              <svg
+                data-testid="session-trend-svg"
+                width={view.width}
+                height={view.height}
+                viewBox={`0 0 ${view.width} ${view.height}`}
+                role="img"
+                aria-label="Your live stress trend for this session: colour and height show how tense each reading is; gaps are windows without a clear read. No numbers are shown."
+                className="block"
+              >
+                {/* subtle band gridlines + axis labels */}
+                {view.axis.gridlines.map((g, idx) => (
+                  <line
+                    key={`grid-${idx}`}
+                    x1={g.x1}
+                    y1={g.y}
+                    x2={g.x2}
+                    y2={g.y}
+                    stroke="var(--color-border)"
+                    strokeWidth={1}
+                  />
+                ))}
+                {view.axis.labels.map((l, idx) => (
+                  <text key={`axis-${idx}`} x={l.x} y={l.y} textAnchor={l.anchor} fill="var(--color-muted)" fontSize={11}>
+                    {l.text}
+                  </text>
+                ))}
+
+                {/* confident step-line (colour = band, height = band) */}
+                {view.steps.map((s, idx) => (
+                  <polyline
+                    key={`seg-${idx}`}
+                    data-testid="trend-seg"
+                    points={s.points.map((p) => `${p.x},${p.y}`).join(" ")}
+                    fill="none"
+                    stroke={s.color}
+                    strokeWidth={STROKE}
+                    strokeLinejoin="round"
+                    strokeLinecap="round"
+                  />
+                ))}
+                {/* isolated confident reading → a dot, not a line */}
+                {view.dots.map((d, idx) => (
+                  <circle key={`dot-${idx}`} data-testid="trend-dot" cx={d.x} cy={d.y} r={DOT_R} fill={d.color} />
+                ))}
+
+                {/* the live "now" marker (popup / keyboard / ≥44px hit-area land in US3) */}
+                {marker.state !== "none" && (
+                  <g data-testid="now-marker">
+                    {marker.state === "live" &&
+                      (pulsing ? (
+                        // gentle pulse via inline SMIL (digits stay in attributes, never in
+                        // rendered text — FR-017); only rendered when motion is allowed (FR-006)
+                        <circle cx={marker.x} cy={marker.y} r={NOW_R} fill="none" stroke={marker.fill} strokeWidth={2}>
+                          <animate
+                            attributeName="r"
+                            values={`${NOW_R};${HALO_R_MAX}`}
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                          <animate
+                            attributeName="opacity"
+                            values="0.5;0;0"
+                            keyTimes="0;0.7;1"
+                            dur="2.4s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
+                      ) : (
+                        <circle
+                          data-testid="now-halo-static"
+                          cx={marker.x}
+                          cy={marker.y}
+                          r={STATIC_HALO_R}
+                          fill="none"
+                          stroke={marker.fill}
+                          strokeWidth={2}
+                          opacity={0.22}
+                        />
+                      ))}
+                    <circle data-testid="now-dot" cx={marker.x} cy={marker.y} r={NOW_R} fill={marker.fill} />
+                  </g>
+                )}
+              </svg>
+            )}
+          </div>
+
+          {/* band legend (no-read keys + FR-021 gating land in US2) */}
           <ul className="mt-3 flex flex-wrap gap-4 text-xs text-muted" aria-hidden>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-meadow" /> At ease
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-meadow)" }} /> At ease
             </li>
             <li className="flex items-center gap-1.5">
-              <span
-                className="size-2.5 rounded-sm"
-                style={{ background: "color-mix(in srgb, var(--color-amber) 55%, var(--color-meadow))" }}
-              />{" "}
-              A little tense
+              <span className="size-2.5 rounded-full" style={{ background: "var(--amber-soft-line)" }} /> A little tense
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-sm bg-amber" /> Tense
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-amber)" }} /> Tense
             </li>
           </ul>
         </>
