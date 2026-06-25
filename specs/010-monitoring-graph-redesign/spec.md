@@ -14,6 +14,14 @@
 
 ---
 
+## Clarifications
+
+### Session 2026-06-25
+
+- Q: As a live session accumulates many readings, how should the horizontal axis behave given FR-001 (fixed 1px-per-unit) collides with FR-002 (fixed container width)? → A: **Window to the most recent ~2 minutes** of readings — a **time-based rolling window** (not a fixed count, so spacing stays stable regardless of read frequency); older readings scroll off the left edge. If 2 minutes ever renders too dense to keep the no-read gap labels legible, **drop the oldest readings rather than shrink spacing** (legibility wins). (FR-002a; Edge Cases; SC-012.)
+- Q: At launch the foggy "stepped out of frame" treatment is gated OFF (FR-015) and can never appear, yet the mock's legend shows all three no-read swatches — show the foggy legend key at launch? → A: **No — hide it until the gate flips.** The legend shows **two** no-read keys at launch (warming, no clear read) and **three** when the FR-015 gate is on; this is part of the same one-line gate flip. (FR-021; SC-004.)
+- Q: The mock/current component show an auto-derived subtitle ("A tense stretch in here." etc.), but the spec was silent — keep it? → A: **Keep it, but in scope with a no-read/warming honesty rule** — it MUST NOT assert a tension level during start-of-session warming or an active no-read (parallel to 009's `deriveHeadline` fork). (FR-024; SC-013.)
+
 ## User Scenarios & Testing *(mandatory)*
 
 This feature redesigns the live **"This session"** graph shown below the camera stage on the monitor page while an employee is actively being recorded. It is **frontend-only** — it consumes the existing read layer unchanged and adds no data, auth, or privacy surface. It is **not purely visual**: it adds real state-handling (consuming `skipCause`, splitting warming-vs-skip, three differentiated no-read treatments) and it is **honesty-critical** (the graph must never tell a user something the pipeline cannot actually know).
@@ -90,6 +98,7 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **Out-of-frame at launch**: out-of-frame is mapped to the muted "no clear read" gap (FR-015) because the foggy treatment is gated OFF at launch — so the user is never told to "step back into frame" while the pipeline can't reliably tell they left (issue #100). When #100 confirms reliability, the gate flips on and out-of-frame renders foggy.
 - **Now marker during a no-read**: with a prior confident reading, the marker parks (muted, static, "last clear read"); with no confident reading yet (warming), there is no marker (FR-004a / FR-004b).
 - **Container resize / responsive**: the graph re-renders at the new fixed-pixel width; markers stay true circles and the graph keeps matching the camera stage width.
+- **Long session (window overflow)**: a session longer than the rolling window shows only the most recent ~2 minutes; older readings scroll off the left edge. Spacing stays fixed (the window is time-based), and if density would threaten gap-label legibility the oldest readings are dropped rather than the spacing shrunk (FR-002a). This growth dimension is new to the live graph — the today-card recap (009) had a bounded dataset and none.
 - **Session paused / ended**: the live graph only polls while actively capturing (warming-up / active); a paused session shows the last rendered state.
 
 ## Requirements *(mandatory)*
@@ -100,6 +109,7 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 
 - **FR-001**: The graph MUST render in a uniform coordinate space where one drawing unit equals one screen pixel, with the drawing width and the coordinate-system width equal, so every marker renders as a **true circle** with no stretch distortion. This replaces today's stretched coordinate space that ovals every marker. (Governing constraint: DC-001, fixed-pixel rendering.)
 - **FR-002**: The graph MUST fill the width of its container and read as a **matched pair** with the live monitoring container (camera/feed stage) directly above it. It MUST NOT impose a narrower max-width. The real width is read from the existing monitor layout, not the mock's standalone-preview width.
+- **FR-002a** *(clarified 2026-06-25)*: Because the session grows unboundedly while the graph width is fixed (FR-002), the trend MUST render a **rolling window of the most recent ~2 minutes** of readings (≈10 readings at the ~12s poll stride) rather than compressing the whole session into the fixed width. The window is **time-based, not a fixed reading count**, so horizontal spacing stays **stable** regardless of read frequency; readings older than the window **scroll off the left edge**. If a 2-minute window ever renders too dense to keep the no-read **gap labels legible**, the implementation MUST **drop the oldest readings (shorten the window) rather than shrink spacing** — legibility (SC-003) wins over completeness. The live "now" marker always sits at the right edge (the latest reading).
 - **FR-003**: The trend MUST render as a **continuous step line** whose **colour encodes the band** (at ease = meadow, a little tense = soft-amber, tense = amber) and whose **height encodes tension** (tenser = higher). This is a continuous step line, not the today-card's lane geometry.
 
 **The live "now" marker**
@@ -132,12 +142,13 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 **Copy & tokens**
 
 - **FR-020**: The graph MUST reuse the existing read layer (`getSessionTrend` / `monitoring-reads.ts`) **unchanged** — no RLS, auth, security, or data-model change, and no probability reaching the client.
-- **FR-021**: The graph MUST present the three band levels (Tense, A little tense, At ease) and a band legend consistent with the mock.
+- **FR-021** *(legend gating clarified 2026-06-25)*: The graph MUST present the three band levels (Tense, A little tense, At ease) and a band legend consistent with the mock. The **no-read legend keys MUST follow the FR-015 gate**: at launch the legend shows **two** no-read keys — *warming up* and *no clear read* — and **omits the foggy "stepped out of frame" key** (the mock shows all three, but the foggy treatment cannot occur while gated OFF, so showing its key would advertise a state the user can never see — the same dishonesty FR-015 avoids). When the FR-015 gate flips on, the foggy key appears, restoring all three; this is part of the same one-line gate flip.
 - **FR-022** *(decided — copy pending Mohamed's wording sign-off before implement)*: The no-read copy MUST **reuse the same `skipCause` vocabulary as the today-card's `phraseFor`** but render it in the **live / present-or-imperative voice** — the live graph is real-time where the today-card is retrospective, so the two are aligned but **NOT identical strings** (e.g. retrospective "kept stepping away" → live imperative "step back into frame"). Resolved **proposed live copy** (flagged for Mohamed's sign-off):
   - **Warming** → **"getting a read"** (present/continuous; matches the mock).
   - **Out-of-frame** → **"step back into frame"** (imperative; the live counterpart of `phraseFor`'s retrospective "kept stepping away"). *Gated OFF at launch (FR-015); the string is ready for when the gate flips on.*
   - **No clear read** → **one generic "no clear read"** string (present; the live counterpart of `phraseFor`'s default "no clear read"). At launch this **single generic string is shown for every cause** the no-clear-read state covers — low-light, insufficient-face, our-side, and the gated-off out-of-frame fallback (FR-015). **No cause-specific variants at launch:** a cause-specific claim such as "too dark to read" asserts we know *why* the read failed, which is only honest if low-light detection is proven reliable — and that reliability is **unproven**, so by the same honesty rule that gated out-of-frame (FR-015), low-light collapses to the generic string too. *Deferred:* the low-light cause-specific variant ("too dark to read", the live counterpart of `phraseFor`'s "light too low") is **deferred pending low-light-reliability confirmation; revisit if confirmed** — a deferred option, not a closed door.
 - **FR-023** *(decided)*: The **"a little tense" mid-band line** MUST reuse the existing pinned token **`--amber-soft-line`** (`#D49A4A` light / `#E8BC7A` dark, from feature 009's `trend-geometry.ts` `BAND_LINE.a_little_tense`). **No new `globals.css` token and no amendment.** This is a deliberate, signed-off ~hue delta from the mock's placeholder (`#CF9A4F` light / `#D8B57A` dark), chosen for **cross-surface consistency with the today-card**.
+- **FR-024** *(clarified 2026-06-25)*: The graph's **auto-derived subtitle** (the one-line summary above the trend — e.g. "A tense stretch in here." / "A little tension creeping in." / "Settled so far.") is **retained and in scope**. It MUST obey the same honesty rule as the rest of the graph: it MUST **never assert a tension level during start-of-session warming** (no confident reading has ever occurred) **or while the live edge is an active no-read**. During warming it MUST fall back to a non-asserting line (e.g. a "getting a read" phrasing); during an active no-read it MUST NOT present a fresh tension claim as the current state. This mirrors feature 009's `deriveHeadline` honesty fork. *Final subtitle wording is pending Mohamed's sign-off, alongside FR-022.*
 
 ### Key Entities
 
@@ -161,6 +172,8 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **SC-009**: A no-read gap is never bridged by a flat line at a carried-forward level. A leading skip (no prior confident reading) renders fade-in only.
 - **SC-010**: A single-reading session renders one dot (never a line); a fully read-less session renders a no-read state (never calm/at-ease).
 - **SC-011**: When the live edge is an active no-read with a prior confident reading, the "now" marker is muted (not band-coloured), static (not pulsing), and its popup reads "last clear read" — never a band-coloured/pulsing "you are here" on a stale reading. During start-of-session warming (no confident reading yet) there is no marker.
+- **SC-012**: In a session longer than the rolling window, the graph shows only the most recent ~2 minutes; horizontal spacing stays fixed (no progressive compression as the session grows) and the no-read gap labels remain legible — and if density forces a tradeoff, the oldest readings are dropped, not the spacing (FR-002a).
+- **SC-013**: The subtitle never asserts a tension level during start-of-session warming or an active no-read (no "settled" / "tense" claim when there is no current confident reading).
 
 ## Resolved decisions (2026-06-25, Mohamed)
 
