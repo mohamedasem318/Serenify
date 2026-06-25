@@ -256,6 +256,32 @@ Cross-references:
 - CLAUDE.md "Backlog ↔ Issues" section
 - docs/BACKLOG.md (cleanup ride-along: stale headers flipped to merged, status
   normalizations, manager-visibility item merge, feature-number remap)
+
+Amendment 10: 1.7.0 → 1.8.0 (2026-06-25, MINOR)
+Bump rationale: Principle VIII's provisional ordering gains one new planned slot —
+`009b-monitoring-graph-redesign` — inserted immediately after the shipped
+`009-today-card-trend-redesign` and before `010-llm-client-and-chatbot`. The slot is the
+live "This session" within-session monitoring graph
+(`apps/web/components/monitor/session-trend.tsx`) scoped out of feature 009; it is
+design-locked (a signed-off HTML reference exists) and pending spec. Two deliberate
+non-actions: slots `010`–`020` are NOT renumbered, and the shipped `009` is NOT renamed
+to `009a` — its branch / PR #25 / CHANGELOG history is fixed, so relabeling it would
+create constitution↔git drift; the `b` suffix already implies `009` is the original. The
+roadmap label is decoupled from the real branch number, which SpecKit auto-assigns at
+`/speckit-specify` time regardless of the slug. MINOR bump: a new planned feature added to
+the provisional ordering materially extends the guidance (consistent with Amendment 8); no
+new/removed principle, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for the touched strings (`009b`, `monitoring-graph-redesign`,
+`session-trend`, the ordering slug list) — zero matches; the templates reference Principle
+VIII by number, not by these literal slugs or feature numbers, so no template edit is
+required (consistent with the Amendment 8/9 audits).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-25
+- docs/CHANGELOG.md entry 2026-06-25
+- apps/web/components/monitor/session-trend.tsx (the surface to be redesigned)
 -->
 
 # Serenify Constitution
@@ -540,7 +566,11 @@ implement, in that order. Implementation without a spec is forbidden.
   `003-employee-dashboard-shell`, `004-onboarding-video-anchor`,
   `005-per-user-calibration`, `006-calibration-capture-quality`,
   `007-visual-redesign`, `008-stress-inference-service`,
-  `009-today-card-trend-redesign`, `010-llm-client-and-chatbot`,
+  `009-today-card-trend-redesign`,
+  `009b-monitoring-graph-redesign` (the live "This session" within-session
+  monitoring graph, scoped out of 009; design-locked — a signed-off HTML
+  reference exists — pending spec),
+  `010-llm-client-and-chatbot`,
   `011-questionnaire`, `012-recommendations`,
   `013-personalization-onboarding`, `014-privacy-controls-and-transparency`,
   `015-preferences-hub`, `016-team-lead-dashboard`,
@@ -735,4 +765,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.7.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-24
+**Version**: 1.8.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-25
