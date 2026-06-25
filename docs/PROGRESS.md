@@ -4,6 +4,23 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Tooling — Dependabot switched to security-updates only (version updates OFF)
+
+**Branch**: `chore/dependabot-security-only` — config correction PR **open for squash-merge** (CI
+green: it touches one YAML + two docs, no lint/typecheck/test surface). **Date**: 2026-06-25.
+Follows up the security-pass closeout (PR #101): that `dependabot.yml` read as "security only" but
+`applies-to: security-updates` only **groups** security PRs — it doesn't scope the block, so version
+updates stayed on and opened five unsolicited bumps (#102 react-dom · #103 radix · #104
+react-hook-form · #105 lucide-react · #106 eslint). Set **`open-pull-requests-limit: 0`** on all three
+blocks (npm `/`, pip `/apps/api`, pip `/packages/ml-video`) — disables version-update PRs while
+security updates keep flowing (separate internal limit of 10) — and added **`labels: []`** so
+Dependabot stops stamping its off-taxonomy `dependencies`/`javascript` labels. `groups`/`ignore` left
+byte-for-byte unchanged. Rationale + the two failure modes (eslint 9→10 major; react/react-dom
+exact-pin skew) in `docs/DECISIONS.md` 2026-06-25. **Post-merge**: close #102–#106 as unintended
+(Dependabot won't reopen them with version updates off); leave alert #10 (postcss) open.
+
+---
+
 ## Tooling — Security/CI pass closeout (Dependabot triage · protobuf accept-and-document · dependabot.yml · DECISION-20 fix)
 
 **Branch**: `chore/security-pass-closeout` (this docs + config entry) — closes the security/CI
