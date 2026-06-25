@@ -1538,3 +1538,27 @@ even if the actual Arabic translation + RTL pass ships later.
 **Landed non-blocking** — **not** a required check yet (watch it stay green first; making the checks required is a separate later step, branch protection untouched). Cleared the lint-baseline blocker (#87, closed by-design) so the first run could be green.
 **Observed**: repo had no CI — lint/typecheck/tests ran only locally, so a regression could land on `main` unguarded.
 **Out of scope (next sessions)**: Dependabot triage; the stale DECISION-20 correction; promoting the checks to required; phase-2 layers (app build / Playwright e2e / Supabase-backed integration).
+
+---
+
+## Monitoring — surfaced during the 2026-06-25 security/CI pass closeout smoke
+
+### Live monitor: does the pipeline distinguish "not in frame" (absent) from "couldn't get a clear read" (present-but-low-confidence)? — read-only diagnostic (#100)
+**Status**: bug (`type:bug` / `area:web` + `area:ml-video`; the decision logic also touches `apps/api` inference)
+**Observed**: 2026-06-25, the end-to-end stress-detection smoke on merged `main` (the security/CI pass closeout).
+**Description**: Walking away from the camera mid-session was surfaced **inconsistently** — **sometimes** the live monitor showed the vague **"couldn't get a clear read"** (the generic "on our side" / thin-read surface), **other times** it correctly showed a distinct **"face not centred" / not-in-frame** state. Same physical action (the user leaving the frame), two different user-facing outcomes.
+
+**The question to resolve**: **does the pipeline distinguish *absent* from *present-but-low-confidence*?** — i.e. does it tell apart **absent** (no face in frame at all — the user walked away) from **present-but-low-confidence** (a face *is* present but extraction/coverage is too thin for a confident read: low light, partial face, motion, a brief glance away), and are those two states deterministically mapped to two **distinct** user surfaces? If they are, why does walking away sometimes fall through to the vague "couldn't get a clear read" instead of the distinct "not in frame" state?
+
+**Why read-only (not a fix)**: there are (at least) two independent paths that can surface on walk-away, suspected to race/overlap rather than cleanly partition the cases —
+  1. **Client-side framing presence machine** — the feature-005 on-device framing signal (`apps/web` `use-framing-guide` + the monitoring presence state) drives the **out-of-frame / "face not centred"** surface (90 s no-face → `out_of_frame`). This is the *distinct, correct* surface.
+  2. **Server-side cause classification** — when a window *is* uploaded but can't be scored, `apps/api` inference / the `packages/ml-video` coverage gate emit a categorical reason mapping to the client cause chip — including the generic **"our side"** surface and the foggy **"skipped a read"** note. This is the *vague* surface the diagnostic chases.
+The diagnostic traces which path fires on a real walk-away, confirms whether "absent" and "present-but-low-confidence" are actually separable signals in the pipeline today, and pins down why the vague server-side message sometimes wins over the distinct client framing state. **No behaviour change in this item** — it scopes the investigation; any fix is a follow-up once the distinction (or its absence) is established.
+
+**Cross-references**:
+  - **#89** (iOS monitoring 0 readings via a server-side decode death that *also* surfaces as the vague "on our side") — same vague-surface class, different root cause (decode vs framing).
+  - The feature-006 coverage gate (`insufficient_face_frames` → the `insufficient-face` chip) — the existing "present but thin" path; check whether walk-away ever routes here vs to "our side".
+  - The "skipped a read" foggy note + the 90 s-no-face → `out_of_frame` presence machine (feature 008 US1/US2) — the two existing distinct surfaces this gap sits between.
+
+**Fix scope**: read-only diagnostic first (no code change) — small investigation across `apps/web` (presence/cause-chip rendering), `apps/api` (inference cause classification), and `packages/ml-video` (coverage gate). Any resulting fix is a separate, later item sized once the diagnostic lands.
+**Address by**: a monitoring-quality pass — not demo-blocking, but it muddies the live-monitor UX (the vague message reads as a system fault when the real cause is "you left the frame"). Pairs with #89 (same vague-surface class).
