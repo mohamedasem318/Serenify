@@ -29,7 +29,7 @@ FOGGY_COLOR   = var(--color-foggy)     # out-of-frame foggy (gated)
 AXIS_GUTTER ≈ 140   RIGHT_MARGIN ≈ 60  # plot area = [AXIS_GUTTER, W − RIGHT_MARGIN]
 STROKE = 3   WARM_STROKE = 2.5 (dash "2 5", opacity .55)   FADE_OPACITY = .25
 NOW_R = 5   HALO_R = 5→13 (pulse)   HIT_R ≥ 22 (≥44px touch target; mock r=15)
-WINDOW_MS = 120_000   N_TARGET ≈ 12   MIN_SLOT = <legibility floor, gap-label font 11px>
+WINDOW_MS = 120_000   N_TARGET ≈ 10   MIN_SLOT = <legibility floor, gap-label font 11px>
 ```
 
 ## Derived view-model
@@ -70,8 +70,8 @@ WINDOW_MS = 120_000   N_TARGET ≈ 12   MIN_SLOT = <legibility floor, gap-label 
 3. **out-of-frame** (`skipCause === "out-of-frame"`): gate ON → foggy; gate OFF (launch) → no_clear_read (FR-015/F7).
 4. **no_clear_read** = any other null-band window (low-light/insufficient-face/our-side, re-warm, or gated-off out-of-frame) → muted gap (FR-012/FR-014).
 5. **no bridge:** a no-read never draws a flat carried-forward line; fade-out at the prior level, gap, fade-in at the next; **fade-in only** when there is no prior confident reading (FR-013/SC-009).
-6. **single confident reading** → a dot, not a line (FR-019/SC-010).
-7. **no confident reading ever** (warming / leading skip / all-skipped) → no now-marker (FR-004b); never render calm/at-ease (SC-010).
+6. **single / isolated confident reading** → a dot, not a line (FR-019/SC-010). This applies to a whole-session single reading **and** to any **lone confident reading flanked by no-reads** (a run of length 1 between gaps): a single point cannot be a line, so it renders as a dot at its band — extending FR-019's single-reading rule to any isolated confident point.
+7. **no confident reading ever** (warming / leading skip / all-skipped) → no now-marker (FR-004b); never render calm/at-ease (SC-010). **Also** (FR-004a × FR-002a rolling-window intersection): when there **is** a prior confident reading but it has **scrolled off the rolling window** so none remains on-screen to anchor to, render **no now-marker** rather than a parked marker pointing off-screen — there is honestly nothing visible to point at. The parked marker (FR-004a) appears only while the last confident reading is still within the drawn window.
 8. **zero trend points** → text-only empty state (FR-018); a warming-only/all-skipped session (≥1 point) is a no-read state, not empty.
 
 ## Out of scope (no change)
