@@ -12,6 +12,37 @@ enforced rule so that every subsequent PR in the security review phase (this
 doc's PR being the first) is exercised by the new protections before the
 harder slices (RLS audit, SECURITY DEFINER bodies, secrets discipline) land.
 
+## Update — 2026-06-25 — Required status checks now enforced
+
+When this doc was first written (2026-05-25) there was no CI workflow, so
+`required_status_checks` was `null` (see "What's intentionally NOT enabled"
+below). Phase-1 CI has since landed (`.github/workflows/ci.yml`, PR #94) and run
+green across PRs #94/#96/#97/#98/#99/#101. With a green baseline established, the
+two CI jobs are now **required** on `main`:
+
+- `web (lint · typecheck · vitest)`
+- `python (ruff · pytest)`
+
+Set via the classic Branch Protection `PUT .../branches/main/protection` with
+`required_status_checks.strict = false` (a branch need not be up to date with
+`main` before merging — least-disruptive on a one-reviewer team) and `contexts`
+= the two check-run names above (matched exactly, including the `·` separators).
+**Every other slice-0 setting is unchanged** — PR still required, linear history,
+no force-push, no deletions, `enforce_admins: false`, 0 required reviewers.
+
+Net effect: a PR into `main` can no longer be merged until both CI jobs pass.
+The "Required status checks (`required_status_checks: null`)" bullet under
+"What's intentionally NOT enabled" is therefore **superseded as of this date**.
+Note the two **required** contexts are the CI jobs only — the one-off
+`.github/dependabot.yml` config-validation check and Dependabot's own meta-checks
+are deliberately NOT required (they do not run on every PR).
+
+Verify live:
+
+```bash
+gh api repos/mohamedasem318/Serenify/branches/main/protection -q '.required_status_checks'
+```
+
 ## Rules enabled
 
 Mirrors the live API response (see verbatim output below). Each bullet names
@@ -47,12 +78,12 @@ shape:
 
 ## What's intentionally NOT enabled
 
-- **Required status checks** (`required_status_checks`: `null`) — no GitHub
-  Actions workflow exists in the repo yet, so there are no checks to require.
-  Requiring a non-existent check would deadlock every merge. Reactivate when
-  CI lands; this pairs with the `docs/BACKLOG.md` entry "CI guard for speckit
-  skills + gitignore rule" (feature 003), which is slated to add the first
-  workflow file.
+- **Required status checks** (`required_status_checks`: `null`) — **SUPERSEDED
+  2026-06-25: now enabled; see the "Update — 2026-06-25" section above.** At the
+  original 2026-05-25 capture, no GitHub Actions workflow existed in the repo
+  yet, so there were no checks to require — requiring a non-existent check would
+  deadlock every merge. CI has since landed (`.github/workflows/ci.yml`) and the
+  `web` + `python` jobs are now required.
 - **Required approving reviewers > 0**
   (`required_approving_review_count`: `0`) — Serenify is a one-reviewer team
   (Mohamed). Raising this to `1` would block Mohamed from self-merging his own
