@@ -67,11 +67,24 @@ export const NO_READ_COLOR = "var(--color-muted)";
 /** Out-of-frame foggy (attention) — used ONLY when the FR-015 gate is on. */
 export const FOGGY_COLOR = "var(--color-foggy)";
 
-/** Plot area = [AXIS_GUTTER, width − RIGHT_MARGIN] (mock: gridlines x 140 → 520, W 580). */
+/** Plot area = [axisGutter, width − rightMargin]. At wide widths these are the mock values
+ *  (gridlines x 140 → 520, W 580); below GUTTER_FULL_W they shrink toward their MINs (see below). */
 export const AXIS_GUTTER = 140;
 export const RIGHT_MARGIN = 60;
 /** Axis label sits this far left of the gutter (mock x=92 with gutter 140). */
 export const LABEL_GUTTER = 48;
+
+// Responsive narrow-width axis sizing (FR-002 narrow-width clarification, decided 2026-06-25).
+// The fixed 140/60 gutters left only ~86px of plot at the ~286px measured width of a 360px
+// viewport (crammed; the foggy label overflowed). Below GUTTER_FULL_W the gutter, right margin,
+// and label offset interpolate DOWN to their MINs at GUTTER_MIN_W, so the plot keeps enough
+// width for legible no-read labels at the floor. The left axis labels STAY — the min gutter
+// (84px) still fits "A little tense" at 11px. Wide widths are unchanged (full mock gutters).
+export const AXIS_GUTTER_MIN = 84;
+export const RIGHT_MARGIN_MIN = 24;
+export const LABEL_GUTTER_MIN = 8;
+export const GUTTER_MIN_W = 320; // at/below this width → MIN gutters
+export const GUTTER_FULL_W = 560; // at/above this width → full (mock) gutters
 
 export const STROKE = 3; // confident step-line
 export const WARM_STROKE = 2.5; // warming dashed line
@@ -232,8 +245,24 @@ const RANK: Record<Band, number> = { at_ease: 0, a_little_tense: 1, tense: 2 };
 const byCapturedAtAsc = (a: TrendInput, b: TrendInput) =>
   a.capturedAt < b.capturedAt ? -1 : a.capturedAt > b.capturedAt ? 1 : 0;
 
-function axisFor(left: number, right: number): { labels: AxisLabel[]; gridlines: Gridline[] } {
-  const lx = left - LABEL_GUTTER;
+const lerpClamp = (w: number, wMin: number, wMax: number, vMin: number, vMax: number) =>
+  w <= wMin ? vMin : w >= wMax ? vMax : vMin + ((vMax - vMin) * (w - wMin)) / (wMax - wMin);
+
+/** Responsive gutter/margin/label-offset for a given container width (full at wide, MIN at the floor). */
+function gutters(width: number): { left: number; rightMargin: number; labelGutter: number } {
+  return {
+    left: Math.round(lerpClamp(width, GUTTER_MIN_W, GUTTER_FULL_W, AXIS_GUTTER_MIN, AXIS_GUTTER)),
+    rightMargin: Math.round(lerpClamp(width, GUTTER_MIN_W, GUTTER_FULL_W, RIGHT_MARGIN_MIN, RIGHT_MARGIN)),
+    labelGutter: Math.round(lerpClamp(width, GUTTER_MIN_W, GUTTER_FULL_W, LABEL_GUTTER_MIN, LABEL_GUTTER)),
+  };
+}
+
+function axisFor(
+  left: number,
+  right: number,
+  labelGutter: number,
+): { labels: AxisLabel[]; gridlines: Gridline[] } {
+  const lx = left - labelGutter;
   return {
     labels: [
       { text: "Tense", x: lx, y: BAND_Y.tense + 3, anchor: "end" },
@@ -256,13 +285,14 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
   const { width, nowMs, showOutOfFrameFoggy = false } = opts;
 
   // ── plot geometry (fixed-px; 1 unit = 1px) ──
-  const left = AXIS_GUTTER;
-  const right = width - RIGHT_MARGIN;
+  const g = gutters(width); // responsive at narrow widths (FR-002 narrow-width clarification)
+  const left = g.left;
+  const right = width - g.rightMargin;
   const plotWidth = Math.max(0, right - left);
   // STABLE slot pitch: a function of width + N_TARGET only — never of how many windows exist
   // (FR-002a). Never below MIN_SLOT: drop the oldest windows instead (SC-012).
   const slotW = Math.max(MIN_SLOT, plotWidth / N_TARGET);
-  const axis = axisFor(left, right);
+  const axis = axisFor(left, right, g.labelGutter);
 
   const sorted = [...points].sort(byCapturedAtAsc);
   const bandCount = sorted.filter((p) => p.band != null).length;

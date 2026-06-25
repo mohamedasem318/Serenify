@@ -26,7 +26,10 @@ BAND_LINE= { tense: var(--color-amber),
              at_ease: var(--color-meadow) }                   # distinct colour per band (SC-003)
 NO_READ_COLOR = var(--color-muted)     # warming line + no-clear-read label/fade
 FOGGY_COLOR   = var(--color-foggy)     # out-of-frame foggy (gated)
-AXIS_GUTTER ≈ 140   RIGHT_MARGIN ≈ 60  # plot area = [AXIS_GUTTER, W − RIGHT_MARGIN]
+AXIS_GUTTER ≈ 140   RIGHT_MARGIN ≈ 60  # plot area = [axisGutter, W − rightMargin]; RESPONSIVE:
+#   below GUTTER_FULL_W (≈560) the gutter/right-margin/label-offset interpolate DOWN to MINs
+#   (AXIS_GUTTER_MIN≈84, RIGHT_MARGIN_MIN≈24, LABEL_GUTTER_MIN≈8) at GUTTER_MIN_W (≈320), so the
+#   plot keeps width for legible no-read labels at the 360px floor (axis labels retained).
 STROKE = 3   WARM_STROKE = 2.5 (dash "2 5", opacity .55)   FADE_OPACITY = .25
 NOW_R = 5   HALO_R = 5→13 (pulse)   HIT_R ≥ 22 (≥44px touch target; mock r=15)
 WINDOW_MS = 120_000   N_TARGET ≈ 10   MIN_SLOT = <legibility floor, gap-label font 11px>

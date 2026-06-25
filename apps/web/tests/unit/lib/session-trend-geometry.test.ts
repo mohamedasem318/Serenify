@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   AXIS_GUTTER,
+  AXIS_GUTTER_MIN,
   BAND_LINE,
   BAND_Y,
   FADE_OPACITY,
@@ -63,6 +64,33 @@ describe("fixed-px width — view.width === the container width (SC-001/SC-002)"
     expect(v.height).toBe(H);
     expect(v.plot.left).toBe(AXIS_GUTTER);
     expect(v.plot.right).toBe(580 - RIGHT_MARGIN);
+  });
+});
+
+// ── FR-002 narrow-width: responsive axis gutter (full at wide, reduced at the 360px floor) ──
+describe("responsive axis gutter (FR-002 narrow-width clarification)", () => {
+  it("uses the full mock gutters at a wide width (~768)", () => {
+    const v = build([pt(0, "at_ease")], 768);
+    expect(v.plot.left).toBe(AXIS_GUTTER); // 140
+    expect(v.plot.right).toBe(768 - RIGHT_MARGIN); // 708
+    expect(v.plot.plotWidth).toBe(768 - AXIS_GUTTER - RIGHT_MARGIN); // 568
+  });
+  it("shrinks the gutter + right margin at the 360px floor so the plot keeps width for labels", () => {
+    const v = build([pt(0, "at_ease")], 360);
+    expect(v.plot.left).toBeLessThan(AXIS_GUTTER); // gutter shrank below 140
+    expect(v.plot.left).toBeGreaterThanOrEqual(AXIS_GUTTER_MIN); // but still fits "A little tense"
+    expect(360 - v.plot.right).toBeLessThan(RIGHT_MARGIN); // right margin shrank below 60
+    // materially wider than the legacy fixed 140/60 plot (160px) — the launch no-read label
+    // ("no clear read", ≈81px) fits at the floor
+    expect(v.plot.plotWidth).toBeGreaterThan(200);
+  });
+  it("shrinks monotonically as width narrows, clamping to the min below GUTTER_MIN_W", () => {
+    const wide = build([pt(0, "at_ease")], 768).plot.left;
+    const mid = build([pt(0, "at_ease")], 440).plot.left;
+    const narrow = build([pt(0, "at_ease")], 300).plot.left;
+    expect(wide).toBeGreaterThanOrEqual(mid);
+    expect(mid).toBeGreaterThanOrEqual(narrow);
+    expect(narrow).toBe(AXIS_GUTTER_MIN); // 300 ≤ GUTTER_MIN_W → clamped to the min
   });
 });
 
