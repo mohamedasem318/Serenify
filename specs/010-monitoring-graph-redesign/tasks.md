@@ -47,7 +47,8 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 
 **Independent Test**: a session of mixed at-ease/a-little-tense/tense readings renders coloured/height-correct segments, the now-marker sits at the latest reading in its band colour, and every marker is a true circle at any container width.
 
-- [ ] T009 [US1] Rewrite `apps/web/components/monitor/session-trend.tsx` shell: measure rendered container width via `ResizeObserver`/ref; render the fixed-px `<svg>` with `width=W` **and** matching `viewBox="0 0 W 210"` (no `preserveAspectRatio` stretch); draw gridlines + left axis labels (Tense / A little tense / At ease); keep the existing ~12s poll-driven re-render (no bespoke enter animation) [CHK013]; consume the geometry module. Keep `sessionId`/`active`/`load`/`pollMs` wiring. [FR-001, FR-002; **SC-001, SC-002**; CHK017]
+- [ ] T009a [US1] **Container-width measurement** in `apps/web/components/monitor/session-trend.tsx`: measure the rendered container width via `ResizeObserver`/ref and expose the measured width `W` to the render; handle mount-before-observer-fires and 0-width-on-mount (no render / safe fallback until a real width arrives). [FR-002; **SC-002**; CHK017]
+- [ ] T009b [US1] **Fixed-px `<svg>` shell** in `apps/web/components/monitor/session-trend.tsx` (depends on T009a): render the `<svg>` with `width=W` **and** matching `viewBox="0 0 W 210"` (no `preserveAspectRatio` stretch); draw gridlines + left axis labels (Tense / A little tense / At ease); keep the existing ~12s poll-driven re-render (no bespoke enter animation) [CHK013]; consume the geometry module. Keep `sessionId`/`active`/`load`/`pollMs` wiring. [FR-001, FR-002; **SC-001, SC-002**; CHK013, CHK017]
 - [ ] T010 [US1] Render the continuous **step-line** (segment colour = `BAND_LINE[band]`, height = `BAND_Y[band]`) and the single-dot case; render the confident-state subtitle (existing peak summary) in `session-trend.tsx`. [FR-003, FR-019; **SC-003, SC-010**]
 - [ ] T011 [US1] Render the **live now-marker** at the right edge (dot recolours to band; gentle CSS pulse) and **remove the old amber peak dot** in `session-trend.tsx`. [FR-004, FR-005, FR-006; **SC-011** (live)]
 - [ ] T012 [US1] Render the **band legend** (at ease = `--color-meadow`, a little tense = `--amber-soft-line`, tense = `--color-amber`) in `session-trend.tsx`. [FR-021 (bands); CHK005]
@@ -119,8 +120,8 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 
 | SC | Tasks |
 |---|---|
-| SC-001 true circles / fixed-px | T003, T009, T013 |
-| SC-002 matched-pair width | T009, T013 |
+| SC-001 true circles / fixed-px | T003, T009b, T013 |
+| SC-002 matched-pair width | T009a, T009b, T013 |
 | SC-003 band by colour+height | T003, T005, T010, T013 |
 | SC-004 distinct no-read treatments | T003, T006, T014, T015, T016, T019 |
 | SC-005 keyboard popup | T020, T022, T025 |
@@ -139,11 +140,11 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 |---|---|
 | CHK005 legend swatch token | T001, T012 |
 | CHK012 right-anchored ramp-up | T004 |
-| CHK013 poll re-render, no bespoke transition | T009 |
+| CHK013 poll re-render, no bespoke transition | T009b |
 | CHK014 popup focus/blur dismiss | T020 |
 | CHK015 `scored` unused | T002 |
 | CHK016 120s / N_target≈12 | T002, T004 |
-| CHK017 360→~768px supported widths | T002, T009 |
+| CHK017 360→~768px supported widths | T002, T009a, T009b |
 | CHK018 shared `max-w-3xl` referent | T001 |
 | CHK020 position-based leading-skip | T006, T015, T019 |
 | CHK022 deterministic-encoding read of SC-003 | T003 |
