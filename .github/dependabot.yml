@@ -6,8 +6,19 @@
 # the next batch arrives pre-grouped instead of as a dozen separate PRs.
 #
 # Guardrails:
-#   - `applies-to: security-updates` on every group → these blocks group
-#     Dependabot's *security* PRs (not a flood of cosmetic version bumps).
+#   - `open-pull-requests-limit: 0` on every block DISABLES version-update PRs.
+#     This is the load-bearing switch for "security-updates only": an `updates:`
+#     block enables *version* updates by default, and `applies-to:
+#     security-updates` only GROUPS the security PRs — it does NOT scope the
+#     block to security-only (that misread is what opened the weekly version
+#     PRs #102–#106). Limit 0 turns version updates off; SECURITY updates are
+#     unaffected — they use a separate internal limit of 10. See
+#     docs/DECISIONS.md 2026-06-25 "Dependabot: security-updates only".
+#   - `labels: []` on every block stops Dependabot stamping its off-taxonomy
+#     `dependencies` / `javascript` labels on PRs — keeps the curated
+#     `type:`/`area:`/`priority:`/`status:` label taxonomy clean.
+#   - `applies-to: security-updates` on every group → the weekly security PRs
+#     arrive pre-grouped (one PR per ecosystem) instead of one-per-advisory.
 #   - NO auto-merge. There is intentionally no auto-merge mechanism here (and CI
 #     is not yet a required check) — every Dependabot PR gets a human approve +
 #     squash-merge, same as #97/#98/#99.
@@ -29,7 +40,8 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
+    labels: []
     groups:
       npm-security:
         applies-to: security-updates
@@ -47,7 +59,8 @@ updates:
     directory: "/apps/api"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
+    labels: []
     groups:
       api-security:
         applies-to: security-updates
@@ -70,7 +83,8 @@ updates:
     directory: "/packages/ml-video"
     schedule:
       interval: "weekly"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
+    labels: []
     groups:
       ml-security:
         applies-to: security-updates
