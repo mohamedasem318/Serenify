@@ -4393,3 +4393,58 @@ Security updates need no revisiting — they keep flowing at limit 0.
 "protobuf accept-and-document" entry (the `ignore` ML-pin fences this block was originally written
 for); Dependabot version-update PRs #102–#106 (closed post-merge as unintended); Dependabot alert
 #10 / postcss (left open — deferred, unaffected); `docs/PROGRESS.md` 2026-06-25.
+
+---
+
+## 2026-06-25 — Constitution Amendment 10 — `009b-monitoring-graph-redesign` roadmap slot (1.7.0 → 1.8.0)
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.7.0 → 1.8.0`).
+
+Principle VIII's provisional ordering gains one new planned slot for the within-session
+monitoring-graph redesign — the live "This session" graph
+(`apps/web/components/monitor/session-trend.tsx`) that was scoped out of feature 009.
+Docs/governance only — no code, no spec, no `specs/NNN/` folder, no `session-trend.tsx`
+change. (Authored by editing `.specify/memory/constitution.md` directly, not via
+`/speckit-constitution`, to preserve the hand-curated Sync Impact Report amendment history.)
+
+**Decision — slot it as `009b` (009's sibling), not `010`.** The new slot is inserted
+immediately after the shipped `009-today-card-trend-redesign` and before
+`010-llm-client-and-chatbot`; slots `010`–`020` are NOT renumbered.
+
+**Why `009b` and not `010` (renumber-avoidance + decoupled label):**
+- **Avoids renumbering 11 downstream slots.** Inserting at `010` would push `010`–`020`
+  each up by one, churning every stale cross-reference to those numbers (Principle III
+  fusion `020`, Principle IV audio `018`, BACKLOG "feature NNN" pointers, CHANGELOG
+  history) for no semantic gain. The `b` suffix inserts the slot in place with zero
+  downstream edits.
+- **It is a redesign of an existing surface, not a new forward feature.** The "This
+  session" graph already ships (`session-trend.tsx` on `main`); this slot redesigns it, so
+  it belongs adjacent to its sibling `009` (the today-card trend redesign it was scoped out
+  of), not at the tail of the forward-feature queue.
+- **The roadmap label is decoupled from the real branch number.** SpecKit auto-assigns the
+  actual `NNN-` branch number at `/speckit-specify` time regardless of this label, so the
+  roadmap slug `009b` carries no constraint on the eventual branch number — it records
+  ordering/intent only.
+
+**Why the shipped `009` is NOT renamed to `009a`.** `009` keeps its number: its branch /
+PR #25 / CHANGELOG history is fixed, and relabeling it `009a` would create constitution↔git
+drift. The `b` suffix already implies `009` is the original.
+
+**Design-locked, pending spec.** A signed-off HTML reference for the redesign exists, so the
+visual direction is locked; only the spec/plan/tasks remain. No BACKLOG entry / GitHub Issue
+is opened for this slot at this step — the redesign was deliberately not filed to BACKLOG
+(`docs/PROGRESS.md` 2026-06-25), and a roadmap slot is the appropriate tracking until its
+spec opens; if a follow-up is later logged it follows the BACKLOG↔Issues contract
+(Amendment 9).
+
+**Amendment artifacts**: `.specify/memory/constitution.md` — Principle VIII ordering list (the
+new `009b` slot), the version line (`1.7.0 → 1.8.0`), and the Sync Impact Report Amendment 10
+entry; `docs/CHANGELOG.md` 2026-06-25. Template audit: **none** — the
+`.specify/templates/{plan,spec,tasks,checklist,constitution}-template.md` files reference
+principles by number, not by slug or feature number (the only `009`-shaped string in the
+templates is the unrelated task id `T009`), so no template edit is required (consistent with
+the Amendment 8/9 audits).
+
+**Revisit if**: the monitoring-graph redesign is realized in a different slot than the
+provisional list reserves (reconcile as done for `009`); or a future scheme change wants the
+`NNNx` sibling-suffix convention generalized or retired.

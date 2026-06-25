@@ -2082,3 +2082,21 @@ privacy-controls `→ 014`).
 
 Cross-references: `.specify/memory/constitution.md` Amendment 9; `docs/DECISIONS.md` 2026-06-24;
 `CLAUDE.md` "Backlog ↔ Issues".
+
+## 2026-06-25 — constitution 1.7.0 → 1.8.0 (MINOR): Principle VIII — `009b-monitoring-graph-redesign` roadmap slot (Amendment 10)
+
+Principle VIII's provisional ordering gains one new planned slot, `009b-monitoring-graph-redesign` —
+the live "This session" within-session monitoring graph
+(`apps/web/components/monitor/session-trend.tsx`), scoped out of feature 009, design-locked (a
+signed-off HTML reference exists) and pending spec. The slot is inserted immediately after the
+shipped `009-today-card-trend-redesign` and before `010-llm-client-and-chatbot`; slots `010`–`020`
+are **not** renumbered and the shipped `009` is **not** renamed (its branch / PR #25 / CHANGELOG
+history is fixed — relabeling would create constitution↔git drift; the `b` suffix already implies
+`009` is the original). The `009b` roadmap label is decoupled from the real branch number, which
+SpecKit auto-assigns at `/speckit-specify` time. MINOR bump: a new planned feature added to the
+provisional ordering materially extends the guidance (consistent with Amendment 8); no new/removed
+principle, no structural change. Template audit: none (templates reference Principle VIII by number,
+not by slug). Authored by editing the constitution file directly, not via `/speckit-constitution`,
+to preserve the hand-curated amendment history.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 10; `docs/DECISIONS.md` 2026-06-25.
