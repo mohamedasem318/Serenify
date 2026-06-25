@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { SessionTrend } from "@/components/monitor/session-trend";
@@ -38,11 +38,13 @@ const pt = (
   skipCause: SessionTrendPoint["skipCause"] = null,
 ): SessionTrendPoint => ({ id, band, scored: band !== null, skipCause, capturedAt: at(secsAgo) });
 
-const renderTrend = (points: SessionTrendPoint[], width = 768) => {
+const renderTrend = (points: SessionTrendPoint[], width = 768, foggy = false) => {
   HTMLElement.prototype.getBoundingClientRect = function () {
     return { width, height: 210, top: 0, left: 0, right: width, bottom: 210, x: 0, y: 0, toJSON() {} } as DOMRect;
   };
-  return render(<SessionTrend sessionId="s1" active={false} load={async () => points} now={() => NOW} />);
+  return render(
+    <SessionTrend sessionId="s1" active={false} load={async () => points} now={() => NOW} showOutOfFrameFoggy={foggy} />,
+  );
 };
 
 const NO_DIGIT = /[0-9]/;
@@ -106,5 +108,86 @@ describe("SessionTrend — empty (zero trend points, FR-018)", () => {
     renderTrend([]);
     expect(await screen.findByTestId("session-trend-empty")).toBeInTheDocument();
     expect(screen.queryByTestId("session-trend-svg")).toBeNull();
+  });
+});
+
+// ── US2: the three honest no-read treatments ──────────────────────────────────────────
+describe("SessionTrend — US2 warming dashed line (SC-004)", () => {
+  it("a leading no-read run renders the dashed muted 'getting a read' line, not a gap", async () => {
+    renderTrend([pt("a", null, 30), pt("b", null, 20), pt("c", "at_ease", 0)]);
+    await screen.findByTestId("session-trend-svg");
+    expect(screen.getByTestId("trend-warming")).toBeInTheDocument();
+    expect(screen.getByText("getting a read")).toBeInTheDocument(); // unique to the gap label
+  });
+});
+
+describe("SessionTrend — US2 foggy gate (SC-004/SC-008/FR-015)", () => {
+  const outOfFrame = [
+    pt("a", "at_ease", 40),
+    pt("b", null, 30, "out-of-frame"),
+    pt("c", null, 20, "out-of-frame"),
+    pt("d", "at_ease", 0),
+  ];
+
+  it("gate OFF (launch): out-of-frame is the MUTED no-clear-read gap — never the foggy copy", async () => {
+    renderTrend(outOfFrame); // foggy default OFF
+    await screen.findByTestId("session-trend-svg");
+    const gap = screen.getByTestId("treatment-no_clear_read");
+    expect(within(gap).getByText("no clear read")).toBeInTheDocument();
+    expect(screen.queryByTestId("treatment-foggy")).toBeNull();
+    expect(screen.queryByText("step back into frame")).toBeNull(); // SC-008
+    expect(screen.getAllByTestId("trend-fade").length).toBeGreaterThanOrEqual(2); // fade out + in
+  });
+
+  it("gate ON: the same out-of-frame skip renders the FOGGY 'step back into frame' gap", async () => {
+    renderTrend(outOfFrame, 768, true);
+    await screen.findByTestId("session-trend-svg");
+    const foggy = screen.getByTestId("treatment-foggy");
+    expect(within(foggy).getByText("step back into frame")).toBeInTheDocument();
+  });
+});
+
+describe("SessionTrend — US2 no-clear-read gap, never bridged (SC-009)", () => {
+  it("a low-light skip between two confident readings shows a muted gap with fade flanks", async () => {
+    renderTrend([pt("a", "at_ease", 30), pt("b", "at_ease", 25), pt("c", null, 15, "low-light"), pt("d", "tense", 5), pt("e", "tense", 0)]);
+    await screen.findByTestId("session-trend-svg");
+    expect(screen.getByTestId("treatment-no_clear_read")).toBeInTheDocument();
+    expect(screen.getAllByTestId("trend-fade").length).toBeGreaterThanOrEqual(2);
+    // confident runs stay split (before/after the gap) — never one bridging polyline
+    const segs = screen.getAllByTestId("trend-seg");
+    expect(segs.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("SessionTrend — US2 empty vs warming discriminator (FR-018)", () => {
+  it("a warming-only session (≥1 point) is NOT the empty text — it shows the warming line", async () => {
+    renderTrend([pt("a", null, 10), pt("b", null, 0)]);
+    await screen.findByTestId("session-trend-svg");
+    expect(screen.queryByTestId("session-trend-empty")).toBeNull();
+    expect(screen.getByTestId("trend-warming")).toBeInTheDocument();
+  });
+});
+
+describe("SessionTrend — US2 legend gating (FR-021)", () => {
+  it("gate OFF: two no-read keys (warming up + no clear read), NO foggy key", async () => {
+    renderTrend([pt("a", "at_ease", 0)]); // confident-only → only the legend carries these strings
+    await screen.findByTestId("session-trend-svg");
+    expect(screen.getByText("warming up")).toBeInTheDocument();
+    expect(screen.getByText(/no\s+clear read/)).toBeInTheDocument();
+    expect(screen.queryByText("stepped out of frame")).toBeNull();
+  });
+  it("gate ON: the foggy 'stepped out of frame' key appears", async () => {
+    renderTrend([pt("a", "at_ease", 0)], 768, true);
+    await screen.findByTestId("session-trend-svg");
+    expect(screen.getByText("stepped out of frame")).toBeInTheDocument();
+  });
+});
+
+describe("SessionTrend — US2 no-read label renders at the 360px floor (label-fit watch)", () => {
+  it("the muted gap label still renders at 360px (legibility verified visually at the checkpoint)", async () => {
+    renderTrend([pt("a", "at_ease", 30), pt("b", null, 15, "low-light"), pt("c", "tense", 0)], 360);
+    await screen.findByTestId("session-trend-svg");
+    const gap = screen.getByTestId("treatment-no_clear_read");
+    expect(within(gap).getByText("no clear read")).toBeInTheDocument();
   });
 });

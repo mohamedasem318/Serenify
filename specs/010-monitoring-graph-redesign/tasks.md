@@ -64,12 +64,12 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 
 **Independent Test**: drive (a) leading no-read start, (b) mid-session out-of-frame, (c) low-light/our-side skip; gate OFF → two visible treatments (dashed + muted gaps, out-of-frame shown muted); gate ON → out-of-frame shows the foggy gap.
 
-- [ ] T014 [US2] Render the **warming dashed muted line** ("getting a read") for the leading null/null run (no now-marker during warming) in `session-trend.tsx`. [FR-010; **SC-004**]
-- [ ] T015 [US2] Render the **no-clear-read muted gap** (static-opacity fade-out → gap → fade-in; muted label "no clear read"); leading/skip-first → **fade-in only**; mid-session re-warm → muted gap (never dashed) in `session-trend.tsx`. [FR-012, FR-013, FR-014; **SC-004, SC-009**; CHK020]
-- [ ] T016 [US2] Build the **out-of-frame foggy treatment** ("step back into frame", foggy colour) **fully per the mock but gated** behind a new `showOutOfFrameFoggy` prop (default **false** → out-of-frame routes to the muted gap) in `session-trend.tsx`. [FR-011, FR-015; **SC-008**; F7]
-- [ ] T017 [US2] Gate the **foggy legend key** on `showOutOfFrameFoggy` (launch: two no-read keys — warming + no clear read; gate ON: add "stepped out of frame") in `session-trend.tsx`. [FR-021 (no-read keys); F7]
-- [ ] T018 [US2] Fix the **empty vs warming discriminator**: zero trend points → text-only ("Your trend builds…"); ≥1 point warming-only/all-skipped → no-read state, **not** the empty text in `session-trend.tsx`. [FR-018; F3]
-- [ ] T019 [US2] RTL tests for US2 in `session-trend.test.tsx`: gate OFF → warming dashed + muted gap, out-of-frame renders muted (no "step back into frame" string anywhere); gate ON → foggy gap with foggy label; no flat bridged line across a gap; leading skip → fade-in only; empty (0 points) vs warming (≥1) discriminator. [**SC-004, SC-008, SC-009**; CHK020]
+- [x] T014 [US2] Render the **warming dashed muted line** ("getting a read") for the leading null/null run (no now-marker during warming) in `session-trend.tsx`. [FR-010; **SC-004**]
+- [x] T015 [US2] Render the **no-clear-read muted gap** (static-opacity fade-out → gap → fade-in; muted label "no clear read"); leading/skip-first → **fade-in only**; mid-session re-warm → muted gap (never dashed) in `session-trend.tsx`. [FR-012, FR-013, FR-014; **SC-004, SC-009**; CHK020]
+- [x] T016 [US2] Build the **out-of-frame foggy treatment** ("step back into frame", foggy colour) **fully per the mock but gated** behind a new `showOutOfFrameFoggy` prop (default **false** → out-of-frame routes to the muted gap) in `session-trend.tsx`. [FR-011, FR-015; **SC-008**; F7]
+- [x] T017 [US2] Gate the **foggy legend key** on `showOutOfFrameFoggy` (launch: two no-read keys — warming + no clear read; gate ON: add "stepped out of frame") in `session-trend.tsx`. [FR-021 (no-read keys); F7]
+- [x] T018 [US2] Fix the **empty vs warming discriminator**: zero trend points → text-only ("Your trend builds…"); ≥1 point warming-only/all-skipped → no-read state, **not** the empty text in `session-trend.tsx`. [FR-018; F3]
+- [x] T019 [US2] RTL tests for US2 in `session-trend.test.tsx`: gate OFF → warming dashed + muted gap, out-of-frame renders muted (no "step back into frame" string anywhere); gate ON → foggy gap with foggy label; no flat bridged line across a gap; leading skip → fade-in only; empty (0 points) vs warming (≥1) discriminator. [**SC-004, SC-008, SC-009**; CHK020]
 
 **Checkpoint**: US1 + US2 both work independently; the three honest treatments are correct under both gate states.
 

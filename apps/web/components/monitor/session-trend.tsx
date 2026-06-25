@@ -4,7 +4,16 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-reads";
-import { HALO_R_MAX, NOW_R, STROKE, buildSessionTrend } from "@/lib/session-trend-geometry";
+import {
+  FADE_OPACITY,
+  HALO_R_MAX,
+  NOW_R,
+  STROKE,
+  WARM_DASH,
+  WARM_OPACITY,
+  WARM_STROKE,
+  buildSessionTrend,
+} from "@/lib/session-trend-geometry";
 
 /**
  * The monitor-page **this-session** live trend (feature 010 / 009b redesign). Visual source
@@ -17,9 +26,9 @@ import { HALO_R_MAX, NOW_R, STROKE, buildSessionTrend } from "@/lib/session-tren
  * any width (replacing the old `viewBox="0 0 100 40"` + `preserveAspectRatio="none"` that
  * ovalled every marker). It carries NO number (FR-017) and reuses `getSessionTrend` unchanged.
  *
- * Build order: US1 = step-line + live now-marker + band legend (this file's current scope).
- * US2 (no-read treatments + foggy gate + legend gating) and US3 (popup + parked refinements
- * + keyboard/reduced-motion + ≥44px touch target) layer on top.
+ * Build order: US1 (step-line + live now-marker + band legend) + US2 (the three honest no-read
+ * treatments + foggy gate + legend gating + empty-vs-warming) are in. US3 (popup + parked
+ * refinements + keyboard/reduced-motion + ≥44px touch target) layers on top.
  *
  * `load` / `active` / `pollMs` / `showOutOfFrameFoggy` / `now` are injectable so the rules are
  * unit-testable without a Supabase round-trip, real timers, real layout, or a real clock.
@@ -27,6 +36,14 @@ import { HALO_R_MAX, NOW_R, STROKE, buildSessionTrend } from "@/lib/session-tren
 
 const DOT_R = 4; // isolated-confident dot (smaller than the now marker)
 const STATIC_HALO_R = 8; // reduced-motion now-marker halo (mock)
+
+// No-read gap-label pill sizing (11px text). Char width tuned to the mock pill widths
+// ("getting a read"≈86, "no clear read"≈88, "step back into frame"≈116).
+const LABEL_CHAR_W = 5.3;
+const LABEL_PAD = 12;
+const LABEL_H = 18;
+const estLabelW = (s: string) => Math.round(s.length * LABEL_CHAR_W) + LABEL_PAD;
+const ptsStr = (pts: { x: number; y: number }[]) => pts.map((p) => `${p.x},${p.y}`).join(" ");
 
 export interface SessionTrendProps {
   sessionId: string;
@@ -148,6 +165,66 @@ export function SessionTrend({
                   </text>
                 ))}
 
+                {/* no-read treatments (US2): warming dashed muted line · muted/foggy gap with
+                    STATIC-opacity fade flanks (no motion — FR-013/SC-006) + a gated label pill.
+                    The geometry already routed out-of-frame to foggy vs no_clear_read per the
+                    FR-015 gate, so this just renders whatever kind it produced. */}
+                {view.treatments.map((t, idx) => {
+                  const w = estLabelW(t.label);
+                  const labelX = Math.min(Math.max(t.labelX - w / 2, view.plot.left), view.plot.right - w);
+                  const labelY = Math.max(15, t.level - 31);
+                  const pillOpacity = t.kind === "foggy" ? 0.16 : 0.12;
+                  return (
+                    <g key={`treat-${idx}`} data-testid={`treatment-${t.kind}`}>
+                      {t.warmLine && (
+                        <polyline
+                          data-testid="trend-warming"
+                          points={ptsStr(t.warmLine)}
+                          fill="none"
+                          stroke={t.color}
+                          strokeWidth={WARM_STROKE}
+                          strokeDasharray={WARM_DASH}
+                          opacity={WARM_OPACITY}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      {t.fadeOut && (
+                        <polyline
+                          data-testid="trend-fade"
+                          points={ptsStr(t.fadeOut)}
+                          fill="none"
+                          stroke={t.color}
+                          strokeWidth={STROKE}
+                          opacity={FADE_OPACITY}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      {t.fadeIn && (
+                        <polyline
+                          data-testid="trend-fade"
+                          points={ptsStr(t.fadeIn)}
+                          fill="none"
+                          stroke={t.color}
+                          strokeWidth={STROKE}
+                          opacity={FADE_OPACITY}
+                          strokeLinecap="round"
+                        />
+                      )}
+                      <rect x={labelX} y={labelY} width={w} height={LABEL_H} rx={9} fill={t.color} opacity={pillOpacity} />
+                      <text
+                        data-testid="treatment-label"
+                        x={labelX + w / 2}
+                        y={labelY + 13}
+                        textAnchor="middle"
+                        fill={t.color}
+                        fontSize={11}
+                      >
+                        {t.label}
+                      </text>
+                    </g>
+                  );
+                })}
+
                 {/* confident step-line (colour = band, height = band) */}
                 {view.steps.map((s, idx) => (
                   <polyline
@@ -207,16 +284,34 @@ export function SessionTrend({
             )}
           </div>
 
-          {/* band legend (no-read keys + FR-021 gating land in US2) */}
-          <ul className="mt-3 flex flex-wrap gap-4 text-xs text-muted" aria-hidden>
+          {/* legend — band keys + FR-021-gated no-read keys (two at launch; the foggy
+              "stepped out of frame" key appears only when the gate is on) */}
+          <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted" aria-hidden>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full" style={{ background: "var(--color-meadow)" }} /> At ease
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-meadow)" }} /> at ease
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full" style={{ background: "var(--amber-soft-line)" }} /> A little tense
+              <span className="size-2.5 rounded-full" style={{ background: "var(--amber-soft-line)" }} /> a little tense
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full" style={{ background: "var(--color-amber)" }} /> Tense
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-amber)" }} /> tense
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span
+                className="inline-block h-0 w-4 border-t-2 border-dashed"
+                style={{ borderColor: "var(--color-muted)", opacity: 0.6 }}
+              />{" "}
+              warming up
+            </li>
+            {showOutOfFrameFoggy && (
+              <li className="flex items-center gap-1.5">
+                <span className="size-2.5 rounded-full" style={{ background: "var(--color-foggy)", opacity: 0.55 }} />{" "}
+                stepped out of frame
+              </li>
+            )}
+            <li className="flex items-center gap-1.5">
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-muted)", opacity: 0.5 }} /> no
+              clear read
             </li>
           </ul>
         </>
