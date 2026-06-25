@@ -4235,3 +4235,100 @@ item merge into feature 016; the feature-number remap); `docs/CHANGELOG.md` (202
 **Revisit if**: the team decides a different store should be canonical (would require re-deciding
 rule 1 and re-rating BACKLOG vs Issues); or the label taxonomy needs a new `type:`/`area:` as new
 packages/surfaces land (add the label, record it here).
+
+---
+
+## 2026-06-25 — protobuf high (Dependabot #1 + #17): accept-and-document, do not patch
+
+**Status**: Accepted (tolerable risk; documented). Supersedes any default "patch every high"
+reflex for these two alerts only.
+
+**Context**: Dependabot raised the same protobuf high twice — alert **#1** (`apps/api`) and
+alert **#17** (`packages/ml-video`) — both for `protobuf 4.25.9`
+(GHSA-7gcm-g887-7qv7 / CVE-2026-0994). It surfaces twice because protobuf is a transitive of
+the load-bearing `mediapipe==0.10.13` pin in both Python workspaces.
+
+**Decision**: Leave both **unpatched, on purpose.** Dismiss the alerts as tolerable risk and add
+a Dependabot `ignore` rule for `protobuf` on both pip ecosystems so the un-takeable bump stops
+being re-proposed (`.github/dependabot.yml`, same pass).
+
+**Why the fix is out of range** (not a "won't bother" — it is *unavailable* under our pins):
+
+- The advisory's only fix floor on the 4.x/5.x line is **protobuf 5.29.6** — there is **no
+  4.25.x patched release**; the entire 4.x branch sits inside the vulnerable range with no
+  escape below 5.
+- **`mediapipe==0.10.13` requires `protobuf<5`** (`<5,>=4.25.3`). 5.29.6 violates that cap, so
+  the fix cannot be taken without abandoning the mediapipe pin. `uv sync --locked` cannot even
+  resolve `mediapipe 0.10.13 + protobuf 5.29.6` — the conflict surfaces at lock time, so
+  Dependabot can't generate a mergeable PR for these manifests anyway.
+
+**Why bumping mediapipe is not a free lunch** (it reaches into the thesis deliverable):
+
+- Every mediapipe that *does* admit protobuf ≥5 (**0.10.30+**) **drops the legacy
+  `mediapipe.solutions.face_mesh` API the extraction pipeline uses** — the newer lines expose
+  only the Tasks-API `FaceLandmarker`. Taking the fix is therefore a **feature-extraction
+  rewrite plus model re-validation**: landmark coordinates drift between the two APIs, so the
+  2958-d vectors must be re-extracted, the per-user-delta model re-fit, and LOSO re-run to
+  confirm discrimination holds. Estimated **~2–6 days**, and it touches the model artifact the
+  thesis depends on — not a dependency-bump-sized change.
+
+**Why it is not reachable** (the residual risk is low, hence "tolerable"):
+
+- The CVE is a **JSON-parse recursion-depth DoS** in protobuf's `json_format` parser. The
+  pipeline feeds mediapipe **only its own internally-generated *binary* graph/config protobufs**
+  — there is **no attacker-controlled JSON** reaching protobuf on any surface (the `/anchor` and
+  monitoring uploads are video bytes, decoded by OpenCV, never JSON→protobuf). So the
+  vulnerable code path is not exercised by any input an attacker can shape.
+
+**Backstop on revisit**: the model already carries a confirmatory **served-path-vs-notebook**
+check (the bit-for-bit extraction/proba fidelity gate; PROGRESS 2026-06-20, MODEL_HANDOFF). Any
+future deliberate ML-stack/Tasks-API upgrade that takes the protobuf fix MUST re-run that gate
+(re-extract → re-fit → re-LOSO) before trusting production vectors. Until such an upgrade is
+scheduled as a unit, the accept-and-document stands.
+
+**Revisit when**: the ML stack is intentionally upgraded to a mediapipe line on protobuf ≥5
+(at which point this is a planned feature-extraction + model-revalidation workstream, not a
+security patch), or the CVE's reachability changes (e.g. a new surface starts parsing
+attacker-controlled JSON through protobuf — none today).
+
+**Cross-references**: Dependabot alerts #1 / #17; `.github/dependabot.yml` (the `protobuf`
+ignore rules); DECISION-1 (the `mediapipe==0.10.13` / Python-3.12 ceiling); `docs/MODELS.md` +
+the `features.py` fidelity caveats; `docs/PROGRESS.md` 2026-06-25 (the security pass).
+
+---
+
+## 2026-06-25 — Correction to DECISION-20: the capture-route CSP is ENFORCED (T004 flip done)
+
+**Status**: Correction (append-only). DECISION-20 is **not** rewritten; this entry records that
+its "Status: Accepted (report-only); flipping to enforce is open as T004" line is now **stale**.
+
+**What changed since DECISION-20 was written**: DECISION-20 (feature 005) described the scoped
+`'wasm-unsafe-eval'` capture-route CSP delta as shipping **Report-Only**, with the flip to
+enforce tracked as the open **T004** deploy blocker. That flip has since happened — the entire
+app CSP, **including** the capture-route delta, is now served **enforcing**, not report-only.
+
+**The enforcing code (where to look)**:
+
+- `apps/web/proxy.ts` — `const CSP_HEADER = "content-security-policy";` (the enforcing header
+  name, **not** `…-report-only`). Its comment records the rollout: the slice-5 fix pass first
+  shipped Report-Only, drove every route under Playwright capturing `securitypolicyviolation`
+  events until the violation list was empty (the one real finding — Zod 4's JIT `new Function`
+  probe — was resolved via the `@/lib/zod` jitless barrel, not by weakening `script-src`), then
+  renamed the header to enforce.
+- `buildCsp(nonce, pathname)` in the same file appends `'wasm-unsafe-eval'` to `script-src`
+  **only** on the capture routes — now `/onboarding`, `/app/calibrate`, **and `/app/monitor`**
+  (feature 008 added the monitoring capture route to `isCaptureRoute`); everywhere else keeps
+  the stricter policy. No `connect-src` host added for the detector (same-origin under
+  `connect-src 'self'`); COEP stays unset.
+- `docs/security/05-csp-header.md` documents the Report-Only → capture → enforce rollout
+  ("Rollout executed") and the empirical violation capture.
+
+**Net**: the "detector must not ship under report-only" deploy blocker DECISION-20 named is
+**resolved** — the policy is enforced in code. The `'wasm-unsafe-eval'` allowance remains tightly
+scoped to the capture routes only. Keep the capture-route set in lockstep across
+`isCaptureRoute` (`proxy.ts`), `CAPTURE_ROUTES` (`next.config.ts`), and the site-wide `camera=()`
+negative-lookahead — see the BACKLOG "new camera/capture route must be registered in EVERY
+camera-policy touchpoint" item (#83).
+
+**Cross-references**: DECISION-20 (the original report-only decision); `apps/web/proxy.ts`;
+`docs/security/05-csp-header.md`; BACKLOG #83 (capture-route registration lockstep).

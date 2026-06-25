@@ -1,0 +1,86 @@
+# Dependabot — grouped SECURITY updates only, weekly, human-merged.
+#
+# Rationale (2026-06-25 security pass): the first Dependabot triage cleared 14
+# in-range security alerts via three hand-reviewed PRs (#97/#98/#99). This file
+# automates the steady state: one grouped security PR per ecosystem per week, so
+# the next batch arrives pre-grouped instead of as a dozen separate PRs.
+#
+# Guardrails:
+#   - `applies-to: security-updates` on every group → these blocks group
+#     Dependabot's *security* PRs (not a flood of cosmetic version bumps).
+#   - NO auto-merge. There is intentionally no auto-merge mechanism here (and CI
+#     is not yet a required check) — every Dependabot PR gets a human approve +
+#     squash-merge, same as #97/#98/#99.
+#   - `ignore` rules fence off the load-bearing pins so Dependabot stops
+#     re-proposing un-takeable bumps. The protobuf high (alerts #1 + #17) has no
+#     in-range fix under `mediapipe==0.10.13` (`protobuf<5`; the only fix is
+#     5.29.6 ≥5) — see docs/DECISIONS.md 2026-06-25 "protobuf accept-and-document".
+#     An ungated config would open a protobuf PR every week whose `uv sync` can't
+#     even resolve. The ignore list is kept TIGHT — only the genuinely
+#     load-bearing ML pins (+ Next-pinned postcss); fastapi / starlette /
+#     python-multipart / cryptography / pydantic-settings / uvicorn flow through.
+version: 2
+updates:
+  # --- npm (root hoisted lockfile) — the apps/web dev/test toolchain ----------
+  # Every npm advisory so far has been a dev/test-only transitive (vite, ws,
+  # esbuild, @babel/core, js-yaml) — never in the shipped runtime path. Group
+  # them into one weekly security PR.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      npm-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # postcss is pinned EXACTLY by Next (node_modules/next/node_modules/postcss
+      # @ 8.4.31); it can't be bumped as a leaf — it needs a Next upgrade or a
+      # scoped npm `overrides` entry. Tracked manually (alert #10, left open as
+      # deferred-not-accepted); revisit on the next Next.js bump.
+      - dependency-name: "postcss"
+
+  # --- pip: apps/api (FastAPI extraction/inference service) -------------------
+  - package-ecosystem: "pip"
+    directory: "/apps/api"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      api-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # Load-bearing ML pins — bumps are out-of-range or break joblib model
+      # loading. protobuf is capped by mediapipe<5 (no in-range fix); mediapipe
+      # 0.10.13 is the ceiling for the legacy solutions.face_mesh API the pipeline
+      # uses; opencv/scikit-learn/numpy are pinned for bit-for-bit extraction +
+      # unpickling fidelity. See docs/DECISIONS.md 2026-06-25.
+      - dependency-name: "protobuf"
+      - dependency-name: "mediapipe"
+      - dependency-name: "opencv-python"
+      - dependency-name: "scikit-learn"
+      - dependency-name: "numpy"
+
+  # --- pip: packages/ml-video (the shared feature-extraction package) ---------
+  - package-ecosystem: "pip"
+    directory: "/packages/ml-video"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      ml-security:
+        applies-to: security-updates
+        patterns:
+          - "*"
+    ignore:
+      # Same load-bearing ML pins as apps/api (this package owns the extraction
+      # pins; apps/api consumes it as an editable path dep).
+      - dependency-name: "protobuf"
+      - dependency-name: "mediapipe"
+      - dependency-name: "opencv-python"
+      - dependency-name: "scikit-learn"
+      - dependency-name: "numpy"

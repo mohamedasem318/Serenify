@@ -4,6 +4,76 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Tooling — Security/CI pass closeout (Dependabot triage · protobuf accept-and-document · dependabot.yml · DECISION-20 fix)
+
+**Branch**: `chore/security-pass-closeout` (this docs + config entry) — closes the security/CI
+pass whose code landed across **PRs #94/#96** (CI + governance) and **#97/#98/#99** (Dependabot
+patches), all already merged to `main`.
+**Status**: docs + config PR **open for squash-merge**; CI green on it (docs + a YAML — the
+lint/typecheck/test layer is unaffected). Two post-merge steps remain (Part 2 below).
+**Date**: 2026-06-25
+
+The closeout of the first security/CI pass on the repo. Nothing in this entry changes runtime
+behaviour — it is the CI standup + the Dependabot triage outcomes + the governance record.
+
+- **Phase-1 CI stood up + lint baseline cleared (PR #94, squash `3ee89a3`; BACKLOG/issue sync
+  PR #96).** `.github/workflows/ci.yml` runs the cheap hermetic layer (lint · typecheck · Vitest
+  for **web**; `ruff` · `pytest` for **python**) on every PR into `main` + push to `main`. First
+  run green (web: lint 0 / `tsc` clean / Vitest 641 passed; python: ruff clean, pytest 0 failures
+  + the expected ffmpeg/Supabase skips). The 2-error `monitoring-session.tsx` lint baseline was
+  cleared via documented targeted suppressions — **#87 closed by-design / not-planned** (the
+  camera-lifecycle refactor was declared out of scope; the rules stay globally active). Landed
+  **non-blocking** on purpose. Full detail in the entry below.
+- **Dependabot triage → 14 in-range security alerts cleared (PRs #97/#98/#99).** A read-only
+  triage of all 17 alerts split them 14 CLEAN / 1 NEEDS-CARE / 2 BLOCKED-by-pin. The 14 clean
+  in-range bumps landed as three hand-reviewed PRs: **#97** python-multipart `0.0.31` +
+  cryptography `48.0.1` + pydantic-settings `2.14.2` (clears alerts #2/#3/#4/#5/#6/#9); **#98**
+  the npm dev/test toolchain ws/vite/esbuild/js-yaml/@babel/core (clears #11/#12/#13/#14/#15/#16,
+  all dev/test-only — never in a shipped path); **#99** starlette `1.1.0 → 1.3.1` (clears #7/#8;
+  in-range under fastapi's `>=0.46.0`, no parent bump). Dependabot now reports **14 `fixed`**.
+  (The earlier hand-off note said "15 patched" — the authoritative live count is **14**.)
+- **protobuf high (Dependabot #1 `apps/api` + #17 `packages/ml-video`): accept-and-document.**
+  The fix floor is protobuf 5.29.6, but `mediapipe==0.10.13` requires `protobuf<5` and there is
+  no 4.25.x patch — so the fix is **out of range** (and `uv sync --locked` can't even resolve it).
+  Every mediapipe that admits protobuf ≥5 (0.10.30+) drops the legacy `solutions.face_mesh` API
+  the pipeline uses → taking it is a feature-extraction rewrite + model re-validation (~2–6 days,
+  into the thesis deliverable). The CVE is a JSON-parse recursion DoS; the pipeline only feeds
+  mediapipe its own internally-generated binary protobufs (no attacker-controlled JSON on any
+  surface) → **not reachable**. **Decision: accept-and-document** (tolerable risk), revisit only
+  on a deliberate ML-stack upgrade; the served-path-vs-notebook fidelity check is the re-validation
+  backstop. Recorded in `docs/DECISIONS.md` 2026-06-25.
+- **`.github/dependabot.yml` added.** Grouped **security-updates only**, weekly, **no auto-merge**:
+  one group per ecosystem (npm `/`, pip `/apps/api`, pip `/packages/ml-video`). The load-bearing
+  ML pins (`protobuf`, `mediapipe`, `opencv-python`, `scikit-learn`, `numpy`) are `ignore`d on the
+  pip ecosystems so the un-takeable protobuf bump stops being re-proposed, and Next-pinned
+  `postcss` is ignored on npm (handled separately). The ignore list is kept tight — fastapi /
+  starlette / python-multipart / cryptography / pydantic-settings / uvicorn flow through.
+- **DECISION-20 correction (CSP now enforced).** DECISION-20 still described the capture-route
+  CSP as report-only with the enforce flip open as T004, but `apps/web/proxy.ts` serves the
+  policy **enforcing** (`CSP_HEADER = "content-security-policy"`; `buildCsp` scopes
+  `'wasm-unsafe-eval'` to `/onboarding`, `/app/calibrate`, `/app/monitor` only). Appended a dated,
+  append-only correction in `docs/DECISIONS.md` 2026-06-25 pointing to the enforcing code +
+  `docs/security/05-csp-header.md`.
+- **End-to-end smoke passed on merged `main`.** A real stress-detection cycle ran clean against
+  merged `main` (calibrate → live monitor → a band reading persisted → recap). The first smoothed
+  read arriving at **~1m45s** is the **designed cold-start gate** (the band is the rolling mean of
+  the last 4 scored ~60 s windows, so the first band lands ~90–105 s in) — **not** a regression.
+- **Governance / BACKLOG↔Issues (Amendment 9).** One new BACKLOG item + its mirrored issue: a
+  read-only diagnostic for the live-monitor "not in frame" vs "couldn't get a clear read"
+  surfacing gap (does the pipeline distinguish *absent* from *present-but-low-confidence*?). The
+  monitoring-graph redesign (a roadmap slot, next session) and the starlette→httpx TestClient
+  deprecation (Mohamed chose to skip) were **deliberately not filed**.
+
+**Remaining — Part 2 (post-merge tidy, after this PR squash-merges):**
+
+- **Dismiss Dependabot alerts #1 + #17** as tolerable risk (pointing at the DECISIONS entry) so
+  the alert list matches reality. **Leave #10 (postcss) open** — deferred, not accepted.
+- **Flip CI to required status checks.** Add the `web` and `python` jobs as required checks on
+  the `main` branch-protection rule (the rest of slice-0 protection unchanged), now that green
+  runs have accumulated. Record it in `docs/security/00-branch-protection.md`.
+
+---
+
 ## Tooling — Phase-1 CI (unit-test layer) + lint baseline cleared
 
 **Branch**: `chore/ci-unit-test-layer` → **merged to `main`** via **PR #94** (squash `3ee89a3`, 2026-06-24);
