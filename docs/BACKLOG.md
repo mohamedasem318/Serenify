@@ -1559,6 +1559,7 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
   - **#89** (iOS monitoring 0 readings via a server-side decode death that *also* surfaces as the vague "on our side") — same vague-surface class, different root cause (decode vs framing).
   - The feature-006 coverage gate (`insufficient_face_frames` → the `insufficient-face` chip) — the existing "present but thin" path; check whether walk-away ever routes here vs to "our side".
   - The "skipped a read" foggy note + the 90 s-no-face → `out_of_frame` presence machine (feature 008 US1/US2) — the two existing distinct surfaces this gap sits between.
+  - **009b / spec 010** (`specs/010-monitoring-graph-redesign`): ships `out-of-frame` mapped to the muted "no clear read" treatment (FR-019 fallback). When this diagnostic confirms `skipCause === "out-of-frame"` is reliable, flip the foggy "step back into frame" treatment on in `session-trend.tsx` — it is a one-line gate; the code is already built per spec 010.
 
 **Fix scope**: read-only diagnostic first (no code change) — small investigation across `apps/web` (presence/cause-chip rendering), `apps/api` (inference cause classification), and `packages/ml-video` (coverage gate). Any resulting fix is a separate, later item sized once the diagnostic lands.
 **Address by**: a monitoring-quality pass — not demo-blocking, but it muddies the live-monitor UX (the vague message reads as a system fault when the real cause is "you left the frame"). Pairs with #89 (same vague-surface class).
