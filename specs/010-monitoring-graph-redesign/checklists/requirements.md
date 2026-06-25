@@ -34,7 +34,7 @@
 - **All three original `[NEEDS CLARIFICATION]` markers are now RESOLVED and removed** (patched directly into the spec 2026-06-25 from Mohamed's decisions — see spec "Resolved decisions"):
   1. **FR-023** — mid-band token: **resolved** to reuse the existing pinned `--amber-soft-line` (no new token, no amendment).
   2. **FR-022** — no-read copy: **resolved** to same `phraseFor` vocabulary in live/imperative voice; proposed live strings recorded, pending Mohamed's final wording sign-off (a sign-off note, not a clarification marker).
-  3. **FR-019** — out-of-frame: **resolved** to ship the foggy treatment built-but-gated-OFF at launch (out-of-frame → muted fallback); reverse-linked to issue #100.
+  3. **FR-015** — out-of-frame: **resolved** to ship the foggy treatment built-but-gated-OFF at launch (out-of-frame → muted fallback); reverse-linked to issue #100.
 - Additional decisions patched in: now-marker no-read behaviour (FR-004a/b, SC-011), leading-skip fade-in-only (Edge Cases, US2 scenario 7).
 - BACKLOG↔Issues contract honoured: a back-reference was appended to **both** issue **#100** and its `docs/BACKLOG.md` entry in the same change (no new issue opened).
 - **Zero clarification markers remain.** All quality items pass. The spec is ready for review before `/speckit-clarify`.
