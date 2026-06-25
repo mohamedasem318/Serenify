@@ -37,11 +37,11 @@ While a monitoring session is running, the employee watches the "This session" g
 
 ### User Story 2 - Understand the three no-read states honestly (Priority: P2)
 
-When the system can't take a reading, the employee sees a **distinct, honest** treatment instead of one undifferentiated gap — three are designed, of which **two are visible at launch** (the third, the out-of-frame foggy treatment, is built but gated OFF per FR-019):
+When the system can't take a reading, the employee sees a **distinct, honest** treatment instead of one undifferentiated gap — three are designed, of which **two are visible at launch** (the third, the out-of-frame foggy treatment, is built but gated OFF per FR-015):
 
 - **Warming up** (session start, no band yet): a **dashed muted line** ("getting a read"). It is a *line*, not a gap, and it is muted — not a stress signal.
-- **Stepped out of frame** (mid-session) — *built but gated OFF at launch (FR-019)*: when enabled, **fade out → gap → fade in** with a **foggy** label ("step back into frame"). Foggy signals *attention*. **At launch this is gated off** and out-of-frame routes to the muted "no clear read" treatment below, because the pipeline cannot yet reliably tell "left frame" from "low confidence" (issue #100).
-- **No clear read** (mid-session): **fade out → gap → fade in**, with a **muted** label. Muted, not stress. At launch this is the treatment for **every** non-warming skip — including out-of-frame (the FR-019 fallback).
+- **Stepped out of frame** (mid-session) — *built but gated OFF at launch (FR-015)*: when enabled, **fade out → gap → fade in** with a **foggy** label ("step back into frame"). Foggy signals *attention*. **At launch this is gated off** and out-of-frame routes to the muted "no clear read" treatment below, because the pipeline cannot yet reliably tell "left frame" from "low confidence" (issue #100).
+- **No clear read** (mid-session): **fade out → gap → fade in**, with a **muted** label. Muted, not stress. At launch this is the treatment for **every** non-warming skip — including out-of-frame (the FR-015 fallback).
 
 A no-read never bridges the calm line: it fades out at its current level, leaves a gap, and eases back in at the new level (fade-in only when there is no prior level — a leading skip).
 
@@ -52,7 +52,7 @@ A no-read never bridges the calm line: it fades out at its current level, leaves
 **Acceptance Scenarios**:
 
 1. **Given** a session that has produced no confident band yet, **When** the graph renders, **Then** the leading no-read run is a dashed muted line (not a gap, not amber).
-2. **Given** a mid-session out-of-frame skip between two confident readings **and the foggy gate OFF (launch default)**, **When** the graph renders, **Then** the trend fades out, leaves a gap, fades back in, and the gap carries the **muted** "no clear read" label — never the foggy "step back into frame" copy (FR-019).
+2. **Given** a mid-session out-of-frame skip between two confident readings **and the foggy gate OFF (launch default)**, **When** the graph renders, **Then** the trend fades out, leaves a gap, fades back in, and the gap carries the **muted** "no clear read" label — never the foggy "step back into frame" copy (FR-015).
 3. **Given** a mid-session no-clear-read skip (low-light / insufficient-face / our-side), **When** the graph renders, **Then** the gap carries a muted label.
 4. **Given** a mid-session out-of-frame skip **and the foggy gate ON**, **When** the graph renders, **Then** the gap carries the **foggy** "step back into frame" label (the built-but-gated treatment, FR-011).
 5. **Given** a mid-session no-read with no skip cause (a re-warm), **When** the graph renders, **Then** it is the muted no-clear-read **gap** treatment — never a dashed warming line (see Assumptions).
@@ -87,7 +87,7 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **Fully read-less session** (warming-only or all-skipped, no confident band ever): render honestly as a no-read state, never as calm / at-ease.
 - **Mid-session re-warm** (a null band with no skip cause after a confident reading, e.g. after a worker restart): the muted no-clear-read **gap** treatment, not a dashed warming line (Assumptions).
 - **Leading skip (after warming, before the first confident reading)**: a skip that occurs before any confident reading but after warming (warming → skip → first reading) has **nothing to fade out of**, so it renders as a **muted gap with fade-IN only** (no fade-out half). Honest and simple (FR-013).
-- **Out-of-frame at launch**: out-of-frame is mapped to the muted "no clear read" gap (FR-019) because the foggy treatment is gated OFF at launch — so the user is never told to "step back into frame" while the pipeline can't reliably tell they left (issue #100). When #100 confirms reliability, the gate flips on and out-of-frame renders foggy.
+- **Out-of-frame at launch**: out-of-frame is mapped to the muted "no clear read" gap (FR-015) because the foggy treatment is gated OFF at launch — so the user is never told to "step back into frame" while the pipeline can't reliably tell they left (issue #100). When #100 confirms reliability, the gate flips on and out-of-frame renders foggy.
 - **Now marker during a no-read**: with a prior confident reading, the marker parks (muted, static, "last clear read"); with no confident reading yet (warming), there is no marker (FR-004a / FR-004b).
 - **Container resize / responsive**: the graph re-renders at the new fixed-pixel width; markers stay true circles and the graph keeps matching the camera stage width.
 - **Session paused / ended**: the live graph only polls while actively capturing (warming-up / active); a paused session shows the last rendered state.
@@ -116,18 +116,18 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 
 - **FR-009**: The graph MUST start consuming `skipCause` and the **warming-vs-skip distinction** from the existing read layer (both already loaded into each trend point but discarded by the component today).
 - **FR-010**: A **leading run of no-read windows at session start** (no confident band yet, no skip cause) MUST render as a **dashed muted line** ("warming up") — a line, not a gap, and muted (not a stress signal).
-- **FR-011** *(built but gated OFF at launch — FR-019)*: The **mid-session out-of-frame** foggy treatment renders as **fade out → gap → fade in** with a **foggy** label inviting the user back into frame (attention, not stress). It MUST be fully built per the mock, but at launch it is gated OFF: out-of-frame instead routes to the muted treatment (FR-012, FR-019). This requirement defines the foggy treatment for when the gate is flipped on.
-- **FR-012**: A **mid-session no-clear-read skip** MUST render as **fade out → gap → fade in** with a **muted** label. At launch this is the treatment for **every** non-warming skip cause — low-light, insufficient-face, our-side, **and out-of-frame** (the FR-019 fallback). (When such a skip is a **leading skip** with no prior confident reading, the fade-out half is omitted — **fade-in only**; see Edge Cases and FR-013.)
+- **FR-011** *(built but gated OFF at launch — FR-015)*: The **mid-session out-of-frame** foggy treatment renders as **fade out → gap → fade in** with a **foggy** label inviting the user back into frame (attention, not stress). It MUST be fully built per the mock, but at launch it is gated OFF: out-of-frame instead routes to the muted treatment (FR-012, FR-015). This requirement defines the foggy treatment for when the gate is flipped on.
+- **FR-012**: A **mid-session no-clear-read skip** MUST render as **fade out → gap → fade in** with a **muted** label. At launch this is the treatment for **every** non-warming skip cause — low-light, insufficient-face, our-side, **and out-of-frame** (the FR-015 fallback). (When such a skip is a **leading skip** with no prior confident reading, the fade-out half is omitted — **fade-in only**; see Edge Cases and FR-013.)
 - **FR-013**: A no-read state MUST **never bridge the calm line**: it fades out at the current level, leaves a gap, and eases back in at the new level — never a flat carried-forward line across the gap. The fade-out half requires a prior confident level to fade out of; when there is none (a **leading skip** before any confident reading), the gap is **fade-in only**.
 - **FR-014**: The dashed warming line is **session-start-only**. Any null band **after** a confident reading (including a mid-session re-warm with no skip cause) MUST render as the **no-clear-read gap** treatment, never a dashed line. (See Assumptions — this is a deliberate, reasoned exception, not an oversight.)
-- **FR-019** *(decided)*: The foggy "step back into frame" out-of-frame treatment **ships OFF at launch.** At launch, `skipCause === "out-of-frame"` MUST map to the **muted "no clear read" gap** treatment (FR-012) — the honesty-first fallback — NOT the foggy treatment. The foggy treatment (FR-011) MUST nonetheless be **fully built per the mock but gated** behind a single feature condition, so enabling it later is a **one-line gate flip**, not a re-implementation. **Reason:** out-of-frame reliability is unproven until the backlogged read-only diagnostic — **GitHub issue #100** / `docs/BACKLOG.md` "Live monitor: does the pipeline distinguish 'not in frame' … from 'couldn't get a clear read'" — confirms `skipCause === "out-of-frame"` is reliable; honesty-first means we do not ship a "you left frame" claim we cannot stand behind. When #100 confirms reliability, flipping the gate on is the only change required (the back-reference in #100 records this trigger).
+- **FR-015** *(decided)*: The foggy "step back into frame" out-of-frame treatment **ships OFF at launch.** At launch, `skipCause === "out-of-frame"` MUST map to the **muted "no clear read" gap** treatment (FR-012) — the honesty-first fallback — NOT the foggy treatment. The foggy treatment (FR-011) MUST nonetheless be **fully built per the mock but gated** behind a single feature condition, so enabling it later is a **one-line gate flip**, not a re-implementation. **Reason:** out-of-frame reliability is unproven until the backlogged read-only diagnostic — **GitHub issue #100** / `docs/BACKLOG.md` "Live monitor: does the pipeline distinguish 'not in frame' … from 'couldn't get a clear read'" — confirms `skipCause === "out-of-frame"` is reliable; honesty-first means we do not ship a "you left frame" claim we cannot stand behind. When #100 confirms reliability, flipping the gate on is the only change required (the back-reference in #100 records this trigger).
 
 **Honesty & semantics (non-negotiable — Graphite)**
 
-- **FR-015**: amber MUST be used **only** for stress signals (the bands). No-read states are NOT stress: the out-of-frame *foggy* role = attention (used only when the foggy treatment is enabled — gated per FR-019; at launch out-of-frame is muted), warming and no-clear-read = muted. Crimson/red MUST NEVER appear anywhere in this graph.
-- **FR-016**: **No numeric probability** MUST ever be shown to the user.
-- **FR-017**: An empty / just-started session (no readings) MUST keep the current **text-only** treatment (no axes, no line).
-- **FR-018**: A session with a **single confident reading** MUST render as a single **dot, not a line**.
+- **FR-016**: amber MUST be used **only** for stress signals (the bands). No-read states are NOT stress: the out-of-frame *foggy* role = attention (used only when the foggy treatment is enabled — gated per FR-015; at launch out-of-frame is muted), warming and no-clear-read = muted. Crimson/red MUST NEVER appear anywhere in this graph.
+- **FR-017**: **No numeric probability** MUST ever be shown to the user.
+- **FR-018**: An empty / just-started session (no readings) MUST keep the current **text-only** treatment (no axes, no line).
+- **FR-019**: A session with a **single confident reading** MUST render as a single **dot, not a line**.
 
 **Copy & tokens**
 
@@ -135,8 +135,8 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **FR-021**: The graph MUST present the three band levels (Tense, A little tense, At ease) and a band legend consistent with the mock.
 - **FR-022** *(decided — copy pending Mohamed's wording sign-off before implement)*: The no-read copy MUST **reuse the same `skipCause` vocabulary as the today-card's `phraseFor`** but render it in the **live / present-or-imperative voice** — the live graph is real-time where the today-card is retrospective, so the two are aligned but **NOT identical strings** (e.g. retrospective "kept stepping away" → live imperative "step back into frame"). Resolved **proposed live copy** (flagged for Mohamed's sign-off):
   - **Warming** → **"getting a read"** (present/continuous; matches the mock).
-  - **Out-of-frame** → **"step back into frame"** (imperative; the live counterpart of `phraseFor`'s retrospective "kept stepping away"). *Gated OFF at launch (FR-019); the string is ready for when the gate flips on.*
-  - **No clear read** → **"no clear read"** (present; the live counterpart of `phraseFor`'s default "no clear read"). *Optional cause-specific live variant for low-light:* **"too dark to read"** (live counterpart of `phraseFor`'s "light too low") — Mohamed to confirm whether the no-clear-read state shows one generic string or cause-specific variants.
+  - **Out-of-frame** → **"step back into frame"** (imperative; the live counterpart of `phraseFor`'s retrospective "kept stepping away"). *Gated OFF at launch (FR-015); the string is ready for when the gate flips on.*
+  - **No clear read** → **one generic "no clear read"** string (present; the live counterpart of `phraseFor`'s default "no clear read"). At launch this **single generic string is shown for every cause** the no-clear-read state covers — low-light, insufficient-face, our-side, and the gated-off out-of-frame fallback (FR-015). **No cause-specific variants at launch:** a cause-specific claim such as "too dark to read" asserts we know *why* the read failed, which is only honest if low-light detection is proven reliable — and that reliability is **unproven**, so by the same honesty rule that gated out-of-frame (FR-015), low-light collapses to the generic string too. *Deferred:* the low-light cause-specific variant ("too dark to read", the live counterpart of `phraseFor`'s "light too low") is **deferred pending low-light-reliability confirmation; revisit if confirmed** — a deferred option, not a closed door.
 - **FR-023** *(decided)*: The **"a little tense" mid-band line** MUST reuse the existing pinned token **`--amber-soft-line`** (`#D49A4A` light / `#E8BC7A` dark, from feature 009's `trend-geometry.ts` `BAND_LINE.a_little_tense`). **No new `globals.css` token and no amendment.** This is a deliberate, signed-off ~hue delta from the mock's placeholder (`#CF9A4F` light / `#D8B57A` dark), chosen for **cross-surface consistency with the today-card**.
 
 ### Key Entities
@@ -144,7 +144,7 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **Trend point** (existing, read-only — `SessionTrendPoint`): one capture window. Carries `band` (at ease / a little tense / tense, or null), `skipCause` (low-light / out-of-frame / insufficient-face / our-side, or null), a capture timestamp, and a `scored` flag. Derivation rule for this feature: **warming** = `band` null **and** `skipCause` null **in a leading run**; **skip** = `band` null **and** `skipCause` set (or a null-band run after a confident reading).
 - **Band**: the three confident stress levels — at ease (meadow), a little tense (soft-amber), tense (amber).
 - **Skip cause**: low-light, out-of-frame, insufficient-face, our-side.
-- **No-read treatment** (derived, new to this component): one of **warming** (dashed muted line, start-only) · **out-of-frame** (foggy gap) · **no-clear-read** (muted gap) — selected from band/skipCause/position.
+- **No-read treatment** (derived, new to this component): one of **warming** (dashed muted line, start-only) · **out-of-frame** (foggy gap — built but gated OFF at launch, FR-015) · **no-clear-read** (muted gap) — selected from band/skipCause/position.
 
 ## Success Criteria *(mandatory)*
 
@@ -157,7 +157,7 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 - **SC-005**: The "you are here" popup is reachable and triggerable using the keyboard alone (appears on focus, not hover-only).
 - **SC-006**: With reduced-motion preferred, no animation plays anywhere in the graph.
 - **SC-007**: No probability value appears anywhere in the rendered output, in any state.
-- **SC-008**: The user is never shown "step back into frame" when the system cannot reliably determine they left frame. At launch this holds **by construction** — the foggy treatment is gated OFF, so out-of-frame renders as the muted "no clear read" (FR-019).
+- **SC-008**: The user is never shown "step back into frame" when the system cannot reliably determine they left frame. At launch this holds **by construction** — the foggy treatment is gated OFF, so out-of-frame renders as the muted "no clear read" (FR-015).
 - **SC-009**: A no-read gap is never bridged by a flat line at a carried-forward level. A leading skip (no prior confident reading) renders fade-in only.
 - **SC-010**: A single-reading session renders one dot (never a line); a fully read-less session renders a no-read state (never calm/at-ease).
 - **SC-011**: When the live edge is an active no-read with a prior confident reading, the "now" marker is muted (not band-coloured), static (not pulsing), and its popup reads "last clear read" — never a band-coloured/pulsing "you are here" on a stale reading. During start-of-session warming (no confident reading yet) there is no marker.
@@ -167,8 +167,8 @@ The employee can inspect their current reading: hovering, focusing (keyboard), o
 These six were decided by Mohamed and are recorded here as resolved (no open clarifications remain):
 
 1. **Now marker during a no-read** → parks at the last confident reading, **muted + static**, popup **"last clear read"** (not band-coloured/pulsing "you are here"); no marker at all during start-of-session warming. (FR-004 / FR-004a / FR-004b; US3 scenarios 4–6; SC-011.)
-2. **Out-of-frame foggy treatment ships OFF at launch** — built but **gated** behind one feature condition; at launch out-of-frame → muted "no clear read" (FR-019 fallback). One-line gate flip to enable. (FR-019; FR-011/FR-012.)
-3. **Back-reference recorded** in GitHub issue **#100** and its `docs/BACKLOG.md` entry (the trigger to flip the gate on); reverse link in FR-019.
+2. **Out-of-frame foggy treatment ships OFF at launch** — built but **gated** behind one feature condition; at launch out-of-frame → muted "no clear read" (FR-015 fallback). One-line gate flip to enable. (FR-015; FR-011/FR-012.)
+3. **Back-reference recorded** in GitHub issue **#100** and its `docs/BACKLOG.md` entry (the trigger to flip the gate on); reverse link in FR-015.
 4. **Mid-band token** → reuse existing `--amber-soft-line` (`#D49A4A`/`#E8BC7A`); no new token, no amendment. (FR-023.)
 5. **No-read copy** → same `phraseFor` vocabulary, **live/imperative voice** (not identical strings); proposed live copy pending Mohamed's wording sign-off. (FR-022.)
 6. **Leading skip** (warming → skip → first reading) → muted gap, **fade-in only**. (Edge Cases; FR-012/FR-013; US2 scenario 7.)
@@ -187,7 +187,7 @@ These six were decided by Mohamed and are recorded here as resolved (no open cla
 - **Read layer**: `getSessionTrend` / `apps/web/lib/api/monitoring-reads.ts` (consumed unchanged); the target component is `apps/web/components/monitor/session-trend.tsx`.
 - **Copy alignment**: the today-card `phraseFor` `skipCause`→copy mapping (FR-022).
 - **Design token**: feature 009's `--amber-soft-line` for the mid band (FR-023).
-- **Out-of-frame reliability**: the backlogged read-only diagnostic **#100** ("not-in-frame vs no-clear-read") — the foggy "step back into frame" treatment is built but **gated OFF at launch** and depends on #100 confirming `skipCause === "out-of-frame"` is reliable before the gate flips on (FR-019). A back-reference recording this trigger has been added to issue #100 and its `docs/BACKLOG.md` entry.
+- **Out-of-frame reliability**: the backlogged read-only diagnostic **#100** ("not-in-frame vs no-clear-read") — the foggy "step back into frame" treatment is built but **gated OFF at launch** and depends on #100 confirming `skipCause === "out-of-frame"` is reliable before the gate flips on (FR-015). A back-reference recording this trigger has been added to issue #100 and its `docs/BACKLOG.md` entry.
 - **Constitution**: Principle VIII (009b slot, v1.8.0), the Amendment 7 charting carve-out, and DC-001 (fixed-pixel rendering).
 
 ## Constitution alignment — Amendment 7 coverage (recon note, not a clarification)
