@@ -4332,3 +4332,64 @@ camera-policy touchpoint" item (#83).
 
 **Cross-references**: DECISION-20 (the original report-only decision); `apps/web/proxy.ts`;
 `docs/security/05-csp-header.md`; BACKLOG #83 (capture-route registration lockstep).
+
+---
+
+## 2026-06-25 — Dependabot: security-updates only (version updates turned OFF)
+
+**Status**: Accepted. Corrects the 2026-06-25 `.github/dependabot.yml` (added in the security-pass
+closeout, PR #101) which inadvertently left *version* updates enabled.
+
+**Context**: The `dependabot.yml` added in the security pass was framed and intended as
+"grouped **security** updates only." It is not. A Dependabot `updates:` block enables **version**
+updates *by default*, and `applies-to: security-updates` on a `groups` entry only controls how
+*security* PRs are **grouped** — it does **not** scope the block to security-only. So the block,
+written purely to fence the load-bearing ML pins (`protobuf`/`mediapipe`/…) and pre-group security
+PRs, also quietly switched on weekly version-update PRs the next time Dependabot ran. That produced
+five unsolicited version bumps in one batch — **#102** react-dom, **#103** @radix-ui/react-dropdown-menu,
+**#104** react-hook-form, **#105** lucide-react, **#106** eslint — none of them security fixes, two
+of them red.
+
+**Decision**: Make the file genuinely security-updates-only by **disabling version updates**, not by
+trying to "scope" them away:
+
+- `open-pull-requests-limit: 0` on all three blocks (npm `/`, pip `/apps/api`, pip
+  `/packages/ml-video`). A limit of 0 turns **version**-update PRs off entirely. **Security** updates
+  are unaffected — Dependabot tracks them against a *separate internal limit of 10*, independent of
+  `open-pull-requests-limit`. The `groups: { applies-to: security-updates }` blocks still pre-group
+  the weekly security PRs at limit 0; the `ignore:` ML-pin fences stay intact (and now matter only
+  for the rare case where an ignored pin is itself the subject of a security advisory).
+- `labels: []` on all three blocks so Dependabot stops stamping its off-taxonomy `dependencies` /
+  `javascript` labels on PRs, keeping the curated `type:`/`area:`/`priority:`/`status:` taxonomy
+  (Constitution Principle VIII / `docs/DECISIONS.md` label-taxonomy entry) clean.
+
+Routine currency bumps (keeping leaf deps fresh) are henceforth handled as **deliberate, reviewed
+batch passes** when we choose to do them — not as a passive weekly PR stream that has to be triaged
+and closed.
+
+**Why version updates are not worth the passive stream here** — the two concrete failure modes the
+#102–#106 batch demonstrated, both of which a human batch pass absorbs but an auto-PR does not:
+
+- **Majors break transitively, silently (#106, eslint 9 → 10).** ESLint 10 removes
+  `context.getFilename()`, which `eslint-plugin-react` still calls, so the flat config throws at
+  lint time; ESLint 10 also raises its Node engine floor, tripping an `EBADENGINE` against the
+  repo's pinned Node 22.11. A version-update PR happily proposes the major and goes red, with the
+  real cost (a plugin-compat + Node-floor migration) buried under a one-line "bump eslint".
+- **Exact-pinned pairs skew (#102, react-dom).** `react` and `react-dom` are exact-pinned and must
+  move together, but Dependabot bumps one leaf at a time — so a lone `react-dom` bump lands
+  mismatched against `react` and fails. Version updates have no notion of "these two move as a unit."
+
+**Why not auto-merge / required-CI gating instead**: leaving version updates on but gating them still
+costs a human a triage+close on every passive PR (the majority of which we don't want this week
+anyway). Turning them off is the lower-friction correct default; we re-enable a currency pass
+intentionally when it's worth the migration attention.
+
+**Revisit when**: we want a scheduled dependency-currency sweep — at which point run it as an
+explicit batch (or temporarily raise `open-pull-requests-limit` for a single controlled pass),
+review the majors by hand (eslint-style breakage, exact-pin pairs), and drop the limit back to 0.
+Security updates need no revisiting — they keep flowing at limit 0.
+
+**Cross-references**: `.github/dependabot.yml` (the limit-0 + labels-[] change); the 2026-06-25
+"protobuf accept-and-document" entry (the `ignore` ML-pin fences this block was originally written
+for); Dependabot version-update PRs #102–#106 (closed post-merge as unintended); Dependabot alert
+#10 / postcss (left open — deferred, unaffected); `docs/PROGRESS.md` 2026-06-25.
