@@ -54,6 +54,21 @@ describe("endSession — re-end race", () => {
   });
 });
 
+describe("submitWindow — outcome parsing", () => {
+  const clip = () => new Blob(["x"], { type: "video/webm" });
+
+  it("parses a 200 {outcome:'superseded'} as a no-op outcome (drop-stale back-pressure)", async () => {
+    // The server scoring gate sheds a stale window with a clean 200 {outcome:"superseded"}.
+    // It must surface as its OWN outcome — never mis-read as warming_up (which would regress
+    // an active band) and never as an error.
+    stubFetch(() => ({ ok: true, status: 200, json: async () => ({ outcome: "superseded" }) }));
+    expect(await submitWindow("sid", clip(), "tok")).toEqual({
+      ok: true,
+      outcome: { outcome: "superseded" },
+    });
+  });
+});
+
 describe("submitWindow — 409 disambiguation (ended vs mid-session no_anchor)", () => {
   const clip = () => new Blob(["x"], { type: "video/webm" });
 

@@ -132,7 +132,10 @@ export function monitorReducer(state: MonitorState, action: MonitorAction): Moni
         return { ...state, op: "warming-up", skipCause: null };
       }
       // outcome.outcome === "skipped" — handled by the orchestrator (which refines the
-      // cause from on-device telemetry) via WINDOW_SKIPPED; treated as a no-op here.
+      // cause from on-device telemetry) via WINDOW_SKIPPED — OR "superseded" (a window the
+      // server scoring gate shed as stale; drop-stale back-pressure). Both are a deliberate
+      // NO-OP here: the held band stays put, and a superseded window must NOT regress an
+      // active band to warming-up (so it is never folded into the warming_up branch above).
       return state;
     }
     case "GO_OUT_OF_FRAME":

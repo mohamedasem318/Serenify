@@ -76,6 +76,17 @@ describe("monitorReducer — state transitions (US1 op-states)", () => {
     expect(next.band).toBe("tense");
     expect(next.skipCause).toBeNull();
   });
+
+  it("a superseded outcome is a no-op — the active band holds, never regresses to warming-up", () => {
+    // The server scoring gate sheds a stale window (drop-stale back-pressure). The client must
+    // treat it as a pure no-op: the held band stays put and the op never falls back to warming.
+    const active: MonitorState = { op: "active", band: "a_little_tense", skipCause: null };
+    const after = monitorReducer(active, {
+      type: "WINDOW_OUTCOME",
+      outcome: { outcome: "superseded" },
+    });
+    expect(after).toEqual(active); // unchanged — band held, still active (not warming-up)
+  });
 });
 
 describe("monitorReducer — US2 presence + lifecycle transitions", () => {

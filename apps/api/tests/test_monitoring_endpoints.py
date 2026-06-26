@@ -20,6 +20,7 @@ from ml_video import FEATURE_DIM, FeatureExtractionError
 from postgrest.exceptions import APIError
 
 from app.services import inference
+from app.services.scoring_gate import scoring_gate
 from tests.conftest import make_token
 
 SUB = "11111111-1111-1111-1111-111111111111"  # conftest make_token() default subject
@@ -208,8 +209,12 @@ def _install_fake(monkeypatch, fake):
 @pytest.fixture(autouse=True)
 def _clear_buffers():
     inference.buffers.clear()
+    # The per-session scoring gate is module-level too; clear it so a lock bound to one
+    # test's TestClient loop is never reused (under the same "sess-N" id) on the next.
+    scoring_gate.clear()
     yield
     inference.buffers.clear()
+    scoring_gate.clear()
 
 
 def _auth(token=None):
@@ -555,9 +560,29 @@ def test_end_evicts_in_memory_smoothing_buffer(client, monkeypatch):
     _post_window(client, sid)
     _post_window(client, sid)
     assert inference.buffers.scored_count(sid) == 2  # buffer populated by scored windows
+    assert sid in scoring_gate._store  # the gate also holds per-session state while live
 
     assert _end_session(client, sid).status_code == 200
     assert inference.buffers.scored_count(sid) == 0  # evicted on end — no leak
+    assert sid not in scoring_gate._store  # the gate state is dropped on end too — no leak
+
+
+def test_sequential_windows_all_score_through_the_gate(client, monkeypatch):
+    # Gate transparency / the HARD CONSTRAINT in the common path: a single-tab client uploads
+    # one window at a time (the client back-pressure guarantees this), so EVERY window is the
+    # freshest when it reaches the gate and scores — drop-stale sheds only a backlog, never the
+    # newest, so warm-up still reaches its 4 scored windows on schedule. (Concurrent supersede
+    # is unit-tested in test_scoring_gate.py; the sync TestClient can't drive true overlap.)
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 120.0)
+    monkeypatch.setattr(ml_video, "compute_anchor",
+                        lambda _p, tail_seconds=None: np.zeros(FEATURE_DIM))
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=0.10))
+
+    outcomes = [_post_window(client, sid).json()["outcome"] for _ in range(4)]
+    assert outcomes == ["warming_up", "warming_up", "warming_up", "reading"]  # M=4 latch holds
+    assert inference.buffers.scored_count(sid) == 4  # all four scored — none falsely shed
 
 
 def test_end_non_employee_returns_403(client, monkeypatch):
