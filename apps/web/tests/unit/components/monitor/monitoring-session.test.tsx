@@ -656,3 +656,54 @@ describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", 
     expect(deps.submitWindow).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * Change 2 — client-side in-flight back-pressure (008 BACKLOG #78 note (b)). The browser used
+ * to fire a new upload every stride regardless of whether the previous one had returned,
+ * wasting ~6x the bytes re-sending soon-superseded windows. The fix: never two uploads in
+ * flight — while one is pending, the stride COALESCES (keeps only the most-recent window, each
+ * the contiguous recording-so-far / a superset of the last), so the next drain sends the
+ * freshest and drops the stale middle ones.
+ */
+describe("MonitoringSession — upload back-pressure (coalescing)", () => {
+  it("never starts a second upload while one is in flight, and sends only the LATEST window", async () => {
+    let resolveFirst: (r: SubmitWindowResult) => void = () => {};
+    const clipsSent: Blob[] = [];
+    let call = 0;
+    const submitWindow = vi.fn(async (_sid: string, clip: Blob): Promise<SubmitWindowResult> => {
+      clipsSent.push(clip);
+      call += 1;
+      // Hold the FIRST upload open so the next strides land while it is in flight.
+      if (call === 1) return new Promise<SubmitWindowResult>((res) => (resolveFirst = res));
+      return { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } };
+    });
+    const { deps, fireStride } = makeDeps([]);
+    deps.submitWindow = submitWindow;
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+
+    // stride 1 → starts upload 1 (held open, unresolved)
+    await act(async () => {
+      fireStride();
+    });
+    expect(submitWindow).toHaveBeenCalledTimes(1);
+
+    // strides 2 and 3 fire WHILE upload 1 is in flight → coalesced, NO new upload starts
+    await act(async () => {
+      fireStride(); // window 2 — becomes pending
+      fireStride(); // window 3 — replaces window 2 as pending (coalesce to the latest)
+    });
+    expect(submitWindow).toHaveBeenCalledTimes(1); // still just the one in flight
+
+    // resolve upload 1 → the drain sends EXACTLY ONE more: the latest window (3), not 2
+    await act(async () => {
+      resolveFirst({ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } });
+    });
+    expect(submitWindow).toHaveBeenCalledTimes(2); // the stale middle window was dropped
+    // the second upload carried the FRESHEST window: the contiguous recording-so-far grows
+    // each stride, so window 3 (3 accumulated chunks) is larger than window 1 (1 chunk).
+    expect(clipsSent[1]!.size).toBeGreaterThan(clipsSent[0]!.size);
+  });
+});
