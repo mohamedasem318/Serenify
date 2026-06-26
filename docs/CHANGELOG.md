@@ -2100,3 +2100,32 @@ not by slug). Authored by editing the constitution file directly, not via `/spec
 to preserve the hand-curated amendment history.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 10; `docs/DECISIONS.md` 2026-06-25.
+
+## 2026-06-26 — fix(monitor) — inference concurrency bound + drop-stale, client back-pressure, service-unavailable surface
+
+A debug/fix to the live-monitor inference path (not a SpecKit feature). PR #113; BACKLOG #110
+(formalizes #78 note (b)) + #111 (camera-down mislabel) closed, #112 (warm-up latency) opened &
+parked. Three independently-revertible changes:
+
+- **Server concurrency bound + drop-stale** (`61b224b`): new `SessionScoringGate`
+  (`apps/api/app/services/scoring_gate.py`) — a per-session `asyncio.Lock` held across
+  `run_in_threadpool` (concurrency 1 per session, vs the anyio default `CapacityLimiter` of 40) +
+  a monotonic per-session sequence; a window superseded by a newer one before its turn is shed as
+  a clean `superseded` outcome (no scoring, no `window_readings` row). The freshest window always
+  scores, so warm-up still latches on schedule.
+- **Client in-flight back-pressure** (`558f60c`): `monitoring-session.tsx` never runs two uploads
+  at once and coalesces to the latest window (the contiguous recording-so-far), dropping ~6× of
+  wasted upload bytes. Window geometry unchanged (60 s / 10 s).
+- **Service-unavailable surface** (`64d98e0`): create-session failures no longer mislabel a backend
+  outage as "camera blocked" — `network` / `5xx` / stray `403` → a distinct service-unavailable
+  surface; `401` / null-token → the existing signed-out surface; `no_anchor` and the real
+  `getUserMedia` denial (Path A) unchanged.
+
+Verification: API pytest 97 / Web Vitest 649 / `tsc` 0 / ESLint 0. Live Stage 1 (API on, no
+`--reload`, single worker): steady-state per-window processing bounded (~18–22 s flat, slope ≈ 0)
+vs the pre-fix O(elapsed) climb to 40–110 s. Stage 2 (API off): the new surface and the camera-denial
+surface are correctly separated.
+
+Rationale + design decisions (concurrency 1 preserves the `_SessionBuffers` single-writer invariant
+#79; the `superseded` no-op; auth-failure routing): `docs/DECISIONS.md` 2026-06-26. No model artifact
+or metric changed, so `docs/MODELS.md` is untouched.

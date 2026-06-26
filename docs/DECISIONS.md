@@ -4448,3 +4448,54 @@ the Amendment 8/9 audits).
 **Revisit if**: the monitoring-graph redesign is realized in a different slot than the
 provisional list reserves (reconcile as done for `009`); or a future scheme change wants the
 `NNNx` sibling-suffix convention generalized or retired.
+
+---
+
+## 2026-06-26 — Live-monitor inference concurrency control: per-session gate = 1 + drop-stale
+
+**Status**: Accepted. Implemented on `fix-inference-concurrency-camera-down` (PR #113);
+BACKLOG #110 (formalizes #78 note (b)). Behavioural change to the inference read path, so
+recorded here.
+
+**Context**: the live-monitor reading lag was contention-dominated and *growing*. A window
+scores ~10–11 s isolated, but `POST /monitoring/sessions/{id}/windows` dispatched scoring via
+`run_in_threadpool` under the **anyio default `CapacityLimiter` = 40**, and the browser fired a
+new 60 s window every ~10 s regardless of whether the previous finished. ~10 windows scored at
+once on one session → CPU oversubscription → each ballooned to 40–110 s → lag climbed. (The
+earlier O(stride) tail-decode fix removed the decode half of #78; this removes the concurrency
+half.)
+
+**Decision**:
+1. **Bound scoring to one window per session** via a per-session `asyncio.Lock` held across the
+   `run_in_threadpool` call (`app/services/scoring_gate.py` `SessionScoringGate`). **Concurrency
+   1, not 2** — the D-3 `_SessionBuffers` smoothing buffer assumes a single writer per session
+   (DECISIONS 2026-06-20 / BACKLOG #79); 2 would let two threads mutate one session's `deque`.
+2. **Drop-stale** via a **monotonic per-session sequence**, not a `captured_at` marker (a counter
+   has no same-millisecond tie, so "freshest" is unambiguous). On acquiring the lock a window
+   re-checks `my_seq == latest_seq`; if a newer window arrived it is **shed**. The freshest window
+   always wins the check, so warm-up still reaches its 4 scored windows — drop-stale only sheds the
+   *backlog*, never the newest (the hard constraint).
+3. **Shed shape = a dedicated `superseded` outcome**, not a reused `skipped`/`warming_up`: it
+   **persists no `window_readings` row**, shows no misleading "couldn't read" note, and is parsed
+   client-side as a **true no-op** — explicitly *not* folded into `warming_up`, which would regress
+   an active band.
+4. **Client back-pressure** (`monitoring-session.tsx`) is the bandwidth half: never two uploads in
+   flight, coalesce to the latest window. This makes drop-stale rarely fire in single-tab use; the
+   server gate is the backstop for misbehaviour / a second tab.
+5. **Camera-down mislabel (same PR, BACKLOG #111)**: create-session failures route to honest
+   surfaces — `401` / null-token → the existing **signed-out** surface (a token problem, not the
+   backend being down), `network` / `5xx` / stray `403` → a new **service-unavailable** surface;
+   `no_anchor` and the real `getUserMedia` denial (Path A) unchanged.
+
+**Rationale**: caps live lag regardless of client behaviour while preserving the single-writer
+buffer invariant and the on-schedule warm-up latch. The `superseded` no-op keeps the honest-surface
+discipline (no fabricated "couldn't read" for a deliberate shed) and avoids persisting rows for shed
+windows.
+
+**Consequence to weigh later (009b / US3)**: drop-stale ⇒ fewer persisted `window_readings` rows ⇒
+the 009b "This session" trend (`specs/010-monitoring-graph-redesign`) will have sparser points —
+revisit when US3 resumes (BACKLOG #110 forward-note).
+
+**Revisit if**: a multi-worker deploy is chosen (the gate is process-local, like `_SessionBuffers`
+#79 — needs session affinity or a shared coordinator); or warm-up latency (#112) is tuned in a way
+that needs the gate to allow a bounded burst for the first M windows.
