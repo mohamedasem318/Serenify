@@ -83,6 +83,11 @@ class Settings(BaseSettings):
     # diagnostic. Server-side only. Env: LOG_LEVEL.
     log_level: str = "INFO"
 
+    # Best-effort startup pass through the real extractor + predict path. This is
+    # enabled in service boots, but tests may disable it to avoid constructing the
+    # native MediaPipe runtime for every TestClient.
+    extractor_prewarm_enabled: bool = True
+
     @property
     def cors_origins(self) -> list[str]:
         """Parsed CORS origins. The browser matches the Origin string EXACTLY, so

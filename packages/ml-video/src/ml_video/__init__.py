@@ -7,6 +7,7 @@ Public surface used by ``apps/api``:
 - ``probe_recorded_seconds(video_path)`` -> recorded duration in seconds (feature-008
   ``< 60 s`` warming-up gate; reuses the decode pass-1 timestamp probe)
 - ``load_model()`` -> Predictor (startup fail-fast contract check)
+- ``prewarm_extractor(predictor)`` -> one best-effort extraction + score warm-up
 - ``FeatureExtractionError``
 - ``FEATURE_DIM`` (2958)
 """
@@ -22,6 +23,7 @@ from .features import (
     motion_features,
 )
 from .loader import Predictor, load_model, models_dir
+from .warmup import ExtractorWarmupResult, prewarm_extractor
 
 __all__ = [
     "compute_anchor",
@@ -31,6 +33,8 @@ __all__ = [
     "load_model",
     "models_dir",
     "Predictor",
+    "ExtractorWarmupResult",
+    "prewarm_extractor",
     "FeatureExtractionError",
     "FEATURE_DIM",
     "lbp_top_features",

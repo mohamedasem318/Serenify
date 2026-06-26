@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 
 import ml_video
@@ -13,6 +14,9 @@ from .auth import ForbiddenRoleError
 from .config import get_settings
 from .logging_config import configure_logging
 from .routers import anchor, health, monitoring
+from .services import inference as monitoring_inference
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -29,6 +33,20 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     app.state.operating_point = settings.stress_operating_point
     app.state.tense_band = settings.stress_tense_band
+    if settings.extractor_prewarm_enabled:
+        try:
+            result = ml_video.prewarm_extractor(
+                app.state.predictor,
+                tail_seconds=monitoring_inference.WINDOW_SECONDS,
+            )
+            logger.info(
+                "extractor prewarm completed in %.2fs (%d frames @ %.1ffps)",
+                result.elapsed_s,
+                result.frames,
+                result.fps,
+            )
+        except Exception as exc:  # noqa: BLE001 - best-effort only; never block boot
+            logger.warning("extractor prewarm failed; continuing startup: %s", exc)
     yield
 
 
