@@ -351,8 +351,8 @@ describe("subtitle never asserts a tension level without a current confident rea
   });
 });
 
-// ── FR-018: empty (zero trend points) is distinct from warming/all-skipped ────────────
-describe("empty vs warming discriminator (FR-018)", () => {
+// ── FR-018 / FR-010: empty (0 points OR 1 warming point) vs the ≥2-point dashed line ──
+describe("empty vs warming discriminator (FR-018 / FR-010)", () => {
   it("zero trend points → isEmpty, no slots, no marker", () => {
     const v = build([], 580);
     expect(v.isEmpty).toBe(true);
@@ -360,7 +360,33 @@ describe("empty vs warming discriminator (FR-018)", () => {
     expect(v.nowMarker.state).toBe("none");
     expect(v.subtitle.kind).toBe("empty");
   });
-  it("a warming-only session (≥1 point) is NOT empty", () => {
-    expect(build([pt(0, null, null)], 580).isEmpty).toBe(false);
+  it("exactly ONE warming point → the just-started TEXT state, lone stub suppressed", () => {
+    const v = build([pt(0, null, null)], 580);
+    expect(v.isEmpty).toBe(true); // collapses to FR-018 text body — no lone right-edge stub
+    expect(v.slots).toHaveLength(0);
+    expect(v.treatments).toHaveLength(0);
+    expect(v.steps).toHaveLength(0);
+    expect(v.nowMarker.state).toBe("none");
+    expect(v.subtitle.kind).toBe("warming"); // FR-024 subtitle unchanged
+    expect(v.subtitle.text).toBe("getting a read");
+  });
+  it("TWO+ warming points → NOT empty; a full-width dashed warming line (no stub phase)", () => {
+    const v = build([pt(10, null, null), pt(0, null, null)], 580);
+    expect(v.isEmpty).toBe(false);
+    const warm = v.treatments.find((t) => t.kind === "warming")!;
+    expect(warm.warmLine).toBeDefined();
+    expect(warm.warmLine!).toHaveLength(2);
+    expect(warm.warmLine![0]!.x).toBeCloseTo(v.plot.left, 6); // left edge …
+    expect(warm.warmLine!.at(-1)!.x).toBeCloseTo(v.plot.right, 6); // … to right edge (fills width)
+  });
+  it("a single SKIP point (not warming) is unchanged — NOT the empty text", () => {
+    const v = build([pt(0, null, "our-side")], 580);
+    expect(v.isEmpty).toBe(false); // out of scope: all-skipped 1-point keeps its no-read treatment
+    expect(v.treatments.some((t) => t.kind === "no_clear_read")).toBe(true);
+  });
+  it("a confident single reading is unchanged — a dot, NOT the empty text (FR-019)", () => {
+    const v = build([pt(0, "at_ease")], 580);
+    expect(v.isEmpty).toBe(false);
+    expect(v.dots).toHaveLength(1);
   });
 });

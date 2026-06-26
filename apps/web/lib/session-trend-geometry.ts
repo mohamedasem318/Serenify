@@ -327,6 +327,34 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
   const firstConfidentIdx = sorted.findIndex((p) => p.band != null);
   const everConfident = firstConfidentIdx >= 0;
 
+  // ── lone warming stub suppression (FR-010 ≥2-point threshold / FR-018, decided 2026-06-27) ──
+  // A warming line needs ≥2 points; a SINGLE warming point would otherwise draw a short dashed
+  // stub pinned at the right edge that snaps to a full-width line on the next poll — jarring. So
+  // exactly one warming point (warming-only, no confident reading yet → no drawable line) collapses
+  // to FR-018's just-started TEXT state (isEmpty), same body as zero points. The subtitle still
+  // derives warming ("getting a read") per FR-024 (unchanged). Scope: the warming-only 1-point case
+  // ONLY — a lone *skip* point, FR-019's confident dot, and a leading-warming-run-of-1 BEFORE a
+  // confident reading (its buildTreatment stub fallback) are all untouched.
+  const oneWarmingPoint =
+    sorted.length === 1 && sorted[0]!.band == null && sorted[0]!.skipCause == null;
+  if (oneWarmingPoint) {
+    return {
+      isEmpty: true,
+      width,
+      height: H,
+      plot: { left, right, slotW: nominalSlotW, plotWidth },
+      slots: [],
+      droppedOldest: false,
+      steps: [],
+      dots: [],
+      treatments: [],
+      nowMarker: { state: "none", pulse: false },
+      subtitle: { kind: "warming", text: SUBTITLE_WARMING },
+      bandCount: 0,
+      axis,
+    };
+  }
+
   // ── rolling window: time-trim (~2 min), then FILL-TO-WIDTH with an N_TARGET / legibility cap ──
   // The drawn windows ALWAYS span the plot edge-to-edge (FR-002a / SC-012a): earliest at `left`,
   // latest ("now") at `right`, pitch = plotWidth/(nDraw−1). Ramp-up (nDraw < N_TARGET) fills and

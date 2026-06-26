@@ -63,5 +63,5 @@ No change to how `monitoring-session.tsx` mounts it (it already passes `sessionI
 - No-read keys follow the gate: **two** at launch (warming, no clear read); the **foggy "stepped out of frame"** key appears only when `showOutOfFrameFoggy` is true.
 
 ### Empty / privacy (FR-018 / FR-017 / SC-007)
-- Zero trend points → text-only ("Your trend builds as readings come in."), no axes/line. A warming-only/all-skipped session (≥1 point) is a no-read state, not empty.
+- Zero trend points **or exactly one warming point** (a single `band null & skipCause null` window — no drawable line yet) → text-only ("Your trend builds as readings come in."), no axes/line/stub (FR-018, 1-warming-point carve-out 2026-06-27). A warming-only session with **≥2** warming points → the dashed warming line; an **all-skipped** session (≥1 *skip* point) → its muted no-read state — not empty. The 1-warming-point text state's subtitle still derives warming ("getting a read", FR-024).
 - **No numeric value of any kind** in any DOM node or attribute. No new read; whitelist + RLS-as-user unchanged.
