@@ -658,23 +658,51 @@ describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", 
 });
 
 /**
- * Change 2 — client-side in-flight back-pressure (008 BACKLOG #78 note (b)). The browser used
- * to fire a new upload every stride regardless of whether the previous one had returned,
- * wasting ~6x the bytes re-sending soon-superseded windows. The fix: never two uploads in
- * flight — while one is pending, the stride COALESCES (keeps only the most-recent window, each
- * the contiguous recording-so-far / a superset of the last), so the next drain sends the
- * freshest and drops the stale middle ones.
+ * Change 2 — client-side in-flight back-pressure (008 BACKLOG #78 note (b)) with the Tier-2
+ * warm-up relaxation. STEADY STATE keeps the original guarantee — never two uploads in flight,
+ * the stride COALESCES to the most-recent window (each the contiguous recording-so-far / a
+ * superset of the last) so the next drain sends the freshest and drops the stale middle ones.
+ * During WARM-UP (until the first `reading` latches the band) the cap is relaxed so the
+ * cold-start windows the server scores concurrently are SENT concurrently — the bandwidth half
+ * of the warm-up speedup.
  */
-describe("MonitoringSession — upload back-pressure (coalescing)", () => {
-  it("never starts a second upload while one is in flight, and sends only the LATEST window", async () => {
-    let resolveFirst: (r: SubmitWindowResult) => void = () => {};
+describe("MonitoringSession — upload back-pressure (warm-up concurrency → steady-state clamp)", () => {
+  it("during warm-up, allows up to 4 uploads in flight at once (relaxed back-pressure)", async () => {
+    // Every upload is held open (none resolves) so warm-up never ends; firing 5 strides must
+    // start exactly 4 concurrent uploads (the cap), the 5th coalesced as pending.
+    const submitWindow = vi.fn(
+      async (): Promise<SubmitWindowResult> =>
+        new Promise<SubmitWindowResult>(() => {}), // held open forever
+    );
+    const { deps, fireStride } = makeDeps([]);
+    deps.submitWindow = submitWindow;
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+
+    await act(async () => {
+      fireStride(); // 1 → upload
+      fireStride(); // 2 → upload (concurrent)
+      fireStride(); // 3 → upload (concurrent)
+      fireStride(); // 4 → upload (concurrent)
+      fireStride(); // 5 → cap hit → coalesced as pending, NO new upload
+    });
+    expect(submitWindow).toHaveBeenCalledTimes(4); // warm-up sends the first 4 concurrently
+  });
+
+  it("after the first reading, clamps to ONE upload in flight and sends only the LATEST", async () => {
+    let resolveHeld: (r: SubmitWindowResult) => void = () => {};
     const clipsSent: Blob[] = [];
     let call = 0;
     const submitWindow = vi.fn(async (_sid: string, clip: Blob): Promise<SubmitWindowResult> => {
       clipsSent.push(clip);
       call += 1;
-      // Hold the FIRST upload open so the next strides land while it is in flight.
-      if (call === 1) return new Promise<SubmitWindowResult>((res) => (resolveFirst = res));
+      // Call 1 latches the band (→ warm-up done); call 2 is held open so later strides land
+      // while the steady-state upload is in flight.
+      if (call === 1)
+        return { ok: true, outcome: { outcome: "reading", band: "at_ease", capturedAt: "t" } };
+      if (call === 2) return new Promise<SubmitWindowResult>((res) => (resolveHeld = res));
       return { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } };
     });
     const { deps, fireStride } = makeDeps([]);
@@ -684,27 +712,32 @@ describe("MonitoringSession — upload back-pressure (coalescing)", () => {
       fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
     });
 
-    // stride 1 → starts upload 1 (held open, unresolved)
+    // stride 1 → reading → warm-up done, the cap clamps back to 1
     await act(async () => {
       fireStride();
     });
     expect(submitWindow).toHaveBeenCalledTimes(1);
 
-    // strides 2 and 3 fire WHILE upload 1 is in flight → coalesced, NO new upload starts
+    // stride 2 → starts the held steady-state upload
     await act(async () => {
-      fireStride(); // window 2 — becomes pending
-      fireStride(); // window 3 — replaces window 2 as pending (coalesce to the latest)
+      fireStride();
     });
-    expect(submitWindow).toHaveBeenCalledTimes(1); // still just the one in flight
+    expect(submitWindow).toHaveBeenCalledTimes(2);
 
-    // resolve upload 1 → the drain sends EXACTLY ONE more: the latest window (3), not 2
+    // strides 3 and 4 fire WHILE upload 2 is in flight → coalesced, NO new upload (cap is 1 now)
     await act(async () => {
-      resolveFirst({ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } });
+      fireStride(); // window 3 — becomes pending
+      fireStride(); // window 4 — replaces window 3 as pending (coalesce to the latest)
     });
-    expect(submitWindow).toHaveBeenCalledTimes(2); // the stale middle window was dropped
-    // the second upload carried the FRESHEST window: the contiguous recording-so-far grows
-    // each stride, so window 3 (3 accumulated chunks) is larger than window 1 (1 chunk).
-    expect(clipsSent[1]!.size).toBeGreaterThan(clipsSent[0]!.size);
+    expect(submitWindow).toHaveBeenCalledTimes(2); // still just the one in flight
+
+    // resolve upload 2 → the drain sends EXACTLY ONE more: the latest window (4), not 3
+    await act(async () => {
+      resolveHeld({ ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } });
+    });
+    expect(submitWindow).toHaveBeenCalledTimes(3); // the stale middle window was dropped
+    // the drained upload carried the FRESHEST window: the recording-so-far grows each stride.
+    expect(clipsSent[2]!.size).toBeGreaterThan(clipsSent[1]!.size);
   });
 });
 

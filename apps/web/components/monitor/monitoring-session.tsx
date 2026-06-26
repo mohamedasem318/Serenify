@@ -67,6 +67,15 @@ import {
  * during-pause). The client receives only the band — no number, no raw video persisted.
  */
 
+/**
+ * Tier-2 warm-up upload concurrency cap (mirrors the server cold-start gate M = 4). Until the
+ * first `reading` latches the band, up to this many windows may be in flight together so the
+ * cold-start windows the server scores concurrently are actually SENT concurrently; after the
+ * band latches the cap clamps to 1 (the steady-state back-pressure). Kept equal to M so the
+ * client never sends more concurrent warm-up windows than the server's warm-up semaphore admits.
+ */
+const WARMUP_UPLOAD_CONCURRENCY = 4;
+
 export interface MonitoringSession {
   accessToken: string;
 }
@@ -166,12 +175,22 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // concurrent acquire attempts (double-click / a re-trigger) can't each pass the
   // sessionIdRef reuse check and spawn a second session (the "two POST /sessions" bug).
   const creatingRef = useRef(false);
-  // Back-pressure for the window upload loop (008 BACKLOG #78 note (b)): never two uploads in
-  // flight at once. `uploadInFlightRef` is the synchronous guard; `pendingClipRef` holds the
-  // single most-recent window captured WHILE one is in flight (coalesced — older queued
-  // windows are overwritten), drained when the in-flight upload completes.
-  const uploadInFlightRef = useRef(false);
+  // Upload back-pressure (008 BACKLOG #78 note (b)) with the Tier-2 warm-up relaxation. STEADY
+  // STATE keeps the original guarantee — never two uploads in flight — but during WARM-UP (until
+  // the first `reading`) up to WARMUP_UPLOAD_CONCURRENCY may be in flight together, so the
+  // cold-start windows the server scores concurrently are SENT concurrently (the bandwidth half
+  // of the warm-up speedup; the server gate + capture-ordered buffer are the matching halves).
+  // `inFlightCountRef` is the synchronous in-flight count; `pendingClipRef` holds the single
+  // most-recent window captured once the cap is hit (coalesced — older queued windows are
+  // overwritten), drained as in-flight uploads complete. `warmupDoneRef` flips on the first
+  // reading and clamps the cap back to 1; it re-arms (→ false) on each fresh recording (initial
+  // grant AND Resume), mirroring the server gate re-entering warm-up on a dropped buffer.
+  const inFlightCountRef = useRef(0);
   const pendingClipRef = useRef<Blob | null>(null);
+  const warmupDoneRef = useRef(false);
+  // Stable indirection so an upload's completion can launch the next pending one without a
+  // forward-reference cycle (runUpload ⇄ its own drain). Wired in an effect below.
+  const runUploadRef = useRef<(clip: Blob) => void>(() => {});
   const facePresentRef = useRef(false);
   const guideRef = useRef<"loading" | "active" | "unavailable">("loading");
   const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
@@ -305,56 +324,71 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         dispatch({ type: "WINDOW_SKIPPED", cause });
       } else {
         // reading / warming_up / superseded — the reducer folds each (superseded is a no-op).
+        // The first `reading` means the band has latched (the server reached its M scored
+        // windows) → warm-up is over, so clamp the upload cap back to single-in-flight.
+        if (outcome.outcome === "reading") warmupDoneRef.current = true;
         dispatch({ type: "WINDOW_OUTCOME", outcome });
       }
     },
     [deps, dispatch],
   );
 
-  // Back-pressure drain (008 BACKLOG #78 note (b)): upload the given window, then any window
-  // that arrived WHILE it was in flight — coalesced to the LATEST only — one at a time, so
-  // there is never more than one upload in flight. Each window is the contiguous
-  // recording-so-far (a superset of the previous), so sending only the newest never loses
-  // signal — it just stops wasting ~6x the upload bytes re-sending stale, soon-superseded
-  // windows (matters on a cloud deploy). This is the bandwidth half; the server scoring
-  // gate's drop-stale is the matching backstop for misbehaviour / a second tab.
-  const pumpUploads = useCallback(
-    async (first: Blob) => {
-      uploadInFlightRef.current = true;
-      try {
-        let clip: Blob | null = first;
-        while (clip) {
-          pendingClipRef.current = null;
+  // Launch ONE upload, tracking the in-flight count, and on completion DRAIN the single
+  // coalesced pending window if the cap allows. Each window is the contiguous recording-so-far
+  // (a superset of the previous), so sending only the newest pending one never loses signal —
+  // it just stops wasting ~6x the upload bytes re-sending stale, soon-superseded windows. The
+  // cap is WARMUP_UPLOAD_CONCURRENCY during warm-up (the cold-start burst overlaps) and 1 after
+  // the band latches (steady-state back-pressure). This is the bandwidth half; the server
+  // scoring gate (warm-up semaphore → single-flight + drop-stale) is the matching backstop.
+  const runUpload = useCallback(
+    (clip: Blob) => {
+      inFlightCountRef.current += 1; // synchronous: handleWindow's cap check sees it at once
+      void (async () => {
+        try {
           await uploadWindow(clip);
-          // The most-recent window captured during the upload (older queued ones were
-          // overwritten by handleWindow). Cleared on teardown so a paused/ended session never
-          // drains a stale window.
-          clip = pendingClipRef.current;
+        } finally {
+          inFlightCountRef.current -= 1;
+          // Drain the most-recent window captured while uploads were saturated (older queued
+          // ones were overwritten by handleWindow; cleared on teardown so a paused/ended
+          // session never drains a stale window). Only if the cap now allows another in flight.
+          const next = pendingClipRef.current;
+          if (next) {
+            const cap = warmupDoneRef.current ? 1 : WARMUP_UPLOAD_CONCURRENCY;
+            if (inFlightCountRef.current < cap) {
+              pendingClipRef.current = null;
+              runUploadRef.current(next);
+            }
+          }
         }
-      } finally {
-        uploadInFlightRef.current = false;
-      }
+      })();
     },
     [uploadWindow],
   );
+  // Wire the indirection ref so an upload's drain can re-enter runUpload (stable: runUpload only
+  // changes if uploadWindow does, which it does not after mount). Set before any stride fires.
+  useEffect(() => {
+    runUploadRef.current = runUpload;
+  }, [runUpload]);
 
-  // One reading out per (gated) stride. Fire-and-forget: never block the recorder. With the
-  // back-pressure above, a stride that fires while an upload is still in flight does NOT start
-  // a second upload — it replaces the pending window with this newer one (coalesce), so the
-  // next drain always sends the freshest, never a stale queued backlog.
+  // One reading out per (gated) stride. Fire-and-forget: never block the recorder. A stride
+  // that fires while the in-flight cap is already saturated does NOT start another upload — it
+  // replaces the pending window with this newer one (coalesce), so the next drain always sends
+  // the freshest, never a stale queued backlog. During warm-up the cap is relaxed so up to
+  // WARMUP_UPLOAD_CONCURRENCY cold-start windows ride out together.
   const handleWindow = useCallback(
     (clip: Blob) => {
       // FR-003: a no-face window is never uploaded — but only gate when the detector is
       // actually running (unavailable/loading → let the server's coverage gate decide).
       if (guideRef.current === "active" && !facePresentRef.current) return;
       if (!sessionIdRef.current) return;
-      if (uploadInFlightRef.current) {
-        pendingClipRef.current = clip; // coalesce: keep only the latest while one is in flight
-        return;
+      const cap = warmupDoneRef.current ? 1 : WARMUP_UPLOAD_CONCURRENCY;
+      if (inFlightCountRef.current < cap) {
+        runUpload(clip);
+      } else {
+        pendingClipRef.current = clip; // coalesce: keep only the latest beyond the cap
       }
-      void pumpUploads(clip).catch(() => {});
     },
-    [pumpUploads],
+    [runUpload],
   );
 
   // End the session (manual End or the 5-min auto-end) and leave to the dashboard. The
@@ -412,6 +446,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     setStream(stream); // drive the reactive bind-and-play effect
     telemetryRef.current = emptyTelemetry();
     facePresentRef.current = false;
+    // Re-arm warm-up for this fresh recording (initial grant OR Resume): the server drops the
+    // smoothing buffer on End/Resume and re-enters its warm-up phase, so the client must relax
+    // its upload cap again too — otherwise a resumed run would re-warm one window at a time.
+    warmupDoneRef.current = false;
     setStreaming(true); // mounts the <video> + detector; bind-and-play wires srcObject + play()
     setPinned(true); // show the self-view at once — the user sees themselves as capture starts
 

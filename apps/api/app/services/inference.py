@@ -38,7 +38,8 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
-from collections import OrderedDict, deque
+import threading
+from collections import OrderedDict
 from datetime import UTC, datetime
 
 import ml_video
@@ -72,49 +73,85 @@ class MissingAnchorError(Exception):
 
 
 class _SessionBuffers:
-    """Per-session in-memory rolling buffer of the last ``N`` SCORED ``proba[1]`` values.
+    """Per-session in-memory rolling buffer of the last ``N`` SCORED ``proba[1]`` values,
+    kept in **capture order** and safe under **concurrent writers**.
 
     Skipped and ``< 60 s`` warming-up windows never call :meth:`record_scored`, so they are
-    excluded from both the buffer and the cold-start ``M`` count (the deque's ``maxlen=N``
-    and ``M == N`` together encode both the smoothing window and the cold-start gate).
+    excluded from both the buffer and the cold-start ``M`` count (``window == N`` and
+    ``M == N`` together encode both the smoothing window and the cold-start gate).
+
+    **Why a capture key, not append order (Tier-2 warm-up concurrency).** The serialized
+    read path appended one scored window at a time, in capture order, so a plain
+    ``deque(maxlen=N)`` was correct. The warm-up spike lets the first M windows score
+    *concurrently*, so appends now land in COMPLETION order, which is not capture order.
+    A mean is order-independent (the first band is unaffected), but a FIFO eviction would
+    drop whichever window *completed* first — silently corrupting the trailing mean the
+    moment steady-state resumes and the window slides. So each scored value carries an
+    ``order_key`` (the recording-so-far length — strictly increasing with capture), and the
+    buffer always keeps the ``window`` entries with the highest keys, returned ascending by
+    key. Eviction therefore drops the earliest-CAPTURED window regardless of completion
+    order, and the first band's mean is identical either way.
+
+    **Thread safety (BACKLOG #79).** Concurrency >1 means several threads mutate one
+    session's list — and, across sessions, the shared ``OrderedDict`` — at once. A single
+    buffer-wide lock guards every mutation (appends are tiny: a sort of ``<= window + 1``
+    elements), so writes never interleave or corrupt. :meth:`scored_count` reads ``len``
+    lock-free (atomic under the GIL, and a transient miscount is harmless — the capture-key
+    ordering makes the warm-up/steady boundary correct regardless of when a window admits).
 
     Bounded by an LRU cap on the number of concurrent sessions so an abandoned session
     cannot grow the map without limit; the explicit per-session drop on End is wired in
-    US2 / T036 (which will call :meth:`drop`). Graduation scale is tens of sessions, so the
-    cap is generous.
+    US2 / T036 (which calls :meth:`drop`). Graduation scale is tens of sessions, so the cap
+    is generous.
     """
 
     def __init__(self, *, window: int = N, max_sessions: int = 1024) -> None:
         self._window = window
         self._max_sessions = max_sessions
-        self._store: OrderedDict[str, deque[float]] = OrderedDict()
+        # session_id → list of (order_key, proba1), kept sorted ascending by order_key and
+        # trimmed to the top ``window`` keys. Guarded by ``_lock`` for concurrent writers.
+        self._store: OrderedDict[str, list[tuple[float, float]]] = OrderedDict()
+        self._lock = threading.Lock()
 
-    def record_scored(self, session_id: str, proba1: float) -> list[float]:
-        """Append a scored ``proba[1]`` and return the current buffer (oldest → newest)."""
-        buf = self._store.get(session_id)
-        if buf is None:
-            buf = deque(maxlen=self._window)
-            self._store[session_id] = buf
-        self._store.move_to_end(session_id)  # mark most-recently-used
-        buf.append(float(proba1))
-        while len(self._store) > self._max_sessions:
-            self._store.popitem(last=False)  # evict the least-recently-used session
-        return list(buf)
+    def record_scored(self, session_id: str, proba1: float, *, order_key: float) -> list[float]:
+        """Append a scored ``proba[1]`` at its capture key and return the current buffer,
+        oldest-captured → newest-captured (the order :func:`smoothing.smooth` means over).
+
+        ``order_key`` orders the buffer by CAPTURE, not by the order appends land, so
+        concurrent warm-up writes still evict the earliest-captured window at hand-off."""
+        with self._lock:
+            buf = self._store.get(session_id)
+            if buf is None:
+                buf = []
+                self._store[session_id] = buf
+            self._store.move_to_end(session_id)  # mark most-recently-used
+            buf.append((float(order_key), float(proba1)))
+            # Keep the top ``window`` by capture key. Stable sort: equal keys (never produced
+            # by a real strictly-growing recording, only by test fakes with a fixed duration)
+            # preserve append order, so the fixed-duration sequential tests are unchanged.
+            buf.sort(key=lambda kv: kv[0])
+            del buf[: -self._window]
+            while len(self._store) > self._max_sessions:
+                self._store.popitem(last=False)  # evict the least-recently-used session
+            return [proba1 for _key, proba1 in buf]
 
     def scored_count(self, session_id: str) -> int:
         """How many scored ``proba[1]`` are currently buffered for this session (0 if none).
 
-        Read-only — used by the DEBUG per-window decision log (never reads the DB)."""
+        Lock-free read (``len`` is atomic under the GIL): used by the warm-up/steady gate on
+        every window admission and by the DEBUG per-window decision log. Never reads the DB."""
         buf = self._store.get(session_id)
         return len(buf) if buf is not None else 0
 
     def drop(self, session_id: str) -> None:
         """Forget a session's buffer (call on End — US2 / T036)."""
-        self._store.pop(session_id, None)
+        with self._lock:
+            self._store.pop(session_id, None)
 
     def clear(self) -> None:
         """Drop all buffers (used by tests for isolation)."""
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
 
 
 # Module-level buffer shared across requests within this worker process.
@@ -232,8 +269,10 @@ def score_window(
 
         # SECOND application: band the SMOOTHED MEAN of the recent scored proba[1], not this
         # single window. record_scored appends THIS reading first (only scored windows enter
-        # the buffer), so the mean includes the current value.
-        recent = buffers.record_scored(session_id, proba1)
+        # the buffer), so the mean includes the current value. ``order_key=recorded_s`` keeps
+        # the buffer in CAPTURE order (recording-so-far length strictly grows with capture) so
+        # concurrent warm-up writes still evict the earliest-captured window at hand-off (#79).
+        recent = buffers.record_scored(session_id, proba1, order_key=recorded_s)
         reading = smooth(recent, t_low=operating_point, t_high=tense_band)
 
         insert_reading(

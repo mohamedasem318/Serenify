@@ -185,10 +185,11 @@ def test_no_per_session_clip_buffer_only_floats_retained(monkeypatch):
         predictor=_StubPredictor([0.4, 0.6]),
     )
     assert created and all(not os.path.exists(p) for p in created)
-    # White-box: the buffer holds floats (the smoothing signal), not bytes (a clip buffer).
+    # White-box: the buffer holds floats (the capture key + smoothing signal), not bytes (a
+    # clip buffer). Each entry is a ``(order_key, proba1)`` float pair — no raw clip retained.
     buffered = inference.buffers._store.get("sess-privacy")
     assert buffered is not None and len(buffered) == 1
-    assert all(isinstance(v, float) for v in buffered)
+    assert all(isinstance(key, float) and isinstance(proba1, float) for key, proba1 in buffered)
     assert inference.buffers.scored_count("sess-privacy") == 1
 
 
