@@ -28,10 +28,10 @@ All decisions reconciled against the signed-off mock `serenify-live-session-grap
 
 Concretely (`session-trend-geometry.ts`):
 - **Window selection:** keep windows with `capturedAt` within `[now − 120_000ms, now]`.
-- **Fixed slot width:** `slotW = floor(plotWidth / N_target)`, `N_target ≈ 12` (≈120s at the 10s capture stride). Slot width is **stable** regardless of how many windows are currently present (CHK016).
-- **Right-anchored (CHK012):** the latest window sits in the rightmost slot (now-marker at the right edge, FR-002a); earlier windows fill leftward; a session younger than the window draws its few windows in the rightmost slots with blank space to the left.
+- **N_target = 12** (the lock count) = 120s ÷ the ~10s capture-**window stride** (NOT the ~12s client poll cadence — see analyze I4). It is the count at which the fill pitch locks.
+- **Fill-to-width pitch (CHK012, decided 2026-06-27):** the drawn windows **always span the full plot edge-to-edge** — earliest at `left`, latest ("now") at `right` — with pitch `= plotWidth / (nDraw − 1)`. During **ramp-up** (nDraw < N_target) the few windows stretch to fill; as each new window arrives they gently re-space (compress) inward. At **N_target** the pitch **locks** at `plotWidth / (N_target − 1)` and older windows scroll off the left thereafter. The ramp-up formula equals the locked pitch at exactly nDraw = N_target → **continuous, no jump**. *(Supersedes the prior "right-anchored, fixed `plotWidth/N_target` slots, blank-left" model — rejected for the "cut off" look.)*
 - **Honest gap width:** because slots are uniform and capture windows are ~uniform duration, a no-read gap's width = its **count of consecutive no-read windows** = an honest elapsed-time proxy (a longer outage is a wider gap), **without** a continuous time axis. *(This is the resolution of the checklist's time-proportional-vs-even-spacing contradiction: even-spaced per window, which equals time-proportional because windows are uniform.)*
-- **Legibility wins (CHK023):** define `MIN_SLOT` (the legibility floor; gap-label font pinned at 11px per mock). If `plotWidth / N_target < MIN_SLOT`, **reduce N_target (drop oldest windows)** rather than shrink `slotW`.
+- **Legibility wins (CHK023):** define `MIN_SLOT` (the legibility floor; gap-label font pinned at 11px per mock). If the edge-to-edge fill pitch `plotWidth / (N_target − 1) < MIN_SLOT` (narrow widths), **cap the drawn count (drop oldest windows)** so the pitch stays ≥ `MIN_SLOT` — never shrink below the floor.
 
 **Rationale.** A live session grows unboundedly while the width is fixed (FR-002); a rolling window bounds the drawn set and keeps the no-read gap labels (≈90–116px in the mock) legible. Uniform slots reconcile "stable spacing" with "honest gaps".
 
@@ -138,7 +138,8 @@ Concretely (`session-trend-geometry.ts`):
 | SC-009 no bridged gap / leading fade-in-only | geometry unit | no flat carried-forward line across a gap; a skip with no prior confident reading → fade-in only |
 | SC-010 single-dot / read-less honesty | geometry unit | 1 confident reading → a dot, not a line; all-skipped → no-read state, never calm |
 | SC-011 parked marker | geometry unit + RTL | active no-read w/ prior confident → muted+static+"last clear read"; no confident ever → no marker |
-| SC-012 rolling window (F1) | geometry unit | >N_target windows → only the last ~120s drawn; uniform slot width stable; gap width = consecutive no-read-window count; drop-oldest before MIN_SLOT |
+| SC-012 rolling window (F1) | geometry unit | >N_target windows → only the last N_target (=12) drawn at the locked `plotWidth/(N_target−1)` pitch; gap width = consecutive no-read-window count; drop-oldest before MIN_SLOT |
+| SC-012a ramp-up fill (2026-06-27) | geometry unit | < N_target windows → fill the full plot width edge-to-edge (pitch `plotWidth/(nDraw−1)`); now-marker at right edge; continuous with the locked pitch at nDraw = N_target (no jump); count = 1 → single dot unchanged |
 | SC-013 subtitle honesty | geometry unit | no tension word during warming / active no-read / all-skipped; resumes summary on a confident reading |
 
 Plus the existing monitor/employee Playwright happy-path (extend: a no-read treatment renders; zero numbers), and a human `smoke-tests.md` at implement (light/dark by eye, 360px no-crush, keyboard focus + popup, reduced-motion, a real live session that warms → reads → steps out → returns).

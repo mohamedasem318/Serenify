@@ -32,7 +32,9 @@ AXIS_GUTTER ≈ 140   RIGHT_MARGIN ≈ 60  # plot area = [axisGutter, W − righ
 #   plot keeps width for legible no-read labels at the 360px floor (axis labels retained).
 STROKE = 3   WARM_STROKE = 2.5 (dash "2 5", opacity .55)   FADE_OPACITY = .25
 NOW_R = 5   HALO_R = 5→13 (pulse)   HIT_R ≥ 22 (≥44px touch target; mock r=15)
-WINDOW_MS = 120_000   N_TARGET ≈ 10   MIN_SLOT = <legibility floor, gap-label font 11px>
+WINDOW_MS = 120_000   N_TARGET = 12   MIN_SLOT = <legibility floor, gap-label font 11px>
+#   N_TARGET = 12 = 120s ÷ the ~10s capture-WINDOW stride (DEFAULT_STRIDE_MS), NOT the ~12s
+#   client poll cadence — the lock count for the fill-to-width pitch (see I4 reconciliation).
 ```
 
 ## Derived view-model
@@ -40,8 +42,8 @@ WINDOW_MS = 120_000   N_TARGET ≈ 10   MIN_SLOT = <legibility floor, gap-label 
 ### `WindowSlot` (one capture window → one uniform slot)
 | Field | Type | Notes |
 |---|---|---|
-| `index` | number | 0 = oldest drawn, right-anchored so latest = rightmost |
-| `x` | number (px) | slot centre = `(W − RIGHT_MARGIN) − (lastIndex − index) × slotW` |
+| `index` | number | 0 = oldest drawn (at the left edge), latest = rightmost (at the right edge) — fill-to-width |
+| `x` | number (px) | slot centre = `left + index × pitch`, `pitch = plotWidth / (nDraw − 1)` (fill-to-width); `nDraw === 1` → pinned at the right edge |
 | `kind` | `confident \| warming \| foggy \| no_clear_read` | from `band`/`skipCause`/position + gate (R-3) |
 | `y` | number \| null | `BAND_Y[band]` for confident; null for no-read |
 | `band` | Band \| null | |
@@ -68,7 +70,7 @@ WINDOW_MS = 120_000   N_TARGET ≈ 10   MIN_SLOT = <legibility floor, gap-label 
 
 ## State derivation rules (the honesty core)
 
-1. **Rolling window:** drop windows with `capturedAt < now − WINDOW_MS`; if `(W−AXIS_GUTTER−RIGHT_MARGIN)/N_TARGET < MIN_SLOT`, reduce N_TARGET (drop oldest) — never shrink the slot (FR-002a/SC-012).
+1. **Rolling window + fill-to-width:** drop windows with `capturedAt < now − WINDOW_MS`; draw the remaining (capped at the last N_TARGET) **edge-to-edge** with pitch `plotWidth / (nDraw − 1)` — ramp-up fills, locking at `plotWidth / (N_TARGET − 1)` at nDraw = N_TARGET, continuous (no jump); `nDraw === 1` → single dot at the right edge. If the edge-to-edge pitch would fall below `MIN_SLOT` (narrow widths), cap the drawn count (drop oldest) so the pitch stays ≥ MIN_SLOT — never shrink below the floor (FR-002a/SC-012/SC-012a).
 2. **warming** = leading run of `band null & skipCause null` **before any confident reading** → dashed muted line (start-only, FR-010/FR-014).
 3. **out-of-frame** (`skipCause === "out-of-frame"`): gate ON → foggy; gate OFF (launch) → no_clear_read (FR-015/F7).
 4. **no_clear_read** = any other null-band window (low-light/insufficient-face/our-side, re-warm, or gated-off out-of-frame) → muted gap (FR-012/FR-014).

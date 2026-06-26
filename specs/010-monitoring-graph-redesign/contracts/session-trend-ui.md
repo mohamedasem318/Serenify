@@ -32,10 +32,10 @@ No change to how `monitoring-session.tsx` mounts it (it already passes `sessionI
 - The now-marker MUST be a true `<circle>` (1:1) at the 360px floor **and** at the `max-w-3xl` (~768px) column.
 - The graph fills its container width and imposes no narrower max-width (matched pair with the camera card above — same `max-w-3xl` column).
 
-### Rolling window + uniform slots (F1 / FR-002a / SC-012)
-- Only windows within the last ~120s are drawn; each capture window (confident **and** no-read) occupies one **equal-width** slot; slot width is stable (= plotWidth / N_target, N_target ≈ 12).
-- **Right-anchored**: the latest window is the rightmost slot (now-marker at the right edge); an early session draws its few windows at the right, blank to the left (CHK012).
-- A no-read gap's width = its count of consecutive no-read windows. If `slotW < MIN_SLOT`, oldest windows are dropped (never shrink the slot) (CHK023).
+### Rolling window + fill-to-width slots (F1 / FR-002a / SC-012 / SC-012a)
+- Only windows within the last ~120s are drawn; each capture window (confident **and** no-read) occupies one **equal-width** slot. **N_target = 12** = the lock count (120s ÷ the ~10s capture-**window stride**, NOT the ~12s client poll cadence).
+- **Fill-to-width** (CHK012, decided 2026-06-27): the drawn windows **always span the full plot edge-to-edge** — earliest at `left`, latest ("now") at the **right edge** — with pitch `= plotWidth / (nDraw − 1)`. During **ramp-up** (nDraw < N_target) the few windows stretch to fill and gently re-space as each new window arrives; at **N_target** the pitch **locks** at `plotWidth / (N_target − 1)` and older windows scroll off the left thereafter. The ramp-up pitch equals the locked pitch at nDraw = N_target → continuous, no jump. `count === 1` → a single dot pinned at the right edge (FR-019), the pitch formula not applied.
+- A no-read gap's width is proportional to its count of consecutive no-read windows (each occupies one pitch-width slot). If the edge-to-edge pitch would fall below `MIN_SLOT` (narrow widths), the drawn count is capped (oldest dropped) so the pitch stays ≥ MIN_SLOT — never shrink the slot below the floor (CHK023).
 
 ### Step-line state encoding (FR-003 / SC-003)
 - Continuous step-line; **colour encodes band** (at ease `--color-meadow`, a little tense `--amber-soft-line`, tense `--color-amber`), **height encodes tension** (`BAND_Y`; tenser = higher). Each band → distinct Y **and** distinct token.

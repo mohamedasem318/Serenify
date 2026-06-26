@@ -34,11 +34,11 @@ The redesign **replaces** today's stretched coordinate space (`viewBox="0 0 100 
 
 **Project Type**: Web application — frontend-only change within `apps/web`, one component + one pure module.
 
-**Performance Goals**: static SVG re-rendered on the existing ~12s poll; the only animation is the now-marker pulse (CSS), suppressed under reduced-motion; 60fps interaction. The rolling window caps the drawn windows (~10–12), so the SVG stays small regardless of session length.
+**Performance Goals**: static SVG re-rendered on the existing ~12s poll; the only animation is the now-marker pulse (CSS), suppressed under reduced-motion; 60fps interaction. The rolling window caps the drawn windows (**N_target = 12**), so the SVG stays small regardless of session length.
 
 **Constraints (non-negotiable, from spec + DC-001)**: fixed-px rendering (1 unit = 1px, no stretched viewBox → true circles, SC-001); fill the container width / matched pair with the camera stage (FR-002/SC-002); uniform slot per capture window + rolling ~2-min window (FR-002a/SC-012); amber = stress only, foggy = attention (gated), warming/no-clear-read = muted, **no red** (FR-016); no numeric probability ever (FR-017/SC-007); RLS-as-user + SELECT whitelist intact (FR-020).
 
-**Scale/Scope**: one session, growing live; the rolling window bounds the drawn set to the most recent ~2 minutes (~10–12 windows at the 10s capture stride); older windows scroll off / drop oldest before slots shrink below the legibility floor (FR-002a).
+**Scale/Scope**: one session, growing live; the rolling window bounds the drawn set to the most recent ~2 minutes (**N_target = 12** windows at the ~10s capture-**window stride** — distinct from the ~12s client poll cadence); during ramp-up (< 12 windows) the few windows fill the full plot width, locking to the `plotWidth/(N_target−1)` pitch at 12; older windows then scroll off / drop oldest before the edge-to-edge pitch falls below the legibility floor (FR-002a).
 
 ## Constitution Check
 
@@ -116,16 +116,16 @@ Each was deferred from the pre-plan audit as "minor / plan-level"; here is the p
 | CHK | Item | Decision (where it lands) |
 |---|---|---|
 | CHK005 | "a little tense" legend swatch colour | Reuse `--amber-soft-line` (FR-023 token), matching the line — **not** the mock placeholder. No new token. (contract: legend) |
-| CHK012 | partial-window / ramp-up x-positioning | **Right-anchored**: slot width is fixed (= plotWidth / N_target); early session draws its few windows in the rightmost slots, blank to the left; now-marker always at the right edge. (geometry) |
+| CHK012 | partial-window / ramp-up x-positioning | **SUPERSEDED 2026-06-27 → fill-to-width during ramp-up** (spec FR-002a ramp-up clause / Clarifications 2026-06-27 / SC-012a). While the visible window count is **< N_target**, the few windows **stretch to fill the full plot width** (earliest at the left edge, latest at the right edge), now-marker pinned at the right edge; existing points gently re-space as each window arrives (by-design). At N_target the slot pitch **locks** at `plotWidth / (N_target − 1)` and older windows scroll off the left thereafter; the ramp-up pitch `plotWidth / (count − 1)` equals the locked pitch at count = N_target (continuous, no jump). *(Prior decision — fixed `plotWidth / N_target` slots anchored right with blank-left — is rejected for the "cut off" look.)* Lands in geometry as **T004a**. |
 | CHK013 | live-update transitions between polls | No bespoke enter animation; re-render on the existing poll, now-marker moves to the new right-edge window. Only motion = the pulse (reduced-motion → none). (component) |
 | CHK014 | popup dismissal on touch | Driven by focus/blur (`:focus-within`, per mock); tap focuses → popup shows, tap-away/blur → hides. No explicit close control. (contract: now-marker) |
 | CHK015 | `scored` flag role | Unused for rendering — band + skipCause + position fully determine every treatment; documented as ignored. (data-model) |
-| CHK016 | "~2 min" precision | Window = capture windows with `capturedAt` within the last **120s**; target capacity **N_target ≈ 12** at the 10s capture stride (drives fixed slot width). (geometry) |
+| CHK016 | "~2 min" precision | Window = capture windows with `capturedAt` within the last **120s**; **N_target = 12** = the lock count, derived as 120s ÷ the ~10s capture-**window stride** (NOT the ~12s client poll cadence — see I4). It is the count at which the fill-to-width pitch **locks** at `plotWidth/(N_target − 1)`. (geometry) |
 | CHK017 | "supported container width" range | **360px viewport floor** (Principle VI) up to the `max-w-3xl` (~768px) column; component reads its actual rendered width. (geometry/contract) |
 | CHK018 | matched-pair reference element | The monitor page's shared `mx-auto w-full max-w-3xl` column (camera card + trend card already occupy it) — holds by existing layout, **no page change**. (structure) |
 | CHK020 | "leading skip" definition breadth | Generalize: the fade-in-only rule keys off **"no prior confident reading"** (position-based), covering a skip-first session with no warming run, not only "after warming". (data-model derivation) |
 | CHK022 | SC-003 measurability | Re-read as a **deterministic-encoding** check: geometry unit asserts each band → distinct Y **and** distinct colour token; by-eye confirmation in `smoke-tests.md`. (tests) |
-| CHK023 | SC-012 "legible" threshold | Define a **MIN_SLOT** floor (the legibility threshold) + pin the gap-label font (11px per mock); when plotWidth / N_target < MIN_SLOT, **drop oldest** (shrink N_target) rather than the slot. (geometry) |
+| CHK023 | SC-012 "legible" threshold | Define a **MIN_SLOT** floor (the legibility threshold) + pin the gap-label font (11px per mock); when the edge-to-edge fill pitch `plotWidth / (N_target − 1)` would fall below MIN_SLOT (narrow widths), **cap the drawn count (drop oldest)** so the pitch stays ≥ MIN_SLOT — never shrink below the floor. (geometry) |
 
 ## Complexity Tracking
 

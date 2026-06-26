@@ -7,7 +7,7 @@ Frontend-only redesign of one component (`apps/web/components/monitor/session-tr
 - Visual target: `serenify-live-session-graph-mock.html` (repo root) — open in a browser, toggle Light/Dark.
 
 ## Build sequence (matches `/speckit-tasks` order)
-1. **Pure geometry/derivation** — `lib/session-trend-geometry.ts`: rolling-window trim, uniform-slot layout (right-anchored), band→Y step-line, no-read treatment derivation (warming/foggy/no-clear-read + leading fade-in-only), now-marker state (live/parked/none), subtitle state. Constants from research R-1.
+1. **Pure geometry/derivation** — `lib/session-trend-geometry.ts`: rolling-window trim, fill-to-width layout (ramp-up fills the full width, locking to `plotWidth/(N_target−1)` at N_target = 12), band→Y step-line, no-read treatment derivation (warming/foggy/no-clear-read + leading fade-in-only), now-marker state (live/parked/none), subtitle state. Constants from research R-1.
 2. **Geometry unit tests** — `tests/unit/lib/session-trend-geometry.test.ts`: map SC-001…SC-013 (research R-9). TDD: write alongside step 1.
 3. **Component** — replace `session-trend.tsx` internals: read container width (`ResizeObserver`/ref), render fixed-px SVG (step-line, treatments, now-marker, gridlines/axis labels), honest subtitle, gated legend, reduced-motion via the repo hook. Add `showOutOfFrameFoggy` prop (default false).
 4. **Component tests** — rewrite `tests/unit/components/monitor/session-trend.test.tsx` to the new surface + the contract invariants.

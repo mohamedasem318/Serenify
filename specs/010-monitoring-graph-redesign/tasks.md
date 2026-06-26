@@ -31,7 +31,8 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 
 - [x] T002 Create `apps/web/lib/session-trend-geometry.ts` scaffold: mock-derived constants (`H=210`, `BAND_Y {tense:58, a_little_tense:120, at_ease:182}`, `BAND_LINE` token map, `AXIS_GUTTER≈140`, `RIGHT_MARGIN≈60`, `STROKE=3`, `WARM_STROKE=2.5`/dash/opacity, `FADE_OPACITY=.25`, `NOW_R=5`, `HALO_R`, `HIT_R`, `WINDOW_MS=120000`, `N_TARGET≈12`, `MIN_SLOT`) and exported types (`WindowSlot`, `Treatment`, `NowMarker`, `SubtitleState`). Document that `scored` is **unused for rendering** [CHK015]. [research R-1; CHK016, CHK017, CHK023]
 - [x] T003 Write the geometry unit-test suite (TDD — author first, expect red) in `apps/web/tests/unit/lib/session-trend-geometry.test.ts`, with cases mapped to: SC-001 (width==viewBox invariant at 360px & ~768px), SC-003 (each band → distinct Y **and** distinct token), SC-004 (treatment distinctness, gate OFF vs ON), SC-008 (out-of-frame routes muted when gate OFF; foggy string absent), SC-009 (no bridged gap; leading/skip-first → fade-in only), SC-010 (single dot; all-skipped → no-read not calm), SC-011 (now-marker live/parked/none), SC-012 (rolling window, uniform slot, drop-oldest before MIN_SLOT), SC-013 (subtitle states). [CHK020, CHK022]
-- [x] T004 Implement rolling-window trim (last `WINDOW_MS`) + **uniform-slot, right-anchored** layout (slot width = plotWidth / N_target; drop oldest before shrinking below `MIN_SLOT`) in `apps/web/lib/session-trend-geometry.ts`. [F1; FR-002a; **SC-012**; CHK012, CHK016, CHK023]
+- [x] T004 Implement rolling-window trim (last `WINDOW_MS`) + **steady-state fill-to-width** layout (window count ≥ N_target = 12: edge-to-edge slots at the locked `plotWidth / (N_target − 1)` pitch, drop oldest before the pitch falls below `MIN_SLOT`) in `apps/web/lib/session-trend-geometry.ts`. [F1; FR-002a; **SC-012**; CHK016, CHK023] ✅ *Reconciled 2026-06-27 (with T004a): the layout is the unified fill-to-width model; the locked pitch denominator is `plotWidth / (N_target − 1)` (was `plotWidth / N_target`), continuous at the lock point; N_target = 12 (window-stride basis, see I4).*
+- [x] T004a Implement **ramp-up fill-to-width** layout in `apps/web/lib/session-trend-geometry.ts`: while the visible window count is **< N_target**, span the few windows across the full plot width (earliest at the left edge, latest at the right edge), now-marker pinned at the right edge, uniform-width slots (gap width stays proportional to consecutive-no-read count, scaled to the fill); gently re-space existing points as each window arrives; **lock** the pitch at `plotWidth / (N_target − 1)` once count reaches N_target (continuous with the ramp-up pitch `plotWidth / (count − 1)` at count = N_target — no jump), then hand off to the steady-state scroll-off (T004); `count === 1` → single dot at the right edge (FR-019), no pitch formula. SC-012a unit tests added (count 2/3/6, continuity at N_target, drop-oldest, now-at-right, single-dot, uniform-slot gap). [FR-002a ramp-up clause; **SC-012a**; CHK012 (superseded → fill-to-width)]
 - [x] T005 Implement band→Y step-line point builder + single-confident-reading dot rule in `apps/web/lib/session-trend-geometry.ts`. [FR-003, FR-019; **SC-003, SC-010**]
 - [x] T006 Implement no-read **treatment derivation** (warming = leading null/null run only; out-of-frame → foggy when gated ON else no-clear-read; everything-else null → no-clear-read incl. mid-session re-warm; fade-out requires a prior confident reading else **fade-in only**; fades are static opacity) in `apps/web/lib/session-trend-geometry.ts`. [research R-3; FR-009–FR-015; **SC-004, SC-008, SC-009**; CHK020]
 - [x] T007 Implement **now-marker state machine** (`live` = recolour to band; `parked` = solid `--color-muted`, no pulse, "last clear read", only with ≥1 prior confident reading; `none` = no confident reading ever) in `apps/web/lib/session-trend-geometry.ts`. [research R-4; FR-004/004a/004b; **SC-011**; F6]
@@ -131,7 +132,8 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 | SC-009 no bridged gap / leading fade-in-only | T003, T006, T015, T019 |
 | SC-010 single dot / read-less honesty | T003, T005, T010, T018 |
 | SC-011 parked now-marker | T003, T007, T011, T021, T025 |
-| SC-012 rolling window / uniform slot | T003, T004 |
+| SC-012 rolling window / uniform slot (steady-state) | T003, T004 |
+| SC-012a ramp-up fill-to-width | T003, T004a |
 | SC-013 subtitle honesty | T003, T008, T024, T025 |
 
 ## Folded checklist decisions (traceability)
@@ -139,7 +141,7 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 | CHK | Task(s) |
 |---|---|
 | CHK005 legend swatch token | T001, T012 |
-| CHK012 right-anchored ramp-up | T004 |
+| CHK012 ramp-up x-positioning (right-anchored → **fill-to-width**, superseded 2026-06-27) | T004a |
 | CHK013 poll re-render, no bespoke transition | T009b |
 | CHK014 popup focus/blur dismiss | T020 |
 | CHK015 `scored` unused | T002 |

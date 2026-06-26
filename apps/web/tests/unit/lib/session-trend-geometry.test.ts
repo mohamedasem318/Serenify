@@ -9,6 +9,7 @@ import {
   FOGGY_COLOR,
   H,
   MIN_SLOT,
+  N_TARGET,
   NO_READ_COLOR,
   RIGHT_MARGIN,
   buildSessionTrend,
@@ -23,7 +24,8 @@ import type { SkipCause } from "@/lib/api/monitoring-reads";
  *   SC-001/002 fixed-px (width == viewBox; plot bounds)   SC-003 band by colour + height
  *   SC-004 distinct no-read treatments (gate OFF vs ON)   SC-008 never "step back" when gated off
  *   SC-009 no bridged gap; leading skip = fade-in only    SC-010 single dot; all-skipped ≠ calm
- *   SC-011 now-marker live / parked / none                SC-012 rolling window, uniform slot, drop-oldest
+ *   SC-011 now-marker live / parked / none                SC-012 rolling window lock + drop-oldest
+ *   SC-012a ramp-up fill-to-width (edge-to-edge; continuous at the N_TARGET lock)
  *   SC-013 subtitle honesty
  */
 
@@ -36,6 +38,9 @@ const pt = (secsAgo: number, band: Band | null, skipCause: SkipCause | null = nu
 });
 const build = (points: TrendInput[], width = 580, showOutOfFrameFoggy = false) =>
   buildSessionTrend(points, { width, nowMs: NOW, showOutOfFrameFoggy });
+/** n confident windows, oldest → newest, one per `stride` seconds (default the ~10s window stride). */
+const many = (n: number, stride = 10) =>
+  Array.from({ length: n }, (_, i) => pt((n - 1 - i) * stride, "at_ease"));
 
 // ── SC-003: band encoded by distinct height AND distinct colour ───────────────────────
 describe("constants — each band has a distinct Y and a distinct token (SC-003)", () => {
@@ -94,37 +99,113 @@ describe("responsive axis gutter (FR-002 narrow-width clarification)", () => {
   });
 });
 
-// ── SC-012: rolling window, uniform slot, right-anchored, drop-oldest ──────────────────
-describe("rolling window + uniform slot, right-anchored (SC-012)", () => {
-  const many = (n: number, stride = 10) =>
-    Array.from({ length: n }, (_, i) => pt((n - 1 - i) * stride, "at_ease")); // oldest → newest
-
-  it("the latest window is right-anchored at the plot's right edge", () => {
+// ── SC-012: rolling window — steady-state lock + drop-oldest ──────────────────────────
+describe("rolling window — steady-state lock + drop-oldest (SC-012)", () => {
+  it("the latest ('now') window sits at the plot's right edge", () => {
     const v = build(many(5), 580);
-    expect(v.slots.at(-1)!.x).toBe(v.plot.right);
+    expect(v.slots.at(-1)!.x).toBeCloseTo(v.plot.right, 6);
   });
-  it("slots are uniformly spaced by a STABLE slot width (independent of window count)", () => {
-    const a = build(many(3), 580);
-    const b = build(many(8), 580);
-    expect(a.plot.slotW).toBe(b.plot.slotW); // stable spacing regardless of read frequency
-    const xs = b.slots.map((s) => s.x);
-    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(b.plot.slotW, 6);
+  it("at/over N_TARGET windows the pitch LOCKS at plotWidth/(N_TARGET−1), stable as it grows", () => {
+    const a = build(many(13), 580); // ≥ N_TARGET → locked
+    const b = build(many(15), 580); // more windows, same lock (no compression as the session grows)
+    expect(a.slots).toHaveLength(N_TARGET);
+    expect(b.slots).toHaveLength(N_TARGET);
+    expect(a.plot.slotW).toBeCloseTo(a.plot.plotWidth / (N_TARGET - 1), 6);
+    expect(a.plot.slotW).toBeCloseTo(b.plot.slotW, 6); // STABLE once locked (SC-012)
+    expect(a.droppedOldest).toBe(true);
+    const xs = a.slots.map((s) => s.x);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(a.plot.slotW, 6);
   });
-  it("a young session draws its few windows clustered at the RIGHT (ramp-up, CHK012)", () => {
-    const v = build(many(3), 580);
-    expect(v.slots).toHaveLength(3);
-    expect(v.slots[0]!.x).toBeCloseTo(v.plot.right - 2 * v.plot.slotW, 6);
-  });
-  it("windows older than the ~2-min window scroll off the left edge", () => {
+  it("windows older than the ~2-min rolling window scroll off the left edge", () => {
     const v = build([pt(300, "tense"), pt(20, "at_ease"), pt(10, "at_ease"), pt(0, "at_ease")], 580);
     expect(v.slots).toHaveLength(3); // the 300s-old window is gone
   });
-  it("never shrinks the slot below MIN_SLOT — drops the oldest instead (legibility wins)", () => {
+  it("never lets the edge-to-edge pitch fall below MIN_SLOT — drops the oldest instead", () => {
     const v = build(many(12), 360); // 12 windows within 2 min, narrow viewport
     expect(v.plot.slotW).toBeGreaterThanOrEqual(MIN_SLOT);
     expect(v.droppedOldest).toBe(true);
     expect(v.slots.length).toBeLessThan(12);
-    expect(v.slots.at(-1)!.x).toBe(v.plot.right); // still right-anchored after dropping
+    expect(v.slots.at(-1)!.x).toBeCloseTo(v.plot.right, 6); // latest still at the right edge
+  });
+});
+
+// ── SC-012a: ramp-up fill-to-width (2026-06-27) ───────────────────────────────────────
+describe("ramp-up fill-to-width (SC-012a)", () => {
+  it("count = 2 → earliest at the LEFT edge, latest at the RIGHT edge", () => {
+    const v = build(many(2), 580);
+    expect(v.slots).toHaveLength(2);
+    expect(v.slots[0]!.x).toBeCloseTo(v.plot.left, 6);
+    expect(v.slots.at(-1)!.x).toBeCloseTo(v.plot.right, 6);
+  });
+  it("count = 3 → evenly fills the full width: left, mid, right", () => {
+    const v = build(many(3), 580);
+    const { left, right, plotWidth } = v.plot;
+    const xs = v.slots.map((s) => s.x);
+    expect(xs[0]).toBeCloseTo(left, 6);
+    expect(xs[1]).toBeCloseTo(left + plotWidth / 2, 6);
+    expect(xs[2]).toBeCloseTo(right, 6);
+  });
+  it("count = 6 → uniform pitch = plotWidth/(count−1), spanning edge-to-edge", () => {
+    const v = build(many(6), 580);
+    const pitch = v.plot.plotWidth / 5;
+    expect(v.plot.slotW).toBeCloseTo(pitch, 6);
+    const xs = v.slots.map((s) => s.x);
+    expect(xs[0]).toBeCloseTo(v.plot.left, 6);
+    expect(xs.at(-1)).toBeCloseTo(v.plot.right, 6);
+    for (let i = 1; i < xs.length; i++) expect(xs[i]! - xs[i - 1]!).toBeCloseTo(pitch, 6);
+  });
+  it("ramp-up COMPRESSES as windows arrive (pitch shrinks 3 → 8 windows) — by-design re-spacing", () => {
+    const three = build(many(3), 580).plot.slotW;
+    const eight = build(many(8), 580).plot.slotW;
+    expect(three).toBeGreaterThan(eight); // distinct from the steady-state lock (SC-012)
+  });
+  it("CONTINUITY: the ramp pitch at count = N_TARGET equals the locked pitch (no jump)", () => {
+    const atTarget = build(many(N_TARGET), 580); // exactly N_TARGET windows (all within 120s)
+    expect(atTarget.slots).toHaveLength(N_TARGET);
+    const rampPitch = atTarget.plot.plotWidth / (N_TARGET - 1);
+    const lockedPitch = build(many(15), 580).plot.slotW; // > N_TARGET → locked
+    expect(atTarget.plot.slotW).toBeCloseTo(rampPitch, 6);
+    expect(atTarget.plot.slotW).toBeCloseTo(lockedPitch, 6); // continuous at the lock point
+  });
+  it("count > N_TARGET → only the last N_TARGET windows render, oldest dropped, 'now' at right", () => {
+    const v = build(many(20), 580);
+    expect(v.slots).toHaveLength(N_TARGET);
+    expect(v.droppedOldest).toBe(true);
+    expect(v.slots.at(-1)!.x).toBeCloseTo(v.plot.right, 6);
+    expect(v.nowMarker.x).toBeCloseTo(v.plot.right, 6);
+  });
+  it("now-marker x === the right edge across every count ≥ 2", () => {
+    for (const n of [2, 3, 7, N_TARGET, 18]) {
+      const v = build(many(n), 580);
+      expect(v.nowMarker.x).toBeCloseTo(v.plot.right, 6);
+    }
+  });
+  it("count = 1 → a single dot pinned at the right edge, no pitch formula (FR-019)", () => {
+    const v = build(many(1), 580);
+    expect(v.slots).toHaveLength(1);
+    expect(v.dots).toHaveLength(1);
+    expect(v.steps).toHaveLength(0);
+    expect(v.slots[0]!.x).toBeCloseTo(v.plot.right, 6);
+    expect(v.dots[0]!.x).toBeCloseTo(v.plot.right, 6);
+  });
+  it("uniform slots under fill: a k-window no-read run's centre-span = (k−1)×pitch (∝ k)", () => {
+    // ramp-up session: confident → 3 consecutive no-read windows → confident (5 windows total)
+    const v = build(
+      [
+        pt(40, "at_ease"),
+        pt(30, null, "low-light"),
+        pt(20, null, "low-light"),
+        pt(10, null, "low-light"),
+        pt(0, "at_ease"),
+      ],
+      580,
+    );
+    expect(v.slots).toHaveLength(5);
+    const pitch = v.plot.plotWidth / 4; // count − 1 = 4
+    expect(v.plot.slotW).toBeCloseTo(pitch, 6);
+    const gap = v.treatments.find((t) => t.kind === "no_clear_read")!;
+    // 3 no-read slots at indices 1,2,3 → centre-span (3−1)×pitch; each occupies one pitch-wide slot
+    expect(gap.x2 - gap.x1).toBeCloseTo(2 * pitch, 6);
   });
 });
 

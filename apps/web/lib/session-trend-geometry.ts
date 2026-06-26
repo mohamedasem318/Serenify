@@ -20,11 +20,15 @@
  *   • FIXED-PX (DC-001 / FR-001 / SC-001): 1 unit = 1px. The caller sets the SVG `width`
  *     AND a matching `viewBox` width to `view.width` — NO stretched viewBox — so the now
  *     marker is a TRUE circle at any width.
- *   • UNIFORM SLOT / ROLLING WINDOW (FR-002a / SC-012): each capture window (confident AND
- *     no-read alike) occupies one EQUAL-width slot; slot width is STABLE (independent of how
- *     many windows exist); the latest window is right-anchored at the plot's right edge;
- *     windows older than ~2 min scroll off the left; if slots would fall below `MIN_SLOT`
- *     the OLDEST windows are dropped — the slot is never shrunk (legibility wins).
+ *   • FILL-TO-WIDTH / ROLLING WINDOW (FR-002a / SC-012 / SC-012a): each capture window
+ *     (confident AND no-read alike) occupies one EQUAL-width slot; the drawn windows ALWAYS
+ *     span the full plot edge-to-edge — earliest at `left`, latest ("now") at the right edge —
+ *     with pitch = plotWidth/(nDraw−1). During ramp-up (nDraw < N_TARGET) the few windows
+ *     stretch to fill and gently re-space as each poll adds one; at N_TARGET the pitch LOCKS at
+ *     plotWidth/(N_TARGET−1) and older windows scroll off the left thereafter (continuous — the
+ *     ramp formula equals the locked pitch at nDraw === N_TARGET, no jump). Windows older than
+ *     ~2 min scroll off the left; if the edge-to-edge pitch would fall below `MIN_SLOT` the
+ *     drawn count is capped (OLDEST dropped) so the pitch stays ≥ MIN_SLOT (legibility wins).
  *   • THREE HONEST NO-READ TREATMENTS (FR-010..FR-015): warming = a leading null/null run
  *     before any confident reading → dashed muted line ("getting a read"); foggy =
  *     out-of-frame, BUILT BUT GATED OFF at launch (`showOutOfFrameFoggy=false`) → only then
@@ -103,8 +107,11 @@ export const HALO_R_MAX = 13; // pulse end (mock @keyframes)
 export const HIT_R = 22;
 
 export const WINDOW_MS = 120_000; // rolling window ≈ 2 min (FR-002a)
-export const N_TARGET = 10; // ≈ 2 min at the ~12s poll stride (FR-002a); sets the slot pitch
-/** Legibility floor: the slot is never shrunk below this — drop oldest instead (SC-012). */
+/** The lock count for fill-to-width: 120s ÷ the ~10s capture-WINDOW stride (DEFAULT_STRIDE_MS,
+ *  monitoring's scoreable-window cadence) — NOT the ~12s client poll/re-fetch cadence. At nDraw
+ *  === N_TARGET the edge-to-edge pitch locks at plotWidth/(N_TARGET−1) (FR-002a / SC-012a). */
+export const N_TARGET = 12;
+/** Legibility floor: the edge-to-edge pitch is never shrunk below this — drop oldest instead (SC-012). */
 export const MIN_SLOT = 24;
 
 // ── Derived view-model types ───────────────────────────────────────────────────────────
@@ -126,7 +133,7 @@ export type WindowKind = "confident" | "warming" | "foggy" | "no_clear_read";
 export interface WindowSlot {
   /** Index into the time-sorted session (for warming/whole-session reasoning). */
   srcIndex: number;
-  /** 0 = oldest DRAWN, right-anchored so the latest = rightmost. */
+  /** 0 = oldest DRAWN (at the left edge); the latest = rightmost (at the right edge) — fill-to-width. */
   index: number;
   x: number;
   kind: WindowKind;
@@ -289,9 +296,10 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
   const left = g.left;
   const right = width - g.rightMargin;
   const plotWidth = Math.max(0, right - left);
-  // STABLE slot pitch: a function of width + N_TARGET only — never of how many windows exist
-  // (FR-002a). Never below MIN_SLOT: drop the oldest windows instead (SC-012).
-  const slotW = Math.max(MIN_SLOT, plotWidth / N_TARGET);
+  // Nominal pitch for the empty/single-window cases (no fill spans to measure yet) — the locked
+  // edge-to-edge pitch at full N_TARGET, floored at MIN_SLOT. The real per-render pitch (when ≥2
+  // windows fill the width) is computed below as plotWidth/(nDraw−1) (FR-002a / SC-012a).
+  const nominalSlotW = Math.max(MIN_SLOT, plotWidth / Math.max(1, N_TARGET - 1));
   const axis = axisFor(left, right, g.labelGutter);
 
   const sorted = [...points].sort(byCapturedAtAsc);
@@ -302,7 +310,7 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
       isEmpty: true,
       width,
       height: H,
-      plot: { left, right, slotW, plotWidth },
+      plot: { left, right, slotW: nominalSlotW, plotWidth },
       slots: [],
       droppedOldest: false,
       steps: [],
@@ -319,19 +327,30 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
   const firstConfidentIdx = sorted.findIndex((p) => p.band != null);
   const everConfident = firstConfidentIdx >= 0;
 
-  // ── rolling window: time-trim (~2 min) then count-cap (drop OLDEST, never shrink slot) ──
+  // ── rolling window: time-trim (~2 min), then FILL-TO-WIDTH with an N_TARGET / legibility cap ──
+  // The drawn windows ALWAYS span the plot edge-to-edge (FR-002a / SC-012a): earliest at `left`,
+  // latest ("now") at `right`, pitch = plotWidth/(nDraw−1). Ramp-up (nDraw < N_TARGET) fills and
+  // re-spaces as windows arrive; at N_TARGET the pitch LOCKS at plotWidth/(N_TARGET−1) and older
+  // windows scroll off — continuous because the ramp formula equals the locked pitch at N_TARGET.
+  // Legibility (SC-012): cap the drawn count so the edge-to-edge pitch never falls below MIN_SLOT.
   const cutoff = nowMs - WINDOW_MS;
   const windowed = sorted
     .map((p, i) => ({ p, i }))
     .filter(({ p }) => Date.parse(p.capturedAt) >= cutoff);
-  const maxSlots = Math.max(1, Math.floor(plotWidth / slotW) + 1);
-  const drawnSrc = windowed.slice(Math.max(0, windowed.length - maxSlots));
-  const droppedOldest = windowed.length > drawnSrc.length;
-  const nDraw = drawnSrc.length;
+  // Max windows we can fill edge-to-edge while keeping pitch ≥ MIN_SLOT (plotWidth/(n−1) ≥ MIN_SLOT).
+  const capByLegibility = Math.max(2, Math.floor(plotWidth / MIN_SLOT) + 1);
+  const nCap = Math.min(N_TARGET, capByLegibility);
+  const nDraw = Math.min(windowed.length, nCap);
+  const drawnSrc = windowed.slice(Math.max(0, windowed.length - nDraw));
+  const droppedOldest = windowed.length > nDraw;
+  // Per-render uniform pitch: plotWidth/(nDraw−1) when ≥2 windows fill the width; else nominal.
+  const slotW = nDraw >= 2 ? plotWidth / (nDraw - 1) : nominalSlotW;
 
-  // ── slots (uniform pitch, right-anchored so the latest window = the right edge) ──
+  // ── slots (fill-to-width: earliest at the left edge, latest "now" at the right edge) ──
+  // A lone window (nDraw === 1) is pinned at the right edge — the pitch formula (÷0) is skipped,
+  // and a single confident reading renders as a dot (FR-019) consistent with the now-marker edge.
   const slots: WindowSlot[] = drawnSrc.map(({ p, i }, k) => {
-    const x = right - (nDraw - 1 - k) * slotW;
+    const x = nDraw === 1 ? right : left + k * slotW;
     if (p.band != null) {
       return { srcIndex: i, index: k, x, kind: "confident", band: p.band, y: BAND_Y[p.band] };
     }
