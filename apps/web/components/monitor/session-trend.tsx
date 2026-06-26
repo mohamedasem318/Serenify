@@ -7,12 +7,14 @@ import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-re
 import {
   FADE_OPACITY,
   HALO_R_MAX,
+  HIT_R,
   NOW_R,
   STROKE,
   WARM_DASH,
   WARM_OPACITY,
   WARM_STROKE,
   buildSessionTrend,
+  type NowMarker as NowMarkerView,
 } from "@/lib/session-trend-geometry";
 
 /**
@@ -44,6 +46,154 @@ const LABEL_PAD = 12;
 const LABEL_H = 18;
 const estLabelW = (s: string) => Math.round(s.length * LABEL_CHAR_W) + LABEL_PAD;
 const ptsStr = (pts: { x: number; y: number }[]) => pts.map((p) => `${p.x},${p.y}`).join(" ");
+
+/**
+ * The live "now" marker (US3 — T020–T023): a focusable group with a hover / focus / tap popup,
+ * the gentle pulse (or reduced-motion static halo), and a ≥44×44 touch hit-area.
+ *
+ * HONESTY (FR-007 / US3 scenario 8): the popup copy AND the marker fill/halo are read LIVE from
+ * the geometry `marker` every render, so when the live edge flips confident ⇄ no-read the marker
+ * reparks (band colour + pulse ⇄ muted + static) and an already-open popup's copy flips
+ * "you are here" ⇄ "last clear read" without re-opening. The `pinned` state controls only
+ * VISIBILITY, never the text.
+ *
+ * Reveal/dismiss (CHK014 / FR-007): hover shows / mouse-out hides; focus shows / blur hides; a
+ * tap TOGGLES (second tap on the marker closes), a tap OUTSIDE dismisses, and Esc closes. Pure
+ * `:focus-within` (the mock's mechanism) can't express the toggle/outside-dismiss, hence the
+ * explicit `pinned` state. The marker only mounts while there's a reading to anchor to
+ * (`state !== "none"`); if it scrolls off and later returns it remounts fresh (no stale pin).
+ */
+function NowMarker({
+  marker,
+  reducedMotion,
+  plot,
+}: {
+  marker: NowMarkerView;
+  reducedMotion: boolean;
+  plot: { left: number; right: number };
+}) {
+  const gRef = useRef<SVGGElement | null>(null);
+  const [hover, setHover] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const open = hover || focused || pinned;
+
+  // Outside-tap dismiss for a pinned popup. A tap on the marker itself is handled by the
+  // group's onClick toggle, so it is excluded here via `contains`.
+  useEffect(() => {
+    if (!pinned) return;
+    const onDown = (e: Event) => {
+      const t = e.target as Node | null;
+      if (gRef.current && t && !gRef.current.contains(t)) setPinned(false);
+    };
+    document.addEventListener("pointerdown", onDown);
+    return () => document.removeEventListener("pointerdown", onDown);
+  }, [pinned]);
+
+  const x = marker.x ?? plot.right;
+  const y = marker.y ?? 0;
+  const fill = marker.fill ?? "var(--color-muted)";
+  const isLive = marker.state === "live";
+  const pulsing = isLive && marker.pulse && !reducedMotion;
+  const text = marker.popup ?? "";
+
+  // Popup bubble geometry — clamped inside the plot so it never clips off-plot at the right-edge
+  // "now" position (opens up + left there). The pointer still aims at the dot. (FR-007 placement.)
+  const tipW = Math.round(text.length * 6) + 20;
+  const tipH = 21;
+  const rectLeft = Math.min(Math.max(x - tipW / 2, plot.left), Math.max(plot.left, plot.right - tipW));
+  const rectTop = Math.max(2, y - 13 - tipH);
+  const rectBottom = rectTop + tipH;
+  const pointerX = Math.min(Math.max(x, rectLeft + 8), rectLeft + tipW - 8);
+
+  return (
+    <g
+      ref={gRef}
+      data-testid="now-marker"
+      data-state={marker.state}
+      tabIndex={0}
+      role="img"
+      aria-label={marker.ariaLabel}
+      style={{ cursor: "pointer", outline: "none" }}
+      onPointerEnter={() => setHover(true)}
+      onPointerLeave={() => setHover(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+      onClick={() => setPinned((p) => !p)}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          setPinned(false);
+          return;
+        }
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setPinned((p) => !p);
+        }
+      }}
+    >
+      {/* halo: live pulse (motion) → live static halo (reduced-motion) → none when parked */}
+      {isLive &&
+        (pulsing ? (
+          // gentle pulse via inline SMIL (digits stay in attributes, never rendered text —
+          // FR-017); rendered only when motion is allowed (FR-006/SC-006)
+          <circle cx={x} cy={y} r={NOW_R} fill="none" stroke={fill} strokeWidth={2}>
+            <animate attributeName="r" values={`${NOW_R};${HALO_R_MAX}`} dur="2.4s" repeatCount="indefinite" />
+            <animate
+              attributeName="opacity"
+              values="0.5;0;0"
+              keyTimes="0;0.7;1"
+              dur="2.4s"
+              repeatCount="indefinite"
+            />
+          </circle>
+        ) : (
+          <circle
+            data-testid="now-halo-static"
+            cx={x}
+            cy={y}
+            r={STATIC_HALO_R}
+            fill="none"
+            stroke={fill}
+            strokeWidth={2}
+            opacity={0.22}
+          />
+        ))}
+
+      <circle data-testid="now-dot" cx={x} cy={y} r={NOW_R} fill={fill} />
+
+      {/* the popup — copy tracks the live marker state (FR-007). Decorative for AT users (the
+          group's aria-label is the accessible name) → aria-hidden + never receives pointer events.
+          Reduced-motion drops the fade so SC-006 holds. */}
+      <g
+        data-testid="now-tip"
+        data-open={open}
+        aria-hidden
+        opacity={open ? 1 : 0}
+        pointerEvents="none"
+        style={{ transition: reducedMotion ? "none" : "opacity .15s" }}
+      >
+        <rect x={rectLeft} y={rectTop} width={tipW} height={tipH} rx={6} fill="var(--color-ink)" />
+        <path
+          d={`M${pointerX - 6},${rectBottom} L${pointerX},${rectBottom + 8} L${pointerX + 6},${rectBottom} Z`}
+          fill="var(--color-ink)"
+        />
+        <text
+          data-testid="now-tip-text"
+          x={rectLeft + tipW / 2}
+          y={rectTop + 14}
+          textAnchor="middle"
+          fill="var(--color-surface)"
+          fontSize={11}
+        >
+          {text}
+        </text>
+      </g>
+
+      {/* ≥44×44 touch hit-area (T023) — an intended divergence from the mock's r=15. */}
+      <circle data-testid="now-hit" cx={x} cy={y} r={HIT_R} fill="transparent" pointerEvents="all" />
+    </g>
+  );
+}
 
 export interface SessionTrendProps {
   sessionId: string;
@@ -115,7 +265,6 @@ export function SessionTrend({
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const view = buildSessionTrend(points, { width, nowMs: now(), showOutOfFrameFoggy });
   const marker = view.nowMarker;
-  const pulsing = marker.state === "live" && marker.pulse && !reducedMotion;
 
   return (
     <section
@@ -243,42 +392,10 @@ export function SessionTrend({
                   <circle key={`dot-${idx}`} data-testid="trend-dot" cx={d.x} cy={d.y} r={DOT_R} fill={d.color} />
                 ))}
 
-                {/* the live "now" marker (popup / keyboard / ≥44px hit-area land in US3) */}
+                {/* the live "now" marker — popup (hover/focus/tap), parked muted/static state,
+                    keyboard + reduced-motion a11y, and the ≥44px hit-area (US3, in NowMarker) */}
                 {marker.state !== "none" && (
-                  <g data-testid="now-marker">
-                    {marker.state === "live" &&
-                      (pulsing ? (
-                        // gentle pulse via inline SMIL (digits stay in attributes, never in
-                        // rendered text — FR-017); only rendered when motion is allowed (FR-006)
-                        <circle cx={marker.x} cy={marker.y} r={NOW_R} fill="none" stroke={marker.fill} strokeWidth={2}>
-                          <animate
-                            attributeName="r"
-                            values={`${NOW_R};${HALO_R_MAX}`}
-                            dur="2.4s"
-                            repeatCount="indefinite"
-                          />
-                          <animate
-                            attributeName="opacity"
-                            values="0.5;0;0"
-                            keyTimes="0;0.7;1"
-                            dur="2.4s"
-                            repeatCount="indefinite"
-                          />
-                        </circle>
-                      ) : (
-                        <circle
-                          data-testid="now-halo-static"
-                          cx={marker.x}
-                          cy={marker.y}
-                          r={STATIC_HALO_R}
-                          fill="none"
-                          stroke={marker.fill}
-                          strokeWidth={2}
-                          opacity={0.22}
-                        />
-                      ))}
-                    <circle data-testid="now-dot" cx={marker.x} cy={marker.y} r={NOW_R} fill={marker.fill} />
-                  </g>
+                  <NowMarker marker={marker} reducedMotion={reducedMotion} plot={view.plot} />
                 )}
               </svg>
             )}
