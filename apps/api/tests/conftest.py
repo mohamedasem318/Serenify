@@ -20,6 +20,9 @@ os.environ.setdefault("SUPABASE_URL", "http://127.0.0.1:54321")
 # secret, not the service-role key). Seed a placeholder so settings validate; the
 # Phase-3 tests never touch the network.
 os.environ.setdefault("SUPABASE_ANON_KEY", "test-anon-publishable-key")
+# Startup extractor pre-warm is covered by a targeted test; keep the shared
+# TestClient fixture fast and free of native MediaPipe startup.
+os.environ.setdefault("EXTRACTOR_PREWARM_ENABLED", "false")
 
 import cv2  # noqa: E402
 import jwt  # noqa: E402
