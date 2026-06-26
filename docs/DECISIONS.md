@@ -4499,3 +4499,50 @@ revisit when US3 resumes (BACKLOG #110 forward-note).
 **Revisit if**: a multi-worker deploy is chosen (the gate is process-local, like `_SessionBuffers`
 #79 — needs session affinity or a shared coordinator); or warm-up latency (#112) is tuned in a way
 that needs the gate to allow a bounded burst for the first M windows.
+
+---
+
+## 2026-06-26 — Tier-2 warm-up scoring concurrency: tried and ABANDONED (no-go)
+
+**Status**: Rejected (negative result — recorded so it is not re-attempted). Built and measured on
+the throwaway branch `try-tier2-warmup-concurrency` (PR #114, **closed unmerged**, branch deleted;
+head commit `667fa8d` retained via the closed PR). `main` is byte-for-byte unchanged. This is the
+experiment the preceding (2026-06-26 gate) entry's *"Revisit if … warm-up latency (#112) … bounded
+burst for the first M windows"* forward-note anticipated — and the answer is **no**.
+
+**Hypothesis**: time-to-first-band is the bulk of the warm-up, so let the first **M=4** cold-start
+windows score **concurrently** (a per-session `asyncio.Semaphore(M)` that never sheds), then hard-clamp
+back to the #113 single-flight + drop-stale once the band latches, to pull the first reading earlier.
+
+**Why it was abandoned — three findings**:
+1. **Capture-floor bound (hardware-independent).** The 4th *scoreable* window cannot be **captured**
+   before ~90 s (10 s stride × 4 windows, each needing ≥ 60 s of recording). Concurrency speeds up
+   *processing*, not *capture*, so there is nothing for it to compress — the band lands at ~90 s + one
+   window's processing no matter what. Shortening the stride is a **different lever** (not pursued here).
+2. **Under contention it was SLOWER.** Offline replay of the real cold-start fixtures (harness in PR
+   #114 / `667fa8d`): 4-way concurrent extraction inflated per-window processing **~3.1×**
+   (~7.3 s → ~22.7 s) — MediaPipe/LBP decodes are CPU-bound and 4 saturate the cores. The band is
+   delivered only after the band-carrying window finishes, so inflating that window pushed first-band
+   *later*. A **live 3-session diagnostic** confirmed it: first-band **delivered** at 1:46 / 1:47 / 2:06
+   vs a serial floor of ~1:42 — concurrency *added* 4–24 s, worst on the cold first run.
+3. **It introduced a reachable display regression the serial path cannot produce.** With concurrency the
+   first M windows complete **out of capture order**, so a later-captured window can finish while the
+   buffer briefly holds < M scored → it returns `warming_up` **after** a band was already delivered. The
+   reducer's `warming_up` branch unconditionally sets `op:"warming-up"`, regressing the live band to
+   "Getting a read on things" (the #80/#81 fingerprint) and rendering an early-looking band + a warming
+   gap in the `captured_at`-ordered trend. Serial completion is *in* capture order (buffer fills
+   1→2→3→4 monotonically), so this is structurally impossible. Observed in the heavy-contention cold-start
+   session (a ~0.1 s near-miss live; present in the persisted trend).
+
+**Confirmed good (kept as knowledge, not as code)**: steady-state stayed **bounded** — the #113 lag fix
+held; per-window processing recovered to ~13 s once the clamp engaged, with **no return** of the growing
+40→110 s lag. The correctness mechanisms were sound and fully tested (capture-ordered, lock-guarded
+`_SessionBuffers`; warm-up semaphore gate that re-arms on Resume).
+
+**No CHANGELOG entry** — nothing shipped.
+
+**Revisit only if**: a target deploy is materially **slower per-window than the dev laptop** (so
+per-window processing exceeds the 10 s stride → a real serial pileup to compress) or upload bandwidth of
+the multi-MB growing clips dominates — re-measure on that hardware first with the PR #114 harness; **or**
+the capture stride itself is shortened (a different lever that moves the capture floor). On current
+hardware neither holds.
