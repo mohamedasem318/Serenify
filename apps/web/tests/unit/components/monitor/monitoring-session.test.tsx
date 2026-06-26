@@ -707,3 +707,46 @@ describe("MonitoringSession — upload back-pressure (coalescing)", () => {
     expect(clipsSent[1]!.size).toBeGreaterThan(clipsSent[0]!.size);
   });
 });
+
+/**
+ * Change 3 — camera-down mislabel fix. Every non-no_anchor create failure (network / 5xx /
+ * 401 / null-token) used to be flattened into the CAMERA_BLOCKED surface, telling users to
+ * "turn your camera back on in browser settings" when the BACKEND was down. Now each failure
+ * routes to its honest surface; the genuine getUserMedia denial (Path A) stays camera-blocked.
+ */
+describe("MonitoringSession — create-failure surfaces (camera-down mislabel)", () => {
+  it("backend unreachable (network) → service-unavailable surface, NOT camera-blocked, camera never opened", async () => {
+    const { deps } = makeDeps([]);
+    deps.createSession = vi.fn(async () => ({ ok: false, kind: "network" }) as const);
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/can.t reach serenify right now/i)).toBeInTheDocument();
+    expect(screen.queryByText(/camera access is blocked/i)).toBeNull(); // the mislabel is gone
+    // acquire-late: a create failure must never have prompted the camera (it's not the camera).
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it("a 5xx (unknown) create failure → service-unavailable surface", async () => {
+    const { deps } = makeDeps([]);
+    deps.createSession = vi.fn(async () => ({ ok: false, kind: "unknown" }) as const);
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/can.t reach serenify right now/i)).toBeInTheDocument();
+  });
+
+  it("a 401 (unauthorized) create failure → the honest signed-out surface, not camera-blocked", async () => {
+    const { deps } = makeDeps([]);
+    deps.createSession = vi.fn(async () => ({ ok: false, kind: "unauthorized" }) as const);
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(await screen.findByText(/your sign-in expired/i)).toBeInTheDocument();
+    expect(screen.queryByText(/camera access is blocked/i)).toBeNull();
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+  });
+});

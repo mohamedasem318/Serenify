@@ -27,6 +27,14 @@ describe("monitorReducer — state transitions (US1 op-states)", () => {
     expect(monitorReducer(initialMonitorState, { type: "NO_ANCHOR" }).op).toBe("calibrate-first");
   });
 
+  it("SERVICE_UNAVAILABLE → service-unavailable (a backend-down state, distinct from blocked)", () => {
+    // The backend being unreachable on create is its OWN state — NOT the camera-blocked
+    // surface (which carries the wrong "turn your camera back on" instruction).
+    const s = monitorReducer(initialMonitorState, { type: "SERVICE_UNAVAILABLE" });
+    expect(s.op).toBe("service-unavailable");
+    expect(s.cameraError).toBeNull(); // not a camera-access failure
+  });
+
   it("CAMERA_ERROR carries the mapped camera-access kind onto the blocked surface", () => {
     // The mapped getUserMedia rejection (busy / no-device / blocked) drives honest copy —
     // no generic "blocked" catch-all (FR-022).

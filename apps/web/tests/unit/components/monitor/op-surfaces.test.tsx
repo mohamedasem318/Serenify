@@ -106,6 +106,31 @@ describe("OpSurfaces — blocked (foggy attention)", () => {
   });
 });
 
+describe("OpSurfaces — service-unavailable (backend down, NOT the camera)", () => {
+  it("points at the connection/service, never the camera, and retries", () => {
+    const onRetry = vi.fn();
+    const { container } = render(
+      <OpSurfaces
+        state={{ op: "service-unavailable", band: null, skipCause: null }}
+        onAllow={noop}
+        onRetryBlocked={onRetry}
+      />,
+    );
+    // Honest copy: the SERVICE is unreachable…
+    expect(screen.getByText(/can.t reach serenify right now/i)).toBeInTheDocument();
+    expect(screen.getByText(/reach the check-in service/i)).toBeInTheDocument();
+    // …and crucially NOT the misleading camera-blocked copy.
+    expect(screen.queryByText(/camera access is blocked/i)).toBeNull();
+    expect(screen.queryByText(/browser.s site settings/i)).toBeNull();
+    // FOGGY attention, never amber (a connectivity blip is not a stress signal).
+    expect(container.querySelector(".text-amber, .bg-amber, .border-amber")).toBeNull();
+    // Retry re-attempts the create (same handler the blocked surface uses).
+    fireEvent.click(screen.getByRole("button", { name: /try again/i }));
+    expect(onRetry).toHaveBeenCalled();
+    expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
+  });
+});
+
 describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => {
   it("keeps the band and names a likely cause + fix via CauseChip", () => {
     const { container } = render0({ op: "active", band: "at_ease", skipCause: "low-light" });

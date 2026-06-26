@@ -1,6 +1,6 @@
 "use client";
 
-import { Camera, CameraOff, CircleDashed, Focus, LogIn } from "lucide-react";
+import { Camera, CameraOff, CircleDashed, CloudOff, Focus, LogIn } from "lucide-react";
 
 import { CauseChip } from "@/components/anchor/cause-chip";
 import { Button } from "@/components/ui/button";
@@ -180,6 +180,35 @@ function SignedOutPanel() {
   );
 }
 
+/**
+ * The backend couldn't be reached to start the session (the create call's fetch threw, or it
+ * returned a 5xx). This is the SERVICE being down — NOT the camera — so it gets its own honest
+ * surface instead of the misleading "Camera access is blocked · turn it back on in your
+ * browser settings" copy (which sent users to fix a camera that was never the problem). FOGGY
+ * attention (a connectivity blip is not a stress signal, never amber), with a "Try again"
+ * retry that re-attempts the create (the camera is never opened until a session is confirmed).
+ * Mirrors BlockedPanel's shape; the icon + copy point at the connection, not the webcam.
+ */
+function ServiceUnavailablePanel({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
+      <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
+        <CloudOff className="size-7" strokeWidth={1.75} aria-hidden />
+      </span>
+      <h2 className="font-display text-2xl text-ink">Can&apos;t reach Serenify right now</h2>
+      <p className="text-pretty text-base leading-relaxed text-muted">
+        We couldn&apos;t reach the check-in service to start your session. It&apos;s usually a
+        brief blip — try again in a moment.
+      </p>
+      <div className="mt-5">
+        <Button onClick={onRetry} variant="outline" className="h-12 px-6 text-base">
+          Try again
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /** A skipped read: the bloom holds the last band; a calm FOGGY note names a likely
  *  cause + gentle fix via the shared CauseChip. Never amber (it's attention, not stress). */
 function SkipNote({ cause }: { cause: React.ComponentProps<typeof CauseChip>["cause"] }) {
@@ -352,6 +381,8 @@ export function OpSurfaces({
       return <BlockedPanel kind={state.cameraError ?? "blocked"} onRetry={onRetryBlocked} />;
     case "signed-out":
       return <SignedOutPanel />;
+    case "service-unavailable":
+      return <ServiceUnavailablePanel onRetry={onRetryBlocked} />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
     case "out-of-frame":

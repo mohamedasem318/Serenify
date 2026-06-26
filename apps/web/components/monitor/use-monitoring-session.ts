@@ -45,6 +45,7 @@ export type MonitorOp =
   | "ended" // session ended (manual End / auto-end) — orchestrator navigates to the dashboard (US2)
   | "blocked" // camera blocked / busy / no device
   | "signed-out" // the sign-in expired and couldn't be refreshed → scoring stops, re-auth needed
+  | "service-unavailable" // couldn't reach the backend to start (network / 5xx) — the SERVICE is down, NOT the camera
   | "calibrate-first"; // no_anchor → the calibrate-first panel routes to /app/calibrate (op-surfaces)
 
 /** The live capture ops (recorder running, a band may show). */
@@ -82,7 +83,8 @@ export type MonitorAction =
   | { type: "CAMERA_BLOCKED" } // generic block (secure-context / session-create failure)
   | { type: "CAMERA_ERROR"; kind: CameraErrorKind } // mapped getUserMedia rejection (err.name)
   | { type: "NO_ANCHOR" }
-  | { type: "SESSION_EXPIRED" } // upload couldn't carry a valid token (401 / un-refreshable) — never silent
+  | { type: "SESSION_EXPIRED" } // upload/create couldn't carry a valid token (401 / un-refreshable) — never silent
+  | { type: "SERVICE_UNAVAILABLE" } // create couldn't reach the backend (network / 5xx) — the service is down, not the camera
   | { type: "WINDOW_OUTCOME"; outcome: WindowOutcome }
   | { type: "WINDOW_SKIPPED"; cause: FailureCause }
   // US2 (T038) — presence + lifecycle
@@ -110,6 +112,11 @@ export function monitorReducer(state: MonitorState, action: MonitorAction): Moni
       // surface (the standing release effect then frees the camera) — never a silent frozen
       // band. The orchestrator guards on a live op before dispatching, mirroring NO_ANCHOR.
       return { ...state, op: "signed-out", cameraError: null, skipCause: null };
+    case "SERVICE_UNAVAILABLE":
+      // The create call couldn't reach the backend (the fetch threw → network, or a 5xx).
+      // The camera is fine — the SERVICE is down — so this must NOT route to the blocked
+      // "turn the camera back on" surface. Distinct, honest surface with a "Try again" retry.
+      return { ...state, op: "service-unavailable", cameraError: null, skipCause: null };
     case "WINDOW_SKIPPED":
       // A skipped window keeps the last band (bloom holds) and shows the foggy skip
       // note; op is unchanged (still warming-up, or still active). Ignored once the

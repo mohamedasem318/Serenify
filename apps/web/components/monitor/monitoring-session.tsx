@@ -481,13 +481,32 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       try {
         const session = await deps.getSession();
         if (!session) {
-          dispatch({ type: "CAMERA_BLOCKED" });
+          // No browser session (signed out / un-refreshable) — an AUTH state, not a camera
+          // block. Route to the honest "sign in again" surface, never "turn your camera back
+          // on" (which the create path used to do for every non-no_anchor failure).
+          dispatch({ type: "SESSION_EXPIRED" });
           return;
         }
         tokenRef.current = session.accessToken;
         const created = await deps.createSession(session.accessToken);
         if (!created.ok) {
-          dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
+          // Route each create failure to its HONEST surface — never flatten a backend/auth
+          // failure into "Camera access is blocked · turn it back on in browser settings"
+          // (the mislabel bug): no_anchor → calibrate-first (unchanged); a 401 → the signed-out
+          // re-auth surface; everything else (the fetch threw → network, a 5xx → unknown, or a
+          // stray 403) → the new service-unavailable surface (the backend is down, not the
+          // camera). The genuine getUserMedia denial (Path A) is handled separately and stays
+          // on the camera-blocked surface.
+          switch (created.kind) {
+            case "no_anchor":
+              dispatch({ type: "NO_ANCHOR" });
+              break;
+            case "unauthorized":
+              dispatch({ type: "SESSION_EXPIRED" });
+              break;
+            default:
+              dispatch({ type: "SERVICE_UNAVAILABLE" });
+          }
           return;
         }
         sessionIdRef.current = created.sessionId;
