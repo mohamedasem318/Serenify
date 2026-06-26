@@ -23,7 +23,11 @@ export type ServerSkipCause = "insufficient-face" | "our-side";
 export type WindowOutcome =
   | { outcome: "reading"; band: Band; capturedAt: string }
   | { outcome: "warming_up"; capturedAt: string }
-  | { outcome: "skipped"; cause: ServerSkipCause };
+  | { outcome: "skipped"; cause: ServerSkipCause }
+  // The per-session scoring gate shed this window because a newer one for the same session
+  // arrived first (drop-stale; server-side back-pressure). Routine, never an error — the
+  // caller treats it as a no-op (no band change, no skip note). See the API's SupersededOutcome.
+  | { outcome: "superseded" };
 
 export type CreateSessionResult =
   | { ok: true; sessionId: string; modelVersion: string }
@@ -118,6 +122,11 @@ export async function submitWindow(
     }
     if (body.outcome === "skipped") {
       return { ok: true, outcome: { outcome: "skipped", cause: body.cause } };
+    }
+    // Drop-stale shed (server scoring gate): a no-op the caller tolerates. Disambiguated
+    // explicitly so it is NEVER mis-read as `warming_up` (which would regress an active band).
+    if (body.outcome === "superseded") {
+      return { ok: true, outcome: { outcome: "superseded" } };
     }
     return { ok: true, outcome: { outcome: "warming_up", capturedAt: body.captured_at } };
   }

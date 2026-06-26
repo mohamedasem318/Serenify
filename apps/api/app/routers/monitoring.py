@@ -47,6 +47,7 @@ from ..schemas import (
     EndSessionResponse,
     PatchSessionRequest,
     PatchSessionResponse,
+    SupersededOutcome,
 )
 from ..services.inference import (
     WINDOW_MEDIA_SUFFIX,
@@ -54,6 +55,7 @@ from ..services.inference import (
     buffers,
     score_window,
 )
+from ..services.scoring_gate import scoring_gate
 from ..supabase_user import (
     finalize_active_session,
     get_my_anchor,
@@ -133,22 +135,38 @@ async def submit_window(
     if session["status"] == "ended":
         return JSONResponse(status_code=409, content={"error": "ended_session"})
 
-    clip_bytes = await clip.read()
-    # CPU-bound decode + MediaPipe + LBP + (blocking) supabase I/O — off the event loop so a
-    # slow window never serializes the next (FR-016, SC-007). The client keeps its single
-    # continuous recorder running and uploads on its own timer regardless of this response.
+    # Bound live scoring to ONE window per session + shed the backlog (drop-stale): the
+    # browser fires a new 60 s window every ~10 s regardless of whether the last one finished,
+    # which (with the anyio default CapacityLimiter of 40) used to run ~10 windows at once on
+    # one session and oversubscribe the CPU, so each window ballooned to 40-110 s and the live
+    # lag GREW. The gate serializes scoring per session and, when a window finally gets its
+    # turn, sheds it as ``superseded`` if a NEWER window for the same session has since arrived
+    # — so only the freshest window is ever scored. The freshest window always wins the
+    # freshness check, so warm-up still reaches its 4 scored windows on schedule (the band is
+    # never starved); only the backlog is dropped. See ``services.scoring_gate`` + the client
+    # back-pressure in ``monitoring-session.tsx`` (this gate is the server-side backstop).
     try:
-        outcome = await run_in_threadpool(
-            score_window,
-            clip_bytes=clip_bytes,
-            content_type=base_type,
-            client=client,
-            predictor=request.app.state.predictor,
-            operating_point=request.app.state.operating_point,
-            tense_band=request.app.state.tense_band,
-            session_id=session_id,
-            user_id=user_id,
-        )
+        async with scoring_gate.window(session_id) as is_freshest:
+            if not is_freshest:
+                # Superseded by a newer window for this session — shed cleanly: no scoring, no
+                # ``window_readings`` row. The client tolerates this as a no-op (never an error
+                # surface, never a band regression).
+                return SupersededOutcome()
+            clip_bytes = await clip.read()
+            # CPU-bound decode + MediaPipe + LBP + (blocking) supabase I/O — off the event loop
+            # so a slow window never serializes the next (FR-016, SC-007). The gate holds the
+            # per-session lock across this call so at most one window per session ever scores.
+            outcome = await run_in_threadpool(
+                score_window,
+                clip_bytes=clip_bytes,
+                content_type=base_type,
+                client=client,
+                predictor=request.app.state.predictor,
+                operating_point=request.app.state.operating_point,
+                tense_band=request.app.state.tense_band,
+                session_id=session_id,
+                user_id=user_id,
+            )
     except MissingAnchorError:
         # Defensive mid-session guard (US3 / T042): the caller's anchor vanished AFTER the
         # create-time check (T021) — score_window raises rather than fabricating a
@@ -233,8 +251,9 @@ async def end_session(
     if updated is None:  # defensive: RLS update-own denied after a select-own pass
         return JSONResponse(status_code=404, content={"error": "unknown_session"})
 
-    # Free the session's smoothing buffer now it can never score again (no memory leak on
-    # ended sessions; the deferred LRU cap is the backstop, this is the explicit drop the
-    # _SessionBuffers contract promised on End).
+    # Free the session's smoothing buffer AND its scoring-gate state now it can never score
+    # again (no memory leak on ended sessions; the deferred LRU caps are the backstop, these
+    # are the explicit drops the _SessionBuffers / SessionScoringGate contracts promise on End).
     buffers.drop(session_id)
+    scoring_gate.drop(session_id)
     return EndSessionResponse(session_id=session_id, ended_at=ended_at)

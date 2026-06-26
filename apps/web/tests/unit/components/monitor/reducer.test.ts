@@ -27,6 +27,14 @@ describe("monitorReducer — state transitions (US1 op-states)", () => {
     expect(monitorReducer(initialMonitorState, { type: "NO_ANCHOR" }).op).toBe("calibrate-first");
   });
 
+  it("SERVICE_UNAVAILABLE → service-unavailable (a backend-down state, distinct from blocked)", () => {
+    // The backend being unreachable on create is its OWN state — NOT the camera-blocked
+    // surface (which carries the wrong "turn your camera back on" instruction).
+    const s = monitorReducer(initialMonitorState, { type: "SERVICE_UNAVAILABLE" });
+    expect(s.op).toBe("service-unavailable");
+    expect(s.cameraError).toBeNull(); // not a camera-access failure
+  });
+
   it("CAMERA_ERROR carries the mapped camera-access kind onto the blocked surface", () => {
     // The mapped getUserMedia rejection (busy / no-device / blocked) drives honest copy —
     // no generic "blocked" catch-all (FR-022).
@@ -75,6 +83,17 @@ describe("monitorReducer — state transitions (US1 op-states)", () => {
     });
     expect(next.band).toBe("tense");
     expect(next.skipCause).toBeNull();
+  });
+
+  it("a superseded outcome is a no-op — the active band holds, never regresses to warming-up", () => {
+    // The server scoring gate sheds a stale window (drop-stale back-pressure). The client must
+    // treat it as a pure no-op: the held band stays put and the op never falls back to warming.
+    const active: MonitorState = { op: "active", band: "a_little_tense", skipCause: null };
+    const after = monitorReducer(active, {
+      type: "WINDOW_OUTCOME",
+      outcome: { outcome: "superseded" },
+    });
+    expect(after).toEqual(active); // unchanged — band held, still active (not warming-up)
   });
 });
 

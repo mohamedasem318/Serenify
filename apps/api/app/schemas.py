@@ -93,7 +93,18 @@ class SkippedOutcome(BaseModel):
     cause: SkipCause
 
 
+class SupersededOutcome(BaseModel):
+    """This window was shed by the per-session scoring gate: a newer window for the same
+    session arrived before this one could be scored (drop-stale; see ``services.scoring_gate``).
+    Routine back-pressure, never an error — no probability, no reading, and **no
+    ``window_readings`` row is persisted** (so the trend has fewer points, by design). The
+    client treats it as a no-op (the held band stays; the freshest window carries the next
+    reading)."""
+
+    outcome: Literal["superseded"] = "superseded"
+
+
 WindowOutcome = Annotated[
-    ReadingOutcome | WarmingUpOutcome | SkippedOutcome,
+    ReadingOutcome | WarmingUpOutcome | SkippedOutcome | SupersededOutcome,
     Field(discriminator="outcome"),
 ]

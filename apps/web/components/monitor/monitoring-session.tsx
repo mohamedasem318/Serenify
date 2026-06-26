@@ -166,6 +166,12 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // concurrent acquire attempts (double-click / a re-trigger) can't each pass the
   // sessionIdRef reuse check and spawn a second session (the "two POST /sessions" bug).
   const creatingRef = useRef(false);
+  // Back-pressure for the window upload loop (008 BACKLOG #78 note (b)): never two uploads in
+  // flight at once. `uploadInFlightRef` is the synchronous guard; `pendingClipRef` holds the
+  // single most-recent window captured WHILE one is in flight (coalesced — older queued
+  // windows are overwritten), drained when the in-flight upload completes.
+  const uploadInFlightRef = useRef(false);
+  const pendingClipRef = useRef<Blob | null>(null);
   const facePresentRef = useRef(false);
   const guideRef = useRef<"loading" | "active" | "unavailable">("loading");
   const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
@@ -246,65 +252,109 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     return token;
   }, [deps]);
 
-  // One reading out per (gated) stride. Fire-and-forget: never block the recorder; a
-  // transient transport error just skips this reading and the loop continues (FR-016).
-  const handleWindow = useCallback(
-    (clip: Blob) => {
-      // FR-003: a no-face window is never uploaded — but only gate when the detector is
-      // actually running (unavailable/loading → let the server's coverage gate decide).
-      if (guideRef.current === "active" && !facePresentRef.current) return;
+  // Upload ONE window and fold its outcome into the state machine. Reads `sessionIdRef` live
+  // (so the drain loop below stays correct across strides). A transient transport error just
+  // skips this reading and the loop continues (FR-016); auth loss / a vanished anchor surface
+  // honestly.
+  const uploadWindow = useCallback(
+    async (clip: Blob) => {
       const sessionId = sessionIdRef.current;
       if (!sessionId) return;
       // Only act on an auth failure while a session is live — mirrors the WINDOW_OUTCOME
       // late-window discipline so a window that lands after pause/end can't reopen a surface
       // over a paused/ended session.
       const liveNow = () => opRef.current === "warming-up" || opRef.current === "active";
-      void (async () => {
-        // Approach A — a FRESH token per upload from the Supabase browser client. The SDK
-        // auto-refreshes a near/expired token, so every window carries a valid token instead
-        // of the once-captured one that went stale after ~1 h (the silent-401 smoke break).
-        // Still the USER's own token (RLS-as-the-user; no service credential) — just current.
-        const session = await deps.getSession();
-        const token = session?.accessToken ?? null;
-        if (!token) {
-          // The browser session couldn't be refreshed (signed out / refresh failed). Don't
-          // upload a stale token and don't skip silently — surface the honest re-auth state.
+      // Approach A — a FRESH token per upload from the Supabase browser client. The SDK
+      // auto-refreshes a near/expired token, so every window carries a valid token instead
+      // of the once-captured one that went stale after ~1 h (the silent-401 smoke break).
+      // Still the USER's own token (RLS-as-the-user; no service credential) — just current.
+      const session = await deps.getSession();
+      const token = session?.accessToken ?? null;
+      if (!token) {
+        // The browser session couldn't be refreshed (signed out / refresh failed). Don't
+        // upload a stale token and don't skip silently — surface the honest re-auth state.
+        if (liveNow()) dispatch({ type: "SESSION_EXPIRED" });
+        return;
+      }
+      tokenRef.current = token; // keep the cached token current for the lifecycle calls too
+      const res = await deps.submitWindow(sessionId, clip, token);
+      if (!res.ok) {
+        // A 401 even with a freshly-minted token is a genuine auth loss — NEVER silent (the
+        // frozen-band break): stop on the honest re-auth surface (the standing release
+        // effect then frees the camera as the op leaves the live set).
+        if (res.kind === "unauthorized") {
           if (liveNow()) dispatch({ type: "SESSION_EXPIRED" });
           return;
         }
-        tokenRef.current = token; // keep the cached token current for the lifecycle calls too
-        const res = await deps.submitWindow(sessionId, clip, token);
-        if (!res.ok) {
-          // A 401 even with a freshly-minted token is a genuine auth loss — NEVER silent (the
-          // frozen-band break): stop on the honest re-auth surface (the standing release
-          // effect then frees the camera as the op leaves the live set).
-          if (res.kind === "unauthorized") {
-            if (liveNow()) dispatch({ type: "SESSION_EXPIRED" });
-            return;
-          }
-          // Defensive mid-session no_anchor (US3 / T042): the user's anchor vanished after the
-          // create-time guard → route to the SAME calibrate-first surface the create path uses
-          // (reuse NO_ANCHOR). Guarded on a live op (FR-016). Other error kinds drop silently.
-          if (res.kind === "no_anchor" && liveNow()) {
-            dispatch({ type: "NO_ANCHOR" });
-          }
-          return;
+        // Defensive mid-session no_anchor (US3 / T042): the user's anchor vanished after the
+        // create-time guard → route to the SAME calibrate-first surface the create path uses
+        // (reuse NO_ANCHOR). Guarded on a live op (FR-016). Other error kinds drop silently.
+        if (res.kind === "no_anchor" && liveNow()) {
+          dispatch({ type: "NO_ANCHOR" });
         }
-        const outcome = res.outcome;
-        if (outcome.outcome === "skipped") {
-          // The client refines the coarse server cause from on-device telemetry, exactly
-          // as calibration does (low-light vs out-of-frame); "our-side" owns our failures.
-          const cause: FailureCause =
-            outcome.cause === "insufficient-face"
-              ? dominantCause(telemetryRef.current)
-              : "our-side";
-          dispatch({ type: "WINDOW_SKIPPED", cause });
-        } else {
-          dispatch({ type: "WINDOW_OUTCOME", outcome });
-        }
-      })().catch(() => {});
+        return;
+      }
+      const outcome = res.outcome;
+      if (outcome.outcome === "skipped") {
+        // The client refines the coarse server cause from on-device telemetry, exactly
+        // as calibration does (low-light vs out-of-frame); "our-side" owns our failures.
+        const cause: FailureCause =
+          outcome.cause === "insufficient-face"
+            ? dominantCause(telemetryRef.current)
+            : "our-side";
+        dispatch({ type: "WINDOW_SKIPPED", cause });
+      } else {
+        // reading / warming_up / superseded — the reducer folds each (superseded is a no-op).
+        dispatch({ type: "WINDOW_OUTCOME", outcome });
+      }
     },
     [deps, dispatch],
+  );
+
+  // Back-pressure drain (008 BACKLOG #78 note (b)): upload the given window, then any window
+  // that arrived WHILE it was in flight — coalesced to the LATEST only — one at a time, so
+  // there is never more than one upload in flight. Each window is the contiguous
+  // recording-so-far (a superset of the previous), so sending only the newest never loses
+  // signal — it just stops wasting ~6x the upload bytes re-sending stale, soon-superseded
+  // windows (matters on a cloud deploy). This is the bandwidth half; the server scoring
+  // gate's drop-stale is the matching backstop for misbehaviour / a second tab.
+  const pumpUploads = useCallback(
+    async (first: Blob) => {
+      uploadInFlightRef.current = true;
+      try {
+        let clip: Blob | null = first;
+        while (clip) {
+          pendingClipRef.current = null;
+          await uploadWindow(clip);
+          // The most-recent window captured during the upload (older queued ones were
+          // overwritten by handleWindow). Cleared on teardown so a paused/ended session never
+          // drains a stale window.
+          clip = pendingClipRef.current;
+        }
+      } finally {
+        uploadInFlightRef.current = false;
+      }
+    },
+    [uploadWindow],
+  );
+
+  // One reading out per (gated) stride. Fire-and-forget: never block the recorder. With the
+  // back-pressure above, a stride that fires while an upload is still in flight does NOT start
+  // a second upload — it replaces the pending window with this newer one (coalesce), so the
+  // next drain always sends the freshest, never a stale queued backlog.
+  const handleWindow = useCallback(
+    (clip: Blob) => {
+      // FR-003: a no-face window is never uploaded — but only gate when the detector is
+      // actually running (unavailable/loading → let the server's coverage gate decide).
+      if (guideRef.current === "active" && !facePresentRef.current) return;
+      if (!sessionIdRef.current) return;
+      if (uploadInFlightRef.current) {
+        pendingClipRef.current = clip; // coalesce: keep only the latest while one is in flight
+        return;
+      }
+      void pumpUploads(clip).catch(() => {});
+    },
+    [pumpUploads],
   );
 
   // End the session (manual End or the 5-min auto-end) and leave to the dashboard. The
@@ -431,13 +481,32 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       try {
         const session = await deps.getSession();
         if (!session) {
-          dispatch({ type: "CAMERA_BLOCKED" });
+          // No browser session (signed out / un-refreshable) — an AUTH state, not a camera
+          // block. Route to the honest "sign in again" surface, never "turn your camera back
+          // on" (which the create path used to do for every non-no_anchor failure).
+          dispatch({ type: "SESSION_EXPIRED" });
           return;
         }
         tokenRef.current = session.accessToken;
         const created = await deps.createSession(session.accessToken);
         if (!created.ok) {
-          dispatch(created.kind === "no_anchor" ? { type: "NO_ANCHOR" } : { type: "CAMERA_BLOCKED" });
+          // Route each create failure to its HONEST surface — never flatten a backend/auth
+          // failure into "Camera access is blocked · turn it back on in browser settings"
+          // (the mislabel bug): no_anchor → calibrate-first (unchanged); a 401 → the signed-out
+          // re-auth surface; everything else (the fetch threw → network, a 5xx → unknown, or a
+          // stray 403) → the new service-unavailable surface (the backend is down, not the
+          // camera). The genuine getUserMedia denial (Path A) is handled separately and stays
+          // on the camera-blocked surface.
+          switch (created.kind) {
+            case "no_anchor":
+              dispatch({ type: "NO_ANCHOR" });
+              break;
+            case "unauthorized":
+              dispatch({ type: "SESSION_EXPIRED" });
+              break;
+            default:
+              dispatch({ type: "SERVICE_UNAVAILABLE" });
+          }
           return;
         }
         sessionIdRef.current = created.sessionId;
@@ -558,6 +627,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     presenceRef.current = null;
     recorderRef.current?.stop();
     recorderRef.current = null;
+    // Drop any window coalesced while an upload was in flight: once the op leaves the live set
+    // (paused / ended / blocked / signed-out) the drain loop must not send a now-stale window.
+    pendingClipRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- a one-time state reset during camera teardown: when the op leaves a capturing state, stopStream() calls setStream(null) once to release the live stream — not the per-render cascade this rule guards against.
     stopStream();
   }, [op, stopStream]);
