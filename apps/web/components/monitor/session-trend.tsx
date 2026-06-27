@@ -18,9 +18,6 @@ import {
   type NowMarker as NowMarkerView,
 } from "@/lib/session-trend-geometry";
 
-// [ST7-DEBUG] Temporary instrumentation — flip to false (or delete block) to remove all logging.
-const __ST7 = true;
-
 /**
  * The monitor-page **this-session** live trend (feature 010 / 009b redesign). Visual source
  * of truth: `serenify-live-session-graph-mock.html` ("match this"). All honesty-critical
@@ -248,26 +245,14 @@ export function SessionTrend({
     };
   }, []);
   const refetch = useCallback(async () => {
-    if (__ST7) console.log("[ST7] refetch start — sessionId:", sessionId);
     try {
       const next = await loadRef.current(sessionId);
-      if (__ST7) console.log("[ST7] refetch result — next.length:", next.length);
       if (mountedRef.current) {
         // getSessionTrend returns [] (not throws) on error; treat a silent empty the same
         // as an exception — keep existing rows so the parked marker isn't wiped mid-session.
-        setPoints((prev) => {
-          const keep = next.length === 0 && prev.length > 0;
-          if (__ST7)
-            console.log(
-              "[ST7] setPoints — prev.length:", prev.length,
-              "next.length:", next.length,
-              "→", keep ? "KEPT prev (guard)" : "REPLACED with next",
-            );
-          return keep ? prev : next;
-        });
+        setPoints((prev) => (next.length === 0 && prev.length > 0 ? prev : next));
       }
-    } catch (err) {
-      if (__ST7) console.log("[ST7] refetch CAUGHT error — keeping prev:", err);
+    } catch {
       /* a transient read failure just leaves the last trend in place */
     }
   }, [sessionId]);
@@ -278,11 +263,9 @@ export function SessionTrend({
   // freshness: a blunt low interval adds steady DB load that bites on the cheap deploy VM — the
   // event-driven refresh below carries the freshness for ~one fetch per real reading instead.
   useEffect(() => {
-    if (__ST7) console.log("[ST7] poll effect — active:", active, "— firing immediate refetch");
     void refetch();
     if (!active) return;
     const id = setInterval(() => {
-      if (__ST7) console.log("[ST7] poll interval tick");
       void refetch();
     }, pollMs);
     return () => clearInterval(id);
@@ -298,8 +281,6 @@ export function SessionTrend({
   const seenSignalRef = useRef(refreshSignal);
   useEffect(() => {
     if (refreshSignal === seenSignalRef.current) return;
-    if (__ST7)
-      console.log("[ST7] signal refetch — refreshSignal:", refreshSignal, "(was:", seenSignalRef.current, ")");
     seenSignalRef.current = refreshSignal;
     void refetch();
   }, [refreshSignal, refetch]);
@@ -325,15 +306,6 @@ export function SessionTrend({
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const view = buildSessionTrend(points, { width, nowMs: now(), showOutOfFrameFoggy });
   const marker = view.nowMarker;
-  if (__ST7)
-    console.log(
-      "[ST7] render — isEmpty:", view.isEmpty,
-      "| pts in:", points.length,
-      "| slots:", view.slots.length,
-      "| marker.state:", marker.state,
-      "| subtitle:", view.subtitle.kind,
-      "| active:", active,
-    );
 
   return (
     <section

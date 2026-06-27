@@ -46,9 +46,6 @@ import {
   type WindowRecorderHandle,
 } from "./window-recorder";
 
-// [ST7-DEBUG] Temporary instrumentation — flip to false (or delete block) to remove all logging.
-const __ST7 = true;
-
 /**
  * Monitoring session orchestrator (feature 008, US1 — T032). Owns the side effects and
  * wires the parts: the continuous recorder (T026), the feature-005 face-detector gate
@@ -320,7 +317,6 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       // `superseded` shed (drop-stale back-pressure) writes NO row, so it never nudges. The
       // marker stays sourced from the persisted row the refetch reads — no optimistic value.
       if (outcome.outcome !== "superseded") {
-        if (__ST7) console.log("[ST7] trendRefresh bump — outcome:", outcome.outcome);
         setTrendRefresh((n) => n + 1);
       }
     },
@@ -447,7 +443,6 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     presenceRef.current = deps.createPresenceMonitor({
       onOutOfFrame: () => {
         if (opRef.current !== "active" && opRef.current !== "warming-up") return;
-        if (__ST7) console.log("[ST7] GO_OUT_OF_FRAME — opRef was:", opRef.current);
         dispatch({ type: "GO_OUT_OF_FRAME" });
         const sid = sessionIdRef.current;
         const tok = tokenRef.current;
@@ -455,7 +450,6 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       },
       onReturn: () => {
         if (opRef.current !== "out-of-frame") return;
-        if (__ST7) console.log("[ST7] RETURN_TO_FRAME — opRef was:", opRef.current);
         dispatch({ type: "RETURN_TO_FRAME" });
         const sid = sessionIdRef.current;
         const tok = tokenRef.current;
@@ -617,16 +611,6 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const sessionLive =
     op === "warming-up" || op === "active" || op === "out-of-frame" || op === "paused";
   const timerRunning = op === "warming-up" || op === "active" || op === "out-of-frame";
-  useEffect(() => {
-    if (__ST7)
-      console.log(
-        "[ST7] op →", op,
-        "| sessionLive:", sessionLive,
-        "| active-for-trend:", op === "warming-up" || op === "active",
-        "| liveSessionId:", liveSessionId,
-      );
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [op]); // intentionally omit derived booleans — op is the authoritative source
   useEffect(() => {
     if (!timerRunning) {
       // Paused / not-live: bank the elapsed run so Resume continues from here, then idle.
