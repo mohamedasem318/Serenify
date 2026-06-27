@@ -326,6 +326,54 @@ describe("SessionTrend — US3 touch hit-area ≥44px (T023 / Principle VI)", ()
   });
 });
 
+// ── T011a: event-driven now-marker freshness (FR-004 freshness clause) ─────────────────
+describe("SessionTrend — event-driven freshness (FR-004): marker refreshes on refreshSignal, not only the poll", () => {
+  const stubWidth = (width = 768) => {
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return { width, height: 210, top: 0, left: 0, right: width, bottom: 210, x: 0, y: 0, toJSON() {} } as DOMRect;
+    };
+  };
+
+  it("updates the now-marker on a new reading WITHOUT waiting for a poll tick", async () => {
+    stubWidth();
+    // The persisted rows the reader returns change between calls; `load` identity stays stable.
+    let dataset: SessionTrendPoint[] = [pt("a", "at_ease", 10), pt("b", "at_ease", 0)]; // live edge at_ease → meadow
+    const load = async () => dataset;
+
+    // active=false → NO poll interval at all, and pollMs is huge as belt-and-braces: any
+    // post-mount update can therefore ONLY come from the refreshSignal (event-driven) path.
+    const { rerender } = render(
+      <SessionTrend sessionId="s1" active={false} pollMs={10_000_000} refreshSignal={0} load={load} now={() => NOW} />,
+    );
+    const dot = await screen.findByTestId("now-dot");
+    await waitFor(() => expect(dot.getAttribute("fill")).toBe("var(--color-meadow)"));
+
+    // A new reading is persisted (the parent bumps refreshSignal alongside the orb/bloom update).
+    dataset = [pt("a", "at_ease", 10), pt("b", "tense", 0)]; // live edge now tense → amber
+    rerender(
+      <SessionTrend sessionId="s1" active={false} pollMs={10_000_000} refreshSignal={1} load={load} now={() => NOW} />,
+    );
+
+    // Marker reflects the NEW reading immediately — no timers advanced, no poll tick fired.
+    await waitFor(() => expect(screen.getByTestId("now-dot").getAttribute("fill")).toBe("var(--color-amber)"));
+  });
+
+  it("does NOT re-fetch on the initial (non-zero) signal value — no spurious mount-time refresh", async () => {
+    stubWidth();
+    let calls = 0;
+    const load = async () => {
+      calls += 1;
+      return [pt("a", "at_ease", 10), pt("b", "tense", 0)];
+    };
+    render(
+      <SessionTrend sessionId="s1" active={false} pollMs={10_000_000} refreshSignal={3} load={load} now={() => NOW} />,
+    );
+    await screen.findByTestId("now-dot");
+    // Exactly one load — the mount poll — never a second from the non-zero initial signal.
+    expect(calls).toBe(1);
+  });
+});
+
 describe("SessionTrend — US3 honest subtitle (FR-024 / SC-013)", () => {
   const TENSION = /tense|settled|tension/i;
 

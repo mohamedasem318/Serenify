@@ -201,8 +201,14 @@ export interface SessionTrendProps {
   active?: boolean;
   /** Injectable reader (defaults to the shared RLS reader). */
   load?: (sessionId: string) => Promise<SessionTrendPoint[]>;
-  /** Poll cadence in ms (default ≈ one stride). */
+  /** Poll cadence in ms (default ≈ one stride) — the steady-state BACKSTOP, not the freshness path. */
   pollMs?: number;
+  /**
+   * FR-004 freshness: a monotonically increasing counter the parent bumps the instant a new
+   * reading is persisted (the same WINDOW_OUTCOME that updates the live bloom/orb). Each change
+   * triggers an immediate re-fetch so the now-marker tracks the orb instead of trailing the poll.
+   */
+  refreshSignal?: number;
   /** FR-015 foggy gate — default OFF at launch (out-of-frame → muted no-clear-read). */
   showOutOfFrameFoggy?: boolean;
   /** Injectable clock for deterministic tests (defaults to Date.now). */
@@ -214,6 +220,7 @@ export function SessionTrend({
   active = true,
   load = getSessionTrend,
   pollMs = 12_000,
+  refreshSignal = 0,
   showOutOfFrameFoggy = false,
   now = Date.now,
 }: SessionTrendProps) {
@@ -225,24 +232,51 @@ export function SessionTrend({
     loadRef.current = load;
   }, [load]);
 
+  // A single shared re-fetch of the persisted rows, used by BOTH the background poll and the
+  // event-driven refresh. setState lives inside this async callback (never the synchronous
+  // effect body), so it doesn't trip react-hooks/set-state-in-effect; a mounted-guard drops a
+  // late resolve after unmount.
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let alive = true;
-    const tick = async () => {
-      try {
-        const next = await loadRef.current(sessionId);
-        if (alive) setPoints(next);
-      } catch {
-        /* a transient read failure just leaves the last trend in place */
-      }
-    };
-    void tick();
-    if (!active) return () => void (alive = false);
-    const id = setInterval(tick, pollMs);
+    mountedRef.current = true;
     return () => {
-      alive = false;
-      clearInterval(id);
+      mountedRef.current = false;
     };
-  }, [sessionId, active, pollMs]);
+  }, []);
+  const refetch = useCallback(async () => {
+    try {
+      const next = await loadRef.current(sessionId);
+      if (mountedRef.current) setPoints(next);
+    } catch {
+      /* a transient read failure just leaves the last trend in place */
+    }
+  }, [sessionId]);
+
+  // Background poll — the steady-state BACKSTOP (default ≈ one stride). It does the first load
+  // on mount and keeps the trend correct across windows that produce no new reading (e.g. a long
+  // no-read stretch) and after a transient read failure. Deliberately NOT lowered to chase
+  // freshness: a blunt low interval adds steady DB load that bites on the cheap deploy VM — the
+  // event-driven refresh below carries the freshness for ~one fetch per real reading instead.
+  useEffect(() => {
+    void refetch();
+    if (!active) return;
+    const id = setInterval(() => void refetch(), pollMs);
+    return () => clearInterval(id);
+  }, [refetch, active, pollMs]);
+
+  // Event-driven refresh (FR-004 freshness): the parent bumps `refreshSignal` the instant a new
+  // reading is persisted (the SAME WINDOW_OUTCOME that updates the live bloom/orb), so the
+  // now-marker tracks the orb instead of trailing by up to one poll interval (the ~2 s lag). The
+  // marker still comes from the PERSISTED row — the row is committed before the window POST
+  // response returns, so a re-fetch on that event always sees it; there is no optimistic
+  // in-memory value and therefore no marker-vs-step-line mismatch. The initial value is skipped
+  // (the poll effect already loads once on mount).
+  const seenSignalRef = useRef(refreshSignal);
+  useEffect(() => {
+    if (refreshSignal === seenSignalRef.current) return;
+    seenSignalRef.current = refreshSignal;
+    void refetch();
+  }, [refreshSignal, refetch]);
 
   // ── T009a: measure the rendered container width ──
   // A callback ref measures the instant the node mounts (handles mount-before-observer and
