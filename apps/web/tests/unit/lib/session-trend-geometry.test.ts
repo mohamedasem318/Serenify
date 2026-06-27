@@ -394,7 +394,7 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
   });
 
   it("a STALE confident live edge (no fresh reading) PARKS muted — NOT live (ST-7)", () => {
-    const v = build(frozen(6, 30), 580); // latest reading 30s old → stale, still in-window
+    const v = build(frozen(6, 65), 580); // latest reading 65s old → past the 60s horizon, all six still in-window
     expect(v.nowMarker.state).toBe("parked");
     expect(v.nowMarker.fill).toBe(NO_READ_COLOR);
     expect(v.nowMarker.pulse).toBe(false);
@@ -404,7 +404,7 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
   });
 
   it("the step-line PERSISTS while the stale readings are still in-window (not a hollow frame)", () => {
-    const v = build(frozen(6, 30), 580);
+    const v = build(frozen(6, 65), 580);
     expect(v.isEmpty).toBe(false);
     expect(v.slots).toHaveLength(6); // all six are < 2 min old → all drawn
     expect(v.steps.length).toBeGreaterThanOrEqual(1); // the line is still there
@@ -432,7 +432,7 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
     const fresh = at(12_000); // 12s after the last reading → still fresh
     expect(fresh.nowMarker.state).toBe("live");
 
-    const stale = at(40_000); // 40s after → stale, but readings still in-window
+    const stale = at(70_000); // 70s after → stale (past the 60s horizon), but readings still in-window
     expect(stale.nowMarker.state).toBe("parked");
     expect(stale.steps.length).toBeGreaterThanOrEqual(1); // line persists through the park
     expect(stale.isEmpty).toBe(false);
@@ -444,7 +444,7 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
 
   it("the subtitle drops the tension summary on a STALE edge (FR-024 / SC-013)", () => {
     // "Settled so far." asserts a calm level we no longer currently have — must go neutral.
-    const v = build(frozen(6, 30), 580);
+    const v = build(frozen(6, 65), 580);
     expect(v.subtitle.kind).toBe("no_read");
     expect(v.subtitle.text).toBe("No clear read right now");
   });
@@ -455,7 +455,7 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
     expect(live.nowMarker.popup).toBe("you are here");
     expect(live.dots).toHaveLength(1);
 
-    const parked = build([pt(45, "a_little_tense")], 580); // 45s old → stale single dot
+    const parked = build([pt(70, "a_little_tense")], 580); // 70s old → stale single dot (past the 60s horizon)
     expect(parked.nowMarker.state).toBe("parked");
     expect(parked.nowMarker.popup).toBe("last clear read");
     expect(parked.nowMarker.fill).toBe(NO_READ_COLOR);

@@ -111,6 +111,34 @@ export const WINDOW_MS = 120_000; // rolling window ≈ 2 min (FR-002a)
  *  monitoring's scoreable-window cadence) — NOT the ~12s client poll/re-fetch cadence. At nDraw
  *  === N_TARGET the edge-to-edge pitch locks at plotWidth/(N_TARGET−1) (FR-002a / SC-012a). */
 export const N_TARGET = 12;
+/** One capture-window stride. Equals the recorder's DEFAULT_STRIDE_MS (10s); kept DERIVED from
+ *  the local geometry constants so this deliberately-pure module never imports the browser-only
+ *  recorder. (WINDOW_MS / N_TARGET = 120_000 / 12 = 10_000 = window-recorder.ts DEFAULT_STRIDE_MS.) */
+export const STRIDE_MS = WINDOW_MS / N_TARGET; // 10_000
+
+/** Client re-fetch cadence for `getSessionTrend` — the steady-state poll BACKSTOP (the
+ *  event-driven `refreshSignal` carries the fast path). `<SessionTrend>` defaults its `pollMs`
+ *  prop to THIS single source of truth, so the freshness horizon below stays in lock-step with
+ *  the poll instead of duplicating a 12_000 magic number across the lib/component boundary. */
+export const POLL_MS = 12_000;
+
+/**
+ * Worst-case HEALTHY per-window processing time, from server upload-arrival (`captured_at`, stamped
+ * at the TOP of `score_window` BEFORE probe → anchor → predict → smooth → insert) to the persisted
+ * `window_readings` row. So a reading is already this old — at most — the instant it lands, before
+ * any client fetch can even see it. Anchored on the DOCUMENTED worst case, COLD window included:
+ * BACKLOG #110/#112 (post-PR #113) measured steady-state ~18–22 s/window with a ~27–29 s cold-start
+ * spike on window 1. Rounded UP to 30 s — deliberately generous, because false-parking a live read
+ * (the active ST-7 bug, FR-004a) is the failure we are fixing, whereas parking a few seconds late
+ * on a genuine freeze is a trivial cost. (Laptop figures; the Azure-VM re-measure is warm-up #112,
+ * a separate concern from this freshness gate.) */
+export const PROCESSING_CEILING_MS = 30_000;
+
+/** Cushion ON TOP of the worst-case healthy read age — absorbs client/server clock skew AND
+ *  poll/processing jitter (run-to-run variance + the sub-poll gap before a fresh row is fetched).
+ *  Honestly named: NOT skew-only. Keeps a healthy live session comfortably clear of the threshold. */
+export const FRESHNESS_MARGIN_MS = 8_000;
+
 /**
  * Live-edge freshness horizon (FR-004a honesty — fix for ST-7 / #117). The marker is "live"
  * (and the subtitle asserts the session summary) ONLY while the latest reading is no older than
@@ -122,11 +150,16 @@ export const N_TARGET = 12;
  * reading" from "the last point is confident" alone (no age check) kept the marker live on stale
  * data until it scrolled off — the exact dishonesty this redesign exists to prevent.
  *
- * = 2 capture strides (2 × WINDOW_MS / N_TARGET = 20s): one window may legitimately be in flight,
- * so a SECOND elapsed window with no new reading is the honest "overdue" signal. Comfortably above
- * the ~12s poll backstop, so a healthy live session never flickers live↔parked between polls.
- */
-export const STALE_AFTER_MS = 2 * (WINDOW_MS / N_TARGET); // 20_000
+ * Derived from NAMED constants (no magic number). The worst-case age a HEALTHY freshest reading
+ * can legitimately reach before a newer one replaces it = one window still in flight (STRIDE_MS)
+ * + that window's processing to insert (PROCESSING_CEILING_MS) + one poll cycle to fetch it
+ * (POLL_MS) = 52 s; the FRESHNESS_MARGIN_MS cushion lands the horizon at 60 s — comfortably ABOVE
+ * that worst healthy age yet FAR BELOW WINDOW_MS (120 s, scroll-off), so a live session never
+ * false-parks while a real freeze still parks long before its last reading slides off the window.
+ * (The old 20 s horizon predated the PR-#113 ~18–22 s processing band and false-parked healthy
+ * reads as stale — the ST-7 regression.) */
+export const STALE_AFTER_MS =
+  STRIDE_MS + PROCESSING_CEILING_MS + POLL_MS + FRESHNESS_MARGIN_MS; // 60_000
 /** Legibility floor: the edge-to-edge pitch is never shrunk below this — drop oldest instead (SC-012). */
 export const MIN_SLOT = 24;
 
