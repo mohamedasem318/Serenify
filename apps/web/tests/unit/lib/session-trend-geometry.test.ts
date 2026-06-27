@@ -7,12 +7,16 @@ import {
   BAND_Y,
   FADE_OPACITY,
   FOGGY_COLOR,
+  FRESHNESS_MARGIN_MS,
   H,
   MIN_SLOT,
   N_TARGET,
   NO_READ_COLOR,
+  POLL_MS,
+  PROCESSING_CEILING_MS,
   RIGHT_MARGIN,
   STALE_AFTER_MS,
+  STRIDE_MS,
   WINDOW_MS,
   buildSessionTrend,
   type TrendInput,
@@ -386,11 +390,24 @@ describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-
   const frozen = (count: number, latestSecsAgo: number, stride = 10): TrendInput[] =>
     Array.from({ length: count }, (_, i) => pt(latestSecsAgo + (count - 1 - i) * stride, "at_ease"));
 
-  it("STALE_AFTER_MS is a few capture strides — well under the 2-min window, above the 12s poll", () => {
-    const stride = WINDOW_MS / N_TARGET; // ~10s
-    expect(STALE_AFTER_MS).toBeGreaterThan(12_000); // no flicker against the 12s poll backstop
-    expect(STALE_AFTER_MS).toBeGreaterThanOrEqual(stride);
-    expect(STALE_AFTER_MS).toBeLessThan(WINDOW_MS); // parks long before the reading scrolls off
+  it("freshness horizon is pinned ABOVE the worst healthy read age and BELOW the scroll-off window", () => {
+    // The guard that stops anyone re-breaking FR-004a in EITHER direction (the ST-7 regression
+    // was a horizon set too LOW — false-parking healthy reads). The worst age a healthy freshest
+    // reading can reach before a newer one replaces it = one window in flight + its processing to
+    // insert + one poll cycle to fetch it. `captured_at` is upload-now (not window-start), so no
+    // window-length term is needed.
+    const worstHealthyReadAge = STRIDE_MS + PROCESSING_CEILING_MS + POLL_MS; // 52_000
+    // LOWER bound: never false-park a live read. Strictly greater ⇒ the margin is real (> 0).
+    expect(STALE_AFTER_MS).toBeGreaterThan(worstHealthyReadAge);
+    expect(STALE_AFTER_MS - worstHealthyReadAge).toBe(FRESHNESS_MARGIN_MS); // the cushion, exactly
+    // UPPER bound: park well before the last reading scrolls off the 2-min window.
+    expect(STALE_AFTER_MS).toBeLessThan(WINDOW_MS);
+    // and still clear of the poll backstop, so a healthy session never flickers live↔parked.
+    expect(STALE_AFTER_MS).toBeGreaterThan(POLL_MS);
+    // the derivation is exactly the named-constant sum — no magic number can creep back in.
+    expect(STALE_AFTER_MS).toBe(STRIDE_MS + PROCESSING_CEILING_MS + POLL_MS + FRESHNESS_MARGIN_MS);
+    // STRIDE_MS stays equal to the recorder's DEFAULT_STRIDE_MS (10s), derived from the geometry.
+    expect(STRIDE_MS).toBe(WINDOW_MS / N_TARGET);
   });
 
   it("a STALE confident live edge (no fresh reading) PARKS muted — NOT live (ST-7)", () => {
