@@ -1594,11 +1594,18 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
 
 ---
 
-## From feature 010 (monitoring-graph-redesign) — branch open
+## From feature 010 (monitoring-graph-redesign) — merged 2026-06-27
+
+Frontend-only redesign of the live "This session" monitoring graph (roadmap label `009b`), **merged
+to `main`** via **PR #118** (squash `6b8653e`, 2026-06-27); feature branch deleted. No new open
+follow-ups were logged from this feature beyond the one below — the 11 unchecked
+`checklists/requirements.md` items and the optional T029 (Amendment 7 second-example doc-polish) are
+spec-internal / optional-polish (Mohamed's call), not backlog-shaped, and are deliberately not filed
+here.
 
 ### ~~010 ST-7: parked marker disappears on single-reading → out-of-frame transition~~ — resolved (#117)
-**Status**: resolved (`type:bug` / `area:web`)
-**Resolved**: 2026-06-27 on `010-monitoring-graph-redesign` — silent-empty refetch guard (`setPoints` functional update, commit `8517118`), now-marker parks on stale out-of-frame edge (commit `ae43e5f`), FR-004a freshness horizon 20 s→60 s to stop false-parking healthy live reads (commit `a550ab3`), two-sided regression guard (commit `cbce6b2`). ST-7 re-run passed 2026-06-27.
+**Status**: resolved (`type:bug` / `area:web`) — GitHub issue **#117 CLOSED** (2026-06-27).
+**Resolved**: 2026-06-27 on `010-monitoring-graph-redesign` — silent-empty refetch guard (`setPoints` functional update, commit `8517118`), now-marker parks on stale out-of-frame edge (commit `ae43e5f`), FR-004a freshness horizon 20 s→60 s to stop false-parking healthy live reads (commit `a550ab3`), two-sided regression guard (commit `cbce6b2`). ST-7 re-run passed 2026-06-27. **Merged to `main`** via **PR #118** (squash `6b8653e`, 2026-06-27) — the per-fix commits listed above were on the now-deleted feature branch and are squashed into `6b8653e` on `main`.
 **Observed**: 2026-06-27, ST-7 manual smoke (this branch).
 **Description**: With exactly **1 confident reading** in the session, stepping out of frame caused the graph to blank and the confident dot (the parked marker) to disappear instead of staying muted + static at the last confident position (SC-010 / FR-004a). The no-clear-read gap treatment only appeared **after returning to frame**, not during the out-of-frame period.
 **Root cause**: `getSessionTrend` returns `[]` (not throws) on any Supabase error (`if (error || !data) return []`, monitoring-reads.ts). In `session-trend.tsx`, `refetch` called `setPoints(next)` unconditionally, so a silent empty response wiped `points` → `isEmpty=true`. The geometry (`buildNowMarker`) handles `[confident, no_read]` correctly; the bug was purely in the component's data layer. The upload gate on out-of-frame means no `refreshSignal` fires, so the only refetch is the immediate one triggered by `active→false` — exactly the moment a transient Supabase error can return `[]`.
