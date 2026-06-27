@@ -282,6 +282,31 @@ Cross-references:
 - docs/DECISIONS.md entry 2026-06-25
 - docs/CHANGELOG.md entry 2026-06-25
 - apps/web/components/monitor/session-trend.tsx (the surface to be redesigned)
+
+Amendment 11: 1.8.0 → 1.8.1 (2026-06-27, PATCH)
+Bump rationale: Pure documentation catch-up — the monitoring-graph redesign shipped
+(merged to `main` via PR #118, squash `6b8653e`, with its own `specs/010-…` folder, US1–US3,
+and 726 unit tests), so its Principle VIII roadmap label is reconciled with git reality: the
+`009b-monitoring-graph-redesign` interstitial becomes the canonical `010-monitoring-graph-redesign`
+(and the "scoped out of 009 … pending spec" parenthetical is dropped — it has a spec and shipped),
+cascading the unstarted tail up by one (`010`→`011` … `020`→`021`). Two live feature-number
+cross-references move with the tail: Principle IV audio `018 → 019`, Principle III fusion
+`020 → 021`. PATCH (not Amendment 8's MINOR): this adds NO new slot, removes NO principle, and
+changes NO rule or guidance — it only relabels existing provisional slots to match the shipped
+feature number, a non-semantic reconcile. Risk is low: every renumbered downstream slot is
+unstarted, so no branch / PR / spec folder is affected (the shipped `001`–`010` keep their numbers).
+The Amendment 10 narrative above is left as written (it is the dated record of why `009b` was the
+right call at the time — historical, not live).
+
+Affected templates: none. The .specify/templates/{plan,spec,tasks,checklist,constitution}-
+template.md files reference Principle VIII by number, not by these slugs or feature numbers, so no
+template edit is required (consistent with the Amendment 8/9/10 audits).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-27
+- docs/CHANGELOG.md entry 2026-06-27
+- specs/010-monitoring-graph-redesign/ (the shipped feature this reconciles to)
+- PR #118 (squash 6b8653e) — the merge that made the slot canonical
 -->
 
 # Serenify Constitution
@@ -378,7 +403,7 @@ Each package MUST expose the same inference contract (input shape, output
 schema, confidence/quality signal). Adding a new modality MUST be a config
 change in the inference service plus a new package — never a rewrite of
 shared code. Cross-modality fusion lives in a separate fusion layer (see
-feature 020) and consumes the common interface only.
+feature 021) and consumes the common interface only.
 
 **Rationale**: Modalities arrive at different times (video first, then
 audio, then physio, then fusion). Coupling them would force every modality
@@ -404,7 +429,7 @@ directly.
   N turns) that reconciles with the physiological signal stream.
 
 **Fine-tuning clause (open decision, must close before audio modality lands
-in feature 018):** Default is prompting-only. If the team chooses to
+in feature 019):** Default is prompting-only. If the team chooses to
 fine-tune later, the fine-tuned model MUST (a) be served behind the same
 `LLMProvider` interface so app code does not change, (b) be evaluated on a
 documented held-out set with metrics published in `docs/MODELS.md`, and
@@ -567,15 +592,13 @@ implement, in that order. Implementation without a spec is forbidden.
   `005-per-user-calibration`, `006-calibration-capture-quality`,
   `007-visual-redesign`, `008-stress-inference-service`,
   `009-today-card-trend-redesign`,
-  `009b-monitoring-graph-redesign` (the live "This session" within-session
-  monitoring graph, scoped out of 009; design-locked — a signed-off HTML
-  reference exists — pending spec),
-  `010-llm-client-and-chatbot`,
-  `011-questionnaire`, `012-recommendations`,
-  `013-personalization-onboarding`, `014-privacy-controls-and-transparency`,
-  `015-preferences-hub`, `016-team-lead-dashboard`,
-  `017-admin-dashboard`, `018-audio-modality`,
-  `019-physio-modality`, `020-fusion`.
+  `010-monitoring-graph-redesign`,
+  `011-llm-client-and-chatbot`,
+  `012-questionnaire`, `013-recommendations`,
+  `014-personalization-onboarding`, `015-privacy-controls-and-transparency`,
+  `016-preferences-hub`, `017-team-lead-dashboard`,
+  `018-admin-dashboard`, `019-audio-modality`,
+  `020-physio-modality`, `021-fusion`.
 
 **Rationale**: A four-person team building an ML product needs a single
 source of truth per feature. Spec-driven development makes scope explicit,
@@ -765,4 +788,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.8.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-25
+**Version**: 1.8.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-27
