@@ -98,7 +98,7 @@ description: "Task list for the live 'This session' monitoring-graph redesign (0
 ## Phase 6: Polish & Cross-Cutting Concerns
 
 - [ ] T026 [P] Extend the existing monitor/employee Playwright happy-path in `apps/web/tests/e2e/` to assert a no-read treatment renders and **no numeric value of any kind** appears in the graph. [**SC-007**]
-- [ ] T027 [P] Author `specs/010-monitoring-graph-redesign/smoke-tests.md` (Constitution VII / gate 5): light/dark by eye, 360px no-crush, keyboard focus + popup, reduced-motion, and a live warm → read → out-of-frame → return session.
+- [x] T027 [P] Author `specs/010-monitoring-graph-redesign/smoke-tests.md` (Constitution VII / gate 5): light/dark by eye, 360px no-crush, keyboard focus + popup, reduced-motion, **marker-freshness** (FR-004 freshness clause / T011a — the now-marker recolours within one window of the live bloom/orb, never trailing a poll behind), and a live warm → read → out-of-frame → return session.
 - [ ] T028 Final verification: `cd apps/web && npm run lint && npx tsc --noEmit && npx vitest run --pool=threads tests/unit/lib/session-trend-geometry.test.ts tests/unit/components/monitor/session-trend.test.tsx` (Windows: `--pool=threads` per project memory); confirm the SC-001…SC-013 coverage map below is fully satisfied.
 - [ ] T029 [P] **[OPTIONAL — leave optional per review; do not drop]** Amendment 7 doc-polish: add the live graph as a **second named example** in the charting carve-out (constitution Technology Stack row + `docs/DECISIONS.md`), PATCH bump. The live graph is already covered by the technique-scoped carve-out (research R-8), so this is **not** a gate — Mohamed's call. [research R-8]
 
