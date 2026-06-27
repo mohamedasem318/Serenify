@@ -134,8 +134,12 @@ export async function installMonitoringMocks(page: Page) {
  * paths are matched — Supabase's `rest/v1/monitoring_sessions` (no `/sessions` slash) is NOT
  * intercepted, so the dashboard recap reads hit the real DB.
  */
-export async function interceptMonitoringApi(page: Page, opts: { warmingWindows?: number } = {}) {
+export async function interceptMonitoringApi(
+  page: Page,
+  opts: { warmingWindows?: number; forceSessionId?: string } = {},
+) {
   const warming = opts.warmingWindows ?? 2;
+  const forceSessionId = opts.forceSessionId;
   let windowCount = 0;
   let sessionSeq = 0;
 
@@ -173,9 +177,12 @@ export async function interceptMonitoringApi(page: Page, opts: { warmingWindows?
       return json(200, { session_id: "e2e-session", status: "active" });
     }
     if (method === "POST") {
-      // create session
+      // create session. `forceSessionId` makes the orchestrator adopt a REAL seeded session id
+      // (see seedLiveNoReadSession) so the live `getSessionTrend` RLS read returns its persisted
+      // rows — the seam T026 uses to assert a no-read treatment renders in the live graph.
       sessionSeq += 1;
-      return json(201, { session_id: `e2e-session-${sessionSeq}`, model_version: MODEL_VERSION });
+      const sid = forceSessionId ?? `e2e-session-${sessionSeq}`;
+      return json(201, { session_id: sid, model_version: MODEL_VERSION });
     }
     return json(404, { error: "unexpected" });
   });
@@ -218,6 +225,48 @@ export async function seedRetrospectiveSession(userId: string) {
     captured_at: new Date(startedMs + ((i + 1) / (bands.length + 1)) * span).toISOString(),
     scored: true,
     band,
+  }));
+  const { error: rErr } = await admin.from("window_readings").insert(rows);
+  if (rErr) throw rErr;
+  return sess.id as string;
+}
+
+/**
+ * Seed ONE **fresh-live, read-less** monitoring session (status active, started seconds ago)
+ * with two warming window rows (band = null, scored = false, no skip cause). Pair it with
+ * `interceptMonitoringApi(page, { forceSessionId })` so the orchestrator adopts THIS session id:
+ * the live "This session" trend then reads these persisted no-read rows through the real
+ * browser RLS `getSessionTrend`, and the geometry renders the warming dashed-line **no-read
+ * treatment** in the SVG with NO numeric value of any kind — the SC-007 / FR-015 guard T026
+ * asserts. Two rows (not one) clear the lone-warming-stub suppression so the graph SVG draws.
+ *
+ * It is deliberately fresh-live so the dashboard's retrospective recap EXCLUDES it (FR-031),
+ * leaving the today-recap assertions untouched. The FastAPI window POSTs stay mocked, so no
+ * confident row is ever persisted for it — the trend honestly stays in the no-read treatment.
+ */
+export async function seedLiveNoReadSession(userId: string) {
+  const admin = createAdminClient();
+  const now = Date.now();
+
+  const { data: sess, error: sErr } = await admin
+    .from("monitoring_sessions")
+    .insert({
+      user_id: userId,
+      started_at: new Date(now - 30_000).toISOString(),
+      status: "active",
+      model_version: MODEL_VERSION,
+    })
+    .select("id")
+    .single();
+  if (sErr || !sess) throw sErr ?? new Error("seed live session failed");
+
+  const rows = [now - 8_000, now - 2_000].map((t) => ({
+    session_id: sess.id,
+    user_id: userId,
+    captured_at: new Date(t).toISOString(),
+    scored: false,
+    band: null,
+    skip_cause: null,
   }));
   const { error: rErr } = await admin.from("window_readings").insert(rows);
   if (rErr) throw rErr;
