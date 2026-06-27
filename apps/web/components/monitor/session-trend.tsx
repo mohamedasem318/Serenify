@@ -246,7 +246,11 @@ export function SessionTrend({
   const refetch = useCallback(async () => {
     try {
       const next = await loadRef.current(sessionId);
-      if (mountedRef.current) setPoints(next);
+      if (mountedRef.current) {
+        // getSessionTrend returns [] (not throws) on error; treat a silent empty the same
+        // as an exception — keep existing rows so the parked marker isn't wiped mid-session.
+        setPoints((prev) => (next.length === 0 && prev.length > 0 ? prev : next));
+      }
     } catch {
       /* a transient read failure just leaves the last trend in place */
     }

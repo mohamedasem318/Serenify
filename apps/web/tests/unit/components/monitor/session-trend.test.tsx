@@ -374,6 +374,40 @@ describe("SessionTrend — event-driven freshness (FR-004): marker refreshes on 
   });
 });
 
+// ── ST-7 regression: parked marker must survive a transient empty refetch ──────────────
+describe("SessionTrend — ST-7 regression: existing trend is not wiped by a transient empty refetch", () => {
+  const stubWidth = (width = 768) => {
+    HTMLElement.prototype.getBoundingClientRect = function () {
+      return { width, height: 210, top: 0, left: 0, right: width, bottom: 210, x: 0, y: 0, toJSON() {} } as DOMRect;
+    };
+  };
+
+  it("keeps the existing trend (and parked marker) when a subsequent refetch returns [] — guards against getSessionTrend returning [] on Supabase error", async () => {
+    stubWidth();
+    let serveEmpty = false;
+    const load = async () => (serveEmpty ? [] : [pt("a", "at_ease", 10)]);
+
+    // Mount with active=true: poll fires once and loads the 1 confident reading.
+    const { rerender } = render(
+      <SessionTrend sessionId="s1" active={true} pollMs={10_000_000} refreshSignal={0} load={load} now={() => NOW} />,
+    );
+    await waitFor(() => expect(screen.getByTestId("now-dot").getAttribute("fill")).toBe("var(--color-meadow)"));
+
+    // Switch to active=false (what monitoring-session does on out-of-frame).  The effect fires
+    // an immediate refetch which now returns [].  Before the fix this cleared points → isEmpty.
+    serveEmpty = true;
+    rerender(
+      <SessionTrend sessionId="s1" active={false} pollMs={10_000_000} refreshSignal={0} load={load} now={() => NOW} />,
+    );
+
+    // The graph must NOT blank out — the existing 1-reading trend must survive the empty response.
+    await waitFor(() => {
+      expect(screen.queryByTestId("session-trend-empty")).toBeNull();
+      expect(screen.getByTestId("now-marker")).toBeInTheDocument();
+    });
+  });
+});
+
 describe("SessionTrend — US3 honest subtitle (FR-024 / SC-013)", () => {
   const TENSION = /tense|settled|tension/i;
 

@@ -1591,3 +1591,15 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
 **Tier options (ranked by safety)**: **T1** (low risk, ~10–13 s real + perceived) pre-warm the extractor to kill the first-window cold-start spike + a display-only "getting your first read — N of 4" cue → ~2:15, no inference-path change. **T2** (high risk/effort, realistically **~2:00 not ~90 s** given the 10 s window spacing) bounded warm-up burst — score the first M=4 windows concurrently then **hard-clamp to 1**; re-opens the just-fixed path, needs `_SessionBuffers` locking (#79), and must **score-all-of-the-first-M (not drop-stale)** or warm-up starves. **T3** (medium risk) provisional early band at M=2–3 — trades smoothing quality (touches the locked M=N=4 contract; SC-003 drift; needs sign-off).
 **Caveat**: all second-counts are **laptop-specific** (i5, browser competing for CPU). On the Azure demo VM the per-window cost changes, reshaping the warm-up math — **re-measure on the real VM before tuning warm-up.**
 **Address by**: a future warm-up-latency pass, only after a VM re-measure; not demo-blocking.
+
+---
+
+## From feature 010 (monitoring-graph-redesign) — branch open
+
+### 010 ST-7: parked marker disappears on single-reading → out-of-frame transition (#117)
+**Status**: bug (`type:bug` / `area:web`)
+**Observed**: 2026-06-27, ST-7 manual smoke (this branch).
+**Description**: With exactly **1 confident reading** in the session, stepping out of frame caused the graph to blank and the confident dot (the parked marker) to disappear instead of staying muted + static at the last confident position (SC-010 / FR-004a). The no-clear-read gap treatment only appeared **after returning to frame**, not during the out-of-frame period.
+**Root cause**: `getSessionTrend` returns `[]` (not throws) on any Supabase error (`if (error || !data) return []`, monitoring-reads.ts). In `session-trend.tsx`, `refetch` called `setPoints(next)` unconditionally, so a silent empty response wiped `points` → `isEmpty=true`. The geometry (`buildNowMarker`) handles `[confident, no_read]` correctly; the bug was purely in the component's data layer. The upload gate on out-of-frame means no `refreshSignal` fires, so the only refetch is the immediate one triggered by `active→false` (monitoring-session.tsx line 727) — exactly the moment a transient Supabase error can return `[]`.
+**Fix**: `session-trend.tsx` `refetch` — functional update guard: `setPoints((prev) => next.length === 0 && prev.length > 0 ? prev : next)` treats a silent empty response like a thrown exception and leaves existing rows in place. Regression tests added in both geometry and component suites. Leave #117 open for Mohamed to re-run ST-7.
+**Address by**: before merging feature 010 to `main`.

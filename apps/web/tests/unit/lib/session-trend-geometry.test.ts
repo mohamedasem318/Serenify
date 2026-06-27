@@ -323,6 +323,26 @@ describe("now-marker state machine (SC-011)", () => {
     expect(build([pt(10, null, null), pt(0, null, "out-of-frame")], 580).nowMarker.state).toBe("none");
     expect(build([pt(0, null, "our-side")], 580).nowMarker.state).toBe("none");
   });
+  it("PARKED when exactly one confident reading is followed by an active no-read — single-reading park (SC-010 / FR-004a / ST-7)", () => {
+    // The lone confident dot is a valid park anchor (SC-010 / FR-019); the marker must not
+    // disappear just because there is only one prior reading.
+    const v = build([pt(10, "at_ease"), pt(0, null, "out-of-frame")], 580);
+    expect(v.nowMarker.state).toBe("parked");
+    expect(v.nowMarker.fill).toBe(NO_READ_COLOR);
+    expect(v.nowMarker.pulse).toBe(false);
+    expect(v.nowMarker.popup).toBe("last clear read");
+    // The lone confident still renders as a dot (FR-019), never a step line
+    expect(v.dots).toHaveLength(1);
+    expect(v.steps).toHaveLength(0);
+  });
+  it("PARKED when the lone confident reading is flanked by no-reads on both sides (SC-010)", () => {
+    const v = build([pt(20, null, "low-light"), pt(10, "tense"), pt(0, null, "low-light")], 580);
+    expect(v.nowMarker.state).toBe("parked");
+    expect(v.nowMarker.fill).toBe(NO_READ_COLOR);
+    expect(v.nowMarker.y).toBe(BAND_Y.tense);
+    expect(v.dots).toHaveLength(1);
+    expect(v.steps).toHaveLength(0);
+  });
 });
 
 // ── SC-013: subtitle honesty ──────────────────────────────────────────────────────────
