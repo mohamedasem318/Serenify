@@ -111,6 +111,22 @@ export const WINDOW_MS = 120_000; // rolling window ≈ 2 min (FR-002a)
  *  monitoring's scoreable-window cadence) — NOT the ~12s client poll/re-fetch cadence. At nDraw
  *  === N_TARGET the edge-to-edge pitch locks at plotWidth/(N_TARGET−1) (FR-002a / SC-012a). */
 export const N_TARGET = 12;
+/**
+ * Live-edge freshness horizon (FR-004a honesty — fix for ST-7 / #117). The marker is "live"
+ * (and the subtitle asserts the session summary) ONLY while the latest reading is no older than
+ * this; past it the live edge is treated as an (implicit) active no-read so the marker PARKS
+ * muted ("last clear read") instead of falsely pulsing "you are here" on a stale reading.
+ *
+ * Why this matters: out of frame the no-read rows may not reach the client, so the geometry sees
+ * a FROZEN confident session while the 1s clock keeps advancing `nowMs`. Deriving "current
+ * reading" from "the last point is confident" alone (no age check) kept the marker live on stale
+ * data until it scrolled off — the exact dishonesty this redesign exists to prevent.
+ *
+ * = 2 capture strides (2 × WINDOW_MS / N_TARGET = 20s): one window may legitimately be in flight,
+ * so a SECOND elapsed window with no new reading is the honest "overdue" signal. Comfortably above
+ * the ~12s poll backstop, so a healthy live session never flickers live↔parked between polls.
+ */
+export const STALE_AFTER_MS = 2 * (WINDOW_MS / N_TARGET); // 20_000
 /** Legibility floor: the edge-to-edge pitch is never shrunk below this — drop oldest instead (SC-012). */
 export const MIN_SLOT = 24;
 
@@ -326,6 +342,13 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
   // session-level facts (FR-004b "ever"; FR-010/FR-014 warming is session-start-only)
   const firstConfidentIdx = sorted.findIndex((p) => p.band != null);
   const everConfident = firstConfidentIdx >= 0;
+  // FR-004a freshness (ST-7 / #117): is the LATEST reading recent enough to be the CURRENT read?
+  // When it is stale (out of frame, no fresh row arriving while the clock advances) the live edge
+  // is an implicit no-read → the marker parks + the subtitle goes neutral, instead of asserting a
+  // "you are here" / tension summary on a stale reading. The latest point is the live edge: when
+  // any window is drawn it is the rightmost slot (newest timestamp); once it too ages past the
+  // 2-min window everything has scrolled off and the marker is NONE regardless.
+  const liveEdgeFresh = nowMs - Date.parse(sorted[sorted.length - 1]!.capturedAt) <= STALE_AFTER_MS;
 
   // ── lone warming stub suppression (FR-010 ≥2-point threshold / FR-018, decided 2026-06-27) ──
   // A warming line needs ≥2 points; a SINGLE warming point would otherwise draw a short dashed
@@ -435,8 +458,8 @@ export function buildSessionTrend(points: TrendInput[], opts: BuildOpts): Sessio
     steps,
     dots,
     treatments,
-    nowMarker: buildNowMarker(slots, everConfident),
-    subtitle: buildSubtitle(sorted, everConfident),
+    nowMarker: buildNowMarker(slots, everConfident, liveEdgeFresh),
+    subtitle: buildSubtitle(sorted, everConfident, liveEdgeFresh),
     bandCount,
     axis,
   };
@@ -517,11 +540,14 @@ function buildTreatment(
   return t;
 }
 
-function buildNowMarker(slots: WindowSlot[], everConfident: boolean): NowMarker {
+function buildNowMarker(slots: WindowSlot[], everConfident: boolean, liveEdgeFresh: boolean): NowMarker {
   // no confident reading has EVER occurred → no anchor to mark (FR-004b)
   if (slots.length === 0 || !everConfident) return { state: "none", pulse: false };
   const last = slots[slots.length - 1]!;
-  if (last.kind === "confident") {
+  // LIVE only when the live edge is a confident reading AND that reading is FRESH (FR-004a / ST-7).
+  // A confident-but-STALE edge (out of frame, no new row while the clock advances) is an implicit
+  // active no-read: fall through to park muted, never pulse "you are here" on a stale reading.
+  if (last.kind === "confident" && liveEdgeFresh) {
     return {
       state: "live",
       x: last.x,
@@ -533,7 +559,8 @@ function buildNowMarker(slots: WindowSlot[], everConfident: boolean): NowMarker 
       ariaLabel: "You are here — your current reading",
     };
   }
-  // active no-read → park on the last confident reading still on screen (FR-004a)
+  // active no-read (a real no-read edge OR a stale confident edge) → park on the last confident
+  // reading still on screen (FR-004a). It scrolls off → no anchor → none (FR-004a × FR-002a).
   const pc = priorConfident(slots, slots.length);
   if (!pc) return { state: "none", pulse: false }; // the last confident scrolled off-window
   return {
@@ -548,10 +575,13 @@ function buildNowMarker(slots: WindowSlot[], everConfident: boolean): NowMarker 
   };
 }
 
-function buildSubtitle(sorted: TrendInput[], everConfident: boolean): SubtitleState {
+function buildSubtitle(sorted: TrendInput[], everConfident: boolean, liveEdgeFresh: boolean): SubtitleState {
   const last = sorted[sorted.length - 1]!;
-  if (last.band != null) {
-    // confident live edge → the peak-derived session summary (existing behaviour, FR-024)
+  if (last.band != null && liveEdgeFresh) {
+    // confident AND fresh live edge → the peak-derived session summary (existing behaviour, FR-024).
+    // A confident-but-STALE edge falls through to the neutral no-read line below: asserting a
+    // tension level (incl. "Settled so far.") without a CURRENT reading is the FR-024/SC-013
+    // dishonesty — same root cause as the marker parking (ST-7).
     let peak = 0;
     for (const p of sorted) if (p.band != null) peak = Math.max(peak, RANK[p.band]);
     const text =

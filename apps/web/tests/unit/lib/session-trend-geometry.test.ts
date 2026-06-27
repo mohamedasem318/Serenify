@@ -12,6 +12,8 @@ import {
   N_TARGET,
   NO_READ_COLOR,
   RIGHT_MARGIN,
+  STALE_AFTER_MS,
+  WINDOW_MS,
   buildSessionTrend,
   type TrendInput,
 } from "@/lib/session-trend-geometry";
@@ -368,6 +370,100 @@ describe("subtitle never asserts a tension level without a current confident rea
     const v = build([pt(0, null, "our-side")], 580);
     expect(v.subtitle.kind).toBe("no_read");
     expect(v.subtitle.text).toBe("No clear read right now");
+  });
+});
+
+// ── ST-7 / FR-004a / #117: out-of-frame freshness — a STALE confident edge parks, not "live" ──
+// Repro of the live bug: a confident session is on screen, the employee steps out of frame, and
+// NO new readings arrive (the no-read rows aren't reaching the client). The wall clock keeps
+// advancing (the parent's 1s elapsed-clock re-renders the card), so `nowMs` marches forward over
+// a FROZEN set of confident points. The marker must NOT keep claiming "you are here" (live) on a
+// stale reading (the exact dishonesty FR-004a forbids) — it must PARK muted ("last clear read")
+// while the last confident reading is still in-window, and only go NONE once it scrolls off.
+describe("out-of-frame freshness — stale live edge parks, not live (ST-7 / FR-004a / #117)", () => {
+  // a frozen confident session whose LATEST reading is `latestSecsAgo` old vs the build's NOW,
+  // stepping back one ~10s stride per older reading (all within the 2-min window unless said).
+  const frozen = (count: number, latestSecsAgo: number, stride = 10): TrendInput[] =>
+    Array.from({ length: count }, (_, i) => pt(latestSecsAgo + (count - 1 - i) * stride, "at_ease"));
+
+  it("STALE_AFTER_MS is a few capture strides — well under the 2-min window, above the 12s poll", () => {
+    const stride = WINDOW_MS / N_TARGET; // ~10s
+    expect(STALE_AFTER_MS).toBeGreaterThan(12_000); // no flicker against the 12s poll backstop
+    expect(STALE_AFTER_MS).toBeGreaterThanOrEqual(stride);
+    expect(STALE_AFTER_MS).toBeLessThan(WINDOW_MS); // parks long before the reading scrolls off
+  });
+
+  it("a STALE confident live edge (no fresh reading) PARKS muted — NOT live (ST-7)", () => {
+    const v = build(frozen(6, 30), 580); // latest reading 30s old → stale, still in-window
+    expect(v.nowMarker.state).toBe("parked");
+    expect(v.nowMarker.fill).toBe(NO_READ_COLOR);
+    expect(v.nowMarker.pulse).toBe(false);
+    expect(v.nowMarker.popup).toBe("last clear read");
+    expect(v.nowMarker.x).toBeCloseTo(v.plot.right, 6); // on the last (stale) confident reading
+    expect(v.nowMarker.y).toBe(BAND_Y.at_ease);
+  });
+
+  it("the step-line PERSISTS while the stale readings are still in-window (not a hollow frame)", () => {
+    const v = build(frozen(6, 30), 580);
+    expect(v.isEmpty).toBe(false);
+    expect(v.slots).toHaveLength(6); // all six are < 2 min old → all drawn
+    expect(v.steps.length).toBeGreaterThanOrEqual(1); // the line is still there
+  });
+
+  it("a FRESH confident live edge stays LIVE — no false park within one window", () => {
+    const v = build(frozen(6, 12), 580); // latest reading only 12s old → fresh
+    expect(v.nowMarker.state).toBe("live");
+    expect(v.nowMarker.pulse).toBe(true);
+    expect(v.nowMarker.popup).toBe("you are here");
+    expect(v.nowMarker.fill).toBe(BAND_LINE.at_ease);
+  });
+
+  it("marker → NONE only once the last confident reading scrolls off the 2-min window", () => {
+    const v = build(frozen(4, 200), 580); // every reading > 2 min old → all scrolled off
+    expect(v.slots).toHaveLength(0);
+    expect(v.nowMarker.state).toBe("none");
+  });
+
+  it("advancing nowMs over a FROZEN confident session: live → parked → none", () => {
+    const session = many(18); // 18 confident, latest at NOW (oldest 170s ago)
+    const at = (offsetMs: number) =>
+      buildSessionTrend(session, { width: 580, nowMs: NOW + offsetMs });
+
+    const fresh = at(12_000); // 12s after the last reading → still fresh
+    expect(fresh.nowMarker.state).toBe("live");
+
+    const stale = at(40_000); // 40s after → stale, but readings still in-window
+    expect(stale.nowMarker.state).toBe("parked");
+    expect(stale.steps.length).toBeGreaterThanOrEqual(1); // line persists through the park
+    expect(stale.isEmpty).toBe(false);
+
+    const gone = at(130_000); // 130s after → the last reading has scrolled off
+    expect(gone.slots).toHaveLength(0);
+    expect(gone.nowMarker.state).toBe("none");
+  });
+
+  it("the subtitle drops the tension summary on a STALE edge (FR-024 / SC-013)", () => {
+    // "Settled so far." asserts a calm level we no longer currently have — must go neutral.
+    const v = build(frozen(6, 30), 580);
+    expect(v.subtitle.kind).toBe("no_read");
+    expect(v.subtitle.text).toBe("No clear read right now");
+  });
+
+  it("a single confident reading: FRESH = live 'you are here'; STALE = parked 'last clear read'", () => {
+    const live = build([pt(2, "a_little_tense")], 580); // 2s old → live single dot
+    expect(live.nowMarker.state).toBe("live");
+    expect(live.nowMarker.popup).toBe("you are here");
+    expect(live.dots).toHaveLength(1);
+
+    const parked = build([pt(45, "a_little_tense")], 580); // 45s old → stale single dot
+    expect(parked.nowMarker.state).toBe("parked");
+    expect(parked.nowMarker.popup).toBe("last clear read");
+    expect(parked.nowMarker.fill).toBe(NO_READ_COLOR);
+    expect(parked.dots).toHaveLength(1); // still a dot (FR-019), just parked-muted
+  });
+
+  it("never-confident frozen session stays NONE regardless of age (FR-004b)", () => {
+    expect(build([pt(40, null, "out-of-frame"), pt(30, null, "out-of-frame")], 580).nowMarker.state).toBe("none");
   });
 });
 
