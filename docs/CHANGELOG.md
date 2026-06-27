@@ -2176,3 +2176,19 @@ artifact or metric changed, so `docs/MODELS.md` is untouched.
 Cross-references: `specs/010-monitoring-graph-redesign/` (spec / plan / tasks / research / smoke-tests
 / checklists); `docs/DECISIONS.md` 2026-06-27; `docs/PROGRESS.md` 2026-06-27; `docs/BACKLOG.md` "From
 feature 010".
+
+## 2026-06-27 — constitution 1.8.0 → 1.8.1 (PATCH): Principle VIII roadmap renumber `009b → 010` (Amendment 11)
+
+Documentation catch-up reconciling Principle VIII's provisional ordering with shipped reality: the
+monitoring-graph redesign merged (PR #118, squash `6b8653e`, with `specs/010-…`, US1–US3, 726 unit
+tests), so the `009b-monitoring-graph-redesign` interstitial label becomes the canonical
+`010-monitoring-graph-redesign` (and the "scoped out of 009 … pending spec" parenthetical is dropped —
+it has a spec and shipped), cascading the unstarted tail up by one (`010-llm-client-and-chatbot → 011`
+… `020-fusion → 021`). Cross-references renumbered: Principle IV audio `018 → 019`, Principle III
+fusion `020 → 021`. PATCH bump (not Amendment 8's MINOR): this adds no new slot, removes no principle,
+and changes no rule — it only relabels existing provisional slots to match the shipped feature number,
+a non-semantic reconcile; every renumbered slot is unstarted, so no branch / PR / spec folder is
+affected and the shipped `001`–`010` keep their numbers. The Amendment 10 narrative is left as written
+(historical record of the `009b` interstitial decision).
+
+Cross-references: `.specify/memory/constitution.md` Amendment 11; `docs/DECISIONS.md` 2026-06-27.
