@@ -2129,3 +2129,50 @@ surface are correctly separated.
 Rationale + design decisions (concurrency 1 preserves the `_SessionBuffers` single-writer invariant
 #79; the `superseded` no-op; auth-failure routing): `docs/DECISIONS.md` 2026-06-26. No model artifact
 or metric changed, so `docs/MODELS.md` is untouched.
+
+## 2026-06-27 — feat(010-monitoring-graph-redesign) — feature complete
+
+The live "This session" within-session monitoring graph redesign (roadmap label `009b`) is **merged
+to `main`** via **PR #118** (squash `6b8653e`, 2026-06-27); feature branch deleted (local + remote).
+Frontend-only inside `apps/web`: it replaces the internals of
+`apps/web/components/monitor/session-trend.tsx` and adds one new pure module
+`apps/web/lib/session-trend-geometry.ts`, consuming the existing read layer (`getSessionTrend` /
+`monitoring-reads.ts`) unchanged — no data-layer / RLS / SELECT-whitelist / API / page-layout /
+`globals.css` change, and no probability reaches the client. The technical core is the same
+**fixed-pixel SVG rendering** as feature 009 (DC-001: 1 SVG unit = 1 screen pixel, intrinsic
+`width == viewBox` width, no stretched viewBox — the totem/oval bug it exists to kill), but the
+geometry differs: a single continuous **band-coloured step line** across one session's capture
+windows on a **uniform slot per capture window** x-axis with a **rolling ~2-min window**
+(`N_target = 12`), plus a single live **"now" marker** that recolours to the current band and parks
+muted/static during a no-read. Shipped US1 (live trend) + US2 (the three honest no-read treatments —
+warming dashed line · out-of-frame foggy gap **gated OFF at launch** per FR-015 · no-clear-read muted
+gap — plus the ramp-up fill-to-width geometry and the 1-warming-point stub suppression) + US3 (the
+"you are here" / "last clear read" popup, parked marker, and full a11y: Esc / outside-tap / ≥44px
+touch targets / reduced-motion).
+
+**Governance / spec-amendment status (Principle VIII):** the spec was **clarified mid-flight** and
+the clarifications are already folded into `specs/010-monitoring-graph-redesign/spec.md` and dated
+there (Clarifications **Session 2026-06-27**): the **ramp-up fill-to-width** x-axis (FR-002a ramp-up
+clause + new **SC-012a**), the **1-warming-point** carve-out (FR-010 ≥2-point threshold / FR-018),
+**event-driven now-marker freshness** (FR-004 freshness clause + task T011a), and the popup
+**tap-toggle + outside-dismiss + live-copy** rule (FR-007). These are in-spec dated clarifications,
+not retroactive FR/SC rewrites. The **#117** out-of-frame staleness re-tune (**20 s → 60 s**) is an
+**implementation constant** — the freshness horizon is derived from named constants
+(`STRIDE_MS + PROCESSING_CEILING_MS + POLL_MS + FRESHNESS_MARGIN_MS` = 10+30+12+8) and is **not a
+value documented in any FR/SC**; FR-004a's parked-marker behaviour is unchanged in wording. **No FR
+or SC was renumbered or had its normative meaning changed at merge beyond the dated in-spec
+clarifications** — this entry records completion. The constitution roadmap renumber that created the
+`009b` slot was logged separately (the 2026-06-25 Amendment 10 entry above) and is **not** repeated
+here.
+
+Merge-time verification (`apps/web`, 2026-06-27): Vitest **726 passed / 70 files**, 0 failed;
+`npm run lint` **clean (0 errors)** — the prior 2-error `monitoring-session.tsx` lint baseline was
+cleared in PR #94 (2026-06-25), so this branch is fully green, not riding a baseline; `tsc --noEmit`
+**green**. Mohamed's hand-run smoke gate **PASSED** (ST-1…ST-7; ST-7 re-run after the #117 fix). The
+dev harness route used for real-CSS width measurement was deleted before merge. BACKLOG↔Issues
+(Amendment 9): **#117** opened-on-discovery / closed-on-fix in the same change (now CLOSED). No model
+artifact or metric changed, so `docs/MODELS.md` is untouched.
+
+Cross-references: `specs/010-monitoring-graph-redesign/` (spec / plan / tasks / research / smoke-tests
+/ checklists); `docs/DECISIONS.md` 2026-06-27; `docs/PROGRESS.md` 2026-06-27; `docs/BACKLOG.md` "From
+feature 010".
