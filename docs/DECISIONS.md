@@ -4641,3 +4641,48 @@ Tracking); `docs/CHANGELOG.md` 2026-06-27; `docs/PROGRESS.md` 2026-06-27; `docs/
 feature 010" (#117 resolved) + the open #100 (foggy-gate trigger); the 2026-06-25 Amendment 10 entry
 (the `009b` roadmap slot); the 2026-06-26 inference-concurrency entry (drop-stale ⇒ sparser trend
 points, the forward-note this feature consumes).
+
+---
+
+## 2026-06-27 — Constitution Amendment 11 — roadmap renumber `009b → 010` (monitoring-graph) (1.8.0 → 1.8.1)
+
+**Status**: Accepted (constitutional amendment, PATCH bump `1.8.0 → 1.8.1`). Authored by editing
+`.specify/memory/constitution.md` directly (not via `/speckit-constitution`, to preserve the
+hand-curated Sync Impact Report history). Docs/governance only — no code, no spec, no `specs/NNN/`
+rename.
+
+**Decision — make monitoring-graph canonically `010`, not the `009b` interstitial.** Amendment 10
+(2026-06-25) slotted the redesign as `009b` to avoid renumbering the tail *while it was still
+design-locked and pending spec*. It has since **shipped** — a full feature with its own
+`specs/010-monitoring-graph-redesign/` folder, US1–US3, a pure geometry module, 726 unit tests, and a
+squash-merge to `main` (PR #118, `6b8653e`, 2026-06-27). A shipped feature with its own spec earns a
+**sequential number**, and SpecKit had already auto-assigned the branch `010`, so the roadmap is
+reconciled **to git reality**: `009b-monitoring-graph-redesign` → `010-monitoring-graph-redesign` (the
+"scoped out of 009 … pending spec" parenthetical dropped — no longer true). The tail renumber
+(`010-llm-client-and-chatbot → 011` … `020-fusion → 021`) is the **mechanical consequence**, plus the
+two live cross-refs (Principle IV audio `018 → 019`, Principle III fusion `020 → 021`).
+
+**Why `010`-canonical over keeping `009b`.** The `b`-suffix interstitial was a *renumber-avoidance*
+device justified by "it's a redesign of an existing surface, not a forward feature, and it isn't
+built yet" (Amendment 10). Both halves of that lapsed once it shipped with a sequential `specs/010-…`
+folder: the roadmap label now **diverges from the actual branch/spec number** (`010`), and a
+roadmap whose labels don't match the shipped artifacts is the very drift the ordering list exists to
+prevent. Keeping `009b` would mean the canonical record says `009b` while git, the specs folder, and
+PR #118 all say `010` — confusing for every future reader. Renumbering is cheap here precisely
+because **every renumbered slot is unstarted** (no branch, PR, or spec folder bears those numbers
+yet); the shipped `001`–`010` are untouched.
+
+**Why PATCH, not MINOR.** Amendment 8 was MINOR because it **added two new feature slots** and
+reordered — materially changing the guidance. This amendment adds **no** slot, removes **no** slot or
+principle, and changes **no** rule: the same features remain in the same relative order; only the
+numeric labels shift to match shipped reality. That is a non-semantic documentation reconcile —
+PATCH. (Contrast also Amendment 10's MINOR, which *added* the `009b` slot.)
+
+**Risk**: low. No started work references the renumbered slots; the shipped feature numbers are
+fixed; the Amendment 10 narrative is left verbatim as the dated record of the interstitial decision
+(append-only history is not rewritten to make numbers line up).
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 11 (Sync Impact Report) + Principle
+VIII ordering list + Principle III/IV cross-refs + the version line; `docs/CHANGELOG.md` 2026-06-27;
+`specs/010-monitoring-graph-redesign/`; PR #118 (`6b8653e`); the 2026-06-25 Amendment 10 entry (the
+superseded-by-shipping `009b` slot decision).
