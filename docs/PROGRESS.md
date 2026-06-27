@@ -4,6 +4,86 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 010 — Monitoring Graph Redesign (merged to main)
+
+**Branch**: `010-monitoring-graph-redesign` (roadmap label `009b-monitoring-graph-redesign`)
+**Status**: **merged to `main`** via **PR #118** (squash `6b8653e`, 2026-06-27); feature branch
+deleted (local + remote). Frontend-only redesign of the live **"This session"** within-session
+monitoring graph — the card below the camera stage on the monitor page — consuming the existing read
+layer unchanged (no data-layer / RLS / SELECT-whitelist / API / page-layout / `globals.css` change;
+no probability to the client). One component replaced (`apps/web/components/monitor/session-trend.tsx`)
+plus one new pure module (`apps/web/lib/session-trend-geometry.ts`).
+**Date**: 2026-06-27
+
+**Scope shipped**:
+
+- **US1 — live trend (MVP).** A single continuous **band-coloured step line** (at ease = meadow ·
+  a little tense = `--amber-soft-line` · tense = amber; height = tension) on **fixed-pixel SVG
+  rendering** (DC-001: 1 SVG unit = 1 screen pixel, intrinsic `width == viewBox` width, no stretched
+  viewBox — replacing the totem/oval `viewBox="0 0 100 40" preserveAspectRatio="none"` bug), with a
+  single live **"now" marker** at the right edge that recolours to the current band. Reads its
+  rendered container width via `ResizeObserver`/ref; matched-pair width with the camera stage holds
+  by the existing `max-w-3xl` column (no page change).
+- **US2 — three honest no-read treatments + ramp-up geometry.** Starts consuming `skipCause` + the
+  warming-vs-skip distinction the component used to discard, splitting no-reads into **warming**
+  (dashed muted line, start-only, ≥2 points) · **out-of-frame foggy gap** (built per the mock but
+  **gated OFF at launch** behind `showOutOfFrameFoggy`, FR-015 — out-of-frame routes to the muted gap
+  until issue #100 confirms reliability) · **no-clear-read muted gap** (static-opacity fade, never a
+  bridged flat line; leading skip → fade-in only). Plus the **ramp-up fill-to-width** x-axis (windows
+  fill the full plot width during the first ~2 min, locking the slot pitch at `N_target = 12`, then
+  scroll off the left) and **1-warming-point stub suppression** (a lone warming point shows the
+  just-started text, not a stub-then-snap line).
+- **US3 — inspect + a11y.** The "you are here" / "last clear read" **popup** (hover · focus · tap),
+  the **parked now-marker** (muted + static during a no-read with a prior confident reading), full
+  keyboard operability, **outside-tap / second-tap dismiss**, ≥44×44px touch hit-area, and
+  reduced-motion (pulse → static halo; fades are static opacity, not animation). Honest **subtitle**
+  fork (neutral "No clear read right now" during an active no-read / all-skipped; "getting a read"
+  while warming).
+- **Event-driven refresh fix (T011a).** The orb/trend lag is fixed by a new `refreshSignal` prop:
+  `monitoring-session.tsx` bumps a counter on each **persisted** window outcome (reading /
+  scored-warming / skipped — **not** `superseded`), and `session-trend.tsx` re-fetches
+  `getSessionTrend` immediately on each bump while the ~12 s poll stays as the steady-state backstop.
+  The marker stays sourced from the persisted row (committed before the window POST returns), so
+  there is no optimistic value and no marker-vs-step-line mismatch.
+- **#117 out-of-frame staleness fix.** The parked marker no longer disappears on the single-reading →
+  out-of-frame edge case (a silent-empty `getSessionTrend` refetch guard), and the freshness horizon
+  was re-tuned **20 s → 60 s** — derived from named constants `STRIDE_MS + PROCESSING_CEILING_MS +
+  POLL_MS + FRESHNESS_MARGIN_MS` (10+30+12+8) and guarded **two-sided**: the threshold must exceed
+  the worst-case healthy read age (~52 s, so a live read is never false-parked) **and** stay below
+  `WINDOW_MS` (120 s, so a genuinely stale reading still scrolls off). Live-confirmed in the ST-7
+  re-run.
+
+**Test results** (`apps/web`, 2026-06-27):
+
+- Vitest: **726 passed / 70 files**, 0 failed (`--pool=threads` on Windows per project memory; CI
+  runs the same suite on ubuntu).
+- `npm run lint`: **clean (0 errors)** — the prior 2-error `monitoring-session.tsx` baseline was
+  cleared in **PR #94** (2026-06-25), so this branch is fully green, not riding a baseline.
+- `tsc --noEmit`: **green**.
+
+**Gates**:
+
+- ✅ Smoke gate — `specs/010-monitoring-graph-redesign/smoke-tests.md` **signed off by Mohamed
+  (PASS, ST-1…ST-7)** (Constitution VII / gate 5): band colour+height in light/dark, fixed-px true
+  circles / no totem stretch / matched-pair at 360px & ~768px, ramp-up fill-to-width → continuous
+  lock → scroll-off, keyboard focus + popup + tap-toggle + ≥44px touch, reduced-motion, now-marker
+  freshness in lockstep with the bloom, and the honest warm → read → out-of-frame → return journey.
+  **ST-7 was re-run after the #117 fix** and passed.
+- ✅ Typecheck / Vitest / Lint — all green (counts above).
+- ✅ Squash-merge — merged via **PR #118** (`6b8653e`, 2026-06-27); feature branch deleted
+  (local + remote). The dev harness route used for real-CSS width measurement was deleted before
+  merge. No `/speckit-analyze` blocker arose (no analyze finding required a resolution on this
+  branch).
+- ✅ Governance (Amendment 9) — **#117** opened-on-discovery / closed-on-fix in the same change
+  (now CLOSED); the foggy-gate trigger remains back-referenced in the open **#100**.
+
+**Privacy invariant**: untouched — **frontend-only** (the merge diff touches only `apps/web/*` +
+`docs/*` + `specs/*` + `CLAUDE.md`; **no `apps/api` / data-layer / migration change**). No new read,
+no probability on the wire, SELECT whitelist (`id, captured_at, scored, band, skip_cause`) + the
+RLS-as-user reader intact; the live graph shows **no numeric value of any kind** (FR-017 / SC-007).
+
+---
+
 ## Tooling — Dependabot switched to security-updates only (version updates OFF)
 
 **Branch**: `chore/dependabot-security-only` — config correction PR **open for squash-merge** (CI

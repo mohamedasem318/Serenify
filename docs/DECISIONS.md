@@ -4546,3 +4546,143 @@ per-window processing exceeds the 10 s stride → a real serial pileup to compre
 the multi-MB growing clips dominates — re-measure on that hardware first with the PR #114 harness; **or**
 the capture stride itself is shortened (a different lever that moves the capture floor). On current
 hardware neither holds.
+
+---
+
+## 2026-06-27 — feature 010 (monitoring-graph-redesign, roadmap 009b): load-bearing decisions
+
+**Status**: Accepted. Shipped on `010-monitoring-graph-redesign`, **merged to `main`** via **PR #118**
+(squash `6b8653e`, 2026-06-27). Frontend-only inside `apps/web` (one component
+`components/monitor/session-trend.tsx` replaced + one new pure module `lib/session-trend-geometry.ts`);
+the read layer, RLS, SELECT whitelist, page layout, and `globals.css` are untouched and no probability
+reaches the client. Full reasoning in `specs/010-monitoring-graph-redesign/{spec,plan,research}.md`;
+this entry pins the three decisions that are load-bearing for anyone touching the live graph next.
+
+### D1 (headline) — out-of-frame staleness threshold re-tuned 20 s → 60 s, constant-derived + two-sided regression guard
+
+**Context.** During the ST-7 smoke (#117) the parked now-marker behaviour exposed two coupled bugs: a
+single-reading → out-of-frame transition **blanked** the graph (the marker vanished instead of parking),
+and the freshness horizon that decides "is the live edge stale enough to park the marker?" was set to a
+flat **20 s** — short enough that a perfectly healthy live read could exceed it and **false-park** (the
+marker mutes/relabels "last clear read" while the read is actually fine).
+
+**Decision.**
+1. **Fix the blank** with a silent-empty refetch guard in `session-trend.tsx`: `getSessionTrend` returns
+   `[]` (it does **not** throw) on any transient Supabase error, and `refetch` previously called
+   `setPoints(next)` unconditionally, wiping `points` → `isEmpty`. Replace with a functional update that
+   treats a silent empty response like a thrown exception: `setPoints((prev) => next.length === 0 &&
+   prev.length > 0 ? prev : next)` — keep the existing rows. (The geometry already handled
+   `[confident, no_read]` correctly; the bug was purely in the component's data layer.)
+2. **Raise the freshness horizon to a constant-derived 60 s**, not a hand-picked round number:
+   `STRIDE_MS (10) + PROCESSING_CEILING_MS (30) + POLL_MS (12) + FRESHNESS_MARGIN_MS (8) = 60 s`. The
+   horizon is the **worst-case age of a still-healthy live read** plus margin — derived from the actual
+   pipeline cadence, so it tracks the system rather than a guess.
+3. **Guard it two-sided** (the regression discipline): the threshold must be **greater than the
+   worst-case healthy read age (~52 s)** — its lower bound — *and* **less than `WINDOW_MS` (120 s)** —
+   its upper bound. The lower bound stops **false-parking a live read** (the #117 symptom); the upper
+   bound guarantees a **genuinely stale** reading still **scrolls off the rolling ~2-min window**
+   (FR-002a) rather than parking forever off-screen. A one-sided "just make it bigger" fix would have
+   satisfied the lower bound while silently risking the upper.
+
+**Rationale.** Parking the marker on a stale reading while still showing a live anchor is exactly the
+dishonesty this redesign exists to prevent; the threshold is the hinge between "honest stale anchor" and
+"false-parked healthy read", so it is derived from named cadence constants and fenced from both sides,
+not tuned by feel. **Scope note (Principle VIII):** the `20 s → 60 s` value is an **implementation
+constant** — it is not a number written into any FR/SC, and FR-004a's parked-marker *behaviour* is
+unchanged in wording — so this is a code re-tune, not a spec amendment. Live-confirmed in the ST-7
+re-run (2026-06-27). BACKLOG `#117` (CLOSED).
+
+### D2 — three honest no-read treatments + ramp-up fill-to-width geometry (US2)
+
+**Decision.** Split no-reads into **three** treatments derived in the pure module from `band` +
+`skipCause` + position: **warming** (dashed muted line, session-start-only, ≥2 points) · **out-of-frame
+foggy gap** (built per the mock but **gated OFF at launch** behind a single injectable
+`showOutOfFrameFoggy` boolean — at launch out-of-frame routes to the muted gap) · **no-clear-read muted
+gap** (static-opacity fade, never a bridged flat carried-forward line; a leading skip with no prior
+confident reading is **fade-in only**). The x-axis is a **uniform slot per capture window** on a rolling
+~2-min window; during **ramp-up** (< `N_target = 12` windows) the few windows **fill the full plot
+width** edge-to-edge (pitch `plotWidth / (count − 1)`), **locking** at `plotWidth / (N_target − 1)` once
+the count reaches 12 (continuous at the hand-off, no jump), then older windows scroll off the left.
+
+**Rationale / why over the alternatives.** The component used to **flatten every no-read into one
+undifferentiated gap** and discard both `skipCause` and the warming-vs-skip signal (both already on
+every `SessionTrendPoint`); the redesign is honesty-critical, so each cause gets a distinct, honest
+treatment. The **foggy gate ships OFF** because out-of-frame reliability is unproven until issue **#100**
+confirms `skipCause === "out-of-frame"` is distinguishable from low-confidence — honesty-first means not
+shipping a "you left frame" claim we cannot stand behind; the gate is a **one-line flip**, not a
+re-implementation, when #100 lands. **Fill-to-width** was chosen over the prior right-anchored fixed
+`plotWidth / N_target` slots (which left the left of the plot blank — a "cut off" look for the first
+~2 min of every session) and over fill-**from-left** (which would move the "you are here" now-marker for
+~2 min); the pick keeps the now-marker dead-still at the right edge and accepts gentle background
+re-spacing as the cost. Static-opacity fades (not temporal animation) satisfy reduced-motion (SC-006) by
+construction.
+
+### D3 — event-driven now-marker freshness via a `refreshSignal` prop (the orb/trend lag fix)
+
+**Decision.** Make the live now-marker reflect a new reading as promptly as the camera-stage bloom/orb:
+`monitoring-session.tsx` bumps a `trendRefresh` counter on each **persisted** window outcome (reading /
+scored-warming / skipped — **not** `superseded`, which writes no `window_readings` row) and passes it as
+a `refreshSignal` prop; `session-trend.tsx` re-fetches `getSessionTrend` **immediately** on each
+`refreshSignal` change, while the pre-existing ~12 s poll stays as the steady-state **backstop**
+(deliberately **not** lowered — DB load on the deploy VM).
+
+**Rationale / why over the alternatives.** The marker visibly **trailed the live orb by up to a poll
+(~2 s+)** because it only updated on the background poll. Rejected: **lowering the poll interval**
+(raises DB load on every session for a problem that only matters at the live edge) and an **optimistic
+in-memory marker value** (would risk a marker-vs-step-line mismatch). The marker stays sourced from the
+**persisted row** — committed *before* the window POST response returns (`insert_reading` precedes the
+returned outcome in `apps/api/app/services/inference.py` + `supabase_user.py`) — so the event-driven
+refetch reads a row that already exists: **no optimistic value, no mismatch**, and the same read
+layer/contract (only *when* `getSessionTrend` is called changes).
+
+**Cross-references**: `specs/010-monitoring-graph-redesign/` (spec FR-002a / FR-004 / FR-004a / FR-011 /
+FR-012 / FR-015, SC-008 / SC-009 / SC-011 / SC-012a; research R-2 / R-3 / R-4; plan Complexity
+Tracking); `docs/CHANGELOG.md` 2026-06-27; `docs/PROGRESS.md` 2026-06-27; `docs/BACKLOG.md` "From
+feature 010" (#117 resolved) + the open #100 (foggy-gate trigger); the 2026-06-25 Amendment 10 entry
+(the `009b` roadmap slot); the 2026-06-26 inference-concurrency entry (drop-stale ⇒ sparser trend
+points, the forward-note this feature consumes).
+
+---
+
+## 2026-06-27 — Constitution Amendment 11 — roadmap renumber `009b → 010` (monitoring-graph) (1.8.0 → 1.8.1)
+
+**Status**: Accepted (constitutional amendment, PATCH bump `1.8.0 → 1.8.1`). Authored by editing
+`.specify/memory/constitution.md` directly (not via `/speckit-constitution`, to preserve the
+hand-curated Sync Impact Report history). Docs/governance only — no code, no spec, no `specs/NNN/`
+rename.
+
+**Decision — make monitoring-graph canonically `010`, not the `009b` interstitial.** Amendment 10
+(2026-06-25) slotted the redesign as `009b` to avoid renumbering the tail *while it was still
+design-locked and pending spec*. It has since **shipped** — a full feature with its own
+`specs/010-monitoring-graph-redesign/` folder, US1–US3, a pure geometry module, 726 unit tests, and a
+squash-merge to `main` (PR #118, `6b8653e`, 2026-06-27). A shipped feature with its own spec earns a
+**sequential number**, and SpecKit had already auto-assigned the branch `010`, so the roadmap is
+reconciled **to git reality**: `009b-monitoring-graph-redesign` → `010-monitoring-graph-redesign` (the
+"scoped out of 009 … pending spec" parenthetical dropped — no longer true). The tail renumber
+(`010-llm-client-and-chatbot → 011` … `020-fusion → 021`) is the **mechanical consequence**, plus the
+two live cross-refs (Principle IV audio `018 → 019`, Principle III fusion `020 → 021`).
+
+**Why `010`-canonical over keeping `009b`.** The `b`-suffix interstitial was a *renumber-avoidance*
+device justified by "it's a redesign of an existing surface, not a forward feature, and it isn't
+built yet" (Amendment 10). Both halves of that lapsed once it shipped with a sequential `specs/010-…`
+folder: the roadmap label now **diverges from the actual branch/spec number** (`010`), and a
+roadmap whose labels don't match the shipped artifacts is the very drift the ordering list exists to
+prevent. Keeping `009b` would mean the canonical record says `009b` while git, the specs folder, and
+PR #118 all say `010` — confusing for every future reader. Renumbering is cheap here precisely
+because **every renumbered slot is unstarted** (no branch, PR, or spec folder bears those numbers
+yet); the shipped `001`–`010` are untouched.
+
+**Why PATCH, not MINOR.** Amendment 8 was MINOR because it **added two new feature slots** and
+reordered — materially changing the guidance. This amendment adds **no** slot, removes **no** slot or
+principle, and changes **no** rule: the same features remain in the same relative order; only the
+numeric labels shift to match shipped reality. That is a non-semantic documentation reconcile —
+PATCH. (Contrast also Amendment 10's MINOR, which *added* the `009b` slot.)
+
+**Risk**: low. No started work references the renumbered slots; the shipped feature numbers are
+fixed; the Amendment 10 narrative is left verbatim as the dated record of the interstitial decision
+(append-only history is not rewritten to make numbers line up).
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 11 (Sync Impact Report) + Principle
+VIII ordering list + Principle III/IV cross-refs + the version line; `docs/CHANGELOG.md` 2026-06-27;
+`specs/010-monitoring-graph-redesign/`; PR #118 (`6b8653e`); the 2026-06-25 Amendment 10 entry (the
+superseded-by-shipping `009b` slot decision).
