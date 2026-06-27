@@ -1559,6 +1559,7 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
   - **#89** (iOS monitoring 0 readings via a server-side decode death that *also* surfaces as the vague "on our side") — same vague-surface class, different root cause (decode vs framing).
   - The feature-006 coverage gate (`insufficient_face_frames` → the `insufficient-face` chip) — the existing "present but thin" path; check whether walk-away ever routes here vs to "our side".
   - The "skipped a read" foggy note + the 90 s-no-face → `out_of_frame` presence machine (feature 008 US1/US2) — the two existing distinct surfaces this gap sits between.
+  - **009b / spec 010** (`specs/010-monitoring-graph-redesign`): ships `out-of-frame` mapped to the muted "no clear read" treatment (FR-019 fallback). When this diagnostic confirms `skipCause === "out-of-frame"` is reliable, flip the foggy "step back into frame" treatment on in `session-trend.tsx` — it is a one-line gate; the code is already built per spec 010.
 
 **Fix scope**: read-only diagnostic first (no code change) — small investigation across `apps/web` (presence/cause-chip rendering), `apps/api` (inference cause classification), and `packages/ml-video` (coverage gate). Any resulting fix is a separate, later item sized once the diagnostic lands.
 **Address by**: a monitoring-quality pass — not demo-blocking, but it muddies the live-monitor UX (the vague message reads as a system fault when the real cause is "you left the frame"). Pairs with #89 (same vague-surface class).
@@ -1590,3 +1591,15 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
 **Tier options (ranked by safety)**: **T1** (low risk, ~10–13 s real + perceived) pre-warm the extractor to kill the first-window cold-start spike + a display-only "getting your first read — N of 4" cue → ~2:15, no inference-path change. **T2** (high risk/effort, realistically **~2:00 not ~90 s** given the 10 s window spacing) bounded warm-up burst — score the first M=4 windows concurrently then **hard-clamp to 1**; re-opens the just-fixed path, needs `_SessionBuffers` locking (#79), and must **score-all-of-the-first-M (not drop-stale)** or warm-up starves. **T3** (medium risk) provisional early band at M=2–3 — trades smoothing quality (touches the locked M=N=4 contract; SC-003 drift; needs sign-off).
 **Caveat**: all second-counts are **laptop-specific** (i5, browser competing for CPU). On the Azure demo VM the per-window cost changes, reshaping the warm-up math — **re-measure on the real VM before tuning warm-up.**
 **Address by**: a future warm-up-latency pass, only after a VM re-measure; not demo-blocking.
+
+---
+
+## From feature 010 (monitoring-graph-redesign) — branch open
+
+### ~~010 ST-7: parked marker disappears on single-reading → out-of-frame transition~~ — resolved (#117)
+**Status**: resolved (`type:bug` / `area:web`)
+**Resolved**: 2026-06-27 on `010-monitoring-graph-redesign` — silent-empty refetch guard (`setPoints` functional update, commit `8517118`), now-marker parks on stale out-of-frame edge (commit `ae43e5f`), FR-004a freshness horizon 20 s→60 s to stop false-parking healthy live reads (commit `a550ab3`), two-sided regression guard (commit `cbce6b2`). ST-7 re-run passed 2026-06-27.
+**Observed**: 2026-06-27, ST-7 manual smoke (this branch).
+**Description**: With exactly **1 confident reading** in the session, stepping out of frame caused the graph to blank and the confident dot (the parked marker) to disappear instead of staying muted + static at the last confident position (SC-010 / FR-004a). The no-clear-read gap treatment only appeared **after returning to frame**, not during the out-of-frame period.
+**Root cause**: `getSessionTrend` returns `[]` (not throws) on any Supabase error (`if (error || !data) return []`, monitoring-reads.ts). In `session-trend.tsx`, `refetch` called `setPoints(next)` unconditionally, so a silent empty response wiped `points` → `isEmpty=true`. The geometry (`buildNowMarker`) handles `[confident, no_read]` correctly; the bug was purely in the component's data layer. The upload gate on out-of-frame means no `refreshSignal` fires, so the only refetch is the immediate one triggered by `active→false` — exactly the moment a transient Supabase error can return `[]`.
+**Fix**: `session-trend.tsx` `refetch` — functional update guard: `setPoints((prev) => next.length === 0 && prev.length > 0 ? prev : next)` treats a silent empty response like a thrown exception and leaves existing rows in place. Regression tests added in both geometry and component suites.

@@ -1,20 +1,25 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/009-today-card-trend-redesign/plan.md` (with supporting artifacts:
-`research.md`, `data-model.md`, `contracts/today-trend-ui.md`, `quickstart.md`).
-This is a frontend-only redesign of the employee dashboard today check-in card's
-collapsed + expanded stress-trend surfaces and session timeline. It **consumes the
-existing read layer** unchanged (`getTodayRecap` / `getTodayTrend` /
-`deriveRecap` / `sessionTenor` in `apps/web/lib/api/monitoring-reads.ts`, wired in
-`components/home/todays-checkin-card.tsx`) — no data-layer, RLS, or whitelist
-change; no probability reaches the client. The central technique is **fixed-pixel
-SVG rendering** (1 unit = 1px; SVG width = nLanes × laneWidth with a matching
-viewBox; NO stretched viewBox — that stretch is the totem bug the prior build
-hit). Visual source of truth: `serenify-008followups-trend-FINAL.html` (real
-Graphite tokens). Two forks await Mohamed before implement: headline-honesty
-(`deriveHeadline` "tense" wording vs FR-002) and the amber-text light value
-(`#8A580F` mock vs `#7E5310` constitution) — see `plan.md` Complexity Tracking.
+at `specs/010-monitoring-graph-redesign/plan.md` (with supporting artifacts:
+`research.md`, `data-model.md`, `contracts/session-trend-ui.md`, `quickstart.md`).
+This is a frontend-only redesign of the live **"This session"** monitoring graph
+(`apps/web/components/monitor/session-trend.tsx`, the card below the camera stage),
+roadmap label `009b`. It **consumes the existing read layer** unchanged
+(`getSessionTrend` in `apps/web/lib/api/monitoring-reads.ts`, wired in
+`components/monitor/monitoring-session.tsx`) — no data-layer, RLS, whitelist,
+page-layout, or token change; no probability reaches the client. The central
+technique is **fixed-pixel SVG rendering** (1 unit = 1px; SVG width = container
+width with a matching viewBox; NO stretched viewBox — the totem/oval bug). The
+x-axis is a **uniform slot per capture window** on a **rolling ~2-min window**
+(decided F1). It splits no-reads into three honest treatments (warming dashed line ·
+out-of-frame foggy gap, **gated OFF at launch** per FR-015 · no-clear-read muted
+gap) and parks the now-marker muted/static during a no-read. Visual source of
+truth: `serenify-live-session-graph-mock.html` (real Graphite tokens; all already
+in `globals.css`). NEW pure module: `apps/web/lib/session-trend-geometry.ts`.
+All copy is signed off (FR-024 neutral no-read subtitle = "No clear read
+right now"; FR-022 labels approved). The pre-existing ~12s
+polling (vs the WebSocket constraint) is out of scope here (consumed unchanged).
 <!-- SPECKIT END -->
 
 ## Backlog ↔ Issues

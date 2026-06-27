@@ -156,6 +156,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // monitor-page this-session trend re-renders once a session exists. Additive only —
   // the ref stays the source of truth for the side-effect paths.
   const [liveSessionId, setLiveSessionId] = useState<string | null>(null);
+  // FR-004 freshness: bumped on each window the server PERSISTED so the this-session trend
+  // re-fetches the new row immediately (tracking the live bloom) instead of waiting for its
+  // ~12 s poll. Carries NO band value — just "something new landed" → re-read the persisted rows.
+  const [trendRefresh, setTrendRefresh] = useState(0);
 
   const streamRef = useRef<MediaStream | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
@@ -306,6 +310,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       } else {
         // reading / warming_up / superseded — the reducer folds each (superseded is a no-op).
         dispatch({ type: "WINDOW_OUTCOME", outcome });
+      }
+      // FR-004 freshness: a window the server PERSISTED (reading / scored-warming / skipped)
+      // adds/changes a trend row, so nudge the this-session trend to re-fetch at once instead
+      // of waiting for its poll — the now-marker then tracks the live bloom (no ~2 s trail). A
+      // `superseded` shed (drop-stale back-pressure) writes NO row, so it never nudges. The
+      // marker stays sourced from the persisted row the refetch reads — no optimistic value.
+      if (outcome.outcome !== "superseded") {
+        setTrendRefresh((n) => n + 1);
       }
     },
     [deps, dispatch],
@@ -716,6 +728,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
           sessionId={liveSessionId}
           active={op === "warming-up" || op === "active"}
           load={loadSessionTrend}
+          refreshSignal={trendRefresh}
         />
       )}
     </div>

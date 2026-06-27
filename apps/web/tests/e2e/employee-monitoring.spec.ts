@@ -9,6 +9,7 @@ import {
 import {
   installMonitoringMocks,
   interceptMonitoringApi,
+  seedLiveNoReadSession,
   seedRetrospectiveSession,
 } from "./monitoring-helpers";
 
@@ -40,12 +41,17 @@ test("employee happy path: start → permission → warming-up → reading → e
 
   await installMonitoringMocks(page);
   await installActiveDetector(page); // the framing gate sees a centred, lit face → uploads proceed
-  await interceptMonitoringApi(page); // warming_up ×2 → reading (at_ease)
 
   // A calibrated employee (real anchor → has_anchor true → the card loads the recap branch,
   // never calibrate-first) + one ended session earlier today so the recap has content.
   const emp = await createCalibratedEmployee("Monitor Tester");
   await seedRetrospectiveSession(emp.id);
+
+  // T026 (SC-007 / FR-015): seed a fresh-live read-less session and have the orchestrator adopt
+  // its id, so the live "This session" trend reads real persisted no-read rows and renders the
+  // warming no-read treatment in the SVG — the surface we assert carries NO numeric value.
+  const liveSessionId = await seedLiveNoReadSession(emp.id);
+  await interceptMonitoringApi(page, { forceSessionId: liveSessionId }); // warming_up ×2 → reading
 
   await signInToApp(page, emp);
 
@@ -74,6 +80,24 @@ test("employee happy path: start → permission → warming-up → reading → e
   await expect(page.getByTestId("bloom")).toHaveAttribute("data-tone", "ease");
   // No number/gauge is ever rendered (FR-015) — the page shows no percent sign.
   await expect(page.locator("body")).not.toContainText("%");
+
+  // ── T026 (SC-007 / FR-015): the live "This session" graph renders a no-read TREATMENT and
+  //    carries NO numeric value of any kind ────────────────────────────────────────────────
+  // The orchestrator adopted the seeded read-less session (forceSessionId), so the trend's real
+  // RLS read returns its warming rows: the graph draws the warming dashed-line no-read treatment
+  // rather than fabricating a band. (The bloom above reads the MOCKED window outcome — a separate
+  // seam; the trend reads persisted rows, which the boundary fake never writes a confident row to.)
+  const trend = page.getByTestId("session-trend");
+  await expect(trend).toBeVisible({ timeout: 30_000 });
+  const trendSvg = page.getByTestId("session-trend-svg");
+  await expect(trendSvg).toBeVisible({ timeout: 30_000 });
+  // a genuine no-read treatment is in the SVG (the warming dashed line + its group)
+  await expect(page.getByTestId("treatment-warming")).toBeAttached();
+  await expect(page.getByTestId("trend-warming")).toBeAttached();
+  // SC-007: the only text the graph renders is band/treatment labels — never a digit.
+  const graphText = (await trendSvg.evaluate((el) => el.textContent)) ?? "";
+  expect(graphText).not.toMatch(/\d/);
+  expect(graphText).not.toContain("%");
 
   // ── end the session → back to the dashboard (mock-gap #6: no standalone "ended" screen) ──
   await page.getByRole("button", { name: "End session" }).click();
