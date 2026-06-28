@@ -4686,3 +4686,61 @@ fixed; the Amendment 10 narrative is left verbatim as the dated record of the in
 VIII ordering list + Principle III/IV cross-refs + the version line; `docs/CHANGELOG.md` 2026-06-27;
 `specs/010-monitoring-graph-redesign/`; PR #118 (`6b8653e`); the 2026-06-25 Amendment 10 entry (the
 superseded-by-shipping `009b` slot decision).
+
+## 2026-06-28 — Primary/fallback LLM switch to gpt-oss (Groq Llama-3.3-70B deprecation)
+
+**Status**: Accepted.
+
+**Decision**: Primary LLM `llama-3.3-70b-versatile` → `openai/gpt-oss-120b` (Groq, `reasoning_effort="low"`). Fallback Gemma-3-4B → `openai/gpt-oss-20b` via LM Studio. The adapter keeps a defensive `{...}` extractor backstop for reasoning that leaks into `content` (a known Groq bug); `reasoning_format` is a Qwen param and is NOT used (use `reasoning_effort`). Scorers use `response_format={"type":"json_object"}`.
+
+**Rationale**: Groq is shutting down Llama-3.3-70B on 2026-08-16. gpt-oss is Groq's stated consolidation target (deprecation-resilient), supports strict JSON-schema structured outputs, and keeps primary + fallback in one family. Chosen over qwen3.x (coding-agent register, wrong for a companion) and over staying on any Llama (all deprecating).
+
+**Revisit if**: per-message-scorer token cost on the reasoning model becomes a problem in production (a reasoning model as the every-turn scorer is wasteful — consider a lighter scorer path and/or prompt caching before go-live).
+
+## 2026-06-28 — Rollup uses its own variant prompt, not the shared per-message prompt
+
+**Status**: Accepted. Reverses an earlier "shared is fine" call.
+
+**Decision**: The session rollup uses a dedicated "where did they land — weight the ending, not the peak" prompt (`scorer_rollup`), separate from the per-message scorer (`scorer_per_message`). Two scorer prompt files.
+
+**Rationale**: A test run showed the shared prompt anchoring on peak stress (stuck on "tense") on a conversation that ended calm, while the variant correctly read the calmer landing ("at_ease"). The rollup is the considered whole-conversation read; it must weight the arc.
+
+## 2026-06-28 — Crisis is a live-only signal (band-only persisted)
+
+**Status**: Accepted.
+
+**Decision**: The per-message `crisis` flag and Ren's silent `[CRISIS]` token drive the resource panel in the moment. The rollup persists **band only**. Crisis is never stored as a conversation property, never a dashboard band/badge, never a per-message log.
+
+**Rationale**: Persisting crisis latched a false sticky "crisis" label on the whole session. Live-only also satisfies the Principle I invariant (crisis never persisted, never to the employer chain). Consistent with constitution Amendment 12.
+
+## 2026-06-28 — Crisis panel trigger = scorer crisis OR Ren [CRISIS]
+
+**Status**: Accepted. Extends the original brief (scorer-only gate).
+
+**Decision**: The resource panel fires when the per-message scorer returns `crisis:true` OR Ren emits the `[CRISIS]` token. Either is sufficient.
+
+**Rationale**: Live testing showed the scorer can miss where Ren catches. A false-positive panel is mildly intrusive; a missed crisis is dangerous — maximize recall on the safety path.
+
+## 2026-06-28 — Relief-vs-loss crisis framing (precision fix)
+
+**Status**: Accepted.
+
+**Decision**: Crisis = a person framing their absence as relief / being better off gone. NOT crisis = absence framed as loss / being needed, or ordinary mortality / natural-death worry. Encoded in both the scorer and Ren prompts.
+
+**Rationale**: Fixed a false-positive class (e.g. "if I died they'd be left with debt" — mortality anxiety, not intent) without losing genuine passive-ideation detection.
+
+## 2026-06-28 — Known limitation: the two crisis nets are not independent
+
+**Status**: Accepted (logged, not fixed).
+
+**Decision**: The scorer `crisis` flag and Ren's `[CRISIS]` token both run on the same relief-vs-loss heuristic, so they catch the same cases and miss the same cases — correlated, not independent, redundancy.
+
+**Rationale**: Acceptable for the demo. Revisit before real users — e.g. a differently-framed second check — so the second net fails independently of the first.
+
+## 2026-06-28 — Per-message scorer returns band + crisis (not crisis-only)
+
+**Status**: Accepted.
+
+**Decision**: The every-turn scorer returns `{band, crisis}`. The band serves as the rollup's fallback if the rollup call fails or returns malformed JSON.
+
+**Rationale**: Testing showed zero crisis-detection cost from also returning the band, so one call covers both jobs.
