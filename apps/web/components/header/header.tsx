@@ -11,12 +11,12 @@ type HeaderProps = {
   role: "employee" | "team_lead" | "admin";
 };
 
-export function Header({ fullName, email }: HeaderProps) {
+export function Header({ fullName, email, role }: HeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between gap-4 border-b border-border bg-bg px-4 sm:px-6">
       <div className="flex items-center gap-2">
         <div className="md:hidden">
-          <MobileMenu />
+          <MobileMenu role={role} />
         </div>
         <Link
           href="/app"
@@ -30,7 +30,7 @@ export function Header({ fullName, email }: HeaderProps) {
       </div>
 
       <div className="hidden md:flex">
-        <CenterNav />
+        <CenterNav role={role} />
       </div>
 
       <div className="flex items-center gap-1">

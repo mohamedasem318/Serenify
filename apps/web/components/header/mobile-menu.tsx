@@ -14,18 +14,30 @@ import {
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
 
+type Role = "employee" | "team_lead" | "admin";
+
 type Destination = {
   href: string;
   label: string;
+  /** Exact-match active state (Home is the root of /app — see CenterNav). */
+  exact?: boolean;
+  /** Visible to this role only (omit = all roles). */
+  employeeOnly?: boolean;
 };
 
 const DESTINATIONS: ReadonlyArray<Destination> = [
-  { href: "/app", label: "Home" },
+  { href: "/app", label: "Home", exact: true },
+  // Mirror CenterNav: Chat is an employee-only surface (FR-016). Without this the
+  // hamburger had no Chat link, stranding employees at narrow widths (no center nav).
+  { href: "/app/chat", label: "Chat", exact: true, employeeOnly: true },
 ];
 
-export function MobileMenu() {
+export function MobileMenu({ role }: { role?: Role }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const destinations = DESTINATIONS.filter(
+    (d) => !d.employeeOnly || role === "employee",
+  );
 
   return (
     <Sheet open={open} onOpenChange={setOpen}>
@@ -43,9 +55,10 @@ export function MobileMenu() {
           aria-label="Workflow destinations"
           className="mt-8 flex flex-col gap-1"
         >
-          {DESTINATIONS.map(({ href, label }) => {
-            const active =
-              pathname === href || pathname.startsWith(`${href}/`);
+          {destinations.map(({ href, label, exact }) => {
+            const active = exact
+              ? pathname === href
+              : pathname === href || pathname.startsWith(`${href}/`);
             return (
               <SheetClose key={href} asChild>
                 <Link

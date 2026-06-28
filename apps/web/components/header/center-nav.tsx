@@ -15,18 +15,27 @@ type Destination = {
    * destinations (Insights etc.) omit this and keep the prefix match below.
    */
   exact?: boolean;
+  /** Visible to this role only (omit = all roles). */
+  employeeOnly?: boolean;
 };
 
 const DESTINATIONS: ReadonlyArray<Destination> = [
   { href: "/app", label: "Home", exact: true },
+  // Chat is an employee-only surface (FR-016).
+  { href: "/app/chat", label: "Chat", exact: true, employeeOnly: true },
 ];
 
-export function CenterNav() {
+type Role = "employee" | "team_lead" | "admin";
+
+export function CenterNav({ role }: { role?: Role }) {
   const pathname = usePathname();
+  const destinations = DESTINATIONS.filter(
+    (d) => !d.employeeOnly || role === "employee",
+  );
 
   return (
     <nav aria-label="Workflow destinations" className="flex items-center gap-1">
-      {DESTINATIONS.map(({ href, label, exact }) => {
+      {destinations.map(({ href, label, exact }) => {
         const active = exact
           ? pathname === href
           : pathname === href || pathname.startsWith(`${href}/`);
