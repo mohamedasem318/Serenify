@@ -108,3 +108,100 @@ WindowOutcome = Annotated[
     ReadingOutcome | WarmingUpOutcome | SkippedOutcome | SupersededOutcome,
     Field(discriminator="outcome"),
 ]
+
+
+# ── Chat (feature 011, contracts/orchestration.md + chat-storage-rls.md) ─────
+# Reuses `Band` (at_ease | a_little_tense | tense). Note what is DELIBERATELY
+# absent from every response below: no crisis flag is ever persisted or echoed as
+# stored state, no per-message band, no raw scorer JSON, no prompt text. The live
+# crisis panel (CrisisPanel) is a render-only payload (FR-041).
+
+ConversationState = Literal["open", "ended"]
+ChatRole = Literal["user", "assistant"]
+
+
+class ConversationSummary(BaseModel):
+    """A conversation row for history / recent-chats. Carries the ONE stored
+    chat-derived band (rollup_band) — never a crisis field."""
+
+    id: str
+    title: str | None
+    state: ConversationState
+    rollup_band: Band | None
+    message_count: int
+    last_message_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChatMessageOut(BaseModel):
+    id: str
+    role: ChatRole
+    content: str
+    created_at: datetime
+
+
+class ConversationDetail(BaseModel):
+    conversation: ConversationSummary
+    messages: list[ChatMessageOut]
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummary]
+
+
+class CrisisResourceOut(BaseModel):
+    """A verified app-table resource row — never model-generated (FR-035)."""
+
+    country: Literal["EG", "US"]
+    name: str
+    number: str
+    url: str | None = None
+    last_checked: str
+
+
+class CrisisPanel(BaseModel):
+    """Live, render-only crisis payload. Surfaces verified resources + the
+    universal immediate-danger line. Rendering it persists NOTHING (FR-041/042)."""
+
+    resources: list[CrisisResourceOut]
+    universal_line: str
+    emergency_number: str | None = None
+
+
+class SendMessageRequest(BaseModel):
+    content: str
+
+
+class SendMessageResponse(BaseModel):
+    """Outcome of one user send.
+
+    - ``ok``: Ren replied; ``assistant_message`` present. ``crisis`` may be set
+      (scorer flag OR Ren's [CRISIS] token). ``rollup_band`` set when a fifth-message
+      rollup ran. Per-message score is never persisted or returned.
+    - ``assistant_failed``: the user message persisted but Ren failed after retry; the
+      client shows a calm trouble state and can retry without retyping (FR-052/054).
+    - ``rate_limited``: the send was blocked; nothing persisted (FR-059).
+    """
+
+    outcome: Literal["ok", "assistant_failed", "rate_limited"]
+    user_message: ChatMessageOut | None = None
+    assistant_message: ChatMessageOut | None = None
+    crisis: CrisisPanel | None = None
+    rollup_band: Band | None = None
+    conversation: ConversationSummary | None = None
+    retry_after_seconds: int | None = None
+
+
+class RenameConversationRequest(BaseModel):
+    title: str
+
+
+class EndConversationResponse(BaseModel):
+    """End flow. ``ended``: rollup + auto-title both succeeded and the conversation
+    is closed. ``retry``: rollup or title failed after retry — the conversation stays
+    OPEN with a calm retry state (FR-032b); it is not marked ended."""
+
+    outcome: Literal["ended", "retry"]
+    conversation: ConversationSummary | None = None
+
