@@ -51,7 +51,11 @@ export default async function AppPage() {
             (null/error → undefined, treated conservatively as calibrated — matches the banner
             logic; only an explicit `false` routes to calibrate-first). */}
         <TodaysCheckinCard userId={user.id} hasAnchor={hasAnchor ?? undefined} />
-        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+        {/* Stacks to one column until 880px (mock breakpoint) so neither secondary card
+            is squeezed into the cramped 2-col band that md (768) would create. */}
+        {/* items-start so each card sizes to its own content — the recent-chats card is
+            height-capped independently and must not be stretched to match its neighbour. */}
+        <div className="grid grid-cols-1 items-start gap-6 min-[880px]:grid-cols-2">
           <ThingsThatMightHelpCard />
           <RecentChatsCard />
         </div>

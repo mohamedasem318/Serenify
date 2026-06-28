@@ -37,10 +37,18 @@ import { cn } from "@/lib/utils";
 type Variant = "page" | "panel";
 type SendError = null | "trouble" | "rate_limited" | "end_retry" | "load_failed";
 
+/** Panel host (the pill) state hook: the LIVE active conversation and whether it can be
+ *  finalized. Lets the pill's header × end the exact conversation in view — including one
+ *  lazily created after the panel opened — via the same endChat path, without the pill
+ *  having to track the shell's internal state. */
+export type PanelChatState = { conversationId: string | null; canEnd: boolean };
+
 type Props = {
   variant?: Variant;
   initialConversations: ConversationSummary[];
   initialDetail: ConversationDetail | null;
+  /** Panel variant only: report active-conversation state up to the host (the pill). */
+  onPanelStateChange?: (state: PanelChatState) => void;
 };
 
 function RenAvatar({ size = 34 }: { size?: number }) {
@@ -74,7 +82,12 @@ function MessageBubble({ message }: { message: ChatMessage }) {
   );
 }
 
-export function ChatShell({ variant = "page", initialConversations, initialDetail }: Props) {
+export function ChatShell({
+  variant = "page",
+  initialConversations,
+  initialDetail,
+  onPanelStateChange,
+}: Props) {
   const isPanel = variant === "panel";
   const [conversations, setConversations] = useState(initialConversations);
   const [activeId, setActiveId] = useState<string | null>(
@@ -113,6 +126,17 @@ export function ChatShell({ variant = "page", initialConversations, initialDetai
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
+
+  // Panel host (pill) reporting: an empty or already-ended conversation has nothing to
+  // finalize, so canEnd is false and the pill's × collapses without an end call. A
+  // freshly lazy-created conversation has no row in `conversations` yet → default "open".
+  useEffect(() => {
+    if (!isPanel) return;
+    onPanelStateChange?.({
+      conversationId: activeId,
+      canEnd: !!activeId && messages.length > 0 && (active?.state ?? "open") === "open",
+    });
+  }, [isPanel, activeId, messages.length, active?.state, onPanelStateChange]);
 
   function upsertConversation(summary: ConversationSummary) {
     setConversations((list) => {
