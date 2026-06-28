@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ConversationSummary } from "@/lib/api/chat-client";
 import { BOT_NAME } from "@/lib/chat/constants";
+import { openChatPillFresh } from "@/lib/chat/pill-launcher";
 import { relativeTime } from "@/lib/chat/relative-time";
 
 const COLLAPSE_KEY = "serenify.recentChats.collapsed";
@@ -60,11 +61,12 @@ export function RecentChatsCard() {
     });
   }
 
-  // Open a blank composer (?new=1) rather than persisting an empty conversation up front;
-  // the row is created by the first message in the chat shell. Avoids the ghost "New chat"
-  // row that an abandoned create used to leave in this very card.
+  // "+ New chat" opens the floating pill in place (fresh, blank composer) instead of
+  // deep-linking to /app/chat — staying on the home dashboard. The row is still created
+  // lazily by the first message in the pill's shell, so an abandoned New chat leaves no
+  // ghost row. (Opening an EXISTING row from the list below still navigates to /app/chat.)
   function handleNewChat() {
-    router.push("/app/chat?new=1");
+    openChatPillFresh();
   }
 
   async function submitRename(id: string) {
@@ -125,9 +127,10 @@ export function RecentChatsCard() {
           pick them back up.
         </p>
       ) : (
-        // Only the LIST scrolls — the header above stays fixed. max-h comfortably fits
-        // ~6 rows; beyond that the list scrolls inside the card instead of growing it.
-        <ul className="max-h-[26rem] overflow-y-auto p-2" data-testid="recent-chats-list">
+        // Only the LIST scrolls — the header above stays fixed. max-h shows at most ~5
+        // rows (a sliver of the 6th peeks as a scroll affordance); beyond that the list
+        // scrolls inside the card instead of growing it.
+        <ul className="max-h-[22rem] overflow-y-auto p-2" data-testid="recent-chats-list">
           {conversations.map((c) => (
             <li
               key={c.id}

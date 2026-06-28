@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+
+import { OPEN_CHAT_PILL_EVENT } from "@/lib/chat/pill-launcher";
 
 const { usePathname } = vi.hoisted(() => ({ usePathname: vi.fn(() => "/app") }));
 vi.mock("next/navigation", () => ({ usePathname }));
@@ -178,7 +180,7 @@ describe("ChatPill header — minimize vs end (standard chat-widget pattern)", (
     expect(screen.getByTestId("chat-pill")).toBeInTheDocument();
   });
 
-  it("reopening after an end starts a FRESH composer (does not reload the finalized chat)", async () => {
+  it("reopening after an end starts FRESH — it re-consults the backend (single source of truth)", async () => {
     (actions.loadCurrentConversation as Mock).mockResolvedValue(withMessages);
     const user = userEvent.setup();
     render(<ChatPill />);
@@ -186,11 +188,50 @@ describe("ChatPill header — minimize vs end (standard chat-widget pattern)", (
     await user.click(screen.getByTestId("pill-end"));
     const confirm = await screen.findByTestId("end-confirm");
     await user.click(within(confirm).getByRole("button", { name: /end chat/i }));
+    await waitFor(() => expect(actions.endChat).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.queryByTestId("chat-pill-panel")).toBeNull());
 
+    // The backend's get_current_conversation now EXCLUDES the finalized chat → null on
+    // reopen, so the pill lands on a fresh composer. No client-side "skip reload" flag.
     (actions.loadCurrentConversation as Mock).mockClear();
+    (actions.loadCurrentConversation as Mock).mockResolvedValue({ ok: true, data: null });
     await openPanel(user);
-    // The finalized conversation must NOT be reloaded as "current" — fresh composer instead.
+    expect(actions.loadCurrentConversation).toHaveBeenCalled();
+
+    // Fresh: nothing to finalize, so × collapses with no confirm and no SECOND end call.
+    await user.click(screen.getByTestId("pill-end"));
+    expect(screen.queryByTestId("end-confirm")).toBeNull();
+    expect(actions.endChat).toHaveBeenCalledTimes(1);
+  });
+
+  it("starts fresh across a remount (navigate away and back) — freshness is the backend's job", async () => {
+    // After an end + navigation the component unmounts and remounts; any client-only flag
+    // would be lost. The backend reports no current chat (ended excluded) → fresh start.
+    (actions.loadCurrentConversation as Mock).mockResolvedValue({ ok: true, data: null });
+    const user = userEvent.setup();
+    const { unmount } = render(<ChatPill />);
+    unmount();
+    render(<ChatPill />);
+
+    await openPanel(user);
+    expect(actions.loadCurrentConversation).toHaveBeenCalled();
+    await user.click(screen.getByTestId("pill-end"));
+    expect(screen.queryByTestId("end-confirm")).toBeNull();
+    expect(actions.endChat).not.toHaveBeenCalled();
+  });
+
+  it("opens fresh in place when the home card asks (open-chat-pill event) — no current chat loaded", async () => {
+    // The card's "+ New chat" fires this event instead of deep-linking to /app/chat.
+    (actions.loadCurrentConversation as Mock).mockResolvedValue(withMessages);
+    render(<ChatPill />);
+    expect(screen.queryByTestId("chat-pill-panel")).toBeNull();
+
+    act(() => {
+      window.dispatchEvent(new Event(OPEN_CHAT_PILL_EVENT));
+    });
+
+    expect(await screen.findByTestId("chat-pill-panel")).toBeInTheDocument();
+    // Fresh start: it does NOT resume the current conversation.
     expect(actions.loadCurrentConversation).not.toHaveBeenCalled();
   });
 });

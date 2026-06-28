@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import type { ConversationDetail } from "@/lib/api/chat-client";
 import { BOT_NAME } from "@/lib/chat/constants";
+import { OPEN_CHAT_PILL_EVENT } from "@/lib/chat/pill-launcher";
 
 /**
  * Height of the rendered pill in px. Still exported so notification.tsx can read the
@@ -51,13 +52,25 @@ export function ChatPill() {
   // The live active-conversation state reported up by the embedded shell — read at the
   // moment the × is pressed (a ref, so reporting it never re-renders the pill).
   const panelStateRef = useRef<PanelChatState>({ conversationId: null, canEnd: false });
-  // Set after an end so the NEXT open lands on a fresh composer instead of reloading the
-  // just-finalized chat (the API still treats an ended chat as the "current" one).
-  const freshNextRef = useRef(false);
 
   const handlePanelState = useCallback((state: PanelChatState) => {
     panelStateRef.current = state;
   }, []);
+
+  // Open a FRESH chat in place when the home "Recent chats" card asks (its "+ New chat"),
+  // rather than the card deep-linking to /app/chat. Expands from the nub onto a blank
+  // composer; the row is created lazily on the first send.
+  const openFresh = useCallback(() => {
+    setDetail(null);
+    setLoading(false);
+    setOpen(true);
+  }, []);
+
+  useEffect(() => {
+    if (suppressed) return;
+    window.addEventListener(OPEN_CHAT_PILL_EVENT, openFresh);
+    return () => window.removeEventListener(OPEN_CHAT_PILL_EVENT, openFresh);
+  }, [suppressed, openFresh]);
 
   useEffect(() => {
     // No pill on the chat route → no offset to reserve for notification stacking.
@@ -71,16 +84,13 @@ export function ChatPill() {
 
   async function handleOpen() {
     setOpen(true);
-    if (freshNextRef.current) {
-      // Reopening right after an end: start fresh (a new conversation is created lazily
-      // on the first message) rather than reloading the finalized chat.
-      freshNextRef.current = false;
-      setDetail(null);
-      return;
-    }
     setLoading(true);
     const res = await loadCurrentConversation();
     setLoading(false);
+    // The backend is the single source of truth for "current": its
+    // get_current_conversation excludes finalized (ended) chats, so after an end this
+    // resolves to null → a fresh composer, even across a navigation/remount. No
+    // client-side "skip the reload" flag to carry. An unfinished chat still resumes.
     setDetail(res.ok ? res.data : null);
   }
 
@@ -100,12 +110,13 @@ export function ChatPill() {
   }
 
   // Confirmed end: finalize via the SAME endChat action the /app/chat page uses
-  // (auto-title + rollup lock), then collapse. Reopening starts fresh.
+  // (auto-title + rollup lock), then collapse. Reopening starts fresh because the
+  // backend no longer reports the finalized chat as "current" (see handleOpen) — there
+  // is no client flag to survive a remount.
   async function handleEndConfirmed() {
     const id = panelStateRef.current.conversationId;
     setConfirmingEnd(false);
     if (id) await endChat(id);
-    freshNextRef.current = true;
     setDetail(null);
     setOpen(false);
   }

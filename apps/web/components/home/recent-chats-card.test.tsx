@@ -10,9 +10,11 @@ vi.mock("@/app/(authed)/app/chat/actions", () => ({
   renameChat: vi.fn(),
   deleteChat: vi.fn(),
 }));
+vi.mock("@/lib/chat/pill-launcher", () => ({ openChatPillFresh: vi.fn() }));
 
 import { RecentChatsCard } from "@/components/home/recent-chats-card";
 import * as actions from "@/app/(authed)/app/chat/actions";
+import * as launcher from "@/lib/chat/pill-launcher";
 
 const rows = [
   {
@@ -65,17 +67,19 @@ describe("RecentChatsCard (FR-015/015a)", () => {
     expect(localStorage.getItem("serenify.recentChats.collapsed")).toBe("1");
   });
 
-  it("opens a blank New chat without persisting a row (creation defers to first send)", async () => {
+  it("opens the chat pill in a fresh state instead of deep-linking to /app/chat", async () => {
     (actions.createChat as Mock).mockResolvedValue({ ok: true, data: { ...rows[0], id: "new1", title: null } });
     const user = userEvent.setup();
     render(<RecentChatsCard />);
     await screen.findByText("A heavy week at work");
 
     await user.click(screen.getByRole("button", { name: /new chat/i }));
-    // No empty conversation is written; we just land on a fresh composer (?new=1), and
-    // the row is created later by the first message (in the chat shell).
+    // "+ New chat" no longer navigates — it asks the floating pill to open fresh IN PLACE
+    // (stay on the home dashboard). No empty conversation is written; the row is created
+    // later by the first message in the pill's shell.
+    expect(launcher.openChatPillFresh).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
     expect(actions.createChat).not.toHaveBeenCalled();
-    expect(push).toHaveBeenCalledWith("/app/chat?new=1");
   });
 
   it("opens a conversation from its row", async () => {
@@ -85,11 +89,11 @@ describe("RecentChatsCard (FR-015/015a)", () => {
     expect(push).toHaveBeenCalledWith("/app/chat?c=c1");
   });
 
-  it("caps height and scrolls the list once chats accumulate past ~6 rows", async () => {
-    // Eight conversations — more than the ~6 the card shows before scrolling, so the
+  it("caps the visible list at ~5 rows and scrolls the rest inside the card", async () => {
+    // Seven conversations — more than the ~5 the card shows before scrolling, so the
     // list must become a bounded, internally-scrolling region rather than growing the
     // card unbounded.
-    const many = Array.from({ length: 8 }, (_, i) => ({
+    const many = Array.from({ length: 7 }, (_, i) => ({
       ...rows[0],
       id: `c${i}`,
       title: `Conversation ${i}`,
@@ -98,12 +102,13 @@ describe("RecentChatsCard (FR-015/015a)", () => {
     render(<RecentChatsCard />);
     await screen.findByText("Conversation 0");
 
-    // All eight render — the card no longer truncates to 6; height + scroll is the limiter.
-    expect(screen.getByText("Conversation 7")).toBeInTheDocument();
+    // All seven render — the card never truncates the data; height + scroll is the limiter.
+    expect(screen.getByText("Conversation 6")).toBeInTheDocument();
 
-    // The LIST is the bounded scroll region (the header stays fixed above it).
+    // The LIST is the bounded scroll region (the header stays fixed above it); its max-h
+    // is sized to ~5 rows so the 6th onward scroll inside the card.
     const list = screen.getByTestId("recent-chats-list");
     expect(list.className).toMatch(/overflow-y-auto/);
-    expect(list.className).toMatch(/max-h-/);
+    expect(list.className).toContain("max-h-[22rem]");
   });
 });
