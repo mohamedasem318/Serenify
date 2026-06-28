@@ -4,12 +4,12 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 011 — LLM Client and Ren Chatbot (implemented; PR open for squash-merge)
+## Feature 011 — LLM Client and Ren Chatbot (merged to main)
 
 **Branch**: `011-llm-client-chatbot`
-**Status**: **implemented and human-validated** — smoke pass complete
-(`specs/011-llm-client-chatbot/smoke-tests.md` **ALL GREEN**, 2026-06-28/29). **PR open for
-squash-merge** (Mohamed squash-merges; not merged in this wrap). Builds the shared LLM client
+**Status**: **merged to `main`** via **PR #121** (squash `8979ee2`, 2026-06-29); feature branch
+deleted (local + remote). Implemented and human-validated — smoke pass complete
+(`specs/011-llm-client-chatbot/smoke-tests.md` **ALL GREEN**, 2026-06-28/29). Builds the shared LLM client
 package (`packages/llm-client`) + the first chatbot surface (Ren) riding on it: dual-mode
 stress detection (per-message scorer + whole-conversation rollup), live-only crisis
 escalation, employee-private persistence (RLS-as-user, no service-role), and the approved 011
@@ -66,7 +66,8 @@ constitution **Amendment 12** (CHANGELOG 2026-06-28) — not repeated here.
   separation, and 360px / light+dark / WCAG-AA design + a11y. Guardrail greps PASS (no inline
   prompt strings in API call sites; no service-role path for chat content).
 - ✅ Test gate — all suites + lint + tsc + ruff green (counts above).
-- ⏳ Squash-merge — **PR open; awaiting Mohamed's squash-merge** (not merged in this wrap).
+- ✅ Squash-merge — **merged to `main`** via **PR #121** (squash `8979ee2`, 2026-06-29);
+  feature branch deleted (local + remote).
 
 **Deferred / known items**:
 

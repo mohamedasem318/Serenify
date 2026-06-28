@@ -2205,11 +2205,13 @@ Rationale: Groq is shutting down Llama-3.3-70B on 2026-08-16; gpt-oss is the
 deprecation-resilient consolidation target with structured-output support. The
 Principle I invariants encode the feature-011 safety locks as durable rules.
 
-## 2026-06-29 — feat(011-llm-client-chatbot) — feature complete (implemented; smoke pass; PR open for squash-merge)
+## 2026-06-29 — feat(011-llm-client-chatbot) — feature complete (merged to main, PR #121)
 
 Feature 011 — the shared LLM client package plus the first chatbot surface (Ren) riding on
-it — is **implemented and human-validated** (`specs/011-llm-client-chatbot/smoke-tests.md`
-ALL GREEN, 2026-06-28/29). This entry records completion + the as-built notes. The LLM
+it — is **merged to `main`** via **PR #121** (squash `8979ee2`, 2026-06-29); feature branch
+deleted (local + remote). Implemented and human-validated
+(`specs/011-llm-client-chatbot/smoke-tests.md` ALL GREEN, 2026-06-28/29). This entry records
+completion + the as-built notes. The LLM
 provider switch and the crisis / scorer / rollup design decisions were logged separately
 (constitution **Amendment 12** + `docs/DECISIONS.md` 2026-06-28) and are **not** repeated
 here. No spec FR/SC was renumbered or had its normative meaning changed at completion; the

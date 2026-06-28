@@ -1617,7 +1617,7 @@ here.
 
 ---
 
-## From feature 011 (llm-client-chatbot) — implemented 2026-06-29 (PR open for squash-merge)
+## From feature 011 (llm-client-chatbot) — merged 2026-06-29 (PR #121)
 
 The shared LLM client package (`packages/llm-client`) + the first Ren chatbot surface. Smoke
 pass ALL GREEN (`specs/011-llm-client-chatbot/smoke-tests.md`, 2026-06-28/29). **No new
