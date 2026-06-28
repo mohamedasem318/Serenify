@@ -87,7 +87,7 @@ As an employee, I can ask Ren for help and receive one practical, calm suggestio
 
 As an employee, I can end a chat, see it titled calmly, and later resume or manage it from recent chats or the full history page.
 
-**Why this priority**: Persistence turns the chatbot from a one-off panel into a usable private journal-like support surface and creates the rollup band that feature 012 recommendations will later read.
+**Why this priority**: Persistence turns the chatbot from a one-off panel into a usable private journal-like support surface and creates the rollup band that feature 013 recommendations will later read.
 
 **Independent Test**: Start a conversation, send several turns, end it, and confirm the title and rollup band appear on the recent-chats card and full history. Resume the conversation and verify text continuity comes from persisted messages.
 
@@ -262,7 +262,7 @@ The panel always includes a universal immediate-danger line: if the employee is 
 
 ### Signal-Separation Rule
 
-Chat and video are separate modalities in 011. The chat rollup band labels recent chats and later gives feature 012 recommendations a chat-derived input. It does not change video-derived today-card or trend readings. When a recent stored video read is available, it can only be used as context for Ren's opener or as agreement context in rollup; it cannot overwrite the conversation's rollup band and cannot create a fused band.
+Chat and video are separate modalities in 011. The chat rollup band labels recent chats and later gives feature 013 recommendations a chat-derived input. It does not change video-derived today-card or trend readings. When a recent stored video read is available, it can only be used as context for Ren's opener or as agreement context in rollup; it cannot overwrite the conversation's rollup band and cannot create a fused band.
 
 ### Out of Scope
 
@@ -324,3 +324,4 @@ Chat and video are separate modalities in 011. The chat rollup band labels recen
 - **Principle VI - Responsive & Accessible by Default**: The pill has mobile icon-only behavior with `aria-label="Talk to Ren"`, all touch targets meet the 44px minimum, and chat surfaces support 360px and both themes.
 - **Principle VII - Mandatory Testing Per PR**: The hard-case rubric, privacy checks, RLS-as-user behavior, scorer JSON behavior, and responsive accessibility states require automated and smoke coverage during later phases.
 - **Principle VIII - Spec-Driven Workflow**: This spec defines scope before plan/tasks/implementation and records the 011 roadmap intent.
+- **Principle IX - Secrets Discipline**: The Groq API token and the LM Studio fallback's Cloudflare Tunnel hostname are secrets/private-service pointers. They live only in env files and deployment-panel variables, are gitignored, and appear in no committed code, prompt file, test, or fixture. Provider selection reads these values at runtime; no key, tunnel URL, or private hostname is hardcoded.

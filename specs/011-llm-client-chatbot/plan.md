@@ -26,7 +26,7 @@ The implementation reuses existing feature-003 shell primitives and Graphite tok
 
 **Target Platform**: Web application on Vercel plus FastAPI on DigitalOcean Droplet; Supabase hosted Postgres/Auth; 360px minimum viewport through desktop; light and dark themes equal priority.
 
-**Project Type**: Full-stack web application plus shared TypeScript LLM package.
+**Project Type**: Full-stack web application plus shared Python LLM package.
 
 **Performance Goals**: Per-message Ren and scorer calls launch concurrently; per-conversation send lock prevents duplicate sends; retry once or twice with backoff for transient LLM failures; rollup every fifth user message and on `[END]`; rate limit sends per employee with a calm inline blocked state.
 
@@ -48,6 +48,7 @@ The implementation reuses existing feature-003 shell primitives and Graphite tok
 | **VI. Responsive & Accessible by Default** | PASS | `/app/chat`, pill, panel, recent card, crisis panel, and empty states target 360px minimum, both themes, WCAG AA, 44px touch targets. Mobile pill is icon-only with `aria-label="Talk to Ren"`. Any motion respects the repo media-query hook, not Framer Motion's reduced-motion hook. |
 | **VII. Mandatory Testing Per PR** | PASS | Plan defines frontend, backend, package, RLS, privacy, role e2e, and smoke coverage. Required hard cases: listen-first, one suggestion, `[END]`, crisis from scorer and `[CRISIS]`, no generated numbers, prompt-file seams, clean scorer JSON, signal separation, rate limiting, and failed end-flow retry. |
 | **VIII. Spec-Driven Workflow** | PASS | `spec.md` and this `plan.md` exist under `specs/011-llm-client-chatbot/`. Phase 0/1 artifacts are generated here. `tasks.md` and `smoke-tests.md` follow in later SpecKit phases. No BACKLOG item is introduced by this plan. |
+| **IX. Secrets Discipline** | PASS | This feature introduces the Groq API token and the LM Studio fallback's Cloudflare Tunnel hostname. Both are secrets/private-service pointers under Principle IX: they MUST live only in env files (`.env.local` / deployment-panel variables on Vercel, DigitalOcean, and Supabase), MUST be gitignored, and MUST NOT appear in any committed file — not in `packages/llm-client` provider config, `apps/api` services, prompt files, tests, or fixtures. Provider selection is config-driven by reading these env values at runtime; no key, tunnel URL, or private hostname is hardcoded. Telemetry already excludes prompt/message text (Principle I), so no secret leaks via logs. |
 
 **Privacy review note (Principle I)**: Chat content and crisis handling stay employee-private. All chat persistence runs as the authenticated employee through RLS; service-role access is not used for chat content. A crisis trigger only affects live response rendering and the verified resource panel. Crisis never reaches manager/admin/employer layers, never creates an employer notification, and is not persisted on conversations, messages, dashboards, logs, telemetry, or product behavior tables.
 
