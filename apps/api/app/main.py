@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from .auth import ForbiddenRoleError
 from .config import get_settings
 from .logging_config import configure_logging
-from .routers import anchor, health, monitoring
+from .routers import anchor, chat, health, monitoring
 
 
 @asynccontextmanager
@@ -48,11 +48,11 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
-        # PATCH is required: the only PATCH route is the monitoring lifecycle transition
-        # (pause / resume / out-of-frame). web→API is always cross-origin, so omitting PATCH
-        # made the browser's preflight 400 and every transition silently never persisted.
+        # PATCH is required for the monitoring lifecycle transition; DELETE for chat
+        # conversation hard-delete (feature 011). web→API is always cross-origin, so an
+        # omitted method makes the browser preflight 400 and the call silently never runs.
         # Kept an EXPLICIT allow-list (no "*") to avoid any wildcard-vs-credentials interaction.
-        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type"],
     )
     app.add_exception_handler(ForbiddenRoleError, _forbidden_role_handler)
@@ -64,6 +64,9 @@ def create_app() -> FastAPI:
     # the Phase-3 startup wiring above (app.state.operating_point / .tense_band), the
     # require_employee gate, and the user-context client.
     app.include_router(monitoring.router)
+    # Feature 011: employee-only Ren chat. Conversation CRUD + orchestrated
+    # send/retry/end. RLS-as-user; no service-role; crisis is live-only.
+    app.include_router(chat.router)
     return app
 
 

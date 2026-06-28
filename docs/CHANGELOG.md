@@ -2204,3 +2204,90 @@ Cross-references: `.specify/memory/constitution.md` Amendment 11; `docs/DECISION
 Rationale: Groq is shutting down Llama-3.3-70B on 2026-08-16; gpt-oss is the
 deprecation-resilient consolidation target with structured-output support. The
 Principle I invariants encode the feature-011 safety locks as durable rules.
+
+## 2026-06-29 — feat(011-llm-client-chatbot) — feature complete (implemented; smoke pass; PR open for squash-merge)
+
+Feature 011 — the shared LLM client package plus the first chatbot surface (Ren) riding on
+it — is **implemented and human-validated** (`specs/011-llm-client-chatbot/smoke-tests.md`
+ALL GREEN, 2026-06-28/29). This entry records completion + the as-built notes. The LLM
+provider switch and the crisis / scorer / rollup design decisions were logged separately
+(constitution **Amendment 12** + `docs/DECISIONS.md` 2026-06-28) and are **not** repeated
+here. No spec FR/SC was renumbered or had its normative meaning changed at completion; the
+in-spec clarifications (Session 2026-06-28) were folded into `spec.md` during planning.
+
+What shipped:
+
+- **Shared LLM client (`packages/llm-client`)** — one provider boundary for all app LLM calls
+  (FR-001), so app code imports no vendor SDK directly: config-driven primary Groq
+  `openai/gpt-oss-120b` (reasoning_effort=low) + LM Studio `openai/gpt-oss-20b` fallback
+  presented through the *same* boundary (FR-002 / FR-057), fail-clean default with silent
+  fallback behind an explicit flag (FR-003), defensive `{...}` extraction so reasoning-model
+  leakage never corrupts scorer JSON or reaches users (FR-004), JSON-object scorer responses
+  validated to `{band, crisis}` (FR-005), and the bot display name from one config string
+  (FR-006). Versioned prompt seams loaded from `packages/llm-client/prompts/` for the five
+  011 call sites — `ren`, `ren_preference_block` (injected only when preferences exist; empty
+  in 011), `scorer_per_message`, `scorer_rollup`, `auto_title` — with wording treated as fixed
+  (FR-007…FR-010).
+- **Chat orchestration (`apps/api`)** — listen-first Ren reply + per-message scorer run in
+  parallel, the scorer never steering Ren's wording (FR-023 / FR-024); the per-message scorer
+  reads the current message + previous two turns and is discarded after use, never persisted
+  (FR-025 / FR-026); a fresh whole-conversation rollup every fifth user message and on `[END]`,
+  band-only persisted (rollup crisis discarded), never averaging per-message bands (FR-027…
+  FR-029); `[END]` auto-title without banned distress words (FR-031); per-conversation send
+  serialization (FR-032a), keep-open-on-end-failure retry (FR-032b), retry-with-backoff and
+  never-lose-the-typed-message reliability (FR-051…FR-054), a sliding-window context guard with
+  no summarization (FR-055 / FR-056), a per-employee send rate limit (FR-059), and privacy-safe
+  operational telemetry only (FR-058).
+- **Crisis path (live-only)** — the resource panel fires on scorer `crisis:true` OR Ren's
+  silent `[CRISIS]` token (FR-033 / FR-034); resources render only from the human-verified app
+  table (Egypt 16328 / US 988, last-checked 2026-06-28) plus the universal immediate-danger
+  line, never blank (FR-035…FR-040); crisis is never persisted, never routed to manager /
+  admin / employer, and uses calm foggy treatment, never crimson (FR-041…FR-044).
+- **Chat surfaces (`apps/web`)** — `/app/chat` full page (history sidebar, switch / rename /
+  delete, empty states), the employee-only bottom-right "Talk to Ren" pill (desktop label +
+  ✦ / mobile icon-only with `aria-label="Talk to Ren"`), the home Recent-chats card
+  (client-side relative timestamps avoiding the server-tz issue #53, per-row rename / delete,
+  browser-local collapse toggle, + New chat), the employee Chat nav item, the persistent
+  companion disclaimer on every surface, Graphite language, 360px / light+dark / WCAG-AA /
+  ≥44px (FR-011…FR-019).
+- **Persistence + privacy** — conversations and messages stored RLS-as-the-employee, **no
+  service-role key on any chat path**, hard delete on conversation delete (FR-020…FR-022);
+  resume from persisted text only (FR-032).
+- **Signal separation + dual-mode reconcile** — chat-derived bands appear on recent-chat
+  surfaces only and never touch the video today-card / live monitor / video-trend (FR-045 /
+  FR-046); opportunistic video reconcile as Ren-opener / rollup-agreement context with the 70 s
+  staleness rule and no fused band (FR-047…FR-050).
+
+As-built notes (not spec FR/SC changes):
+
+- **Crisis country = universal line in 011.** `profiles` has no `country` column yet and the
+  country picker is out of scope (spec Out-of-Scope), so the live panel renders the universal
+  immediate-danger line; the verified Egypt/US rows exist in the resource table and are covered
+  by automated tests (FR-040 never-blank confirmed in smoke).
+- **Four Playwright e2e tasks deferred** — T034 (role entry-point visibility), T052 (crisis
+  privacy), T064 (end/resume), T073 (signal separation) need the live FastAPI+Supabase stack
+  and the repo's e2e auth fixtures (the same fixture-stack gap that keeps phase-2 CI e2e out of
+  scope, BACKLOG #41). The behaviour is covered meanwhile by the automated Vitest + pytest
+  role/access/crisis/separation suites and the manual smoke pass; **not claimed as done.**
+  Recorded in `docs/PROGRESS.md` + `docs/BACKLOG.md`.
+- **Ren name personalization deferred.** No `preferred_name` was implemented; the
+  `ren_preference_block` seam ships empty (FR-009) and `profiles` stores `full_name` only.
+  Addressing the employee by name belongs to a future first/last-name split — no column was
+  added. Recorded in `docs/PROGRESS.md` + `docs/BACKLOG.md`.
+
+Test results (2026-06-29): `packages/llm-client` **28 passed** / `apps/api` **155 passed**
+(incl. the 57 chat tests across `test_chat_storage_rls`, `test_chat_store`,
+`test_chat_prompt_boundaries`, `test_crisis_resources`, `test_chat_orchestration`,
+`test_chat_context_window`, `test_chat_crisis_flow`, `test_chat_rollup_title`,
+`test_chat_privacy`, `test_chat_video_reconcile`, `test_ren_behavior_rubric`) / `apps/web`
+Vitest **775 passed / 79 files**; lint + `tsc --noEmit` + ruff (both Python workspaces) all
+clean. Guardrail greps PASS (no inline prompt strings in API call sites; no service-role path
+for chat content). Manual smoke `specs/011-llm-client-chatbot/smoke-tests.md` PASS.
+
+**#75 (ToS / Privacy Policy / signup consent gate) stays OPEN** — 011 ships the in-app
+companion disclaimer only; the full pre-production consent gate is unchanged and remains a
+pre-real-data blocker.
+
+Cross-references: `specs/011-llm-client-chatbot/` (spec / plan / tasks / smoke-tests);
+`docs/DECISIONS.md` 2026-06-28; `docs/PROGRESS.md` 2026-06-29; `docs/BACKLOG.md` "From feature
+011"; `.specify/memory/constitution.md` Amendment 12.

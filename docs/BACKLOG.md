@@ -1467,6 +1467,10 @@ placeholder linking to empty pages). **Hard gate: before any real user data.** P
 the security-slice-7 "`/signup` is open self-serve — gate to invite-only — ⛔
 PRE-PRODUCTION DEPLOY BLOCKER" entry (both are binding pre-real-data gates on the signup
 surface) and with the `/app/account` Privacy placeholder that feature 015 fills in.
+**Update (2026-06-29, feature 011)**: still **OPEN** — feature 011 ships only the in-app
+chatbot companion disclaimer ("Ren is an AI companion, not a substitute for professional
+care.") on chat surfaces; this is **not** the consent gate. The full ToS/Privacy documents +
+the account-creation consent checkbox remain unbuilt and this stays a pre-real-data blocker.
 
 ### Internationalization — Arabic (RTL) and possibly French (#76)
 **Status**: deferred-feature
@@ -1610,3 +1614,27 @@ here.
 **Description**: With exactly **1 confident reading** in the session, stepping out of frame caused the graph to blank and the confident dot (the parked marker) to disappear instead of staying muted + static at the last confident position (SC-010 / FR-004a). The no-clear-read gap treatment only appeared **after returning to frame**, not during the out-of-frame period.
 **Root cause**: `getSessionTrend` returns `[]` (not throws) on any Supabase error (`if (error || !data) return []`, monitoring-reads.ts). In `session-trend.tsx`, `refetch` called `setPoints(next)` unconditionally, so a silent empty response wiped `points` → `isEmpty=true`. The geometry (`buildNowMarker`) handles `[confident, no_read]` correctly; the bug was purely in the component's data layer. The upload gate on out-of-frame means no `refreshSignal` fires, so the only refetch is the immediate one triggered by `active→false` — exactly the moment a transient Supabase error can return `[]`.
 **Fix**: `session-trend.tsx` `refetch` — functional update guard: `setPoints((prev) => next.length === 0 && prev.length > 0 ? prev : next)` treats a silent empty response like a thrown exception and leaves existing rows in place. Regression tests added in both geometry and component suites.
+
+---
+
+## From feature 011 (llm-client-chatbot) — implemented 2026-06-29 (PR open for squash-merge)
+
+The shared LLM client package (`packages/llm-client`) + the first Ren chatbot surface. Smoke
+pass ALL GREEN (`specs/011-llm-client-chatbot/smoke-tests.md`, 2026-06-28/29). **No new
+BACKLOG follow-ups are filed from this feature.** Two deferrals are recorded in
+`docs/PROGRESS.md` (Feature 011) as spec-internal / known-deferred items rather than
+backlog-shaped issues — the same treatment feature 010 gave its unfiled spec-internal items:
+
+- **Four Playwright e2e tasks deferred — T034 / T052 / T064 / T073** (role entry-point
+  visibility, crisis privacy, end/resume, signal separation): blocked on the live
+  FastAPI+Supabase e2e auth-fixture stack (pairs with the phase-2 CI / Supabase-in-CI work,
+  #41). Covered meanwhile by the automated `apps/web` Vitest + `apps/api` pytest
+  role/access/crisis/separation suites and the manual smoke pass. Not a standalone follow-up —
+  revived with the e2e fixture stack. **Not claimed as done.**
+- **Ren name personalization deferred**: no `preferred_name` shipped — the `ren_preference_block`
+  seam is empty in 011 (FR-009) and `profiles` stores `full_name` only. Addressing the employee
+  by name belongs to a future first/last-name split; no column was added.
+
+**#75** (ToS / Privacy Policy / signup consent gate) remains **OPEN** — 011 ships only the
+in-app companion disclaimer ("Ren is an AI companion, not a substitute for professional
+care."); the full pre-production consent gate is unchanged and stays a pre-real-data blocker.

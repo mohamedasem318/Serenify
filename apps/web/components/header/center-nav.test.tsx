@@ -62,3 +62,32 @@ describe("CenterNav", () => {
     ).not.toHaveAttribute("aria-current");
   });
 });
+
+describe("CenterNav — employee-only Chat item (FR-016)", () => {
+  beforeEach(() => {
+    mockPathname = "/app";
+  });
+
+  it("shows a Chat link to /app/chat for employees", () => {
+    render(<CenterNav role="employee" />);
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("href", "/app/chat");
+  });
+
+  it("hides the Chat link for team leads and admins", () => {
+    render(<CenterNav role="team_lead" />);
+    expect(screen.queryByRole("link", { name: "Chat" })).not.toBeInTheDocument();
+    render(<CenterNav role="admin" />);
+    expect(screen.queryByRole("link", { name: "Chat" })).not.toBeInTheDocument();
+  });
+
+  it("hides the Chat link when no role is provided", () => {
+    render(<CenterNav />);
+    expect(screen.queryByRole("link", { name: "Chat" })).not.toBeInTheDocument();
+  });
+
+  it("marks Chat as current on /app/chat", () => {
+    mockPathname = "/app/chat";
+    render(<CenterNav role="employee" />);
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute("aria-current", "page");
+  });
+});

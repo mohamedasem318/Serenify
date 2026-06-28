@@ -4,6 +4,103 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 011 — LLM Client and Ren Chatbot (implemented; PR open for squash-merge)
+
+**Branch**: `011-llm-client-chatbot`
+**Status**: **implemented and human-validated** — smoke pass complete
+(`specs/011-llm-client-chatbot/smoke-tests.md` **ALL GREEN**, 2026-06-28/29). **PR open for
+squash-merge** (Mohamed squash-merges; not merged in this wrap). Builds the shared LLM client
+package (`packages/llm-client`) + the first chatbot surface (Ren) riding on it: dual-mode
+stress detection (per-message scorer + whole-conversation rollup), live-only crisis
+escalation, employee-private persistence (RLS-as-user, no service-role), and the approved 011
+chatbot design. New package `packages/llm-client`; new `apps/api` chat router + services
+(`routers/chat.py`, `services/chat_orchestrator.py`, `chat_video_context.py`,
+`crisis_resources.py`, `llm_client.py`); new `apps/web` chat surfaces (`app/(authed)/app/chat`,
+`components/chat/*`, `lib/api/chat-client.ts`, `lib/chat/*`). The LLM provider switch +
+crisis / scorer / rollup design decisions are logged in `docs/DECISIONS.md` 2026-06-28 and
+constitution **Amendment 12** (CHANGELOG 2026-06-28) — not repeated here.
+**Date**: 2026-06-29
+
+**Scope shipped** (US1–US6 / FR-001…FR-059):
+
+- **US1 — entry points + shared store.** `/app/chat` full page, the employee-only "Talk to
+  Ren" pill (desktop label + ✦ / mobile icon-only `aria-label`), the home Recent-chats card,
+  and the employee Chat nav item — all reaching one shared conversation store; team-lead /
+  admin / unauthenticated users never see chat entry points or chat rows.
+- **US2 — listen-first.** Ren reply + per-message scorer run in parallel; the scorer never
+  steers Ren's wording; a failed send preserves the typed text for retry (no lost message).
+- **US3 — one suggestion + disclaimer.** Ren offers at most one concrete next step; the
+  companion disclaimer ("Ren is an AI companion, not a substitute for professional care.")
+  stays visible on the page, the pill, and empty states.
+- **US4 — end / title / resume.** Fresh whole-conversation rollup every fifth user message and
+  on `[END]`; band-only persisted (no per-message scores, no crisis flag); calm auto-title with
+  no banned distress words; resume reconstructs continuity from persisted text; rename + delete
+  (immediate hard delete) consistent across surfaces.
+- **US5 — crisis (live-only).** Calm foggy resource panel on scorer `crisis:true` OR Ren's
+  silent `[CRISIS]` token; resources only from the verified table (Egypt 16328 / US 988,
+  last-checked 2026-06-28) + the universal immediate-danger line; never persisted, never routed
+  to manager / admin / employer; Ren generates no phone numbers or service names.
+- **US6 — signal separation + reconcile.** Chat-derived bands appear on recent-chat surfaces
+  only and never alter the video today-card / live monitor / video-trend; opportunistic video
+  reconcile as opener / agreement context with the 70 s staleness rule and no fused band.
+
+**Test results** (2026-06-29):
+
+- `packages/llm-client` `uv run pytest`: **28 passed**; ruff clean.
+- `apps/api` `uv run pytest`: **155 passed** (incl. the **57 chat tests** across
+  `test_chat_storage_rls`, `test_chat_store`, `test_chat_prompt_boundaries`,
+  `test_crisis_resources`, `test_chat_orchestration`, `test_chat_context_window`,
+  `test_chat_crisis_flow`, `test_chat_rollup_title`, `test_chat_privacy`,
+  `test_chat_video_reconcile`, `test_ren_behavior_rubric`; the balance is the pre-existing
+  feature-005/006/008 monitoring + local replay suite, which scored against the committed ML
+  artifact this run); ruff clean.
+- `apps/web`: `npm run lint` **clean**, `tsc --noEmit` **clean**, Vitest **775 passed / 79
+  files** (`--pool=threads` per the Windows EPERM memory; CI runs the same suite on ubuntu).
+
+**Gates**:
+
+- ✅ Smoke gate — `specs/011-llm-client-chatbot/smoke-tests.md` **ALL GREEN** (2026-06-28/29,
+  Constitution VII): entry points + shared store, listen-first send + retry, crisis (both
+  triggers → same foggy panel, no Ren-generated numbers, nothing persisted / notified),
+  one-suggestion + persistent disclaimer, end / title / resume + rename + hard-delete, signal
+  separation, and 360px / light+dark / WCAG-AA design + a11y. Guardrail greps PASS (no inline
+  prompt strings in API call sites; no service-role path for chat content).
+- ✅ Test gate — all suites + lint + tsc + ruff green (counts above).
+- ⏳ Squash-merge — **PR open; awaiting Mohamed's squash-merge** (not merged in this wrap).
+
+**Deferred / known items**:
+
+- **Four Playwright e2e tasks deferred — T034 / T052 / T064 / T073** (role entry-point
+  visibility, crisis privacy, end/resume, signal separation). They need the live
+  FastAPI+Supabase stack + the repo's e2e auth fixtures (the same fixture-stack gap that keeps
+  phase-2 CI e2e out of scope, BACKLOG #41). The behaviour they would cover is exercised by the
+  automated Vitest + pytest suites (role/access, crisis, end/resume, separation) and confirmed
+  in the manual smoke pass. **Not claimed as done.** Spec-internal deferred tasks (same shape
+  as feature 010's unfiled spec-internal items) — recorded here + in `docs/BACKLOG.md` "From
+  feature 011", not filed as a separate BACKLOG issue.
+- **Ren name personalization deferred.** No `preferred_name` was implemented; the
+  `ren_preference_block` seam ships empty (FR-009) and `profiles` stores `full_name` only.
+  Addressing the employee by name belongs to a future first/last-name split — revisit then.
+  **No `preferred_name` column was added.**
+- **Crisis country = universal line.** `profiles` has no `country` column yet and the country
+  picker is out of scope (spec Out-of-Scope), so the live panel shows the universal
+  immediate-danger line; the Egypt/US verified rows exist and are covered by automated tests.
+- **#75 (ToS / Privacy Policy / signup consent gate) stays OPEN.** 011 ships only the in-app
+  companion disclaimer; the full pre-production consent gate is unchanged and remains a
+  pre-real-data blocker.
+
+**Privacy invariant**: chat is employee-private end to end — RLS-as-the-employee on
+conversations + messages, **no service-role key on any chat path**, immediate hard delete on
+delete, crisis live-only (never persisted, never to the manager / admin / employer chain), and
+privacy-safe telemetry only (request outcome / provider / latency bucket / retry count /
+validation-failure type — never message text, prompt text, crisis booleans, bands, or
+resource-panel events). Consistent with constitution Principle I + Amendment 12.
+
+**Next**: 011 was the shared-LLM-client foundation; the questionnaire and recommendations
+features now build on the same provider boundary.
+
+---
+
 ## Feature 010 — Monitoring Graph Redesign (merged to main)
 
 **Branch**: `010-monitoring-graph-redesign` (roadmap label `009b-monitoring-graph-redesign`)

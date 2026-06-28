@@ -29,3 +29,28 @@ describe("MobileMenu", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("MobileMenu — employee-only Chat item (FR-016)", () => {
+  it("reveals a Chat link to /app/chat for employees", async () => {
+    const user = userEvent.setup();
+    render(<MobileMenu role="employee" />);
+    await user.click(screen.getByLabelText("Open menu"));
+    expect(screen.getByRole("link", { name: "Chat" })).toHaveAttribute(
+      "href",
+      "/app/chat",
+    );
+  });
+
+  it("hides the Chat link for team leads, admins, and when no role is given", async () => {
+    const user = userEvent.setup();
+    for (const role of ["team_lead", "admin"] as const) {
+      const { unmount } = render(<MobileMenu role={role} />);
+      await user.click(screen.getByLabelText("Open menu"));
+      expect(screen.queryByRole("link", { name: "Chat" })).not.toBeInTheDocument();
+      unmount();
+    }
+    render(<MobileMenu />);
+    await user.click(screen.getByLabelText("Open menu"));
+    expect(screen.queryByRole("link", { name: "Chat" })).not.toBeInTheDocument();
+  });
+});
