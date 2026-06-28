@@ -2192,3 +2192,15 @@ affected and the shipped `001`–`010` keep their numbers. The Amendment 10 narr
 (historical record of the `009b` interstitial decision).
 
 Cross-references: `.specify/memory/constitution.md` Amendment 11; `docs/DECISIONS.md` 2026-06-27.
+
+## 2026-06-28 — constitution(I, IV, Tech Stack) — Amendment 12 (1.8.1 → 1.9.0)
+
+- Primary LLM: Groq Llama-3.3-70B → `openai/gpt-oss-120b` (reasoning_effort=low).
+- Fallback LLM: LM Studio Gemma-3-4B → `openai/gpt-oss-20b`.
+- Principle I: companion chat content is employee-private (never reaches
+  manager/admin); a crisis disclosure never triggers manager/admin/employer
+  notification and is never persisted (crisis routes to external resources only).
+
+Rationale: Groq is shutting down Llama-3.3-70B on 2026-08-16; gpt-oss is the
+deprecation-resilient consolidation target with structured-output support. The
+Principle I invariants encode the feature-011 safety locks as durable rules.

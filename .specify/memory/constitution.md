@@ -307,6 +307,30 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-06-27
 - specs/010-monitoring-graph-redesign/ (the shipped feature this reconciles to)
 - PR #118 (squash 6b8653e) — the merge that made the slot canonical
+
+Amendment 12: 1.8.1 → 1.9.0 (2026-06-28, MINOR)
+Bump rationale: (1) Technology Stack + Principle IV provider swap — Groq is
+deprecating `llama-3.3-70b-versatile` (shutdown 2026-08-16), so the primary
+LLM moves to `openai/gpt-oss-120b` (reasoning_effort=low) and the fallback
+from Gemma-3-4B to `openai/gpt-oss-20b` via LM Studio. gpt-oss is Groq's
+stated consolidation target (deprecation-resilient) and supports strict
+JSON-schema structured outputs, which the scorer relies on. (2) Principle I
+gains two disclosure invariants: companion chat content is employee-private
+(never reaches manager/admin), and a crisis disclosure never triggers any
+manager/admin/employer notification and is never persisted — crisis routes
+to external resources only. Triggered by feature 011 (llm-client-and-chatbot)
+prompt-tuning lock. MINOR bump: a stack substitution plus materially expanded
+Principle I guidance; no new/removed principle, no structural change.
+
+Affected templates: none. The .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md reference principles by number and the stack by
+section, not by the provider literals or these invariants; no template edit
+is required (consistent with the Amendment 8–11 audits).
+
+Cross-references:
+- docs/DECISIONS.md entries 2026-06-28
+- docs/CHANGELOG.md entry 2026-06-28
+- specs/011-llm-client-and-chatbot/ (spec to follow)
 -->
 
 # Serenify Constitution
@@ -346,6 +370,17 @@ following invariants MUST hold at all times:
   visible to their direct manager.
 - An opt-in "I'd like to talk" button MUST surface a discreet check-in flag
   to the direct manager. It MUST NOT reveal what triggered the request.
+- Conversations with the in-app companion (chat text, titles, and any
+  derived stress band) are employee-private content. They MUST NEVER reach
+  the manager-facing or admin-facing layer — the same boundary as raw
+  signals. A chat-derived band appears only on the owning employee's own
+  surfaces.
+- A crisis disclosure (suicidal ideation, self-harm, or intent to harm
+  others) MUST NEVER trigger any manager, admin, or employer notification,
+  and MUST NEVER be persisted as a stored property of a conversation.
+  Crisis support routes only to verified external resources or a person the
+  user themselves chooses. Routing a mental-health crisis into the employer
+  chain is a permanent, non-negotiable prohibition.
 - Manager hierarchy: a direct manager sees their direct reports only.
   Skip-level managers and above see only aggregated org-wide data and MUST
   NEVER see individual employees.
@@ -416,9 +451,12 @@ All LLM access MUST go through a single `LLMProvider` adapter interface in
 `packages/llm-client/`. Application code MUST NEVER import a vendor SDK
 directly.
 
-- Primary provider: Groq (Llama-3.3-70B) via API.
-- Fallback provider: local LM Studio (Gemma-3-4B or similar small open
-  model) exposed via Cloudflare Tunnel.
+- Primary provider: Groq — `openai/gpt-oss-120b` via API, run at
+  `reasoning_effort="low"`. (gpt-oss is a reasoning model; its reasoning
+  returns in a separate field, and the adapter MUST tolerate occasional
+  leakage of reasoning into `content` with a defensive extractor.)
+- Fallback provider: local LM Studio (`openai/gpt-oss-20b`, same model
+  family as primary) exposed via Cloudflare Tunnel.
 - Provider selection MUST be controllable by config — swapping providers
   MUST NOT require code changes outside `packages/llm-client/`.
 - All prompts MUST live as versioned files in
@@ -659,8 +697,8 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Frontend             | Next.js 16 (App Router; `proxy.ts` replaces `middleware.ts`) on Vercel |
 | Backend + ML serving | FastAPI on a DigitalOcean Droplet                         |
 | Database / Auth / Storage / Realtime | Supabase (Postgres-based)                  |
-| Primary LLM          | Groq — Llama-3.3-70B via API                              |
-| Fallback LLM         | Local LM Studio (Gemma-3-4B or similar) via Cloudflare Tunnel |
+| Primary LLM          | Groq — `openai/gpt-oss-120b` (`reasoning_effort=low`) via API |
+| Fallback LLM         | Local LM Studio (`openai/gpt-oss-20b`) via Cloudflare Tunnel |
 | Transactional email  | Resend (production); Supabase email until Resend domain verified |
 | DNS / CDN / Tunnel   | Cloudflare (free tier)                                    |
 | Error tracking       | Sentry                                                    |
@@ -788,4 +826,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.8.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-27
+**Version**: 1.9.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-28
