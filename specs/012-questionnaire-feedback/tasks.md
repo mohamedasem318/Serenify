@@ -55,10 +55,10 @@
 
 **Purpose**: Provide typed authenticated Supabase access for the UI without service-role or manager-visible individual paths.
 
-- [ ] T024 [P] Add Principle VII tests for typed confirmatory prompt create/resolve calls, session feedback insert/update calls, weekly cadence calls, and weekly submit/summary RPC mapping in `apps/web/tests/unit/lib/questionnaire/questionnaire-client.test.ts`
-- [ ] T025 [P] Add Principle VII tests for shared questionnaire enum/value validation against `data-model.md` enumerations in `apps/web/tests/unit/lib/questionnaire/types.test.ts`
-- [ ] T026 Implement shared questionnaire domain types and enum guards for confirmatory outcomes, session feedback values, and weekly check-in values in `apps/web/lib/questionnaire/types.ts`
-- [ ] T027 Implement authenticated RLS-as-user questionnaire data client with no admin Supabase import, no service-role path, typed table payloads, typed RPC calls, and no manager individual-row reads in `apps/web/lib/api/questionnaire-client.ts`
+- [X] T024 [P] Add Principle VII tests for typed confirmatory prompt create/resolve calls, session feedback insert/update calls, weekly cadence calls, and weekly submit/summary RPC mapping in `apps/web/tests/unit/lib/questionnaire/questionnaire-client.test.ts`
+- [X] T025 [P] Add Principle VII tests for shared questionnaire enum/value validation against `data-model.md` enumerations in `apps/web/tests/unit/lib/questionnaire/types.test.ts`
+- [X] T026 Implement shared questionnaire domain types and enum guards for confirmatory outcomes, session feedback values, and weekly check-in values in `apps/web/lib/questionnaire/types.ts`
+- [X] T027 Implement authenticated RLS-as-user questionnaire data client with no admin Supabase import, no service-role path, typed table payloads, typed RPC calls, and no manager individual-row reads in `apps/web/lib/api/questionnaire-client.ts`
 
 **Checkpoint**: UI code can call typed authenticated helpers, but no UI has been mounted yet.
 
@@ -72,19 +72,19 @@
 
 ### Tests for User Story 1
 
-- [ ] T028 [P] [US1] Add Principle VII trigger tests for `CONFIRMATORY_TENSE_SUSTAINED_MS=20_000`, `CONFIRMATORY_PROMPT_MIN_DWELL_MS=4_500`, one prompt per session, next-session false-alarm suppression, race resolution, chat-signal exclusion, and no cross-worker/server state in `apps/web/tests/unit/lib/questionnaire/confirmatory-trigger.test.ts`
-- [ ] T029 [P] [US1] Add Principle VII tests for `Notification` `dismissible={false}` and `nonModal={true}` behavior: no close button, Escape/outside click/blur cannot dismiss, keyboard answerability preserved, and no focus trap in `apps/web/components/notification.test.tsx`
-- [ ] T030 [P] [US1] Add Principle VII accessibility and copy tests for the confirmatory prompt title, body, three ordered native buttons, Graphite color roles, lucide icons, and 44px targets in `apps/web/tests/unit/components/questionnaire/confirmatory-prompt.test.tsx`
-- [ ] T031 [P] [US1] Add Principle VII Ren handoff tests for `confirmed` and `opened_chat` query seams with no recommendation cards in `apps/web/tests/unit/components/chat/chat-handoff.test.tsx`
+- [X] T028 [P] [US1] Add Principle VII trigger tests for `CONFIRMATORY_TENSE_SUSTAINED_MS=20_000`, `CONFIRMATORY_PROMPT_MIN_DWELL_MS=4_500`, one prompt per session, next-session false-alarm suppression, race resolution, chat-signal exclusion, and no cross-worker/server state in `apps/web/tests/unit/lib/questionnaire/confirmatory-trigger.test.ts`
+- [X] T029 [P] [US1] Add Principle VII tests for `Notification` `dismissible={false}` and `nonModal={true}` behavior: no close button, Escape/outside click/blur cannot dismiss, keyboard answerability preserved, and no focus trap in `apps/web/components/notification.test.tsx`
+- [X] T030 [P] [US1] Add Principle VII accessibility and copy tests for the confirmatory prompt title, body, three ordered native buttons, Graphite color roles, lucide icons, and 44px targets in `apps/web/tests/unit/components/questionnaire/confirmatory-prompt.test.tsx`
+- [X] T031 [P] [US1] Add Principle VII Ren handoff tests for `confirmed` and `opened_chat` query seams with no recommendation cards in `apps/web/tests/unit/components/chat/chat-handoff.test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T032 [US1] Implement confirmatory tunables in `apps/web/lib/questionnaire/constants.ts`
-- [ ] T033 [US1] Implement `useConfirmatoryTrigger` over the existing `WindowOutcome`/`Band` stream with local per-session state, dwell floor, false-alarm suppression consumption, single-resolution guard, and no backend polling in `apps/web/lib/questionnaire/confirmatory-trigger.ts`
-- [ ] T034 [US1] Extend `NotificationProps` with backward-compatible `dismissible?: boolean` and `nonModal?: boolean`, and prevent close UI/Escape/outside dismissal when `dismissible=false` in `apps/web/components/notification.tsx`
-- [ ] T035 [US1] Implement `ConfirmatoryPrompt` with exact spec copy, three ordered outcomes, accessible labels/descriptions, Graphite tokens, and lucide `Activity`, `Wind`, and `MessageCircle` icons in `apps/web/components/questionnaire/confirmatory-prompt.tsx`
-- [ ] T036 [US1] Add Ren handoff query support for `?handoff=confirmatory_yes` and `?handoff=confirmatory_maybe` without recommendation cards in `apps/web/app/(authed)/app/chat/page.tsx` and `apps/web/components/chat/chat-shell.tsx`
-- [ ] T037 [US1] Feed active `MonitoringSession` `liveSessionId` and `submitWindow()` outcomes into the confirmatory trigger, resolve prompt expiry before session-end navigation, and preserve the existing Band contract in `apps/web/components/monitor/monitoring-session.tsx`
+- [X] T032 [US1] Implement confirmatory tunables in `apps/web/lib/questionnaire/constants.ts`
+- [X] T033 [US1] Implement `useConfirmatoryTrigger` over the existing `WindowOutcome`/`Band` stream with local per-session state, dwell floor, false-alarm suppression consumption, single-resolution guard, and no backend polling in `apps/web/lib/questionnaire/confirmatory-trigger.ts`
+- [X] T034 [US1] Extend `NotificationProps` with backward-compatible `dismissible?: boolean` and `nonModal?: boolean`, and prevent close UI/Escape/outside dismissal when `dismissible=false` in `apps/web/components/notification.tsx`
+- [X] T035 [US1] Implement `ConfirmatoryPrompt` with exact spec copy, three ordered outcomes, accessible labels/descriptions, Graphite tokens, and lucide `Activity`, `Wind`, and `MessageCircle` icons in `apps/web/components/questionnaire/confirmatory-prompt.tsx`
+- [X] T036 [US1] Add Ren handoff query support for `?handoff=confirmatory_yes` and `?handoff=confirmatory_maybe` without recommendation cards in `apps/web/app/(authed)/app/chat/page.tsx` and `apps/web/components/chat/chat-shell.tsx`
+- [X] T037 [US1] Feed active `MonitoringSession` `liveSessionId` and `submitWindow()` outcomes into the confirmatory trigger, resolve prompt expiry before session-end navigation, and preserve the existing Band contract in `apps/web/components/monitor/monitoring-session.tsx`
 
 **Checkpoint**: User Story 1 is independently functional and testable against controlled band sequences.
 
@@ -98,17 +98,17 @@
 
 ### Tests for User Story 2
 
-- [ ] T038 [P] [US2] Add Principle VII tests for `SESSION_END_FEEDBACK_SAMPLING_POLICY='every_session'` and the future sampling seam in `apps/web/tests/unit/lib/questionnaire/session-feedback-sampling.test.ts`
-- [ ] T039 [P] [US2] Add Principle VII component tests for session-end card initial actions, Good success state, Skip muted state, exact negative reasons, non-empty free-text validation, tailored action states, and an explicit SC-007 interaction-count assertion that each path (Good, each negative reason, free text, Skip) completes in no more than three interactions after the card appears in `apps/web/tests/unit/components/questionnaire/session-end-feedback-card.test.tsx`
-- [ ] T040 [P] [US2] Add Principle VII privacy tests that session-end free text and `ren_too_robotic` are stored only as employee-private product feedback and never passed to Ren or manager aggregate calls in `apps/web/tests/unit/components/questionnaire/session-end-feedback-privacy.test.tsx`
-- [ ] T041 [P] [US2] Add Principle VII tests for the session-end route targets: the `suggestion_didnt_help` action routes to `/app/account` (plain, no preferences anchor yet) and the `needed_quiet` action routes to `/app/account#notifications` in `apps/web/components/account/questionnaire-route-anchors.test.tsx`
+- [X] T038 [P] [US2] Add Principle VII tests for `SESSION_END_FEEDBACK_SAMPLING_POLICY='every_session'` and the future sampling seam in `apps/web/tests/unit/lib/questionnaire/session-feedback-sampling.test.ts`
+- [X] T039 [P] [US2] Add Principle VII component tests for session-end card initial actions, Good success state, Skip muted state, exact negative reasons, non-empty free-text validation, tailored action states, and an explicit SC-007 interaction-count assertion that each path (Good, each negative reason, free text, Skip) completes in no more than three interactions after the card appears in `apps/web/tests/unit/components/questionnaire/session-end-feedback-card.test.tsx`
+- [X] T040 [P] [US2] Add Principle VII privacy tests that session-end free text and `ren_too_robotic` are stored only as employee-private product feedback and never passed to Ren or manager aggregate calls in `apps/web/tests/unit/components/questionnaire/session-end-feedback-privacy.test.tsx`
+- [X] T041 [P] [US2] Add Principle VII tests for the session-end route targets: the `suggestion_didnt_help` action routes to `/app/account` (plain, no preferences anchor yet) and the `needed_quiet` action routes to `/app/account#notifications` in `apps/web/components/account/questionnaire-route-anchors.test.tsx`
 
 ### Implementation for User Story 2
 
-- [ ] T042 [US2] Implement the v1 every-session sampling seam in `apps/web/lib/questionnaire/session-feedback-sampling.ts`
-- [ ] T043 [US2] Implement `SessionEndFeedbackCard` with exact copy, option ordering, Good/Skip/negative/free-text states, Graphite tokens, lucide icons, minimum 44px controls, and employee-private privacy copy in `apps/web/components/questionnaire/session-end-feedback-card.tsx`
-- [ ] T044 [US2] Ensure `notifications-placeholder.tsx` carries an `id="notifications"` anchor (add if missing) for the `needed_quiet` ("needed quiet time") route action; route the `suggestion_didnt_help` ("suggestion didn't help") action to `/app/account` plain — do NOT add a preferences anchor, since no preferences section exists yet (it will target a real preferences section once features 014/016 ship) — in `apps/web/components/account/notifications-placeholder.tsx`
-- [ ] T045 [US2] Persist session-end submitted/skipped outcomes through the authenticated questionnaire client without Ren handoff, manager writes, or aggregate writes in `apps/web/components/questionnaire/session-end-feedback-card.tsx`
+- [X] T042 [US2] Implement the v1 every-session sampling seam in `apps/web/lib/questionnaire/session-feedback-sampling.ts`
+- [X] T043 [US2] Implement `SessionEndFeedbackCard` with exact copy, option ordering, Good/Skip/negative/free-text states, Graphite tokens, lucide icons, minimum 44px controls, and employee-private privacy copy in `apps/web/components/questionnaire/session-end-feedback-card.tsx`
+- [X] T044 [US2] Ensure `notifications-placeholder.tsx` carries an `id="notifications"` anchor (add if missing) for the `needed_quiet` ("needed quiet time") route action; route the `suggestion_didnt_help` ("suggestion didn't help") action to `/app/account` plain — do NOT add a preferences anchor, since no preferences section exists yet (it will target a real preferences section once features 014/016 ship) — in `apps/web/components/account/notifications-placeholder.tsx`
+- [X] T045 [US2] Persist session-end submitted/skipped outcomes through the authenticated questionnaire client without Ren handoff, manager writes, or aggregate writes in `apps/web/components/questionnaire/session-end-feedback-card.tsx`
 
 **Checkpoint**: User Story 2 is independently functional after ended sessions and keeps product feedback employee-private.
 
@@ -122,15 +122,15 @@
 
 ### Tests for User Story 3
 
-- [ ] T046 [P] [US3] Add Principle VII tests for ISO-week start calculation, first authenticated visit eligibility, completion suppression, first-skip re-prompt, second-skip suppression, and abandoned-Q2 non-completion in `apps/web/tests/unit/lib/questionnaire/weekly-cadence.test.ts`
-- [ ] T047 [P] [US3] Add Principle VII tests for weekly card Good, Skip, Could-be-better entry, exact Q1/Q2 options, Back, disabled Done, Done completion, and no contribution on skip/abandon in `apps/web/tests/unit/components/questionnaire/weekly-check-in-card.test.tsx`
-- [ ] T048 [P] [US3] Add Principle VII accessibility tests for weekly two-step focus movement, `role="progressbar"` ARIA values/text, live step announcements, and keyboard/screen-reader reachability of Back and Done in `apps/web/tests/unit/components/questionnaire/weekly-stepper-accessibility.test.tsx`
+- [X] T046 [P] [US3] Add Principle VII tests for ISO-week start calculation, first authenticated visit eligibility, completion suppression, first-skip re-prompt, second-skip suppression, and abandoned-Q2 non-completion in `apps/web/tests/unit/lib/questionnaire/weekly-cadence.test.ts`
+- [X] T047 [P] [US3] Add Principle VII tests for weekly card Good, Skip, Could-be-better entry, exact Q1/Q2 options, Back, disabled Done, Done completion, and no contribution on skip/abandon in `apps/web/tests/unit/components/questionnaire/weekly-check-in-card.test.tsx`
+- [X] T048 [P] [US3] Add Principle VII accessibility tests for weekly two-step focus movement, `role="progressbar"` ARIA values/text, live step announcements, and keyboard/screen-reader reachability of Back and Done in `apps/web/tests/unit/components/questionnaire/weekly-stepper-accessibility.test.tsx`
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] Implement ISO-week cadence helpers and eligibility decisions for first authenticated visit, one same-week re-prompt after skip, second-skip suppression, and completed-week suppression in `apps/web/lib/questionnaire/weekly-cadence.ts`
-- [ ] T050 [US3] Implement `WeeklyCheckInCard` with exact heading, Good/Could-be-better/Skip states, two-step Q1/Q2 flow, Back/Done controls, progress state, Graphite tokens, lucide icons, and minimum 44px controls in `apps/web/components/questionnaire/weekly-check-in-card.tsx`
-- [ ] T051 [US3] Wire weekly skip/completion to private cadence updates and `submit_weekly_work_environment_checkin`, ensuring skipped and abandoned paths create no aggregate contribution in `apps/web/components/questionnaire/weekly-check-in-card.tsx`
+- [X] T049 [US3] Implement ISO-week cadence helpers and eligibility decisions for first authenticated visit, one same-week re-prompt after skip, second-skip suppression, and completed-week suppression in `apps/web/lib/questionnaire/weekly-cadence.ts`
+- [X] T050 [US3] Implement `WeeklyCheckInCard` with exact heading, Good/Could-be-better/Skip states, two-step Q1/Q2 flow, Back/Done controls, progress state, Graphite tokens, lucide icons, and minimum 44px controls in `apps/web/components/questionnaire/weekly-check-in-card.tsx`
+- [X] T051 [US3] Wire weekly skip/completion to private cadence updates and `submit_weekly_work_environment_checkin`, ensuring skipped and abandoned paths create no aggregate contribution in `apps/web/components/questionnaire/weekly-check-in-card.tsx`
 
 **Checkpoint**: User Story 3 is independently functional and stores only aggregate-safe weekly answers.
 
@@ -144,21 +144,21 @@
 
 ### Tests for User Story 4
 
-- [ ] T052 [P] [US4] Add Principle VII coordinator tests proving confirmatory prompt and session-end feedback never co-occur, prompt session-end expiry resolves first, weekly check-in stays separate from active monitoring, and rendering priority is centralized in `apps/web/tests/unit/components/questionnaire/questionnaire-coordinator.test.tsx`
-- [ ] T053 [P] [US4] Add Principle VII reduced-motion test for smiley draw-in final-state rendering through `useMediaQuery("(prefers-reduced-motion: reduce)")` in `apps/web/tests/unit/components/questionnaire/reduced-motion-smiley.test.tsx`
-- [ ] T054 [P] [US4] Add Principle VII reduced-motion test for check draw-in final-state rendering through `useMediaQuery("(prefers-reduced-motion: reduce)")` in `apps/web/tests/unit/components/questionnaire/reduced-motion-check.test.tsx`
-- [ ] T055 [P] [US4] Add Principle VII reduced-motion test for weekly progress fill updating without transition when reduced motion is preferred in `apps/web/tests/unit/components/questionnaire/reduced-motion-progress.test.tsx`
-- [ ] T056 [P] [US4] Add Principle VII reduced-motion test for muted skip wind/text appearing without pop or fade movement when reduced motion is preferred in `apps/web/tests/unit/components/questionnaire/reduced-motion-muted-skip.test.tsx`
-- [ ] T057 [P] [US4] Add Principle VII visual contract tests for Graphite token usage, amber only on stress-confirm affordances, meadow on affirmative/success states, foggy on neutral attention/error states, no crimson on questionnaire surfaces, and lucide-only icons in `apps/web/tests/unit/components/questionnaire/questionnaire-visual-contract.test.tsx`
-- [ ] T058 [P] [US4] Add Principle VII Playwright flow tests for confirmatory/session-end collision, Ren handoff, session-end account routing, an SC-007 assertion that each session-end path reaches its visible end state in no more than three interactions, and weekly cadence re-prompt behavior in `apps/web/tests/e2e/questionnaire.spec.ts`
-- [ ] T059 [P] [US4] Add Principle VII Playwright layout tests for 360px and desktop, light/dark WCAG AA gates, 44px targets, and no overlapping/truncated essential text in `apps/web/tests/e2e/questionnaire-layout.spec.ts`
+- [X] T052 [P] [US4] Add Principle VII coordinator tests proving confirmatory prompt and session-end feedback never co-occur, prompt session-end expiry resolves first, weekly check-in stays separate from active monitoring, and rendering priority is centralized in `apps/web/tests/unit/components/questionnaire/questionnaire-coordinator.test.tsx`
+- [X] T053 [P] [US4] Add Principle VII reduced-motion test for smiley draw-in final-state rendering through `useMediaQuery("(prefers-reduced-motion: reduce)")` in `apps/web/tests/unit/components/questionnaire/reduced-motion-smiley.test.tsx`
+- [X] T054 [P] [US4] Add Principle VII reduced-motion test for check draw-in final-state rendering through `useMediaQuery("(prefers-reduced-motion: reduce)")` in `apps/web/tests/unit/components/questionnaire/reduced-motion-check.test.tsx`
+- [X] T055 [P] [US4] Add Principle VII reduced-motion test for weekly progress fill updating without transition when reduced motion is preferred in `apps/web/tests/unit/components/questionnaire/reduced-motion-progress.test.tsx`
+- [X] T056 [P] [US4] Add Principle VII reduced-motion test for muted skip wind/text appearing without pop or fade movement when reduced motion is preferred in `apps/web/tests/unit/components/questionnaire/reduced-motion-muted-skip.test.tsx`
+- [X] T057 [P] [US4] Add Principle VII visual contract tests for Graphite token usage, amber only on stress-confirm affordances, meadow on affirmative/success states, foggy on neutral attention/error states, no crimson on questionnaire surfaces, and lucide-only icons in `apps/web/tests/unit/components/questionnaire/questionnaire-visual-contract.test.tsx`
+- [X] T058 [P] [US4] Add Principle VII Playwright flow tests for confirmatory/session-end collision, Ren handoff, session-end account routing, an SC-007 assertion that each session-end path reaches its visible end state in no more than three interactions, and weekly cadence re-prompt behavior in `apps/web/tests/e2e/questionnaire.spec.ts`
+- [X] T059 [P] [US4] Add Principle VII Playwright layout tests for 360px and desktop, light/dark WCAG AA gates, 44px targets, and no overlapping/truncated essential text in `apps/web/tests/e2e/questionnaire-layout.spec.ts`
 
 ### Implementation for User Story 4
 
-- [ ] T060 [US4] Implement shared `QuestionnaireResultIcon` for smiley draw-in, check draw-in, and muted skip states with `useMediaQuery` reduced-motion handling in `apps/web/components/questionnaire/questionnaire-result-icon.tsx`
-- [ ] T061 [US4] Implement `QuestionnaireCoordinator` with centralized surface priority, anti-collision rules, confirmatory expiry-before-session-end behavior, session-end eligibility, and weekly eligibility inputs in `apps/web/components/questionnaire/questionnaire-coordinator.tsx`
-- [ ] T062 [US4] Mount the coordinator on the authenticated employee dashboard without changing Today-card rendering or monitoring trend rendering in `apps/web/app/(authed)/app/page.tsx`
-- [ ] T063 [US4] Apply final Graphite token, lucide icon, focus-ring, 44px target, and responsive text-fit pass across questionnaire components in `apps/web/components/questionnaire/confirmatory-prompt.tsx`, `apps/web/components/questionnaire/session-end-feedback-card.tsx`, `apps/web/components/questionnaire/weekly-check-in-card.tsx`, and `apps/web/components/questionnaire/questionnaire-result-icon.tsx`
+- [X] T060 [US4] Implement shared `QuestionnaireResultIcon` for smiley draw-in, check draw-in, and muted skip states with `useMediaQuery` reduced-motion handling in `apps/web/components/questionnaire/questionnaire-result-icon.tsx`
+- [X] T061 [US4] Implement `QuestionnaireCoordinator` with centralized surface priority, anti-collision rules, confirmatory expiry-before-session-end behavior, session-end eligibility, and weekly eligibility inputs in `apps/web/components/questionnaire/questionnaire-coordinator.tsx`
+- [X] T062 [US4] Mount the coordinator on the authenticated employee dashboard without changing Today-card rendering or monitoring trend rendering in `apps/web/app/(authed)/app/page.tsx`
+- [X] T063 [US4] Apply final Graphite token, lucide icon, focus-ring, 44px target, and responsive text-fit pass across questionnaire components in `apps/web/components/questionnaire/confirmatory-prompt.tsx`, `apps/web/components/questionnaire/session-end-feedback-card.tsx`, `apps/web/components/questionnaire/weekly-check-in-card.tsx`, and `apps/web/components/questionnaire/questionnaire-result-icon.tsx`
 
 **Checkpoint**: All questionnaire surfaces work together without accessibility, privacy, or collision regressions.
 
@@ -168,11 +168,11 @@
 
 **Purpose**: Verify invariants that span DB, API/client, UI, and out-of-scope surfaces.
 
-- [ ] T064 [P] Add Principle VII non-regression test proving confirmatory outcomes do not suppress, annotate, or otherwise change `TodaysCheckinCard`, `TodayView`, `TodayTrendPlot`, or `SessionTrend` rendering in `apps/web/tests/unit/components/questionnaire/today-trend-untouched.test.tsx`
-- [ ] T065 [P] Add Principle VII model-scope regression test proving Feature 012 does not require changes under `packages/ml-video` or `docs/MODELS.md` in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T066 Run DB/privacy verification and record command/result placeholders in `specs/012-questionnaire-feedback/smoke-tests.md`
-- [ ] T067 Run focused web unit/component/e2e/layout verification from `quickstart.md` and record command/result placeholders in `specs/012-questionnaire-feedback/smoke-tests.md`
-- [ ] T068 Run final privacy artifact sweep for no service-role questionnaire path, aggregate-only manager returns, no precise contribution timestamp, immutable `window_readings`, and untouched Today/trend rendering; record results in `specs/012-questionnaire-feedback/smoke-tests.md`
+- [X] T064 [P] Add Principle VII non-regression test proving confirmatory outcomes do not suppress, annotate, or otherwise change `TodaysCheckinCard`, `TodayView`, `TodayTrendPlot`, or `SessionTrend` rendering in `apps/web/tests/unit/components/questionnaire/today-trend-untouched.test.tsx`
+- [X] T065 [P] Add Principle VII model-scope regression test proving Feature 012 does not require changes under `packages/ml-video` or `docs/MODELS.md` in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T066 Run DB/privacy verification and record command/result placeholders in `specs/012-questionnaire-feedback/smoke-tests.md`
+- [X] T067 Run focused web unit/component/e2e/layout verification from `quickstart.md` and record command/result placeholders in `specs/012-questionnaire-feedback/smoke-tests.md`
+- [X] T068 Run final privacy artifact sweep for no service-role questionnaire path, aggregate-only manager returns, no precise contribution timestamp, immutable `window_readings`, and untouched Today/trend rendering; record results in `specs/012-questionnaire-feedback/smoke-tests.md`
 
 ---
 
