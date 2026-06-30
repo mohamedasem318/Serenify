@@ -461,3 +461,31 @@ def test_t013_migration_never_mutates_window_readings():
         "must not add a trigger on window_readings"
     # The single permitted mention: the optional read-only FK from the prompt table.
     assert "references public.window_readings(id)" in low, "expected the optional read-only FK reference"
+
+
+# ── T065 — model-scope regression: Feature 012 touches NO inference model artifact ────
+
+
+def test_t065_no_model_artifact_scope():
+    """Feature 012 is a product layer over the existing coarse `Band` contract — it adds
+    prompt tunables, storage, and UI, but NO stress-model threshold/weight/extractor/metadata
+    change. The migration must therefore name no model artifact, and the feature must not
+    require edits under packages/ml-video or docs/MODELS.md (research.md R-8)."""
+    low = _strip_comments(_sql()).lower()
+    assert low, "migration must exist"
+
+    # The migration must not reference any model artifact path or metadata doc.
+    for token in ("ml-video", "ml_video", "models.md", "model_version", "stress_probability"):
+        assert token not in low, f"migration must not reference model artifact {token!r}"
+
+    # It must not touch model-bearing tables/columns (it only reads window_readings via FK,
+    # asserted immutable in T013). No model-internal vocabulary leaks in. (Word-specific tokens
+    # — `down_weight` is the legitimate false-alarm aggregate marker, not a model weight.)
+    for token in ("stress_threshold", "model_weight", "feature_extractor", "logreg", "stress_probability"):
+        assert token not in low, f"migration must not reference model internal {token!r}"
+
+    # The model artifact tree and the model doc still exist and are untouched by this feature
+    # (a structural anchor — their presence is independent of feature 012).
+    repo_root = Path(__file__).resolve().parents[3]
+    assert (repo_root / "packages" / "ml-video").exists(), "ml-video package expected to exist (untouched)"
+    assert (repo_root / "docs" / "MODELS.md").exists(), "docs/MODELS.md expected to exist (untouched)"
