@@ -168,11 +168,14 @@ def test_t003_confirmatory_prompts_columns_and_constraints():
         assert re.search(rf"\b{col}\b", low), f"missing column {col}"
 
     # One prompt per monitoring session.
-    assert re.search(r"unique\s*\(\s*monitoring_session_id\s*\)", low), "expected UNIQUE(monitoring_session_id)"
+    assert re.search(r"unique\s*\(\s*monitoring_session_id\s*\)", low), \
+        "expected UNIQUE(monitoring_session_id)"
 
     # Trigger band fixed to the top band, and the trigger TIME is required.
     assert "trigger_band = 'tense'" in low
-    assert re.search(r"triggered_window_captured_at\s+timestamptz\s+not null", low), "trigger time must be NOT NULL"
+    assert re.search(
+        r"triggered_window_captured_at\s+timestamptz\s+not null", low
+    ), "trigger time must be NOT NULL"
 
     # Lifecycle / outcome / expiry enumerations.
     for tok in ("'visible'", "'answered'", "'expired'"):
@@ -204,7 +207,8 @@ def test_t004_session_feedback_columns_and_constraints():
         assert re.search(rf"\b{col}\b", low), f"missing column {col}"
 
     # One row per monitoring session.
-    assert re.search(r"unique\s*\(\s*monitoring_session_id\s*\)", low), "expected UNIQUE(monitoring_session_id)"
+    assert re.search(r"unique\s*\(\s*monitoring_session_id\s*\)", low), \
+        "expected UNIQUE(monitoring_session_id)"
 
     # Status / sentiment / reason enumerations.
     for tok in ("'submitted'", "'skipped'"):
@@ -218,11 +222,13 @@ def test_t004_session_feedback_columns_and_constraints():
     # Skip stores nothing (sentiment/reason/free_text/action_target all null on skip).
     assert any("skipped" in c and "is null" in c for c in checks), "skip must store no fields"
     # sentiment='off' requires a reason.
-    assert any("'off'" in c and "reason" in c for c in checks), "sentiment='off' must require a reason"
+    assert any("'off'" in c and "reason" in c for c in checks), \
+        "sentiment='off' must require a reason"
     # Free text only for something_else, and empty/whitespace text rejected.
     assert any("free_text" in c and "something_else" in c for c in checks), \
         "free_text must be gated to reason='something_else'"
-    assert any("btrim" in c or "trim" in c for c in checks), "empty/whitespace free_text must be rejected"
+    assert any("btrim" in c or "trim" in c for c in checks), \
+        "empty/whitespace free_text must be rejected"
 
     # v1 sampling seam defaults to every session.
     assert re.search(r"sampling_policy\s+text\s+not null\s+default\s+'every_session'", low), \
@@ -244,12 +250,15 @@ def test_t005_weekly_cadence_columns_and_constraints():
         "expected UNIQUE(user_id, iso_week_start)"
 
     checks = _checks(low)
-    assert any("prompt_count" in c and "between 0 and 2" in c for c in checks), "prompt_count must be 0-2"
-    assert any("skipped_count" in c and "between 0 and 2" in c for c in checks), "skipped_count must be 0-2"
+    assert any("prompt_count" in c and "between 0 and 2" in c for c in checks), \
+        "prompt_count must be 0-2"
+    assert any("skipped_count" in c and "between 0 and 2" in c for c in checks), \
+        "skipped_count must be 0-2"
 
     # Cadence stores NO work-environment answers.
     for forbidden in ("sentiment", "roadblock", "support"):
-        assert not re.search(rf"\b{forbidden}\b", low), f"cadence must not carry answer column {forbidden!r}"
+        assert not re.search(rf"\b{forbidden}\b", low), \
+            f"cadence must not carry answer column {forbidden!r}"
 
 
 # ── T006 — weekly_work_environment_contributions: identity-stripped, no timestamp ─
@@ -280,8 +289,12 @@ def test_t006_contributions_identity_stripped_and_timestampless():
 def test_t007_owner_only_forced_rls_on_private_tables():
     sql = _sql()
     for table in _PRIVATE_TABLES:
-        assert re.search(rf"alter table public\.{table}\s+enable row level security", sql, re.I), table
-        assert re.search(rf"alter table public\.{table}\s+force\s+row level security", sql, re.I), table
+        assert re.search(
+            rf"alter table public\.{table}\s+enable row level security", sql, re.I
+        ), table
+        assert re.search(
+            rf"alter table public\.{table}\s+force\s+row level security", sql, re.I
+        ), table
 
     by_table: dict[str, list[tuple[str, str]]] = {}
     for name, tbl, pbody in _policies(_strip_comments(sql)):
@@ -291,8 +304,9 @@ def test_t007_owner_only_forced_rls_on_private_tables():
         prefix = _PRIVATE_POLICY_PREFIX[table]
         pol = by_table.get(table, [])
         names = {n for n, _ in pol}
-        assert names == {f"{prefix}_select_self", f"{prefix}_insert_self", f"{prefix}_update_self"}, \
-            f"{table} must have exactly owner select/insert/update policies, got {names}"
+        assert names == {
+            f"{prefix}_select_self", f"{prefix}_insert_self", f"{prefix}_update_self"
+        }, f"{table} must have exactly owner select/insert/update policies, got {names}"
         for name, pbody in pol:
             low = pbody.lower()
             assert "to authenticated" in low, f"{name} must be TO authenticated"
@@ -317,8 +331,9 @@ def test_t008_contributions_forced_rls_revoked_no_manager_policy():
     assert re.search(rf"revoke all on public\.{t} from anon, ?authenticated", sql, re.I), \
         "direct anon/authenticated grants must be revoked"
     # No direct table grant back to anon/authenticated — access is RPC-only.
-    assert not re.search(rf"grant[\w ,()]+on public\.{t}\s+to\s+(anon|authenticated)", sql, re.I), \
-        "contributions must not be directly granted to anon/authenticated"
+    assert not re.search(
+        rf"grant[\w ,()]+on public\.{t}\s+to\s+(anon|authenticated)", sql, re.I
+    ), "contributions must not be directly granted to anon/authenticated"
 
     pols = [(n, b) for n, tbl, b in _policies(_strip_comments(sql)) if tbl == t]
     assert pols, "expected the narrow function-owner policy on the contributions table"
@@ -344,7 +359,8 @@ def test_t009_submit_rpc_security_and_logic():
     # Caller validation via auth.uid(); NO impersonation parameter.
     assert "auth.uid()" in low, "must resolve auth.uid() internally"
     params = _function_param_list(fn)
-    assert "uid" not in params and "user" not in params, f"submit RPC must take no caller-id param: {params!r}"
+    assert "uid" not in params and "user" not in params, \
+        f"submit RPC must take no caller-id param: {params!r}"
 
     # Employee-role gate, ISO-week Monday validation, option validation.
     assert "'employee'" in low and "role" in low, "must gate on employee role"
@@ -352,22 +368,33 @@ def test_t009_submit_rpc_security_and_logic():
     assert "could_be_better" in low and "'good'" in low, "must validate sentiment options"
 
     # Derive the team bucket from profiles.manager_id and complete private cadence.
-    assert "profiles" in low and "manager_id" in low, "must derive team_manager_id from profiles.manager_id"
-    assert "weekly_checkin_cadence" in low and "completed_at" in low, "must complete the private cadence"
+    assert "profiles" in low and "manager_id" in low, \
+        "must derive team_manager_id from profiles.manager_id"
+    assert "weekly_checkin_cadence" in low and "completed_at" in low, \
+        "must complete the private cadence"
 
     # The contribution INSERT must be identity-stripped (no user_id in the column list).
-    ins = re.search(r"insert into public\.weekly_work_environment_contributions\s*\((.*?)\)", low, re.DOTALL)
+    ins = re.search(
+        r"insert into public\.weekly_work_environment_contributions\s*\((.*?)\)",
+        low, re.DOTALL,
+    )
     assert ins, "must insert one contribution row"
     assert "user_id" not in ins.group(1), "contribution insert must carry NO user_id"
 
     # Owner postgres + restricted EXECUTE grants.
     assert re.search(
-        r"alter function public\.submit_weekly_work_environment_checkin\([^)]*\)\s+owner to postgres", sql, re.I)
-    assert re.search(
-        r"revoke execute on function public\.submit_weekly_work_environment_checkin\([^)]*\)\s+from public, ?anon",
+        r"alter function public\.submit_weekly_work_environment_checkin\([^)]*\)"
+        r"\s+owner to postgres",
         sql, re.I)
     assert re.search(
-        r"grant execute on function public\.submit_weekly_work_environment_checkin\([^)]*\)\s+to authenticated",
+        r"revoke execute on function"
+        r" public\.submit_weekly_work_environment_checkin\([^)]*\)"
+        r"\s+from public, ?anon",
+        sql, re.I)
+    assert re.search(
+        r"grant execute on function"
+        r" public\.submit_weekly_work_environment_checkin\([^)]*\)"
+        r"\s+to authenticated",
         sql, re.I)
 
 
@@ -390,7 +417,9 @@ def test_t010_summary_rpc_security_and_grouped_shape():
     rt = re.search(r"returns table\s*\((.*?)\)", low, re.DOTALL)
     assert rt, "summary RPC must RETURNS TABLE(...)"
     ret = rt.group(1)
-    for col in ("iso_week_start", "sample_size", "sentiment", "roadblock", "support", "response_count"):
+    for col in (
+        "iso_week_start", "sample_size", "sentiment", "roadblock", "support", "response_count"
+    ):
         assert col in ret, f"return shape missing {col}"
     # Never return a raw contribution id or individual rows.
     assert not re.search(r"\bid\b", ret), "summary must not return a contribution id column"
@@ -398,12 +427,18 @@ def test_t010_summary_rpc_security_and_grouped_shape():
 
     # Owner postgres + restricted EXECUTE grants.
     assert re.search(
-        r"alter function public\.get_weekly_work_environment_summary\([^)]*\)\s+owner to postgres", sql, re.I)
-    assert re.search(
-        r"revoke execute on function public\.get_weekly_work_environment_summary\([^)]*\)\s+from public, ?anon",
+        r"alter function public\.get_weekly_work_environment_summary\([^)]*\)"
+        r"\s+owner to postgres",
         sql, re.I)
     assert re.search(
-        r"grant execute on function public\.get_weekly_work_environment_summary\([^)]*\)\s+to authenticated",
+        r"revoke execute on function"
+        r" public\.get_weekly_work_environment_summary\([^)]*\)"
+        r"\s+from public, ?anon",
+        sql, re.I)
+    assert re.search(
+        r"grant execute on function"
+        r" public\.get_weekly_work_environment_summary\([^)]*\)"
+        r"\s+to authenticated",
         sql, re.I)
 
 
@@ -424,7 +459,8 @@ def test_t011_summary_rpc_role_gated_visibility():
     assert "team_manager_id" in fn
 
     # Null-bucket rows are excluded from manager summaries.
-    assert re.search(r"team_manager_id\s+is not null", fn), "null team_manager_id rows must be excluded"
+    assert re.search(r"team_manager_id\s+is not null", fn), \
+        "null team_manager_id rows must be excluded"
 
 
 # ── T012 — privacy regression: no service-role / no manager individual-row path ─
@@ -452,15 +488,21 @@ def test_t013_migration_never_mutates_window_readings():
     low = _strip_comments(_sql()).lower()
     assert low, "migration must exist"
     # A read-only FK reference is permitted; any mutation/annotation is not.
-    assert not re.search(r"alter table\s+public\.window_readings", low), "must not ALTER window_readings"
-    assert not re.search(r"update\s+public\.window_readings", low), "must not UPDATE window_readings"
-    assert not re.search(r"delete\s+from\s+public\.window_readings", low), "must not DELETE window_readings"
-    assert not re.search(r"drop\s+\w+[^;]*window_readings", low), "must not DROP anything on window_readings"
-    assert not re.search(r"comment\s+on\s+\w+\s+public\.window_readings", low), "must not annotate window_readings"
+    assert not re.search(r"alter table\s+public\.window_readings", low), \
+        "must not ALTER window_readings"
+    assert not re.search(r"update\s+public\.window_readings", low), \
+        "must not UPDATE window_readings"
+    assert not re.search(r"delete\s+from\s+public\.window_readings", low), \
+        "must not DELETE window_readings"
+    assert not re.search(r"drop\s+\w+[^;]*window_readings", low), \
+        "must not DROP anything on window_readings"
+    assert not re.search(r"comment\s+on\s+\w+\s+public\.window_readings", low), \
+        "must not annotate window_readings"
     assert not re.search(r"create\s+trigger\s+\w+[^;]*on\s+public\.window_readings", low), \
         "must not add a trigger on window_readings"
     # The single permitted mention: the optional read-only FK from the prompt table.
-    assert "references public.window_readings(id)" in low, "expected the optional read-only FK reference"
+    assert "references public.window_readings(id)" in low, \
+        "expected the optional read-only FK reference"
 
 
 # ── T065 — model-scope regression: Feature 012 touches NO inference model artifact ────
@@ -481,11 +523,15 @@ def test_t065_no_model_artifact_scope():
     # It must not touch model-bearing tables/columns (it only reads window_readings via FK,
     # asserted immutable in T013). No model-internal vocabulary leaks in. (Word-specific tokens
     # — `down_weight` is the legitimate false-alarm aggregate marker, not a model weight.)
-    for token in ("stress_threshold", "model_weight", "feature_extractor", "logreg", "stress_probability"):
+    for token in (
+        "stress_threshold", "model_weight", "feature_extractor", "logreg", "stress_probability"
+    ):
         assert token not in low, f"migration must not reference model internal {token!r}"
 
     # The model artifact tree and the model doc still exist and are untouched by this feature
     # (a structural anchor — their presence is independent of feature 012).
     repo_root = Path(__file__).resolve().parents[3]
-    assert (repo_root / "packages" / "ml-video").exists(), "ml-video package expected to exist (untouched)"
-    assert (repo_root / "docs" / "MODELS.md").exists(), "docs/MODELS.md expected to exist (untouched)"
+    assert (repo_root / "packages" / "ml-video").exists(), \
+        "ml-video package expected to exist (untouched)"
+    assert (repo_root / "docs" / "MODELS.md").exists(), \
+        "docs/MODELS.md expected to exist (untouched)"
