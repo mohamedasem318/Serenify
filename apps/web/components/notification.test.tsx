@@ -241,3 +241,87 @@ describe("Notification — dismiss control", () => {
     expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
   });
 });
+
+// ── T029 — non-dismissable confirmatory mode (dismissible=false / nonModal=true) ────────
+// The confirmatory prompt is the one documented `dismissible:false` consumer: it removes
+// close UI and blocks Escape / outside / blur dismissal, but stays keyboard-answerable and
+// must NOT trap focus or make the rest of the app inert (R-5 / accessibility contract).
+describe("Notification — non-dismissable confirmatory mode", () => {
+  beforeEach(() => {
+    useMediaQueryMock.mockReset();
+    document.documentElement.style.removeProperty("--chat-pill-offset");
+  });
+
+  it("renders no close button when dismissible=false", async () => {
+    setup();
+    render(
+      <Notification open onOpenChange={vi.fn()} title="Checking in" dismissible={false} nonModal>
+        <button type="button">Yes, that&apos;s me</button>
+      </Notification>,
+    );
+    await screen.findByTestId("notification");
+    expect(screen.queryByRole("button", { name: "Dismiss" })).toBeNull();
+  });
+
+  it("does NOT render a scrim overlay in nonModal mode (no app inertness)", async () => {
+    setup({ mobile: true }); // mobile is where the overlay would otherwise render
+    render(
+      <Notification open onOpenChange={vi.fn()} title="Checking in" dismissible={false} nonModal>
+        <button type="button">Answer</button>
+      </Notification>,
+    );
+    await screen.findByTestId("notification");
+    expect(screen.queryByTestId("notification-overlay")).toBeNull();
+  });
+
+  it("Escape does not dismiss when dismissible=false", async () => {
+    setup();
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Notification open onOpenChange={onOpenChange} title="Checking in" dismissible={false} nonModal>
+        <button type="button">Answer</button>
+      </Notification>,
+    );
+    await screen.findByTestId("notification");
+    await user.keyboard("{Escape}");
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("an outside click does not dismiss when dismissible=false", async () => {
+    setup();
+    const onOpenChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <div>
+        <button type="button">outside app control</button>
+        <Notification open onOpenChange={onOpenChange} title="Checking in" dismissible={false} nonModal>
+          <button type="button">Answer</button>
+        </Notification>
+      </div>,
+    );
+    await screen.findByTestId("notification");
+    await user.click(screen.getByRole("button", { name: "outside app control" }));
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("keeps answer buttons keyboard-focusable and does not trap focus", async () => {
+    setup();
+    render(
+      <div>
+        <button type="button">outside app control</button>
+        <Notification open onOpenChange={vi.fn()} title="Checking in" dismissible={false} nonModal>
+          <button type="button">Yes, that&apos;s me</button>
+        </Notification>
+      </div>,
+    );
+    await screen.findByTestId("notification");
+    const answer = screen.getByRole("button", { name: "Yes, that's me" });
+    answer.focus();
+    expect(answer).toHaveFocus();
+    // non-modal: focus can leave the prompt to the rest of the app (no trap)
+    const outside = screen.getByRole("button", { name: "outside app control" });
+    outside.focus();
+    expect(outside).toHaveFocus();
+  });
+});
