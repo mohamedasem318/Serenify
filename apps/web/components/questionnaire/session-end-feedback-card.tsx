@@ -1,0 +1,251 @@
+"use client";
+
+import { ArrowRight, Bot, Lightbulb, Meh, Moon, Pencil, Smile, X } from "lucide-react";
+import { useRef, useState } from "react";
+
+import { saveSessionFeedback as defaultSave } from "@/lib/api/questionnaire-client";
+import type { SessionFeedbackReason } from "@/lib/questionnaire/types";
+import { cn } from "@/lib/utils";
+
+import { QuestionnaireResultIcon } from "./questionnaire-result-icon";
+
+/**
+ * Feature 012 / US2 — the session-end product-feedback card.
+ *
+ * Optional and freely skippable. Good → smiley success; "Something was off" → a reason
+ * picker with a tailored action; Skip → a muted wind. Every reason is persisted ONLY as
+ * employee-private product feedback through the questionnaire client (`saveSessionFeedback`).
+ * The card has NO Ren or manager path: `ren_too_robotic` and free text are stored here and
+ * never routed anywhere; the only routes are within /app/account. Calm-first colour roles —
+ * no crimson, no amber. SC-007: every path reaches its end state in ≤3 interactions.
+ */
+
+const OPTION =
+  "flex w-full min-h-11 items-center gap-3 rounded-control border border-border bg-bg px-3.5 py-2.5 " +
+  "text-left text-[15px] leading-snug text-ink transition-colors " +
+  "hover:bg-[color-mix(in_srgb,var(--color-foggy)_8%,var(--color-surface))] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface " +
+  "aria-[pressed=true]:border-meadow";
+
+const SENTIMENT =
+  "flex min-h-11 flex-1 flex-col items-center gap-2 rounded-card border border-border bg-bg px-4 py-4 " +
+  "text-[14px] text-ink transition-colors " +
+  "hover:bg-[color-mix(in_srgb,var(--color-foggy)_8%,var(--color-surface))] " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+
+const ROUTE_BTN =
+  "inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-control border border-border bg-surface " +
+  "px-3 py-2 text-[14px] text-ink transition-colors hover:bg-bg " +
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
+
+export interface SessionEndFeedbackCardProps {
+  userId: string;
+  monitoringSessionId: string;
+  /** Called once the feedback is recorded (submitted or skipped) so the host can mark it done. */
+  onResolved?: () => void;
+  /** Injectable persistence (defaults to the RLS questionnaire client). */
+  save?: typeof defaultSave;
+  /** Injectable navigation for the account route actions (defaults to a full nav). */
+  navigate?: (path: string) => void;
+}
+
+type Ending = "good" | "skip" | null;
+
+export function SessionEndFeedbackCard({
+  userId,
+  monitoringSessionId,
+  onResolved,
+  save = defaultSave,
+  navigate = (path) => {
+    if (typeof window !== "undefined") window.location.assign(path);
+  },
+}: SessionEndFeedbackCardProps) {
+  const [branchOpen, setBranchOpen] = useState(false);
+  const [reason, setReason] = useState<SessionFeedbackReason | null>(null);
+  const [freeText, setFreeText] = useState("");
+  const [ending, setEnding] = useState<Ending>(null);
+  // Track the in-flight save so a route action can await it before a full-page nav can abort it.
+  const savePromiseRef = useRef<Promise<unknown>>(Promise.resolve());
+
+  function persist(args: Parameters<typeof defaultSave>[0]) {
+    savePromiseRef.current = Promise.resolve(save(args));
+    onResolved?.();
+  }
+
+  async function route(path: string) {
+    await savePromiseRef.current;
+    navigate(path);
+  }
+
+  function chooseGood() {
+    persist({ userId, monitoringSessionId, status: "submitted", sentiment: "good" });
+    setEnding("good");
+  }
+
+  function skip() {
+    persist({ userId, monitoringSessionId, status: "skipped" });
+    setEnding("skip");
+  }
+
+  function chooseReason(next: SessionFeedbackReason) {
+    setReason(next);
+    // Route/ack reasons record immediately; `something_else` waits for non-empty free text.
+    if (next !== "something_else") {
+      persist({ userId, monitoringSessionId, status: "submitted", sentiment: "off", reason: next });
+    }
+  }
+
+  function submitFreeText() {
+    if (freeText.trim().length === 0) return; // non-empty trimmed text required
+    persist({
+      userId,
+      monitoringSessionId,
+      status: "submitted",
+      sentiment: "off",
+      reason: "something_else",
+      freeText,
+    });
+    setReason(null); // collapse the editor; feedback recorded
+    setFreeText("");
+  }
+
+  if (ending) {
+    return (
+      <div className="rounded-card border border-border bg-surface p-5 shadow-soft" data-testid="session-end-feedback">
+        <QuestionnaireResultIcon
+          kind={ending === "good" ? "smiley" : "muted"}
+          message={ending === "good" ? "Glad that helped." : "No problem — another time."}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-card border border-border bg-surface p-5 shadow-soft" data-testid="session-end-feedback">
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-display text-[17px] font-semibold leading-tight text-ink">
+          How did that check-in feel?
+        </h2>
+        <button
+          type="button"
+          onClick={skip}
+          className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-[13px] text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+        >
+          <X aria-hidden className="size-3.5" /> Skip
+        </button>
+      </div>
+
+      {!branchOpen ? (
+        <div className="mt-3 flex gap-3">
+          <button type="button" onClick={chooseGood} className={SENTIMENT}>
+            <Smile aria-hidden className="size-7 text-meadow" /> Good
+          </button>
+          <button type="button" onClick={() => setBranchOpen(true)} className={SENTIMENT}>
+            <Meh aria-hidden className="size-7 text-muted" /> Something was off
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 border-t border-border pt-4">
+          <p className="mb-2.5 text-[14px] text-muted">Got it. What felt off?</p>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              aria-pressed={reason === "suggestion_didnt_help"}
+              onClick={() => chooseReason("suggestion_didnt_help")}
+              className={OPTION}
+            >
+              <Lightbulb aria-hidden className="size-[19px] shrink-0 text-muted" /> The suggestion
+              didn&apos;t help
+            </button>
+            <button
+              type="button"
+              aria-pressed={reason === "needed_quiet"}
+              onClick={() => chooseReason("needed_quiet")}
+              className={OPTION}
+            >
+              <Moon aria-hidden className="size-[19px] shrink-0 text-muted" /> I just needed quiet
+              time
+            </button>
+            <button
+              type="button"
+              aria-pressed={reason === "ren_too_robotic"}
+              onClick={() => chooseReason("ren_too_robotic")}
+              className={OPTION}
+            >
+              <Bot aria-hidden className="size-[19px] shrink-0 text-muted" /> The chatbot felt too
+              robotic
+            </button>
+            <button
+              type="button"
+              aria-pressed={reason === "something_else"}
+              onClick={() => chooseReason("something_else")}
+              className={OPTION}
+            >
+              <Pencil aria-hidden className="size-[19px] shrink-0 text-muted" /> Something else
+            </button>
+          </div>
+
+          {reason && <div className="mt-3.5">{renderAction(reason)}</div>}
+        </div>
+      )}
+    </div>
+  );
+
+  function renderAction(r: SessionFeedbackReason) {
+    if (r === "suggestion_didnt_help") {
+      return (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-card bg-[color-mix(in_srgb,var(--color-meadow)_12%,var(--color-surface))] px-3.5 py-3">
+          <span className="text-[14px] text-meadow-text">Your suggestions can be tuned to you.</span>
+          <button type="button" onClick={() => void route("/app/account")} className={ROUTE_BTN}>
+            Update preferences <ArrowRight aria-hidden className="size-[15px]" />
+          </button>
+        </div>
+      );
+    }
+    if (r === "needed_quiet") {
+      return (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 rounded-card bg-[color-mix(in_srgb,var(--color-meadow)_12%,var(--color-surface))] px-3.5 py-3">
+          <span className="text-[14px] text-meadow-text">Want fewer check-ins?</span>
+          <button
+            type="button"
+            onClick={() => void route("/app/account#notifications")}
+            className={ROUTE_BTN}
+          >
+            Notification settings <ArrowRight aria-hidden className="size-[15px]" />
+          </button>
+        </div>
+      );
+    }
+    if (r === "ren_too_robotic") {
+      return (
+        <div className="rounded-card bg-bg px-3.5 py-3 text-[14px] text-muted">
+          Thanks — we&apos;ll keep refining how Ren talks. (stored as product feedback, not sent to
+          Ren)
+        </div>
+      );
+    }
+    // something_else — free text, stored employee-private only.
+    return (
+      <div className="rounded-card bg-bg px-3.5 py-3">
+        <textarea
+          aria-label="Tell us what felt off"
+          placeholder="Tell us what felt off"
+          value={freeText}
+          onChange={(e) => setFreeText(e.target.value)}
+          className="min-h-[62px] w-full resize-y rounded-control border border-border bg-surface p-2.5 text-[14px] text-ink outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <p className="text-[12px] text-muted">This goes to Serenify.</p>
+          <button
+            type="button"
+            onClick={submitFreeText}
+            disabled={freeText.trim().length === 0}
+            className={cn(ROUTE_BTN, "disabled:opacity-40")}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    );
+  }
+}
