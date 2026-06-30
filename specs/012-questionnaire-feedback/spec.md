@@ -155,7 +155,7 @@ As an employee, I can use all questionnaire surfaces in light or dark mode, on s
 - **FR-013a**: Once shown, the confirmatory prompt MUST require a named tunable `confirmatory_prompt_min_dwell_duration`, defaulting to about 4-5 seconds, before a signal drop can auto-dismiss it.
 - **FR-014**: The prompt title MUST be "Checking in" and body copy MUST be "Your signals have looked tense for a little while. Is that how you're feeling?"
 - **FR-015**: The prompt MUST be sticky and not dismissible by outside click, escape misclick, blur, or a visible close/skip action.
-- **FR-016**: The prompt MUST resolve only when the employee answers or when the passive signal drops from `tense` to `a_little_tense` or `at_ease` after the dwell floor.
+- **FR-016**: The prompt MUST resolve only when the employee answers or when the passive signal drops from `tense` to `a_little_tense` or `at_ease` after the prompt has been on-screen for at least the dwell floor (`confirmatory_prompt_min_dwell_duration`, FR-013a). This dwell floor is measured from when the prompt is shown and is distinct from the sustained-tense trigger duration that gates whether the prompt appears (FR-013).
 - **FR-017**: The prompt MUST show exactly three options in this order: "Yes, that's me", "No, I'm okay", and "Maybe — talk about it".
 - **FR-018**: Choosing "Yes, that's me" MUST hand off to Ren with a soft opener and must not show recommendations in this feature.
 - **FR-019**: Choosing "No, I'm okay" MUST dismiss the prompt as a false alarm, persist `false_alarm`, and suppress the confirmatory prompt for the next monitoring session.
@@ -238,7 +238,7 @@ As an employee, I can use all questionnaire surfaces in light or dark mode, on s
 
 ### Measurable Outcomes
 
-- **SC-001**: In controlled monitoring tests, the confirmatory prompt appears in 100% of cases where an active session remains `tense` for the configured sustained duration after the dwell floor.
+- **SC-001**: In controlled monitoring tests, the confirmatory prompt appears in 100% of cases where an active session remains `tense` continuously for the configured sustained-tense trigger duration (`confirmatory_tense_sustained_duration`, FR-013). The minimum on-screen dwell floor (`confirmatory_prompt_min_dwell_duration`, FR-013a) is a separate post-appearance timer that gates only signal-drop auto-dismiss and does not affect whether the prompt appears.
 - **SC-002**: In controlled monitoring tests, the confirmatory prompt appears in 0% of cases where the signal leaves `tense` before the configured sustained duration.
 - **SC-003**: In prompt interaction tests, outside click, blur, escape misclick, and missing close action dismiss the prompt in 0% of cases.
 - **SC-004**: In prompt lifecycle tests, the prompt resolves on valid answer or qualifying signal drop in 100% of cases and appears no more than once per monitoring session.

@@ -42,15 +42,15 @@ Negative reasons and actions:
 
 | Reason label | Stored reason | Action |
 |--------------|---------------|--------|
-| `The suggestion didn't help` | `suggestion_didnt_help` | Route to existing account preferences placeholder. |
+| `The suggestion didn't help` | `suggestion_didnt_help` | Route to `/app/account` (plain; no preferences section exists yet). |
 | `I just needed quiet time` | `needed_quiet` | Route to existing account notification placeholder. |
 | `The chatbot felt too robotic` | `ren_too_robotic` | Store/acknowledge only. Never send to Ren. |
 | `Something else` | `something_else` | Show free text; store non-empty trimmed text only. |
 
 Route targets:
 
-- Preferences seam: `/app/account#preferences` after implementation adds a stable section id.
-- Notifications seam: `/app/account#notifications` using the existing placeholder section.
+- Preferences seam: `/app/account` (plain, no anchor). No preferences section exists in the account route today, so the `suggestion_didnt_help` action routes to the account root. This action will target a real preferences section once features 014/016 ship.
+- Notifications seam: `/app/account#notifications` using the existing notifications placeholder section.
 
 Privacy copy/action:
 

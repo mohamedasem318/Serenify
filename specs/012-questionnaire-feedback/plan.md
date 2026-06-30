@@ -71,7 +71,7 @@ The implementation will use direct Supabase RLS-as-user writes for employee-priv
 
 4. **Confirmatory timing lives beside the existing browser monitoring loop.** The hook consumes `WindowOutcome` readings already returned by `submitWindow()` and the `liveSessionId` held by `MonitoringSession`. It tracks consecutive `tense` observations using named constants and browser time, avoiding any cross-worker server state and preserving the inference server's in-memory smoothing constraint.
 
-5. **Window readings remain immutable.** `false_alarm` is represented only on the prompt row as `manager_aggregate_treatment = 'exclude_or_down_weight'` with a required triggering captured time and optional `window_reading_id`. No `window_readings` row is updated, deleted, suppressed, or annotated; Today card and trend components are not touched.
+5. **Window readings remain immutable.** `false_alarm` is represented only on the prompt row as `aggregate_treatment = 'exclude_or_down_weight'` with a required triggering captured time and optional `window_reading_id`. No `window_readings` row is updated, deleted, suppressed, or annotated; Today card and trend components are not touched.
 
 6. **Notification surface is extended, not replaced.** `Notification` gains a backward-compatible `dismissible?: boolean`/non-modal behavior needed by the documented feature-003 seam. The confirmatory prompt passes `dismissible={false}`, omits close UI, prevents escape/outside dismissal, remains keyboard answerable, and does not trap focus or block the rest of the app.
 
@@ -115,7 +115,7 @@ specs/012-questionnaire-feedback/
 ```text
 apps/web/
 ├── app/(authed)/app/
-│   ├── account/page.tsx                    # add stable placeholder anchors if absent
+│   ├── account/page.tsx                    # ensure notifications-placeholder has id="notifications"; preferences action routes to /app/account plain (no preferences section yet; targets 014/016 later)
 │   ├── chat/page.tsx                       # existing Ren entry; accept handoff query seam if needed
 │   └── page.tsx                            # weekly/session feedback mount point
 ├── components/

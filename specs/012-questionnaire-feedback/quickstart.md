@@ -72,7 +72,7 @@ Expected coverage:
 - Light and dark themes remain WCAG AA.
 - Confirmatory prompt and session-end feedback are never visible together.
 - Ren opens from `confirmed` and `opened_chat` handoffs without recommendation cards.
-- Session-end negative actions route to `/app/account#preferences` and `/app/account#notifications`.
+- Session-end negative actions route the "suggestion didn't help" action to `/app/account` (plain, no preferences anchor yet) and the "needed quiet time" action to `/app/account#notifications`.
 
 ## 5. Manual Smoke Scenarios
 
