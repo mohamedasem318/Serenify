@@ -8,6 +8,10 @@ import {
   type ConversationDetail,
   type ConversationSummary,
 } from "@/lib/api/chat-client";
+import {
+  confirmatoryHandoffOpener,
+  isConfirmatoryHandoff,
+} from "@/lib/chat/confirmatory-handoff";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -17,9 +21,13 @@ type Role = "employee" | "team_lead" | "admin";
 export default async function ChatPage({
   searchParams,
 }: {
-  searchParams: Promise<{ c?: string; new?: string }>;
+  searchParams: Promise<{ c?: string; new?: string; handoff?: string }>;
 }) {
   const sp = await searchParams;
+  // Feature 012 confirmatory Ren handoff: ?handoff=confirmatory_yes|confirmatory_maybe opens
+  // a fresh chat with a soft opener prefilled (no recommendation cards).
+  const handoff = isConfirmatoryHandoff(sp?.handoff) ? sp.handoff : null;
+  const handoffOpener = handoff ? confirmatoryHandoffOpener(handoff) : undefined;
   const supabase = await createClient();
   const {
     data: { user },
@@ -47,7 +55,8 @@ export default async function ChatPage({
     // `?new=1` (from the home "New chat" action) opens a blank composer — skip resuming the
     // current conversation so no empty row is created and none is auto-selected. An explicit
     // `?c=<id>` still wins; plain /app/chat still resumes the most-recent chat (FR resume).
-    const startNew = sp?.new === "1";
+    // A confirmatory handoff also opens a blank composer (the opener is seeded client-side).
+    const startNew = sp?.new === "1" || handoff !== null;
     const detailPromise = requestedId
       ? getConversation(token, requestedId)
       : startNew
@@ -65,7 +74,11 @@ export default async function ChatPage({
     // into the height under the heading; its log keeps its own scroll.
     <div className="mx-auto flex h-[calc(100dvh-8rem)] min-h-[35rem] max-h-[46rem] w-full max-w-6xl flex-col gap-4">
       <h1 className="font-display text-2xl text-ink">Chat</h1>
-      <ChatShell initialConversations={conversations} initialDetail={detail} />
+      <ChatShell
+        initialConversations={conversations}
+        initialDetail={detail}
+        handoffOpener={handoffOpener}
+      />
     </div>
   );
 }
