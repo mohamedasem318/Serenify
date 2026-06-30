@@ -1638,3 +1638,25 @@ backlog-shaped issues — the same treatment feature 010 gave its unfiled spec-i
 **#75** (ToS / Privacy Policy / signup consent gate) remains **OPEN** — 011 ships only the
 in-app companion disclaimer ("Ren is an AI companion, not a substitute for professional
 care."); the full pre-production consent gate is unchanged and stays a pre-real-data blocker.
+
+---
+
+## From feature 012 (questionnaire) — planned
+
+### Work-environment feedback aggregate anonymization hardening (#123)
+**Status**: deferred-feature (`type:feature` / privacy / pre-real-data / `area:db` + `area:web`)
+— **OPEN, blocks real employee data collection; consumed by feature 017 (team-lead-dashboard).**
+**Observed / deferred**: 2026-06-30, Constitution Amendment 13.
+**Description**: Feature 012's weekly work-environment check-in creates a new
+employee-submitted data class: overall sentiment, and when negative, a roadblock
+selection plus a desired-support selection. Principle I allows this class to reach
+the manager-facing layer only as an anonymized team-level aggregate, never as an
+individual employee's attributed answer. The demo build may defer the small-team
+privacy hardening, but real employee data collection MUST NOT start until it is in
+place.
+**Fix scope**: add minimum-headcount suppression to the manager-facing aggregate so
+no tally can be traced back to one person on a small team. Keep the implementation
+separate from stress-signal direct-manager visibility and cover it in the feature
+017 privacy review when the team-lead dashboard consumes the aggregate.
+**Address by**: before any real employee data is collected; implement no later than
+feature 017 (team-lead-dashboard) before exposing the manager aggregate to real data.
