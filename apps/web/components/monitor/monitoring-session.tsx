@@ -24,10 +24,24 @@ import {
   type EndReason,
   type SessionStatus,
   type SubmitWindowResult,
+  type WindowOutcome,
 } from "@/lib/api/monitoring-client";
 import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-reads";
+import {
+  createConfirmatoryPrompt,
+  resolveConfirmatoryAnswered,
+  resolveConfirmatoryExpired,
+} from "@/lib/api/questionnaire-client";
+import { useConfirmatoryTrigger } from "@/lib/questionnaire/confirmatory-trigger";
+import {
+  armFalseAlarmSuppression,
+  consumeFalseAlarmSuppression,
+  hasFalseAlarmSuppression,
+} from "@/lib/questionnaire/false-alarm-suppression";
+import { recordEndedSession } from "@/lib/questionnaire/session-end-handoff";
 import { createClient } from "@/lib/supabase/client";
 
+import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 import { CameraPill, type CameraPillStatus } from "./camera-pill";
 import { OpSurfaces } from "./op-surfaces";
 import {
@@ -131,6 +145,24 @@ function isKeyboardFocus(target: EventTarget | null): boolean {
   }
 }
 
+/**
+ * The owner id (`sub`) from a Supabase access token, read locally from the JWT payload — no
+ * extra round-trip. The confirmatory prompt insert sets `user_id` to this; RLS still verifies
+ * it equals `auth.uid()` (the same token), so a wrong value would simply be rejected.
+ */
+function userIdFromAccessToken(token: string | null): string | null {
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, "+").replace(/_/g, "/"));
+    const sub = (JSON.parse(json) as { sub?: unknown }).sub;
+    return typeof sub === "string" ? sub : null;
+  } catch {
+    return null;
+  }
+}
+
 export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<MonitoringDeps> }) {
   const depsRef = useRef<MonitoringDeps>({ ...defaultDeps(), ...depsOverride });
   const deps = depsRef.current;
@@ -160,6 +192,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // re-fetches the new row immediately (tracking the live bloom) instead of waiting for its
   // ~12 s poll. Carries NO band value — just "something new landed" → re-read the persisted rows.
   const [trendRefresh, setTrendRefresh] = useState(0);
+  // Feature 012 / US1: the latest window outcome, surfaced so the confirmatory trigger can
+  // watch the sustained-`tense` stream. This is the SAME coarse band contract the reducer
+  // consumes — no probability, no new model output (research.md R-3/R-8).
+  const [latestOutcome, setLatestOutcome] = useState<WindowOutcome | null>(null);
 
   const streamRef = useRef<MediaStream | null>(null);
   const videoElRef = useRef<HTMLVideoElement | null>(null);
@@ -185,6 +221,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   const presenceRef = useRef<PresenceMonitorHandle | null>(null);
   const opRef = useRef(op);
   const endingRef = useRef(false);
+  // Feature 012 / US1: the latest `resolveForSessionEnd` from the confirmatory trigger (set
+  // below the hook). endAndLeave reads it at call time and AWAITS it so a visible prompt is
+  // resolved (expired=session_end) before the monitor page navigates away.
+  const confirmatoryResolveRef = useRef<() => Promise<void>>(() => Promise.resolve());
   // Elapsed clock accounting: `elapsedAccumRef` banks counted (non-paused) ms across pause
   // breaks; `runStartRef` marks the current counting run's origin (null while not counting).
   const elapsedAccumRef = useRef(0);
@@ -299,6 +339,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         return;
       }
       const outcome = res.outcome;
+      // Feature 012 / US1: surface every outcome to the confirmatory trigger (a new object
+      // each window, so the trigger re-evaluates the sustained-tense clock).
+      setLatestOutcome(outcome);
       if (outcome.outcome === "skipped") {
         // The client refines the coarse server cause from on-device telemetry, exactly
         // as calibration does (low-light vs out-of-frame); "our-side" owns our failures.
@@ -389,8 +432,17 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       setStreaming(false);
       dispatch({ type: "END" });
 
+      // Feature 012 / US1: resolve a visible confirmatory prompt as expired(session_end)
+      // BEFORE leaving, so it never collides with the dashboard session-end feedback card.
+      // Awaited so the resolve is issued before the full-page nav can abort it.
+      await confirmatoryResolveRef.current();
+
       const sessionId = sessionIdRef.current;
       if (sessionId) {
+        // Feature 012 / US2: hand the just-ended session to the dashboard (one-shot) so the
+        // coordinator can offer session-end product feedback. A side note before the nav —
+        // it does NOT change the navigation target.
+        recordEndedSession(sessionId);
         // L2: end with a FRESH token — a long-paused session's cached token may be stale.
         const token = await freshToken();
         // End routes STRAIGHT to the dashboard recap (008-followups): fire the end POST
@@ -602,6 +654,49 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     [],
   );
 
+  // ── Feature 012 / US1: mid-session confirmatory prompt ──────────────────────────────
+  // Watches the sustained-`tense` band stream (the SAME coarse outcomes the reducer folds).
+  // Persistence runs AS THE EMPLOYEE through the questionnaire client (RLS); a confirmed /
+  // "maybe" answer opens Ren with the handoff seam; a false alarm suppresses the next
+  // session. Expiry on session-end is handled in endAndLeave (awaited before navigation).
+  const confirmatory = useConfirmatoryTrigger({
+    sessionId: liveSessionId,
+    active: op === "active" || op === "warming-up",
+    latestOutcome,
+    createPrompt: async ({ triggeredWindowCapturedAt, triggerWindowReadingId }) => {
+      const sid = sessionIdRef.current;
+      const userId = userIdFromAccessToken(tokenRef.current);
+      if (!sid || !userId) return null;
+      const res = await createConfirmatoryPrompt({
+        userId,
+        monitoringSessionId: sid,
+        triggeredWindowCapturedAt,
+        triggerWindowReadingId,
+      });
+      return res.ok ? res.data.id : null;
+    },
+    resolvePrompt: async (promptId, resolution) => {
+      if (resolution.type === "answered") {
+        await resolveConfirmatoryAnswered(promptId, resolution.outcome);
+      } else {
+        await resolveConfirmatoryExpired(promptId, resolution.reason);
+      }
+    },
+    // R-4: the optional `window_readings.id` link is deferred — the required
+    // `triggered_window_captured_at` time linkage is sufficient for the prompt contract.
+    hasFalseAlarmNextSessionSuppression: hasFalseAlarmSuppression,
+    consumeFalseAlarmNextSessionSuppression: consumeFalseAlarmSuppression,
+    armFalseAlarmNextSessionSuppression: armFalseAlarmSuppression,
+    // Open Ren through the existing chat entry with the confirmatory handoff seam. Full nav
+    // (chat is not a capture route); the prompt is already resolved before this fires.
+    openRen: (handoff) => deps.navigate(`/app/chat?handoff=${handoff}`),
+  });
+  // Keep the latest session-end resolver in a ref (updated in an effect, never during render)
+  // so endAndLeave can await it before navigating.
+  useEffect(() => {
+    confirmatoryResolveRef.current = confirmatory.resolveForSessionEnd;
+  });
+
   // Session elapsed clock. `sessionLive` decides whether the timer is shown at all;
   // `timerRunning` decides whether it COUNTS — a manual Pause excludes its duration from the
   // elapsed time (008-followups): on pause we bank the current run and stop ticking, so the
@@ -731,6 +826,15 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
           refreshSignal={trendRefresh}
         />
       )}
+
+      {/* Feature 012 / US1: the sticky, answer-only confirmatory prompt. Sits beside the
+          monitoring stage (non-modal); shows only after sustained tense. */}
+      <ConfirmatoryPrompt
+        open={confirmatory.visible}
+        onConfirm={confirmatory.onConfirm}
+        onFalseAlarm={confirmatory.onFalseAlarm}
+        onOpenChat={confirmatory.onOpenChat}
+      />
     </div>
   );
 }
