@@ -4744,3 +4744,27 @@ superseded-by-shipping `009b` slot decision).
 **Decision**: The every-turn scorer returns `{band, crisis}`. The band serves as the rollup's fallback if the rollup call fails or returns malformed JSON.
 
 **Rationale**: Testing showed zero crisis-detection cost from also returning the band, so one call covers both jobs.
+
+---
+
+## 2026-06-30 — Constitution Amendment 13 — work-environment feedback is anonymized-aggregate-only for managers
+
+**Status**: Accepted (constitutional amendment, MINOR bump `1.9.0 → 1.10.0`).
+
+**Decision**: Feature 012's weekly work-environment check-in introduces a new
+employee-submitted data class: overall sentiment, and when negative, a roadblock
+selection plus a desired-support selection. This class is separate from stress
+signals. It may reach the manager-facing layer only as an anonymized team-level
+aggregate and must never appear as an individual employee's attributed answer.
+
+**Rationale**: Principle I already governs direct-manager visibility for stress
+trends, but the questionnaire creates a different privacy surface: explicit
+employee-submitted workplace feedback. For the demo, the manager value is the
+team aggregate, not attribution. Small-team anonymization hardening
+(minimum-headcount suppression so a tally cannot identify one person) is
+deferred to BACKLOG because it is larger than the demo slice, but it is mandatory
+before any real employee data is collected.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 13;
+`docs/CHANGELOG.md` 2026-06-30; `docs/BACKLOG.md` work-environment-feedback
+anonymization-hardening item; `specs/012-questionnaire/` (spec to follow).

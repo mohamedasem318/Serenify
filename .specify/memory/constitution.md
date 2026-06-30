@@ -331,6 +331,31 @@ Cross-references:
 - docs/DECISIONS.md entries 2026-06-28
 - docs/CHANGELOG.md entry 2026-06-28
 - specs/011-llm-client-and-chatbot/ (spec to follow)
+
+Amendment 13: 1.9.0 → 1.10.0 (2026-06-30, MINOR)
+Bump rationale: Principle I gains a new privacy invariant for feature 012's
+weekly work-environment check-in. This is a distinct employee-submitted data
+class (overall sentiment and, when negative, a roadblock selection plus a
+desired-support selection), separate from stress signals. Manager visibility is
+limited to anonymized team-level aggregates; individual attributed answers MUST
+NEVER reach the manager-facing layer. Minimum-headcount suppression and related
+small-team aggregation hardening are explicitly deferred for the demo build but
+are REQUIRED before any real employee data is collected. MINOR bump: materially
+expanded Principle I guidance; no new/removed principle, no structural change.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for the touched literals (`work-environment`, `weekly
+employee check-in`, `overall sentiment`, `roadblock`, `desired-support`,
+`anonymized`, `minimum-headcount`, `team-level aggregate`, `manager-facing layer`,
+`employee-submitted`) — zero matches; the templates reference principles by
+number, not by these literal privacy-invariant terms, so no template edit is
+required (consistent with the Amendment 8–12 audits).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-06-30
+- docs/CHANGELOG.md entry 2026-06-30
+- docs/BACKLOG.md work-environment-feedback anonymization-hardening item
+- specs/012-questionnaire/ (spec to follow)
 -->
 
 # Serenify Constitution
@@ -365,6 +390,15 @@ following invariants MUST hold at all times:
   philosophy — not a surveillance tool. Employees control granularity via a
   three-position privacy slider: `full detail` / `summary only` (DEFAULT) /
   `off during specified hours`.
+- Voluntary work-environment feedback — the weekly employee check-in (an
+  overall sentiment and, when negative, a roadblock selection plus a
+  desired-support selection) — is a distinct employee-submitted class, separate
+  from stress signals. It reaches the manager-facing layer ONLY as an
+  anonymized, team-level aggregate, NEVER as an individual employee's
+  attributed answer. The aggregation hardening that makes this robust on small
+  teams (minimum-headcount suppression, so a tally cannot be traced back to one
+  person) is a tracked pre-real-data privacy requirement: deferred for the demo
+  build, REQUIRED before any real employee data is collected.
 - Every employee MUST have access to a "this is what your manager sees right
   now" transparency view from their settings page, rendering the exact data
   visible to their direct manager.
@@ -826,4 +860,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.9.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-28
+**Version**: 1.10.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-30
