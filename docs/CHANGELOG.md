@@ -2293,3 +2293,5 @@ pre-real-data blocker.
 Cross-references: `specs/011-llm-client-chatbot/` (spec / plan / tasks / smoke-tests);
 `docs/DECISIONS.md` 2026-06-28; `docs/PROGRESS.md` 2026-06-29; `docs/BACKLOG.md` "From feature
 011"; `.specify/memory/constitution.md` Amendment 12.
+
+## 2026-06-30 — constitution 1.9.0 → 1.10.0 (MINOR): Principle I — work-environment feedback as anonymized-aggregate-only manager-visible class (Amendment 13)
