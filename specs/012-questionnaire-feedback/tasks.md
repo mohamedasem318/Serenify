@@ -9,7 +9,7 @@
 
 **Purpose**: Create feature-level verification scaffolding without implementing product behavior.
 
-- [ ] T001 Create manual smoke checklist from `quickstart.md` in `specs/012-questionnaire-feedback/smoke-tests.md`
+- [X] T001 Create manual smoke checklist from `quickstart.md` in `specs/012-questionnaire-feedback/smoke-tests.md`
 - [ ] T002 Create questionnaire DB/privacy test harness notes and SQL fixture helper skeleton in `apps/api/tests/test_questionnaire_privacy.py`
 
 ---
