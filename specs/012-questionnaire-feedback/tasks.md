@@ -10,7 +10,7 @@
 **Purpose**: Create feature-level verification scaffolding without implementing product behavior.
 
 - [X] T001 Create manual smoke checklist from `quickstart.md` in `specs/012-questionnaire-feedback/smoke-tests.md`
-- [ ] T002 Create questionnaire DB/privacy test harness notes and SQL fixture helper skeleton in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T002 Create questionnaire DB/privacy test harness notes and SQL fixture helper skeleton in `apps/api/tests/test_questionnaire_privacy.py`
 
 ---
 
@@ -22,17 +22,17 @@
 
 ### Tests for Foundational DB Layer
 
-- [ ] T003 Add Principle VII test for `questionnaire_confirmatory_prompts` columns, one-row-per-session uniqueness, lifecycle constraints, trigger time requirement, and `aggregate_treatment` false-alarm rule in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T004 Add Principle VII test for `questionnaire_session_feedback` columns, one-row-per-session uniqueness, skip/null constraints, negative-reason/free-text constraints, and `sampling_policy='every_session'` in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T005 Add Principle VII test for `weekly_checkin_cadence` columns, `(user_id, iso_week_start)` uniqueness, `prompt_count`/`skipped_count` 0-2 constraints, and absence of answer values in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T006 Add Principle VII test proving `weekly_work_environment_contributions` has no `user_id`, no `created_at`, no `updated_at`, and no precise timestamp column in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T007 Add Principle VII test for owner-only RLS on `questionnaire_confirmatory_prompts`, `questionnaire_session_feedback`, and `weekly_checkin_cadence`, including `TO authenticated`, `USING`, `WITH CHECK`, and owned-monitoring-session checks in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T008 Add Principle VII test for forced RLS, revoked direct `anon`/`authenticated` grants, and no manager/admin policies on `weekly_work_environment_contributions` in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T009 Add Principle VII test for `submit_weekly_work_environment_checkin` SECURITY DEFINER requirements, caller `auth.uid()` validation, employee-role gate, ISO-week Monday validation, option validation, contribution insert, and cadence completion in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T010 Add Principle VII test for `get_weekly_work_environment_summary` SECURITY DEFINER requirements, `PUBLIC`/`anon` execute revokes, authenticated execute grant, and grouped return shape only in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T011 Add Principle VII test for role-gated aggregate visibility: employees rejected, team leads see only visible team buckets, admins see all buckets, and null `team_manager_id` rows are excluded in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T012 Add Principle VII privacy-regression test that Feature 012 code paths add no `SUPABASE_SERVICE_ROLE_KEY`, no service-role client, no FastAPI bypass write, and no questionnaire manager/admin individual row path in `apps/api/tests/test_questionnaire_privacy.py`
-- [ ] T013 Add Principle VII immutability test that the questionnaire migration never alters, updates, deletes, suppresses, or annotates `public.window_readings` in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T003 Add Principle VII test for `questionnaire_confirmatory_prompts` columns, one-row-per-session uniqueness, lifecycle constraints, trigger time requirement, and `aggregate_treatment` false-alarm rule in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T004 Add Principle VII test for `questionnaire_session_feedback` columns, one-row-per-session uniqueness, skip/null constraints, negative-reason/free-text constraints, and `sampling_policy='every_session'` in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T005 Add Principle VII test for `weekly_checkin_cadence` columns, `(user_id, iso_week_start)` uniqueness, `prompt_count`/`skipped_count` 0-2 constraints, and absence of answer values in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T006 Add Principle VII test proving `weekly_work_environment_contributions` has no `user_id`, no `created_at`, no `updated_at`, and no precise timestamp column in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T007 Add Principle VII test for owner-only RLS on `questionnaire_confirmatory_prompts`, `questionnaire_session_feedback`, and `weekly_checkin_cadence`, including `TO authenticated`, `USING`, `WITH CHECK`, and owned-monitoring-session checks in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T008 Add Principle VII test for forced RLS, revoked direct `anon`/`authenticated` grants, and no manager/admin policies on `weekly_work_environment_contributions` in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T009 Add Principle VII test for `submit_weekly_work_environment_checkin` SECURITY DEFINER requirements, caller `auth.uid()` validation, employee-role gate, ISO-week Monday validation, option validation, contribution insert, and cadence completion in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T010 Add Principle VII test for `get_weekly_work_environment_summary` SECURITY DEFINER requirements, `PUBLIC`/`anon` execute revokes, authenticated execute grant, and grouped return shape only in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T011 Add Principle VII test for role-gated aggregate visibility: employees rejected, team leads see only visible team buckets, admins see all buckets, and null `team_manager_id` rows are excluded in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T012 Add Principle VII privacy-regression test that Feature 012 code paths add no `SUPABASE_SERVICE_ROLE_KEY`, no service-role client, no FastAPI bypass write, and no questionnaire manager/admin individual row path in `apps/api/tests/test_questionnaire_privacy.py`
+- [X] T013 Add Principle VII immutability test that the questionnaire migration never alters, updates, deletes, suppresses, or annotates `public.window_readings` in `apps/api/tests/test_questionnaire_privacy.py`
 
 ### Implementation for Foundational DB Layer
 
