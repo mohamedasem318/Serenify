@@ -106,11 +106,11 @@ function loadRoster(): readonly RosterAccount[] {
   return result;
 }
 
-type SeedEnv = { url: string; serviceRoleKey: string; sharedPassword: string };
+type SeedEnv = { url: string; serviceRoleKey: string };
 
 function loadSeedEnv(): SeedEnv {
   // Silently no-ops if the file is absent — a deployed/CI run may export
-  // these three vars directly instead of via a local file.
+  // these two vars directly instead of via a local file.
   loadDotenv({ path: ENV_PATH });
 
   function requireEnv(name: string): string {
@@ -127,7 +127,6 @@ function loadSeedEnv(): SeedEnv {
   return {
     url: requireEnv("SUPABASE_URL"),
     serviceRoleKey: requireEnv("SUPABASE_SERVICE_ROLE_KEY"),
-    sharedPassword: requireEnv("SEED_SHARED_PASSWORD"),
   };
 }
 
@@ -201,7 +200,9 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
     }
     const { data, error } = await admin.auth.admin.createUser({
       email: account.email,
-      password: env.sharedPassword,
+      // Per-account password = the account's own email (operator decision,
+      // not a shared secret) — each person's login is just their address.
+      password: account.email,
       email_confirm: true,
       user_metadata: { full_name: account.full_name },
     });
