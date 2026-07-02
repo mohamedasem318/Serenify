@@ -98,17 +98,21 @@ describe("SessionEndFeedbackCard initial + endings", () => {
     expect(navigate).toHaveBeenCalledWith("/app/account#notifications");
   });
 
-  it("ren_too_robotic shows the product-feedback note and never routes to Ren", async () => {
-    const { save, navigate, user } = setup();
+  it("ren_too_robotic resolves into the shared centered end-state and never routes to Ren", async () => {
+    const { save, navigate, user, onResolved } = setup();
     await user.click(screen.getByRole("button", { name: /Something was off/ }));
     await user.click(screen.getByRole("button", { name: /too.robotic/i }));
     expect(save).toHaveBeenCalledWith(expect.objectContaining({ reason: "ren_too_robotic" }));
-    expect(screen.getByText(/not sent to\s+Ren/i)).toBeInTheDocument();
+    expect(screen.getByText("Thanks — we'll keep refining how Ren talks.")).toBeInTheDocument();
+    expect(screen.getByTestId("questionnaire-result")).toHaveAttribute("data-kind", "check");
     expect(navigate).not.toHaveBeenCalled();
+    // Not yet — the dwell hasn't elapsed, so the end-state has a chance to paint.
+    expect(onResolved).not.toHaveBeenCalled();
+    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1), { timeout: 3000 });
   });
 
-  it("free text requires non-empty trimmed text, then records in THREE interactions (SC-007)", async () => {
-    const { save, user } = setup();
+  it("free text requires non-empty trimmed text, then records in THREE interactions and goes straight to the centered end-state (SC-007)", async () => {
+    const { save, user, onResolved } = setup();
     await user.click(screen.getByRole("button", { name: /Something was off/ })); // 1
     await user.click(screen.getByRole("button", { name: /Something else/i })); // 2
     const send = screen.getByRole("button", { name: /Send/i });
@@ -121,6 +125,13 @@ describe("SessionEndFeedbackCard initial + endings", () => {
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ reason: "something_else", freeText: "the timing felt random" }),
     );
+    // Straight to the end-state — no bounce back to the reason list first.
+    expect(screen.queryByLabelText("Tell us what felt off")).toBeNull();
+    expect(screen.queryByText("Got it. What felt off?")).toBeNull();
+    expect(screen.getByText("Thanks for the feedback.")).toBeInTheDocument();
+    expect(screen.getByTestId("questionnaire-result")).toHaveAttribute("data-kind", "check");
+    expect(onResolved).not.toHaveBeenCalled();
+    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1), { timeout: 3000 });
   });
 
   it("uses no crimson on this surface", () => {
