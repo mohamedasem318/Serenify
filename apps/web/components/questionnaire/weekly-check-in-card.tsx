@@ -158,16 +158,18 @@ export function WeeklyCheckInCard({
 
   return (
     <Shell>
-      <button
-        type="button"
-        onClick={skip}
-        className="absolute right-3 top-3 inline-flex min-h-11 items-center gap-1 rounded-control px-2.5 text-[13px] text-muted transition-colors hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-      >
-        <X aria-hidden className="size-3.5" /> Skip
-      </button>
-      <h2 className="font-display pr-16 text-[17px] font-semibold leading-tight text-ink">
-        How has the work environment felt lately?
-      </h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 className="font-display text-[17px] font-semibold leading-tight text-ink">
+          How has the work environment felt lately?
+        </h2>
+        <button
+          type="button"
+          onClick={skip}
+          className="relative -my-3.5 inline-flex min-h-11 shrink-0 items-center gap-1 rounded-control px-2.5 py-3.5 text-[13px] text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        >
+          <X aria-hidden className="size-3.5" /> Skip
+        </button>
+      </div>
 
       {phase === "choice" ? (
         <div className="mt-3 flex gap-3">
@@ -273,7 +275,7 @@ export function WeeklyCheckInCard({
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="relative rounded-card border border-border bg-surface p-5 shadow-soft"
+      className="rounded-card border border-border bg-surface p-5 shadow-soft"
       data-testid="weekly-check-in"
     >
       {children}
