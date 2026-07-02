@@ -237,3 +237,32 @@
   left: 0;
   background: linear-gradient(270deg, transparent, var(--color-card));
 }
+
+/* ── Feature 012 — questionnaire result-icon + progress animations, COMPONENT-LOCAL ──────
+ * Scoped to the `qri-*` / `qprogress-*` class names; mirrors the mock's .pop / .fadeup /
+ * .drawpath / .bar (serenify-012-questionnaire-mocks.html). Colours come from Graphite tokens
+ * via the components (never copied from the mock). The components ALSO gate these through
+ * useMediaQuery — they omit the animation class entirely under reduced motion so the element
+ * renders in its FINAL state (e.g. a fully-drawn path, offset 0) — and the global
+ * prefers-reduced-motion rule above is the belt to that suspenders. */
+@keyframes qri-pop {
+  from { transform: scale(0.7); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+@keyframes qri-fadeup {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes qri-draw {
+  to { stroke-dashoffset: 0; }
+}
+.qri-pop { animation: qri-pop 0.35s ease; }
+.qri-fadeup { animation: qri-fadeup 0.4s ease; }
+.qri-draw {
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: qri-draw 0.55s 0.15s ease forwards;
+}
+/* The weekly stepper progress fill animates its width; the component drops this class under
+ * reduced motion so the width snaps to its final value without a transition. */
+.qprogress-fill { transition: width 0.35s ease; }

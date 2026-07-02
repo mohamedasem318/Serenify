@@ -2295,3 +2295,56 @@ Cross-references: `specs/011-llm-client-chatbot/` (spec / plan / tasks / smoke-t
 011"; `.specify/memory/constitution.md` Amendment 12.
 
 ## 2026-06-30 — constitution 1.9.0 → 1.10.0 (MINOR): Principle I — work-environment feedback as anonymized-aggregate-only manager-visible class (Amendment 13)
+
+(Full Amendment 13 rationale: `docs/DECISIONS.md` 2026-06-30 and `.specify/memory/constitution.md`.)
+
+## 2026-06-30 — feat(012-questionnaire-feedback): implementation (Phases 3–8, T024–T068)
+
+Built the three Feature 012 questionnaire instruments on the Phase-1/2 privacy foundation
+(migration `20260630000000_questionnaire_feedback.sql`, already merged): a mid-session
+**confirmatory prompt**, a session-end **product-feedback card**, and a weekly
+**work-environment check-in** — all RLS-as-the-employee, no service-role.
+
+- **Authenticated client (Phase 3).** `apps/web/lib/api/questionnaire-client.ts` (direct
+  `@supabase/ssr` browser writes; typed table payloads + the two weekly RPCs) and shared
+  enums/guards in `lib/questionnaire/types.ts`, mirrored 1:1 to `data-model.md`. No admin
+  import, no manager individual-row read.
+- **US1 confirmatory prompt.** `useConfirmatoryTrigger` — pure reducers over the existing
+  `WindowOutcome`/`Band` stream (`CONFIRMATORY_TENSE_SUSTAINED_MS=20_000`,
+  `CONFIRMATORY_PROMPT_MIN_DWELL_MS=4_500`, one prompt/session, single-resolution guard,
+  next-session false-alarm suppression; browser-local, no cross-worker state). `Notification`
+  gained backward-compatible `dismissible`/`nonModal` (answer-only: Escape/outside/blur cannot
+  dismiss, no focus trap). Ren handoff via `/app/chat?handoff=confirmatory_yes|confirmatory_maybe`
+  (soft opener, no recommendation cards). Wired into `monitoring-session.tsx` (latest outcome
+  fed in; prompt expiry resolved before session-end navigation). `aggregate_treatment` set only
+  on `false_alarm`; `window_readings` never mutated.
+- **US2 session-end feedback.** `SessionEndFeedbackCard` — Good→smiley / off→reason picker /
+  Skip→muted; free text + `ren_too_robotic` stored employee-private ONLY (never to Ren or a
+  manager); negative routes go to `/app/account` (plain) and `/app/account#notifications`
+  (placeholder now anchored `id="notifications"`). Every-session sampling seam.
+- **US3 weekly check-in.** `WeeklyCheckInCard` — Good→smiley / could-be-better→two-step stepper
+  (Q1 auto-advance + focus to Q2, `role="progressbar"`, Back, Done) → submits one
+  identity-stripped contribution via the DEFINER RPC; Skip is cadence-only; abandoned Q2 writes
+  nothing.
+- **US4 coordinator + polish.** `QuestionnaireCoordinator` centralizes surface priority
+  (confirmatory ↔ session-end never co-occur; weekly separate from active monitoring), mounted
+  on the dashboard ADDITIVELY (Today card/trend rendering untouched — T064). Shared
+  `QuestionnaireResultIcon`; all four animations honor `prefers-reduced-motion` via
+  `useMediaQuery`.
+
+No model artifact touched (no `packages/ml-video`, no `docs/MODELS.md`, no thresholds) — T065.
+
+Test results (2026-06-30): `apps/api` privacy gate `test_questionnaire_privacy.py` **12 passed**
+(T003–T013 + T065); a **live RLS/DEFINER probe on local Postgres** (clean `supabase db reset`)
+confirmed every boundary (contributions identity-stripped + RPC-only; employees rejected on the
+aggregate read; team-lead sees own bucket only, admin all; owner-only cross-user reads blocked).
+`apps/web` Vitest **906 passed / 98 files**; `tsc --noEmit` clean; ESLint clean on all
+new/changed files. Playwright `questionnaire.spec.ts` + `questionnaire-layout.spec.ts` authored
+(run in the e2e gate; require the seeded running stack).
+
+**BACKLOG #123 (minimum-headcount aggregate suppression) stays OPEN** — the demo build ships
+the `sample_size` hook but not the suppression; it remains a pre-real-data blocker.
+
+Cross-references: `specs/012-questionnaire-feedback/` (spec / plan / tasks / contracts /
+checklists / smoke-tests); `docs/DECISIONS.md` 2026-06-30; `docs/PROGRESS.md` 2026-06-30;
+`docs/BACKLOG.md` #123.

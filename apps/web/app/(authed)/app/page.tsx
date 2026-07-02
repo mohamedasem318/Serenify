@@ -5,6 +5,7 @@ import { RecentChatsCard } from "@/components/home/recent-chats-card";
 import { ThingsThatMightHelpCard } from "@/components/home/things-that-might-help-card";
 import { TodaysCheckinCard } from "@/components/home/todays-checkin-card";
 import { WelcomeBanner } from "@/components/home/welcome-banner";
+import { QuestionnaireCoordinator } from "@/components/questionnaire/questionnaire-coordinator";
 import { RolePlaceholder } from "@/components/role-placeholder/role-placeholder";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,6 +60,11 @@ export default async function AppPage() {
           <ThingsThatMightHelpCard />
           <RecentChatsCard />
         </div>
+        {/* Feature 012 / US4: the questionnaire coordinator — session-end product feedback
+            (for a just-ended session) and the weekly work-environment check-in. It mounts
+            ALONGSIDE the Today card and trend without changing their rendering (T062/T064),
+            and renders nothing when no surface is due. */}
+        <QuestionnaireCoordinator userId={user.id} />
       </div>
     );
   }

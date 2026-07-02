@@ -49,6 +49,12 @@ type Props = {
   initialDetail: ConversationDetail | null;
   /** Panel variant only: report active-conversation state up to the host (the pill). */
   onPanelStateChange?: (state: PanelChatState) => void;
+  /**
+   * Feature 012 confirmatory Ren handoff: a soft opener seeded into the composer when the
+   * user arrives via `?handoff=confirmatory_yes|confirmatory_maybe`. The user can edit
+   * before sending; the handoff opens a plain chat and never surfaces recommendation cards.
+   */
+  handoffOpener?: string;
 };
 
 function RenAvatar({ size = 34 }: { size?: number }) {
@@ -87,6 +93,7 @@ export function ChatShell({
   initialConversations,
   initialDetail,
   onPanelStateChange,
+  handoffOpener,
 }: Props) {
   const isPanel = variant === "panel";
   const [conversations, setConversations] = useState(initialConversations);
@@ -94,7 +101,8 @@ export function ChatShell({
     initialDetail?.conversation.id ?? null,
   );
   const [messages, setMessages] = useState<ChatMessage[]>(initialDetail?.messages ?? []);
-  const [input, setInput] = useState("");
+  // A confirmatory handoff seeds the composer with a soft opener; otherwise it starts empty.
+  const [input, setInput] = useState(handoffOpener ?? "");
   const [isSending, setIsSending] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<SendError>(null);
@@ -114,6 +122,12 @@ export function ChatShell({
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
   }, [messages, crisis]);
+
+  // Confirmatory Ren handoff: land with the composer focused, opener ready to edit/send.
+  useEffect(() => {
+    if (handoffOpener) composerRef.current?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once on a handoff arrival
+  }, []);
 
   // When the history drawer opens, focus its close control and let Escape dismiss it
   // (escape-routes + focus management for the overlay).

@@ -1,8 +1,11 @@
 export function NotificationsPlaceholder() {
   return (
     <section
+      id="notifications"
       aria-labelledby="account-notifications-heading"
-      className="space-y-4"
+      // Feature 012: the `needed_quiet` session-end action routes to /app/account#notifications;
+      // scroll-margin keeps the heading clear of the top of the viewport on anchor jump.
+      className="scroll-mt-24 space-y-4"
     >
       <header className="space-y-1.5">
         <h2

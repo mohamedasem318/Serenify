@@ -4768,3 +4768,50 @@ before any real employee data is collected.
 **Cross-references**: `.specify/memory/constitution.md` Amendment 13;
 `docs/CHANGELOG.md` 2026-06-30; `docs/BACKLOG.md` work-environment-feedback
 anonymization-hardening item; `specs/012-questionnaire/` (spec to follow).
+
+---
+
+## 2026-06-30 — 012 implementation decisions (as-built, Phases 3–8)
+
+**Status**: Accepted (implementation choices; no spec/FR change).
+
+**Decision (D-1) — confirmatory trigger is browser-local, no cross-worker state.** The
+sustained-tense clock, dwell floor, one-per-session guard, single-resolution guard, and the
+next-session false-alarm suppression all live in the browser beside the monitoring loop, over
+the existing coarse `WindowOutcome`/`Band` stream. The trigger module itself keeps **no**
+`localStorage`/`sessionStorage`/global state (proved by a source scan); the one piece of
+state that must survive the monitor→dashboard→monitor full-navigation — the one-shot false-alarm
+suppression and the just-ended-session handoff — lives in a tiny `sessionStorage` HOST store
+(per-tab, browser-local; not cross-worker or server). Rationale: the inference service keeps
+per-session smoothing in memory (research R-3); server-side eligibility state would couple the
+product prompt to the worker buffer.
+
+**Decision (D-2) — confirmatory `user_id` from the JWT, not an extra round-trip.** The prompt
+insert sets `user_id` to the access token's `sub` claim (decoded locally). RLS still verifies it
+equals `(select auth.uid())` on the same token, so a wrong value is simply rejected — the decode
+is an optimization, not a trust boundary.
+
+**Decision (D-3) — optional `trigger_window_reading_id` deferred (research R-4).** The prompt
+stores the REQUIRED `triggered_window_captured_at` time linkage and leaves the optional
+`window_readings.id` null; the monitoring API does not return the reading id, and the time
+linkage is sufficient for the prompt + the feature-017 forward join. Resolving the id is a
+later optimization, not a correctness gap.
+
+**Decision (D-4) — anti-collision centralized; instruments split by surface.** The confirmatory
+prompt renders on the monitor page (resolved as `expired:session_end` before the end-navigation),
+while session-end feedback + the weekly check-in render on the dashboard through
+`QuestionnaireCoordinator`. A single pure `decideQuestionnaireSurface` encodes the priority
+(confirmatory wins; session-end only once monitoring ended and no prompt is open; weekly is
+separate from active monitoring and yields to session-end), so two surfaces can never co-occur.
+The coordinator mounts ADDITIVELY on the dashboard — Today card / trend rendering is untouched
+(T064: zero import edges in either direction).
+
+**Decision (D-5) — result animations via component-local CSS gated by `useMediaQuery`.** The
+four end-state animations (smiley/check draw, progress fill, muted skip) use component-local
+`qri-*`/`qprogress-*` keyframes in `globals.css` (mirroring the `today-plot` precedent — no token
+remap), and the components omit the animation class entirely under reduced motion so the element
+renders in its final state; the global `prefers-reduced-motion` rule is the belt to that
+suspenders. Framer Motion's `useReducedMotion` is deliberately NOT used (research R-6).
+
+**Cross-references**: `specs/012-questionnaire-feedback/` (plan / research / contracts);
+`docs/CHANGELOG.md` 2026-06-30; `docs/PROGRESS.md` 2026-06-30.

@@ -23,14 +23,27 @@ export type NotificationProps = {
   open: boolean;
   /** Called with `false` when the user dismisses, or with `true` on programmatic show. */
   onOpenChange: (open: boolean) => void;
-  /** Display heading — short, calm-voice. */
-  title: string;
+  /** Display heading — short, calm-voice. A ReactNode is allowed so a heading icon can sit
+   *  beside the text; the accessible name still derives from the visible text. */
+  title: ReactNode;
   /** Optional descriptive body. */
   body?: string;
   /** Optional action area below the body — buttons, links, questionnaire snippet. */
   children?: ReactNode;
   /** Dismiss-button label. Defaults to "Dismiss". */
   dismissLabel?: string;
+  /**
+   * When false, the surface is answer-only: no close button, and Escape / outside click /
+   * blur cannot dismiss it. It still closes programmatically (via `open`). Defaults true.
+   * Feature 012's confirmatory prompt is the one documented `dismissible:false` consumer.
+   */
+  dismissible?: boolean;
+  /**
+   * When true, the dialog is non-modal: no focus trap, no scroll lock, no scrim — the rest
+   * of the app stays interactive. The confirmatory prompt uses this so a sticky,
+   * answer-only prompt never makes the surrounding monitoring UI inert. Defaults false.
+   */
+  nonModal?: boolean;
 };
 
 /**
@@ -100,9 +113,22 @@ export function Notification({
   body,
   children,
   dismissLabel = "Dismiss",
+  dismissible = true,
+  nonModal = false,
 }: NotificationProps) {
   const isMobile = useMediaQuery("(max-width: 767px)");
   const reduceMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+
+  // When dismissible=false, swallow every Radix dismiss vector (Escape, pointer/interact
+  // outside, focus-out/blur) so a misclick or stray keypress can never close the prompt.
+  const lockProps = dismissible
+    ? {}
+    : {
+        onEscapeKeyDown: (e: KeyboardEvent) => e.preventDefault(),
+        onPointerDownOutside: (e: Event) => e.preventDefault(),
+        onInteractOutside: (e: Event) => e.preventDefault(),
+        onFocusOutside: (e: Event) => e.preventDefault(),
+      };
 
   const motionVariants = reduceMotion
     ? {
@@ -123,21 +149,24 @@ export function Notification({
         };
 
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={!nonModal}>
       <AnimatePresence>
         {open && (
           <DialogPrimitive.Portal forceMount>
-            <DialogPrimitive.Overlay forceMount asChild>
-              <motion.div
-                data-testid="notification-overlay"
-                className="fixed inset-0 z-50 bg-scrim md:hidden"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: reduceMotion ? 0 : 0.15 }}
-              />
-            </DialogPrimitive.Overlay>
-            <DialogPrimitive.Content forceMount asChild>
+            {/* Non-modal mode renders NO scrim — the rest of the app stays interactive. */}
+            {!nonModal && (
+              <DialogPrimitive.Overlay forceMount asChild>
+                <motion.div
+                  data-testid="notification-overlay"
+                  className="fixed inset-0 z-50 bg-scrim md:hidden"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: reduceMotion ? 0 : 0.15 }}
+                />
+              </DialogPrimitive.Overlay>
+            )}
+            <DialogPrimitive.Content forceMount asChild {...lockProps}>
               <motion.div
                 data-testid="notification"
                 data-variant={isMobile ? "mobile" : "desktop"}
@@ -170,15 +199,17 @@ export function Notification({
                   </DialogPrimitive.Description>
                 )}
                 {children && <div className="mt-4">{children}</div>}
-                <DialogPrimitive.Close asChild>
-                  <Button
-                    variant="secondary"
-                    className="mt-6 w-full"
-                    aria-label={dismissLabel}
-                  >
-                    {dismissLabel}
-                  </Button>
-                </DialogPrimitive.Close>
+                {dismissible && (
+                  <DialogPrimitive.Close asChild>
+                    <Button
+                      variant="secondary"
+                      className="mt-6 w-full"
+                      aria-label={dismissLabel}
+                    >
+                      {dismissLabel}
+                    </Button>
+                  </DialogPrimitive.Close>
+                )}
               </motion.div>
             </DialogPrimitive.Content>
           </DialogPrimitive.Portal>

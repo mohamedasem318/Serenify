@@ -4,6 +4,58 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 012 — Questionnaire Feedback (PR open → main)
+
+**Branch**: `012-questionnaire-feedback`
+**Status**: **implemented, awaiting human smoke + squash-merge.** All 68 tasks (T001–T068)
+complete. Three questionnaire instruments on the Phase-1/2 privacy foundation (migration
+`20260630000000_questionnaire_feedback.sql`): mid-session confirmatory prompt (US1), session-end
+product feedback (US2), weekly work-environment check-in (US3), and a coordinator that keeps
+them from colliding (US4) — all RLS-as-the-employee, no service-role.
+**Date**: 2026-06-30
+
+**Scope shipped** (US1–US4 / Phases 3–8):
+
+- **Phase 3 — authenticated client.** `lib/api/questionnaire-client.ts` (direct `@supabase/ssr`
+  browser writes + the two weekly DEFINER RPCs) and shared enums/guards `lib/questionnaire/types.ts`.
+- **US1 — confirmatory prompt.** `useConfirmatoryTrigger` (pure reducers: 20 s sustained-tense,
+  4.5 s dwell floor, one prompt/session, single-resolution guard, next-session false-alarm
+  suppression in `sessionStorage`, chat-signal-excluded, browser-local). `Notification` extended
+  with `dismissible`/`nonModal` (answer-only, no focus trap). `ConfirmatoryPrompt`. Ren handoff
+  seam (`?handoff=confirmatory_yes|confirmatory_maybe`, soft opener, no recommendation cards).
+  Wired into `monitoring-session.tsx` (expiry resolved before session-end navigation; user_id
+  decoded from the JWT — no extra round-trip).
+- **US2 — session-end feedback.** `SessionEndFeedbackCard` (Good/off/Skip; free text + "too
+  robotic" employee-private only; account routing to `/app/account` + `/app/account#notifications`,
+  the placeholder now `id="notifications"`). Every-session sampling seam.
+- **US3 — weekly check-in.** `WeeklyCheckInCard` (two-step stepper, `role="progressbar"`, focus
+  to Q2, Back/Done; submits one identity-stripped contribution via the DEFINER RPC; skip /
+  abandoned-Q2 create no contribution). ISO-week cadence helpers.
+- **US4 — coordinator + polish.** `QuestionnaireCoordinator` (centralized anti-collision; mounts
+  on the dashboard additively — Today card/trend untouched). Shared `QuestionnaireResultIcon`;
+  four reduced-motion-safe animations via `useMediaQuery`.
+
+**Test gate (2026-06-30)** — `apps/api` `test_questionnaire_privacy.py` **12 passed** (T003–T013 +
+T065) + **live RLS/DEFINER probe** on local Postgres (clean `db reset`) — all boundaries hold;
+`apps/web` Vitest **906 passed / 98 files**; `tsc --noEmit` clean; ESLint clean on changed files.
+Playwright `questionnaire.spec.ts` / `questionnaire-layout.spec.ts` authored (e2e gate; need the
+seeded running stack).
+
+**Deferred / open**:
+
+- **BACKLOG #123** (minimum-headcount aggregate suppression) stays OPEN — `sample_size` hook
+  ships, suppression does not; pre-real-data blocker.
+- The optional `trigger_window_reading_id` link is deferred (research R-4): the prompt stores
+  the required `triggered_window_captured_at` only; the time linkage satisfies the contract.
+- E2E specs authored but not executed here (seeded-stack requirement); behaviour covered green by
+  the Vitest unit/component layer + the live DB probe.
+
+**Cross-references**: `specs/012-questionnaire-feedback/`; `docs/CHANGELOG.md` 2026-06-30;
+`docs/DECISIONS.md` 2026-06-30; `docs/BACKLOG.md` #123; `.specify/memory/constitution.md`
+Amendment 13.
+
+---
+
 ## Feature 011 — LLM Client and Ren Chatbot (merged to main)
 
 **Branch**: `011-llm-client-chatbot`
