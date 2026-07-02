@@ -4852,3 +4852,48 @@ just the initial insert.
 
 **Cross-references**: `specs/012-questionnaire-feedback/smoke-tests.md` (T067 live-execution
 writeup); `docs/CHANGELOG.md` 2026-07-02; `docs/PROGRESS.md` 2026-07-02.
+
+---
+
+## 2026-07-02 — 012 confirmatory-prompt budget semantics: explicit-answer-only consumes it; DB-constraint fix deliberately deferred (partial #127)
+
+**Status**: Accepted (implementation choice + explicit scope split; no spec/FR change).
+Continues the D-N numbering of the 012 entries above.
+
+**Decision (D-8) — the one-per-session prompt budget is consumed ONLY by an explicit user
+answer, never by an auto-resolution.** `useConfirmatoryTrigger`'s `PromptResolution` already
+distinguished `type: "answered"` (confirmed / false_alarm / opened_chat) from `type:
+"expired"` (`signal_drop` / `session_end`), but the reducer's single `resolved` flag
+conflated "this specific shown prompt is done" with "the session's budget is spent" — every
+resolution, including an auto-expiry, permanently blocked further prompting for the rest of
+the session. Chose to split this into two fields (`resolved` — per-prompt guard;
+`budgetConsumed` — session-scoped, set only by an answered resolution) rather than, say,
+making the budget itself session-storage-backed or introducing a resolution counter: the
+split keeps the trigger fully in-memory and pure-reducer-testable (Decision D-1 — no new
+`sessionStorage`/global state), and it makes "what consumes the budget" a single, explicit,
+one-line predicate (`resolution.type === "answered"`) rather than something implied by
+control flow. `markResolvedRearm` resets the trigger to a fresh, un-shown state on any
+non-consuming resolution — this is intentionally a full reset (not a targeted field clear),
+so the hook's own per-prompt refs (`resolvedRef`, `promptIdRef`) and the pure state
+(`tenseRunStartMs`, `shown`, `lastOutcomeTense`) can never disagree about whether a new
+prompt cycle has started.
+
+**Decision (D-9) — shipped the client-side re-arm as its own PR (#130) and deliberately did
+NOT close BACKLOG #127 / GitHub #127.** The client fix alone is not sufficient: the DB
+`qcp_one_per_session UNIQUE (monitoring_session_id)` constraint
+(`supabase/migrations/20260630000000_questionnaire_feedback.sql`) still allows only one row
+per session regardless of `lifecycle`, so `createConfirmatoryPrompt`'s plain `.insert` for a
+SECOND prompt after an auto-expiry rejects with a unique violation and `handleShow` silently
+no-ops — in production a user still cannot be re-prompted end-to-end. This was found during
+the post-merge doc reconcile for PR #130, i.e. after merge; the unit test suite mocks
+`createPrompt` and does not model the real constraint, so it could not have caught the gap.
+Rather than quietly closing the issue on a partial fix, or scope-creeping the DB migration +
+cooldown/cap policy into an unplanned change, the decision is to record the split explicitly:
+PR #130 is the client-side half only, BACKLOG #127 is updated in place (not
+marked resolved) with the remaining scope, and the GitHub issue stays open. The original
+BACKLOG #127 entry already anticipated this needing "its own spec-fix pass, not a drop-in
+change" for the partial-unique-index migration and the cooldown/cap design — that judgment
+holds.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-07-02 (PR #130 entry); `docs/PROGRESS.md`
+2026-07-02 (PR #130 entry); `docs/BACKLOG.md` #127.
