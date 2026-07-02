@@ -13,7 +13,8 @@ import {
 import {
   initialTriggerState,
   isTenseReading,
-  markResolved,
+  markResolvedConsumingBudget,
+  markResolvedRearm,
   reduceDwellElapsed,
   reduceOutcome,
   useConfirmatoryTrigger,
@@ -134,23 +135,70 @@ describe("signal-drop expiry honours the dwell floor", () => {
 });
 
 describe("one prompt per session + single resolution", () => {
-  it("never shows again once resolved", () => {
+  it("an explicit answer consumes the session budget — never shows again", () => {
     let s = initialTriggerState();
     s = reduceOutcome(s, tense("c0"), 0, true, CONFIG).state;
     s = reduceOutcome(s, tense("c20"), 20_000, true, CONFIG).state; // shown
-    s = markResolved(s); // answered
+    s = markResolvedConsumingBudget(s); // e.g. confirmed / false_alarm / opened_chat
+    expect(s.budgetConsumed).toBe(true);
     // a fresh sustained tense run must NOT re-show within the same session
     s = reduceOutcome(s, tense("c40"), 40_000, true, CONFIG).state;
     expect(reduceOutcome(s, tense("c60"), 60_000, true, CONFIG).effect).toEqual({ kind: "none" });
   });
 
-  it("a signal-drop after an answer is a no-op (race resolves once)", () => {
+  it("a signal-drop after an explicit answer is a no-op (race resolves once)", () => {
     let s = initialTriggerState();
     s = reduceOutcome(s, tense("c0"), 0, true, CONFIG).state;
     s = reduceOutcome(s, tense("c20"), 20_000, true, CONFIG).state;
-    s = markResolved(s); // the user answered first
+    s = markResolvedConsumingBudget(s); // the user answered first
     const r = reduceOutcome(s, calm("c30"), 30_000, true, CONFIG); // late signal drop
     expect(r.effect).toEqual({ kind: "none" });
+  });
+
+  it("a signal-drop expiry at/after the dwell floor does NOT consume the budget — a fresh sustained-tense run shows again this session", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, tense("c0"), 0, true, CONFIG).state;
+    s = reduceOutcome(s, tense("c20"), 20_000, true, CONFIG).state; // shown at 20_000
+    const expired = reduceOutcome(s, little("c25"), 20_000 + CONFIRMATORY_PROMPT_MIN_DWELL_MS, true, CONFIG);
+    expect(expired.effect).toEqual({ kind: "expire", reason: "signal_drop" });
+    expect(expired.state.budgetConsumed).toBe(false);
+    // a brand-new sustained-tense run, well within the same session, must show again
+    s = reduceOutcome(expired.state, tense("c60"), 60_000, true, CONFIG).state;
+    expect(reduceOutcome(s, tense("c80"), 80_000, true, CONFIG).effect).toEqual({
+      kind: "show",
+      triggeredWindowCapturedAt: "c80",
+    });
+  });
+
+  it("a signal-drop expiry via the dwell timer does NOT consume the budget — a fresh sustained-tense run shows again this session", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, tense("c0"), 0, true, CONFIG).state;
+    s = reduceOutcome(s, tense("c20"), 20_000, true, CONFIG).state; // shown at 20_000
+    s = reduceOutcome(s, calm("c22"), 22_000, true, CONFIG).state; // dropped before the dwell floor
+    const expired = reduceDwellElapsed(s);
+    expect(expired.effect).toEqual({ kind: "expire", reason: "signal_drop" });
+    expect(expired.state.budgetConsumed).toBe(false);
+    // the dwell timer having already fired for the old prompt must not block the next one
+    expect(reduceDwellElapsed(expired.state).effect).toEqual({ kind: "none" });
+    s = reduceOutcome(expired.state, tense("c60"), 60_000, true, CONFIG).state;
+    expect(reduceOutcome(s, tense("c80"), 80_000, true, CONFIG).effect).toEqual({
+      kind: "show",
+      triggeredWindowCapturedAt: "c80",
+    });
+  });
+});
+
+describe("markResolvedRearm", () => {
+  it("resets to a fresh, un-shown state without touching an already-consumed budget", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, tense("c0"), 0, true, CONFIG).state;
+    s = reduceOutcome(s, tense("c20"), 20_000, true, CONFIG).state;
+    s = markResolvedConsumingBudget(s);
+    const rearmed = markResolvedRearm(s);
+    // defensive: rearming preserves whatever budget state it was given (should not un-consume it)
+    expect(rearmed.budgetConsumed).toBe(true);
+    expect(rearmed.shown).toBe(false);
+    expect(rearmed.tenseRunStartMs).toBeNull();
   });
 });
 
@@ -246,6 +294,77 @@ describe("useConfirmatoryTrigger hook", () => {
     });
     expect(deps.armFalseAlarmNextSessionSuppression).toHaveBeenCalledTimes(1);
     expect(deps.openRen).not.toHaveBeenCalled();
+  });
+
+  it("a signal-drop auto-expiry does NOT consume the budget — a later sustained-tense run creates a second prompt this session", async () => {
+    vi.setSystemTime(0);
+    let promptCount = 0;
+    const deps = makeDeps({ createPrompt: vi.fn(async () => `prompt-${++promptCount}`) });
+    const { result, rerender } = renderHook((p) => useConfirmatoryTrigger(p), { initialProps: deps });
+    await act(async () => rerender({ ...deps, latestOutcome: tense("c0") }));
+    await act(async () => {
+      vi.setSystemTime(20_000);
+      rerender({ ...deps, latestOutcome: tense("c20") });
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledTimes(1);
+    expect(result.current.visible).toBe(true);
+
+    // band leaves tense and stays away past the dwell floor — an auto-expiry, not a user answer
+    await act(async () => {
+      vi.setSystemTime(20_000 + CONFIRMATORY_PROMPT_MIN_DWELL_MS);
+      rerender({ ...deps, latestOutcome: little("c25") });
+      await flush();
+    });
+    expect(deps.resolvePrompt).toHaveBeenCalledWith("prompt-1", {
+      type: "expired",
+      reason: "signal_drop",
+    });
+    expect(result.current.visible).toBe(false);
+
+    // a fresh 20s sustained-tense run, later in the same session, must be able to prompt again
+    await act(async () => {
+      vi.setSystemTime(60_000);
+      rerender({ ...deps, latestOutcome: tense("c60") });
+      await flush();
+    });
+    await act(async () => {
+      vi.setSystemTime(80_000);
+      rerender({ ...deps, latestOutcome: tense("c80") });
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledTimes(2);
+    expect(result.current.visible).toBe(true);
+  });
+
+  it("false alarm consumes the budget — a later sustained-tense run does NOT create a second prompt this session", async () => {
+    vi.setSystemTime(0);
+    const deps = makeDeps();
+    const { result, rerender } = renderHook((p) => useConfirmatoryTrigger(p), { initialProps: deps });
+    await act(async () => rerender({ ...deps, latestOutcome: tense("c0") }));
+    await act(async () => {
+      vi.setSystemTime(20_000);
+      rerender({ ...deps, latestOutcome: tense("c20") });
+      await flush();
+    });
+    await act(async () => {
+      result.current.onFalseAlarm();
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      vi.setSystemTime(60_000);
+      rerender({ ...deps, latestOutcome: tense("c60") });
+      await flush();
+    });
+    await act(async () => {
+      vi.setSystemTime(80_000);
+      rerender({ ...deps, latestOutcome: tense("c80") });
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledTimes(1);
+    expect(result.current.visible).toBe(false);
   });
 
   it("a session carrying next-session suppression consumes it and never shows", async () => {
