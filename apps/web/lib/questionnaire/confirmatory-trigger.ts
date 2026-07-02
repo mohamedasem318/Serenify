@@ -40,8 +40,14 @@ export interface TriggerState {
   /** The prompt has been shown for this session (one-per-session guard). */
   shown: boolean;
   shownAtMs: number | null;
-  /** Single-resolution guard — true once answered or expired. */
+  /** Single-resolution guard for the currently (or most recently) shown prompt. */
   resolved: boolean;
+  /**
+   * The session's one-time prompt budget. Set ONLY by an explicit user answer (confirmed /
+   * false_alarm / opened_chat) — an auto-resolution (signal-drop expiry, session end) leaves
+   * this false so a later sustained-tense episode can still prompt again this session.
+   */
+  budgetConsumed: boolean;
   triggeredWindowCapturedAt: string | null;
   /** Whether the most recent processed outcome was a `tense` reading. */
   lastOutcomeTense: boolean;
@@ -53,6 +59,7 @@ export function initialTriggerState(): TriggerState {
     shown: false,
     shownAtMs: null,
     resolved: false,
+    budgetConsumed: false,
     triggeredWindowCapturedAt: null,
     lastOutcomeTense: false,
   };
@@ -70,9 +77,18 @@ export function isTenseReading(
   return outcome.outcome === "reading" && outcome.band === "tense";
 }
 
-/** Mark the state resolved (answered or expired) — no further prompt this session. */
-export function markResolved(state: TriggerState): TriggerState {
-  return { ...state, resolved: true };
+/** Apply an EXPLICIT user answer (confirmed / false_alarm / opened_chat) — consumes the
+ *  session's one-time prompt budget; no further prompt this session. */
+export function markResolvedConsumingBudget(state: TriggerState): TriggerState {
+  return { ...state, resolved: true, budgetConsumed: true };
+}
+
+/** Apply an AUTO-resolution (signal-drop expiry / session end) — does NOT consume the
+ *  budget; rearms the trigger so a fresh sustained-tense episode can prompt again this
+ *  session. The single-resolution guard for the just-finished prompt is implicit: `shown`
+ *  resets to `false`, so any stale expiry check for it (`reduceDwellElapsed`) is a no-op. */
+export function markResolvedRearm(state: TriggerState): TriggerState {
+  return { ...initialTriggerState(), budgetConsumed: state.budgetConsumed };
 }
 
 /**
@@ -86,7 +102,7 @@ export function reduceOutcome(
   active: boolean,
   config: TriggerConfig,
 ): { state: TriggerState; effect: TriggerEffect } {
-  if (state.resolved) return { state, effect: { kind: "none" } };
+  if (state.budgetConsumed) return { state, effect: { kind: "none" } };
 
   const tense = isTenseReading(outcome);
 
@@ -125,7 +141,7 @@ export function reduceOutcome(
   }
   const onScreen = nowMs - (state.shownAtMs ?? nowMs);
   if (onScreen >= config.dwellMs) {
-    return { state: { ...markResolved(state), lastOutcomeTense: false }, effect: { kind: "expire", reason: "signal_drop" } };
+    return { state: markResolvedRearm(state), effect: { kind: "expire", reason: "signal_drop" } };
   }
   // dropped before the dwell floor — remember it; the dwell timer finalises it
   return { state: { ...state, lastOutcomeTense: false }, effect: { kind: "none" } };
@@ -136,9 +152,9 @@ export function reduceOutcome(
  * currently dropped, expire by signal_drop; if it returned to tense, wait for the next drop.
  */
 export function reduceDwellElapsed(state: TriggerState): { state: TriggerState; effect: TriggerEffect } {
-  if (state.resolved || !state.shown) return { state, effect: { kind: "none" } };
+  if (state.budgetConsumed || !state.shown) return { state, effect: { kind: "none" } };
   if (!state.lastOutcomeTense) {
-    return { state: markResolved(state), effect: { kind: "expire", reason: "signal_drop" } };
+    return { state: markResolvedRearm(state), effect: { kind: "expire", reason: "signal_drop" } };
   }
   return { state, effect: { kind: "none" } };
 }
@@ -218,10 +234,19 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
   function finalize(resolution: PromptResolution): Promise<void> {
     if (resolvedRef.current) return Promise.resolve(); // single-resolution guard across all races
     resolvedRef.current = true;
-    stateRef.current = markResolved(stateRef.current);
     clearDwell();
     setVisible(false);
     const id = promptIdRef.current;
+    if (resolution.type === "answered") {
+      // Explicit user answer — consumes the session's one-time prompt budget.
+      stateRef.current = markResolvedConsumingBudget(stateRef.current);
+    } else {
+      // Auto-resolution (signal-drop / session-end) never spends the budget — rearm so a
+      // later sustained-tense episode can still prompt again this session.
+      stateRef.current = markResolvedRearm(stateRef.current);
+      promptIdRef.current = null;
+      resolvedRef.current = false;
+    }
     return id ? Promise.resolve(depsRef.current.resolvePrompt(id, resolution)) : Promise.resolve();
   }
 
