@@ -5,10 +5,10 @@ import { useEffect, useRef, useState } from "react";
 
 import { saveSessionFeedback as defaultSave } from "@/lib/api/questionnaire-client";
 import { QUESTIONNAIRE_RESULT_DWELL_MS } from "@/lib/questionnaire/constants";
-import type { SessionFeedbackReason } from "@/lib/questionnaire/types";
+import { actionTargetForReason, type SessionFeedbackReason } from "@/lib/questionnaire/types";
 import { cn } from "@/lib/utils";
 
-import { QuestionnaireResultIcon } from "./questionnaire-result-icon";
+import { QuestionnaireResultIcon, type QuestionnaireResultKind } from "./questionnaire-result-icon";
 
 /**
  * Feature 012 / US2 — the session-end product-feedback card.
@@ -50,7 +50,18 @@ export interface SessionEndFeedbackCardProps {
   navigate?: (path: string) => void;
 }
 
-type Ending = "good" | "skip" | null;
+type Ending = "good" | "skip" | "ren_too_robotic" | "something_else" | null;
+
+// The centered end-state every path resolves into (Good/Skip plus the two ack-only reasons —
+// `suggestion_didnt_help`/`needed_quiet` resolve via `route()` instead, once the user clicks
+// through their tailored action). `check` (not a bespoke robot glyph) keeps the two acks
+// visually consistent with each other and with the weekly card's own `check` ending.
+const ENDING_CONTENT: Record<Exclude<Ending, null>, { kind: QuestionnaireResultKind; message: string }> = {
+  good: { kind: "smiley", message: "Glad that helped." },
+  skip: { kind: "muted", message: "No problem — another time." },
+  ren_too_robotic: { kind: "check", message: "Thanks — we'll keep refining how Ren talks." },
+  something_else: { kind: "check", message: "Thanks for the feedback." },
+};
 
 export function SessionEndFeedbackCard({
   userId,
@@ -135,12 +146,15 @@ export function SessionEndFeedbackCard({
       sentiment: "off" as const,
       reason: next,
     };
-    if (next === "suggestion_didnt_help" || next === "needed_quiet") {
-      // Routed reasons resolve only once the user clicks through (see `route`).
-      saveOnly(args);
-    } else {
+    // `something_else` is already handled above; the only other ack-only reason is
+    // `ren_too_robotic` (see `actionTargetForReason`) — the routed reasons fall through below.
+    if (next === "ren_too_robotic" && actionTargetForReason(next) === "ack_only") {
       persist(args);
+      setEnding(next);
+      return;
     }
+    // Routed reasons resolve only once the user clicks through (see `route`).
+    saveOnly(args);
   }
 
   function submitFreeText() {
@@ -153,35 +167,33 @@ export function SessionEndFeedbackCard({
       reason: "something_else",
       freeText,
     });
-    setReason(null); // collapse the editor; feedback recorded
-    setFreeText("");
+    setEnding("something_else");
   }
 
   if (ending) {
+    const { kind, message } = ENDING_CONTENT[ending];
     return (
       <div className="rounded-card border border-border bg-surface p-5 shadow-soft" data-testid="session-end-feedback">
-        <QuestionnaireResultIcon
-          kind={ending === "good" ? "smiley" : "muted"}
-          message={ending === "good" ? "Glad that helped." : "No problem — another time."}
-        />
+        <QuestionnaireResultIcon kind={kind} message={message} />
       </div>
     );
   }
 
   return (
-    <div className="rounded-card border border-border bg-surface p-5 shadow-soft" data-testid="session-end-feedback">
-      <div className="flex items-start justify-between gap-3">
-        <h2 className="font-display text-[17px] font-semibold leading-tight text-ink">
-          How did that check-in feel?
-        </h2>
-        <button
-          type="button"
-          onClick={skip}
-          className="inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-[13px] text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
-        >
-          <X aria-hidden className="size-3.5" /> Skip
-        </button>
-      </div>
+    <div
+      className="relative rounded-card border border-border bg-surface p-5 shadow-soft"
+      data-testid="session-end-feedback"
+    >
+      <button
+        type="button"
+        onClick={skip}
+        className="absolute right-3 top-3 inline-flex min-h-11 items-center gap-1 rounded-control px-2.5 text-[13px] text-muted transition-colors hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+      >
+        <X aria-hidden className="size-3.5" /> Skip
+      </button>
+      <h2 className="font-display pr-16 text-[17px] font-semibold leading-tight text-ink">
+        How did that check-in feel?
+      </h2>
 
       {!branchOpen ? (
         <div className="mt-3 flex gap-3">
@@ -264,15 +276,8 @@ export function SessionEndFeedbackCard({
         </div>
       );
     }
-    if (r === "ren_too_robotic") {
-      return (
-        <div className="rounded-card bg-bg px-3.5 py-3 text-[14px] text-muted">
-          Thanks — we&apos;ll keep refining how Ren talks. (stored as product feedback, not sent to
-          Ren)
-        </div>
-      );
-    }
-    // something_else — free text, stored employee-private only.
+    // something_else — free text, stored employee-private only. (`ren_too_robotic` never
+    // reaches here: it resolves straight to the shared end-state above via `chooseReason`.)
     return (
       <div className="rounded-card bg-bg px-3.5 py-3">
         <textarea
