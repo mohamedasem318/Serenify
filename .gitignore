@@ -16,6 +16,10 @@ next-env.d.ts
 !.env.example
 !.env.local.example
 
+# Real-identity account roster for scripts/seed/seed-accounts.ts (Principle IX/X —
+# real names/emails must never be committed); roster.example.json stays tracked.
+scripts/seed/roster.local.json
+
 # SSH / private keys — never commit. Real keys live in ~/.ssh (off-repo);
 # this is defense-in-depth so a stray copy can't be `git add`-ed by accident.
 *.pem
