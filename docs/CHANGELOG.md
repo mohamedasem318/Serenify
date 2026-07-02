@@ -2348,3 +2348,58 @@ the `sample_size` hook but not the suppression; it remains a pre-real-data block
 Cross-references: `specs/012-questionnaire-feedback/` (spec / plan / tasks / contracts /
 checklists / smoke-tests); `docs/DECISIONS.md` 2026-06-30; `docs/PROGRESS.md` 2026-06-30;
 `docs/BACKLOG.md` #123.
+
+## 2026-07-02 — feat(012-questionnaire-feedback) — feature complete (merged to main, PR #125)
+
+Feature 012 is **merged to `main`** via **PR #125** (squash `636a7fc`, 2026-07-02). This entry
+records completion + the as-built fixes found during the live e2e / pre-merge polish pass, on
+top of the Phases 3–8 implementation logged 2026-06-30 above (not repeated here).
+
+As-built fixes since the 2026-06-30 implementation entry:
+
+- **Coordinator dwell fix (T067 follow-up).** `SessionEndFeedbackCard` and `WeeklyCheckInCard`
+  were calling `onResolved()` synchronously in the same handler that set their own local
+  "ending" state, so `QuestionnaireCoordinator` swapped surfaces in the same React commit
+  before the end-state ever painted — a real SC-007 violation (a routed reason's action button
+  could vanish before its own 3rd click landed). Both cards now defer `onResolved()` behind the
+  same `QUESTIONNAIRE_RESULT_DWELL_MS` the weekly card already used (timer cleared on unmount),
+  so the end-state message actually paints before the coordinator swaps surfaces. The two routed
+  reasons (`suggestion_didnt_help` / `needed_quiet`) are unchanged — they still resolve only from
+  `route()`, on the action-button click.
+- **Session feedback insert → upsert.** `questionnaire-client.ts` `saveSessionFeedback` switched
+  from `.insert` to `.upsert(payload, { onConflict: "monitoring_session_id" })`, with every
+  nullable column set explicitly rather than omitted. Switching reasons before acting used to
+  insert a second row and hit `qsf_one_per_session` `UNIQUE(monitoring_session_id)`, silently
+  discarding the second write; the upsert now overwrites cleanly. `route()` now also halts
+  (logs, doesn't navigate/resolve) on a failed save instead of proceeding as if it succeeded.
+- **Ack-only reasons share the centered end-state.** `ren_too_robotic` and the free-text
+  `something_else` reason now resolve into the same centered `QuestionnaireResultIcon` end-state
+  as Good/Skip, on the same dwell timer, instead of the old inline banner / bounce-back-to-
+  reason-list.
+- **Skip repositioned to a top-right corner chip** on both `SessionEndFeedbackCard` and
+  `WeeklyCheckInCard` (own row, not baseline-aligned with the heading). A follow-up fix restored
+  the mock's flex header (heading + Skip, `justify-between`) with Skip as a ghost link
+  (text-color-only hover, no filled chip) and an invisible vertical hit-slop so it still clears
+  the 44px touch target without the hit/hover box bleeding over the heading — the initial
+  absolute-positioned corner chip had regressed both the hover fill and the header layout.
+- **360px chat-pill overlap fixed.** The coordinator's mobile (base) classes used a plain
+  `bottom-0 + pb-3` while the `sm:` breakpoint reserved `--chat-pill-offset` via `bottom`; at
+  360px the session-end/weekly card sat under the floating chat pill (same z-40, padding alone
+  doesn't separate two fixed siblings). The same bottom-offset formula now applies
+  unconditionally (smaller 0.75rem gap on mobile, `sm:` keeps its 1rem gap), matching
+  `Notification`'s own convention.
+- **BACKLOG #127 / #128 filed** during this pass (expired confirmatory prompts consuming the
+  one-per-session budget with no re-arm path; the uncalibrated `STRESS_TENSE_BAND=0.70`
+  default) — see `docs/BACKLOG.md`.
+- **Manual smoke (Section 5) completed** — all 7 scenarios PASS against a real local Supabase +
+  live camera, each cross-checked directly in Postgres; `specs/012-questionnaire-feedback/smoke-tests.md`
+  signed off complete.
+
+Test results (2026-07-02, post-fix): `apps/api` `test_questionnaire_privacy.py` **12 passed**;
+`apps/web` Vitest **909 passed / 98 files**; `questionnaire.spec.ts` + `questionnaire-layout.spec.ts`
+**4/4 each**; full chromium e2e project **42 passed** (4 pre-existing unrelated skips, 1
+pre-existing unrelated failure in `employee-dashboard-shell.spec.ts`, confirmed via git-stash to
+reproduce without this change); `tsc --noEmit` clean.
+
+Cross-references: `specs/012-questionnaire-feedback/` (smoke-tests.md); `docs/DECISIONS.md`
+2026-07-02; `docs/PROGRESS.md` 2026-07-02; `docs/BACKLOG.md` #123 / #127 / #128.
