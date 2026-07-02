@@ -35,6 +35,26 @@ async function assertTargets(page: Page, names: RegExp[]) {
   }
 }
 
+// The Skip chip's clickable box is intentionally taller than its visible glyph (a hit-slop
+// expansion to reach the 44px target without inflating the visible corner chip — see
+// session-end-feedback-card.tsx / weekly-check-in-card.tsx). That box must still never
+// geometrically overlap the heading's own box; only the vertical dimension is expanded, so a
+// 2D rectangle intersection would only trip if the horizontal gap regressed too.
+async function assertSkipDoesNotOverlapHeading(page: Page) {
+  const skip = page.getByRole("button", { name: /Skip/ }).first();
+  const heading = page.getByRole("heading", { level: 2 }).first();
+  const skipBox = await skip.boundingBox();
+  const headingBox = await heading.boundingBox();
+  expect(skipBox, "Skip has a box").not.toBeNull();
+  expect(headingBox, "heading has a box").not.toBeNull();
+  const overlaps =
+    skipBox!.x < headingBox!.x + headingBox!.width &&
+    skipBox!.x + skipBox!.width > headingBox!.x &&
+    skipBox!.y < headingBox!.y + headingBox!.height &&
+    skipBox!.y + skipBox!.height > headingBox!.y;
+  expect(overlaps, "Skip's clickable box does not overlap the heading's box").toBe(false);
+}
+
 for (const viewport of [
   { label: "360px", width: 360, height: 740 },
   { label: "desktop", width: 1280, height: 900 },
@@ -50,6 +70,7 @@ for (const viewport of [
       await expect(card).toBeVisible();
       await assertNoHorizontalScroll(page);
       await assertTargets(page, [/^Good/, /Could be better/, /Skip/]);
+      await assertSkipDoesNotOverlapHeading(page);
 
       // Into the stepper — Back/Done remain ≥44px and nothing overflows.
       await card.getByRole("button", { name: /Could be better/ }).click();
