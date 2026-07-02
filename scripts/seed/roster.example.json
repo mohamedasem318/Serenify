@@ -1,0 +1,33 @@
+{
+  "accounts": [
+    { "email": "admin1@yourorg.example", "full_name": "Admin One", "role": "admin" },
+    { "email": "admin2@yourorg.example", "full_name": "Admin Two", "role": "admin" },
+    { "email": "admin3@yourorg.example", "full_name": "Admin Three", "role": "admin" },
+    { "email": "admin4@yourorg.example", "full_name": "Admin Four", "role": "admin" },
+    { "email": "lead@yourorg.example", "full_name": "Team Lead", "role": "team_lead" },
+    {
+      "email": "employee1@yourorg.example",
+      "full_name": "Employee One",
+      "role": "employee",
+      "manager_email": "lead@yourorg.example"
+    },
+    {
+      "email": "employee2@yourorg.example",
+      "full_name": "Employee Two",
+      "role": "employee",
+      "manager_email": "lead@yourorg.example"
+    },
+    {
+      "email": "employee3@yourorg.example",
+      "full_name": "Employee Three",
+      "role": "employee",
+      "manager_email": "lead@yourorg.example"
+    },
+    {
+      "email": "employee4@yourorg.example",
+      "full_name": "Employee Four",
+      "role": "employee",
+      "manager_email": "lead@yourorg.example"
+    }
+  ]
+}
