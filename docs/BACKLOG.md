@@ -1660,3 +1660,50 @@ separate from stress-signal direct-manager visibility and cover it in the featur
 017 privacy review when the team-lead dashboard consumes the aggregate.
 **Address by**: before any real employee data is collected; implement no later than
 feature 017 (team-lead-dashboard) before exposing the manager aggregate to real data.
+
+### Expired confirmatory prompt consumes the one-per-session budget — no re-arm (#127)
+**Status**: bug (`type:bug` / `area:db` + `area:web`)
+**Observed**: 2026-07-02, feature-012 pre-merge polish pass.
+**Description**: The confirmatory prompt table enforces `UNIQUE (monitoring_session_id)`
+(`qcp_one_per_session`, `supabase/migrations/20260630000000_questionnaire_feedback.sql`) —
+one row per monitoring session, whether the prompt's `lifecycle` ends `answered` or
+`expired`. Today a prompt that **expires unanswered** (`expiry_reason IN ('signal_drop',
+'session_end')`) still consumes that session's single-prompt budget. If the sustained-tense
+signal later re-enters a sustained-tense state in the SAME session, the user cannot be
+re-prompted, because the UNIQUE constraint (and the client logic gating on it) already
+treats the session as prompted.
+**Desired behavior**: only an *answered* prompt (`lifecycle = 'answered'`, an actual outcome
+recorded) should close the budget. An expired prompt should allow a re-arm — but this needs
+real design, not just relaxing the constraint: a **re-arm condition** (what state transition
+allows a new prompt to open), a **cooldown** (minimum gap after an expiry before a new prompt
+can arm, so a flapping signal doesn't nag), and a **per-session cap** (an upper bound on how
+many prompts can fire even with re-arm, so an expired-then-re-armed loop can't repeat
+indefinitely).
+**Fix scope**: medium — likely drops `UNIQUE (monitoring_session_id)` in favor of a partial
+unique index scoped to `lifecycle = 'answered'`, plus a re-arm/cooldown/cap policy in the
+confirmatory-prompt trigger logic (`apps/web/components/questionnaire/confirmatory-prompt.tsx`,
+`apps/web/components/monitor/monitoring-session.tsx`) and its RLS/DEFINER write path. Needs
+its own spec-fix pass, not a drop-in change.
+**Address by**: 012 fast-follow.
+
+### `STRESS_TENSE_BAND` (0.70) is an uncalibrated hardcoded default (#128)
+**Status**: tech-debt (`type:tech-debt` / `area:api` + `area:ml-video` + `area:docs`)
+**Observed**: 2026-07-02, feature-012 pre-merge polish pass.
+**Description**: `stress_tense_band` (env `STRESS_TENSE_BAND`, default `0.70` —
+`apps/api/app/config.py`) is a hardcoded product default, unlike the lower `0.53`
+stress/not-stress operating point, which is data-derived from the LOSO/GroupKFold-calibrated
+`loso_metrics_60s_calibrated.threshold_sweep_recommended.threshold` in
+`packages/ml-video/models/metadata.json` (documented in `docs/MODELS.md`). The 0.70 tense-band
+split (a-little-tense vs tense, D-3 display-only banding) has no equivalent empirical
+grounding.
+**Plan**: re-run the trained video model over the LOSO/GroupKFold folds to produce calibrated
+probabilities, and set the tense cutoff from that distribution. Evaluate on the **SMOOTHED
+4-window scores** (what users actually experience via the server-side smoothing buffer, D-3)
+rather than raw per-window probabilities — the smoothing-window length (currently N=4) is a
+coupled lever affecting the resulting distribution, so it must be held fixed (or explicitly
+re-considered) during calibration.
+**Fix scope**: ML/calibration work (Kaggle) — touches `apps/api/app/config.py` (the
+constant/default), `packages/ml-video/models/metadata.json` (if the calibrated tense
+operating point is recorded there alongside 0.53), and `docs/MODELS.md` (documenting the
+derivation, mirroring how 0.53 is documented today).
+**Address by**: a future model-calibration pass; not blocking feature 012.
