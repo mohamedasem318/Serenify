@@ -2403,3 +2403,38 @@ reproduce without this change); `tsc --noEmit` clean.
 
 Cross-references: `specs/012-questionnaire-feedback/` (smoke-tests.md); `docs/DECISIONS.md`
 2026-07-02; `docs/PROGRESS.md` 2026-07-02; `docs/BACKLOG.md` #123 / #127 / #128.
+
+## 2026-07-02 — fix(012): confirmatory prompt one-per-session budget only spent by an explicit answer (partial, #127) — merged to main, PR #130
+
+`useConfirmatoryTrigger`'s trigger reducer used a single `resolved` flag for two different
+concerns: the per-prompt single-resolution guard, and the session's one-time prompt budget.
+That meant an auto-resolution — a `signal_drop` expiry, whether detected immediately when a
+non-tense outcome arrived past the dwell floor, or via the dwell-timer callback — permanently
+blocked all further prompt processing for the session, exactly like an explicit user answer.
+A genuine stress spike later in the same session could never be re-prompted.
+
+Split the flag: `resolved` now guards only the currently-(or most-recently-)shown prompt; a
+new `budgetConsumed` field is set ONLY by an explicit `type: "answered"` resolution
+(confirmed / false_alarm / opened_chat) via `markResolvedConsumingBudget`. A new
+`markResolvedRearm` resets the trigger to a fresh un-shown state on any auto-resolution, and
+the hook now resets its own `resolvedRef`/`promptIdRef` on that path too, so a fresh 20 s
+sustained-tense episode can fire a new `show` effect in the same session. Next-session
+false-alarm suppression is unchanged (already correctly scoped to the explicit `false_alarm`
+path only).
+
+**Partial fix — issue stays OPEN.** `questionnaire_confirmatory_prompts` still has
+`qcp_one_per_session UNIQUE (monitoring_session_id)` (full-table, unchanged by this PR);
+`createConfirmatoryPrompt` still does a plain `.insert`. A second prompt row for the same
+session hits that constraint, the insert fails, and `handleShow` silently no-ops — so in
+production a user still cannot be re-prompted after an auto-expiry, even though the
+client-side state machine now wants to try. The remaining DB-constraint + re-arm/cooldown/cap
+policy work (originally scoped in the BACKLOG #127 entry) is unaddressed by this PR and needs
+its own spec-fix pass. Discovered during the post-merge doc reconcile, after merge — the unit
+suite mocks `createPrompt` and so did not catch the gap.
+
+Test results (2026-07-02): `apps/web` Vitest `confirmatory-trigger.test.ts` **20/20** (new:
+both signal-drop paths rearm without spending the budget; single-resolution guard holds);
+full suite **916/916 passed / 98 files**; `tsc --noEmit` clean; ESLint clean.
+
+Cross-references: `docs/PROGRESS.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02;
+`docs/BACKLOG.md` #127.

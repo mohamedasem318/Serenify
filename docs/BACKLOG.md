@@ -1662,29 +1662,48 @@ separate from stress-signal direct-manager visibility and cover it in the featur
 feature 017 (team-lead-dashboard) before exposing the manager aggregate to real data.
 
 ### Expired confirmatory prompt consumes the one-per-session budget — no re-arm (#127)
-**Status**: bug (`type:bug` / `area:db` + `area:web`)
+**Status**: bug (`type:bug` / `area:db` + `area:web`) — **OPEN, partially addressed.**
 **Observed**: 2026-07-02, feature-012 pre-merge polish pass.
+**Progress**: 2026-07-02 — **PR #130** (squash `d89f4db`) fixed the CLIENT-side half only.
+`useConfirmatoryTrigger`'s reducer previously used one `resolved` flag for two different
+concerns (per-prompt single-resolution guard + the session's one-time budget), so an
+auto-resolution (`signal_drop`) permanently blocked all further prompting, same as an
+explicit answer. Split into a per-prompt `resolved` guard and a new session-scoped
+`budgetConsumed` flag, set ONLY by an explicit answer (confirmed / false_alarm /
+opened_chat); a new `markResolvedRearm` resets the trigger (state + the hook's
+`resolvedRef`/`promptIdRef`) on auto-resolution so a fresh 20 s sustained-tense episode can
+fire a new `show` effect in the same session. **This does NOT close the issue** — see
+Description and remaining Fix scope below. Record: `docs/PROGRESS.md` 2026-07-02,
+`docs/CHANGELOG.md` 2026-07-02.
 **Description**: The confirmatory prompt table enforces `UNIQUE (monitoring_session_id)`
 (`qcp_one_per_session`, `supabase/migrations/20260630000000_questionnaire_feedback.sql`) —
 one row per monitoring session, whether the prompt's `lifecycle` ends `answered` or
 `expired`. Today a prompt that **expires unanswered** (`expiry_reason IN ('signal_drop',
-'session_end')`) still consumes that session's single-prompt budget. If the sustained-tense
-signal later re-enters a sustained-tense state in the SAME session, the user cannot be
-re-prompted, because the UNIQUE constraint (and the client logic gating on it) already
-treats the session as prompted.
+'session_end')`) still consumes that session's single-prompt budget at the DB layer: the
+client now WANTS to create a second prompt row after such an expiry (per the fix above), but
+`createConfirmatoryPrompt` (`apps/web/lib/api/questionnaire-client.ts`) still does a plain
+`.insert`, which hits the UNIQUE constraint and fails; `createPrompt` resolves `null` and
+`handleShow` silently no-ops. If the sustained-tense signal later re-enters a sustained-tense
+state in the SAME session, the user still cannot be re-prompted end-to-end.
 **Desired behavior**: only an *answered* prompt (`lifecycle = 'answered'`, an actual outcome
 recorded) should close the budget. An expired prompt should allow a re-arm — but this needs
 real design, not just relaxing the constraint: a **re-arm condition** (what state transition
-allows a new prompt to open), a **cooldown** (minimum gap after an expiry before a new prompt
-can arm, so a flapping signal doesn't nag), and a **per-session cap** (an upper bound on how
-many prompts can fire even with re-arm, so an expired-then-re-armed loop can't repeat
-indefinitely).
-**Fix scope**: medium — likely drops `UNIQUE (monitoring_session_id)` in favor of a partial
-unique index scoped to `lifecycle = 'answered'`, plus a re-arm/cooldown/cap policy in the
-confirmatory-prompt trigger logic (`apps/web/components/questionnaire/confirmatory-prompt.tsx`,
-`apps/web/components/monitor/monitoring-session.tsx`) and its RLS/DEFINER write path. Needs
-its own spec-fix pass, not a drop-in change.
-**Address by**: 012 fast-follow.
+allows a new prompt to open — **DONE client-side, PR #130**), a **cooldown** (minimum gap
+after an expiry before a new prompt can arm, so a flapping signal doesn't nag — **NOT
+addressed**), and a **per-session cap** (an upper bound on how many prompts can fire even
+with re-arm, so an expired-then-re-armed loop can't repeat indefinitely — **NOT addressed**;
+the 20 s sustained-tense floor rate-limits re-prompts per-episode but doesn't bound a long
+session).
+**Fix scope (remaining)**: medium — drop `UNIQUE (monitoring_session_id)` in favor of a
+partial unique index scoped to `lifecycle = 'answered'` on
+`questionnaire_confirmatory_prompts` (new migration, alongside
+`supabase/migrations/20260630000000_questionnaire_feedback.sql`), plus a cooldown/cap policy
+layered on the now-working client re-arm logic
+(`apps/web/lib/questionnaire/confirmatory-trigger.ts`) and its RLS/DEFINER write path
+(`apps/web/lib/api/questionnaire-client.ts`). Needs its own spec-fix pass, not a drop-in
+change.
+**Address by**: 012 fast-follow (client-side portion shipped 2026-07-02 via #130;
+DB-constraint portion still pending).
 
 ### `STRESS_TENSE_BAND` (0.70) is an uncalibrated hardcoded default (#128)
 **Status**: tech-debt (`type:tech-debt` / `area:api` + `area:ml-video` + `area:docs`)

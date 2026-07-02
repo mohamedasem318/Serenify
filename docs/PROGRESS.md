@@ -4,6 +4,58 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Fix — Confirmatory prompt one-per-session budget: client-side re-arm (partial, #127)
+
+**Branch**: `fix/127-confirmatory-prompt-budget-auto-expiry` → merged to `main` via **PR #130**
+(squash `d89f4db`, 2026-07-02).
+**Status**: **partial fix** — the client-side trigger state machine is fixed; the DB write
+path is not, so BACKLOG #127 / GitHub issue #127 stay OPEN. This entry is the implementation
+record for the client-side half only.
+**Date**: 2026-07-02.
+
+**What shipped**: `useConfirmatoryTrigger`'s reducer conflated two concerns in a single
+`resolved` flag — the per-prompt single-resolution guard, and the session's one-time prompt
+budget. An auto-resolution (`signal_drop` expiry, whether detected immediately when a
+non-tense outcome arrived past the dwell floor, or via the dwell-timer callback) was
+permanently blocking all further outcome processing for the session, exactly like an
+explicit user answer — so a genuine stress spike later in the same session could never
+re-prompt. Split the flag: `resolved` now guards only the currently-(or most-recently-)shown
+prompt; a new `budgetConsumed` field is set ONLY by an explicit `type: "answered"` resolution
+(confirmed / false_alarm / opened_chat) via a new `markResolvedConsumingBudget` helper. A new
+`markResolvedRearm` helper resets the trigger to a fresh, un-shown state on any
+auto-resolution — including the hook's own `resolvedRef`/`promptIdRef` — so a later,
+genuinely new 20 s sustained-tense episode can still fire a `show` effect in the same
+session. Next-session false-alarm suppression is untouched (already correctly scoped to the
+explicit `false_alarm` path only).
+
+**Why it's still partial**: `questionnaire_confirmatory_prompts` keeps `CONSTRAINT
+qcp_one_per_session UNIQUE (monitoring_session_id)`
+(`supabase/migrations/20260630000000_questionnaire_feedback.sql`) — unchanged by this PR.
+`createConfirmatoryPrompt` (`apps/web/lib/api/questionnaire-client.ts`) still does a plain
+`.insert`; a second prompt row for the same session (even though the client now wants to
+create one) hits the UNIQUE violation, the insert fails, `createPrompt` resolves `null`, and
+`handleShow` silently no-ops. **In production, a user still cannot be re-prompted after an
+auto-expiry** — the client fix is necessary but not sufficient. Caught during the post-merge
+doc reconcile, after merge — the unit test suite gave false confidence because `createPrompt`
+is mocked in every test and does not model the real DB constraint.
+
+**Remaining scope** (tracked as the still-open part of BACKLOG #127 / GitHub #127): drop the
+full-table unique constraint in favor of a partial unique index scoped to `lifecycle =
+'answered'`, plus the re-arm/cooldown/cap policy design called for in the original BACKLOG
+entry. Needs its own spec-fix pass, not folded into this PR.
+
+**Test gate (2026-07-02)**: `apps/web` Vitest `confirmatory-trigger.test.ts` **20/20** (new
+coverage: both signal-drop expiry paths — immediate and via the dwell timer — do not consume
+the budget and a fresh sustained-tense run re-shows; single-resolution guard still holds);
+full suite **916/916 passed / 98 files**; `tsc --noEmit` clean; ESLint clean on changed
+files. All green against the mocked persistence layer — does not exercise the DB-constraint
+gap described above.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02;
+`docs/BACKLOG.md` #127.
+
+---
+
 ## Feature 012 — Questionnaire Feedback (merged to main)
 
 **Branch**: `012-questionnaire-feedback`
