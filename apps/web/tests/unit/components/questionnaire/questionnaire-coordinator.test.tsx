@@ -130,6 +130,62 @@ describe("QuestionnaireCoordinator (dashboard)", () => {
     }
   });
 
+  it("ren_too_robotic's own end-state message paints before the coordinator swaps to weekly after the dwell", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      render(
+        <QuestionnaireCoordinator
+          userId="u1"
+          takeEndedSession={() => "sess-9"}
+          loadCadence={async () => null /* weekly due */}
+        />,
+      );
+
+      expect(await screen.findByTestId("session-end-feedback")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Something was off/ }));
+      await user.click(screen.getByRole("button", { name: /too.robotic/i }));
+      expect(screen.getByText("Thanks — we'll keep refining how Ren talks.")).toBeInTheDocument();
+      expect(screen.queryByTestId("weekly-check-in")).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(QUESTIONNAIRE_RESULT_DWELL_MS);
+      expect(await screen.findByTestId("weekly-check-in")).toBeInTheDocument();
+      expect(screen.queryByTestId("session-end-feedback")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("something_else's own end-state message paints before the coordinator swaps to weekly after the dwell", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTimeAsync });
+      render(
+        <QuestionnaireCoordinator
+          userId="u1"
+          takeEndedSession={() => "sess-9"}
+          loadCadence={async () => null /* weekly due */}
+        />,
+      );
+
+      expect(await screen.findByTestId("session-end-feedback")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: /Something was off/ }));
+      await user.click(screen.getByRole("button", { name: /Something else/i }));
+      await user.type(screen.getByLabelText("Tell us what felt off"), "the timing felt random");
+      await user.click(screen.getByRole("button", { name: /Send/i }));
+      expect(screen.getByText("Thanks for the feedback.")).toBeInTheDocument();
+      expect(screen.queryByTestId("weekly-check-in")).toBeNull();
+
+      await vi.advanceTimersByTimeAsync(QUESTIONNAIRE_RESULT_DWELL_MS);
+      expect(await screen.findByTestId("weekly-check-in")).toBeInTheDocument();
+      expect(screen.queryByTestId("session-end-feedback")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("shows the weekly check-in when no session just ended and the week is due", async () => {
     render(
       <QuestionnaireCoordinator userId="u1" takeEndedSession={() => null} loadCadence={async () => null} />,
