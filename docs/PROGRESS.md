@@ -4,6 +4,48 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Fix — Confirmatory prompt one-per-session budget: DB-side partial index (#127 done)
+
+**Branch**: `fix/127-qcp-answered-only-unique` → merged to `main` via **PR #132** (squash
+`d057f43`, 2026-07-02).
+**Status**: **done — closes BACKLOG #127 / GitHub issue #127**, together with the client-side
+half shipped in **PR #130** (see the entry directly below). This entry is the implementation
+record for the DB-side half.
+**Date**: 2026-07-02.
+
+**What shipped**: `questionnaire_confirmatory_prompts` dropped the full-table
+`qcp_one_per_session UNIQUE (monitoring_session_id)` constraint and replaced it with a partial
+unique index, `qcp_one_answered_per_session ON questionnaire_confirmatory_prompts
+(monitoring_session_id) WHERE lifecycle = 'answered'`
+(`supabase/migrations/20260702000000_qcp_one_answered_per_session.sql`). A session can now hold
+several `visible`/`expired` rows — one per re-arm episode — while still capping `answered` rows
+at one per session, matching PR #130's client-side `budgetConsumed` predicate exactly (only an
+explicit answer spends the budget). `createConfirmatoryPrompt`
+(`apps/web/lib/api/questionnaire-client.ts`) is otherwise unchanged — its plain `.insert` now
+succeeds for a re-armed session's second prompt instead of hitting the old unconditional
+constraint. Also fixed the insert-failure path, which was previously swallowed entirely: on
+error it now logs `console.error("[questionnaire] confirmatory prompt create failed:", …)`,
+matching the existing `[questionnaire]`-tagged convention in `session-end-feedback-card.tsx`.
+
+**Verification**: live-verified against the local Supabase Postgres instance inside a
+rolled-back transaction (no data persisted) — two non-answered rows (`visible` → `expired` →
+`visible`) in one session both inserted successfully; a second `answered` row in the same
+session was correctly rejected by the new partial index with a unique-violation. The static
+migration-text gate (`apps/api/tests/test_questionnaire_privacy.py`, T003) now also parses this
+migration and asserts the old constraint is dropped and the new partial index is shaped
+correctly — verified RED (assertion fails when the migration file is absent, and when the
+`WHERE` clause is mutated to the wrong lifecycle) before GREEN.
+
+**Test gate (2026-07-02)**: `apps/web` Vitest **917/917 passed / 98 files** (new: the
+insert-failure logging test, verified RED without the fix then GREEN with it); `apps/api`
+pytest full suite passed (`test_questionnaire_privacy.py` 12/12); `tsc --noEmit` clean; ESLint
+0 errors (2 pre-existing unrelated warnings).
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02 (D-10);
+`docs/BACKLOG.md` #127 (resolved).
+
+---
+
 ## Fix — Confirmatory prompt one-per-session budget: client-side re-arm (partial, #127)
 
 **Branch**: `fix/127-confirmatory-prompt-budget-auto-expiry` → merged to `main` via **PR #130**
