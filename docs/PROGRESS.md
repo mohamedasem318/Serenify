@@ -4,15 +4,18 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## Feature 012 — Questionnaire Feedback (PR open → main)
+## Feature 012 — Questionnaire Feedback (merged to main)
 
 **Branch**: `012-questionnaire-feedback`
-**Status**: **implemented, awaiting human smoke + squash-merge.** All 68 tasks (T001–T068)
-complete. Three questionnaire instruments on the Phase-1/2 privacy foundation (migration
+**Status**: **merged to `main`** via **PR #125** (squash `636a7fc`, 2026-07-02); feature branch
+deleted (local + remote). All 68 tasks (T001–T068) complete, plus a post-implementation fix round
+found live-running the e2e suite and during the pre-merge polish pass (dwell timing, an upsert
+correctness fix, shared end-states, and layout fixes — folded into the bullets below). Three
+questionnaire instruments on the Phase-1/2 privacy foundation (migration
 `20260630000000_questionnaire_feedback.sql`): mid-session confirmatory prompt (US1), session-end
 product feedback (US2), weekly work-environment check-in (US3), and a coordinator that keeps
 them from colliding (US4) — all RLS-as-the-employee, no service-role.
-**Date**: 2026-06-30
+**Date**: 2026-07-02
 
 **Scope shipped** (US1–US4 / Phases 3–8):
 
@@ -27,32 +30,69 @@ them from colliding (US4) — all RLS-as-the-employee, no service-role.
   decoded from the JWT — no extra round-trip).
 - **US2 — session-end feedback.** `SessionEndFeedbackCard` (Good/off/Skip; free text + "too
   robotic" employee-private only; account routing to `/app/account` + `/app/account#notifications`,
-  the placeholder now `id="notifications"`). Every-session sampling seam.
+  the placeholder now `id="notifications"`). Every-session sampling seam. Skip is a top-right
+  corner ghost-link chip (own row, not baseline-aligned with the heading; text-color-only hover,
+  invisible hit-slop so it clears the 44px touch target without a filled hover box bleeding over
+  the heading). `ren_too_robotic` and free-text `something_else` resolve into the shared centered
+  `QuestionnaireResultIcon` end-state (not an inline banner / bounce-back-to-reason-list); that
+  end-state, like Good/Skip, now paints on-screen before the coordinator swaps surfaces (see the
+  dwell fix below).
 - **US3 — weekly check-in.** `WeeklyCheckInCard` (two-step stepper, `role="progressbar"`, focus
   to Q2, Back/Done; submits one identity-stripped contribution via the DEFINER RPC; skip /
-  abandoned-Q2 create no contribution). ISO-week cadence helpers.
+  abandoned-Q2 create no contribution). ISO-week cadence helpers. Skip gets the same corner
+  ghost-link chip treatment as US2, with the heading reserving right-padding so it never overlaps.
 - **US4 — coordinator + polish.** `QuestionnaireCoordinator` (centralized anti-collision; mounts
   on the dashboard additively — Today card/trend untouched). Shared `QuestionnaireResultIcon`;
-  four reduced-motion-safe animations via `useMediaQuery`.
+  four reduced-motion-safe animations via `useMediaQuery`. Mobile (360px) bottom-offset now
+  matches the `sm:` breakpoint's `--chat-pill-offset` formula unconditionally, fixing an overlap
+  where the session-end/weekly card sat under the floating chat pill on mobile.
+- **Post-implementation fix — coordinator dwell + session-feedback upsert (T067 follow-up).**
+  `SessionEndFeedbackCard` and `WeeklyCheckInCard` were calling `onResolved()` synchronously in
+  the same handler that set their own local "ending" state, so the coordinator swapped surfaces
+  in the same React commit before the end-state ever painted — a real SC-007 violation. Both
+  cards now defer `onResolved()` behind `QUESTIONNAIRE_RESULT_DWELL_MS` (timer cleared on
+  unmount). Separately, `saveSessionFeedback` switched from `.insert` to
+  `.upsert(payload, { onConflict: "monitoring_session_id" })` with every nullable column set
+  explicitly: switching reasons before acting used to insert a second row and hit
+  `qsf_one_per_session` `UNIQUE(monitoring_session_id)`, silently discarding the second write;
+  `route()` now also halts (logs, doesn't navigate/resolve) on a failed save instead of
+  proceeding as if it succeeded.
 
-**Test gate (2026-06-30)** — `apps/api` `test_questionnaire_privacy.py` **12 passed** (T003–T013 +
-T065) + **live RLS/DEFINER probe** on local Postgres (clean `db reset`) — all boundaries hold;
-`apps/web` Vitest **906 passed / 98 files**; `tsc --noEmit` clean; ESLint clean on changed files.
-Playwright `questionnaire.spec.ts` / `questionnaire-layout.spec.ts` authored (e2e gate; need the
-seeded running stack).
+**Test gate (2026-07-02, post-fix)** — `apps/api` `test_questionnaire_privacy.py` **12 passed**
+(T003–T013 + T065) + **live RLS/DEFINER probe** on local Postgres (clean `db reset`) — all
+boundaries hold; `apps/web` Vitest **909 passed / 98 files**; `tsc --noEmit` clean; ESLint clean
+on all changed files. Playwright `questionnaire.spec.ts` + `questionnaire-layout.spec.ts` **4/4
+each**; full chromium e2e project **42 passed** (4 pre-existing unrelated skips, 1 pre-existing
+unrelated failure in `employee-dashboard-shell.spec.ts`, confirmed via git-stash to reproduce
+without this change).
+
+**Gates**:
+
+- ✅ Test gate — all suites + `tsc` + lint green (counts above).
+- ✅ Smoke gate — `specs/012-questionnaire-feedback/smoke-tests.md` Section 5, **all 7 manual
+  scenarios PASS** against a real local Supabase + live camera, each cross-checked directly in
+  Postgres (confirmatory sustained-tense trigger, dismiss-resistance, false-alarm persistence +
+  next-session suppression, session-end-during-visible-prompt ordering, all 6 session-end
+  feedback paths, weekly ISO-week cadence caps); signed off 2026-07-02 (Constitution VII).
+- ✅ Squash-merge — merged to `main` via **PR #125** (squash `636a7fc`, 2026-07-02); feature
+  branch deleted (local + remote).
+- ✅ Governance (Amendment 9) — **#127** / **#128** opened for the two fast-follow items found
+  during this pass; **#123** stays OPEN (pre-real-data blocker, unaffected by this pass).
 
 **Deferred / open**:
 
 - **BACKLOG #123** (minimum-headcount aggregate suppression) stays OPEN — `sample_size` hook
   ships, suppression does not; pre-real-data blocker.
+- **BACKLOG #127** (expired confirmatory prompt consumes the one-per-session budget, no re-arm) —
+  filed during this pass; 012 fast-follow.
+- **BACKLOG #128** (`STRESS_TENSE_BAND=0.70` is an uncalibrated hardcoded default) — filed during
+  this pass; future model-calibration pass, not blocking 012.
 - The optional `trigger_window_reading_id` link is deferred (research R-4): the prompt stores
   the required `triggered_window_captured_at` only; the time linkage satisfies the contract.
-- E2E specs authored but not executed here (seeded-stack requirement); behaviour covered green by
-  the Vitest unit/component layer + the live DB probe.
 
-**Cross-references**: `specs/012-questionnaire-feedback/`; `docs/CHANGELOG.md` 2026-06-30;
-`docs/DECISIONS.md` 2026-06-30; `docs/BACKLOG.md` #123; `.specify/memory/constitution.md`
-Amendment 13.
+**Cross-references**: `specs/012-questionnaire-feedback/`; `docs/CHANGELOG.md` 2026-06-30 +
+2026-07-02; `docs/DECISIONS.md` 2026-06-30 + 2026-07-02; `docs/BACKLOG.md` #123 / #127 / #128;
+`.specify/memory/constitution.md` Amendment 13.
 
 ---
 
