@@ -4815,3 +4815,40 @@ suspenders. Framer Motion's `useReducedMotion` is deliberately NOT used (researc
 
 **Cross-references**: `specs/012-questionnaire-feedback/` (plan / research / contracts);
 `docs/CHANGELOG.md` 2026-06-30; `docs/PROGRESS.md` 2026-06-30.
+
+---
+
+## 2026-07-02 — 012 post-implementation decisions (as-built, T067 follow-up + pre-merge polish)
+
+**Status**: Accepted (implementation choices found live-running the e2e suite / pre-merge polish;
+no spec/FR change). Continues the D-N numbering of the 2026-06-30 "012 implementation decisions"
+entry above.
+
+**Decision (D-6) — a questionnaire card's own end-state must dwell-paint before the coordinator
+swaps surfaces.** `SessionEndFeedbackCard` and `WeeklyCheckInCard` each own a local terminal
+"ending" render (the `QuestionnaireResultIcon` end-state) before calling `onResolved()` to hand
+control back to `QuestionnaireCoordinator`. `onResolved()` must fire on a deferred timer
+(`QUESTIONNAIRE_RESULT_DWELL_MS`, timer cleared on unmount) — never synchronously in the same
+handler that sets the local "ending" state — so the end-state actually paints in its own React
+commit before the coordinator swaps to the next surface. Calling it synchronously lets the
+coordinator's surface swap and the card's own terminal render race in the same commit, which can
+drop the end-state entirely (found live-running the e2e suite: a routed reason's action button
+could vanish before its own 3rd click landed — a real SC-007 violation). The two routed reasons
+(`suggestion_didnt_help` / `needed_quiet`) are exempt from the dwell — they resolve only from
+`route()`, on the action-button click, once navigation is already underway.
+
+**Decision (D-7) — session feedback is upserted, not inserted, keyed on
+`monitoring_session_id`.** `saveSessionFeedback` writes via
+`.upsert(payload, { onConflict: "monitoring_session_id" })` with every nullable column
+(`sentiment` / `reason` / `free_text` / `action_target`) set explicitly rather than omitted, and
+`route()` halts (logs, does not navigate/resolve) on a failed save rather than proceeding as if
+it succeeded. A plain `.insert` cannot represent "the employee changed their answer before
+acting": the DB enforces one row per session (`qsf_one_per_session`
+`UNIQUE(monitoring_session_id)`), so a second insert after a reason switch was silently rejected,
+leaving the first (now-stale) answer as the row of record. The upsert makes the last write the
+row of record and the explicit nulls keep the CHECK constraints
+(`qsf_free_text_scope`/`qsf_good_no_reason`/`qsf_skip_is_empty`) satisfied on every overwrite, not
+just the initial insert.
+
+**Cross-references**: `specs/012-questionnaire-feedback/smoke-tests.md` (T067 live-execution
+writeup); `docs/CHANGELOG.md` 2026-07-02; `docs/PROGRESS.md` 2026-07-02.
