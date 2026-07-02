@@ -154,23 +154,29 @@ export async function saveSessionFeedback(
   input: SessionFeedbackInput,
   opts?: QClientOpts,
 ): Promise<QResult<{ id: string }>> {
-  const payload: Record<string, unknown> = {
+  const sentiment = input.status === "submitted" ? (input.sentiment ?? null) : null;
+  const isOff = sentiment === "off";
+  const reason = isOff ? (input.reason ?? null) : null;
+  const actionTarget = isOff && input.reason ? actionTargetForReason(input.reason) : null;
+  const trimmedFreeText =
+    isOff && input.reason === "something_else" ? (input.freeText ?? "").trim() : "";
+  // Every nullable column is set explicitly, never merely omitted: this is an upsert (a
+  // reason switch on the same session overwrites the row), and PostgREST's ON CONFLICT DO
+  // UPDATE only touches columns present in the payload. An omitted key would keep its
+  // previous value from an earlier reason and could violate qsf_free_text_scope /
+  // qsf_good_no_reason / qsf_skip_is_empty on the overwrite.
+  const payload = {
     user_id: input.userId,
     monitoring_session_id: input.monitoringSessionId,
     status: input.status,
+    sentiment,
+    reason,
+    action_target: actionTarget,
+    free_text: trimmedFreeText ? trimmedFreeText : null,
   };
-  if (input.status === "submitted") {
-    payload.sentiment = input.sentiment;
-    if (input.sentiment === "off" && input.reason) {
-      payload.reason = input.reason;
-      payload.action_target = actionTargetForReason(input.reason);
-      const trimmed = input.reason === "something_else" ? (input.freeText ?? "").trim() : "";
-      if (trimmed) payload.free_text = trimmed;
-    }
-  }
   const { data, error } = await db(opts)
     .from("questionnaire_session_feedback")
-    .insert(payload)
+    .upsert(payload, { onConflict: "monitoring_session_id" })
     .select("id")
     .single();
   if (error || !data) return fail(error ?? "no row returned");

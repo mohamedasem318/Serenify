@@ -69,6 +69,7 @@ Expected coverage:
 | Run date | Command | Result |
 |----------|---------|--------|
 | 2026-06-30 (T067) | `npx vitest run --pool=threads` (full web suite; `--pool=threads` per the documented Windows EPERM workaround) | **PASS — 906 passed / 98 files**, incl. all questionnaire lib + trigger + cadence + sampling tests |
+| 2026-07-02 (re-run after the coordinator-timing fix below) | `npx vitest run --pool=threads` | **PASS — 907 passed / 98 files** — no regression from the Section 4 fix |
 
 ---
 
@@ -110,10 +111,51 @@ Expected coverage:
 - Ren opens from `confirmed` and `opened_chat` handoffs without recommendation cards.
 - Session-end negative actions: "suggestion didn't help" → `/app/account` (plain), "needed quiet time" → `/app/account#notifications`.
 
+**2026-07-02 — actually executed against the local Supabase + dev server stack (T067 follow-through).**
+
+Pre-req fix (local dev only, not a code change): `globalSetup`'s `auth.admin.listUsers()` was failing
+with `500 Database error finding users` (`sql: Scan error … converting NULL to string`). Root cause:
+five raw-SQL fixture users left over from the 2026-06-30 live RLS/DEFINER probe
+(`admin@t.local`, `m1@t.local`, `m2@t.local`, `e1@t.local`, `e2@t.local`) had `NULL` GoTrue
+token columns (`confirmation_token`, `recovery_token`, `email_change_token_new/current`,
+`phone_change_token`, `reauthentication_token`, `email_change`, `phone_change`) — GoTrue's Go
+driver can't scan `NULL` into those columns. Backfilled to `''` directly in the local Postgres
+container; no application code or migration involved.
+
+**Defect found + fixed:** the first real run of `questionnaire.spec.ts` failed 3 of 4 tests. Root
+cause: `WeeklyCheckInCard` and `SessionEndFeedbackCard` both called `onResolved()` in the *same*
+synchronous handler that set their own local "ending" state. React batches both updates into one
+commit, and `QuestionnaireCoordinator` recomputes `surface` in that same commit — so the parent
+swapped the visible card out (or, worse, unmounted `SessionEndFeedbackCard` before the user's 3rd
+click could ever reach the "Notification settings" / "Update preferences" button) before anything
+ever painted. This is a real SC-007 violation ("≤3 interactions"), not a test artifact — component-
+level unit tests never caught it because they mount each card standalone, with no coordinator to
+race against.
+
+Fix (`components/questionnaire/weekly-check-in-card.tsx`,
+`components/questionnaire/session-end-feedback-card.tsx`,
+`lib/questionnaire/constants.ts` new `QUESTIONNAIRE_RESULT_DWELL_MS=2_500`):
+- Weekly card: `onResolved()` now fires after a 2.5s dwell (timer, cleared on unmount) so the
+  "Glad the week's been good." / "All good — we'll ask again next week." / "Heard — thanks for
+  speaking up." message is actually visible before the coordinator swaps surfaces.
+- Session-end card: `suggestion_didnt_help` and `needed_quiet` now save immediately but only call
+  `onResolved()` from `route()` — i.e. when the user actually clicks the action button — so the
+  action row stays mounted between reason-selection and the route click. `Good`/`Skip`/
+  `ren_too_robotic`/free-text behaviour is unchanged (already covered by the passing
+  `questionnaire-coordinator.test.tsx` Skip-flow expectation, which asserts an immediate swap).
+
+Verified no regression: full `npx vitest run --pool=threads` (907 passed / 98 files) and the full
+chromium e2e project (42 passed, 4 pre-existing skips unrelated to 012, 1 pre-existing unrelated
+failure — see note below) both green after the fix.
+
 | Run date | Command | Result |
 |----------|---------|--------|
-| 2026-06-30 (T067) | `npm --workspace web run test:e2e -- questionnaire` | **AUTHORED — runs in the e2e gate.** `tests/e2e/questionnaire.spec.ts` covers weekly stepper, session-end handoff + account routing (`#notifications` / plain `/app/account`), confirmatory↔session-end single-surface, and the Ren soft-opener handoff (no recommendation cards). Not executed in this run (needs the running Next dev server + service-role-seeded `@example.com` employees per the repo e2e harness); the equivalent behaviour is covered green by the unit/component layer above. |
-| 2026-06-30 (T067) | `npm --workspace web run test:layout -- questionnaire` | **AUTHORED — runs in the e2e gate.** `tests/e2e/questionnaire-layout.spec.ts` asserts 360px + desktop × light/dark: no horizontal overflow and ≥44px targets across the weekly card + stepper. Same seeded-stack requirement; not executed in this run. |
+| 2026-06-30 (T067) | `npm --workspace web run test:e2e -- questionnaire` | AUTHORED, not yet executed (superseded by the row below). |
+| 2026-06-30 (T067) | `npm --workspace web run test:layout -- questionnaire` | AUTHORED, not yet executed (superseded by the row below). |
+| 2026-07-02 | `npx playwright test --config playwright.config.ts tests/e2e/questionnaire.spec.ts --project=chromium` (first real run) | **FAIL — 1/4 passed.** Found the premature-`onResolved` defect above. |
+| 2026-07-02 | Same command, after the fix | **PASS — 4/4.** Weekly Done → visible "Heard — thanks…"; `needed_quiet` → Notification settings → `/app/account#notifications`; `suggestion_didnt_help` → Update preferences → `/app/account`; Ren soft-opener handoff, no recommendation cards. |
+| 2026-07-02 | `npx playwright test --config playwright.config.ts tests/e2e/questionnaire-layout.spec.ts --project=chromium` | **PASS — 4/4** (360px/desktop × light/dark; no horizontal overflow; ≥44px targets on the weekly card + stepper). Note: this spec lives under `tests/e2e/` and needs the real `playwright.config.ts` (globalSetup + service-role seeding) — `npm run test:layout` points at `playwright.layout.config.ts` (no globalSetup) and reports "No tests found" for it; run it via `test:e2e` instead. Comment in the spec corrected to match. |
+| 2026-07-02 | Full chromium e2e project (all specs) | **42 passed, 4 skipped (pre-existing: demo-cohort/cross-tab, unrelated to 012), 1 failed** — `employee-dashboard-shell.spec.ts` "employee shell at 360px" (card x-alignment off by 8px vs an expected ≤4px). Confirmed **pre-existing and unrelated to Feature 012**: reproduces identically with the questionnaire fix stashed out (`git stash` → same failure → `git stash pop`). Feature 008/009 dashboard-shell layout, out of scope here; flagged separately (see close-out note). |
 
 ---
 

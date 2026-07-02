@@ -7,8 +7,10 @@ import { createCalibratedEmployee, signInToApp } from "./anchor-helpers";
  *
  * Renders the weekly check-in (the always-reachable coordinator surface on a fresh ISO week)
  * at 360px and desktop, in light and dark themes, and asserts: no horizontal overflow, every
- * interactive target ≥44px, and the stepper controls remain usable. Runs under the layout
- * config (chromium).
+ * interactive target ≥44px, and the stepper controls remain usable. Lives under tests/e2e (not
+ * tests/layout) and runs through the DEFAULT e2e config (`npm run test:e2e`, chromium project)
+ * because it needs `createCalibratedEmployee`/`signInToApp` — the service-role seeding and
+ * globalSetup that only `playwright.config.ts` wires up; the layout-only config has neither.
  */
 
 async function setTheme(page: Page, theme: "light" | "dark") {

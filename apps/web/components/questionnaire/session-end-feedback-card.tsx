@@ -1,9 +1,10 @@
 "use client";
 
 import { ArrowRight, Bot, Lightbulb, Meh, Moon, Pencil, Smile, X } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { saveSessionFeedback as defaultSave } from "@/lib/api/questionnaire-client";
+import { QUESTIONNAIRE_RESULT_DWELL_MS } from "@/lib/questionnaire/constants";
 import type { SessionFeedbackReason } from "@/lib/questionnaire/types";
 import { cn } from "@/lib/utils";
 
@@ -65,15 +66,52 @@ export function SessionEndFeedbackCard({
   const [freeText, setFreeText] = useState("");
   const [ending, setEnding] = useState<Ending>(null);
   // Track the in-flight save so a route action can await it before a full-page nav can abort it.
-  const savePromiseRef = useRef<Promise<unknown>>(Promise.resolve());
+  const savePromiseRef = useRef<ReturnType<typeof defaultSave>>(
+    Promise.resolve({ ok: true, data: { id: "" } }),
+  );
+  const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Clear any pending resolve timer on unmount so it never fires against a dead card.
+  useEffect(() => {
+    return () => {
+      if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current);
+    };
+  }, []);
+
+  // Save without notifying the coordinator — used by the two route-bearing reasons, whose
+  // action row (Update preferences / Notification settings) must stay on screen until the
+  // user actually clicks it; the coordinator would otherwise swap this card out for the next
+  // surface the instant a reason is chosen, before the button is ever reachable.
+  function saveOnly(args: Parameters<typeof defaultSave>[0]) {
+    const promise = save(args);
+    savePromiseRef.current = promise;
+    return promise;
+  }
+
+  // Good / Skip / ren_too_robotic / free-text: save, then defer the coordinator notification
+  // (same dwell as the weekly card) so the ending screen/note is actually visible before the
+  // parent swaps this card out for the next surface.
   function persist(args: Parameters<typeof defaultSave>[0]) {
-    savePromiseRef.current = Promise.resolve(save(args));
-    onResolved?.();
+    const promise = saveOnly(args);
+    resolveTimerRef.current = setTimeout(() => {
+      void promise.then((result) => {
+        if (!result.ok) {
+          console.error("[questionnaire] session-end feedback save failed:", result.error);
+        }
+      });
+      onResolved?.();
+    }, QUESTIONNAIRE_RESULT_DWELL_MS);
   }
 
   async function route(path: string) {
-    await savePromiseRef.current;
+    const result = await savePromiseRef.current;
+    if (!result.ok) {
+      // Don't resolve/navigate on a failed save — that would silently discard the user's
+      // choice while looking like it succeeded.
+      console.error("[questionnaire] session-end feedback save failed, not navigating:", result.error);
+      return;
+    }
+    onResolved?.();
     navigate(path);
   }
 
@@ -89,9 +127,19 @@ export function SessionEndFeedbackCard({
 
   function chooseReason(next: SessionFeedbackReason) {
     setReason(next);
-    // Route/ack reasons record immediately; `something_else` waits for non-empty free text.
-    if (next !== "something_else") {
-      persist({ userId, monitoringSessionId, status: "submitted", sentiment: "off", reason: next });
+    if (next === "something_else") return; // waits for non-empty free text
+    const args = {
+      userId,
+      monitoringSessionId,
+      status: "submitted" as const,
+      sentiment: "off" as const,
+      reason: next,
+    };
+    if (next === "suggestion_didnt_help" || next === "needed_quiet") {
+      // Routed reasons resolve only once the user clicks through (see `route`).
+      saveOnly(args);
+    } else {
+      persist(args);
     }
   }
 

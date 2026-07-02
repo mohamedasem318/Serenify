@@ -21,6 +21,7 @@ import {
   upsertWeeklyCadence as defaultUpsertCadence,
   type WeeklyCadenceRow,
 } from "@/lib/api/questionnaire-client";
+import { QUESTIONNAIRE_RESULT_DWELL_MS } from "@/lib/questionnaire/constants";
 import type { WeeklyRoadblock, WeeklySupport } from "@/lib/questionnaire/types";
 import { skipPatch } from "@/lib/questionnaire/weekly-cadence";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -97,15 +98,25 @@ export function WeeklyCheckInCard({
   const [roadblock, setRoadblock] = useState<WeeklyRoadblock | null>(null);
   const [support, setSupport] = useState<WeeklySupport | null>(null);
   const q2HeadingRef = useRef<HTMLParagraphElement>(null);
+  const resolveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Q1 auto-advance → move focus to the Q2 heading (accessible stepper movement).
   useEffect(() => {
     if (phase === "q2") q2HeadingRef.current?.focus();
   }, [phase]);
 
+  // Clear any pending resolve timer on unmount so it never fires against a dead card.
+  useEffect(() => {
+    return () => {
+      if (resolveTimerRef.current) clearTimeout(resolveTimerRef.current);
+    };
+  }, []);
+
   function resolve(next: Exclude<Ending, null>) {
     setEnding(next);
-    onResolved?.();
+    // Defer the coordinator notification so the ending screen (smiley/check/muted + message)
+    // is actually visible before the parent swaps this card out for the next surface.
+    resolveTimerRef.current = setTimeout(() => onResolved?.(), QUESTIONNAIRE_RESULT_DWELL_MS);
   }
 
   function chooseGood() {

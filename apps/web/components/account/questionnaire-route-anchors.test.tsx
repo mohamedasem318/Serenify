@@ -17,7 +17,14 @@ describe("session-end route targets", () => {
   it("suggestion_didnt_help routes to /app/account (plain, no anchor)", async () => {
     const navigate = vi.fn();
     const user = userEvent.setup();
-    render(<SessionEndFeedbackCard userId="u" monitoringSessionId="s" save={vi.fn()} navigate={navigate} />);
+    render(
+      <SessionEndFeedbackCard
+        userId="u"
+        monitoringSessionId="s"
+        save={vi.fn(async () => ({ ok: true as const, data: { id: "f" } }))}
+        navigate={navigate}
+      />,
+    );
     await user.click(screen.getByRole("button", { name: /Something was off/ }));
     await user.click(screen.getByRole("button", { name: /suggestion didn.t help/i }));
     await user.click(screen.getByRole("button", { name: /Update preferences/i }));
@@ -29,7 +36,14 @@ describe("session-end route targets", () => {
   it("needed_quiet routes to /app/account#notifications", async () => {
     const navigate = vi.fn();
     const user = userEvent.setup();
-    render(<SessionEndFeedbackCard userId="u" monitoringSessionId="s" save={vi.fn()} navigate={navigate} />);
+    render(
+      <SessionEndFeedbackCard
+        userId="u"
+        monitoringSessionId="s"
+        save={vi.fn(async () => ({ ok: true as const, data: { id: "f" } }))}
+        navigate={navigate}
+      />,
+    );
     await user.click(screen.getByRole("button", { name: /Something was off/ }));
     await user.click(screen.getByRole("button", { name: /needed quiet time/i }));
     await user.click(screen.getByRole("button", { name: /Notification settings/i }));

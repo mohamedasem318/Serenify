@@ -123,7 +123,7 @@ describe("confirmatory prompt create/resolve", () => {
   });
 });
 
-describe("session-end feedback insert", () => {
+describe("session-end feedback upsert", () => {
   it("skip stores no sentiment/reason/free_text/action_target", async () => {
     const db = makeDb({ data: { id: "f1" }, error: null });
     await saveSessionFeedback(
@@ -131,26 +131,29 @@ describe("session-end feedback insert", () => {
       { client: db.client },
     );
     expect(db.calls.from[0]).toBe("questionnaire_session_feedback");
-    const p = db.calls.insert[0] as Record<string, unknown>;
+    const up = db.calls.upsert[0]!;
+    const p = up.payload as Record<string, unknown>;
     expect(p.status).toBe("skipped");
     for (const k of ["sentiment", "reason", "free_text", "action_target"]) {
       expect(p[k] == null).toBe(true);
     }
+    expect((up.opts as Record<string, unknown>).onConflict).toBe("monitoring_session_id");
   });
 
-  it("good stores sentiment only", async () => {
+  it("good stores sentiment only, nulling reason/free_text/action_target explicitly", async () => {
     const db = makeDb({ data: { id: "f" }, error: null });
     await saveSessionFeedback(
       { userId: "u", monitoringSessionId: "s", status: "submitted", sentiment: "good" },
       { client: db.client },
     );
-    const p = db.calls.insert[0] as Record<string, unknown>;
+    const p = db.calls.upsert[0]!.payload as Record<string, unknown>;
     expect(p).toMatchObject({ status: "submitted", sentiment: "good" });
-    expect(p.reason == null).toBe(true);
-    expect(p.free_text == null).toBe(true);
+    expect(p.reason).toBeNull();
+    expect(p.free_text).toBeNull();
+    expect(p.action_target).toBeNull();
   });
 
-  it("off+ren_too_robotic derives ack_only and never sets free_text", async () => {
+  it("off+ren_too_robotic derives ack_only and nulls free_text", async () => {
     const db = makeDb({ data: { id: "f" }, error: null });
     await saveSessionFeedback(
       {
@@ -162,9 +165,9 @@ describe("session-end feedback insert", () => {
       },
       { client: db.client },
     );
-    const p = db.calls.insert[0] as Record<string, unknown>;
+    const p = db.calls.upsert[0]!.payload as Record<string, unknown>;
     expect(p).toMatchObject({ sentiment: "off", reason: "ren_too_robotic", action_target: "ack_only" });
-    expect(p.free_text == null).toBe(true);
+    expect(p.free_text).toBeNull();
   });
 
   it("off+something_else carries trimmed free_text and ack_only", async () => {
@@ -180,7 +183,7 @@ describe("session-end feedback insert", () => {
       },
       { client: db.client },
     );
-    const p = db.calls.insert[0] as Record<string, unknown>;
+    const p = db.calls.upsert[0]!.payload as Record<string, unknown>;
     expect(p).toMatchObject({
       reason: "something_else",
       action_target: "ack_only",
@@ -194,7 +197,35 @@ describe("session-end feedback insert", () => {
       { userId: "u", monitoringSessionId: "s", status: "submitted", sentiment: "off", reason: "suggestion_didnt_help" },
       { client: db.client },
     );
-    expect((db.calls.insert[0] as Record<string, unknown>).action_target).toBe("preferences");
+    const p = db.calls.upsert[0]!.payload as Record<string, unknown>;
+    expect(p.action_target).toBe("preferences");
+    expect(p.free_text).toBeNull();
+  });
+
+  it("upserts on monitoring_session_id so a reason switch cleanly overwrites the row instead of hitting the unique constraint", async () => {
+    const db = makeDb({ data: { id: "f" }, error: null });
+    await saveSessionFeedback(
+      {
+        userId: "u",
+        monitoringSessionId: "s",
+        status: "submitted",
+        sentiment: "off",
+        reason: "something_else",
+        freeText: "first reason",
+      },
+      { client: db.client },
+    );
+    await saveSessionFeedback(
+      { userId: "u", monitoringSessionId: "s", status: "submitted", sentiment: "off", reason: "suggestion_didnt_help" },
+      { client: db.client },
+    );
+    expect(db.calls.upsert).toHaveLength(2);
+    const second = db.calls.upsert[1]!.payload as Record<string, unknown>;
+    // The second write must null out the first reason's free_text explicitly — an upsert
+    // that omitted this key would leave the stale value behind and violate qsf_free_text_scope.
+    expect(second.reason).toBe("suggestion_didnt_help");
+    expect(second.free_text).toBeNull();
+    expect((db.calls.upsert[1]!.opts as Record<string, unknown>).onConflict).toBe("monitoring_session_id");
   });
 });
 

@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -41,7 +41,7 @@ describe("SessionEndFeedbackCard initial + endings", () => {
     expect(screen.getByRole("button", { name: /Skip/ })).toBeInTheDocument();
   });
 
-  it("Good → meadow smiley success in ONE interaction (SC-007)", async () => {
+  it("Good → meadow smiley success in ONE interaction (SC-007), onResolved deferred past the result dwell", async () => {
     const { save, user, onResolved } = setup();
     await user.click(screen.getByRole("button", { name: /Good/ }));
     expect(screen.getByText("Glad that helped.")).toBeInTheDocument();
@@ -49,7 +49,9 @@ describe("SessionEndFeedbackCard initial + endings", () => {
     expect(save).toHaveBeenCalledWith(
       expect.objectContaining({ status: "submitted", sentiment: "good", monitoringSessionId: "s1" }),
     );
-    expect(onResolved).toHaveBeenCalledTimes(1);
+    // Not yet — the dwell hasn't elapsed, so the success screen has a chance to paint.
+    expect(onResolved).not.toHaveBeenCalled();
+    await waitFor(() => expect(onResolved).toHaveBeenCalledTimes(1), { timeout: 3000 });
   });
 
   it("Skip → muted wind in ONE interaction (SC-007)", async () => {
