@@ -45,6 +45,10 @@ from pathlib import Path
 # Repo root: apps/api/tests/test_questionnaire_privacy.py -> parents[3] == repo root.
 _MIGRATIONS = Path(__file__).resolve().parents[3] / "supabase" / "migrations"
 _MIGRATION = _MIGRATIONS / "20260630000000_questionnaire_feedback.sql"
+# BACKLOG #127 follow-up (PR #130 fixed the browser-side budget; this migration fixes
+# the DB side): replaces the full-table qcp_one_per_session constraint with a partial
+# unique index so a re-armed prompt's second (non-answered) row can persist.
+_MIGRATION_QCP_REARM = _MIGRATIONS / "20260702000000_qcp_one_answered_per_session.sql"
 
 _PRIVATE_TABLES = (
     "questionnaire_confirmatory_prompts",
@@ -82,6 +86,15 @@ def _sql() -> str:
     FAILURES ('feature missing') rather than collection errors.
     """
     return _MIGRATION.read_text(encoding="utf-8") if _MIGRATION.is_file() else ""
+
+
+def _sql_qcp_rearm() -> str:
+    """The BACKLOG #127 follow-up migration text, or '' when it does not exist yet."""
+    return (
+        _MIGRATION_QCP_REARM.read_text(encoding="utf-8")
+        if _MIGRATION_QCP_REARM.is_file()
+        else ""
+    )
 
 
 def _strip_comments(sql: str) -> str:
@@ -167,9 +180,32 @@ def test_t003_confirmatory_prompts_columns_and_constraints():
     ):
         assert re.search(rf"\b{col}\b", low), f"missing column {col}"
 
-    # One prompt per monitoring session.
+    # ORIGINAL rule (this migration, unedited history): one prompt per monitoring
+    # session, full stop. BACKLOG #127 follow-up below supersedes it at the DB level
+    # (a re-armed prompt's second non-answered row must persist) — this table-body
+    # text is unchanged because migrations are never edited after authoring.
     assert re.search(r"unique\s*\(\s*monitoring_session_id\s*\)", low), \
         "expected UNIQUE(monitoring_session_id)"
+
+    # BACKLOG #127 follow-up (20260702000000_qcp_one_answered_per_session.sql): the
+    # full-table constraint above is dropped and replaced by a partial index scoped to
+    # lifecycle='answered' — a session may hold several visible/expired rows (one per
+    # re-arm episode), but only one answered row (the client's budgetConsumed rule).
+    rearm = _strip_comments(_sql_qcp_rearm()).lower()
+    assert rearm, (
+        "expected supabase/migrations/20260702000000_qcp_one_answered_per_session.sql"
+    )
+    assert re.search(
+        r"alter\s+table\s+public\.questionnaire_confirmatory_prompts\s+"
+        r"drop\s+constraint\s+qcp_one_per_session",
+        rearm,
+    ), "expected the old qcp_one_per_session constraint to be dropped"
+    assert re.search(
+        r"create\s+unique\s+index\s+qcp_one_answered_per_session\s+"
+        r"on\s+public\.questionnaire_confirmatory_prompts\s*\(\s*monitoring_session_id\s*\)\s+"
+        r"where\s+lifecycle\s*=\s*'answered'",
+        rearm,
+    ), "expected a partial unique index capping ANSWERED rows at one per session"
 
     # Trigger band fixed to the top band, and the trigger TIME is required.
     assert "trigger_band = 'tense'" in low
