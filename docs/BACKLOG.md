@@ -1661,8 +1661,21 @@ separate from stress-signal direct-manager visibility and cover it in the featur
 **Address by**: before any real employee data is collected; implement no later than
 feature 017 (team-lead-dashboard) before exposing the manager aggregate to real data.
 
-### Expired confirmatory prompt consumes the one-per-session budget — no re-arm (#127)
-**Status**: bug (`type:bug` / `area:db` + `area:web`) — **OPEN, partially addressed.**
+### ~~Expired confirmatory prompt consumes the one-per-session budget — no re-arm~~ — resolved (#127)
+**Status**: resolved (`type:bug` / `area:db` + `area:web`) — GitHub issue **#127 CLOSED** (2026-07-02).
+**Resolved**: 2026-07-02, across two PRs. **PR #130** (squash `d89f4db`) fixed the CLIENT-side
+half — see **Progress** below. **PR #132** (squash `d057f43`) fixed the DB-side half: dropped
+the full-table `qcp_one_per_session UNIQUE (monitoring_session_id)` constraint and replaced it
+with a partial unique index, `qcp_one_answered_per_session ON questionnaire_confirmatory_prompts
+(monitoring_session_id) WHERE lifecycle = 'answered'`
+(`supabase/migrations/20260702000000_qcp_one_answered_per_session.sql`) — a session may now
+hold several visible/expired rows (one per re-arm episode); only one **answered** row is
+capped, matching the client's `budgetConsumed` predicate from PR #130. Also fixed the
+previously-silent `createConfirmatoryPrompt` insert-failure path: it now logs a
+`[questionnaire]`-tagged `console.error` instead of swallowing the failure. Live-verified
+against local Postgres in a rolled-back transaction (no data persisted): two non-answered rows
+in one session both insert; a second answered row is still rejected. Record: `docs/PROGRESS.md`
+2026-07-02, `docs/CHANGELOG.md` 2026-07-02, `docs/DECISIONS.md` 2026-07-02 (D-10).
 **Observed**: 2026-07-02, feature-012 pre-merge polish pass.
 **Progress**: 2026-07-02 — **PR #130** (squash `d89f4db`) fixed the CLIENT-side half only.
 `useConfirmatoryTrigger`'s reducer previously used one `resolved` flag for two different
@@ -1672,38 +1685,27 @@ explicit answer. Split into a per-prompt `resolved` guard and a new session-scop
 `budgetConsumed` flag, set ONLY by an explicit answer (confirmed / false_alarm /
 opened_chat); a new `markResolvedRearm` resets the trigger (state + the hook's
 `resolvedRef`/`promptIdRef`) on auto-resolution so a fresh 20 s sustained-tense episode can
-fire a new `show` effect in the same session. **This does NOT close the issue** — see
-Description and remaining Fix scope below. Record: `docs/PROGRESS.md` 2026-07-02,
-`docs/CHANGELOG.md` 2026-07-02.
-**Description**: The confirmatory prompt table enforces `UNIQUE (monitoring_session_id)`
+fire a new `show` effect in the same session.
+**Description**: The confirmatory prompt table enforced `UNIQUE (monitoring_session_id)`
 (`qcp_one_per_session`, `supabase/migrations/20260630000000_questionnaire_feedback.sql`) —
-one row per monitoring session, whether the prompt's `lifecycle` ends `answered` or
-`expired`. Today a prompt that **expires unanswered** (`expiry_reason IN ('signal_drop',
-'session_end')`) still consumes that session's single-prompt budget at the DB layer: the
-client now WANTS to create a second prompt row after such an expiry (per the fix above), but
-`createConfirmatoryPrompt` (`apps/web/lib/api/questionnaire-client.ts`) still does a plain
-`.insert`, which hits the UNIQUE constraint and fails; `createPrompt` resolves `null` and
-`handleShow` silently no-ops. If the sustained-tense signal later re-enters a sustained-tense
-state in the SAME session, the user still cannot be re-prompted end-to-end.
-**Desired behavior**: only an *answered* prompt (`lifecycle = 'answered'`, an actual outcome
-recorded) should close the budget. An expired prompt should allow a re-arm — but this needs
-real design, not just relaxing the constraint: a **re-arm condition** (what state transition
-allows a new prompt to open — **DONE client-side, PR #130**), a **cooldown** (minimum gap
-after an expiry before a new prompt can arm, so a flapping signal doesn't nag — **NOT
-addressed**), and a **per-session cap** (an upper bound on how many prompts can fire even
-with re-arm, so an expired-then-re-armed loop can't repeat indefinitely — **NOT addressed**;
-the 20 s sustained-tense floor rate-limits re-prompts per-episode but doesn't bound a long
-session).
-**Fix scope (remaining)**: medium — drop `UNIQUE (monitoring_session_id)` in favor of a
-partial unique index scoped to `lifecycle = 'answered'` on
-`questionnaire_confirmatory_prompts` (new migration, alongside
-`supabase/migrations/20260630000000_questionnaire_feedback.sql`), plus a cooldown/cap policy
-layered on the now-working client re-arm logic
-(`apps/web/lib/questionnaire/confirmatory-trigger.ts`) and its RLS/DEFINER write path
-(`apps/web/lib/api/questionnaire-client.ts`). Needs its own spec-fix pass, not a drop-in
-change.
-**Address by**: 012 fast-follow (client-side portion shipped 2026-07-02 via #130;
-DB-constraint portion still pending).
+one row per monitoring session, whether the prompt's `lifecycle` ended `answered` or
+`expired`. A prompt that **expired unanswered** (`expiry_reason IN ('signal_drop',
+'session_end')`) still consumed that session's single-prompt budget at the DB layer: after
+PR #130, the client WANTED to create a second prompt row after such an expiry, but
+`createConfirmatoryPrompt` (`apps/web/lib/api/questionnaire-client.ts`) still did a plain
+`.insert`, which hit the UNIQUE constraint and failed silently; `createPrompt` resolved `null`
+and `handleShow` no-opped. Fixed by PR #132 (above).
+**Desired behavior — delivered**: only an *answered* prompt (`lifecycle = 'answered'`, an
+actual outcome recorded) closes the budget; an expired prompt allows a re-arm. The **re-arm
+condition** (what state transition allows a new prompt to open) and the **DB-level budget
+cap** (the partial index) are both done. A **cooldown** (minimum gap after an expiry before a
+new prompt can arm) and a **per-session cap** (an upper bound on total prompts per session,
+independent of re-arm) were considered in the original scoping but are **intentionally NOT
+part of this fix** — #127 was filed specifically because an expired prompt permanently
+blocked re-arm end-to-end, which is now fully resolved. The existing 20 s sustained-tense
+floor already rate-limits re-prompts per-episode. Cooldown/cap remains a potential future
+hardening idea, not currently tracked as its own backlog item — file one separately if still
+wanted.
 
 ### `STRESS_TENSE_BAND` (0.70) is an uncalibrated hardcoded default (#128)
 **Status**: tech-debt (`type:tech-debt` / `area:api` + `area:ml-video` + `area:docs`)

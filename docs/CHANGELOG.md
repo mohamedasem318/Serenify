@@ -2438,3 +2438,37 @@ full suite **916/916 passed / 98 files**; `tsc --noEmit` clean; ESLint clean.
 
 Cross-references: `docs/PROGRESS.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02;
 `docs/BACKLOG.md` #127.
+
+## 2026-07-02 — fix(012): confirmatory prompt budget — DB partial index completes #127, PR #132
+
+Completes BACKLOG #127 / GitHub #127, alongside the client-side half above (PR #130).
+`questionnaire_confirmatory_prompts` dropped the full-table `qcp_one_per_session UNIQUE
+(monitoring_session_id)` constraint and replaced it with a partial unique index,
+`qcp_one_answered_per_session ON questionnaire_confirmatory_prompts (monitoring_session_id)
+WHERE lifecycle = 'answered'`
+(`supabase/migrations/20260702000000_qcp_one_answered_per_session.sql`). A session can now hold
+several `visible`/`expired` rows — one per re-arm episode — while only one `answered` row is
+still capped, matching PR #130's client-side `budgetConsumed` predicate. Chose insert +
+partial-unique-index over upsert-in-place (see `docs/DECISIONS.md` D-10): it preserves a
+permanent row per prompt episode and needed no change to `createConfirmatoryPrompt`'s existing
+plain `.insert`.
+
+Also fixed the previously-silent insert-failure path: `createConfirmatoryPrompt` now logs
+`console.error("[questionnaire] confirmatory prompt create failed:", …)` instead of swallowing
+the error, matching the existing `[questionnaire]`-tagged convention in
+`session-end-feedback-card.tsx`.
+
+Live-verified against the local Supabase Postgres instance inside a rolled-back transaction (no
+data persisted): two non-answered rows in one session both inserted successfully; a second
+`answered` row in the same session was correctly rejected by the new partial index. The static
+migration-text gate (`apps/api/tests/test_questionnaire_privacy.py`, T003) now also parses this
+migration and asserts the old constraint is dropped and the new partial index is shaped
+correctly.
+
+Test results (2026-07-02): `apps/web` Vitest **917/917 passed / 98 files** (new: the
+insert-failure logging test); `apps/api` pytest full suite passed
+(`test_questionnaire_privacy.py` **12/12**); `tsc --noEmit` clean; ESLint 0 errors (2
+pre-existing unrelated warnings).
+
+Cross-references: `docs/PROGRESS.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02 (D-10);
+`docs/BACKLOG.md` #127 (resolved).
