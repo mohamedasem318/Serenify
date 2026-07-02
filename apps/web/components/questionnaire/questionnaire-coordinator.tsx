@@ -126,8 +126,11 @@ export function QuestionnaireCoordinator({
     <div
       data-testid="questionnaire-coordinator"
       // Calm bottom surface: full-width sheet on mobile, bottom-right card on desktop, clearing
-      // the chat pill via the shared --chat-pill-offset (same convention as Notification).
-      className="fixed inset-x-0 bottom-0 z-40 px-3 pb-3 sm:inset-x-auto sm:right-4 sm:bottom-[calc(1rem+var(--chat-pill-offset,0px)+1rem)] sm:px-0 sm:pb-0"
+      // the chat pill via the shared --chat-pill-offset (same convention as Notification). The
+      // clearance has to live in `bottom`, not `padding-bottom` — this wrapper and the pill are
+      // separate `fixed` siblings at the same z-40, so padding alone never stops them from
+      // occupying the same screen region at 360px; only shifting the wrapper's own `bottom` does.
+      className="fixed inset-x-0 bottom-[calc(0.75rem+var(--chat-pill-offset,0px)+0.75rem)] z-40 px-3 sm:inset-x-auto sm:right-4 sm:bottom-[calc(1rem+var(--chat-pill-offset,0px)+1rem)] sm:px-0"
     >
       <div className="mx-auto w-full max-w-[400px]">
         {surface === "session_end" && endedSessionId && (
