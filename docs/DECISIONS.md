@@ -4897,3 +4897,37 @@ holds.
 
 **Cross-references**: `docs/CHANGELOG.md` 2026-07-02 (PR #130 entry); `docs/PROGRESS.md`
 2026-07-02 (PR #130 entry); `docs/BACKLOG.md` #127.
+
+---
+
+## 2026-07-02 — 012 confirmatory prompt: insert + partial index, not upsert-in-place (#127 done)
+
+**Status**: Accepted (implementation choice; no spec/FR change). Continues the D-N numbering
+of the 012 entries above.
+
+**Decision (D-10) — the DB fix completing #127 (PR #132) keeps `questionnaire_confirmatory_prompts`
+INSERT-per-episode with a partial unique index, not upsert-in-place.** The old
+`qcp_one_per_session UNIQUE (monitoring_session_id)` constraint was replaced by
+`qcp_one_answered_per_session ON questionnaire_confirmatory_prompts (monitoring_session_id)
+WHERE lifecycle = 'answered'` — capping only *answered* rows at one per session, so a re-armed
+episode's `visible`/`expired` rows can coexist. The alternative considered was the same pattern
+D-7 uses for the sibling `questionnaire_session_feedback` table: upsert-in-place keyed on
+`monitoring_session_id`. Rejected here, because the two tables model different things. D-7's
+upsert is correct for `qsf` because a session has exactly ONE evolving product-feedback answer —
+a reason switch overwrites the prior one, and there is no history worth keeping. A confirmatory
+prompt is not an evolving answer; each sustained-tense episode is a DISTINCT event with its own
+`shown_at` / `lifecycle` / `outcome`, so upserting would collapse a re-armed session down to its
+most recent episode and destroy the record of the earlier one(s).
+
+Keeping one row per episode (a) preserves genuine per-episode history for any future
+noise/reliability metric (e.g. how often a prompt expires vs. gets answered per session, or how
+many times a session re-arms) — extending D-3's "the time linkage is sufficient for the
+feature-017 forward join": that join now has more than a single collapsed row to reason about
+when a future consumer needs one; (b) breaks no existing reader (nothing today queries more than
+the latest row); and (c) needed no upsert-payload discipline on the client —
+`createConfirmatoryPrompt`'s plain `.insert` (`apps/web/lib/api/questionnaire-client.ts`) is
+unchanged, unlike D-7's `qsf` fix, which had to set every nullable column explicitly to keep its
+CHECK constraints satisfied on every overwrite.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-07-02 (PR #132 entry); `docs/PROGRESS.md`
+2026-07-02 (PR #132 entry); `docs/BACKLOG.md` #127 (resolved); D-3, D-7, D-9 above.
