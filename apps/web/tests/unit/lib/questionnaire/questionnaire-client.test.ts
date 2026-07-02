@@ -93,6 +93,27 @@ describe("confirmatory prompt create/resolve", () => {
     );
   });
 
+  // BACKLOG #127 (this fix): a second createConfirmatoryPrompt insert for the same
+  // session used to hit qcp_one_per_session and fail SILENTLY (no log at all) — the
+  // employee never saw the re-armed prompt and nobody could tell why. The DB-side fix
+  // (20260702000000_qcp_one_answered_per_session.sql) lets that insert succeed again;
+  // this covers the other half — any insert that still fails (e.g. a genuine two-
+  // answered-rows collision, network error) is now surfaced, not swallowed.
+  it("logs a [questionnaire] error when the insert fails instead of swallowing it", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const db = makeDb({ data: null, error: { message: "duplicate key value" } });
+    const res = await createConfirmatoryPrompt(
+      { userId: "u", monitoringSessionId: "s", triggeredWindowCapturedAt: "t" },
+      { client: db.client },
+    );
+    expect(res.ok).toBe(false);
+    expect(consoleError).toHaveBeenCalledWith(
+      "[questionnaire] confirmatory prompt create failed:",
+      expect.stringContaining("duplicate key value"),
+    );
+    consoleError.mockRestore();
+  });
+
   it("resolveConfirmatoryAnswered(false_alarm) marks lifecycle/outcome/down-weight on the row id", async () => {
     const db = makeDb();
     await resolveConfirmatoryAnswered("prompt-1", "false_alarm", { client: db.client });

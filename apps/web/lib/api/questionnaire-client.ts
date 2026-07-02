@@ -70,8 +70,10 @@ export interface NewConfirmatoryPrompt {
 
 /**
  * Insert the prompt row the moment it becomes visible: `lifecycle='visible'`,
- * `trigger_band='tense'`, owner + owned-session linkage. The DB enforces one row per
- * monitoring session (`qcp_one_per_session`). Returns the new row id for the later resolve.
+ * `trigger_band='tense'`, owner + owned-session linkage. A session may hold several
+ * visible/expired rows (one per re-arm episode); the DB caps only ANSWERED rows at
+ * one per session (`qcp_one_answered_per_session`, a partial unique index). Returns
+ * the new row id for the later resolve.
  */
 export async function createConfirmatoryPrompt(
   input: NewConfirmatoryPrompt,
@@ -92,7 +94,11 @@ export async function createConfirmatoryPrompt(
     .insert(payload)
     .select("id")
     .single();
-  if (error || !data) return fail(error ?? "no row returned");
+  if (error || !data) {
+    const result = fail(error ?? "no row returned");
+    console.error("[questionnaire] confirmatory prompt create failed:", result.error);
+    return result;
+  }
   return { ok: true, data: { id: (data as { id: string }).id } };
 }
 
