@@ -1641,7 +1641,7 @@ care."); the full pre-production consent gate is unchanged and stays a pre-real-
 
 ---
 
-## From feature 012 (questionnaire) — planned
+## From feature 012 (questionnaire-feedback) — merged 2026-07-02 (PR #125)
 
 ### Work-environment feedback aggregate anonymization hardening (#123)
 **Status**: deferred-feature (`type:feature` / privacy / pre-real-data / `area:db` + `area:web`)
