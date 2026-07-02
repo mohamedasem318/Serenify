@@ -1,5 +1,12 @@
 # Smoke Tests: Questionnaire Feedback (Feature 012)
 
+**Status: ALL SECTIONS COMPLETE — PASS (2026-07-02).** Sections 1–5 (RLS/privacy, web
+unit, component/a11y, e2e/layout, manual smoke) all verified, including all 7 manual
+scenarios against a real local Supabase + live camera. Final Privacy Artifact Sweep and
+Model Artifact Sweep both confirm no drift. One real defect was found and fixed along the
+way (Section 4 — the questionnaire-coordinator premature-`onResolved` race); no open
+defects remain from this pass.
+
 Manual + automated verification checklist derived from [quickstart.md](./quickstart.md).
 This is a verification ledger, not an implementation script. Command/result rows are
 filled by the Phase 8 verification tasks (T066–T068); they are left as placeholders
@@ -171,7 +178,15 @@ failure — see note below) both green after the fix.
 
 | Scenario | Run date | Result |
 |----------|----------|--------|
-| 1–7 | _TBD (T068 manual)_ | _placeholder_ |
+| 1 | 2026-07-02 | **PASS (incidental).** Real local Supabase + live camera, account `omar.nabil@serenify.tech`. Early short jaw-clench bursts (a few seconds, well under the sustained window) never triggered the prompt — consistent with no-premature-trigger, though not a clean deliberately-timed run. |
+| 2 | 2026-07-02 | **PASS.** Same session — genuine sustained tense (unintentional, from being focused/frowning during an extended stretch) crossed the sustained threshold and the confirmatory prompt appeared in the bottom-right notification surface. Also incidentally exercised the signal-drop auto-expiry path (prompt closed once the band dropped back to `a_little_tense` and the existing `CONFIRMATORY_PROMPT_MIN_DWELL_MS` dwell had already elapsed by the next ~10s-stride reading) — matches existing unit test coverage, not a numbered scenario itself. |
+| 3 | 2026-07-02 | **PASS.** With the prompt visible, outside click and Escape both did nothing — prompt remained (`dismissible={false}` holds live, not just in component tests). |
+| 4 | 2026-07-02 | **PASS, DB-verified.** Clicked "No, I'm okay": prompt faded, Today/trend card visibly unchanged. Verified in Postgres: the row landed `lifecycle=answered`, `outcome=false_alarm`, `aggregate_treatment=exclude_or_down_weight`. Next-session suppression confirmed two ways — live (2nd session: sustained tense readings across the whole graph, prompt never fired; 3rd session: fired normally again) and via DB (`monitoring_sessions` × `questionnaire_confirmatory_prompts` join): session 2 (suppressed) has **0** prompt rows — the trigger never even creates one, not merely hides it — session 3 has 1, matching `CONFIRMATORY_FALSE_ALARM_SUPPRESS_NEXT_SESSIONS=1` exactly. |
+| 5 | 2026-07-02 | **PASS, DB-verified.** Ended the monitoring session while the confirmatory prompt was still visible/unanswered (3rd session from scenario 4's suppression check). Prompt disappeared, then session-end feedback card appeared in its place on the dashboard — never both at once. Verified in Postgres: the prompt row resolved `lifecycle=expired`, `expiry_reason=session_end` (not `signal_drop`) — confirms `resolveForSessionEnd()` drove the expiry, not a coincidental band drop. |
+| 6 | 2026-07-02 | **PASS, DB-verified.** All 6 session-end paths run through the real dashboard, one ended session per path: Good, "suggestion didn't help" (→ Update preferences → `/app/account`), "needed quiet time" (→ Notification settings → `/app/account#notifications`), "chatbot felt too robotic" (shows the not-sent-to-Ren note), free text (Send disabled on empty and on whitespace-only, enabled + submits on real text), and Skip. None opened Ren. Verified in Postgres: `questionnaire_session_feedback` has one correctly-shaped row per path (`status`/`sentiment`/`reason`/`action_target`/`free_text` all match the CHECK-constraint shape), including two incidental repeat rounds (`ren_too_robotic`, `something_else`) that landed identically correct both times. |
+| 7 | 2026-07-02 | **PASS, DB-verified.** Fresh account `yara.fathy@serenify.tech` (no prior cadence row): first dashboard visit showed the weekly card, skipped; reload → reappeared (the one allowed re-prompt), skipped again; reload again → did not appear a third time. Verified in Postgres: `weekly_checkin_cadence` row for the ISO week is `prompt_count=2, skipped_count=2, completed_at=null` — both hit `MAX_PROMPTS`/`MAX_SKIPS`, matching `shouldShowWeeklyCheckIn`'s suppression condition exactly. |
+
+**Note:** `apps/api/.env` (gitignored, not committed) temporarily overrode `STRESS_TENSE_BAND=0.58` (default 0.70) for scenarios 3–7, to cut down real time needed to reach the `tense` band — the backend's 60s-window + 4-reading smoothing means reaching `tense` at the default threshold took several minutes of genuine sustained tension. **Reverted** back to the 0.70 default after scenario 7 passed (line removed from `apps/api/.env`; API server needs one more restart to pick that up, no functional impact until then since the override only ever affected this local dev process).
 
 ---
 
