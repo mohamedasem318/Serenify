@@ -3,6 +3,7 @@ import {
   aggregateTreatmentFor,
   actionTargetForReason,
   type ConfirmatoryExpiryReason,
+  type ConfirmatoryKind,
   type ConfirmatoryOutcome,
   type SessionFeedbackReason,
   type SessionFeedbackSentiment,
@@ -62,18 +63,20 @@ function fail(error: unknown): { ok: false; error: string } {
 export interface NewConfirmatoryPrompt {
   userId: string;
   monitoringSessionId: string;
-  /** From the live `WindowOutcome.capturedAt` that crossed the sustained-tense floor. */
+  /** From the live `WindowOutcome.capturedAt` that crossed the trigger's sustained floor. */
   triggeredWindowCapturedAt: string;
+  /** #134 — which trigger fired: `mild` (sustained a_little_tense) or `tense` (sustained tense). */
+  kind: ConfirmatoryKind;
   /** Optional owner-visible `window_readings.id`, resolved by (session, captured_at). */
   triggerWindowReadingId?: string | null;
 }
 
 /**
- * Insert the prompt row the moment it becomes visible: `lifecycle='visible'`,
- * `trigger_band='tense'`, owner + owned-session linkage. A session may hold several
- * visible/expired rows (one per re-arm episode); the DB caps only ANSWERED rows at
- * one per session (`qcp_one_answered_per_session`, a partial unique index). Returns
- * the new row id for the later resolve.
+ * Insert the prompt row the moment it becomes visible: `lifecycle='visible'`, the trigger `kind`
+ * (#134), `trigger_band='tense'` (the existing constrained column, unchanged), owner + owned-session
+ * linkage. A session may hold several visible/expired rows (one per re-arm episode); the DB caps
+ * ANSWERED rows at one per (session, kind) — `qcp_one_answered_per_session_per_kind`, a partial
+ * unique index. Returns the new row id for the later resolve.
  */
 export async function createConfirmatoryPrompt(
   input: NewConfirmatoryPrompt,
@@ -83,6 +86,7 @@ export async function createConfirmatoryPrompt(
     user_id: input.userId,
     monitoring_session_id: input.monitoringSessionId,
     triggered_window_captured_at: input.triggeredWindowCapturedAt,
+    kind: input.kind,
     trigger_band: "tense",
     lifecycle: "visible",
   };
