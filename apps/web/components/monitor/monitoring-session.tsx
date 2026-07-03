@@ -663,7 +663,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     sessionId: liveSessionId,
     active: op === "active" || op === "warming-up",
     latestOutcome,
-    createPrompt: async ({ triggeredWindowCapturedAt, triggerWindowReadingId }) => {
+    createPrompt: async ({ triggeredWindowCapturedAt, triggerWindowReadingId, kind }) => {
       const sid = sessionIdRef.current;
       const userId = userIdFromAccessToken(tokenRef.current);
       if (!sid || !userId) return null;
@@ -672,6 +672,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         monitoringSessionId: sid,
         triggeredWindowCapturedAt,
         triggerWindowReadingId,
+        kind,
       });
       return res.ok ? res.data.id : null;
     },
