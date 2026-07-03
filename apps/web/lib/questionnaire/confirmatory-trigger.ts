@@ -4,10 +4,15 @@ import { useEffect, useRef, useState } from "react";
 
 import type { WindowOutcome } from "@/lib/api/monitoring-client";
 import {
+  CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS,
   CONFIRMATORY_PROMPT_MIN_DWELL_MS,
   CONFIRMATORY_TENSE_SUSTAINED_MS,
 } from "@/lib/questionnaire/constants";
-import type { ConfirmatoryExpiryReason, ConfirmatoryOutcome } from "@/lib/questionnaire/types";
+import type {
+  ConfirmatoryExpiryReason,
+  ConfirmatoryKind,
+  ConfirmatoryOutcome,
+} from "@/lib/questionnaire/types";
 
 /**
  * Feature 012 / US1 — the confirmatory prompt trigger.
@@ -25,43 +30,62 @@ import type { ConfirmatoryExpiryReason, ConfirmatoryOutcome } from "@/lib/questi
  */
 
 export interface TriggerConfig {
+  /** The ACUTE (`tense`) trigger's sustained floor (~20s). */
   sustainedMs: number;
+  /** #134 — the MILD (`a_little_tense`) trigger's sustained floor (~60s). */
+  mildSustainedMs: number;
   dwellMs: number;
 }
 
 export const DEFAULT_TRIGGER_CONFIG: TriggerConfig = {
   sustainedMs: CONFIRMATORY_TENSE_SUSTAINED_MS,
+  mildSustainedMs: CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS,
   dwellMs: CONFIRMATORY_PROMPT_MIN_DWELL_MS,
 };
 
 export interface TriggerState {
-  /** When the current consecutive-`tense` run started (wall-clock ms); null when not tracking. */
+  /** When the current consecutive-`tense` (acute) run started (wall-clock ms); null when not tracking. */
   tenseRunStartMs: number | null;
+  /** #134 — when the current consecutive-`a_little_tense` (mild) run started; null when not tracking. */
+  littleRunStartMs: number | null;
   /** The prompt has been shown for this session (one-per-session guard). */
   shown: boolean;
+  /** Which trigger produced the currently- (or most-recently-) shown prompt — decides which budget(s) an answer burns. */
+  shownKind: ConfirmatoryKind | null;
   shownAtMs: number | null;
   /** Single-resolution guard for the currently (or most recently) shown prompt. */
   resolved: boolean;
   /**
-   * The session's one-time prompt budget. Set ONLY by an explicit user answer (confirmed /
-   * false_alarm / opened_chat) — an auto-resolution (signal-drop expiry, session end) leaves
-   * this false so a later sustained-tense episode can still prompt again this session.
+   * The session's one-time ACUTE (`tense`) prompt budget — this IS the plan's `tenseBudgetConsumed`;
+   * the field name is kept so the #127/#130/#132 guarantee tests stay byte-for-byte unchanged. Set
+   * ONLY by an explicit answer to a TENSE prompt (which is senior and also burns the mild budget).
+   * An auto-resolution (signal-drop expiry, session end) leaves it false so a later sustained-tense
+   * episode can still prompt again this session. `budgetConsumed ⟹ mildBudgetConsumed`, always.
    */
   budgetConsumed: boolean;
+  /**
+   * #134 — the session's one-time MILD (`a_little_tense`) prompt budget. Set by an explicit answer
+   * to EITHER a mild OR a tense prompt (a tense answer blocks any later down-tier mild nag).
+   * Auto-resolutions never spend it.
+   */
+  mildBudgetConsumed: boolean;
   triggeredWindowCapturedAt: string | null;
-  /** Whether the most recent processed outcome was a `tense` reading. */
-  lastOutcomeTense: boolean;
+  /** Whether the most recent processed outcome matched the SHOWN prompt's sustaining band. */
+  lastOutcomeSustained: boolean;
 }
 
 export function initialTriggerState(): TriggerState {
   return {
     tenseRunStartMs: null,
+    littleRunStartMs: null,
     shown: false,
+    shownKind: null,
     shownAtMs: null,
     resolved: false,
     budgetConsumed: false,
+    mildBudgetConsumed: false,
     triggeredWindowCapturedAt: null,
-    lastOutcomeTense: false,
+    lastOutcomeSustained: false,
   };
 }
 
@@ -70,25 +94,58 @@ export type TriggerEffect =
   | { kind: "show"; triggeredWindowCapturedAt: string }
   | { kind: "expire"; reason: "signal_drop" };
 
-/** A `tense` band reading is the ONLY outcome that drives the sustained clock. */
+/** A `tense` band reading is the ONLY outcome that drives the ACUTE sustained clock. */
 export function isTenseReading(
   outcome: WindowOutcome,
 ): outcome is { outcome: "reading"; band: "tense"; capturedAt: string } {
   return outcome.outcome === "reading" && outcome.band === "tense";
 }
 
-/** Apply an EXPLICIT user answer (confirmed / false_alarm / opened_chat) — consumes the
- *  session's one-time prompt budget; no further prompt this session. */
-export function markResolvedConsumingBudget(state: TriggerState): TriggerState {
-  return { ...state, resolved: true, budgetConsumed: true };
+/**
+ * #134 — an `a_little_tense` band reading is the ONLY outcome that drives the MILD sustained
+ * clock. Exact-band match, deliberately parallel to `isTenseReading` — NOT a "≥ threshold" /
+ * band-ordering test (the reducer has no band-ordering precedent, and must not gain one here).
+ */
+export function isLittleTenseReading(
+  outcome: WindowOutcome,
+): outcome is { outcome: "reading"; band: "a_little_tense"; capturedAt: string } {
+  return outcome.outcome === "reading" && outcome.band === "a_little_tense";
 }
 
-/** Apply an AUTO-resolution (signal-drop expiry / session end) — does NOT consume the
- *  budget; rearms the trigger so a fresh sustained-tense episode can prompt again this
- *  session. The single-resolution guard for the just-finished prompt is implicit: `shown`
- *  resets to `false`, so any stale expiry check for it (`reduceDwellElapsed`) is a no-op. */
+/** Whether an outcome is the sustaining band for a shown prompt of `kind` — the reused dwell /
+ *  signal-drop machinery keys off this so a mild prompt is kept alive by `a_little_tense` and a
+ *  tense prompt by `tense`, unchanged otherwise. */
+function isSustainingReading(outcome: WindowOutcome, kind: ConfirmatoryKind | null): boolean {
+  if (kind === "tense") return isTenseReading(outcome);
+  if (kind === "mild") return isLittleTenseReading(outcome);
+  return false;
+}
+
+/** Apply an AUTO-resolution (signal-drop expiry / session end) — does NOT consume either budget;
+ *  rearms the trigger so a fresh sustained episode can prompt again this session. The
+ *  single-resolution guard for the just-finished prompt is implicit: `shown` resets to `false`,
+ *  so any stale expiry check for it (`reduceDwellElapsed`) is a no-op. */
 export function markResolvedRearm(state: TriggerState): TriggerState {
-  return { ...initialTriggerState(), budgetConsumed: state.budgetConsumed };
+  return {
+    ...initialTriggerState(),
+    budgetConsumed: state.budgetConsumed,
+    mildBudgetConsumed: state.mildBudgetConsumed,
+  };
+}
+
+/** Apply an EXPLICIT user answer (confirmed / false_alarm / opened_chat), then rearm. Consumes
+ *  the one-time budget for the KIND that was shown: a MILD answer burns ONLY the mild budget (a
+ *  later sustained-tense episode keeps its shot); a TENSE answer is senior and burns BOTH (no
+ *  down-tier mild nag after an acute answer). Rearming (resetting shown/runs/resolved) is what
+ *  lets the session's still-open OTHER budget prompt again; the per-kind budget gate — not a
+ *  latched flag — is what prevents a repeat of the SAME kind this session. */
+export function markResolvedConsumingBudget(state: TriggerState): TriggerState {
+  const tenseAnswer = state.shownKind === "tense";
+  return {
+    ...markResolvedRearm(state),
+    mildBudgetConsumed: true,
+    budgetConsumed: tenseAnswer ? true : state.budgetConsumed,
+  };
 }
 
 /**
@@ -102,58 +159,89 @@ export function reduceOutcome(
   active: boolean,
   config: TriggerConfig,
 ): { state: TriggerState; effect: TriggerEffect } {
+  // A TENSE answer ends all prompting for the session (it burns BOTH budgets, so
+  // budgetConsumed ⟹ mildBudgetConsumed). A MILD answer leaves budgetConsumed false, so
+  // processing continues below and a later sustained-tense episode can still prompt.
   if (state.budgetConsumed) return { state, effect: { kind: "none" } };
 
-  const tense = isTenseReading(outcome);
-
   if (!state.shown) {
-    // ── Pre-show: track consecutive tense ──
-    if (active && isTenseReading(outcome)) {
-      if (state.tenseRunStartMs == null) {
-        return {
-          state: { ...state, tenseRunStartMs: nowMs, lastOutcomeTense: true },
-          effect: { kind: "none" },
-        };
-      }
-      const elapsed = nowMs - state.tenseRunStartMs;
-      if (elapsed >= config.sustainedMs) {
-        return {
-          state: {
-            ...state,
-            shown: true,
-            shownAtMs: nowMs,
-            triggeredWindowCapturedAt: outcome.capturedAt,
-            lastOutcomeTense: true,
-          },
-          effect: { kind: "show", triggeredWindowCapturedAt: outcome.capturedAt },
-        };
-      }
-      return { state: { ...state, lastOutcomeTense: true }, effect: { kind: "none" } };
+    // ── Pre-show: two independent sustained clocks under a per-band reset matrix ──
+    const feedsTense = active && isTenseReading(outcome);
+    const feedsLittle = active && isLittleTenseReading(outcome);
+    // Matrix: a `tense` reading feeds the acute run and zeroes the mild run; an `a_little_tense`
+    // reading feeds the mild run and zeroes the acute run; anything else / inactive zeroes both.
+    // Climbing `a_little_tense` → `tense` therefore abandons the mild run and hands off to acute.
+    const nextTense = feedsTense ? (state.tenseRunStartMs ?? nowMs) : null;
+    const nextLittle = feedsLittle ? (state.littleRunStartMs ?? nowMs) : null;
+
+    // ── Arbitration: the ACUTE (`tense`) condition is SENIOR and evaluated FIRST. If both runs
+    // ever qualify in one reduce, tense wins. (The matrix makes the two mutually exclusive per
+    // real reading; this ordering is an explicit, load-bearing guard against a later reorder.)
+    if (feedsTense && nextTense != null && nowMs - nextTense >= config.sustainedMs) {
+      return {
+        state: {
+          ...state,
+          tenseRunStartMs: null,
+          littleRunStartMs: null,
+          shown: true,
+          shownKind: "tense",
+          shownAtMs: nowMs,
+          triggeredWindowCapturedAt: outcome.capturedAt,
+          lastOutcomeSustained: true,
+        },
+        effect: { kind: "show", triggeredWindowCapturedAt: outcome.capturedAt },
+      };
     }
-    // any lower band / non-reading / inactive resets the run
-    return { state: { ...state, tenseRunStartMs: null, lastOutcomeTense: false }, effect: { kind: "none" } };
+    // The MILD condition — reached only when the acute one did not fire, and only while the mild
+    // budget is still open (a tense answer would have short-circuited above via budgetConsumed).
+    if (
+      feedsLittle &&
+      !state.mildBudgetConsumed &&
+      nextLittle != null &&
+      nowMs - nextLittle >= config.mildSustainedMs
+    ) {
+      return {
+        state: {
+          ...state,
+          tenseRunStartMs: null,
+          littleRunStartMs: null,
+          shown: true,
+          shownKind: "mild",
+          shownAtMs: nowMs,
+          triggeredWindowCapturedAt: outcome.capturedAt,
+          lastOutcomeSustained: true,
+        },
+        effect: { kind: "show", triggeredWindowCapturedAt: outcome.capturedAt },
+      };
+    }
+    // No show — advance/reset both runs per the matrix.
+    return {
+      state: { ...state, tenseRunStartMs: nextTense, littleRunStartMs: nextLittle, lastOutcomeSustained: false },
+      effect: { kind: "none" },
+    };
   }
 
-  // ── Shown, not resolved: handle signal-drop expiry past the dwell floor ──
-  if (tense) {
-    // signal returned to tense — no expiry, cancel any pending drop
-    return { state: { ...state, lastOutcomeTense: true }, effect: { kind: "none" } };
+  // ── Shown, not resolved: reuse the dwell / signal-drop machinery, keyed to the shown kind's band ──
+  if (isSustainingReading(outcome, state.shownKind)) {
+    // sustaining band still present — no expiry, cancel any pending drop
+    return { state: { ...state, lastOutcomeSustained: true }, effect: { kind: "none" } };
   }
   const onScreen = nowMs - (state.shownAtMs ?? nowMs);
   if (onScreen >= config.dwellMs) {
     return { state: markResolvedRearm(state), effect: { kind: "expire", reason: "signal_drop" } };
   }
   // dropped before the dwell floor — remember it; the dwell timer finalises it
-  return { state: { ...state, lastOutcomeTense: false }, effect: { kind: "none" } };
+  return { state: { ...state, lastOutcomeSustained: false }, effect: { kind: "none" } };
 }
 
 /**
- * The dwell timer fired (`CONFIRMATORY_PROMPT_MIN_DWELL_MS` after show). If the signal is
- * currently dropped, expire by signal_drop; if it returned to tense, wait for the next drop.
+ * The dwell timer fired (`CONFIRMATORY_PROMPT_MIN_DWELL_MS` after show). If the shown prompt's
+ * sustaining band is currently dropped, expire by signal_drop; if it returned, wait for the next
+ * drop. (The sustaining band is `tense` for an acute prompt, `a_little_tense` for a mild one.)
  */
 export function reduceDwellElapsed(state: TriggerState): { state: TriggerState; effect: TriggerEffect } {
   if (state.budgetConsumed || !state.shown) return { state, effect: { kind: "none" } };
-  if (!state.lastOutcomeTense) {
+  if (!state.lastOutcomeSustained) {
     return { state: markResolvedRearm(state), effect: { kind: "expire", reason: "signal_drop" } };
   }
   return { state, effect: { kind: "none" } };
@@ -176,6 +264,8 @@ export interface ConfirmatoryTriggerDeps {
   createPrompt: (input: {
     triggeredWindowCapturedAt: string;
     triggerWindowReadingId: string | null;
+    /** #134 — which trigger fired (`mild` = sustained a_little_tense, `tense` = sustained tense). */
+    kind: ConfirmatoryKind;
   }) => Promise<string | null>;
   /** Resolve the shown prompt exactly once (answered outcome or expiry reason). */
   resolvePrompt: (promptId: string, resolution: PromptResolution) => Promise<void> | void;
@@ -238,11 +328,20 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
     setVisible(false);
     const id = promptIdRef.current;
     if (resolution.type === "answered") {
-      // Explicit user answer — consumes the session's one-time prompt budget.
+      // Explicit user answer — consumes the shown kind's one-time budget (a tense answer burns
+      // both; a mild answer burns only mild). Capture the kind BEFORE the reducer rearms it.
+      const answeredKind = stateRef.current.shownKind;
       stateRef.current = markResolvedConsumingBudget(stateRef.current);
+      // A MILD answer leaves the session's tense budget open, so rearm the per-prompt refs to let
+      // a later sustained-tense episode show and resolve. A TENSE answer burns both budgets — keep
+      // the refs latched exactly as before (#127/#130): the budget gate blocks any further prompt.
+      if (answeredKind === "mild") {
+        promptIdRef.current = null;
+        resolvedRef.current = false;
+      }
     } else {
-      // Auto-resolution (signal-drop / session-end) never spends the budget — rearm so a
-      // later sustained-tense episode can still prompt again this session.
+      // Auto-resolution (signal-drop / session-end) never spends a budget — rearm so a
+      // later sustained episode can still prompt again this session.
       stateRef.current = markResolvedRearm(stateRef.current);
       promptIdRef.current = null;
       resolvedRef.current = false;
@@ -260,14 +359,14 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
     depsRef.current.openRen(handoff);
   }
 
-  async function handleShow(capturedAt: string) {
+  async function handleShow(capturedAt: string, kind: ConfirmatoryKind) {
     const d = depsRef.current;
     const sid = d.sessionId;
     let readingId: string | null = null;
     if (d.resolveWindowReadingId && sid) {
       readingId = await d.resolveWindowReadingId(sid, capturedAt);
     }
-    const id = await d.createPrompt({ triggeredWindowCapturedAt: capturedAt, triggerWindowReadingId: readingId });
+    const id = await d.createPrompt({ triggeredWindowCapturedAt: capturedAt, triggerWindowReadingId: readingId, kind });
     if (!id) return;
     if (resolvedRef.current) {
       // Resolved (e.g. the session ended) while the insert was in flight — the row was created
@@ -310,7 +409,10 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
     processedRef.current = latestOutcome;
     const { state, effect } = reduceOutcome(stateRef.current, latestOutcome, Date.now(), active, config);
     stateRef.current = state;
-    if (effect.kind === "show") void handleShow(effect.triggeredWindowCapturedAt);
+    // The show effect carries the trigger time; the KIND rides on the reduced state (`shownKind`),
+    // set atomically with the show transition — kept off the effect so the effect shape (and the
+    // #127/#130/#132 reducer tests that pin it) stays unchanged.
+    if (effect.kind === "show" && state.shownKind) void handleShow(effect.triggeredWindowCapturedAt, state.shownKind);
     else if (effect.kind === "expire") finalize({ type: "expired", reason: effect.reason });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- callbacks read from depsRef; effect keyed to the outcome/active/session
   }, [latestOutcome, active, sessionId]);
