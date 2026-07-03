@@ -1728,3 +1728,47 @@ constant/default), `packages/ml-video/models/metadata.json` (if the calibrated t
 operating point is recorded there alongside 0.53), and `docs/MODELS.md` (documenting the
 derivation, mirroring how 0.53 is documented today).
 **Address by**: a future model-calibration pass; not blocking feature 012.
+
+### ~~Add a second, milder confirmatory trigger (~60 s sustained `a_little_tense`)~~ — resolved (#134)
+**Status**: resolved (`type:feature` / `area:web` + `area:db`) — GitHub issue **#134 CLOSED** (2026-07-03).
+**Resolved**: 2026-07-03, **PR #135** (squash `ad58777`). Added a second confirmatory trigger — ~60 s
+sustained `a_little_tense` (a slow simmer that never spikes) — beside the existing ~20 s
+sustained-`tense` acute trigger, reusing the prompt / dwell / expiry / single-resolution machinery;
+only the pre-show timer logic and the budget gained a second path. The reducer
+(`apps/web/lib/questionnaire/confirmatory-trigger.ts`) runs two independent sustained clocks
+(`tenseRunStartMs`, `littleRunStartMs`) with an exact-band `isLittleTenseReading` predicate (no
+band-ordering) under a **per-band reset matrix** — `tense` feeds the acute run and zeroes the mild
+run, `a_little_tense` feeds the mild run and zeroes the acute run, anything else / inactive zeroes
+both (climbing `a_little_tense` → `tense` hands off to acute) — and **arbitrates acute-first (tense
+wins)**. The budget is **tense-senior**: a mild answer spends only the mild budget (a later
+sustained-tense keeps its shot); a tense answer spends both (no down-tier nag); auto-resolutions
+spend neither and re-arm, exactly as #127/#130. Net: **≤1 mild + ≤1 tense per session**. The DB
+change (`supabase/migrations/20260703000000_qcp_kind_column.sql`) adds a `kind` ('mild' | 'tense')
+column (existing rows backfilled to 'tense') and replaces the #132 `qcp_one_answered_per_session`
+index with `qcp_one_answered_per_session_per_kind ON questionnaire_confirmatory_prompts
+(monitoring_session_id, kind) WHERE lifecycle = 'answered'` — one answered row per (session, kind),
+proven necessary against real Postgres (two answered rows collided on the old single-session index).
+The ~60 s mild dwell is a designed default, not empirically calibrated (see #128). The #127/#130/#132
+guarantees are preserved (six named reducer/hook tests unchanged and green). Record:
+`docs/PROGRESS.md` 2026-07-03, `docs/CHANGELOG.md` 2026-07-03, `docs/DECISIONS.md` 2026-07-03 (D-11).
+**Observed**: 2026-07-02, feature-012 follow-up (planned enhancement, filed as GitHub #134).
+**Description**: The confirmatory prompt previously fired on a single condition — ~20 s sustained
+`tense`. A slow simmer that stays at `a_little_tense` without ever spiking into `tense` produced no
+prompt at all. #134 adds the milder trigger so that pattern is caught, with a tense-senior per-type
+budget so the two triggers never cannibalize each other's one-per-session shot (a mild prompt never
+locks out a real tense one; a tense answer blocks a later down-tier mild).
+
+### Tense-senior budget silences confirmatory prompts for the rest of a session after a tense answer (#136)
+**Status**: watch (`type:tech-debt` / `area:web` / `status:watch`) — GitHub issue **#136 OPEN**.
+**Observed**: 2026-07-03, filed alongside the #134 tense-senior budget.
+**Description**: Because a **tense** answer spends BOTH budgets (#134 / D-11), once a user answers a
+genuine acute prompt they receive **no further confirmatory prompts for the rest of that monitoring
+session** — including a later, distinct acute spike. This is intentional today (it avoids a
+down-tier "nag"), and low-urgency: a session hard-ends after **5 min of continuous face-absence**
+(`AUTO_END_AFTER_MS`), so normal breaks start a fresh session with a fresh budget, and most sessions
+produce 0–1 prompts anyway.
+**Revisit for**: **long, continuous all-day sessions** (a user who never trips the 5-min auto-end)
+could go the rest of the day silent after one tense answer. Decide **alongside the potential #127
+cooldown idea** — a minimum gap after a prompt before re-arm could replace the hard per-session
+lockout more gracefully than reopening the budget.
+**Address by**: not blocking the demo; monitor-only for now.
