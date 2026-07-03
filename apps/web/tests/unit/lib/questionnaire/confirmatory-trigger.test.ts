@@ -7,11 +7,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WindowOutcome } from "@/lib/api/monitoring-client";
 import {
+  CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS,
   CONFIRMATORY_PROMPT_MIN_DWELL_MS,
   CONFIRMATORY_TENSE_SUSTAINED_MS,
 } from "@/lib/questionnaire/constants";
 import {
   initialTriggerState,
+  isLittleTenseReading,
   isTenseReading,
   markResolvedConsumingBudget,
   markResolvedRearm,
@@ -32,6 +34,7 @@ import {
 
 const CONFIG: TriggerConfig = {
   sustainedMs: CONFIRMATORY_TENSE_SUSTAINED_MS,
+  mildSustainedMs: CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS,
   dwellMs: CONFIRMATORY_PROMPT_MIN_DWELL_MS,
 };
 
@@ -202,6 +205,159 @@ describe("markResolvedRearm", () => {
   });
 });
 
+// ── Second (milder) trigger: sustained a_little_tense (#134) ──────────────────────────
+
+describe("isLittleTenseReading", () => {
+  it("is true ONLY for a reading with band=a_little_tense", () => {
+    expect(isLittleTenseReading(little("t"))).toBe(true);
+    expect(isLittleTenseReading(tense("t"))).toBe(false);
+    expect(isLittleTenseReading(calm("t"))).toBe(false);
+    expect(isLittleTenseReading(warming("t"))).toBe(false);
+    expect(isLittleTenseReading(skipped)).toBe(false);
+    expect(isLittleTenseReading(superseded)).toBe(false);
+  });
+});
+
+describe("sustained a_little_tense → mild show", () => {
+  it("shows a MILD prompt only after CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS of consecutive a_little_tense", () => {
+    let s = initialTriggerState();
+    let r = reduceOutcome(s, little("m0"), 0, true, CONFIG); // mild run starts
+    expect(r.effect).toEqual({ kind: "none" });
+    s = r.state;
+    r = reduceOutcome(s, little("m30"), 30_000, true, CONFIG); // 30s < 60s
+    expect(r.effect).toEqual({ kind: "none" });
+    s = r.state;
+    r = reduceOutcome(s, little("m60"), 60_000, true, CONFIG); // 60s >= 60s → show
+    expect(r.effect).toEqual({ kind: "show", triggeredWindowCapturedAt: "m60" });
+    expect(r.state.shownKind).toBe("mild");
+  });
+
+  it("does NOT show a mild prompt before the mild threshold", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, little("m0"), 0, true, CONFIG).state;
+    expect(reduceOutcome(s, little("m59"), 59_000, true, CONFIG).effect).toEqual({ kind: "none" });
+  });
+
+  it("inactive monitoring never starts the mild timer", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, little("m0"), 0, false, CONFIG).state;
+    expect(reduceOutcome(s, little("m90"), 90_000, false, CONFIG).effect).toEqual({ kind: "none" });
+  });
+});
+
+describe("per-band reset matrix (pre-show)", () => {
+  // A synthetic state with BOTH runs primed — feed one reading, inspect which run survives.
+  // (The matrix is exactly: tense feeds acute + zeroes mild; a_little_tense feeds mild +
+  // zeroes acute; anything else / inactive zeroes both.)
+  const primeBoth = () => ({ ...initialTriggerState(), tenseRunStartMs: 1_000, littleRunStartMs: 2_000 });
+
+  it("a tense reading feeds the acute run and zeroes the mild run", () => {
+    const r = reduceOutcome(primeBoth(), tense("c"), 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBe(1_000);
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+  it("an a_little_tense reading feeds the mild run and zeroes the acute run", () => {
+    const r = reduceOutcome(primeBoth(), little("c"), 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBe(2_000);
+  });
+  it("an at_ease reading zeroes both runs", () => {
+    const r = reduceOutcome(primeBoth(), calm("c"), 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+  it("a warming_up reading zeroes both runs", () => {
+    const r = reduceOutcome(primeBoth(), warming("c"), 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+  it("a skipped reading zeroes both runs", () => {
+    const r = reduceOutcome(primeBoth(), skipped, 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+  it("a superseded reading zeroes both runs", () => {
+    const r = reduceOutcome(primeBoth(), superseded, 5_000, true, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+  it("inactive monitoring zeroes both runs even on a tense reading", () => {
+    const r = reduceOutcome(primeBoth(), tense("c"), 5_000, false, CONFIG);
+    expect(r.state.tenseRunStartMs).toBeNull();
+    expect(r.state.littleRunStartMs).toBeNull();
+  });
+});
+
+describe("climbing a_little_tense → tense hands off to the acute timer", () => {
+  it("zeroes a nearly-complete mild run and starts a fresh acute run", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, little("m0"), 0, true, CONFIG).state; // mild run @0
+    s = reduceOutcome(s, little("m50"), 50_000, true, CONFIG).state; // mild @50s (10s short of 60)
+    s = reduceOutcome(s, tense("t55"), 55_000, true, CONFIG).state; // climb → mild zeroed, acute @55s
+    expect(s.littleRunStartMs).toBeNull();
+    expect(s.tenseRunStartMs).toBe(55_000);
+    // the abandoned mild run must not fire, and the acute run needs its full 20s from 55s
+    expect(reduceOutcome(s, tense("t75"), 75_000, true, CONFIG).effect).toEqual({
+      kind: "show",
+      triggeredWindowCapturedAt: "t75",
+    });
+  });
+});
+
+describe("arbitration — tense is senior", () => {
+  it("shows the TENSE prompt when both runs qualify in a single reduce", () => {
+    // A state the matrix never produces (each band zeroes the other run); built directly to
+    // prove the acute condition is evaluated BEFORE the mild one — a reorder must not flip this.
+    const primed = { ...initialTriggerState(), tenseRunStartMs: 0, littleRunStartMs: 0 };
+    const r = reduceOutcome(primed, tense("cX"), 100_000, true, CONFIG);
+    expect(r.effect).toEqual({ kind: "show", triggeredWindowCapturedAt: "cX" });
+    expect(r.state.shownKind).toBe("tense");
+    expect(r.state.mildBudgetConsumed).toBe(false); // showing tense never spends the mild budget
+  });
+});
+
+describe("tense-senior budget (two flags)", () => {
+  function showMild(): ReturnType<typeof reduceOutcome>["state"] {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, little("m0"), 0, true, CONFIG).state;
+    s = reduceOutcome(s, little("m60"), 60_000, true, CONFIG).state;
+    return s; // shownKind === "mild"
+  }
+
+  it("a mild answer consumes ONLY the mild budget — a later sustained-tense still shows", () => {
+    let s = showMild();
+    expect(s.shownKind).toBe("mild");
+    s = markResolvedConsumingBudget(s);
+    expect(s.mildBudgetConsumed).toBe(true);
+    expect(s.budgetConsumed).toBe(false); // the acute budget stays open
+    // a fresh 20s sustained-tense run later in the session must still show a tense prompt
+    s = reduceOutcome(s, tense("t100"), 100_000, true, CONFIG).state;
+    const r = reduceOutcome(s, tense("t120"), 120_000, true, CONFIG);
+    expect(r.effect).toEqual({ kind: "show", triggeredWindowCapturedAt: "t120" });
+    expect(r.state.shownKind).toBe("tense");
+  });
+
+  it("a tense answer consumes BOTH budgets — a later sustained-mild is blocked", () => {
+    let s = initialTriggerState();
+    s = reduceOutcome(s, tense("t0"), 0, true, CONFIG).state;
+    s = reduceOutcome(s, tense("t20"), 20_000, true, CONFIG).state; // shown tense
+    expect(s.shownKind).toBe("tense");
+    s = markResolvedConsumingBudget(s);
+    expect(s.budgetConsumed).toBe(true);
+    expect(s.mildBudgetConsumed).toBe(true);
+    // a fresh 60s sustained-mild run must NOT show (no down-tier nag after an acute answer)
+    s = reduceOutcome(s, little("m100"), 100_000, true, CONFIG).state;
+    expect(reduceOutcome(s, little("m160"), 160_000, true, CONFIG).effect).toEqual({ kind: "none" });
+  });
+
+  it("a mild answer blocks a later mild (≤1 mild per session)", () => {
+    let s = showMild();
+    s = markResolvedConsumingBudget(s);
+    s = reduceOutcome(s, little("m100"), 100_000, true, CONFIG).state;
+    expect(reduceOutcome(s, little("m160"), 160_000, true, CONFIG).effect).toEqual({ kind: "none" });
+  });
+});
+
 // ── Hook wiring (fake timers) ────────────────────────────────────────────────────────
 
 describe("useConfirmatoryTrigger hook", () => {
@@ -248,6 +404,7 @@ describe("useConfirmatoryTrigger hook", () => {
     expect(deps.createPrompt).toHaveBeenCalledWith({
       triggeredWindowCapturedAt: "c20",
       triggerWindowReadingId: "wr-1",
+      kind: "tense",
     });
     expect(result.current.visible).toBe(true);
   });
@@ -380,6 +537,56 @@ describe("useConfirmatoryTrigger hook", () => {
     });
     expect(deps.createPrompt).not.toHaveBeenCalled();
     expect(result.current.visible).toBe(false);
+  });
+
+  it("a mild prompt persists kind='mild', and answering it re-arms so a later sustained-tense shows a tense prompt", async () => {
+    vi.setSystemTime(0);
+    let n = 0;
+    const deps = makeDeps({ createPrompt: vi.fn(async () => `prompt-${++n}`) });
+    const { result, rerender } = renderHook((p) => useConfirmatoryTrigger(p), { initialProps: deps });
+
+    // sustain a_little_tense for 60s → a MILD prompt
+    await act(async () => rerender({ ...deps, latestOutcome: little("m0") }));
+    await act(async () => {
+      vi.setSystemTime(60_000);
+      rerender({ ...deps, latestOutcome: little("m60") });
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledWith({
+      triggeredWindowCapturedAt: "m60",
+      triggerWindowReadingId: "wr-1",
+      kind: "mild",
+    });
+    expect(result.current.visible).toBe(true);
+
+    // answering the mild prompt consumes ONLY the mild budget and re-arms for a later tense
+    await act(async () => {
+      result.current.onConfirm();
+      await flush();
+    });
+    expect(deps.resolvePrompt).toHaveBeenCalledWith("prompt-1", {
+      type: "answered",
+      outcome: "confirmed",
+    });
+
+    // a fresh 20s sustained-tense run, later in the SAME session, still creates a second prompt
+    await act(async () => {
+      vi.setSystemTime(100_000);
+      rerender({ ...deps, latestOutcome: tense("t100") });
+      await flush();
+    });
+    await act(async () => {
+      vi.setSystemTime(120_000);
+      rerender({ ...deps, latestOutcome: tense("t120") });
+      await flush();
+    });
+    expect(deps.createPrompt).toHaveBeenCalledWith({
+      triggeredWindowCapturedAt: "t120",
+      triggerWindowReadingId: "wr-1",
+      kind: "tense",
+    });
+    expect(deps.createPrompt).toHaveBeenCalledTimes(2);
+    expect(result.current.visible).toBe(true);
   });
 });
 
