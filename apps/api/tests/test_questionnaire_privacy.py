@@ -49,6 +49,9 @@ _MIGRATION = _MIGRATIONS / "20260630000000_questionnaire_feedback.sql"
 # the DB side): replaces the full-table qcp_one_per_session constraint with a partial
 # unique index so a re-armed prompt's second (non-answered) row can persist.
 _MIGRATION_QCP_REARM = _MIGRATIONS / "20260702000000_qcp_one_answered_per_session.sql"
+# BACKLOG #134: the second, milder trigger adds a `kind` ('mild'|'tense') discriminator and
+# re-scopes the answered-row cap from one-per-session to one-per-(session, kind).
+_MIGRATION_QCP_KIND = _MIGRATIONS / "20260703000000_qcp_kind_column.sql"
 
 _PRIVATE_TABLES = (
     "questionnaire_confirmatory_prompts",
@@ -93,6 +96,15 @@ def _sql_qcp_rearm() -> str:
     return (
         _MIGRATION_QCP_REARM.read_text(encoding="utf-8")
         if _MIGRATION_QCP_REARM.is_file()
+        else ""
+    )
+
+
+def _sql_qcp_kind() -> str:
+    """The BACKLOG #134 (kind column + per-kind answered index) migration text, or ''."""
+    return (
+        _MIGRATION_QCP_KIND.read_text(encoding="utf-8")
+        if _MIGRATION_QCP_KIND.is_file()
         else ""
     )
 
@@ -207,6 +219,31 @@ def test_t003_confirmatory_prompts_columns_and_constraints():
         rearm,
     ), "expected a partial unique index capping ANSWERED rows at one per session"
 
+    # BACKLOG #134 (20260703000000_qcp_kind_column.sql): the second, milder trigger adds a
+    # `kind` ('mild'|'tense') discriminator and RE-SCOPES the answered-row cap from one-per-
+    # session to one-per-(session, kind) — so a mild-answered + tense-answered pair can coexist,
+    # but neither kind is answerable twice. The single-column answered index above is superseded.
+    kindsql = _strip_comments(_sql_qcp_kind()).lower()
+    assert kindsql, (
+        "expected supabase/migrations/20260703000000_qcp_kind_column.sql"
+    )
+    assert re.search(r"add\s+column\s+kind\s+text\s+not\s+null", kindsql), \
+        "expected a NOT NULL kind column"
+    assert re.search(r"kind\s+in\s*\(\s*'mild'\s*,\s*'tense'\s*\)", kindsql), \
+        "kind must be constrained to 'mild' | 'tense'"
+    assert re.search(
+        r"drop\s+index\s+if\s+exists\s+qcp_one_answered_per_session", kindsql
+    ), "expected the single-column answered index to be dropped by the #134 migration"
+    assert re.search(
+        r"create\s+unique\s+index\s+qcp_one_answered_per_session_per_kind\s+"
+        r"on\s+public\.questionnaire_confirmatory_prompts\s*"
+        r"\(\s*monitoring_session_id\s*,\s*kind\s*\)\s+"
+        r"where\s+lifecycle\s*=\s*'answered'",
+        kindsql,
+    ), "expected a partial unique index capping ANSWERED rows at one per (session, kind)"
+
+    # `trigger_band` is UNCHANGED by #134 — still the constrained ('tense'-only) column; the
+    # new `kind` column (not trigger_band) is the mild/tense discriminator.
     # Trigger band fixed to the top band, and the trigger TIME is required.
     assert "trigger_band = 'tense'" in low
     assert re.search(
