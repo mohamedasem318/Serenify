@@ -65,6 +65,7 @@ describe("confirmatory prompt create/resolve", () => {
         monitoringSessionId: "sess-1",
         triggeredWindowCapturedAt: "2026-06-30T10:00:00.000Z",
         triggerWindowReadingId: "wr-9",
+        kind: "tense",
       },
       { client: db.client },
     );
@@ -76,15 +77,33 @@ describe("confirmatory prompt create/resolve", () => {
       triggered_window_captured_at: "2026-06-30T10:00:00.000Z",
       trigger_window_reading_id: "wr-9",
       trigger_band: "tense",
+      kind: "tense",
       lifecycle: "visible",
     });
     expect(res).toEqual({ ok: true, data: { id: "prompt-1" } });
   });
 
+  it("createConfirmatoryPrompt records kind='mild' for the milder trigger (#134)", async () => {
+    const db = makeDb({ data: { id: "prompt-2" }, error: null });
+    await createConfirmatoryPrompt(
+      {
+        userId: "u",
+        monitoringSessionId: "s",
+        triggeredWindowCapturedAt: "t",
+        kind: "mild",
+      },
+      { client: db.client },
+    );
+    const payload = db.calls.insert[0] as Record<string, unknown>;
+    // The `kind` discriminator distinguishes the two triggers; `trigger_band` stays the
+    // existing constrained ('tense'-only) column and is unchanged by this feature.
+    expect(payload).toMatchObject({ kind: "mild", trigger_band: "tense", lifecycle: "visible" });
+  });
+
   it("omits trigger_window_reading_id when unresolved", async () => {
     const db = makeDb({ data: { id: "p" }, error: null });
     await createConfirmatoryPrompt(
-      { userId: "u", monitoringSessionId: "s", triggeredWindowCapturedAt: "t" },
+      { userId: "u", monitoringSessionId: "s", triggeredWindowCapturedAt: "t", kind: "tense" },
       { client: db.client },
     );
     const payload = db.calls.insert[0] as Record<string, unknown>;
@@ -103,7 +122,7 @@ describe("confirmatory prompt create/resolve", () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     const db = makeDb({ data: null, error: { message: "duplicate key value" } });
     const res = await createConfirmatoryPrompt(
-      { userId: "u", monitoringSessionId: "s", triggeredWindowCapturedAt: "t" },
+      { userId: "u", monitoringSessionId: "s", triggeredWindowCapturedAt: "t", kind: "tense" },
       { client: db.client },
     );
     expect(res.ok).toBe(false);

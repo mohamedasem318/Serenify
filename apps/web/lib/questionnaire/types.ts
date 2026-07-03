@@ -11,6 +11,14 @@
 
 // ── Confirmatory prompt (questionnaire_confirmatory_prompts) ─────────────────────────
 
+/**
+ * Which trigger produced a confirmatory prompt (#134). `tense` = the ~20s sustained-`tense`
+ * acute spike; `mild` = the ~60s sustained-`a_little_tense` slow simmer. Mirrors the migration's
+ * `kind` CHECK — the DB caps ANSWERED rows at one per (session, kind).
+ */
+export const CONFIRMATORY_KINDS = ["mild", "tense"] as const;
+export type ConfirmatoryKind = (typeof CONFIRMATORY_KINDS)[number];
+
 export const CONFIRMATORY_OUTCOMES = ["confirmed", "false_alarm", "opened_chat"] as const;
 export type ConfirmatoryOutcome = (typeof CONFIRMATORY_OUTCOMES)[number];
 
@@ -72,6 +80,7 @@ function makeGuard<T extends string>(values: readonly T[]) {
   return (value: unknown): value is T => typeof value === "string" && set.has(value);
 }
 
+export const isConfirmatoryKind = makeGuard(CONFIRMATORY_KINDS);
 export const isConfirmatoryOutcome = makeGuard(CONFIRMATORY_OUTCOMES);
 export const isConfirmatoryLifecycle = makeGuard(CONFIRMATORY_LIFECYCLES);
 export const isConfirmatoryExpiryReason = makeGuard(CONFIRMATORY_EXPIRY_REASONS);
