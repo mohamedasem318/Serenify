@@ -2472,3 +2472,46 @@ pre-existing unrelated warnings).
 
 Cross-references: `docs/PROGRESS.md` 2026-07-02; `docs/DECISIONS.md` 2026-07-02 (D-10);
 `docs/BACKLOG.md` #127 (resolved).
+
+## 2026-07-03 — feat(012): second, milder confirmatory trigger — sustained `a_little_tense`, PR #135
+
+Closes BACKLOG #134 / GitHub #134. Adds a second, milder confirmatory trigger — ~60 s sustained
+`a_little_tense` (a slow simmer that never spikes) — beside the existing ~20 s sustained-`tense`
+acute trigger, reusing the existing prompt / dwell / expiry / single-resolution machinery; only
+the pre-show timer logic and the budget gain a second path (PR #135, squash `ad58777`).
+
+**Reducer** (`apps/web/lib/questionnaire/confirmatory-trigger.ts`): a second sustained clock
+(`littleRunStartMs`) driven by an exact-band `isLittleTenseReading` predicate (no band-ordering),
+under a per-band reset matrix — `tense` feeds the acute run and zeroes the mild run,
+`a_little_tense` feeds the mild run and zeroes the acute run, anything else / inactive zeroes both
+(so climbing `a_little_tense` → `tense` hands off to the acute timer). Arbitration is explicit:
+the acute condition is evaluated FIRST (tense wins). The mild dwell constant
+`CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS = 60_000` is a designed default, NOT empirically
+calibrated — StressID's 60 s stressor clips can't validate a sustained-mild threshold under the
+4×60 s smoothing buffer (same limitation as the 0.70 tense band, #128); recover from live data.
+
+**Tense-senior budget**: `shownKind` plus two flags replace the single one-per-session budget. A
+mild answer spends only the mild budget (a later sustained-tense keeps its shot); a tense answer
+spends both (no down-tier nag after an acute answer). Auto-resolutions (signal-drop / session-end)
+spend neither and re-arm, exactly as #127/#130. Net: ≤1 mild + ≤1 tense per session.
+
+**DB** (`supabase/migrations/20260703000000_qcp_kind_column.sql`): adds a `kind` ('mild' | 'tense')
+discriminator (existing rows backfilled to 'tense'), drops the #132 `qcp_one_answered_per_session`
+index and replaces it with `qcp_one_answered_per_session_per_kind ON
+questionnaire_confirmatory_prompts (monitoring_session_id, kind) WHERE lifecycle = 'answered'` —
+one answered row per (session, kind). `createConfirmatoryPrompt`
+(`apps/web/lib/api/questionnaire-client.ts`) now writes `kind`; `trigger_band` is unchanged (still
+the constrained 'tense'-only column), and the #132 `[questionnaire]` insert-failure `console.error`
+is kept. The #127 / #130 / #132 guarantees are preserved — the six named reducer/hook guarantee
+tests are byte-for-byte unchanged and green.
+
+Test results (2026-07-03): `apps/web` Vitest — questionnaire dir 88/88, full suite **935/935
+passed / 98 files** (58 confirmatory reducer/hook/client tests); `apps/api` pytest
+`test_questionnaire_privacy.py` **12/12**; `tsc --noEmit` clean; ESLint 0 errors (1 pre-existing
+unrelated warning). Live-verified against the local Supabase Postgres inside a rolled-back
+transaction (no data persisted): the old single-column index rejected a second `answered` row in
+one session (RED), and after the migration a mild-answered + tense-answered pair both persist while
+a second same-kind `answered` row is rejected by the new per-kind index (GREEN).
+
+Cross-references: `docs/PROGRESS.md` 2026-07-03; `docs/DECISIONS.md` 2026-07-03 (D-11);
+`docs/BACKLOG.md` #134 (resolved).
