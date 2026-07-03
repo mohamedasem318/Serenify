@@ -4931,3 +4931,50 @@ CHECK constraints satisfied on every overwrite.
 
 **Cross-references**: `docs/CHANGELOG.md` 2026-07-02 (PR #132 entry); `docs/PROGRESS.md`
 2026-07-02 (PR #132 entry); `docs/BACKLOG.md` #127 (resolved); D-3, D-7, D-9 above.
+
+---
+
+## 2026-07-03 — 012 confirmatory prompt: tense-senior budget + per-kind answered index (#134)
+
+**Status**: Accepted (implementation choice; no spec/FR change). Continues the D-N numbering
+of the 012 entries above. A deliberate sibling to D-10 — the second, milder trigger (#134, PR
+#135) reuses the #127/#130/#132 machinery and only extends the budget and its DB mirror.
+
+**Decision (D-11) — the second (mild) trigger uses a tense-senior TWO-budget model, mirrored at
+the DB by a per-`(monitoring_session_id, kind)` answered index rather than one answered row per
+session.** Two coupled decisions:
+
+1. **Tense-senior budget (two flags, not one shared budget).** The acute trigger's one-time
+   budget (`budgetConsumed`) is joined by a mild one (`mildBudgetConsumed`), and a new `shownKind`
+   records which trigger produced the shown prompt. A **mild** answer spends ONLY the mild budget;
+   a **tense** (explicit) answer spends BOTH. The alternative — a single shared one-per-session
+   budget for both triggers — was rejected on two grounds, one level up from the #127 guarantee
+   (D-8: only an explicit answer consumes the budget). First, a wasted mild prompt must never lock
+   out a real tense one: with a shared budget, answering (or even showing) a low-stakes mild prompt
+   would silently spend the session's only shot, so a genuine acute spike later in the same session
+   would go un-surfaced — the opposite of what the acute trigger exists for. Keeping the tense
+   budget independent guarantees the acute path always keeps its shot. Second, answering a genuine
+   tense prompt SHOULD close the door on a lower-tier mild "nag" for the rest of that session —
+   hence a tense answer is senior and spends both. Auto-resolutions (signal-drop / session-end)
+   still spend neither and re-arm (D-8 unchanged). The two flags keep the trigger fully in-memory
+   and pure-reducer-testable (D-1), and make "what each answer consumes" an explicit one-line
+   predicate keyed on `shownKind` rather than something implied by control flow.
+
+2. **Per-kind answered index (the DB mirror of the per-type budget).** The database now caps one
+   `answered` row per `(monitoring_session_id, kind)` — `qcp_one_answered_per_session_per_kind ON
+   questionnaire_confirmatory_prompts (monitoring_session_id, kind) WHERE lifecycle = 'answered'`
+   (`supabase/migrations/20260703000000_qcp_kind_column.sql`) — extending D-10's insert +
+   partial-index choice by adding a `kind` dimension, rather than D-10's single answered-per-session
+   cap. This was proven necessary, not cosmetic: D-10's `qcp_one_answered_per_session
+   (monitoring_session_id) WHERE lifecycle = 'answered'` caps answered rows at one per session, full
+   stop, so a mild-answered + tense-answered pair collides — verified live against the local
+   Postgres, where the second `answered` UPDATE raised `duplicate key value violates unique
+   constraint "qcp_one_answered_per_session"`. A new `kind` ('mild' | 'tense') column (existing rows
+   backfilled to 'tense') carries the discriminator; `trigger_band` was deliberately left unchanged
+   (still the constrained 'tense'-only column — widening it would touch the base migration's CHECK
+   and the T003 privacy assertion, out of scope here). The per-kind index is the exact DB-level
+   analogue of the two-flag budget: one answered mild + one answered tense per session, neither kind
+   answerable twice.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-07-03 (PR #135 entry); `docs/PROGRESS.md`
+2026-07-03 (PR #135 entry); `docs/BACKLOG.md` #134 (resolved); D-3, D-8, D-10 above.
