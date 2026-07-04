@@ -7,6 +7,7 @@ persisted. Chat bands are written only to chat_conversations.
 from __future__ import annotations
 
 import asyncio
+import os
 import time
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -139,9 +140,17 @@ def _first_name(client: Client, user_id: str) -> str:
     return first or "there"
 
 
+# TEMPORARY, REVERSIBLE: when SERENIFY_FORCE_CRISIS_COUNTRY is set (e.g. "EG"), force the
+# crisis panel to that country regardless of the employee's profile. Unset (the default,
+# incl. CI/tests) => normal profile-based lookup. To revert, delete this line and the guard.
+_HARDCODED_COUNTRY: str | None = os.getenv("SERENIFY_FORCE_CRISIS_COUNTRY")
+
+
 def _country(client: Client, user_id: str) -> str | None:
     """Best-effort employee country. Profiles may not carry a country column yet; any
     failure means "unknown" → the crisis panel shows the universal line only (FR-040)."""
+    if _HARDCODED_COUNTRY is not None:
+        return _HARDCODED_COUNTRY
     try:
         resp = client.table("profiles").select("country").eq("id", user_id).execute()
     except Exception:
