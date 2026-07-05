@@ -1772,3 +1772,16 @@ could go the rest of the day silent after one tense answer. Decide **alongside t
 cooldown idea** — a minimum gap after a prompt before re-arm could replace the hard per-session
 lockout more gracefully than reopening the budget.
 **Address by**: not blocking the demo; monitor-only for now.
+
+---
+
+## Ops — Supabase local→cloud migration (`excukdzjudslbqmkysrc`) — executed 2026-07-04
+
+### Supabase cloud migration — deploy-step follow-ups (production domains + apps/api repoint) (#139)
+**Status**: deferred-feature (`type:tech-debt` / `priority:blocker` / `area:infra` + `area:api` + `area:web`) — **OPEN, blocks production deploy.** GitHub issue **#139 OPEN**.
+**Observed**: 2026-07-04, execution of `docs/runbooks/supabase-local-to-cloud-migration.md` — local → cloud project `excukdzjudslbqmkysrc` (EU / Frankfurt). 14 real accounts + profiles + ~300 rows across 9 tables migrated (UUIDs / `email_confirmed_at` / `anchor_vector` bytea preserved; 6/6 anchors byte-identical to the §5a dump; RLS + grants verified on cloud; passwords reset; `apps/web/.env.local` repointed).
+**(a) Runbook junk-delete reorder — DONE (provenance)**: the §4 `DELETE ... WHERE email LIKE '%@t.local'` was moved to a new §5c after the §5b child-row load — deleting fixtures in §4 FK-fails §5b's load of their own child rows (`pg_dump` can't filter). One deferred cascade drops fixtures + identities + skeleton profiles + child rows together. Patched in commit `d74864d`. No further action.
+**(b) Production-domain settings — OPEN (deploy blocker)**: Supabase Auth `site_url` + `additional_redirect_urls`, `apps/web/.env.local` `SITE_URL` / `NEXT_PUBLIC_API_URL`, and `apps/api/.env` `ALLOWED_ORIGINS` are all still localhost; set to the deployed origin at the Vercel/Azure step (confirmation/recovery links fall back to `site_url` otherwise).
+**(c) apps/api not repointed — OPEN (Azure backend blocker)**: only `apps/web/.env.local` was repointed (URL + anon). `apps/api/.env` still points local; a cloud run needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` + the cloud **`SUPABASE_JWT_SECRET`** (else it rejects cloud JWTs — HS256 mismatch).
+**Not in scope**: SMTP (Resend) is a separate task; live new signup stays blocked until it lands.
+**Address by**: the Vercel (web) / Azure (api) deploy step — (b) and (c) are prerequisites.
