@@ -1,7 +1,12 @@
-# Forward artifact (DECISION-7): feature 004 ships local-only; this image is not
-# deployed here. Build from the REPO ROOT so the ml-video path dep resolves:
+# Serenify anchor / monitoring / chat API — x86 (linux/amd64) runtime image.
 #
-#   docker build -f apps/api/Dockerfile -t serenify-api .
+# Build from the REPO ROOT so the editable path deps resolve (ml-video AND
+# llm-client live under packages/, referenced as ../../packages/... in uv.lock):
+#
+#   docker build --platform linux/amd64 -f apps/api/Dockerfile -t serenify-api .
+#
+# Target host: Azure ACI, francecentral, x86/amd64 (the ARM path is dead). Building
+# --platform linux/amd64 keeps the image matched to the x86-validated ML pipeline.
 #
 # Python pinned to 3.12 — mediapipe==0.10.13 has no 3.13 wheel (DECISION-1).
 FROM python:3.12-slim
@@ -17,17 +22,34 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1 libglib2.0-0 ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
+# Fail the build loudly if ffmpeg is unusable (a silent video-decode break otherwise).
+RUN ffmpeg -version
+
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Deterministic + offline-friendly uv: never fetch a Python (the base image supplies
+# 3.12), compile bytecode for faster cold starts, copy (not hardlink) across layers.
+ENV UV_PYTHON_DOWNLOADS=never \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy
+
 WORKDIR /srv
-# Copy the editable path-dep target first, then the API project.
-COPY packages/ml-video /srv/packages/ml-video
-COPY apps/api /srv/apps/api
+# Copy the editable path-dep targets first, then the API project. ALL THREE are
+# required by uv.lock — omitting llm-client (feature 011) fails `uv sync --frozen`.
+COPY packages/ml-video   /srv/packages/ml-video
+COPY packages/llm-client /srv/packages/llm-client
+COPY apps/api            /srv/apps/api
 
 WORKDIR /srv/apps/api
+# --frozen: install EXACTLY what uv.lock pins (scikit-learn==1.6.1 is load-bearing —
+# a mismatch unpickles the RandomForest to a silently-wrong model). --no-dev drops
+# pytest/ruff from the runtime image.
 RUN uv sync --frozen --no-dev
 
 EXPOSE 8000
-# SUPABASE_JWT_SECRET and ALLOWED_ORIGINS are injected at run time, never baked in
+# Single worker (the in-memory smoothing buffer is per-process; NO --reload).
+# --no-sync: the env was already synced at build time, so container start never
+# re-checks the lock or touches the network. SUPABASE_JWT_SECRET / SUPABASE_URL /
+# SUPABASE_ANON_KEY / ALLOWED_ORIGINS are injected at RUN time, never baked in
 # (Principle IX). The production ALLOWED_ORIGINS is [TBD by deployment].
-CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uv", "run", "--no-sync", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
