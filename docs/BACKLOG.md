@@ -71,8 +71,14 @@ the now-authed state — user had to refresh manually. Resolution above covers t
 plus the symmetric sign-out propagation (sign out in one tab → sibling tabs
 navigate to /login).
 
-### Supabase default email templates include unused 6-digit OTP block (#33)
-**Status**: polish
+### ~~Supabase default email templates include unused 6-digit OTP block~~ — resolved (#33)
+**Status**: resolved
+**Resolved**: 2026-07-11 on `chore/api-container-deploy` — added branded
+confirmation and password-recovery templates at `supabase/templates/`, wired
+them through `supabase/config.toml`, and covered the template/config contract
+with `apps/web/tests/unit/supabase-email-templates.test.ts`. Templates keep both
+`{{ .ConfirmationURL }}` and `{{ .Token }}` so the existing link and six-digit
+OTP flows both work.
 **Observed**: smoke test ST-1 of feature 001
 **Description**: Both confirmation and password-reset emails ship with a magic link AND
 a 6-digit OTP code. The app now supports OTP entry as a fallback (added during feature 001),
