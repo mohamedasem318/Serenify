@@ -39,6 +39,9 @@ export async function POST(request: NextRequest) {
   // requires a valid admin session cookie; service-role invites bypass GoTrue's
   // per-IP buckets, so a custom durable limiter is the right shape (Supabase
   // table backed). See docs/security/07-rate-limits-and-parity.md F2.
+  if (!serverEnv.supabaseServiceRoleKey) {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 
   // Step 0a: authenticate the caller before doing any other work.
   const supabase = await createClient();

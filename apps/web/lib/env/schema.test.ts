@@ -60,10 +60,21 @@ describe("serverEnvSchema", () => {
     expect(parsed.supabaseServiceRoleKey).toBe(fakeKey);
   });
 
-  it("throws when supabaseServiceRoleKey is missing", () => {
-    expect(() =>
-      serverEnvSchema.parse({ supabaseUrl: validUrl, supabaseAnonKey: fakeKey }),
-    ).toThrow();
+  it("parses without a service-role key when admin invites are disabled", () => {
+    const parsed = serverEnvSchema.parse({
+      supabaseUrl: validUrl,
+      supabaseAnonKey: fakeKey,
+    });
+    expect(parsed.supabaseServiceRoleKey).toBeUndefined();
+  });
+
+  it("treats a blank service-role key as absent", () => {
+    const parsed = serverEnvSchema.parse({
+      supabaseUrl: validUrl,
+      supabaseAnonKey: fakeKey,
+      supabaseServiceRoleKey: "",
+    });
+    expect(parsed.supabaseServiceRoleKey).toBeUndefined();
   });
 
   it("defaults siteUrl to localhost when unset", () => {
