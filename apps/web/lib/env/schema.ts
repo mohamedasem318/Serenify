@@ -9,18 +9,12 @@ import { z } from "@/lib/zod";
  * `@/lib/zod` barrel, whose only side effect is the benign `jitless` config
  * (CSP; see docs/security/05-csp-header.md) — not a server-only or env binding.
  *
- * Public Supabase keys are validated by length only. Optional server-only
- * secrets must stay optional here so production deployments can omit privileged
- * admin capabilities entirely.
+ * Public Supabase keys are validated by length only.
  */
 
 const supabaseKey = z
   .string()
   .min(100, "Supabase key looks too short — expected a JWT");
-const optionalSupabaseKey = z.preprocess(
-  (value) => (value === "" ? undefined : value),
-  supabaseKey.optional(),
-);
 
 export const clientEnvSchema = z.object({
   supabaseUrl: z.url(),
@@ -33,7 +27,6 @@ export const clientEnvSchema = z.object({
 });
 
 export const serverEnvSchema = clientEnvSchema.extend({
-  supabaseServiceRoleKey: optionalSupabaseKey,
   siteUrl: z.url().default("http://localhost:3000"),
 });
 
