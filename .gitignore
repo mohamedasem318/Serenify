@@ -113,3 +113,5 @@ st1-shots/
 
 # SpecKit per-branch state (the constitution at .specify/memory/ stays tracked)
 .specify/feature.json
+
+graphify-out/cost.json
