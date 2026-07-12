@@ -352,8 +352,8 @@ Specifics the future pass should evaluate:
 three existing token-tuning entries above. Not blocking any
 in-progress feature; deferred polish.
 
-### Card heading typography — fresh design read needed (#48)
-**Status**: polish
+### ~~Card heading typography — fresh design read needed (#48)~~
+**Status**: RESOLVED — 2026-07-12, fixed in feature 007 (PR #22, commit 0b71d4a): DM Serif Display replaced with Outfit system-wide; the outdated serif feel is gone.
 **Observed**: 2026-05-22, feature 003 Phase 7 eyeball (T045 re-look)
 **Description**: The three home cards ship with their headings in
 `font-display` (DM Serif Display) — `text-2xl` on TodaysCheckinCard
