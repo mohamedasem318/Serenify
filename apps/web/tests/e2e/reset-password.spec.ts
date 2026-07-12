@@ -34,6 +34,11 @@ test.beforeEach(async ({ page }) => {
   if (new URL(page.url()).pathname === "/onboarding") {
     await page.getByLabel("Full name").fill("Reset Ux");
     await page.getByRole("button", { name: "Continue" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Set your calm baseline" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Turn on camera" }).click();
+    await page.getByRole("button", { name: "Not now" }).click();
     await expect(page).toHaveURL(/\/app$/);
   }
 
