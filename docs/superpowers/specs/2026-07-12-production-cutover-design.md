@@ -30,10 +30,10 @@ external HTTPS ingress, and a zero minimum replica count. Cloudflare remains aut
 for `serenify.tech`; `api.serenify.tech` points to the Container App and Azure supplies the free
 managed TLS certificate.
 
-The previous ACI remains available during validation. It is stopped only after the custom
-domain, backend health endpoint, authenticated API path, and frontend origin have been verified.
-This gives the cutover a clear rollback target without paying for both services longer than
-necessary.
+On 2026-07-12 Mohamed deleted the prior Azure resource groups to stop credit consumption. The
+production test therefore starts from an empty Azure subscription: balance is checked first,
+one fresh resource group is created, and the image registry plus Container App are provisioned
+only when the local release candidate is ready. There is no legacy Azure rollback target.
 
 ## Constitution Amendment
 
@@ -71,10 +71,12 @@ source templates. The preview is checked at desktop and 360 px widths in light a
 1. Ratify and commit the v1.11.0 constitution amendment.
 2. Remove repository service-role tooling and verify RLS-as-user guards.
 3. Redesign, test, and preview both auth email templates.
-4. Resize the Container App to 4 vCPU / 8 GiB while keeping `minReplicas=0` and `maxReplicas=1`.
+4. Check remaining Azure student credit, then create a fresh private registry and Container App
+   at 4 vCPU / 8 GiB with `minReplicas=0` and `maxReplicas=1`.
 5. Add Cloudflare validation/DNS records and bind an Azure managed certificate.
 6. Verify `https://api.serenify.tech/healthz` and authenticated application behavior.
-7. Stop the old ACI after cutover verification; keep it undeleted until final acceptance.
+7. Measure registry and Container Apps consumption, report the projected credit lifetime, and
+   leave only the explicitly accepted production resources active.
 
 ## Verification
 
@@ -84,4 +86,3 @@ source templates. The preview is checked at desktop and 360 px widths in light a
 - Container App revision health, resources, ingress, certificate, DNS, CORS, and custom-domain
   health checks.
 - No `--reload` in the deployed command or image metadata.
-

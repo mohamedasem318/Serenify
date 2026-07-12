@@ -4,7 +4,7 @@
 
 **Goal:** Publish Serenify's RLS-as-user FastAPI backend at `https://api.serenify.tech` on a cost-controlled 4 vCPU / 8 GiB Azure Container App and ship Graphite-branded Supabase auth emails.
 
-**Architecture:** Keep the existing Supabase Cloud and Next.js boundaries. Run the existing API/ML image in Azure Container Apps with scale-to-zero, front it with Azure managed TLS and Cloudflare DNS, and retain the old ACI only through validation. Keep security, email design, and infrastructure changes in separate commits.
+**Architecture:** Keep the existing Supabase Cloud and Next.js boundaries. After local release verification, check Azure student-credit balance and provision a fresh private registry plus Azure Container App with scale-to-zero, then front it with Azure managed TLS and Cloudflare DNS. Keep security, email design, and infrastructure changes in separate commits.
 
 **Tech Stack:** FastAPI, Azure Container Apps, Azure CLI, Cloudflare DNS, Supabase Auth/Postgres RLS, Resend SMTP, HTML email, Vitest, pytest.
 
@@ -172,32 +172,37 @@ git add apps/web/tests/unit/supabase-email-templates.test.ts supabase/templates 
 git commit -m "fix(email): align auth templates with graphite"
 ```
 
-### Task 4: Resize and Bind the Azure Backend
+### Task 4: Provision and Bind the Azure Backend
 
 **Files:**
 - No repository files unless an existing deployment document requires current resource values.
 
 **Interfaces:**
-- Consumes: `serenify-api-ca`, its current Azure FQDN, Cloudflare-managed `serenify.tech` DNS.
+- Consumes: the verified local API image, remaining Azure student credit, and Cloudflare-managed `serenify.tech` DNS.
 - Produces: healthy `https://api.serenify.tech` on 4 vCPU / 8 GiB with managed TLS.
 
-- [ ] **Step 1: Capture pre-change state without secrets**
+- [ ] **Step 1: Confirm empty state and credit balance without secrets**
 
-Run `az containerapp show`, revision list, ACI show, and public DNS queries. Record resource state,
-FQDN, compute, scale, and certificate status without printing environment variable values.
+Run Azure resource-group/resource listings, public DNS queries, and the Azure consumption/balance
+commands available to the student subscription. Record remaining credit and the absence of the
+deleted resources without printing environment variable values.
 
-- [ ] **Step 2: Resize the Container App**
+- [ ] **Step 2: Build and provision fresh resources**
 
 ```powershell
-az containerapp update -g serenify-demo-rg -n serenify-api-ca `
-  --cpu 4.0 --memory 8Gi --min-replicas 0 --max-replicas 1
+az group create -n serenify-prod-rg -l francecentral
+az acr create -g serenify-prod-rg -n serenifyacr38443bf9 --sku Basic
+az acr build -g serenify-prod-rg -r serenifyacr38443bf9 `
+  -t serenify-api:production -f apps/api/Dockerfile .
 ```
 
-Expected: a healthy latest revision reports 4 CPU, 8Gi, and scale 0..1.
+Create a Container Apps environment and `serenify-api` app from that private image with external
+port 8000, 4 CPU, 8Gi memory, `minReplicas=0`, and `maxReplicas=1`. Store runtime values as Azure
+Container App secrets and references. Expected: a healthy first revision and HTTPS `/healthz`.
 
 - [ ] **Step 3: Configure DNS validation and custom domain**
 
-Create Cloudflare DNS records required by Azure: `api` CNAME to the Container App FQDN and
+Create Cloudflare DNS records required by Azure: `api` CNAME to the new Container App FQDN and
 `asuid.api` TXT to the Container App custom-domain verification ID. Keep Cloudflare proxying off
 until Azure validates and issues the managed certificate. Bind `api.serenify.tech` and the free
 managed certificate using Azure CLI help-discovered commands.
@@ -209,11 +214,11 @@ Run: `Invoke-RestMethod https://api.serenify.tech/healthz`
 Expected: HTTP 200 with `status=ready` and the locked model version. Verify CORS from
 `https://serenify.tech` and confirm no deployed command contains `--reload`.
 
-- [ ] **Step 5: Stop the old ACI after cutover**
+- [ ] **Step 5: Measure and report credit lifetime**
 
-Run: `az container stop -g serenify-demo-rg -n serenify-api`
-
-Expected: old ACI state becomes stopped only after all custom-domain checks pass.
+Capture Azure Cost Management usage after the test window, separate the always-on Basic registry
+cost from active Container Apps compute, and calculate conservative credit-lifetime scenarios for
+idle scale-to-zero and expected demo traffic. Do not leave test-only duplicate resources active.
 
 ### Task 5: Configure Supabase Auth Delivery and Final Verification
 
