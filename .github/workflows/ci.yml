@@ -22,6 +22,15 @@ permissions:
   contents: read
 
 jobs:
+  # --- Structural guard: speckit skill files + .gitignore sanity --------------
+  speckit-guard:
+    name: speckit-skills guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check speckit skills exist and .gitignore is narrow
+        run: node scripts/check-speckit-skills.mjs
+
   # --- apps/web — the only JS/TS workspace: lint + typecheck + Vitest ---------
   web:
     name: web (lint · typecheck · vitest)
