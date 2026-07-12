@@ -68,13 +68,14 @@ The existing local guard is included as a separate commit:
 | Principle | Status | Evidence |
 |---|---|---|
 | I. Privacy by Architecture | PASS | Check-in creates the authenticated session before opening the camera; no media exists during wake. |
-| II. Employee Agency and Consent | PASS | Wake begins only after an explicit calibration/check-in action; no page-load keepalive is added. |
-| III. Explainable AI | PASS | No inference result or model behavior changes. |
-| IV. AI Boundary | PASS | No LLM path changes. |
+| II. Subject-Disjoint ML Evaluation | PASS | No dataset, model, evaluation, threshold, or inference behavior changes. |
+| III. Modality Isolation | PASS | The browser continues sending media only through the existing monitoring boundary; no raw signal type or transport changes. |
+| IV. LLM Provider Abstraction | PASS | No LLM path or provider changes. |
 | V. Calm-First Design Language | PASS | Pending stays meadow/neutral; foggy remains failure-only; amber/crimson are absent. |
 | VI. Responsive and Accessible | PASS | Existing 44px action is retained, pending is disabled and announced, and copy is bounded for 360px. |
 | VII. Mandatory Testing | PASS | Timeout, pending, privacy ordering, and duplicate prevention receive focused tests plus full verification. |
 | VIII. Spec-Driven Workflow | PASS | This design and its implementation plan precede code; the separate CI guard protects managed SpecKit skills. |
 | IX. Secrets Discipline | PASS | No environment variable, secret, service-role path, or deployment credential changes. |
+| X. Dataset Stewardship | PASS | No dataset, model artifact, demo identity, or public subject material changes. |
 
 No constitution exception or amendment is required.
