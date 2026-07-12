@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { endSession, patchStatus, submitWindow } from "@/lib/api/monitoring-client";
+import { createSession, endSession, patchStatus, submitWindow } from "@/lib/api/monitoring-client";
 
 /**
  * Feature 008 / US2 — T041: the lifecycle write client. The load-bearing case is the
@@ -21,7 +21,40 @@ function stubFetch(impl: () => Partial<Response>) {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
+
+describe("createSession — cold-start timeout", () => {
+  it("keeps the default request pending until the 75-second wake boundary", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        signal = init?.signal ?? undefined;
+        return new Promise<Response>((_resolve, reject) => {
+          signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+        });
+      }),
+    );
+
+    let settled = false;
+    const request = createSession("tok").then((result) => {
+      settled = true;
+      return result;
+    });
+
+    await vi.advanceTimersByTimeAsync(74_999);
+    expect(settled).toBe(false);
+    expect(signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(request).resolves.toEqual({ ok: false, kind: "network" });
+    expect(signal?.aborted).toBe(true);
+  });
+});
 
 describe("endSession — re-end race", () => {
   it("treats a 409 (already ended) as success — the race resolves silently", async () => {

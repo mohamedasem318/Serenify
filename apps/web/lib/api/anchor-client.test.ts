@@ -15,6 +15,7 @@ function makeClip(type = "video/webm;codecs=vp9") {
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -87,6 +88,31 @@ describe("postAnchor", () => {
 });
 
 describe("checkHealth", () => {
+  it("keeps the default request pending until the 75-second wake boundary", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation((_input, init) => {
+      signal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+      });
+    });
+
+    let settled = false;
+    const request = checkHealth().then((result) => {
+      settled = true;
+      return result;
+    });
+
+    await vi.advanceTimersByTimeAsync(74_999);
+    expect(settled).toBe(false);
+    expect(signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    await expect(request).resolves.toBe(false);
+    expect(signal?.aborted).toBe(true);
+  });
+
   it("returns true when /healthz responds ok", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(200, {}));
     expect(await checkHealth()).toBe(true);

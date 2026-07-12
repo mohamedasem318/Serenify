@@ -177,6 +177,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // for synchronous reads (stop/recorder), the state drives the bind-and-play effect.
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [streaming, setStreaming] = useState(false);
+  const [starting, setStarting] = useState(false);
   const [pinned, setPinned] = useState(false);
   // Self-view peek (008-followups): the preview reveals on pointer-hover OR keyboard focus of
   // the pill and AUTO-HIDES when the pointer leaves / focus blurs — so an un-pinned preview
@@ -542,6 +543,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       // first call owns this entry; exactly one session is created per monitoring entry.
       if (creatingRef.current) return;
       creatingRef.current = true;
+      setStarting(true);
       try {
         const session = await deps.getSession();
         if (!session) {
@@ -580,6 +582,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         // Cleared on every exit (success OR an error return) so a later retry can create
         // again; the in-flight window is only the span of the awaits above.
         creatingRef.current = false;
+        setStarting(false);
       }
     }
 
@@ -808,6 +811,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
 
         <OpSurfaces
           state={state}
+          starting={starting}
           onAllow={handleAllow}
           onRetryBlocked={handleRetryBlocked}
           onPause={handlePause}

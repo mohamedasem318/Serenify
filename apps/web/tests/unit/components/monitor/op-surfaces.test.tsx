@@ -61,6 +61,25 @@ describe("OpSurfaces — permission (meadow affirmative invitation, FR-024 reass
     fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
     expect(onAllow).toHaveBeenCalled();
   });
+
+  it("announces and disables the action while Serenify wakes", () => {
+    const onAllow = vi.fn();
+    render(
+      <OpSurfaces
+        state={{ op: "permission", band: null, skipCause: null }}
+        starting
+        onAllow={onAllow}
+        onRetryBlocked={noop}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: /waking serenify/i });
+    expect(button).toBeDisabled();
+    expect(button.parentElement).toHaveAttribute("aria-live", "polite");
+    expect(button.className).toContain("h-12");
+    fireEvent.click(button);
+    expect(onAllow).not.toHaveBeenCalled();
+  });
 });
 
 describe("OpSurfaces — blocked (foggy attention)", () => {

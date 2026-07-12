@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MonitoringSession, type MonitoringDeps } from "@/components/monitor/monitoring-session";
 import type { PresenceCallbacks } from "@/components/monitor/presence-monitor";
-import type { SubmitWindowResult } from "@/lib/api/monitoring-client";
+import type { CreateSessionResult, SubmitWindowResult } from "@/lib/api/monitoring-client";
 import type { MinimalWindowRecorder } from "@/components/monitor/window-recorder";
 
 /**
@@ -236,6 +236,34 @@ describe("MonitoringSession orchestrator", () => {
 
     expect(deps.createSession).toHaveBeenCalledTimes(1);
     expect(deps.getUserMedia).toHaveBeenCalledTimes(1); // exactly one camera opened
+  });
+
+  it("shows a disabled wake state and keeps the camera off while session creation is pending", async () => {
+    const { deps } = makeDeps([]);
+    let finishCreate: ((result: CreateSessionResult) => void) | undefined;
+    deps.createSession = vi.fn(
+      () =>
+        new Promise<CreateSessionResult>((resolve) => {
+          finishCreate = resolve;
+        }),
+    );
+    render(<MonitoringSession deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+
+    const waking = await screen.findByRole("button", { name: /waking serenify/i });
+    expect(waking).toBeDisabled();
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+
+    fireEvent.click(waking);
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finishCreate?.({ ok: false, kind: "network" });
+    });
+    expect(await screen.findByText(/can.t reach serenify right now/i)).toBeInTheDocument();
   });
 
   it("binds the self-view srcObject and plays on stream-ready (no focus event needed)", async () => {

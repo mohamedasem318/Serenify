@@ -66,12 +66,23 @@ function authHeaders(accessToken: string): HeadersInit {
  * with no anchor gets `409` (mapped to `no_anchor`); no global/fallback anchor is ever
  * substituted (SC-004).
  */
-export async function createSession(accessToken: string): Promise<CreateSessionResult> {
+export async function createSession(
+  accessToken: string,
+  timeoutMs = 75_000,
+): Promise<CreateSessionResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   let res: Response;
   try {
-    res = await fetch(SESSIONS_ENDPOINT, { method: "POST", headers: authHeaders(accessToken) });
+    res = await fetch(SESSIONS_ENDPOINT, {
+      method: "POST",
+      headers: authHeaders(accessToken),
+      signal: controller.signal,
+    });
   } catch {
     return { ok: false, kind: "network" };
+  } finally {
+    clearTimeout(timer);
   }
 
   if (res.status === 201) {
