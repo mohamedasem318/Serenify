@@ -1,5 +1,7 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
@@ -45,4 +47,49 @@ describe("Supabase auth email templates", () => {
       expect(html).not.toMatch(/#(?:C98637|894A4E)\b/i);
     },
   );
+
+  it.each(templates)(
+    "$type template follows the Graphite typography and contrast contract",
+    ({ path }) => {
+      const html = readFileSync(path, "utf8");
+
+      expect(html).toContain("fonts.googleapis.com/css2?family=Inter");
+      expect(html).toContain("family=Outfit");
+      expect(html).toContain('class="wordmark"');
+      expect(html).toContain('class="headline"');
+      expect(html).toMatch(/>serenify<\/[^>]+>/);
+      expect(html).toContain("border-top:4px solid #3E7A63");
+      expect(html).toMatch(
+        /\.wordmark\s*\{\s*color:\s*#E2E5E8\s*!important;/,
+      );
+      expect(html).toMatch(
+        /\.headline\s*\{\s*color:\s*#E2E5E8\s*!important;/,
+      );
+      expect(html).toContain("max-width:520px");
+    },
+  );
+
+  it("generates browser previews with representative values", () => {
+    const outputDir = mkdtempSync(join(tmpdir(), "serenify-email-preview-"));
+    const script = resolve(repoRoot, "scripts/preview-auth-emails.mjs");
+
+    try {
+      execFileSync(process.execPath, [script, outputDir]);
+
+      for (const template of templates) {
+        const preview = readFileSync(
+          resolve(outputDir, `${template.type}.html`),
+          "utf8",
+        );
+        expect(preview).toContain("482731");
+        expect(preview).toContain(
+          "https://serenify.tech/auth/callback?token=preview",
+        );
+        expect(preview).not.toContain("{{ .ConfirmationURL }}");
+        expect(preview).not.toContain("{{ .Token }}");
+      }
+    } finally {
+      rmSync(outputDir, { recursive: true, force: true });
+    }
+  });
 });
