@@ -1290,8 +1290,8 @@ human/device-dependent runs, not code.
 **Address by**: all three BEFORE the detector ships to any real (HTTPS, real-tenant)
 environment. T004 specifically must precede the detector's first production call.
 
-### Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate (#74)
-**Status**: bug
+### ~~Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate (#74)~~
+**Status**: RESOLVED — 2026-07-12, fixed in feature 006 (commit 7a1c2da, PR #19)
 **Category**: backend / extraction quality (anchor validity)
 **Observed**: 2026-06-01, feature 005 smoke — a 60 s baseline recording in which the
 user's face was actually in frame for only **~2 s** was still accepted as success
