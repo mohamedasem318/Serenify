@@ -30,7 +30,7 @@
 - [x] T013 Run focused tests, full Vitest, lint, typecheck, and production build.
 - [x] T014 Run the SpecKit guard, diff check, secret scan, and all ten constitution checks.
 - [x] T015 Run `graphify update .` and keep generated graph artifacts out of the PR.
-- [ ] T016 Push the branch and open a PR with test and constitution evidence.
+- [x] T016 Push the branch and open a PR with test and constitution evidence ([#143](https://github.com/mohamedasem318/Serenify/pull/143)).
 - [ ] T017 Record Mohamed's production smoke-test sign-off in `smoke-tests.md` before merge.
 
 ## Dependencies
