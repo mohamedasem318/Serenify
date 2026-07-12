@@ -10,7 +10,7 @@
     "seed:reset": "tsx scripts/seed-demo.ts --reset",
     "seed:accounts": "tsx scripts/seed/seed-accounts.ts",
     "seed:accounts:local-reset": "supabase db reset && npm run seed:accounts",
-    "check:speckit-skills": "node scripts/check-speckit-skills.mjs",
+    "check:speckit-skills": "node --test scripts/check-speckit-skills.test.mjs && node scripts/check-speckit-skills.mjs",
     "test:seed": "vitest run",
     "test:seed:integration": "cross-env SUPABASE_INTEGRATION=1 vitest run"
   },

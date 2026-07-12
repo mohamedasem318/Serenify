@@ -30,7 +30,12 @@ if (missing.length) {
 }
 
 const gitignore = fs.readFileSync(".gitignore", "utf8");
-if (/^\.claude\/?\s*$/m.test(gitignore)) {
+const broadClaudeIgnore = gitignore.split(/\r?\n/).some((rawLine) => {
+  const line = rawLine.trim();
+  if (!line || line.startsWith("#") || line.startsWith("!")) return false;
+  return /^\/?(?:\*\*\/)?\.claude(?:\/(?:\*{1,2})(?:\/\*{1,2})*)?\/?$/.test(line);
+});
+if (broadClaudeIgnore) {
   console.error(
     "Broad `.claude/` rule found in .gitignore — narrow to `.claude/settings.local.json` per 7a7beff."
   );
