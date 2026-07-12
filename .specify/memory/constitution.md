@@ -356,6 +356,24 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-06-30
 - docs/BACKLOG.md work-environment-feedback anonymization-hardening item
 - specs/012-questionnaire/ (spec to follow)
+
+Amendment 14: 1.10.0 → 1.11.0 (2026-07-12, MINOR)
+Bump rationale: Azure for Students and the existing Azure Container App replace
+the previously planned DigitalOcean Droplet for backend and ML serving. The
+locked stack now authorizes FastAPI on Azure Container Apps, and Principle IX
+authorizes Azure's production secret panel alongside Vercel and Supabase. This
+is a locked-stack substitution and therefore a MINOR bump; no principle is
+added or removed and no section is restructured.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-template.md
+and .specify/templates/commands/*.md for `DigitalOcean`, `Azure Container Apps`,
+backend/ML hosting, and production secret-panel literals — no propagation is
+required. Audited CLAUDE.md and AGENTS.md; neither contains a conflicting live
+hosting or secret-panel reference. Historical DigitalOcean references remain
+unchanged.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-12
 -->
 
 # Serenify Constitution
@@ -682,7 +700,7 @@ failure that kills graduation projects.
 Secrets MUST NEVER appear in the repository.
 
 - `.env.local`, `.env.production`, and any `*.env` file MUST be gitignored.
-- Production secrets are set in the Vercel, DigitalOcean, and Supabase
+- Production secrets are set in the Vercel, Azure, and Supabase
   environment-variable panels — never in code, never in committed config,
   never in CI workflow YAML in plaintext.
 - Hardcoded API keys, hostnames pointing at private services, database
@@ -729,7 +747,7 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Layer                | Technology                                                |
 |----------------------|-----------------------------------------------------------|
 | Frontend             | Next.js 16 (App Router; `proxy.ts` replaces `middleware.ts`) on Vercel |
-| Backend + ML serving | FastAPI on a DigitalOcean Droplet                         |
+| Backend + ML serving | FastAPI on Azure Container Apps (Azure for Students)            |
 | Database / Auth / Storage / Realtime | Supabase (Postgres-based)                  |
 | Primary LLM          | Groq — `openai/gpt-oss-120b` (`reasoning_effort=low`) via API |
 | Fallback LLM         | Local LM Studio (`openai/gpt-oss-20b`) via Cloudflare Tunnel |
@@ -860,4 +878,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.10.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-06-30
+**Version**: 1.11.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-12

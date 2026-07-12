@@ -51,26 +51,19 @@ describe("clientEnvSchema", () => {
 });
 
 describe("serverEnvSchema", () => {
-  it("parses a valid server env including the service-role key", () => {
+  it("parses a valid server env without privileged secrets", () => {
     const parsed = serverEnvSchema.parse({
       supabaseUrl: validUrl,
       supabaseAnonKey: fakeKey,
-      supabaseServiceRoleKey: fakeKey,
     });
-    expect(parsed.supabaseServiceRoleKey).toBe(fakeKey);
-  });
-
-  it("throws when supabaseServiceRoleKey is missing", () => {
-    expect(() =>
-      serverEnvSchema.parse({ supabaseUrl: validUrl, supabaseAnonKey: fakeKey }),
-    ).toThrow();
+    expect(parsed.supabaseUrl).toBe(validUrl);
+    expect(parsed.supabaseAnonKey).toBe(fakeKey);
   });
 
   it("defaults siteUrl to localhost when unset", () => {
     const parsed = serverEnvSchema.parse({
       supabaseUrl: validUrl,
       supabaseAnonKey: fakeKey,
-      supabaseServiceRoleKey: fakeKey,
     });
     expect(parsed.siteUrl).toBe("http://localhost:3000");
   });
@@ -80,7 +73,6 @@ describe("serverEnvSchema", () => {
       serverEnvSchema.parse({
         supabaseUrl: validUrl,
         supabaseAnonKey: fakeKey,
-        supabaseServiceRoleKey: fakeKey,
         siteUrl: "not-a-url",
       }),
     ).toThrow();

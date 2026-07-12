@@ -71,8 +71,14 @@ the now-authed state — user had to refresh manually. Resolution above covers t
 plus the symmetric sign-out propagation (sign out in one tab → sibling tabs
 navigate to /login).
 
-### Supabase default email templates include unused 6-digit OTP block (#33)
-**Status**: polish
+### ~~Supabase default email templates include unused 6-digit OTP block~~ — resolved (#33)
+**Status**: resolved
+**Resolved**: 2026-07-11 on `chore/api-container-deploy` — added branded
+confirmation and password-recovery templates at `supabase/templates/`, wired
+them through `supabase/config.toml`, and covered the template/config contract
+with `apps/web/tests/unit/supabase-email-templates.test.ts`. Templates keep both
+`{{ .ConfirmationURL }}` and `{{ .Token }}` so the existing link and six-digit
+OTP flows both work.
 **Observed**: smoke test ST-1 of feature 001
 **Description**: Both confirmation and password-reset emails ship with a magic link AND
 a 6-digit OTP code. The app now supports OTP entry as a fallback (added during feature 001),
@@ -346,8 +352,8 @@ Specifics the future pass should evaluate:
 three existing token-tuning entries above. Not blocking any
 in-progress feature; deferred polish.
 
-### Card heading typography — fresh design read needed (#48)
-**Status**: polish
+### ~~Card heading typography — fresh design read needed (#48)~~
+**Status**: RESOLVED — 2026-07-12, fixed in feature 007 (PR #22, commit 0b71d4a): DM Serif Display replaced with Outfit system-wide; the outdated serif feel is gone.
 **Observed**: 2026-05-22, feature 003 Phase 7 eyeball (T045 re-look)
 **Description**: The three home cards ship with their headings in
 `font-display` (DM Serif Display) — `text-2xl` on TodaysCheckinCard
@@ -1284,8 +1290,8 @@ human/device-dependent runs, not code.
 **Address by**: all three BEFORE the detector ships to any real (HTTPS, real-tenant)
 environment. T004 specifically must precede the detector's first production call.
 
-### Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate (#74)
-**Status**: bug
+### ~~Thin baseline accepted as success — no minimum-usable-frames / extraction-quality gate (#74)~~
+**Status**: RESOLVED — 2026-07-12, fixed in feature 006 (commit 7a1c2da, PR #19)
 **Category**: backend / extraction quality (anchor validity)
 **Observed**: 2026-06-01, feature 005 smoke — a 60 s baseline recording in which the
 user's face was actually in frame for only **~2 s** was still accepted as success

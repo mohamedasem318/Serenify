@@ -4978,3 +4978,31 @@ session.** Two coupled decisions:
 
 **Cross-references**: `docs/CHANGELOG.md` 2026-07-03 (PR #135 entry); `docs/PROGRESS.md`
 2026-07-03 (PR #135 entry); `docs/BACKLOG.md` #134 (resolved); D-3, D-8, D-10 above.
+
+---
+
+## 2026-07-12 — Azure Container Apps for backend and ML serving
+
+**Status**: Accepted (locked-stack substitution; Constitution Amendment 14).
+
+**Decision**: Host the FastAPI backend and ML inference service on the existing Azure
+Container App under Azure for Students, replacing the planned DigitalOcean Droplet as the
+production target. Provision production-equivalent compute at 4 vCPU and 8 GiB, matching the
+capacity of the current Azure Container Instance, and use scale-to-zero to control student-credit
+consumption when the service is idle.
+
+Azure Container Apps is the selected target because Azure for Students credits and the available
+free-tier allowances reduce deployment cost while preserving the required compute profile. Its
+managed HTTPS ingress and custom-domain support provide the production path for
+`api.serenify.tech` without operating a separate TLS reverse proxy. Production secret values
+remain exclusively in the Azure, Vercel, and Supabase secret or environment panels; no value is
+recorded here or committed to the repository.
+
+**Validation and rollback**: The existing Azure Container Instance remains running as the rollback
+target until the Container App revision, health endpoint, managed HTTPS, custom domain, and
+production behavior are validated. The hosting cutover is not complete merely because this stack
+choice is ratified; failed validation returns traffic to the old ACI while the Container App is
+corrected.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 14; Constitution Principle IX
+and Technology Stack (Locked).

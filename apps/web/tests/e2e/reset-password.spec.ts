@@ -1,16 +1,14 @@
 import { expect, test } from "@playwright/test";
 
-import { createAdminClient } from "./setup/admin-client";
-import { randomEmail } from "./helpers";
+import { fetchLatestOtp, randomEmail } from "./helpers";
 
 const PASSWORD = "ResetUx123!";
 
 /**
- * UX-only coverage for the reset-password form. These tests don't
- * exercise the recovery email flow (that's ST-4 / a manual smoke
- * step) — they sign a user in directly and visit /reset-password so
- * we can assert on the validation cadence and the password-toggle
- * affordance from the new PasswordInput component.
+ * UX-only coverage for the reset-password form. These tests create a fresh
+ * user through the public signup and OTP flow, then visit /reset-password so
+ * we can assert on the validation cadence and the password-toggle affordance
+ * from the new PasswordInput component.
  *
  * /reset-password is reachable to any authenticated user because the
  * proxy doesn't bounce them off the page (it was removed from
@@ -18,23 +16,31 @@ const PASSWORD = "ResetUx123!";
  * signed-in user the form renders directly.
  */
 test.beforeEach(async ({ page }) => {
-  const admin = createAdminClient();
   const email = randomEmail("reset-ux");
-  const { data: created, error } = await admin.auth.admin.createUser({
-    email,
-    password: PASSWORD,
-    email_confirm: true,
-    user_metadata: { full_name: "Reset Ux" },
-  });
-  if (error || !created.user) {
-    throw error ?? new Error("createUser returned no user");
-  }
 
-  await page.goto("/login");
+  await page.goto("/signup");
+  await page.getByLabel("Full name").fill("Reset Ux");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  await page.getByRole("button", { name: "Create account" }).click();
+  await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
+
+  const otp = await fetchLatestOtp(email);
+  expect(otp).toMatch(/^\d{6}$/);
+  await page.getByLabel("Digit 1").click();
+  await page.keyboard.type(otp);
+  await expect(page).toHaveURL(/\/(app|onboarding)$/, { timeout: 10_000 });
+
+  if (new URL(page.url()).pathname === "/onboarding") {
+    await page.getByLabel("Full name").fill("Reset Ux");
+    await page.getByRole("button", { name: "Continue" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Set your calm baseline" }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Turn on camera" }).click();
+    await page.getByRole("button", { name: "Not now" }).click();
+    await expect(page).toHaveURL(/\/app$/);
+  }
 
   await page.goto("/reset-password");
   await expect(

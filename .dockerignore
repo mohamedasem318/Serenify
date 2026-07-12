@@ -1,0 +1,61 @@
+# Build context is the REPO ROOT (docker build -f apps/api/Dockerfile .). Only
+# packages/ml-video, packages/llm-client and apps/api are COPYed into the image;
+# the `**/`-prefixed rules below keep secrets, virtualenvs, caches and tests OUT of
+# those copied trees, and the plain rules trim the context sent to the daemon.
+
+# --- Secrets: NEVER bake env files into the image (Principle IX; runtime env only) ---
+**/.env
+**/.env.*
+
+# --- Python virtualenvs (Windows-built here; useless + huge in a linux image) ---
+**/.venv
+**/venv
+
+# --- Python caches / coverage / build cruft ---
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.ruff_cache
+**/.mypy_cache
+**/.coverage
+**/.coverage.*
+**/htmlcov
+**/*.egg-info
+**/.python-version
+
+# --- Tests (not needed at runtime) ---
+**/tests
+
+# --- The web app + Node toolchain (not part of this image) ---
+apps/web
+**/node_modules
+**/.next
+**/out
+**/dist
+**/build
+
+# --- Docs, specs, thesis, mocks, scratch ---
+docs
+specs
+.specify
+.agents
+.claude
+scripts
+supabase
+_scratch-*
+*.html
+
+# --- Smoke / validation / keep-up scratch harnesses ---
+.smoke_*
+.validation_*
+.azure_keepup_*
+
+# --- VCS / CI / editor / OS ---
+.git
+.gitignore
+.gitattributes
+.github
+.vscode
+.idea
+**/.DS_Store
+**/Thumbs.db
