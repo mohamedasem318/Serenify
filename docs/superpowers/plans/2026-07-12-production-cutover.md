@@ -4,7 +4,7 @@
 
 **Goal:** Publish Serenify's RLS-as-user FastAPI backend at `https://api.serenify.tech` on a cost-controlled 4 vCPU / 8 GiB Azure Container App and ship Graphite-branded Supabase auth emails.
 
-**Architecture:** Keep the existing Supabase Cloud and Next.js boundaries. After local release verification, check Azure student-credit balance and provision a fresh private registry plus Azure Container App with scale-to-zero, then front it with Azure managed TLS and Cloudflare DNS. Keep security, email design, and infrastructure changes in separate commits.
+**Architecture:** Keep the existing Supabase Cloud and Next.js boundaries. After local release verification, publish the image from the public repository to GitHub Container Registry through a repository-scoped GitHub Action, then check Azure student-credit balance and provision a fresh Azure Container App with scale-to-zero. Front it with Azure managed TLS and Cloudflare DNS. Keep security, email design, and infrastructure changes in separate commits.
 
 **Tech Stack:** FastAPI, Azure Container Apps, Azure CLI, Cloudflare DNS, Supabase Auth/Postgres RLS, Resend SMTP, HTML email, Vitest, pytest.
 
@@ -190,15 +190,15 @@ deleted resources without printing environment variable values.
 - [ ] **Step 2: Build and provision fresh resources**
 
 ```powershell
+gh workflow run publish-api-image.yml --ref chore/api-container-deploy
+gh run watch --exit-status
 az group create -n serenify-prod-rg -l francecentral
-az acr create -g serenify-prod-rg -n serenifyacr38443bf9 --sku Basic
-az acr build -g serenify-prod-rg -r serenifyacr38443bf9 `
-  -t serenify-api:production -f apps/api/Dockerfile .
 ```
 
-Create a Container Apps environment and `serenify-api` app from that private image with external
-port 8000, 4 CPU, 8Gi memory, `minReplicas=0`, and `maxReplicas=1`. Store runtime values as Azure
-Container App secrets and references. Expected: a healthy first revision and HTTPS `/healthz`.
+Create a Container Apps environment and `serenify-api` app from
+`ghcr.io/mohamedasem318/serenify-api:production` with external port 8000, 4 CPU, 8Gi memory,
+`minReplicas=0`, and `maxReplicas=1`. Store runtime values as Azure Container App secrets and
+references. Expected: a healthy first revision and HTTPS `/healthz`.
 
 - [ ] **Step 3: Configure DNS validation and custom domain**
 
@@ -216,9 +216,9 @@ Expected: HTTP 200 with `status=ready` and the locked model version. Verify CORS
 
 - [ ] **Step 5: Measure and report credit lifetime**
 
-Capture Azure Cost Management usage after the test window, separate the always-on Basic registry
-cost from active Container Apps compute, and calculate conservative credit-lifetime scenarios for
-idle scale-to-zero and expected demo traffic. Do not leave test-only duplicate resources active.
+Capture Azure Cost Management usage after the test window and calculate conservative
+credit-lifetime scenarios for idle scale-to-zero and expected demo traffic. GitHub Container
+Registry contributes no Azure charge. Do not leave test-only duplicate resources active.
 
 ### Task 5: Configure Supabase Auth Delivery and Final Verification
 
