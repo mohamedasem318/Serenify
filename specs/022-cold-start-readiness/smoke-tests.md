@@ -27,7 +27,7 @@
 
 ## Sign-Off
 
-- **Automated evidence recorded by**: Codex, 2026-07-13 — 948 Vitest tests; ESLint 0 errors (2 pre-existing warnings); TypeScript and Turbopack production build passed; SpecKit positive/negative guard passed; 360px/desktop light/dark browser geometry and contrast passed.
+- **Automated evidence recorded by**: Codex, 2026-07-13 — 952 Vitest tests; ESLint 0 errors (2 pre-existing warnings); TypeScript and Turbopack production build passed; 8 SpecKit guard fixtures plus the live guard passed; 4 committed Playwright checks passed at 360px/desktop in light/dark; the layout harness returned 404 from the production build.
 - **Production result**: Pending
 - **Mohamed approval**: Pending
 - **Date**: Pending
