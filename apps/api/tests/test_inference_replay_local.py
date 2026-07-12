@@ -74,7 +74,8 @@ def _local_config() -> dict[str, str] | None:
 pytestmark = pytest.mark.skipif(
     not _FIXTURES or _local_config() is None,
     reason=(
-        "continuous fixtures (gitignored), local Supabase config, or caller access token absent — local-only "
+        "continuous fixtures (gitignored), local Supabase config, or caller access "
+        "token absent — local-only "
         "replay; the CI guards are the representation-rejecting fakes in "
         "test_inference_service.py / test_monitoring_endpoints.py"
     ),
