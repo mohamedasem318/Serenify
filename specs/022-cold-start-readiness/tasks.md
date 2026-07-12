@@ -6,30 +6,30 @@
 
 ## Phase 1: Bounded Wake Requests
 
-- [ ] T001 [US1] Add a failing default-timeout test in `apps/web/lib/api/anchor-client.test.ts`.
-- [ ] T002 [US1] Change `checkHealth` default timeout to 75 seconds and verify focused tests pass.
-- [ ] T003 [US2] Add a failing abort/result test in `apps/web/tests/unit/lib/monitoring-client.test.ts`.
-- [ ] T004 [US2] Add a bounded `AbortController` timeout to `createSession` and verify focused tests pass.
+- [x] T001 [US1] Add a failing default-timeout test in `apps/web/lib/api/anchor-client.test.ts`.
+- [x] T002 [US1] Change `checkHealth` default timeout to 75 seconds and verify focused tests pass.
+- [x] T003 [US2] Add a failing abort/result test in `apps/web/tests/unit/lib/monitoring-client.test.ts`.
+- [x] T004 [US2] Add a bounded `AbortController` timeout to `createSession` and verify focused tests pass.
 
 ## Phase 2: Accessible Responsive Pending State
 
-- [ ] T005 [US2] Add failing pending, camera-order, and duplicate-activation tests in monitor component suites.
-- [ ] T006 [US2] Add local `starting` state to `MonitoringSession` and expose it through `OpSurfaces`.
-- [ ] T007 [US2] Keep the existing 48px meadow action, disable/relabel it during wake, and add polite live status semantics.
-- [ ] T008 [US1] Add a failing calibration copy assertion and update the existing checking message.
-- [ ] T009 [US1] Verify pending copy and controls at 360px and desktop in light and dark themes without clipping or overlap.
+- [x] T005 [US2] Add failing pending, camera-order, and duplicate-activation tests in monitor component suites.
+- [x] T006 [US2] Add local `starting` state to `MonitoringSession` and expose it through `OpSurfaces`.
+- [x] T007 [US2] Keep the existing 48px meadow action, disable/relabel it during wake, and add polite live status semantics.
+- [x] T008 [US1] Add a failing calibration copy assertion and update the existing checking message.
+- [x] T009 [US1] Verify pending copy and controls at 360px and desktop in light and dark themes without clipping or overlap.
 
 ## Phase 3: SpecKit Guard
 
-- [ ] T010 [US3] Port only the prepared workflow, package script, guard script, and required managed skill into the isolated branch.
-- [ ] T011 [US3] Run the guard successfully in the repository.
-- [ ] T012 [US3] Prove the guard fails against a temporary fixture missing one required `SKILL.md`.
+- [x] T010 [US3] Port only the prepared workflow, package script, guard script, and required managed skill into the isolated branch.
+- [x] T011 [US3] Run the guard successfully in the repository.
+- [x] T012 [US3] Prove the guard fails against a temporary fixture missing one required `SKILL.md`.
 
 ## Phase 4: Verification and Delivery
 
-- [ ] T013 Run focused tests, full Vitest, lint, typecheck, and production build.
-- [ ] T014 Run the SpecKit guard, diff check, secret scan, and all ten constitution checks.
-- [ ] T015 Run `graphify update .` and keep generated graph artifacts out of the PR.
+- [x] T013 Run focused tests, full Vitest, lint, typecheck, and production build.
+- [x] T014 Run the SpecKit guard, diff check, secret scan, and all ten constitution checks.
+- [x] T015 Run `graphify update .` and keep generated graph artifacts out of the PR.
 - [ ] T016 Push the branch and open a PR with test and constitution evidence.
 - [ ] T017 Record Mohamed's production smoke-test sign-off in `smoke-tests.md` before merge.
 

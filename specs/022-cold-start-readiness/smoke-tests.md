@@ -6,14 +6,14 @@
 
 ## Automated Pre-Merge Evidence
 
-- [ ] Health request remains pending before 75 seconds and aborts at the boundary.
-- [ ] Monitoring session creation maps timeout to the existing network failure.
-- [ ] Check-in wake state is disabled and politely announced.
-- [ ] Camera remains unopened while session creation is pending.
-- [ ] Repeated activation creates only one session.
-- [ ] Calibration wake copy explains the expected delay.
-- [ ] 360px and desktop layouts have no clipping or overlap in light and dark themes.
-- [ ] Full tests, lint, typecheck, build, CI guard, diff, and secrets checks pass.
+- [x] Health request remains pending before 75 seconds and aborts at the boundary.
+- [x] Monitoring session creation maps timeout to the existing network failure.
+- [x] Check-in wake state is disabled and politely announced.
+- [x] Camera remains unopened while session creation is pending.
+- [x] Repeated activation creates only one session.
+- [x] Calibration wake copy explains the expected delay.
+- [x] 360px and desktop layouts have no clipping or overlap in light and dark themes.
+- [x] Full tests, lint, typecheck, build, CI guard, diff, and secrets checks pass.
 
 ## Production Smoke Procedure
 
@@ -27,7 +27,7 @@
 
 ## Sign-Off
 
-- **Automated evidence recorded by**: Pending
+- **Automated evidence recorded by**: Codex, 2026-07-13 — 948 Vitest tests; ESLint 0 errors (2 pre-existing warnings); TypeScript and Turbopack production build passed; SpecKit positive/negative guard passed; 360px/desktop light/dark browser geometry and contrast passed.
 - **Production result**: Pending
 - **Mohamed approval**: Pending
 - **Date**: Pending
