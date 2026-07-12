@@ -8,26 +8,24 @@ The fix is ``insert_reading(..., returning=minimal)`` (see ``app/supabase_user.p
 
 It replays the **real continuous device-gate fixtures** (the growing contiguous
 recording-so-far at ~62/122/182/241/301 s) through the **real ASGI app** against **real
-local Supabase**, signing in a seeded demo employee against **real GoTrue** to get a real
-access token — no camera, no browser, no stubbed sub-calls. It asserts the sequence is all
-``200`` (the regression was 500) and reaches a ``reading`` only after ``M=4`` scored windows.
+local Supabase** using a caller access token supplied by the developer — no camera, no browser,
+no stubbed sub-calls. It asserts the sequence is all ``200`` (the regression was 500) and
+reaches a ``reading`` only after ``M=4`` scored windows.
 
 It is **local-only and skips cleanly** when its prerequisites are absent (mirroring
 ``packages/ml-video/tests/test_tail_window.py`` assertion 3):
   * the continuous fixtures are **gitignored** (not in CI);
-  * it needs a **running local Supabase** with the demo seed (``npm run seed``);
+  * it needs a **running local Supabase** with a caller that has a calibrated anchor;
   * it reads the dev's local Supabase config from the standard env files.
+  * ``SERENIFY_LOCAL_REPLAY_ACCESS_TOKEN`` must hold that caller's access token.
 The CI-runnable guards for the same bug are the fakes in ``test_inference_service.py`` /
 ``test_monitoring_endpoints.py`` (their ``window_readings`` insert rejects a representation
 read-back, mirroring the real 42501).
-
-The **service-role key is used only as harness scaffolding** to discover a seeded
-employee's email; the endpoint path under test uses the **user token + anon key only**
-(no service-role), exactly as production does.
 """
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -38,8 +36,8 @@ _FIXTURE_DIR = (
 )
 _FIXTURES = sorted(_FIXTURE_DIR.glob("recording-so-far_*.webm"))
 
-_SHARED_DEMO_PASSWORD = "DemoUser123!"  # scripts/seed-demo.ts SHARED_PASSWORD (demo cohort)
 _BANDS = {"at_ease", "a_little_tense", "tense"}
+_ACCESS_TOKEN_ENV = "SERENIFY_LOCAL_REPLAY_ACCESS_TOKEN"
 
 
 def _parse_env_file(path: Path) -> dict[str, str]:
@@ -67,56 +65,20 @@ def _local_config() -> dict[str, str] | None:
     url = api_env.get("SUPABASE_URL") or web_env.get("NEXT_PUBLIC_SUPABASE_URL")
     anon = api_env.get("SUPABASE_ANON_KEY") or web_env.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
     secret = api_env.get("SUPABASE_JWT_SECRET")
-    service_role = web_env.get("SUPABASE_SERVICE_ROLE_KEY")
-    if not (url and anon and secret and service_role):
+    access_token = os.environ.get(_ACCESS_TOKEN_ENV)
+    if not (url and anon and secret and access_token):
         return None
-    return {"url": url, "anon": anon, "secret": secret, "service_role": service_role}
+    return {"url": url, "anon": anon, "secret": secret, "access_token": access_token}
 
 
 pytestmark = pytest.mark.skipif(
     not _FIXTURES or _local_config() is None,
     reason=(
-        "continuous fixtures (gitignored) or local Supabase config absent — local-only "
+        "continuous fixtures (gitignored), local Supabase config, or caller access token absent — local-only "
         "replay; the CI guards are the representation-rejecting fakes in "
         "test_inference_service.py / test_monitoring_endpoints.py"
     ),
 )
-
-
-def _discover_employee_email(cfg: dict[str, str], httpx) -> str:
-    """A seeded demo employee with a calibrated anchor. Service-role is SCAFFOLDING only
-    (to look up the email) — never on the endpoint path under test."""
-    svc = {"apikey": cfg["service_role"], "Authorization": f"Bearer {cfg['service_role']}"}
-    rows = httpx.get(
-        f"{cfg['url']}/rest/v1/profiles",
-        params={
-            "select": "id,role,anchor_captured_at",
-            "role": "eq.employee",
-            "anchor_captured_at": "not.is.null",
-            "limit": "1",
-        },
-        headers=svc,
-        timeout=10.0,
-    ).json()
-    if not rows:
-        pytest.skip("no calibrated demo employee — run `npm run seed` against local Supabase")
-    uid = rows[0]["id"]
-    user = httpx.get(f"{cfg['url']}/auth/v1/admin/users/{uid}", headers=svc, timeout=10.0).json()
-    return user["email"]
-
-
-def _sign_in(cfg: dict[str, str], email: str, httpx) -> str:
-    """Real GoTrue password grant → a real access token (exercises real JWT verification)."""
-    resp = httpx.post(
-        f"{cfg['url']}/auth/v1/token",
-        params={"grant_type": "password"},
-        json={"email": email, "password": _SHARED_DEMO_PASSWORD},
-        headers={"apikey": cfg["anon"], "Content-Type": "application/json"},
-        timeout=10.0,
-    )
-    if resp.status_code != 200:
-        pytest.skip(f"demo employee sign-in failed ({resp.status_code}) — reseed local Supabase")
-    return resp.json()["access_token"]
 
 
 def test_replay_continuous_fixtures_reaches_a_reading():
@@ -124,7 +86,6 @@ def test_replay_continuous_fixtures_reaches_a_reading():
 
     The core regression assertion is that **every** window returns ``200`` (the bug 500-ed
     them) and the sequence reaches a ``reading`` exactly when the 4th scored window lands."""
-    import httpx
     from fastapi.testclient import TestClient
 
     from app.config import Settings, get_settings
@@ -132,13 +93,6 @@ def test_replay_continuous_fixtures_reaches_a_reading():
 
     cfg = _local_config()
     assert cfg is not None  # guarded by pytestmark
-
-    # Reachability + a seeded employee, else skip (Supabase down / not seeded).
-    try:
-        email = _discover_employee_email(cfg, httpx)
-        token = _sign_in(cfg, email, httpx)
-    except httpx.HTTPError as exc:
-        pytest.skip(f"local Supabase not reachable: {exc!r}")
 
     # A real app whose REQUEST-path settings are the real local Supabase config, isolated to
     # this app instance via dependency_overrides (no global env / settings-cache mutation, so
@@ -152,7 +106,9 @@ def test_replay_continuous_fixtures_reaches_a_reading():
     app = create_app()
     app.dependency_overrides[get_settings] = lambda: real_settings
 
-    auth = {"Authorization": f"Bearer {token}"}
+    # The API forwards this caller bearer with cfg["anon"] as its PostgREST apikey, matching
+    # the RLS-as-user production path. The harness neither creates nor discovers a token.
+    auth = {"Authorization": f"Bearer {cfg['access_token']}"}
     with TestClient(app) as client:
         created = client.post("/monitoring/sessions", headers=auth)
         assert created.status_code == 201, created.text
