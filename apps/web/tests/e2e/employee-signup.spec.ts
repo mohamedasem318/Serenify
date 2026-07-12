@@ -1,14 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { createAdminClient } from "./setup/admin-client";
-import { randomEmail } from "./helpers";
+import { fetchLatestOtp, randomEmail } from "./helpers";
 
 const PASSWORD = "Employee123!";
 
-test("employee can sign up, bypass-confirm, sign in, onboard, see role", async ({
+test("employee can sign up, confirm OTP, and see the employee app", async ({
   page,
 }) => {
-  const admin = createAdminClient();
   const email = randomEmail("employee");
 
   // /signup form happy path.
@@ -19,24 +17,14 @@ test("employee can sign up, bypass-confirm, sign in, onboard, see role", async (
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
 
-  // Bypass email confirmation via admin client (research R-4).
-  const { data: list } = await admin.auth.admin.listUsers({ perPage: 200 });
-  const created = list.users.find((u) => u.email === email);
-  expect(created).toBeTruthy();
-  await admin.auth.admin.updateUserById(created!.id, { email_confirm: true });
+  const otp = await fetchLatestOtp(email);
+  expect(otp).toMatch(/^\d{6}$/);
 
-  // Clear the unconfirmed-signup session cookies so the next /login
-  // navigation actually shows the form (otherwise the proxy would bounce
-  // a signed-in user to /app).
-  await page.context().clearCookies();
-
-  // Sign in. full_name was carried via raw_user_meta_data, so the proxy
-  // routes straight to /app — no onboarding stop.
-  await page.goto("/login");
-  await page.getByLabel("Email").fill(email);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page).toHaveURL(/\/app$/);
+  // Enter the OTP through the rendered six-box panel. Completion verifies the
+  // user session and navigates to the authenticated app.
+  await page.getByLabel("Digit 1").click();
+  await page.keyboard.type(otp);
+  await expect(page).toHaveURL(/\/app$/, { timeout: 10_000 });
   // Phase 7 T044: the role-banner testid is no longer rendered for
   // employees — they see the welcome banner + skeleton cards now.
   // T057's "drop role-banner / use welcome banner" guidance applied

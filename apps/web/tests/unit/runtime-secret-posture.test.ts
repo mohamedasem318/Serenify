@@ -6,6 +6,10 @@ import { describe, expect, it } from "vitest";
 const webRoot = resolve(__dirname, "../..");
 const productionRoots = ["app", "lib"].map((dir) => resolve(webRoot, dir));
 const replayHarness = resolve(webRoot, "../api/tests/test_inference_replay_local.py");
+const authE2eSpecs = [
+  resolve(webRoot, "tests/e2e/employee-signup.spec.ts"),
+  resolve(webRoot, "tests/e2e/reset-password.spec.ts"),
+];
 const forbiddenRuntimeTokens = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "service_role",
@@ -43,6 +47,17 @@ describe("runtime secret posture", () => {
   it("keeps service-role/admin-client code out of production runtime and replay files", () => {
     const files = [...productionRoots.flatMap(sourceFiles), replayHarness];
     const violations = files.flatMap((file) => {
+      const source = stripNonExecutableText(readFileSync(file, "utf8"), file);
+      return forbiddenRuntimeTokens
+        .filter((token) => source.includes(token))
+        .map((token) => `${file.replace(`${webRoot}\\`, "")}: ${token}`);
+    });
+
+    expect(violations).toEqual([]);
+  });
+
+  it("keeps privileged auth bypasses out of auth e2e specs", () => {
+    const violations = authE2eSpecs.flatMap((file) => {
       const source = stripNonExecutableText(readFileSync(file, "utf8"), file);
       return forbiddenRuntimeTokens
         .filter((token) => source.includes(token))
