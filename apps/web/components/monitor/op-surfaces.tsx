@@ -200,7 +200,13 @@ function SignedOutPanel() {
  * retry that re-attempts the create (the camera is never opened until a session is confirmed).
  * Mirrors BlockedPanel's shape; the icon + copy point at the connection, not the webcam.
  */
-function ServiceUnavailablePanel({ onRetry }: { onRetry: () => void }) {
+function ServiceUnavailablePanel({
+  onRetry,
+  starting,
+}: {
+  onRetry: () => void;
+  starting: boolean;
+}) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
       <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
@@ -211,9 +217,14 @@ function ServiceUnavailablePanel({ onRetry }: { onRetry: () => void }) {
         We couldn&apos;t reach the check-in service to start your session. It&apos;s usually a
         brief blip — try again in a moment.
       </p>
-      <div className="mt-5">
-        <Button onClick={onRetry} variant="outline" className="h-12 px-6 text-base">
-          Try again
+      <div className="mt-5 max-w-full" aria-live="polite" aria-atomic="true">
+        <Button
+          onClick={onRetry}
+          disabled={starting}
+          variant="outline"
+          className="h-12 max-w-full px-6 text-base"
+        >
+          {starting ? "Waking Serenify..." : "Try again"}
         </Button>
       </div>
     </div>
@@ -395,7 +406,7 @@ export function OpSurfaces({
     case "signed-out":
       return <SignedOutPanel />;
     case "service-unavailable":
-      return <ServiceUnavailablePanel onRetry={onRetryBlocked} />;
+      return <ServiceUnavailablePanel onRetry={onRetryBlocked} starting={starting} />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
     case "out-of-frame":

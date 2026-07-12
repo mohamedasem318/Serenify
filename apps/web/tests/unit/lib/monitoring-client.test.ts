@@ -54,6 +54,32 @@ describe("createSession — cold-start timeout", () => {
     await expect(request).resolves.toEqual({ ok: false, kind: "network" });
     expect(signal?.aborted).toBe(true);
   });
+
+  it("keeps the timeout active while the success response body is parsed", async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        signal = init?.signal ?? undefined;
+        return Promise.resolve({
+          status: 201,
+          json: () =>
+            new Promise((_resolve, reject) => {
+              signal?.addEventListener("abort", () =>
+                reject(new DOMException("Aborted", "AbortError")),
+              );
+            }),
+        } as Response);
+      }),
+    );
+
+    const request = createSession("tok");
+    await vi.advanceTimersByTimeAsync(75_000);
+
+    expect(signal?.aborted).toBe(true);
+    await expect(request).resolves.toEqual({ ok: false, kind: "network" });
+  });
 });
 
 describe("endSession — re-end race", () => {

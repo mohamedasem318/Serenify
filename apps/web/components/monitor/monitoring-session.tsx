@@ -207,6 +207,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // concurrent acquire attempts (double-click / a re-trigger) can't each pass the
   // sessionIdRef reuse check and spawn a second session (the "two POST /sessions" bug).
   const creatingRef = useRef(false);
+  const mountedRef = useRef(true);
   // Back-pressure for the window upload loop (008 BACKLOG #78 note (b)): never two uploads in
   // flight at once. `uploadInFlightRef` is the synchronous guard; `pendingClipRef` holds the
   // single most-recent window captured WHILE one is in flight (coalesced — older queued
@@ -468,8 +469,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     try {
       stream = await deps.getUserMedia({ video: true, audio: false }); // mic off (audio is feature 013)
     } catch (err) {
+      if (!mountedRef.current) return false;
       const kind = cameraErrorKind(err).replace("camera-", "") as CameraErrorKind;
       dispatch({ type: "CAMERA_ERROR", kind });
+      return false;
+    }
+
+    if (!mountedRef.current) {
+      stream.getTracks().forEach((track) => track.stop());
       return false;
     }
 
@@ -546,6 +553,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
       setStarting(true);
       try {
         const session = await deps.getSession();
+        if (!mountedRef.current) return;
         if (!session) {
           // No browser session (signed out / un-refreshable) — an AUTH state, not a camera
           // block. Route to the honest "sign in again" surface, never "turn your camera back
@@ -555,6 +563,10 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         }
         tokenRef.current = session.accessToken;
         const created = await deps.createSession(session.accessToken);
+        if (!mountedRef.current) {
+          if (created.ok) await deps.endSession(created.sessionId, "error", session.accessToken);
+          return;
+        }
         if (!created.ok) {
           // Route each create failure to its HONEST surface — never flatten a backend/auth
           // failure into "Camera access is blocked · turn it back on in browser settings"
@@ -582,13 +594,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         // Cleared on every exit (success OR an error return) so a later retry can create
         // again; the in-flight window is only the span of the awaits above.
         creatingRef.current = false;
-        setStarting(false);
+        if (mountedRef.current) setStarting(false);
       }
     }
 
     // Only NOW open the camera — after a confirmed 201.
+    if (!mountedRef.current) return;
     const opened = await openCameraAndRecord();
-    if (opened) dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
+    if (opened && mountedRef.current) dispatch({ type: "CAMERA_GRANTED" }); // → warming-up
   }, [deps, dispatch, openCameraAndRecord, stopStream]);
 
   const handleRetryBlocked = useCallback(() => {
@@ -747,10 +760,14 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
 
   // Release the camera + recorder + monitor on unmount / route navigation (privacy).
   useEffect(
-    () => () => {
-      presenceRef.current?.stop();
-      recorderRef.current?.stop();
-      stopStream();
+    () => {
+      mountedRef.current = true;
+      return () => {
+        mountedRef.current = false;
+        presenceRef.current?.stop();
+        recorderRef.current?.stop();
+        stopStream();
+      };
     },
     [stopStream],
   );

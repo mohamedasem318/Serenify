@@ -72,32 +72,31 @@ export async function createSession(
 ): Promise<CreateSessionResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let res: Response;
   try {
-    res = await fetch(SESSIONS_ENDPOINT, {
+    const res = await fetch(SESSIONS_ENDPOINT, {
       method: "POST",
       headers: authHeaders(accessToken),
       signal: controller.signal,
     });
+
+    if (res.status === 201) {
+      const body = await res.json();
+      return { ok: true, sessionId: body.session_id, modelVersion: body.model_version };
+    }
+    switch (res.status) {
+      case 409:
+        return { ok: false, kind: "no_anchor" };
+      case 403:
+        return { ok: false, kind: "forbidden_role" };
+      case 401:
+        return { ok: false, kind: "unauthorized" };
+      default:
+        return { ok: false, kind: "unknown" };
+    }
   } catch {
     return { ok: false, kind: "network" };
   } finally {
     clearTimeout(timer);
-  }
-
-  if (res.status === 201) {
-    const body = await res.json();
-    return { ok: true, sessionId: body.session_id, modelVersion: body.model_version };
-  }
-  switch (res.status) {
-    case 409:
-      return { ok: false, kind: "no_anchor" };
-    case 403:
-      return { ok: false, kind: "forbidden_role" };
-    case 401:
-      return { ok: false, kind: "unauthorized" };
-    default:
-      return { ok: false, kind: "unknown" };
   }
 }
 

@@ -148,6 +148,24 @@ describe("OpSurfaces — service-unavailable (backend down, NOT the camera)", ()
     expect(onRetry).toHaveBeenCalled();
     expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
   });
+
+  it("disables and announces a retry while the service wakes", () => {
+    const onRetry = vi.fn();
+    render(
+      <OpSurfaces
+        state={{ op: "service-unavailable", band: null, skipCause: null }}
+        starting
+        onAllow={noop}
+        onRetryBlocked={onRetry}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: /waking serenify/i });
+    expect(button).toBeDisabled();
+    expect(button.parentElement).toHaveAttribute("aria-live", "polite");
+    fireEvent.click(button);
+    expect(onRetry).not.toHaveBeenCalled();
+  });
 });
 
 describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => {
