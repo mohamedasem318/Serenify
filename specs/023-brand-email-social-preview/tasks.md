@@ -18,5 +18,5 @@
 - [x] T008 Render and visually inspect both email previews and the social image.
 - [x] T009 Run focused tests, full web test, lint, typecheck, and production build.
 - [x] T010 Run secret/constitution/diff checks and `graphify update .` when available.
-- [ ] T011 Push, open the PR, record its number in BACKLOG, and close GitHub issue #38.
+- [x] T011 Push, open the PR, record its number in BACKLOG, and close GitHub issue #38.
 - [ ] T012 After squash merge, remove the task branch/worktree and leave local main current without disturbing user-owned files.
