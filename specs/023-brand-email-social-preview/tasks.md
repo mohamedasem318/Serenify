@@ -11,7 +11,7 @@
 - [x] T004 Align both HTML wordmarks and center both CTA cells.
 - [x] T005 Add production metadata and the fixed Graphite Open Graph image route.
 - [x] T006 Verify the existing password reset action satisfies its regression tests without behavior changes.
-- [ ] T007 Resolve BACKLOG #38 with date and delivery reference.
+- [x] T007 Resolve BACKLOG #38 with date and delivery reference.
 
 ## Phase 3: Verification and Delivery
 

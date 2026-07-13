@@ -131,12 +131,11 @@ if you want to support both hostnames in dev.
 **Address by**: optional; not blocking.
 
 ### Force re-sign-in after password reset (security alternative) (#38)
-**Status**: deferred-feature
-**Observed**: design discussion during feature 001
-**Description**: Current behavior auto-signs-in the user after a successful PKCE password
-reset (industry standard for SaaS). Some workplace security postures prefer forcing a
-re-sign-in with the new password. Could be made a per-deployment config later.
-**Address by**: revisit if a corporate deployment requires it.
+**Status**: resolved — 2026-07-13 (implemented in `d4621fe`; verified in PR #144)
+**Observed**: design discussion during feature 001; implementation re-verified for production
+**Resolution**: A successful PKCE password update calls `auth.signOut()` before the client
+routes to `/login?flash=password_updated`. A focused server-action regression test now locks
+the update-before-sign-out order and proves failed updates do not end the recovery session.
 
 ### Dedicated `/verify-otp` route (instead of inline panels) (#39)
 **Status**: deferred-feature
