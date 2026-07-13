@@ -68,6 +68,14 @@ describe("GreenRoom (FR-005–011)", () => {
     expect(screen.queryByText(/you.re all set/i)).toBeNull();
   });
 
+  it("explains the expected cold-start wait while the backend health check is pending", () => {
+    render(<GreenRoom {...base} guide="active" ready={false} gate="ready" checking />);
+    expect(
+      screen.getByText(/waking serenify.*about a minute after some time away/i),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /i.m ready/i })).toBeDisabled();
+  });
+
   it("offers a calm 'Not now' exit and shows the device picker", () => {
     const onNotNow = vi.fn();
     render(

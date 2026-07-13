@@ -51,7 +51,13 @@ const STATELINE_CLASS: Record<StatelineTone, string> = {
   muted: "text-muted", // warming-up — neutral, not amber
 };
 
-function PermissionPanel({ onAllow }: { onAllow: () => void }) {
+function PermissionPanel({
+  onAllow,
+  starting,
+}: {
+  onAllow: () => void;
+  starting: boolean;
+}) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
       <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-meadow/15 text-meadow">
@@ -61,9 +67,14 @@ function PermissionPanel({ onAllow }: { onAllow: () => void }) {
       <p className="text-pretty text-base leading-relaxed text-muted">
         Reads facial cues to gauge stress while you work. Your manager never sees your video.
       </p>
-      <div className="mt-5">
-        <Button onClick={onAllow} variant="meadow" className="h-12 px-6 text-base">
-          Allow camera access
+      <div className="mt-5 max-w-full" aria-live="polite" aria-atomic="true">
+        <Button
+          onClick={onAllow}
+          disabled={starting}
+          variant="meadow"
+          className="h-12 max-w-full px-6 text-base"
+        >
+          {starting ? "Waking Serenify..." : "Allow camera access"}
         </Button>
       </div>
     </div>
@@ -189,7 +200,13 @@ function SignedOutPanel() {
  * retry that re-attempts the create (the camera is never opened until a session is confirmed).
  * Mirrors BlockedPanel's shape; the icon + copy point at the connection, not the webcam.
  */
-function ServiceUnavailablePanel({ onRetry }: { onRetry: () => void }) {
+function ServiceUnavailablePanel({
+  onRetry,
+  starting,
+}: {
+  onRetry: () => void;
+  starting: boolean;
+}) {
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-2 text-center">
       <span className="mb-2 grid size-16 place-items-center rounded-2xl bg-foggy/15 text-foggy">
@@ -200,9 +217,14 @@ function ServiceUnavailablePanel({ onRetry }: { onRetry: () => void }) {
         We couldn&apos;t reach the check-in service to start your session. It&apos;s usually a
         brief blip — try again in a moment.
       </p>
-      <div className="mt-5">
-        <Button onClick={onRetry} variant="outline" className="h-12 px-6 text-base">
-          Try again
+      <div className="mt-5 max-w-full" aria-live="polite" aria-atomic="true">
+        <Button
+          onClick={onRetry}
+          disabled={starting}
+          variant="outline"
+          className="h-12 max-w-full px-6 text-base"
+        >
+          {starting ? "Waking Serenify..." : "Try again"}
         </Button>
       </div>
     </div>
@@ -360,6 +382,7 @@ function PausedStage({
 
 export function OpSurfaces({
   state,
+  starting = false,
   onAllow,
   onRetryBlocked,
   onPause = () => {},
@@ -367,6 +390,7 @@ export function OpSurfaces({
   onEnd = () => {},
 }: {
   state: MonitorState;
+  starting?: boolean;
   onAllow: () => void;
   onRetryBlocked: () => void;
   /** US2 lifecycle handlers (optional so the US1 panels render standalone in tests). */
@@ -376,13 +400,13 @@ export function OpSurfaces({
 }) {
   switch (state.op) {
     case "permission":
-      return <PermissionPanel onAllow={onAllow} />;
+      return <PermissionPanel onAllow={onAllow} starting={starting} />;
     case "blocked":
       return <BlockedPanel kind={state.cameraError ?? "blocked"} onRetry={onRetryBlocked} />;
     case "signed-out":
       return <SignedOutPanel />;
     case "service-unavailable":
-      return <ServiceUnavailablePanel onRetry={onRetryBlocked} />;
+      return <ServiceUnavailablePanel onRetry={onRetryBlocked} starting={starting} />;
     case "calibrate-first":
       return <CalibrateFirstPanel />;
     case "out-of-frame":

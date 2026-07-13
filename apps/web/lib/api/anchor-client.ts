@@ -74,7 +74,7 @@ export async function postAnchor(clip: Blob, accessToken: string): Promise<Ancho
  * accepts the connection but never responds — from stalling the Start click
  * indefinitely; a killed backend already rejects fast (connection refused).
  */
-export async function checkHealth(timeoutMs = 4000): Promise<boolean> {
+export async function checkHealth(timeoutMs = 75_000): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {

@@ -34,6 +34,7 @@ export function GreenRoom({
   guide,
   gate,
   ready,
+  checking = false,
   serviceUnavailable = false,
   devicePicker,
   onReady,
@@ -42,6 +43,8 @@ export function GreenRoom({
   guide: GuideState;
   gate: GateVerdict;
   ready: boolean;
+  /** The explicit readiness request is waiting for a scaled-to-zero API to wake. */
+  checking?: boolean;
   /**
    * The `/healthz` gate found the backend down (FR-056). "I'm ready" stays disabled
    * and the status line must NOT affirm ("You're all set"); the blocking modal —
@@ -60,9 +63,11 @@ export function GreenRoom({
   // it (the line must not lead the button + brackets). Still never for the
   // unavailable bypass (we don't claim "set" for a frame we can't see) nor while the
   // backend is down (nothing is "set" if we can't record).
-  const affirmed = !serviceUnavailable && guide === "active" && ready;
-  const helper = serviceUnavailable
-    ? "Hang on a moment — checking the connection."
+  const affirmed = !checking && !serviceUnavailable && guide === "active" && ready;
+  const helper = checking
+    ? "Waking Serenify... This can take about a minute after some time away."
+    : serviceUnavailable
+      ? "Serenify is unavailable right now."
     : loading
       ? "Getting your live guide ready…"
       : guide === "unavailable"
@@ -103,7 +108,7 @@ export function GreenRoom({
       <div className="flex flex-col gap-2">
         <Button
           onClick={onReady}
-          disabled={!ready || serviceUnavailable}
+          disabled={!ready || checking || serviceUnavailable}
           variant="meadow"
           className="h-12 w-full text-base"
         >

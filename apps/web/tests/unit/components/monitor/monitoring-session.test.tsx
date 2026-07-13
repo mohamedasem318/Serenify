@@ -3,7 +3,7 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 
 import { MonitoringSession, type MonitoringDeps } from "@/components/monitor/monitoring-session";
 import type { PresenceCallbacks } from "@/components/monitor/presence-monitor";
-import type { SubmitWindowResult } from "@/lib/api/monitoring-client";
+import type { CreateSessionResult, SubmitWindowResult } from "@/lib/api/monitoring-client";
 import type { MinimalWindowRecorder } from "@/components/monitor/window-recorder";
 
 /**
@@ -236,6 +236,85 @@ describe("MonitoringSession orchestrator", () => {
 
     expect(deps.createSession).toHaveBeenCalledTimes(1);
     expect(deps.getUserMedia).toHaveBeenCalledTimes(1); // exactly one camera opened
+  });
+
+  it("shows a disabled wake state and keeps the camera off while session creation is pending", async () => {
+    const { deps } = makeDeps([]);
+    let finishCreate: ((result: CreateSessionResult) => void) | undefined;
+    deps.createSession = vi.fn(
+      () =>
+        new Promise<CreateSessionResult>((resolve) => {
+          finishCreate = resolve;
+        }),
+    );
+    render(<MonitoringSession deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+
+    const waking = await screen.findByRole("button", { name: /waking serenify/i });
+    expect(waking).toBeDisabled();
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+
+    fireEvent.click(waking);
+    expect(deps.createSession).toHaveBeenCalledTimes(1);
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+
+    await act(async () => {
+      finishCreate?.({ ok: false, kind: "network" });
+    });
+    expect(await screen.findByText(/can.t reach serenify right now/i)).toBeInTheDocument();
+  });
+
+  it("does not open the camera when session creation resolves after unmount", async () => {
+    const { deps } = makeDeps([]);
+    deps.endSession = vi.fn(async () => ({ ok: true }));
+    let finishCreate: ((result: CreateSessionResult) => void) | undefined;
+    deps.createSession = vi.fn(
+      () =>
+        new Promise<CreateSessionResult>((resolve) => {
+          finishCreate = resolve;
+        }),
+    );
+    const view = render(<MonitoringSession deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    expect(await screen.findByRole("button", { name: /waking serenify/i })).toBeDisabled();
+
+    view.unmount();
+    await act(async () => {
+      finishCreate?.({ ok: true, sessionId: "late-sid", modelVersion: "m" });
+    });
+
+    expect(deps.getUserMedia).not.toHaveBeenCalled();
+    expect(deps.endSession).toHaveBeenCalledWith("late-sid", "error", "tok");
+  });
+
+  it("stops a camera stream that resolves after unmount", async () => {
+    const { deps } = makeDeps([]);
+    const stopFirst = vi.fn();
+    const stopSecond = vi.fn();
+    let finishCamera: ((stream: MediaStream) => void) | undefined;
+    deps.getUserMedia = vi.fn(
+      () =>
+        new Promise<MediaStream>((resolve) => {
+          finishCamera = resolve;
+        }),
+    );
+    const view = render(<MonitoringSession deps={deps} />);
+
+    fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    await vi.waitFor(() => expect(deps.getUserMedia).toHaveBeenCalledTimes(1));
+
+    view.unmount();
+    await act(async () => {
+      finishCamera?.({
+        getTracks: () => [{ stop: stopFirst }, { stop: stopSecond }],
+      } as unknown as MediaStream);
+    });
+
+    expect(stopFirst).toHaveBeenCalledTimes(1);
+    expect(stopSecond).toHaveBeenCalledTimes(1);
   });
 
   it("binds the self-view srcObject and plays on stream-ready (no focus event needed)", async () => {

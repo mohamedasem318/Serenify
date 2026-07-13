@@ -641,6 +641,7 @@ export function AnchorRecorder({
                 // disabled while down (modal blocks) or mid-check; enabled only when
                 // the soft gate has cleared AND the backend is reachable.
                 ready={healthGate === "down" ? false : ready && healthGate !== "checking"}
+                checking={healthGate === "checking"}
                 serviceUnavailable={healthGate === "down"}
                 devicePicker={<DevicePicker permissionGranted onChange={handleDeviceChange} />}
                 onReady={handleReady}
