@@ -2,7 +2,7 @@
 
 **Feature**: `022-cold-start-readiness`
 
-**Status**: Pending production deployment and Mohamed sign-off
+**Status**: Passed on protected Vercel branch preview against production services; approved for merge
 
 ## Automated Pre-Merge Evidence
 
@@ -28,8 +28,8 @@
 ## Sign-Off
 
 - **Automated evidence recorded by**: Codex, 2026-07-13 — 952 Vitest tests; ESLint 0 errors (2 pre-existing warnings); TypeScript and Turbopack production build passed; 8 SpecKit guard fixtures plus the live guard passed; 4 committed Playwright checks passed at 360px/desktop in light/dark; the layout harness returned 404 from the production build.
-- **Production result**: Pending
-- **Mohamed approval**: Pending
-- **Date**: Pending
+- **Production result**: PASS — calibration woke the production Azure API in under one minute; check-in completed normally; the first reading arrived at approximately 1:36 and updated again within about 10 seconds.
+- **Mohamed approval**: Approved — "it worked flawlessly"; no comments or remaining UX concerns.
+- **Date**: 2026-07-13
 
-This file must be updated with actual results before the PR is squash-merged.
+The branch preview used the production Azure API and Supabase project. The temporary preview CORS origin was removed after the smoke test; production web alias deployment follows the squash merge.
