@@ -58,6 +58,12 @@ describe("Supabase auth email templates", () => {
       expect(html).toContain('class="wordmark"');
       expect(html).toContain('class="headline"');
       expect(html).toMatch(/>serenify<\/[^>]+>/);
+      expect(html).toContain(
+        "font:400 24px/1 Outfit,Inter,Arial,sans-serif;letter-spacing:0;",
+      );
+      expect(html).toMatch(
+        /<td align="center" style="padding:20px 28px 16px;text-align:center;">\s*<a class="button"/,
+      );
       expect(html).toContain("border-top:4px solid #3E7A63");
       expect(html).toMatch(
         /\.wordmark\s*\{\s*color:\s*#E2E5E8\s*!important;/,
