@@ -16,8 +16,24 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://serenify.tech"),
   title: "Serenify",
   description: "Workplace stress, gently noticed.",
+  alternates: { canonical: "/" },
+  openGraph: {
+    title: "Serenify",
+    description: "Workplace stress, gently noticed.",
+    url: "https://serenify.tech",
+    siteName: "Serenify",
+    type: "website",
+    images: ["/opengraph-image"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Serenify",
+    description: "Workplace stress, gently noticed.",
+    images: ["/opengraph-image"],
+  },
 };
 
 export default async function RootLayout({
