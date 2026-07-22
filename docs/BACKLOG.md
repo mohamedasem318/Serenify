@@ -1788,10 +1788,31 @@ lockout more gracefully than reopening the budget.
 ## Ops — Supabase local→cloud migration (`excukdzjudslbqmkysrc`) — executed 2026-07-04
 
 ### Supabase cloud migration — deploy-step follow-ups (production domains + apps/api repoint) (#139)
-**Status**: deferred-feature (`type:tech-debt` / `priority:blocker` / `area:infra` + `area:api` + `area:web`) — **OPEN, blocks production deploy.** GitHub issue **#139 OPEN**.
+**Status**: deferred-feature (`type:tech-debt` / `area:api`) — **OPEN, local-workstation only. Does NOT block production; production shipped and passed smoke on 2026-07-13.** GitHub issue **#139 OPEN** (rescoped 2026-07-22; `priority:blocker` + `area:infra` + `area:web` dropped).
+**Reconciled 2026-07-22**: this entry was written 2026-07-04 as a pre-deploy blocker and was never
+revisited after the cutover shipped. Production went live at `https://serenify.tech` on 2026-07-12
+(PR #142) and passed a production smoke test on 2026-07-13 (`specs/022-cold-start-readiness/smoke-tests.md`:
+PASS, Mohamed approval "it worked flawlessly"). Items (a) and (b) are closed out and item (c) is
+resolved *for production*; only the local-workstation half of (c) genuinely remains.
 **Observed**: 2026-07-04, execution of `docs/runbooks/supabase-local-to-cloud-migration.md` — local → cloud project `excukdzjudslbqmkysrc` (EU / Frankfurt). 14 real accounts + profiles + ~300 rows across 9 tables migrated (UUIDs / `email_confirmed_at` / `anchor_vector` bytea preserved; 6/6 anchors byte-identical to the §5a dump; RLS + grants verified on cloud; passwords reset; `apps/web/.env.local` repointed).
 **(a) Runbook junk-delete reorder — DONE (provenance)**: the §4 `DELETE ... WHERE email LIKE '%@t.local'` was moved to a new §5c after the §5b child-row load — deleting fixtures in §4 FK-fails §5b's load of their own child rows (`pg_dump` can't filter). One deferred cascade drops fixtures + identities + skeleton profiles + child rows together. Patched in commit `d74864d`. No further action.
-**(b) Production-domain settings — OPEN (deploy blocker)**: Supabase Auth `site_url` + `additional_redirect_urls`, `apps/web/.env.local` `SITE_URL` / `NEXT_PUBLIC_API_URL`, and `apps/api/.env` `ALLOWED_ORIGINS` are all still localhost; set to the deployed origin at the Vercel/Azure step (confirmation/recovery links fall back to `site_url` otherwise).
-**(c) apps/api not repointed — OPEN (Azure backend blocker)**: only `apps/web/.env.local` was repointed (URL + anon). `apps/api/.env` still points local; a cloud run needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` + the cloud **`SUPABASE_JWT_SECRET`** (else it rejects cloud JWTs — HS256 mismatch).
-**Not in scope**: SMTP (Resend) is a separate task; live new signup stays blocked until it lands.
-**Address by**: the Vercel (web) / Azure (api) deploy step — (b) and (c) are prerequisites.
+**(b) Production-domain settings — DONE (2026-07-12/13, PR #142)**: Supabase Auth `site_url` +
+`additional_redirect_urls`, the Vercel `SITE_URL` / `NEXT_PUBLIC_API_URL`, and the Azure Container
+App `ALLOWED_ORIGINS` are all set to the production origins (`https://serenify.tech` /
+`https://api.serenify.tech`) in their respective platform panels. Evidenced by the 2026-07-13
+production smoke test — sign-in, calibration, and check-in all succeeded end-to-end against the
+production Azure API and cloud Supabase, which is not possible with a localhost redirect allow-list
+or a mismatched CORS origin. Panel values are not committed (Principle IX).
+**(c) apps/api repoint — DONE for production, OPEN for local dev**: the *deployed* API reads its
+`SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_JWT_SECRET` from Azure Container App secrets, which
+are set to the cloud project — again proven by the smoke test (a JWT-secret mismatch would have
+failed every authenticated request with HS256 signature errors). **What genuinely remains** is the
+untracked local file `apps/api/.env` on Mohamed's workstation, still pointing at local Supabase.
+Consequence is dev-only but is a real footgun: running `apps/web` (cloud) against a local `apps/api`
+(local Supabase) makes the API reject every cloud-issued JWT with an opaque 401, because the HS256
+secrets differ. Fix is a three-value edit to one untracked file; no code, migration, or panel change.
+**Resend / SMTP — DONE (not a blocker)**: the earlier "live new signup stays blocked until SMTP
+lands" note is obsolete. Resend is live in production as Supabase's **custom SMTP provider**,
+configured in the Supabase dashboard. It is correctly absent from this repo — the integration is a
+dashboard/DNS concern by design and calls no application code. See `docs/DECISIONS.md` 2026-07-22.
+**Address by**: opportunistically, next time `apps/api` is run locally. Not gating anything.

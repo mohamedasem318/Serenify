@@ -5061,3 +5061,37 @@ always-on host.
 `docs/superpowers/specs/2026-07-12-production-cutover-design.md`;
 `.specify/memory/constitution.md` Amendment 14; `apps/api/Dockerfile` (target-host comment corrected
 in the same change).
+
+---
+
+## 2026-07-22 — Resend is live as Supabase's custom SMTP provider (zero repo footprint by design)
+
+**Status**: Accepted (records a delivered integration; Constitution Amendment 15, PATCH).
+
+**Decision / state of the world**: Transactional email for Serenify is delivered by **Resend**,
+wired as the **custom SMTP provider beneath Supabase Auth**, configured through the Supabase
+dashboard. Production email is sending. The two Graphite-branded templates shipped in PR #142
+(`supabase/templates/confirmation.html`, `recovery.html`) are rendered by Supabase Auth and handed
+to Resend for delivery.
+
+**Why this is recorded explicitly**: a repo-scoped audit will find **no trace of Resend** — no
+`RESEND_API_KEY`, no SDK dependency, no calling code, no SPF/DKIM/DMARC files. That absence is the
+*intended architecture*, not an incomplete integration. Because Resend sits beneath Supabase Auth
+as an SMTP relay rather than being called by application code, the entire integration lives in the
+Supabase dashboard plus DNS records at the registrar. A 2026-07-21 recon read the repo-level
+absence as "Resend is NOT integrated"; that inference was wrong, and this entry exists so the same
+wrong conclusion is not drawn again from the same correct observation.
+
+**Operational consequences**:
+- Mail-delivery incidents are diagnosed in the Supabase Auth logs and the Resend dashboard, **not**
+  in this repository. Nothing in `apps/` or `packages/` participates in delivery.
+- The SMTP password is a Supabase dashboard secret. It is never committed and never appears in CI
+  (Principle IX).
+- Changing sender identity, domain, or rate limits is a dashboard + DNS operation and will produce
+  little or no repo diff. Do not expect a PR to accompany such a change.
+- The earlier claim that live new-user signup was gated on SMTP landing (`docs/BACKLOG.md` #139) is
+  obsolete; that gate is cleared.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 15 and the Technology Stack
+(Locked) transactional-email row; `docs/BACKLOG.md` #139 (Resend note); `supabase/config.toml`
+template wiring; `supabase/templates/{confirmation,recovery}.html`.
