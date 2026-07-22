@@ -5,8 +5,11 @@
 #
 #   docker build --platform linux/amd64 -f apps/api/Dockerfile -t serenify-api .
 #
-# Target host: Azure ACI, francecentral, x86/amd64 (the ARM path is dead). Building
-# --platform linux/amd64 keeps the image matched to the x86-validated ML pipeline.
+# Target host: Azure Container Apps (`serenify-api` in `serenify-prod-rg`), francecentral,
+# x86/amd64 (the ARM path is dead). Building --platform linux/amd64 keeps the image matched to
+# the x86-validated ML pipeline. Container Apps replaced ACI as the production target in
+# Constitution Amendment 14 (2026-07-12); no ACI remains — this image tag, published to
+# `ghcr.io/mohamedasem318/serenify-api:production`, is the durable recovery artifact.
 #
 # Python pinned to 3.12 — mediapipe==0.10.13 has no 3.13 wheel (DECISION-1).
 FROM python:3.12-slim
