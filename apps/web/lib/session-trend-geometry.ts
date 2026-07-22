@@ -46,7 +46,7 @@
 import type { Band } from "@/lib/api/monitoring-client";
 import type { SkipCause } from "@/lib/api/monitoring-reads";
 
-// ── Geometry constants (locked to serenify-live-session-graph-mock.html) ───────────────
+// ── Geometry constants (locked to docs/mockups/serenify-live-session-graph-mock.html) ───────────────
 
 /** Fixed canvas height = the viewBox height; width = the container px (set by the caller). */
 export const H = 210;

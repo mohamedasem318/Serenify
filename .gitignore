@@ -80,10 +80,24 @@ pnpm-debug.log*
 specs/.staging/
 
 # Disposable spike scaffolding + dev mocks — never commit. Two such artifacts
-# (the _scratch-008-continuous-spike/ harness + serenify-008-*mock*.html) rode into
+# (the _scratch-008-continuous-spike/ harness + a serenify-*.html mock) rode into
 # main via the 008 squash; these guards stop that class of scratch from recurring.
 _scratch-*/
-serenify-008-*mock*.html
+
+# Design mockups (signed-off HTML visual sources of truth). They live on the
+# design machine only and are deliberately NOT tracked — they are large, they are
+# point-in-time artifacts, and the specs that cite them are the durable record.
+#
+# The previous pattern here was `serenify-008-*mock*.html`, which matched NONE of
+# the five files it was written to catch: `serenify-008followups-trend-FINAL.html`
+# has no hyphen after `008`, and neither the FINAL nor the `-redesign-reference`
+# file contains the substring `mock`. The guard silently did nothing. Replaced with
+# a location rule plus a name rule so neither a rename nor a new mock can slip past.
+#
+# Canonical home is docs/mockups/ (README.md there IS tracked — only *.html is not).
+# The root rule stays as a backstop for files dropped in the repo root by habit.
+docs/mockups/*.html
+serenify-*.html
 
 # Model-artifact staging drop (committed artifacts live in packages/ml-*/models/)
 tmp/
@@ -114,4 +128,8 @@ st1-shots/
 # SpecKit per-branch state (the constitution at .specify/memory/ stays tracked)
 .specify/feature.json
 
-graphify-out/cost.json
+# Graphify knowledge graph — regenerable build output, ~9 MB of JSON plus caches
+# and per-run transcript dirs. Rebuild with `graphify update .`; never commit.
+# (Previously only cost.json was ignored, which left graph.json, GRAPH_REPORT.md,
+# cache/, transcripts/, and the dated run dirs untracked-but-unignored noise.)
+graphify-out/

@@ -29,7 +29,7 @@ import {
  * single confident reading is a filled dot. Each lane's peak == its `tenor` (the chip value),
  * so the plot and the timeline can never disagree (SC-004).
  *
- * Visual source of truth: serenify-008followups-trend-FINAL.html.
+ * Visual source of truth: docs/mockups/serenify-008followups-trend-FINAL.html.
  *
  * SMOKE-AUTHOR CARRY-FORWARD (T026): the no-stretch rule is asserted here only at the SVG
  * attribute level (jsdom has no layout). A browser could still visually stretch via CSS, which
