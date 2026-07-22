@@ -1816,3 +1816,52 @@ lands" note is obsolete. Resend is live in production as Supabase's **custom SMT
 configured in the Supabase dashboard. It is correctly absent from this repo — the integration is a
 dashboard/DNS concern by design and calls no application code. See `docs/DECISIONS.md` 2026-07-22.
 **Address by**: opportunistically, next time `apps/api` is run locally. Not gating anything.
+
+---
+
+## Ops — Production cutover to Azure Container Apps — executed 2026-07-12/13 (PR #142/#143/#144)
+
+### Azure production infrastructure has no IaC — environment is not reproducible from the repo (#145)
+**Status**: tech-debt (`type:tech-debt` / `area:infra`) — **OPEN, not a blocker.** GitHub issue **#145 OPEN**.
+**Observed**: 2026-07-22, post-cutover docs reconciliation (the same pass that settled the ACI-rollback
+contradiction in `docs/DECISIONS.md`).
+**Description**: The production Azure backend was provisioned **manually via `az` CLI**. No
+infrastructure-as-code is committed — no Bicep, ARM template, Container Apps YAML, `azure.yaml`,
+compose file, systemd unit, or reverse-proxy config. This was deliberate at cutover time ("no
+repository files unless an existing deployment document requires current resource values"); what was
+never recorded is the consequence.
+
+**The risk**: the live environment **cannot be recreated from this repository**. The only description
+of the deployed configuration is prose in `docs/superpowers/plans/2026-07-12-production-cutover.md`,
+so rebuilding means a human re-reading that document and re-running `az` commands by hand.
+
+This compounds with the confirmed absence of a rollback target (`docs/DECISIONS.md` 2026-07-22: the
+prior ACI was deleted; `az group list` returns only `serenify-prod-rg` holding the Container Apps
+environment, `serenify-api`, and its managed certificate). The failure mode is therefore not "flip
+traffic back" but **"re-provision from a prose document, under pressure."** Exposed if the resource
+group is deleted, the Azure for Students subscription lapses (finite student credit), or a revision
+breaks with no healthy earlier revision retained. Undocumented-as-code today:
+
+  - Container App sizing/scaling — 4 vCPU / 8 GiB, `minReplicas=0`, `maxReplicas=1`, external
+    ingress on port 8000.
+  - The managed-environment + managed-certificate setup for `api.serenify.tech`.
+  - The Container App secret and env-var **names and wiring** (values are correctly panel-only per
+    Principle IX, but the wiring exists nowhere machine-readable).
+  - Cloudflare DNS — the `api` CNAME plus the `asuid.api` TXT record for Azure domain validation,
+    proxying off.
+
+The GHCR tag `ghcr.io/mohamedasem318/serenify-api:production` is the one durable reproducible
+artifact in the chain. The image is fine; everything *around* the image is undocumented.
+
+**Fix scope**: medium. Commit provisioning as code — either **Bicep** (`infra/main.bicep` +
+`main.bicepparam`; declarative, idempotent, diffable — preferred if this outlives the thesis) or an
+**`az`-based provisioning script** (`scripts/provision-azure.*`; lower ceremony, closer to what was
+actually run — preferred if the goal is just capturing what exists). Must declare the resource group,
+managed environment, container app (image, ingress, port, CPU/memory, replica bounds), custom-domain
+binding, and managed certificate; reference secrets **by name only, never by value**; and be verified
+against a throwaway resource group so it is known to work rather than assumed to. Add a
+`docs/runbooks/` pointer matching the existing runbook convention.
+
+**Address by**: before the thesis defense, not before any feature. Production is live, healthy, and
+smoke-verified (2026-07-13) — nothing is broken and nothing is blocked. This is insurance against a
+low-probability, high-cost event whose cost peaks exactly when it is least affordable.
