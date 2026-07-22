@@ -480,7 +480,12 @@ of the same UX-polish revision. Not blocking any in-progress
 phase.
 
 ### CI guard for speckit skills + gitignore rule (#50)
-**Status**: tech-debt
+**Status**: resolved — 2026-07-13 (`90171c3`, branch `fix/cold-start-readiness`, PR #143). GitHub issue **#50 CLOSED** (2026-07-12 — closed ahead of the code, same drift as #33).
+**Resolution**: `scripts/check-speckit-skills.mjs` + its `check-speckit-skills.test.mjs` fixtures + the
+`speckit-guard` CI job (`.github/workflows/ci.yml`) added — the guard verifies the required
+`.claude/skills/speckit-*/SKILL.md` files are present and rejects a broad `.claude/` ignore rule
+(FR-010 of `specs/022-cold-start-readiness/`). Covers Mode A; Mode B is mitigated by the same job
+failing on any branch whose tree is missing the blobs.
 **Observed**: 2026-05-22, feature 003 — second regression of
 `.claude/skills/speckit-*/SKILL.md` going missing on disk,
 mirroring the PR #3 incident (7a7beff restore) only days
