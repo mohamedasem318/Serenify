@@ -197,7 +197,7 @@
 /* ── Feature 009 / US4 — today-card trend plot, COMPONENT-LOCAL only ──────────────────────
  * Scoped to the lane strip via the `today-plot-*` class names; NOT an app-wide scrollbar
  * restyle (that is a separate chore, out of scope here — tasks.md Scope). The thin styled
- * scrollbar + the edge-fade overlays match serenify-008followups-trend-FINAL.html (.lanes /
+ * scrollbar + the edge-fade overlays match docs/mockups/serenify-008followups-trend-FINAL.html (.lanes /
  * .fade). The fade's opacity TRANSITION is added by the component only when reduced motion is
  * not preferred (FR-015); the global reduced-motion rule above is the belt to this suspenders. */
 .today-plot-scroll {
@@ -240,7 +240,7 @@
 
 /* ── Feature 012 — questionnaire result-icon + progress animations, COMPONENT-LOCAL ──────
  * Scoped to the `qri-*` / `qprogress-*` class names; mirrors the mock's .pop / .fadeup /
- * .drawpath / .bar (serenify-012-questionnaire-mocks.html). Colours come from Graphite tokens
+ * .drawpath / .bar (docs/mockups/serenify-012-questionnaire-mocks.html). Colours come from Graphite tokens
  * via the components (never copied from the mock). The components ALSO gate these through
  * useMediaQuery — they omit the animation class entirely under reduced motion so the element
  * renders in its FINAL state (e.g. a fully-drawn path, offset 0) — and the global

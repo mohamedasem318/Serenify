@@ -480,7 +480,12 @@ of the same UX-polish revision. Not blocking any in-progress
 phase.
 
 ### CI guard for speckit skills + gitignore rule (#50)
-**Status**: tech-debt
+**Status**: resolved — 2026-07-13 (`90171c3`, branch `fix/cold-start-readiness`, PR #143). GitHub issue **#50 CLOSED** (2026-07-12 — closed ahead of the code, same drift as #33).
+**Resolution**: `scripts/check-speckit-skills.mjs` + its `check-speckit-skills.test.mjs` fixtures + the
+`speckit-guard` CI job (`.github/workflows/ci.yml`) added — the guard verifies the required
+`.claude/skills/speckit-*/SKILL.md` files are present and rejects a broad `.claude/` ignore rule
+(FR-010 of `specs/022-cold-start-readiness/`). Covers Mode A; Mode B is mitigated by the same job
+failing on any branch whose tree is missing the blobs.
 **Observed**: 2026-05-22, feature 003 — second regression of
 `.claude/skills/speckit-*/SKILL.md` going missing on disk,
 mirroring the PR #3 incident (7a7beff restore) only days
@@ -1783,10 +1788,80 @@ lockout more gracefully than reopening the budget.
 ## Ops — Supabase local→cloud migration (`excukdzjudslbqmkysrc`) — executed 2026-07-04
 
 ### Supabase cloud migration — deploy-step follow-ups (production domains + apps/api repoint) (#139)
-**Status**: deferred-feature (`type:tech-debt` / `priority:blocker` / `area:infra` + `area:api` + `area:web`) — **OPEN, blocks production deploy.** GitHub issue **#139 OPEN**.
+**Status**: deferred-feature (`type:tech-debt` / `area:api`) — **OPEN, local-workstation only. Does NOT block production; production shipped and passed smoke on 2026-07-13.** GitHub issue **#139 OPEN** (rescoped 2026-07-22; `priority:blocker` + `area:infra` + `area:web` dropped).
+**Reconciled 2026-07-22**: this entry was written 2026-07-04 as a pre-deploy blocker and was never
+revisited after the cutover shipped. Production went live at `https://serenify.tech` on 2026-07-12
+(PR #142) and passed a production smoke test on 2026-07-13 (`specs/022-cold-start-readiness/smoke-tests.md`:
+PASS, Mohamed approval "it worked flawlessly"). Items (a) and (b) are closed out and item (c) is
+resolved *for production*; only the local-workstation half of (c) genuinely remains.
 **Observed**: 2026-07-04, execution of `docs/runbooks/supabase-local-to-cloud-migration.md` — local → cloud project `excukdzjudslbqmkysrc` (EU / Frankfurt). 14 real accounts + profiles + ~300 rows across 9 tables migrated (UUIDs / `email_confirmed_at` / `anchor_vector` bytea preserved; 6/6 anchors byte-identical to the §5a dump; RLS + grants verified on cloud; passwords reset; `apps/web/.env.local` repointed).
 **(a) Runbook junk-delete reorder — DONE (provenance)**: the §4 `DELETE ... WHERE email LIKE '%@t.local'` was moved to a new §5c after the §5b child-row load — deleting fixtures in §4 FK-fails §5b's load of their own child rows (`pg_dump` can't filter). One deferred cascade drops fixtures + identities + skeleton profiles + child rows together. Patched in commit `d74864d`. No further action.
-**(b) Production-domain settings — OPEN (deploy blocker)**: Supabase Auth `site_url` + `additional_redirect_urls`, `apps/web/.env.local` `SITE_URL` / `NEXT_PUBLIC_API_URL`, and `apps/api/.env` `ALLOWED_ORIGINS` are all still localhost; set to the deployed origin at the Vercel/Azure step (confirmation/recovery links fall back to `site_url` otherwise).
-**(c) apps/api not repointed — OPEN (Azure backend blocker)**: only `apps/web/.env.local` was repointed (URL + anon). `apps/api/.env` still points local; a cloud run needs `SUPABASE_URL` + `SUPABASE_ANON_KEY` + the cloud **`SUPABASE_JWT_SECRET`** (else it rejects cloud JWTs — HS256 mismatch).
-**Not in scope**: SMTP (Resend) is a separate task; live new signup stays blocked until it lands.
-**Address by**: the Vercel (web) / Azure (api) deploy step — (b) and (c) are prerequisites.
+**(b) Production-domain settings — DONE (2026-07-12/13, PR #142)**: Supabase Auth `site_url` +
+`additional_redirect_urls`, the Vercel `SITE_URL` / `NEXT_PUBLIC_API_URL`, and the Azure Container
+App `ALLOWED_ORIGINS` are all set to the production origins (`https://serenify.tech` /
+`https://api.serenify.tech`) in their respective platform panels. Evidenced by the 2026-07-13
+production smoke test — sign-in, calibration, and check-in all succeeded end-to-end against the
+production Azure API and cloud Supabase, which is not possible with a localhost redirect allow-list
+or a mismatched CORS origin. Panel values are not committed (Principle IX).
+**(c) apps/api repoint — DONE for production, OPEN for local dev**: the *deployed* API reads its
+`SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_JWT_SECRET` from Azure Container App secrets, which
+are set to the cloud project — again proven by the smoke test (a JWT-secret mismatch would have
+failed every authenticated request with HS256 signature errors). **What genuinely remains** is the
+untracked local file `apps/api/.env` on Mohamed's workstation, still pointing at local Supabase.
+Consequence is dev-only but is a real footgun: running `apps/web` (cloud) against a local `apps/api`
+(local Supabase) makes the API reject every cloud-issued JWT with an opaque 401, because the HS256
+secrets differ. Fix is a three-value edit to one untracked file; no code, migration, or panel change.
+**Resend / SMTP — DONE (not a blocker)**: the earlier "live new signup stays blocked until SMTP
+lands" note is obsolete. Resend is live in production as Supabase's **custom SMTP provider**,
+configured in the Supabase dashboard. It is correctly absent from this repo — the integration is a
+dashboard/DNS concern by design and calls no application code. See `docs/DECISIONS.md` 2026-07-22.
+**Address by**: opportunistically, next time `apps/api` is run locally. Not gating anything.
+
+---
+
+## Ops — Production cutover to Azure Container Apps — executed 2026-07-12/13 (PR #142/#143/#144)
+
+### Azure production infrastructure has no IaC — environment is not reproducible from the repo (#145)
+**Status**: tech-debt (`type:tech-debt` / `area:infra`) — **OPEN, not a blocker.** GitHub issue **#145 OPEN**.
+**Observed**: 2026-07-22, post-cutover docs reconciliation (the same pass that settled the ACI-rollback
+contradiction in `docs/DECISIONS.md`).
+**Description**: The production Azure backend was provisioned **manually via `az` CLI**. No
+infrastructure-as-code is committed — no Bicep, ARM template, Container Apps YAML, `azure.yaml`,
+compose file, systemd unit, or reverse-proxy config. This was deliberate at cutover time ("no
+repository files unless an existing deployment document requires current resource values"); what was
+never recorded is the consequence.
+
+**The risk**: the live environment **cannot be recreated from this repository**. The only description
+of the deployed configuration is prose in `docs/superpowers/plans/2026-07-12-production-cutover.md`,
+so rebuilding means a human re-reading that document and re-running `az` commands by hand.
+
+This compounds with the confirmed absence of a rollback target (`docs/DECISIONS.md` 2026-07-22: the
+prior ACI was deleted; `az group list` returns only `serenify-prod-rg` holding the Container Apps
+environment, `serenify-api`, and its managed certificate). The failure mode is therefore not "flip
+traffic back" but **"re-provision from a prose document, under pressure."** Exposed if the resource
+group is deleted, the Azure for Students subscription lapses (finite student credit), or a revision
+breaks with no healthy earlier revision retained. Undocumented-as-code today:
+
+  - Container App sizing/scaling — 4 vCPU / 8 GiB, `minReplicas=0`, `maxReplicas=1`, external
+    ingress on port 8000.
+  - The managed-environment + managed-certificate setup for `api.serenify.tech`.
+  - The Container App secret and env-var **names and wiring** (values are correctly panel-only per
+    Principle IX, but the wiring exists nowhere machine-readable).
+  - Cloudflare DNS — the `api` CNAME plus the `asuid.api` TXT record for Azure domain validation,
+    proxying off.
+
+The GHCR tag `ghcr.io/mohamedasem318/serenify-api:production` is the one durable reproducible
+artifact in the chain. The image is fine; everything *around* the image is undocumented.
+
+**Fix scope**: medium. Commit provisioning as code — either **Bicep** (`infra/main.bicep` +
+`main.bicepparam`; declarative, idempotent, diffable — preferred if this outlives the thesis) or an
+**`az`-based provisioning script** (`scripts/provision-azure.*`; lower ceremony, closer to what was
+actually run — preferred if the goal is just capturing what exists). Must declare the resource group,
+managed environment, container app (image, ingress, port, CPU/memory, replica bounds), custom-domain
+binding, and managed certificate; reference secrets **by name only, never by value**; and be verified
+against a throwaway resource group so it is known to work rather than assumed to. Add a
+`docs/runbooks/` pointer matching the existing runbook convention.
+
+**Address by**: before the thesis defense, not before any feature. Production is live, healthy, and
+smoke-verified (2026-07-13) — nothing is broken and nothing is blocked. This is insurance against a
+low-probability, high-cost event whose cost peaks exactly when it is least affordable.

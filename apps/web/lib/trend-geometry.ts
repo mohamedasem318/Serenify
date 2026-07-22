@@ -20,7 +20,7 @@
 export type Band = "at_ease" | "a_little_tense" | "tense";
 export type Tenor = Band | "no_read";
 
-// Expanded lane-plot canvas (px). Band Y-centres locked to serenify-008followups-trend-FINAL.html.
+// Expanded lane-plot canvas (px). Band Y-centres locked to docs/mockups/serenify-008followups-trend-FINAL.html.
 export const PLOT_H = 200;
 export const STROKE = 3;
 export const LANE_MIN = 112;

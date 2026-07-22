@@ -20,7 +20,7 @@ import {
 
 /**
  * The monitor-page **this-session** live trend (feature 010 / 009b redesign). Visual source
- * of truth: `serenify-live-session-graph-mock.html` ("match this"). All honesty-critical
+ * of truth: `docs/mockups/serenify-live-session-graph-mock.html` ("match this"). All honesty-critical
  * geometry + state derivation lives in the pure `lib/session-trend-geometry.ts`; this
  * component only measures its container width and renders the derived view-model.
  *

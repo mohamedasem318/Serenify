@@ -5006,3 +5006,92 @@ corrected.
 
 **Cross-references**: `.specify/memory/constitution.md` Amendment 14; Constitution Principle IX
 and Technology Stack (Locked).
+
+> **Superseded in part (2026-07-22)**: the "Validation and rollback" paragraph above is factually
+> wrong as written — the ACI rollback target did not survive this PR. See the 2026-07-22 entry
+> "No ACI rollback target exists — Container Apps is the only production backend" below.
+
+---
+
+## 2026-07-22 — No ACI rollback target exists — Container Apps is the only production backend
+
+**Status**: Accepted (correction; supersedes the "Validation and rollback" paragraph of the
+2026-07-12 entry "Azure Container Apps for backend and ML serving").
+
+**Correction**: The 2026-07-12 entry states *"The existing Azure Container Instance remains running
+as the rollback target."* **This is not true and was never true after that PR merged.** The
+2026-07-12 cutover *design* doc records the opposite in the same squashed PR
+(`docs/superpowers/specs/2026-07-12-production-cutover-design.md`: *"Mohamed deleted the prior Azure
+resource groups to stop credit consumption… There is no legacy Azure rollback target."*). The
+DECISIONS entry was drafted earlier in the PR and never reconciled against the design doc, so the
+two shipped contradicting each other.
+
+**Live verification (2026-07-22)**: `az group list` against the Azure for Students subscription
+returns exactly one resource group:
+
+| Name | Location | Status |
+|---|---|---|
+| `serenify-prod-rg` | francecentral | Succeeded |
+
+`az resource list -g serenify-prod-rg` returns exactly three resources, all Container Apps:
+
+| Name | Type |
+|---|---|
+| `serenify-prod-env` | `Microsoft.App/managedEnvironments` |
+| `serenify-api` | `Microsoft.App/containerApps` |
+| `serenify-prod-env/mc-serenify-prod--api-serenify-tec-8034` | `Microsoft.App/managedEnvironments/managedCertificates` |
+
+There is **no `Microsoft.ContainerInstance/containerGroups` resource in the subscription**, and no
+second resource group. The ACI is gone.
+
+**Consequence — state this plainly: there is no rollback target.** If the `serenify-api` Container
+App revision breaks, traffic cannot be returned to a previously-validated backend; the only
+recovery paths are (a) `az containerapp revision` rollback to an earlier *revision of the same
+Container App*, which exists only while an older healthy revision is retained, or (b) re-provision
+from `ghcr.io/mohamedasem318/serenify-api:production` — the image tag is the real durable artifact.
+Recovery is a re-provision, not a traffic flip, and it is not instantaneous.
+
+**Why this was accepted rather than fixed by re-creating an ACI**: the ACI was deleted deliberately
+to stop student-credit consumption, and the Container App runs `minReplicas=0` for the same reason.
+Keeping a warm parallel ACI would reintroduce exactly the cost the scale-to-zero design exists to
+avoid. The mitigation is the GHCR image tag plus Container Apps revision retention, not a second
+always-on host.
+
+**Cross-references**: the 2026-07-12 entry above (corrected here);
+`docs/superpowers/specs/2026-07-12-production-cutover-design.md`;
+`.specify/memory/constitution.md` Amendment 14; `apps/api/Dockerfile` (target-host comment corrected
+in the same change).
+
+---
+
+## 2026-07-22 — Resend is live as Supabase's custom SMTP provider (zero repo footprint by design)
+
+**Status**: Accepted (records a delivered integration; Constitution Amendment 15, PATCH).
+
+**Decision / state of the world**: Transactional email for Serenify is delivered by **Resend**,
+wired as the **custom SMTP provider beneath Supabase Auth**, configured through the Supabase
+dashboard. Production email is sending. The two Graphite-branded templates shipped in PR #142
+(`supabase/templates/confirmation.html`, `recovery.html`) are rendered by Supabase Auth and handed
+to Resend for delivery.
+
+**Why this is recorded explicitly**: a repo-scoped audit will find **no trace of Resend** — no
+`RESEND_API_KEY`, no SDK dependency, no calling code, no SPF/DKIM/DMARC files. That absence is the
+*intended architecture*, not an incomplete integration. Because Resend sits beneath Supabase Auth
+as an SMTP relay rather than being called by application code, the entire integration lives in the
+Supabase dashboard plus DNS records at the registrar. A 2026-07-21 recon read the repo-level
+absence as "Resend is NOT integrated"; that inference was wrong, and this entry exists so the same
+wrong conclusion is not drawn again from the same correct observation.
+
+**Operational consequences**:
+- Mail-delivery incidents are diagnosed in the Supabase Auth logs and the Resend dashboard, **not**
+  in this repository. Nothing in `apps/` or `packages/` participates in delivery.
+- The SMTP password is a Supabase dashboard secret. It is never committed and never appears in CI
+  (Principle IX).
+- Changing sender identity, domain, or rate limits is a dashboard + DNS operation and will produce
+  little or no repo diff. Do not expect a PR to accompany such a change.
+- The earlier claim that live new-user signup was gated on SMTP landing (`docs/BACKLOG.md` #139) is
+  obsolete; that gate is cleared.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 15 and the Technology Stack
+(Locked) transactional-email row; `docs/BACKLOG.md` #139 (Resend note); `supabase/config.toml`
+template wiring; `supabase/templates/{confirmation,recovery}.html`.

@@ -2515,3 +2515,184 @@ a second same-kind `answered` row is rejected by the new per-kind index (GREEN).
 
 Cross-references: `docs/PROGRESS.md` 2026-07-03; `docs/DECISIONS.md` 2026-07-03 (D-11);
 `docs/BACKLOG.md` #134 (resolved).
+
+## 2026-07-12 — chore(deploy): production cutover — Azure Container Apps, GHCR image, branded auth emails, service-role removal (PR #142)
+
+**Backfilled 2026-07-22.** This entry and the two below were written after the fact: PRs #142,
+#143, and #144 shipped the entire deployment milestone between 2026-07-12 and 2026-07-13 without a
+CHANGELOG or PROGRESS entry, the first break in the per-feature convention held since feature 001.
+The gap was found by a 2026-07-21 recon. Content is reconstructed from the commits, the SpecKit
+artifacts, and the platform state — not from memory.
+
+**Hosting.** The backend moved to **Azure Container Apps** (`serenify-api` in resource group
+`serenify-prod-rg`, France Central), replacing the planned DigitalOcean Droplet. Ratified as
+**Constitution Amendment 14** (1.10.0 → 1.11.0, MINOR — a locked-stack substitution). Sizing is
+**4 vCPU / 8 GiB, `minReplicas=0`, `maxReplicas=1`** — scale-to-zero to control Azure for Students
+credit. Managed HTTPS ingress and custom-domain support give `api.serenify.tech` a production TLS
+path without operating a separate reverse proxy. Container port 8000; uvicorn single worker, no
+`--reload`.
+
+**No IaC.** Provisioning was performed manually via `az` CLI and is deliberately **not tracked in
+git** — no Bicep, ARM, Container Apps YAML, compose file, systemd unit, or nginx/caddy config
+exists. The live resource configuration is reconstructable from
+`docs/superpowers/plans/2026-07-12-production-cutover.md`, not from committed state. Consequence
+worth naming: the deployment is not reproducible from this repository alone.
+
+**Image pipeline.** New `.github/workflows/publish-api-image.yml` — manual `workflow_dispatch`,
+builds `linux/amd64`, pushes to `ghcr.io/mohamedasem318/serenify-api:production` using the
+repo-scoped `GITHUB_TOKEN`, deliberately avoiding a paid Azure Container Registry. No Azure
+credentials exist in CI; the deploy step itself is manual.
+
+**Container build fixes.** The Dockerfile never copied `packages/llm-client` (added in feature
+011), so a clean `uv sync --frozen` failed on three editable path deps — a build that had never
+succeeded from a clean context. Adds the missing COPY, an `ffmpeg -version` build-layer check (a
+silent video-decode break otherwise), deterministic uv env vars, and `uv run --no-sync` at boot so
+container start never re-checks the lock or touches the network. New `apps/api/.dockerignore`: with
+no ignore file, a root-context build baked `apps/api/.env` — **real dev secrets** — into the image
+and copied both Windows `.venv` trees. Build context dropped from gigabytes to a few MB.
+
+**Security posture.** Removed the runtime admin/service-role path entirely — deleted
+`apps/web/lib/supabase/admin.ts` and `apps/web/app/api/admin/invite/route.ts`. Production access is
+now **RLS-as-user throughout**, and inference replay runs as the authenticated user. Locked by a
+new `apps/web/tests/unit/runtime-secret-posture.test.ts`; deploy no longer requires a service-role
+key at all.
+
+**Branded auth email.** Authored `supabase/templates/confirmation.html` and `recovery.html`
+(Graphite-branded, 520px card, meadow-green top rule, text wordmark, OTP fallback), wired via
+`supabase/config.toml`, with `scripts/preview-auth-emails.mjs` for visual QA and 95 lines of
+template-invariant tests pinning subjects, GoTrue variables, the absence of `<img>` and of
+amber/crimson, and both dark-mode mechanisms.
+
+**Backlog reconciliation.** Retro-closed **#74** (usable-face-coverage gate had shipped in feature
+006 / PR #19) and **#48** (card-heading serif resolved by the DM Serif Display → Outfit swap in
+feature 007 / PR #22). Both were already fixed in code and never reconciled.
+
+**Deviation from Principle VIII, recorded not excused**: this PR produced **no `specs/0NN-…`
+folder** — `specs/` jumps `012 → 022`. It shipped against ad-hoc `docs/superpowers/` plan and
+design documents instead of the standard SpecKit artifact set. #143 and #144 immediately below both
+got proper spec/plan/tasks/smoke-tests folders.
+
+25 files changed, 930 insertions, 331 deletions. Co-authored by all three teammates.
+
+Cross-references: `docs/PROGRESS.md` 2026-07-12; `docs/DECISIONS.md` 2026-07-12 and 2026-07-22
+(ACI-rollback correction); `.specify/memory/constitution.md` Amendment 14; `docs/BACKLOG.md` #74,
+#48, #139.
+
+## 2026-07-13 — fix(web): cold-start readiness for a scale-to-zero backend + speckit CI guard (PR #143)
+
+**Backfilled 2026-07-22.** See the note on the 2026-07-12 entry.
+
+**The problem `minReplicas=0` created.** Scale-to-zero controls credit consumption but means the
+first request after idle pays a full container cold start. Measured on production: a request from
+zero replicas took **46.68 seconds**; a warm request took **0.34 seconds**. The pre-existing client
+timeouts were far below that, so the honest backend behaviour read to the user as a hard failure.
+
+**Fix.** A bounded **75-second** wake allowance on the two entry paths that can hit a cold backend —
+health readiness (FR-001) and monitoring-session creation (FR-002) — with the timer released after
+settlement and abort/fetch failure mapped onto the existing `network` result rather than a new error
+class. Wake requests begin only on an explicit calibration or check-in action (FR-003); they are
+never speculative.
+
+**Ordering fix that matters for trust**: check-in now creates the authenticated backend session
+**before** requesting camera access (FR-004). Previously a user could be prompted for their camera
+and watch the indicator light up while the backend was still asleep — the camera opening before
+there is anything to send it to is exactly the kind of thing this product cannot afford to do.
+
+**Copy and a11y.** Pending states are explicit rather than silent: check-in disables its action,
+shows `Waking Serenify…`, and exposes a polite live status (FR-005); calibration explains that wake
+can take about a minute after idle time (FR-006). No new animation and no new reduced-motion path
+(FR-009) — a spinner would have been the easy answer and was rejected. The pending control stays
+≥44px and fits at 360px in light and dark (FR-008).
+
+**CI guard (closes BACKLOG/issue #50).** `scripts/check-speckit-skills.mjs` + a
+`check-speckit-skills.test.mjs` fixture suite + a `speckit-guard` job verify the required
+`.claude/skills/speckit-*/SKILL.md` files are present and reject a broad `.claude/` ignore rule
+(FR-010) — ending the recurring silent disappearance of the SpecKit skills that had cost a diagnosis
+plus a context reset each time it recurred.
+
+Also adds a non-production `/cold-start-harness` route with a committed Playwright layout contract
+(the harness returns 404 from a production build).
+
+**Production smoke test — PASS, 2026-07-13** (`specs/022-cold-start-readiness/smoke-tests.md`):
+*"calibration woke the production Azure API in under one minute; check-in completed normally; the
+first reading arrived at approximately 1:36 and updated again within about 10 seconds."* Run against
+the **production** Azure API and Supabase project from a protected branch preview; the temporary
+preview CORS origin was removed afterwards. Approval recorded: *"it worked flawlessly"*, no
+remaining UX concerns. Pre-merge evidence: 952 Vitest tests, ESLint 0 errors, TypeScript + Turbopack
+production build, 8 guard fixtures, 4 Playwright checks at 360px/desktop in light/dark.
+
+25 files changed, 1068 insertions, 42 deletions. **No co-author trailers** — a break from the
+blanket rule, noted here since the omission is now permanent in history.
+
+Cross-references: `docs/PROGRESS.md` 2026-07-13; `specs/022-cold-start-readiness/`;
+`docs/superpowers/specs/2026-07-13-cold-start-readiness-design.md`; `docs/BACKLOG.md` #50
+(resolved).
+
+## 2026-07-13 — fix(brand): auth email polish, social share preview, password-reset sign-out lock (PR #144)
+
+**Backfilled 2026-07-22.** See the note on the 2026-07-12 entry.
+
+**Email.** Wordmarks stay **text, never an image** — `Outfit, Inter, Arial, sans-serif` at 400/24px
+(FR-001), mirroring the app header. CTA cells use both `align="center"` and inline centered
+alignment (FR-002), redundant on purpose for older email engines. GoTrue placeholders and the
+dark-mode styles are preserved (FR-003).
+
+**Social preview.** New `apps/web/app/opengraph-image.tsx` — a `next/og` `ImageResponse` at exactly
+**1200×630** (FR-005), fixed dark composition because link unfurlers do not receive a viewer theme.
+Headline **"Workplace stress, gently noticed."** over a meadow rule and "Private check-ins for
+calmer workdays". Root metadata in `layout.tsx` sets `metadataBase: https://serenify.tech`, canonical
+`/`, full OpenGraph and `twitter: summary_large_image` (FR-004). One deliberate brand deviation: the
+OG image uses Arial, not Inter/Outfit, since Satori does not fetch Google Fonts the same way.
+
+**Password reset (closes BACKLOG/issue #38).** A successful password update ends the recovery
+session and routes to login; a failed one does **not** (FR-006). This was already the behaviour —
+the change is that it is now locked by `apps/web/tests/unit/reset-password-actions.test.ts` so it
+cannot silently regress.
+
+Both new test files pin their invariants tightly (OG dimensions, content type, icon source,
+wordmark, tagline, `#101214` background; email subjects, fonts, wordmark style string, top rule).
+**Any future restyle of the templates or the OG card must update these expectations in the same
+commit** — they will fail otherwise, by design.
+
+13 files changed, 429 insertions, 12 deletions. **No co-author trailers** — same omission as #143.
+
+Cross-references: `docs/PROGRESS.md` 2026-07-13; `specs/023-brand-email-social-preview/`;
+`docs/BACKLOG.md` #38 (resolved).
+
+## 2026-07-13 — Serenify is live in production at https://serenify.tech (verified)
+
+**Backfilled 2026-07-22.** Recorded because the only evidence that production exists and works
+lived inside a SpecKit smoke-test file, in no canonical document.
+
+**Topology as deployed:**
+
+| Component | Runtime | Location |
+|---|---|---|
+| Web (Next.js 16) | Vercel | `https://serenify.tech` |
+| API (FastAPI + uvicorn, single worker) | Azure Container Apps, France Central | `https://api.serenify.tech`, port 8000 |
+| Database / Auth | Supabase Cloud (EU / Frankfurt) | project `excukdzjudslbqmkysrc` |
+| API image | GHCR | `ghcr.io/mohamedasem318/serenify-api:production` |
+| Transactional email | **Resend**, as Supabase Auth's custom SMTP provider | dashboard-configured |
+| Fallback LLM | Local LM Studio via Cloudflare Tunnel | self-hosted by design |
+
+**Verified 2026-07-13** by the production smoke test quoted in the PR #143 entry: PASS against the
+real Azure API and cloud Supabase, cold wake under one minute, first reading ≈1:36.
+
+**Resend is live** as Supabase's custom SMTP provider and production email is sending. It has **zero
+repository footprint by design** — no API key, no SDK, no calling code — because it sits beneath
+Supabase Auth as an SMTP relay rather than being called by application code. A 2026-07-21 recon read
+that absence as "Resend is not integrated"; that inference was wrong. Ratified as **Constitution
+Amendment 15** (1.11.0 → 1.11.1, PATCH), which drops the now-satisfied "until Resend domain
+verified" caveat from the locked stack table. See `docs/DECISIONS.md` 2026-07-22.
+
+**There is no rollback target.** `docs/DECISIONS.md` (2026-07-12) claimed the prior Azure Container
+Instance remained running as one; the cutover design doc in the same PR said the resource groups had
+been deleted to stop credit consumption. Settled on 2026-07-22 by querying the subscription:
+`az group list` returns exactly one group (`serenify-prod-rg`) holding only the Container Apps
+environment, the `serenify-api` app, and its managed certificate. **No ACI exists.** Recovery is a
+re-provision from the GHCR image tag or a Container Apps revision rollback — not a traffic flip to a
+warm standby, and not instantaneous. Corrected in `docs/DECISIONS.md` 2026-07-22.
+
+Cross-references: `docs/PROGRESS.md` 2026-07-13; `docs/DECISIONS.md` 2026-07-22 (both entries);
+`.specify/memory/constitution.md` Amendments 14 and 15;
+`specs/022-cold-start-readiness/smoke-tests.md`.

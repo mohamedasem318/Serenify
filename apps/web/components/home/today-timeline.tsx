@@ -16,7 +16,7 @@ import { HIGHLIGHT_FILL } from "@/lib/trend-geometry";
  * graphic amber. The live monitor's "processed, then deleted" reassurance line is intentionally
  * NOT shown here (FR-013) — it stays on the monitor.
  *
- * Visual source of truth: serenify-008followups-trend-FINAL.html (`.trow` / `.chip`).
+ * Visual source of truth: docs/mockups/serenify-008followups-trend-FINAL.html (`.trow` / `.chip`).
  */
 
 const CHIP: Record<ChipTone, { className: string; style: CSSProperties }> = {

@@ -374,6 +374,27 @@ unchanged.
 
 Cross-references:
 - docs/DECISIONS.md entry 2026-07-12
+
+Amendment 15: 1.11.0 → 1.11.1 (2026-07-22, PATCH)
+Bump rationale: the Transactional email stack row carried the transitional caveat
+"Supabase email until Resend domain verified". That condition is now satisfied —
+Resend is live in production as Supabase's custom SMTP provider, configured in the
+Supabase dashboard. The row is updated to state the delivered arrangement. PATCH
+(not MINOR): this is NOT a stack substitution — Resend was already the named
+production choice; only a now-satisfied precondition is removed. No principle is
+added, removed, or restructured, and no behavioral rule changes.
+
+Note for future auditors: Resend correctly has zero footprint in this repository —
+no API key, no SDK, no calling code. It is wired beneath Supabase Auth as an SMTP
+provider, so mail delivery changes are a dashboard + DNS concern, not a code
+concern. Absence from the repo is the intended architecture, not missing work.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks}-template.md
+and .specify/templates/commands/*.md for transactional-email and SMTP literals — no
+propagation is required.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-22
 -->
 
 # Serenify Constitution
@@ -751,7 +772,7 @@ amendment (see Governance) and a decision entry in `docs/DECISIONS.md`.
 | Database / Auth / Storage / Realtime | Supabase (Postgres-based)                  |
 | Primary LLM          | Groq — `openai/gpt-oss-120b` (`reasoning_effort=low`) via API |
 | Fallback LLM         | Local LM Studio (`openai/gpt-oss-20b`) via Cloudflare Tunnel |
-| Transactional email  | Resend (production); Supabase email until Resend domain verified |
+| Transactional email  | Resend, live as Supabase Auth's custom SMTP provider (dashboard-configured; no repo footprint by design) |
 | DNS / CDN / Tunnel   | Cloudflare (free tier)                                    |
 | Error tracking       | Sentry                                                    |
 | Product analytics    | PostHog Cloud                                             |
@@ -878,4 +899,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.11.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-12
+**Version**: 1.11.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-22
