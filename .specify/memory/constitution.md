@@ -729,7 +729,7 @@ Secrets MUST NEVER appear in the repository.
   committed file are a constitutional violation. Review MUST block the
   merge and the secret MUST be rotated immediately.
 - Mohamed's personal secrets reference file at
-  `C:\Users\moham\secrets\serenify.txt` is reference-only and MUST NEVER
+  `<local secrets file>` is reference-only and MUST NEVER
   be pasted into the repository, into commits, into PR descriptions, into
   issue comments, or into any committed documentation. Claude Code MUST
   NOT read from or echo this file into any committed artifact.

@@ -68,7 +68,7 @@ X (dataset stewardship) are not engaged. Mapping:
 | VI. Responsive & Accessible | ✅ | All five auth pages and onboarding render correctly at 360px. Touch targets ≥ 44×44px. `prefers-color-scheme` and `prefers-reduced-motion` are respected; the dark palette is wired from day one. |
 | VII. Mandatory Testing Per PR | ✅ (with caveat) | Vitest unit tests for Zod schemas and the middleware role-gate helper. Playwright happy-path per role (employee via signup; team_lead and admin via seeded Supabase admin API). pytest is N/A — no Python in this feature. Smoke-tests.md is already drafted in this folder. |
 | VIII. Spec-Driven Workflow | ✅ | `spec.md` was amended on 2026-05-17 to replace team affiliation with the direct-manager hierarchy and reduce onboarding to `full_name` only. The amendment is logged in `docs/CHANGELOG.md`. Plan and spec are now in agreement. |
-| IX. Secrets Discipline (NON-NEG) | ✅ | `.env.local` is gitignored at repo init; `SUPABASE_SERVICE_ROLE_KEY` lives only in server-side code (admin invite route handler) and is never imported into client components. Vercel env vars hold production secrets. `C:\Users\moham\secrets\serenify.txt` is not referenced from any committed file. |
+| IX. Secrets Discipline (NON-NEG) | ✅ | `.env.local` is gitignored at repo init; `SUPABASE_SERVICE_ROLE_KEY` lives only in server-side code (admin invite route handler) and is never imported into client components. Vercel env vars hold production secrets. `<local secrets file>` is not referenced from any committed file. |
 
 **Gate result**: PASS. The earlier draft of this plan diverged from
 `spec.md` on the team-affiliation model; both `spec.md` and
