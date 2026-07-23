@@ -31,6 +31,17 @@ matching issue in the same change. Never update one without the other; on confli
 wins. Full rules: constitution Principle VIII; operational detail + label taxonomy:
 `docs/DECISIONS.md`.
 
+## Commit & PR conventions
+
+- **Never write `Claude-Session:` trailers or any `claude.ai` URLs** into commit messages, PR
+  descriptions, or issue comments. This repository is **public**, and those URLs link to private
+  agent sessions — publishing one exposes a private session to anyone. This applies to squash-merge
+  messages too: strip any such trailer before merging, since squash concatenates the branch's commit
+  messages by default. (Two such trailers already exist on `main` in older feature commits, `#23`
+  and `#118`; history is not rewritten for them — the rule is forward-looking.)
+- Co-author trailers: add all three teammates (`Fatma-Alzahraaa`, `gehaddmohamedd`, `hebatullah003`)
+  as `Co-authored-by:` trailers on every commit.
+
 ## graphify
 
 This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and
