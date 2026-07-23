@@ -1,5 +1,6 @@
 {
-  "hooks": {
+  "_comment": "DISABLED 2026-07-23: the graphify PreToolUse guard hook below spawned a visible PowerShell window on every matched Bash call on Windows, which was disruptive. It is only an advisory nudge (graphify hook-check), so turning it off does not change functionality: graphify commands still work when run manually, and the windowless git post-commit auto-rebuild hook (.git/hooks/post-commit) is untouched. Preserved here (top-level key renamed 'hooks' -> '_disabledHooks') instead of deleted so it is obvious what was turned off and easy to restore -- rename '_disabledHooks' back to 'hooks' to re-enable.",
+  "_disabledHooks": {
     "PreToolUse": [
       {
         "matcher": "Bash",
