@@ -1,6 +1,7 @@
 {
+  "description": "graphify PreToolUse guard DISABLED 2026-07-23: on Windows it spawned a visible PowerShell window on every matched Bash call (disruptive). Advisory-only, so disabling changes no functionality — graphify still runs when invoked manually, and the windowless git post-commit rebuild hook (.git/hooks/post-commit) is untouched. Codex's hooks schema is strict (only 'description' and 'hooks' are allowed at the top level; a '_comment' key makes the whole file fail to parse), so the rationale lives here and the definition below is parked under the non-event key 'disabledGraphifyGuard'. Codex dispatches hooks strictly by event name, so a non-event key never fires. To re-enable, rename 'disabledGraphifyGuard' back to 'PreToolUse'.",
   "hooks": {
-    "PreToolUse": [
+    "disabledGraphifyGuard": [
       {
         "matcher": "Bash",
         "hooks": [
