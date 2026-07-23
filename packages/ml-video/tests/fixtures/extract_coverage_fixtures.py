@@ -1,5 +1,11 @@
 """DEV-ONLY, one-time extractor for the coverage-gate fixtures (feature 006, T011).
 
+NOTE: the committed ``.npy`` arrays are now **synthetic** (structure-only) — see
+``make_synthetic_fixtures.py`` and ``PROVENANCE.md``. This extractor is kept as the
+historical record of how the *original real* arrays were produced; running it requires
+the pinned mediapipe env and the raw clips (gitignored, not in the repo) and would
+overwrite the synthetic arrays with real extractions.
+
 This is NOT a pytest module (the filename is not ``test_*``), so pytest never
 collects it and CI never runs it. Run it ONCE, in the pinned ml-video env
 (Python 3.12, ``mediapipe==0.10.13``), to turn the four real calibration clips into

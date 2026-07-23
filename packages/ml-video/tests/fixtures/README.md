@@ -5,18 +5,30 @@ These fixtures back the usable-face-coverage gate's honest boundary test
 
 ## What lives here
 
-- `thin.npy`, `good_ideal.npy`, `good_realistic.npy`, `half.npy` — **derived landmark
-  arrays** (`float64 (N_kept, 956)`), each the FaceMesh landmark output of one real
-  calibration clip run through `ml_video.pipeline.extract_landmarks`. They are
-  **geometry, not frames** — no image/pixel data.
-- `extract_coverage_fixtures.py` — the **dev-only, one-time** extractor (a `__main__`
-  CLI, deliberately **not** a `test_*` file so pytest never collects it).
+- `thin.npy`, `good_ideal.npy`, `good_realistic.npy`, `half.npy` — **synthetic landmark
+  arrays** (`float64 (N_kept, 956)`). They reproduce each original clip's shape and its
+  exact count of **non-zero (detected-face) rows** — nothing else. The coverage gate
+  (`ml_video.coverage`) only ever tests, per row, whether the row is non-zero and counts
+  the rows; it never reads landmark *values*. So these stand-ins yield the same
+  `(usable, kept, fraction)` — and every accept/reject in the boundary test — as the
+  real extractions did, with **no real capture committed**.
+- `make_synthetic_fixtures.py` — the generator for the four arrays above (a `__main__`
+  CLI, **not** a `test_*` file, so pytest never collects it). Regenerate with
+  `python tests/fixtures/make_synthetic_fixtures.py`; verify with `--check`. Needs only
+  numpy — no mediapipe, no clips, no pinned env.
+- `extract_coverage_fixtures.py` — the historical **dev-only** extractor that produced
+  the *original real* arrays from the raw clips (kept for the record; needs the pinned
+  mediapipe env and the gitignored clips, which are not in the repo).
+- `PROVENANCE.md` — where the real clips came from and the forensic check that all four
+  are landscape webcam captures (**none iOS**).
 
-> Status: calibrated, then **recalibrated on real browser webm** (DECISION-32). The
-> `.npy` arrays were regenerated from the four `.webm` clips through the fixed
-> VFR-timestamp decode (DECISION-29); the per-clip `usable / kept / fraction` and the
-> chosen thresholds are recorded below and in research.md "Calibration measurements"
-> / "Chosen thresholds (DECISION-32)".
+> Status: the committed arrays are **synthetic** (structure-only), swapped in for the
+> real extractions. The calibration numbers they encode were fixed in DECISION-32
+> (recalibrated on real browser webm through the fixed VFR-timestamp decode,
+> DECISION-29); the per-clip `usable / kept / fraction` and the chosen thresholds are
+> recorded below and in research.md "Calibration measurements" / "Chosen thresholds
+> (DECISION-32)". The rows below describe those real measurements — the synthetic arrays
+> reproduce their `usable / kept / fraction` exactly.
 
 ## Why raw clips are NOT committed
 
@@ -24,10 +36,14 @@ The raw calibration **video clips are intentionally never committed** (see
 `.gitignore` here): `*.mp4` / `*.webm` / `*.mov` / `*.avi` are excluded so a raw
 recording can never be added by accident. This keeps raw signal off the repo
 (Constitution Principle I — raw frames stay in the inference layer) and avoids any
-dataset-consent exposure (Principle X). Only the **derived `.npy` landmark arrays**
-are committed — analogous to using StressID feature vectors (not media) as fixtures.
+dataset-consent exposure (Principle X). The committed `.npy` arrays are now **synthetic**
+(structure-only) — stronger still: no real landmark geometry ships at all.
 
 ## Provenance
+
+> The committed arrays are synthetic; this section and the table below describe the
+> **real clips** they were extracted from. Full provenance + the "none is iOS" forensic
+> check are in [`PROVENANCE.md`](./PROVENANCE.md).
 
 The four clips are the developers' own calibration recordings (not StressID media),
 captured in the browser as `.webm` (the dev recorder
