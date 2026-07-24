@@ -395,6 +395,66 @@ propagation is required.
 
 Cross-references:
 - docs/DECISIONS.md entry 2026-07-22
+
+Amendment 16: 1.11.1 → 1.12.0 (2026-07-24, MINOR)
+Bump rationale: Two changes to Principle VIII's provisional ordering plus one new
+standing rule. (1) A new slot `013-public-surface-and-legal` is inserted — scope:
+the public landing page, `/terms`, `/privacy`, the site footer, and the signup
+consent gate. (2) `privacy-controls-and-transparency` is moved to sit AFTER
+`team-lead-dashboard`, fixing a latent dependency inversion: it governs what an
+employee lets their team lead see, so it cannot meaningfully ship before the
+team-lead dashboard it constrains exists, yet it previously sat ahead of it.
+Accepted consequence, stated plainly: with this ordering `017-team-lead-dashboard`
+ships with hardcoded default visibility scopes and
+`018-privacy-controls-and-transparency` retrofits employee-facing controls onto it
+— the alternative was leaving the inversion in place (tracked as GitHub issue #152
+and a `docs/BACKLOG.md` entry). The unstarted tail renumbers accordingly:
+`recommendations` 013→014, `personalization-onboarding` 014→015; `preferences-hub`
+and `team-lead-dashboard` keep 016/017; `admin-dashboard` 018→019, `audio-modality`
+019→020, `physio-modality` 020→021, `fusion` 021→022. Two live body cross-references
+move with the tail: Principle IV audio `019 → 020`, Principle III fusion
+`021 → 022`. (3) Principle VIII gains a standing rule, grouped with the existing
+DECISIONS/PROGRESS/CHANGELOG/BACKLOG logging bullets: whenever a feature changes
+what data is collected, where it goes, who can see it, or how long it is retained,
+the Privacy Policy and Terms of Service MUST be reviewed and updated in the same PR
+(mirrored verbatim into `CLAUDE.md`). MINOR bump: a new planned slot, a reorder of
+the provisional ordering, and new guidance added to an existing principle all
+materially extend the guidance (consistent with Amendments 8/9/10/13); no principle
+is added, removed, or restructured, and no numbered section changes.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for the affected slugs (`recommendations`,
+`personalization-onboarding`, `preferences-hub`, `team-lead-dashboard`,
+`privacy-controls-and-transparency`, `admin-dashboard`, `audio-modality`,
+`physio-modality`, `fusion`, `public-surface-and-legal`), the feature-number
+literals `013`–`022`, and the new rule's terms (`Privacy Policy`, `Terms of
+Service`, `retention`). The only hit is a generic `[NEEDS CLARIFICATION: retention
+period not specified]` example FR in spec-template.md — an illustrative placeholder
+in the template's "marking unclear requirements" block, not a reference to this
+rule or any feature — so no template edit is required (consistent with the
+Amendment 8–15 audits: templates reference principles by number, not by these
+literals). Recorded here so the next auditor does not re-flag the coincidental
+`retention` match.
+
+Cross-reference sweep (outside the constitution): forward-looking feature-number
+references in shipped `specs/*/` are NOT retro-edited by this ordering change,
+consistent with Amendments 8 and 11 — those spec docs are point-in-time records and
+the constitution's ordering list is the source of truth for a feature's current
+number. The stale specs/011 and specs/012 references (recommendations 013→014,
+personalization 014→015) were identified and deliberately left; specs/004's
+audio=013 / physio=014 / fusion=015 labels are pre-existing drift unrelated to this
+amendment and also left. `docs/BACKLOG.md` — the forward-routing source of truth —
+WAS reconciled in place: its number-bearing references were corrected (admin
+018→019, privacy 015→018) keeping each durable slug; item #86 (90-day purge job)
+was clarified as unslotted (explicitly NOT owned by 013); and BACKLOG:599's
+`008/010/014` list was left as pre-existing ambiguous drift. Detail in
+docs/DECISIONS.md 2026-07-24.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-24
+- docs/CHANGELOG.md entry 2026-07-24
+- CLAUDE.md (Privacy Policy / Terms of Service rule mirrored verbatim)
+- GitHub issue #152 / docs/BACKLOG.md (accepted 017→018 ordering consequence)
 -->
 
 # Serenify Constitution
@@ -511,7 +571,7 @@ Each package MUST expose the same inference contract (input shape, output
 schema, confidence/quality signal). Adding a new modality MUST be a config
 change in the inference service plus a new package — never a rewrite of
 shared code. Cross-modality fusion lives in a separate fusion layer (see
-feature 021) and consumes the common interface only.
+feature 022) and consumes the common interface only.
 
 **Rationale**: Modalities arrive at different times (video first, then
 audio, then physio, then fusion). Coupling them would force every modality
@@ -540,7 +600,7 @@ directly.
   N turns) that reconciles with the physiological signal stream.
 
 **Fine-tuning clause (open decision, must close before audio modality lands
-in feature 019):** Default is prompting-only. If the team chooses to
+in feature 020):** Default is prompting-only. If the team chooses to
 fine-tune later, the fine-tuned model MUST (a) be served behind the same
 `LLMProvider` interface so app code does not change, (b) be evaluated on a
 documented held-out set with metrics published in `docs/MODELS.md`, and
@@ -694,6 +754,9 @@ implement, in that order. Implementation without a spec is forbidden.
   logged, closed when it is fixed, both in the same change. Issues never diverge
   from BACKLOG; on conflict, BACKLOG wins. Label taxonomy and operational detail
   are recorded in `docs/DECISIONS.md`.
+- Whenever a feature changes what data is collected, where it goes, who can
+  see it, or how long it is retained, the Privacy Policy and Terms of Service
+  MUST be reviewed and updated in the same PR.
 - Claude Code MAY commit and push its own work directly to feature
   branches. Mohamed reviews PRs/commits before merging branches to `main`.
 - Provisional feature ordering (subject to change; record changes in
@@ -705,11 +768,11 @@ implement, in that order. Implementation without a spec is forbidden.
   `009-today-card-trend-redesign`,
   `010-monitoring-graph-redesign`,
   `011-llm-client-and-chatbot`,
-  `012-questionnaire`, `013-recommendations`,
-  `014-personalization-onboarding`, `015-privacy-controls-and-transparency`,
+  `012-questionnaire`, `013-public-surface-and-legal`,
+  `014-recommendations`, `015-personalization-onboarding`,
   `016-preferences-hub`, `017-team-lead-dashboard`,
-  `018-admin-dashboard`, `019-audio-modality`,
-  `020-physio-modality`, `021-fusion`.
+  `018-privacy-controls-and-transparency`, `019-admin-dashboard`,
+  `020-audio-modality`, `021-physio-modality`, `022-fusion`.
 
 **Rationale**: A four-person team building an ML product needs a single
 source of truth per feature. Spec-driven development makes scope explicit,
@@ -899,4 +962,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.11.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-22
+**Version**: 1.12.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-24
