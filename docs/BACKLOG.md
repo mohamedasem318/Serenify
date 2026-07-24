@@ -1469,18 +1469,27 @@ substance; a consent checkbox + links wired into the signup Server Action
 (`apps/web/app/(auth)/signup/actions.ts`) that blocks account creation until accepted;
 acceptance recorded (timestamp + document version) so consent is auditable; and the
 "informed-draft-not-legal-advice" caveat tracked until a qualified legal review clears it.
-**Address by**: draft **alongside feature 018 (privacy-controls-and-transparency)**, since
-that feature defines the exact data-handling substance the documents must describe (manager
-visibility, privacy slider, transparency view) — write the policy and the controls together
-so they cannot drift. **Ship the signup checkbox together with the real documents** (not a
-placeholder linking to empty pages). **Hard gate: before any real user data.** Pairs with
-the security-slice-7 "`/signup` is open self-serve — gate to invite-only — ⛔
-PRE-PRODUCTION DEPLOY BLOCKER" entry (both are binding pre-real-data gates on the signup
-surface) and with the `/app/account` Privacy placeholder that feature 018 fills in.
+**Address by**: **feature 013 (public-surface-and-legal)** — the public landing page,
+`/terms`, `/privacy`, the site footer, and the signup consent gate are exactly 013's scope
+(Constitution Amendment 16). The documents must still be grounded in the actual
+data-handling substance that **feature 018 (privacy-controls-and-transparency)** defines
+(manager visibility, privacy slider, transparency view) — 013 authors the ToS/Privacy pages
+and wires the signup gate; 018's data-handling substance feeds their content, and either doc
+gets revisited if 018 changes what is collected/seen/retained (see the standing
+Privacy-Policy/ToS-per-PR rule added in Amendment 16). **Ship the signup checkbox together
+with the real documents** (not a placeholder linking to empty pages). **Hard gate: before
+any real user data.** Pairs with the security-slice-7 "`/signup` is open self-serve — gate
+to invite-only — ⛔ PRE-PRODUCTION DEPLOY BLOCKER" entry (both are binding pre-real-data
+gates on the signup surface) and with the `/app/account` Privacy placeholder that feature
+018 fills in.
 **Update (2026-06-29, feature 011)**: still **OPEN** — feature 011 ships only the in-app
 chatbot companion disclaimer ("Ren is an AI companion, not a substitute for professional
 care.") on chat surfaces; this is **not** the consent gate. The full ToS/Privacy documents +
 the account-creation consent checkbox remain unbuilt and this stays a pre-real-data blocker.
+**Update (2026-07-24, Constitution Amendment 16)**: owning feature reconciled from
+`018-privacy-controls-and-transparency` to **`013-public-surface-and-legal`** — Amendment 16
+inserted 013 as the slot for the public landing page/`/terms`/`/privacy`/signup consent gate,
+which is #75's actual subject; still **OPEN** (013 has not shipped).
 
 ### Internationalization — Arabic (RTL) and possibly French (#76)
 **Status**: deferred-feature
