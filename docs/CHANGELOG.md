@@ -2696,3 +2696,36 @@ warm standby, and not instantaneous. Corrected in `docs/DECISIONS.md` 2026-07-22
 Cross-references: `docs/PROGRESS.md` 2026-07-13; `docs/DECISIONS.md` 2026-07-22 (both entries);
 `.specify/memory/constitution.md` Amendments 14 and 15;
 `specs/022-cold-start-readiness/smoke-tests.md`.
+
+## 2026-07-24 — Constitution Amendment 16 (MINOR, 1.11.1 → 1.12.0): feature-ordering reorder + Privacy-Policy/ToS-per-PR rule
+
+Principle VIII provisional ordering: a new slot `013-public-surface-and-legal` (public landing page,
+`/terms`, `/privacy`, footer, signup consent gate) is inserted, and `privacy-controls-and-transparency`
+is moved to sit **after** `team-lead-dashboard` to fix a dependency inversion (it governs what an
+employee lets their team lead see, so it cannot ship before the dashboard it constrains). Resulting
+013–022 tail: `013-public-surface-and-legal`, `014-recommendations`, `015-personalization-onboarding`,
+`016-preferences-hub`, `017-team-lead-dashboard`, `018-privacy-controls-and-transparency`,
+`019-admin-dashboard`, `020-audio-modality`, `021-physio-modality`, `022-fusion`. By-slug:
+recommendations 013→014, personalization-onboarding 014→015, preferences-hub/team-lead-dashboard keep
+016/017, privacy-controls 015→018, admin 018→019, audio 019→020, physio 020→021, fusion 021→022. Two
+constitution body cross-refs moved with the tail (Principle IV audio 019→020, Principle III fusion
+021→022).
+
+Accepted consequence: `017-team-lead-dashboard` ships with hardcoded default visibility scopes and
+`018-privacy-controls-and-transparency` retrofits employee-facing controls onto it — tracked as GitHub
+issue #152 + a `docs/BACKLOG.md` entry, not left only in the constitution rationale.
+
+New standing rule (Principle VIII, mirrored into `CLAUDE.md`): whenever a feature changes what data is
+collected, where it goes, who can see it, or how long it is retained, the Privacy Policy and Terms of
+Service MUST be reviewed and updated in the same PR.
+
+Template audit: none (the only grep hit is a generic `retention period` placeholder FR in
+`spec-template.md`, unrelated). `docs/BACKLOG.md` was reconciled in place (admin 018→019, privacy
+015→018, keeping slugs; #86 clarified as unslotted); shipped `specs/*/` were deliberately NOT
+retro-edited (point-in-time records; constitution ordering is the source of truth), consistent with
+Amendments 8/11. MINOR bump: new slot + reorder + new guidance on an existing principle; no principle
+added/removed/restructured. Hand-edited to preserve the Sync Impact Report history (Amendment 10
+precedent).
+
+Cross-references: `.specify/memory/constitution.md` Amendment 16; `docs/DECISIONS.md` 2026-07-24;
+`CLAUDE.md`; `docs/BACKLOG.md` (#152, #86, #75); GitHub issue #152.
