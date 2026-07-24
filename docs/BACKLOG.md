@@ -1900,3 +1900,28 @@ controls). Suggested issue labels: `type:feature`, `area:web`, `area:db`.
 **Address by**: `017-team-lead-dashboard` (build the centralized defaults) and
 `018-privacy-controls-and-transparency` (the retrofit). See `.specify/memory/constitution.md`
 Amendment 16 and `docs/DECISIONS.md` 2026-07-24.
+
+## From constitution Amendment 17 (wordmark canonization + manager-visibility copy discipline) — 2026-07-24
+
+### `--color-on-accent` and `--color-scrim` are shipped Graphite tokens never registered in Principle V (#155)
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#155 OPEN**.
+**Observed**: 2026-07-24, during the constitution Amendment 17 template/token audit.
+**Description**: Principle V's palette block is declared **"locked, no additions without amendment"**, but
+two tokens shipped in feature 007 have never been named there: `--color-on-accent`
+(`apps/web/app/globals.css:39` — light `#F8F9FA`, dark uses `--color-bg`) and `--color-scrim`
+(`globals.css:41` — `rgba(28, 32, 35, 0.60)`, fixed in both modes). Principle V lists
+bg / surface / ink / muted / meadow / foggy / amber / crimson / border, plus the four amber sub-tokens
+that **Amendment 5 explicitly registered**. Amendment 4 (the 007 visual redesign) described the
+filled-accent foreground rule in prose but never named `--color-on-accent`, and never mentioned
+`--color-scrim` at all. **This is a documentation gap, not a code problem** — both tokens are correct,
+shipped, and in use. The risk is that the next Principle V amendment either rediscovers them as a
+surprise or treats the palette list as complete when it is not.
+**Precedent**: Amendment 17 closed exactly this gap for a third 007 token, `--color-meadow-text`, because
+the new Wordmark rule depends on it. The remaining two were **deliberately** left out of that amendment
+as out of scope and logged here instead, rather than silently widening an approved amendment.
+**Fix scope**: register both in Principle V's palette block with their values and their 007 origin, in
+whichever amendment next touches Principle V — a **ride-along, not an amendment of its own**. Do **not**
+change either value. Suggested issue labels: `type:tech-debt`, `area:docs`.
+**Address by**: the next amendment that touches Principle V. See `.specify/memory/constitution.md`
+Amendment 17, `docs/DECISIONS.md` 2026-07-24 (Amendment 17), and `docs/DECISIONS.md` 2026-06-17
+(filled-accent CTA foreground) / 2026-06-18 (`--color-meadow-text`).
