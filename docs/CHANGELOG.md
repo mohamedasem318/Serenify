@@ -2729,3 +2729,76 @@ precedent).
 
 Cross-references: `.specify/memory/constitution.md` Amendment 16; `docs/DECISIONS.md` 2026-07-24;
 `CLAUDE.md`; `docs/BACKLOG.md` (#152, #86, #75); GitHub issue #152.
+
+## 2026-07-24 — Constitution Amendment 17 (MINOR, 1.12.0 → 1.13.0): two-colour wordmark canonized + manager-visibility copy discipline
+
+Two changes on two existing principles, landed as **one** amendment because both answer blocking open
+questions in the same feature spec (`013-public-surface-and-legal`: OQ-3 and OQ-1) and land in one PR.
+Amendment 12 is the precedent — it likewise paired an unrelated Principle IV / locked-stack change with
+Principle I disclosure invariants on a single feature trigger. Amendment atomicity here tracks the
+landing event, not the topic.
+
+**Principle V — new `Wordmark` block.** `serenify` is canonized as a **two-colour** wordmark: `seren` in
+the `ink` token, `ify` in the `meadow-text` token, always lowercase, never carrying a dot or other
+terminal punctuation, and **defined once as a single shared component** reused at every site that renders
+it inside the web app's React tree. Two classes of render site sit outside that tree and cannot consume
+the component — the `next/og` social card (Satori cannot load the app's self-hosted fonts) and the
+Supabase transactional email templates (inline-styled HTML) — so they are an explicit **hand-sync
+carve-out**, updated in the same PR as any wordmark change. Without that carve-out the rule would be
+violated on day one by `opengraph-image.tsx:52` and `supabase/templates/{confirmation,recovery}.html:38`,
+and a rule the codebase already breaks is worse than no rule.
+
+The lowercase sentence **moves** out of the Typography block into Wordmark rather than being duplicated,
+and Wordmark deliberately does not restate that the wordmark is set in Outfit — Typography, two sentences
+above, already assigns it. Two places stating one rule is two places to drift.
+
+**No new token, no value change** — but `--color-meadow-text` (light `#346A56` / dark `#63B292`) is
+registered in Principle V for the first time. It shipped in feature 007 (`globals.css:40,157`,
+`docs/DECISIONS.md` 2026-06-18) yet was never named in the constitution, even though the palette is
+declared "locked, no additions without amendment". Two sibling 007 tokens in the same unregistered
+position, `--color-on-accent` and `--color-scrim`, were deliberately left out of scope and logged to
+`docs/BACKLOG.md` + GitHub issue **#155** to ride along with the next Principle V amendment.
+
+**Principle I — new public-communication rule.** Principle I's **substance is unchanged**: per-individual
+manager visibility with the employee-controlled granularity slider remains the intended end-state, and no
+existing invariant is edited. The new rule governs only how that end-state may be *described* in
+public-facing or user-facing text — honestly, with not-yet-live controls marked not-yet-live (the slider
+and the transparency view arrive with feature 018), and without flattening in the other direction: chat
+content and crisis disclosures genuinely never reach a manager, admin, or employer, while stress-trend
+summaries **are** manager-visible by default at the `summary only` granularity. That granularity default
+is quoted from the existing Principle I slider bullet, which has carried "(DEFAULT)" since the 1.0.0
+ratification — a copy-discipline rule must not be where a new substantive default first appears.
+
+This resolves the 013 spec's blocking **OQ-1** by choosing its Option B and constraining how B is
+written — not by amending Principle I, which was Option A and was not taken. It also resolves **OQ-3**:
+yes, the wordmark canonization requires an amendment.
+
+Principle I now names feature 018 (`privacy-controls-and-transparency`) — the **third** live
+feature-number cross-reference in the principle bodies, alongside Principle IV's audio 020 and
+Principle III's fusion 022. Future ordering amendments must move all three.
+
+**Template audit: none.** All five templates grepped for `wordmark`, `two-colour`/`two-color`,
+`lowercase`, `Principle V`, `Principle I`, `manager visibility`, `Graphite`, `meadow`, `meadow-text`,
+`ink`, `serenify` — the only hits are coincidental substrings of `ink` inside "link"/"Link" in ordinary
+markdown boilerplate (`checklist-template.md:5,39`, `plan-template.md:3`, `spec-template.md:19`),
+recorded so they are not re-flagged.
+
+**Cross-reference sweep: reported, not bulk-edited.** Four `README.md` lines (11, 15, 16, 18) state
+manager visibility or the privacy slider as present-tense product fact without a not-yet-live marker —
+`:18` most clearly, since the slider does not exist. Three lines in the signed-off landing mock
+(`:442`, `:550`, `:772`) carry exactly the flattened "nothing reaches a manager" claim the new rule
+forbids; that file is **gitignored and untracked**, so it cannot be edited by a PR and the rule instead
+binds at transcription time when 013's landing copy is written from it. Four live user-facing strings
+were verified already compliant and must not be "corrected". Full detail, including a sweep-methodology
+caveat (ripgrep silently skips the mock because it honours `.gitignore`), in `docs/DECISIONS.md`
+2026-07-24 (Amendment 17).
+
+MINOR bump: materially expanded guidance on two existing principles; no principle added, removed, or
+restructured, and no numbered section changed. Hand-edited to preserve the curated Sync Impact Report
+history (Amendment 10 precedent). Not mirrored into `CLAUDE.md` — unlike Amendment 16's per-PR
+procedural gate, these are design and copy rules, and the constitution is already read on every SpecKit
+feature.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 17; `docs/DECISIONS.md` 2026-07-24
+(Amendment 17); `docs/BACKLOG.md` "From constitution Amendment 17"; GitHub issue #155;
+`specs/013-public-surface-and-legal/spec.md` OQ-1 and OQ-3.

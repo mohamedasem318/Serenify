@@ -455,6 +455,97 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-07-24
 - CLAUDE.md (Privacy Policy / Terms of Service rule mirrored verbatim)
 - GitHub issue #152 / docs/BACKLOG.md (accepted 017→018 ordering consequence)
+
+Amendment 17: 1.12.0 → 1.13.0 (2026-07-24, MINOR)
+Bump rationale: Two changes on two existing principles, landed as ONE amendment
+because both answer blocking open questions in the same feature spec
+(013-public-surface-and-legal: OQ-3 and OQ-1) and land in one PR — consistent with
+Amendment 12, which likewise paired unrelated Principle IV/stack and Principle I
+changes on a single feature trigger. Amendment atomicity here tracks the landing
+event, not the topic.
+
+(1) Principle V gains a **Wordmark** block. `serenify` is canonized as a two-colour
+treatment — `seren` in the `ink` token, `ify` in the `meadow-text` token —
+lowercase, no terminal punctuation, defined ONCE as a single shared component and
+reused at every site that renders it inside the web app's React tree. Two classes
+of render site sit outside that tree and cannot consume the component (the
+`next/og` social card, since Satori cannot load the app's fonts; and the Supabase
+transactional email templates, which are inline-styled HTML), so they are an
+explicit hand-sync carve-out rather than a rule the codebase violates on day one.
+The lowercase sentence MOVES out of the Typography block into Wordmark rather than
+being duplicated — two places stating one rule is two places to drift. For the same
+reason the Wordmark block does NOT restate that the wordmark is set in Outfit;
+Typography, two sentences above, already assigns Outfit to the wordmark.
+
+This adds NO new token and changes NO token value; it fixes an application rule for
+an existing element. It does register `--color-meadow-text` (light `#346A56` / dark
+`#63B292`) in Principle V for the first time: the token shipped in feature 007
+(docs/DECISIONS.md 2026-06-18) but was never named here, even though this palette is
+declared "locked, no additions without amendment". Two sibling 007 tokens,
+`--color-on-accent` and `--color-scrim`, are in the same unregistered position and
+are deliberately NOT fixed here — out of scope for this amendment, logged to
+docs/BACKLOG.md and GitHub issue #155 to ride along with whichever amendment next
+touches Principle V. The wordmark rule goes in the constitution rather than only in
+DECISIONS because the constitution is read on every SpecKit feature — a wordmark
+rule holds against drift only where it is enforced.
+
+(2) Principle I gains a public-communication rule. Principle I's SUBSTANCE IS
+UNCHANGED: per-individual manager visibility with the employee-controlled
+granularity slider remains the intended end-state, and no invariant is edited. The
+new rule governs only how that end-state may be described in public-facing or
+user-facing text — it MUST be described honestly, controls that are not yet live
+MUST be marked not-yet-live, and it MUST NOT be flattened in the other direction
+either: chat content and crisis disclosures genuinely never reach a
+manager/admin/employer, while stress-trend summaries ARE manager-visible by default
+at the `summary only` granularity. That granularity default is NOT introduced here —
+it is quoted from the existing Principle I slider bullet, which has carried
+"`summary only` (DEFAULT)" since the 1.0.0 ratification. A copy-discipline rule must
+not be the place a new substantive default first appears. This resolves the 013
+spec's blocking OQ-1 by choosing its Option B and constraining how B is written —
+NOT by amending Principle I, which was Option A.
+
+MINOR bump: materially expanded guidance on two existing principles (Governance's
+MINOR definition; consistent with Amendments 5/12/13); no principle is added,
+removed, or restructured, and no numbered section changes. Moving the lowercase
+sentence between two sub-blocks of Principle V is not a structural change — MAJOR is
+scoped to removing a principle or a numbered section. Hand-edited (not via
+/speckit-constitution) to preserve the curated Sync Impact Report history, per the
+Amendment 10 precedent.
+
+New live body cross-reference: Principle I now names feature 018
+(`privacy-controls-and-transparency`). This is the THIRD feature-number reference in
+the principle bodies — future Principle VIII ordering amendments must move it
+alongside Principle IV's audio 020 and Principle III's fusion 022. The slug is
+carried with the number so a renumber stays greppable by slug.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for `wordmark`, `two-colour`/`two-color`, `lowercase`,
+`Principle V`, `Principle I`, `manager visibility`, `Graphite`, `meadow`,
+`meadow-text`, `ink`, `--color-ink`, and `serenify` — zero substantive matches. The
+only hits are coincidental substrings of `ink` inside the words "link"/"Link" at
+checklist-template.md:5,39, plan-template.md:3, and spec-template.md:19 — ordinary
+markdown link boilerplate, unrelated to the palette token. Recorded so the next
+auditor does not re-flag them (same practice as Amendment 16's `retention` note).
+
+Cross-reference sweep (outside the constitution): reported in full in
+docs/DECISIONS.md 2026-07-24 (Amendment 17) and deliberately NOT bulk-edited in this
+amendment. Four README.md lines state manager visibility or the privacy slider as
+present-tense product fact without a not-yet-live marker; three lines in the
+signed-off landing mock carry exactly the flattened "nothing reaches a manager"
+claim the new rule forbids — that mock is gitignored and untracked, so it cannot be
+edited by a PR and the rule instead binds at transcription time, when 013's landing
+copy is written from it. Four live user-facing strings were checked and are already
+compliant and MUST NOT be "corrected".
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-24 (Amendment 17)
+- docs/CHANGELOG.md entry 2026-07-24 (Amendment 17)
+- docs/BACKLOG.md "From constitution Amendment 17" section / GitHub issue #155
+- specs/013-public-surface-and-legal/spec.md OQ-1 (resolved: Option B) and OQ-3
+  (resolved: yes, an amendment is required)
+- docs/mockups/serenify-landing-mock.html:92,422 (source of the `seren`/`ify` split;
+  untracked — see docs/mockups/README.md)
+- docs/DECISIONS.md 2026-06-18 (`--color-meadow-text` origin, feature 007)
 -->
 
 # Serenify Constitution
@@ -514,6 +605,21 @@ following invariants MUST hold at all times:
   Crisis support routes only to verified external resources or a person the
   user themselves chooses. Routing a mental-health crisis into the employer
   chain is a permanent, non-negotiable prohibition.
+- **Public-communication rule.** Any public-facing or user-facing text that
+  describes manager visibility — landing page, legal documents, consent
+  surfaces, marketing copy — MUST describe the end-state above honestly, and
+  MUST mark any control that is not yet live as not yet live. It MUST NOT
+  imply a control exists before it ships: the three-position privacy slider
+  and the transparency view arrive with feature 018
+  (`privacy-controls-and-transparency`), and copy written before then MUST say
+  so. It MUST NOT overclaim in the other direction either. Companion chat
+  content and crisis disclosures genuinely never reach a manager, admin, or
+  employer; stress-trend summaries ARE manager-visible by default, at the
+  `summary only` granularity. That distinction MUST be preserved in copy and
+  MUST NOT be flattened into a blanket "nothing reaches a manager." A privacy
+  promise published to the public is durable: copy that promises less
+  visibility than this principle designs becomes a lie the day that
+  visibility ships.
 - Manager hierarchy: a direct manager sees their direct reports only.
   Skip-level managers and above see only aggregated org-wide data and MUST
   NEVER see individual employees.
@@ -669,9 +775,26 @@ and every documented pairing meets WCAG AA:
 
 **Typography**: Inter for all UI/body text. Outfit is the display/heading
 typeface — wordmark, page and section headings, card titles, and large numerals
-— and MUST NOT be used for body, buttons, labels, or chart text. The wordmark
-is set lowercase (`serenify`). Outfit and Inter are both self-hosted under the
-SIL Open Font License; DM Serif Display is retired.
+— and MUST NOT be used for body, buttons, labels, or chart text. Outfit and
+Inter are both self-hosted under the SIL Open Font License; DM Serif Display is
+retired.
+
+**Wordmark**: `serenify` is a **two-colour** wordmark — `seren` in the `ink`
+token, `ify` in the `meadow-text` token — always lowercase, and never carrying
+a dot or other terminal punctuation. Within the web app's React tree it MUST be
+defined **once**, as a single shared component, and reused at every site that
+renders it; re-typing the markup at a new site is a violation. Two classes of
+render site sit outside that tree and cannot consume the component — the
+`next/og` social card (Satori cannot load the app's fonts) and the Supabase
+transactional email templates (inline-styled HTML) — so they MUST be kept in
+sync by hand, and any change to the wordmark MUST update them in the same PR.
+
+This introduces **no new token and changes no token value**: `ink` is in the
+palette above, and `--color-meadow-text` (light `#346A56` / dark `#63B292` —
+the AA-safe small-meadow text added by feature 007, `docs/DECISIONS.md`
+2026-06-18) is named here for the first time, closing a gap where a shipped
+Graphite token had never been registered in this principle. What changes is an
+application rule for an existing element.
 
 **Iconography**: Lucide library only. Stroke weight MUST be consistent
 across the surface.
@@ -962,4 +1085,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.12.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-24
+**Version**: 1.13.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-24
