@@ -31,6 +31,12 @@ matching issue in the same change. Never update one without the other; on confli
 wins. Full rules: constitution Principle VIII; operational detail + label taxonomy:
 `docs/DECISIONS.md`.
 
+## Privacy Policy & Terms of Service
+
+Whenever a feature changes what data is collected, where it goes, who can see it, or
+how long it is retained, the Privacy Policy and Terms of Service MUST be reviewed and
+updated in the same PR.
+
 ## Commit & PR conventions
 
 - **Never write `Claude-Session:` trailers or any `claude.ai` URLs** into commit messages, PR
