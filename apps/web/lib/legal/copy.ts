@@ -442,10 +442,10 @@ export const PRIVACY_MANAGER_HIERARCHY =
   "Neither of those views exists yet to be used or misused.";
 
 export const PRIVACY_MANAGER_CONTROLS =
-  "You are meant to control how much of that a manager sees. A three-position privacy " +
-  "slider — full detail, summary only, or off during hours you choose — will set the " +
-  "granularity, and a transparency view will show you exactly what your manager sees, so " +
-  "that you never have to take this document's word for it. Both arrive with Serenify's " +
+  "You are meant to control how much of that a manager would see. A three-position " +
+  "privacy slider — full detail, summary only, or off during hours you choose — will set " +
+  "the granularity, and a transparency view will show you exactly what your manager would " +
+  "see, so that you never have to take this document's word for it. Both arrive with Serenify's " +
   "privacy-controls-and-transparency work. Neither is live yet. There is nothing to " +
   "configure today, and no setting you could change now would alter what anyone sees; " +
   "summary only is the default the slider will start from.";
