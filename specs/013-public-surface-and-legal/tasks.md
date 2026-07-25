@@ -239,7 +239,7 @@ applies the migration cleanly; the three live psql probe results are recorded.
 
 ### Ship P2
 
-- [ ] T019 [P2] Run the phase verification and open the P2 PR from `p2-consent-foundation` into `013-public-surface-and-legal`. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green locally with results in the PR body; the PR body states plainly that this phase **ships no UI** and **writes no consent row for any existing user**; the T018 probe output is included; commits are per-file with the three co-author trailers; no `Claude-Session:` trailer and no `claude.ai` URL; all three CI checks green. Dependencies: T014, T015, T016, T017, T018.
+- [X] T019 [P2] Run the phase verification and open the P2 PR from `p2-consent-foundation` into `013-public-surface-and-legal`. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green locally with results in the PR body; the PR body states plainly that this phase **ships no UI** and **writes no consent row for any existing user**; the T018 probe output is included; commits are per-file with the three co-author trailers; no `Claude-Session:` trailer and no `claude.ai` URL; all three CI checks green. Dependencies: T014, T015, T016, T017, T018.
 
 **Checkpoint**: the consent model is proven at the database layer and exhaustively at the pure layer, before any surface depends on it. P4 and P5 have their foundation.
 
