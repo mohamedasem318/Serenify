@@ -5186,3 +5186,64 @@ All four are the honest end-state, correctly un-flattened; the only defect is th
 **Not mirrored into `CLAUDE.md`** — unlike Amendment 16's Privacy-Policy/ToS rule, which is a per-PR procedural gate. Both of these are design/copy rules, and the stated rationale for putting the wordmark in the constitution at all is that the constitution is read on every SpecKit feature. Keeping `CLAUDE.md` lean was the explicit call.
 
 **Cross-references**: `.specify/memory/constitution.md` Amendment 17 (Sync Impact Report + Principle I public-communication bullet + Principle V Typography/Wordmark blocks + version line `1.13.0`); `docs/CHANGELOG.md` 2026-07-24 (Amendment 17); `docs/BACKLOG.md` "From constitution Amendment 17" section; GitHub issue #155; `specs/013-public-surface-and-legal/spec.md` OQ-1 (resolved: Option B) and OQ-3 (resolved: an amendment is required); `docs/DECISIONS.md` 2026-06-18 (`--color-meadow-text` origin) and 2026-06-17 (filled-accent CTA foreground).
+
+---
+
+## 2026-07-25 — GitHub resolves a `pull_request` workflow from the PR's **merge ref**, not from the base branch or `main`
+
+**Status**: Accepted (measured, not inferred).
+
+**Context**: `.github/workflows/ci.yml` triggered only on `main`, so all three
+checks — `python (ruff · pytest)`, `web (lint · typecheck · vitest)` and
+`speckit-skills guard` — were silent for every PR into a feature branch; only
+Vercel ran. Confirmed on PR #160 (base `013-public-surface-and-legal`): two
+Vercel contexts, zero Actions checks — against PR #159 (base `main`) running all
+three. Feature 013 lands as ~9 stacked PRs including a migration and an
+application-wide entry gate, so this was a precondition
+(`specs/013-public-surface-and-legal/plan.md` §15, R1). Fixed in PR #164 by adding
+`[0-9][0-9][0-9]-*` — this repo's feature-branch convention, `001-auth-and-roles`
+through `013-public-surface-and-legal` — to both `pull_request` and `push`.
+
+**Finding**: For a `pull_request` event, GitHub reads the workflow file from the
+PR's **merge ref** (head merged into base). It does **not** read it from the base
+branch alone, and it does **not** read it from the default branch. Landing a
+trigger change on `main` therefore does not, by itself, make checks appear on PRs
+into a feature branch that was cut before that change.
+
+**Evidence** — three throwaway PRs, all with a `013-*` base, opened **before** #164
+merged so `main` could not be a confounder. All were closed and their branches
+deleted:
+
+| Probe | Base has the fix | Head has the fix | Guard checks ran? | Evidence |
+|---|---|---|---|---|
+| A (#161) | yes | yes | **yes**, all three green | run `30139855625` (`pull_request`) |
+| B (#162) | no | no | **no** — Vercel only | no CI run was created for that branch at all |
+| C (#163) | no | **yes** | **yes**, all three green | run `30139858220` (`pull_request`) |
+
+Probe C is the discriminator: the base branch carried no trigger change and the
+checks still ran, because the head carried it into the merge ref. Probe B is the
+control — not a cancelled or failed run, but no run created at all.
+
+**Consequence**: a feature branch cut **before** the trigger fix must have the
+commit merged into it before PRs into it run checks. `013-public-surface-and-legal`
+was 1 commit ahead of `main` and 0 behind, so this was **not** a fast-forward — it
+took merge commit `528f70e`. Branches cut from `main` **after** `cbb7f81` (the #164
+squash merge) inherit the trigger automatically and need nothing.
+
+Verified afterwards on PR #165 (head `chore/ci-verify-013-probe`, cut from
+`013-public-surface-and-legal` exactly as a phase branch will be, and deliberately
+named so it does **not** match `[0-9][0-9][0-9]-*`): all three checks ran from a
+single `pull_request` run `30140145032`, each listed once.
+
+**Side-effect, accepted**: a head branch whose own name matches `[0-9][0-9][0-9]-*`
+now also gets a `push` run, so its PR check list shows each check **twice** — once
+from `push`, once from `pull_request`. Both must pass; it is cosmetic noise, not a
+correctness problem. The `push` half is kept because an integration branch
+accumulating a 9-PR stack deserves the same green baseline `main` has: the base
+moves under earlier PRs, so the post-merge state is worth re-checking. Dropping
+`[0-9][0-9][0-9]-*` from the `push` trigger removes the duplication at that cost.
+
+**Cross-references**: PR #164 (the fix, squash-merged as `cbb7f81`); PRs #161, #162,
+#163 (probes, closed, branches deleted); PR #165 (post-merge verification, closed);
+`.github/workflows/ci.yml` header comment (the finding is recorded there so it need
+not be rediscovered); `specs/013-public-surface-and-legal/plan.md` §15 R1.
