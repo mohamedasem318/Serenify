@@ -60,6 +60,14 @@ describe("PublicNavbar", () => {
     expect(home).toHaveTextContent("serenify");
   });
 
+  it("gives the wordmark link a 44 px tap target (FR-053)", () => {
+    // Regression. The T036 walk measured this link at 81×24 in a real browser: the app
+    // header's equivalent has the same gap, so copying the app header faithfully — which
+    // FR-018 requires — reproduced the defect rather than avoiding it.
+    render(<PublicNavbar />);
+    expect(screen.getByLabelText("Serenify home").className).toMatch(/\bmin-h-11\b/);
+  });
+
   it("exposes every public destination", () => {
     const { container } = render(<PublicNavbar />);
     const hrefs = Array.from(container.querySelectorAll("a[href]")).map((a) =>
@@ -157,6 +165,10 @@ describe("PublicFooter", () => {
     for (const link of links) {
       expect(accessibleName(link)).not.toBe("");
       expect(link.className).toMatch(/min-h-11/);
+      // Regression, both axes. The T036 walk measured "Terms" at 41 px WIDE while it
+      // passed the height floor — a short label makes an inline-flex link narrower than
+      // the 44 px target even when its height is right.
+      expect(link.className).toMatch(/min-w-11/);
       // FR-053: a tap target's label must not wrap to two lines.
       expect(link.className).toMatch(/whitespace-nowrap/);
     }

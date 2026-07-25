@@ -23,8 +23,10 @@ import { PUBLIC_DESTINATIONS } from "@/components/public/destinations";
  * which say it properly. `tests/unit/components/public/public-shell.test.tsx` asserts the
  * string exactly, so a re-worded copyright line fails CI rather than shipping.
  *
- * Links are `min-h-11` (44 px) with `whitespace-nowrap`: at 320 px the row wraps between
- * the links rather than inside a label (FR-053).
+ * Links are `min-h-11 min-w-11` (44×44) with `whitespace-nowrap`: at 320 px the row wraps
+ * between the links rather than inside a label (FR-053). `min-w-11` is not decorative —
+ * measured at 320 px, "Terms" rendered 41 px wide and failed the target-size floor on the
+ * horizontal axis while passing it on the vertical.
  */
 export function PublicFooter() {
   return (
@@ -38,7 +40,7 @@ export function PublicFooter() {
                 <li key={href}>
                   <Link
                     href={href}
-                    className="inline-flex min-h-11 items-center whitespace-nowrap text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center whitespace-nowrap text-sm text-muted transition-colors hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     {label}
                   </Link>

@@ -37,10 +37,18 @@ export function PublicNavbar() {
         <div className="md:hidden">
           <PublicMobileNav />
         </div>
+        {/*
+         * `min-h-11` gives the wordmark link a 44 px tap target (FR-053). Measured at
+         * 320 px it was 81×24 without it — the app header's equivalent link has the same
+         * gap, which is why matching the app header is not on its own sufficient here.
+         * `items-center` replaces the app header's `items-baseline` and renders
+         * identically: the link has a single child, so there is no second baseline to
+         * align to, and the taller box then centres the wordmark rather than top-pinning it.
+         */}
         <Link
           href="/"
           aria-label="Serenify home"
-          className="inline-flex items-baseline gap-2 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex min-h-11 items-center gap-2 rounded-control focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <Wordmark className="text-2xl leading-none" />
         </Link>
