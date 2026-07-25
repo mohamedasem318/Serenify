@@ -1,25 +1,33 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/010-monitoring-graph-redesign/plan.md` (with supporting artifacts:
-`research.md`, `data-model.md`, `contracts/session-trend-ui.md`, `quickstart.md`).
-This is a frontend-only redesign of the live **"This session"** monitoring graph
-(`apps/web/components/monitor/session-trend.tsx`, the card below the camera stage),
-roadmap label `009b`. It **consumes the existing read layer** unchanged
-(`getSessionTrend` in `apps/web/lib/api/monitoring-reads.ts`, wired in
-`components/monitor/monitoring-session.tsx`) — no data-layer, RLS, whitelist,
-page-layout, or token change; no probability reaches the client. The central
-technique is **fixed-pixel SVG rendering** (1 unit = 1px; SVG width = container
-width with a matching viewBox; NO stretched viewBox — the totem/oval bug). The
-x-axis is a **uniform slot per capture window** on a **rolling ~2-min window**
-(decided F1). It splits no-reads into three honest treatments (warming dashed line ·
-out-of-frame foggy gap, **gated OFF at launch** per FR-015 · no-clear-read muted
-gap) and parks the now-marker muted/static during a no-read. Visual source of
-truth: `serenify-live-session-graph-mock.html` (real Graphite tokens; all already
-in `globals.css`). NEW pure module: `apps/web/lib/session-trend-geometry.ts`.
-All copy is signed off (FR-024 neutral no-read subtitle = "No clear read
-right now"; FR-022 labels approved). The pre-existing ~12s
-polling (vs the WebSocket constraint) is out of scope here (consumed unchanged).
+at `specs/013-public-surface-and-legal/plan.md` (with supporting artifacts:
+`research.md`, `data-model.md`, `contracts/consent-evaluate.md`,
+`contracts/consent-gates.md`, `contracts/wordmark.md`,
+`contracts/landing-hero-story.md`, `contracts/public-surface.md`,
+`quickstart.md`; `tasks.md` and `smoke-tests.md` follow). Section numbers
+(`§6.3`, `§7.3`, `§10.3`, …) are stable across those files — the map is in
+plan.md §4.1.
+This feature builds the public front door and the legal surface behind it:
+the landing page at `/`, `/terms`, `/privacy`, a public navbar + footer, and
+**two consent gates** — Terms/Privacy and camera-and-inference. Neither gate is
+one-time: both texts can be revised, and a revision judged **material**
+re-prompts everyone whose recorded consent predates it, so consent is a
+**history** (one append-only row per accepted revision, never overwritten) and
+the Terms/Privacy gate blocks the **whole application**, not just signup.
+Version identity — not timestamp comparison — decides re-consent, against an
+**in-repo registry** (`apps/web/lib/consent/registry.ts`); one migration
+(`user_consents`, owner-only RLS, immutability trigger, no UPDATE/DELETE grant).
+Declining writes nothing, deletes nothing, and writes no withdrawal state.
+Terminology is binding: **calibration** / **monitoring session** / **weekly
+work-environment check-in** — never bare "check-in". The signed-off landing mock
+(`docs/mockups/serenify-landing-mock.html`, gitignored — grep it with
+`--no-ignore`) carries **three forbidden lines** (`:442`, `:550`, `:772`) that
+Amendment 17 bans; replacement copy is **APPROVED and fixed verbatim in plan §10.3**
+— use it character-for-character, do not re-word it.
+Implements constitution 1.13.0 Amendment 17 (two-colour wordmark, one shared
+component + two hand-sync exceptions; manager-visibility copy discipline) and
+MUST NOT re-amend the constitution. Closes #75 and #157; **not** #62.
 <!-- SPECKIT END -->
 
 ## Backlog ↔ Issues
