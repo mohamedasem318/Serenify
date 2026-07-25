@@ -22,10 +22,10 @@ describe("Wordmark", () => {
   }
 
   it("splits into exactly two halves, in the ink and meadow-text tokens", () => {
-    const wrapper = renderWordmark();
-    const [seren, ify] = Array.from(wrapper.children);
+    const halves = Array.from(renderWordmark().children);
 
-    expect(wrapper.children).toHaveLength(2);
+    expect(halves).toHaveLength(2);
+    const [seren, ify] = halves as [Element, Element];
     expect(seren.textContent).toBe("seren");
     expect(seren).toHaveClass("text-ink");
     expect(ify.textContent).toBe("ify");

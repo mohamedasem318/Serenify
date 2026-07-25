@@ -73,11 +73,11 @@ function cssBlock(opener: RegExp, label: string): string {
 }
 
 function token(block: string, name: string, label: string): string {
-  const found = block.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`));
-  if (!found) {
+  const value = block.match(new RegExp(`--${name}\\s*:\\s*([^;]+);`))?.[1];
+  if (value === undefined) {
     throw new Error(`app/globals.css: --${name} is not declared in ${label}`);
   }
-  return found[1].trim().toUpperCase();
+  return value.trim().toUpperCase();
 }
 
 // `/@theme\s*\{/` matches the light block at the top and NOT the later
@@ -105,10 +105,11 @@ function colourRendering(source: string, half: "seren" | "ify"): string {
   const declared = source
     .slice(Math.max(0, at - 200), at)
     .match(/#[0-9A-Fa-f]{6}/g);
-  if (!declared) {
+  const own = declared?.at(-1);
+  if (own === undefined) {
     throw new Error(`no colour declared on the "${half}" element`);
   }
-  return declared[declared.length - 1].toUpperCase();
+  return own.toUpperCase();
 }
 
 /** A dark-mode rule that recolours one half with `colour`. */
