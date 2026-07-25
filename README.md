@@ -8,14 +8,14 @@
 
 **Workplace stress, gently noticed.** A privacy-first web app that helps employees notice and reflect on work stress — without turning it into surveillance. Live at **[serenify.tech](https://serenify.tech)**.
 
-Serenify reads short, calibrated webcam check-ins for signs of stress, confirms with a light questionnaire, offers a supportive chat companion, and shows each person their own trend over time. Managers see graded trends for their reports — never raw video, never chat content.
+Serenify reads short, calibrated webcam check-ins for signs of stress, confirms with a light questionnaire, offers a supportive chat companion, and shows each person their own trend over time. Managers are designed to see graded trends for their reports; no manager-facing surface is live today. Raw video and chat content never reach a manager — that one is permanent, and true right now.
 
 Most workplace-wellbeing tools are either surveys nobody fills in or monitoring nobody consented to. The bet here is that stress signals should reach the *person feeling them* — "be heard and felt," not "be watched." So privacy is the architecture, not a setting:
 
-- **Raw video never leaves the inference layer** — managers get graded bands, aggregates, and trends, computed downstream of the model, never the frames.
-- **Bounded visibility** — a direct manager sees only their own reports; skip-level and above see anonymized org-wide aggregates.
+- **Raw video never leaves the inference layer** — managers get graded bands, aggregates, and trends, computed downstream of the model, never the frames. That manager view is the designed end-state; no manager-facing surface is live today.
+- **Bounded visibility** — a direct manager sees only their own reports; skip-level and above see anonymized org-wide aggregates. This describes the designed end-state; no manager-facing surface is live today.
 - **Private companion chat** — conversations are employee-private and never reach an employer; crisis disclosures are never persisted and never notify anyone.
-- **Employee-controlled granularity** — a three-position privacy slider: full detail, summary only, or off during set hours.
+- **Employee-controlled granularity** — a three-position privacy slider: full detail, summary only, or off during set hours. The slider and the transparency view arrive with feature 018; there's nothing to configure yet.
 
 ## How it works
 
