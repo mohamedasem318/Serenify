@@ -406,7 +406,7 @@ export const PRIVACY_CRISIS_P2 =
 
 // § Weekly work-environment check-in
 
-const PRIVACY_WEEKLY_HEADING = "The weekly work-environment check-in";
+const PRIVACY_WEEKLY_HEADING = "Weekly work-environment check-in";
 
 export const PRIVACY_WEEKLY_P1 =
   "The weekly work-environment check-in asks about your working conditions, not about " +
@@ -458,7 +458,9 @@ export const PRIVACY_MANAGER_ADMIN =
 
 // § Where the data lives
 
-const PRIVACY_PROCESSORS_HEADING = "Where your data lives, and who processes it";
+// Headings double as the in-page index labels, so they stay short enough to sit on ONE
+// line inside a 44 px index row at 320 px (FR-053: no tap target whose label wraps).
+const PRIVACY_PROCESSORS_HEADING = "Where your data lives";
 
 export const PRIVACY_PROCESSORS_P1 =
   "Serenify runs on services operated by other companies. Each processes some of your " +
