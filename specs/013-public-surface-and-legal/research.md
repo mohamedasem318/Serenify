@@ -178,7 +178,7 @@ Plus a **live psql RLS probe** (the repo's documented `SET LOCAL ROLE` + `set_co
 ### §12.2 How each required proof is obtained
 
 **"Declining or abandoning a gate creates no consent record."**
-- *DB*: the static gate asserts `decision`'s CHECK enumerates exactly `('granted')`; that no `INSERT INTO public.user_consents` appears anywhere in the migration (no backfill); and that the only INSERT policy is the owner-self one.
+- *DB*: the static gate asserts `decision`'s CHECK enumerates exactly `('granted')`; that no `INSERT INTO public.user_consents` appears in the migration **outside the `handle_new_user()` function body**, and that no `INSERT … SELECT` sources `auth.users` or `public.profiles` (no backfill); and that the only INSERT policy is the owner-self one. The one INSERT that does appear — inside `handle_new_user()` ([`data-model.md`](./data-model.md) §6.6) — fires only on auth-user creation and is therefore structurally incapable of writing a row for a user who already exists, so it satisfies FR-041 rather than violating it.
 - *Server*: unit tests over the consent-write action with an injected fake writer — the decline path returns having made **zero** write calls; the abandon path never invokes the action at all, so zero is trivially provable.
 - *Component*: RTL tests asserting the gate's decline control calls no writer and leaves the surface presentable again.
 
