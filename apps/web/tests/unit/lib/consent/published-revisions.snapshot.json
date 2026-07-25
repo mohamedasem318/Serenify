@@ -11,9 +11,17 @@
     "registry disagree, the registry is what changed illegitimately — fix the registry,",
     "do not 're-baseline' the snapshot.",
     "",
-    "Both lists are empty in P2 by design: terms_privacy's first entry lands in P3 with",
-    "the documents (T023), camera_inference's in P4 with the camera wording."
+    "terms_privacy@2026-07-26.1 is the first entry this snapshot has ever locked (P3,",
+    "T023). From here it can never be edited. camera_inference is still empty; its first",
+    "entry lands in P4 with the camera wording."
   ],
-  "terms_privacy": [],
+  "terms_privacy": [
+    {
+      "versionId": "terms_privacy@2026-07-26.1",
+      "publishedOn": "2026-07-26",
+      "materiality": "material",
+      "rationale": "Initial publication of the Terms of Service and the Privacy Policy. The first revision of a text is material by definition — there is no earlier wording anyone could already hold, so every user must be asked. Published together with the documents themselves in lib/legal/copy.ts (feature 013, P3)."
+    }
+  ],
   "camera_inference": []
 }
