@@ -1,0 +1,2 @@
+CI trigger probe: C head - head carries fix, base does not
+Throwaway branch. Delete after the experiment.
