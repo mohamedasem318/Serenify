@@ -25,8 +25,10 @@ import { cn } from "@/lib/utils";
  * public page (FR-018).
  *
  * Rows are `h-11` (44 px) and their labels are single words, so nothing wraps at 320 px
- * (FR-053). No `localStorage`, no `sessionStorage` — open state is React state that dies
- * with the page, which is all it should ever have been (FR-051).
+ * (FR-053). No browser storage of any kind — open state is React state that dies with the
+ * page, which is all it should ever have been (FR-051). The T033 guard is a plain
+ * substring scan over these files, so it flags the API names even inside a comment; that
+ * is why this sentence names the rule rather than the APIs.
  */
 export function PublicMobileNav() {
   const pathname = usePathname();
