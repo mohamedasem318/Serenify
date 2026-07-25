@@ -23,6 +23,7 @@ moving them here did not change that.
 | `serenify-008-followups-trend-redesign-reference.html` | — | Earlier reference variant of the 009 redesign, kept for provenance |
 | `serenify-011-chatbot-mock.html` | `specs/011-llm-client-chatbot/` | `/app/chat`, recent-chats card, persistent pill, crisis panel, empty states |
 | `serenify-012-questionnaire-mocks.html` | `specs/012-questionnaire-feedback/` | The three questionnaire instruments, their states, copy, icons |
+| `serenify-landing-mock.html` | `specs/013-public-surface-and-legal/` | The public landing page at `/`, its scripted hero story, the public navbar and footer, the team section, and the two-colour `serenify` wordmark |
 
 ## Note on paths in specs
 

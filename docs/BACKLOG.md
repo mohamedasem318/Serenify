@@ -1490,6 +1490,14 @@ the account-creation consent checkbox remain unbuilt and this stays a pre-real-d
 `018-privacy-controls-and-transparency` to **`013-public-surface-and-legal`** — Amendment 16
 inserted 013 as the slot for the public landing page/`/terms`/`/privacy`/signup consent gate,
 which is #75's actual subject; still **OPEN** (013 has not shipped).
+**Update (2026-07-25, mis-close corrected)**: GitHub issue #75 was closed as COMPLETED on
+2026-07-24 by commit `fba656d` (PR #154, the owning-feature reconcile above), which carried a
+stray closing keyword. **Nothing that could complete it shipped** — there is still no `/terms`,
+no `/privacy`, and no signup consent checkbox. This entry and `docs/DECISIONS.md` both recorded
+it as OPEN, and per `CLAUDE.md` BACKLOG wins on conflict, so **the issue was reopened**. It
+re-closes only when feature 013 ships. Newly paired with **#157** (camera + inference consent
+gate) — the two consent gates on the same user journey, both owned by 013, both binding
+pre-real-data blockers.
 
 ### Internationalization — Arabic (RTL) and possibly French (#76)
 **Status**: deferred-feature
@@ -1925,3 +1933,112 @@ change either value. Suggested issue labels: `type:tech-debt`, `area:docs`.
 **Address by**: the next amendment that touches Principle V. See `.specify/memory/constitution.md`
 Amendment 17, `docs/DECISIONS.md` 2026-07-24 (Amendment 17), and `docs/DECISIONS.md` 2026-06-17
 (filled-accent CTA foreground) / 2026-06-18 (`--color-meadow-text`).
+
+---
+
+## From feature 013 spec (public-surface-and-legal) — captured 2026-07-25
+
+### Camera + inference consent gate — no consent is recorded for webcam capture or inference — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#157)
+**Status**: deferred-feature (`type:feature` / `area:web` / `area:db` / `priority:blocker`) — **OPEN.** GitHub issue **#157 OPEN**.
+**Category**: legal / compliance / consent
+**Observed**: 2026-07-25, while resolving the open questions in `specs/013-public-surface-and-legal/spec.md` (OQ-7 point 3). New scope — this had no issue and no BACKLOG entry.
+**Description**: The app requests camera access via `getUserMedia` at the calibration
+intro (`apps/web/components/anchor/intro.tsx`) and infers a stress reading from the
+frames, which is then stored against a named employee (`window_readings`). **No consent
+to that processing is obtained or persisted anywhere** — `grep -ri consent` over
+`apps/**` and `supabase/**` returns zero hits; there is no consent table and no consent
+column. The only thing between the user and biometric-adjacent inference is the
+browser's permission dialog, which grants *device access*, not agreement to the
+processing, and which leaves no artifact that could be produced later to show anyone was
+ever asked. Every existing account is in this position retroactively. The nearest thing
+that exists today is copy, not consent: the calibration intro reassures "Your video
+isn't stored — only the calm reading it produces" and notes "Your browser will ask for
+permission next."
+**⚠ Legal position is believed, not verified.** The belief is that webcam-derived,
+health-adjacent inference in an employment context sits in the most strictly treated
+category under Egypt's **Law 151/2020**, and that consent for it must be explicit and
+demonstrable — a browser prompt being neither. **This has not been checked by a
+qualified lawyer**, and nothing in this repository constitutes legal review; it inherits
+#75's standing caveat that a qualified review is required before any real (non-demo)
+user data is processed. **The blocker does not rest on that belief.** It rests on the
+operational fact above: the camera opens, inference runs, a reading is stored against a
+named person, and no record exists that they agreed to any of it. That is sufficient on
+its own.
+**Fix scope**: medium (FEATURE work). The requirements are already specified as
+**FR-037–FR-043** in `specs/013-public-surface-and-legal/spec.md` — this entry points at
+them rather than restating them, so the two cannot drift. In summary: a one-time gate
+before a user's first-ever calibration, presented **before** camera access is requested
+and before any capture begins (FR-037/FR-038); the grant persisted with a timestamp
+(FR-039) and not re-shown afterwards (FR-040); declining or abandoning writes **no**
+record and blocks calibration (FR-042). Two constraints matter most and are easy to get
+wrong:
+- **No backfill (FR-041).** Existing users have never given camera consent and MUST be
+  prompted once on their next session. Consent MUST NOT be backfilled as already-granted
+  — recording a fact that never happened is forbidden. Existing readings, sessions, and
+  accounts are left untouched: this is a gate, not a deletion.
+- **Withdrawal-ready shape (FR-043).** Withdrawal itself is out of scope and belongs to
+  **feature 018** (`privacy-controls-and-transparency`), but the record MUST be shaped so
+  withdrawal can be added later without rework. **A shape that can only ever express
+  "granted" is not acceptable.** The concrete schema is a plan decision.
+**Address by**: **feature 013 (public-surface-and-legal)**, which owns it and closes this
+issue when it ships. Pairs with **#75** (ToS/Privacy + signup consent gate) — both are
+binding pre-real-data gates on the same user journey, and both are owned by 013. Does
+**not** pair with **#62** (`/signup` invite-only): #62 governs *who may hold an account
+at all* and is an unrelated auth-posture/tenancy blocker that 013 does not address.
+
+### `README.md` states manager visibility + the privacy slider as present-tense fact, violating the merged Principle I public-communication rule (#158)
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#158 OPEN**.
+**Category**: docs / public-facing copy compliance
+**Observed**: 2026-07-24, during the constitution Amendment 17 copy sweep; logged 2026-07-25 once the amendment merged and the rule went live.
+**Description**: Constitution **Amendment 17** added a **public-communication rule** to
+Principle I: any public-facing or user-facing text describing manager visibility MUST mark
+controls that are not yet live as not yet live. The sweep that accompanied the amendment
+found **four non-compliant lines in `README.md`** and **deliberately did not edit them** —
+correctly, because bulk-editing prose is not an amendment's job. That was the right call for
+the amendment PR, but it leaves a gap: **the amendment is merged, so `main` now carries
+public-facing copy that violates a live constitutional rule, with nothing tracking it.** This
+entry closes that gap. The four lines, all present tense with no not-yet-live qualifier:
+- **`README.md:11`** — "Managers see graded trends for their reports — never raw video, never chat content."
+- **`README.md:15`** — "**Raw video never leaves the inference layer** — managers get graded bands, aggregates, and trends, computed downstream of the model, never the frames."
+- **`README.md:16`** — "**Bounded visibility** — a direct manager sees only their own reports; skip-level and above see anonymized org-wide aggregates."
+- **`README.md:18`** — "**Employee-controlled granularity** — a three-position privacy slider: full detail, summary only, or off during set hours."
+
+None of this is live: `monitoring_sessions` and `window_readings` are self-only, there is no
+manager read policy and no manager-facing route, and the three-position slider and the
+transparency view both arrive with **feature 018** (`privacy-controls-and-transparency`).
+**The claims are not wrong about the designed end-state — they are wrong about the tense.**
+**Fix scope**: small (docs only), but **not uniform across the four lines**.
+- **Lines 15, 16 and 18** are fixed by **one added sentence** marking the block as the
+  designed end-state and stating that no manager-facing surface is live today.
+- **⚠ Line 11 needs more than an appended sentence.** It welds a permanent Principle I
+  invariant to a not-yet-live claim inside a single sentence: *"Managers see graded trends
+  for their reports"* (**not live** — no manager read policy, no manager-facing route) —
+  *"never raw video, never chat content"* (**permanent invariant**, true today and forever).
+  Appending a not-yet-live marker to that sentence would drag the invariant under the marker
+  too, implying the raw-video and chat-content guarantees are also merely planned — which is
+  false, and is exactly the other-direction flattening the same rule forbids. **Line 11
+  likely needs splitting** so the permanent half stands unqualified and only the
+  manager-visibility half carries the marker. Do not append a sentence to line 11 and call it
+  done.
+
+Model the voice on the
+already-compliant in-app string at `apps/web/components/account/privacy-placeholder.tsx:24-26`
+("Visibility controls arrive with the transparency view. You'll be able to choose what your
+manager sees and what stays private — there's nothing to configure yet."), which names the
+control, says what it will let the person do, and closes on the fact that there is nothing to
+configure yet. Do **not** rewrite the four lines' substance and do **not** hedge the two
+genuinely unconditional promises they contain (chat is employee-private and never reaches an
+employer; crisis disclosures are never persisted and never notify anyone) — those are
+permanent Principle I invariants, not unbuilt controls, and softening them would flatten the
+distinction in the other direction, which the same rule forbids.
+**⚠ Do NOT touch the four verified-compliant strings.** Amendment 17's sweep checked four
+live user-facing strings and found them already compliant. They MUST NOT be "corrected" —
+re-editing copy that already passes is how a compliance sweep introduces the defect it was
+meant to remove.
+**Address by**: any docs pass; it is a **ride-along, not a feature**. Deliberately **not**
+fixed in the feature-013 spec PR that logged it, which is spec-scope only. Note that feature
+**013** (`public-surface-and-legal`) independently ships **FR-048a**, which imposes the same
+point-of-use not-yet-live discipline on the landing page, both legal documents, and both
+consent gates — `README.md` is simply not one of 013's surfaces, so it needs its own fix.
+See `.specify/memory/constitution.md` Principle I (public-communication rule, Amendment 17)
+and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
