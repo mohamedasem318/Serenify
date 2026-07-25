@@ -11,7 +11,7 @@ Implements constitution v1.13.0 Amendment 17 (Principle V, Wordmark block): **on
 ```tsx
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-display lowercase tracking-tight", className)}>
+    <span className={cn("font-display tracking-tight", className, "lowercase")}>
       <span className="text-ink">seren</span>
       <span className="text-meadow-text">ify</span>
     </span>
@@ -19,7 +19,9 @@ export function Wordmark({ className }: { className?: string }) {
 }
 ```
 
-Size and spacing come from the caller's `className` (the five sites differ: `text-4xl sm:text-5xl` on the auth and onboarding layouts, `text-2xl` in the app header, and the new navbar/footer sizes). `lowercase` is on the component so a caller cannot pass `capitalize`. No dot, no terminal punctuation — there is no place in the markup for one.
+Size and spacing come from the caller's `className` (the five sites differ: `text-4xl sm:text-5xl` on the auth and onboarding layouts, `text-2xl` in the app header, and the new navbar/footer sizes). No dot, no terminal punctuation — there is no place in the markup for one.
+
+**`lowercase` is passed after the caller's `className`, and the order is load-bearing.** `cn()` is `tailwind-merge`, which resolves conflicting utilities in favour of the **last** one. Written the other way round — `cn("… lowercase …", className)` — a caller passing `capitalize` would silently win, because both are in the same `text-transform` group and the caller's class comes later; the wordmark would render "Serenify" and no test would notice. Applying `lowercase` last is what makes **FR-030 structural rather than conventional**: casing cannot be overridden from a call site, while size and tracking still can — which is exactly what five sites with five different sizes need. A component test asserts that a caller passing `capitalize` still renders lowercase, so the ordering cannot be "tidied" back without failing CI.
 
 > Why `components/brand/` and not `components/ui/`: [`research.md`](../research.md) §8.
 
