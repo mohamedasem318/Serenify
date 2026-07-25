@@ -117,7 +117,7 @@ Both levers are exercised in **smoke test ST-10** before the feature merges to `
 
 ## §7.4 Existing users — never backfilled
 
-No migration writes a `user_consents` row for anyone (asserted by the static-parse gate: the migration contains no `INSERT INTO public.user_consents`). Every existing user starts with **zero** consent records for both texts, which is the truth: they were never asked.
+No migration backfills a `user_consents` row for anyone (asserted by the static-parse gate: the migration contains no `INSERT INTO public.user_consents` **outside the `handle_new_user()` function body**, and no `INSERT … SELECT` sourcing `auth.users` or `public.profiles`). The one INSERT that does appear — inside `handle_new_user()` ([`data-model.md`](../data-model.md) §6.6) — fires only on auth-user creation and is therefore structurally incapable of writing a row for a user who already exists, so it satisfies FR-041 rather than violating it. The migration stays one file. Every existing user starts with **zero** consent records for both texts, which is the truth: they were never asked.
 
 - **Terms/Privacy**: the shell gate presents once, on their next session. Accepting writes one row. Nothing existing is touched.
 - **Camera/inference**: presented once, at their next arrival at a capture route. Existing readings, monitoring sessions, and accounts are untouched — this is a gate, not a deletion.
