@@ -12,8 +12,16 @@ import { cn } from "@/lib/utils";
  * Size and spacing come from the caller's `className`, because the five
  * in-tree render sites differ: `text-2xl` in the app header,
  * `text-4xl sm:text-5xl` on the auth and onboarding layouts, and the
- * public navbar/footer sizes. `lowercase` sits on the component rather
- * than on the callers so casing is decided in one place.
+ * public navbar/footer sizes.
+ *
+ * Note the argument order: `lowercase` is passed to `cn()` AFTER the
+ * caller's `className`, not before it. `cn()` is tailwind-merge, which
+ * resolves conflicting utilities in favour of the LAST one — so with
+ * `cn("… lowercase …", className)` a caller passing `capitalize` would
+ * silently win and the wordmark would render "Serenify". Applying
+ * `lowercase` last makes FR-030 structural rather than conventional:
+ * casing cannot be overridden from a call site, while size and tracking
+ * still can, which is what the five differing sites need.
  *
  * Lives in `components/brand/`, not `components/ui/`: that namespace is
  * the shadcn primitive namespace regenerated from `components.json`,
@@ -28,7 +36,7 @@ import { cn } from "@/lib/utils";
  */
 export function Wordmark({ className }: { className?: string }) {
   return (
-    <span className={cn("font-display lowercase tracking-tight", className)}>
+    <span className={cn("font-display tracking-tight", className, "lowercase")}>
       <span className="text-ink">seren</span>
       <span className="text-meadow-text">ify</span>
     </span>
