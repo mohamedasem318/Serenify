@@ -24,8 +24,9 @@ import {
  *  - **Every section is a real `<section>` with a real `<h2>`.** The anchors are not
  *    decorative: they are what lets a screen-reader user jump by heading and what makes
  *    `/privacy#what-a-manager-can-see` a citable link. Nothing here is a styled `<div>`.
- *  - **`scroll-mt-20`** on each section, so an anchor jump does not park the heading
- *    underneath the 64 px fixed-height navbar.
+ *  - **`scroll-mt-8`** on each section, so an anchor jump leaves the heading clear of the
+ *    viewport edge. The public navbar is not sticky — it matches the app header, which is
+ *    not either — so this is breathing room rather than clearance for a fixed bar.
  *
  * The version identifier and publication date are READ FROM THE REGISTRY, never
  * hard-coded — `currentRevision("terms_privacy")` is the same source the consent gate
@@ -119,7 +120,7 @@ export function LegalDocument({ title, lede, sections }: LegalDocumentProps) {
          */}
         <nav
           aria-labelledby="legal-contents"
-          className="mb-10 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto"
+          className="mb-10 lg:sticky lg:top-8 lg:mb-0 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto"
         >
           <h2
             id="legal-contents"
@@ -143,7 +144,7 @@ export function LegalDocument({ title, lede, sections }: LegalDocumentProps) {
 
         <article className="max-w-[68ch]">
           {sections.map((section) => (
-            <section key={section.id} id={section.id} className="scroll-mt-20 pt-10 first:pt-0">
+            <section key={section.id} id={section.id} className="scroll-mt-8 pt-10 first:pt-0">
               <h2 className="font-display text-xl leading-snug text-ink [overflow-wrap:anywhere] sm:text-2xl">
                 {section.heading}
               </h2>
