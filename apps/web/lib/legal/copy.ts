@@ -264,6 +264,524 @@ export const TERMS_CONTACT_P1 =
   "did not expect, go to Mohamed Asem at mohamedasem318@gmail.com. There is no support " +
   "desk behind that address — it reaches one person, who wrote this.";
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Privacy Policy (T022)
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const PRIVACY_TITLE = "Privacy Policy";
+
+export const PRIVACY_LEDE =
+  "Serenify points a camera at people and infers how stressed they are. That is a lot to " +
+  "ask, so this document says exactly what happens to what it captures — what is sent, " +
+  "what is thrown away, what is kept, and who can see it. Where a protection is not built " +
+  "yet, it says so in the same breath as describing it.";
+
+// § Who is responsible
+
+const PRIVACY_CONTROLLER_HEADING = "Who is responsible";
+
+export const PRIVACY_CONTROLLER_P1 =
+  "The data controller is Mohamed Asem, as an individual, reachable at " +
+  "mohamedasem318@gmail.com. There is no company and no legal entity. Serenify is a " +
+  "non-commercial graduation project, and the same person who decided how your data is " +
+  "handled is the person who answers that address.";
+
+export const PRIVACY_CONTROLLER_P2 =
+  "Serenify has no registered data protection officer. Given that it processes health-" +
+  "related and biometric data, Egyptian law is likely to expect one. That is one of the " +
+  "gaps qualified legal review would need to close.";
+
+// § What Serenify handles
+
+const PRIVACY_CATEGORIES_HEADING = "What Serenify handles";
+
+export const PRIVACY_CATEGORIES_P1 = "Six kinds of data, and nothing else.";
+
+export const PRIVACY_CATEGORIES_ITEMS: readonly string[] = [
+  "Account — your name, your email address, and your role. This is what signing up creates.",
+  "Calibration — a numeric vector derived from a short webcam capture, describing what your ordinary, unstressed face looks like, plus when it was taken and which model version read it. The video itself is not part of it.",
+  "Monitoring session readings — for each scored window of a session, the time it was captured and a graded band: at ease, a little tense, or tense. Where a window could not be scored, the reason is kept instead, such as low light or being out of frame.",
+  "Weekly work-environment check-in — your answers to a short questionnaire about your working conditions: an overall sentiment and, when it is negative, a roadblock and the kind of support you would want.",
+  "Companion conversation — the messages you and Ren exchange, and the titles of those conversations.",
+  "Consent records — for each consent you have accepted, which document it was, which published revision of it you were shown, and when. One entry per acceptance; accepting a later revision adds an entry rather than replacing the earlier one.",
+];
+
+export const PRIVACY_CATEGORIES_P2 =
+  "Serenify sets cookies only to keep you signed in. There are no analytics cookies and " +
+  "no advertising cookies, which is why the site has no consent banner to dismiss. Your " +
+  "light or dark mode preference is remembered by your browser and is never sent anywhere.";
+
+// § Your camera
+
+const PRIVACY_CAMERA_HEADING = "What happens to your camera";
+
+export const PRIVACY_CAMERA_P1 =
+  "This is the part most worth reading closely, so it is written without hedging.";
+
+export const PRIVACY_CAMERA_P2 =
+  "Video is transmitted. During a calibration or a monitoring session, your browser " +
+  "records short clips and uploads them to Serenify's inference service, which runs on " +
+  "Microsoft Azure. The reading is not computed on your device, and this document will " +
+  "not tell you otherwise.";
+
+export const PRIVACY_CAMERA_P3 =
+  "The clip is then deleted. The inference service writes each upload to a temporary file, " +
+  "reads it, and deletes that file before the request ends — on every outcome, including " +
+  "when the read fails, when the model errors, and when the request is abandoned partway. " +
+  "The deletion is not a cleanup step that could be skipped; it is written so that it runs " +
+  "whether or not anything went wrong, and there is a dedicated test whose only job is to " +
+  "prove it still does.";
+
+export const PRIVACY_CAMERA_P4 =
+  "Video is never stored. There is no bucket, no table, and no file path where a clip " +
+  "lands, and no interface anywhere in Serenify that could retrieve one. No human being " +
+  "can view or replay your video — not a manager, not an administrator, not the person who " +
+  "wrote this. That is not a policy anyone chose to follow; it is that the storage and the " +
+  "retrieval path were never built.";
+
+export const PRIVACY_CAMERA_P5 =
+  "Your camera is only ever active while you are on a calibration or monitoring session " +
+  "screen and have started one. Serenify never captures audio.";
+
+// § What is kept
+
+const PRIVACY_RETENTION_HEADING = "What is kept, and for how long";
+
+export const PRIVACY_RETENTION_P1 =
+  "From a monitoring session, only the derived reading survives: the time, and the graded " +
+  "band. The model also produces a numeric probability behind that band, and it is worth " +
+  "knowing that this number is deliberately withheld — the database is configured so that " +
+  "even you cannot read your own probability, only the band it became. A stress score is " +
+  "the kind of number that reads as more certain than it is, so nothing in Serenify shows " +
+  "you one.";
+
+export const PRIVACY_RETENTION_P2 =
+  "Readings are kept for ninety days. Stated precisely, because the distinction matters: " +
+  "that is a policy, not a mechanism. No purge job runs on a schedule today, and this " +
+  "document does not promise one. Account data, calibration, questionnaire answers, and " +
+  "conversations are kept while your account exists.";
+
+export const PRIVACY_RETENTION_P3 =
+  "Deleting your account removes everything attached to it. Every table that holds your " +
+  "data is keyed to your account so that it goes when the account goes, rather than being " +
+  "cleaned up afterwards by someone remembering to.";
+
+// § Companion conversation
+
+const PRIVACY_CHAT_HEADING = "Your conversations with Ren";
+
+export const PRIVACY_CHAT_P1 =
+  "Companion chat content and crisis disclosures never reach a manager, an administrator, " +
+  "or an employer. That is permanent and unconditional. It is not a control waiting to be " +
+  "built and it carries no caveat anywhere in this document, because it is not a setting — " +
+  "the database rule that governs those rows admits exactly one reader, the account that " +
+  "wrote them, and there is no second rule granting anyone else a way in.";
+
+export const PRIVACY_CHAT_P2 =
+  "To generate each reply, your messages are sent to a language-model provider, along with " +
+  "a short hedged note about your most recent stored reading when there is one. That note " +
+  "carries a band, never video and never a number. Nothing about the conversation flows " +
+  "back the other way: a stress band derived from a conversation is written only to that " +
+  "conversation and never reaches any camera-side surface.";
+
+export const PRIVACY_CHAT_P3 =
+  "Serenify keeps your conversations so you can return to them. You can delete a " +
+  "conversation, and deleting it removes its messages.";
+
+// § Crisis
+
+const PRIVACY_CRISIS_HEADING = "If a conversation turns to crisis";
+
+export const PRIVACY_CRISIS_P1 =
+  "If you disclose thoughts of suicide, self-harm, or harming someone else, Serenify " +
+  "responds by showing you support resources — verified external services, chosen by " +
+  "country where that is known. It does exactly that and nothing more.";
+
+export const PRIVACY_CRISIS_P2 =
+  "No notification is sent to a manager, an administrator, or an employer. None exists to " +
+  "send. The recognition itself is never written down: it lives for the length of one " +
+  "reply, decides whether to show you the support panel, and is gone. No column records " +
+  "it, so no report could ever count it. Routing a mental-health crisis into an employer " +
+  "chain is a permanent prohibition in this project, not a configuration.";
+
+// § Weekly work-environment check-in
+
+const PRIVACY_WEEKLY_HEADING = "The weekly work-environment check-in";
+
+export const PRIVACY_WEEKLY_P1 =
+  "The weekly work-environment check-in asks about your working conditions, not about " +
+  "you. It is treated as a separate class of data from stress signals, and it is the one " +
+  "thing in Serenify designed to reach a manager — but only ever as a count.";
+
+export const PRIVACY_WEEKLY_P2 =
+  "Answers are separated from identity before they are grouped, so what a manager would " +
+  "see is how many people in a team gave each answer, never who gave which. An individual " +
+  "attributed answer is not something the system declines to show; it is something the " +
+  "grouping makes it unable to produce. The safeguard that makes this robust on very small " +
+  "teams — suppressing a tally that is small enough to point at one person — is required " +
+  "before real employee data is collected and is not built yet.";
+
+// § Manager visibility (FR-048a) — the three passages, each carrying its own marker
+
+const PRIVACY_MANAGER_HEADING = "What a manager can see";
+
+export const PRIVACY_MANAGER_DEFAULT =
+  "Serenify is designed so that a direct manager can see your stress-trend summary — " +
+  "graded bands and trends derived after inference, never raw video and never conversation " +
+  "content — by default, at the granularity Serenify calls summary only. That is the " +
+  "design, and it is stated here plainly rather than softened, because a privacy promise " +
+  "that quietly under-describes what a manager will eventually see becomes a lie the day " +
+  "that view ships. No manager-facing surface is live today. There is no manager screen in " +
+  "the application, and the database holds no rule that would let one person read another " +
+  "person's readings or sessions — your readings are visible to you and to nobody else.";
+
+export const PRIVACY_MANAGER_HIERARCHY =
+  "In the designed end-state, a direct manager sees their own direct reports and no one " +
+  "else; a skip-level manager, and anyone above them, sees aggregated organisation-wide " +
+  "figures only and never an individual employee. No manager-facing surface is live today. " +
+  "Neither of those views exists yet to be used or misused.";
+
+export const PRIVACY_MANAGER_CONTROLS =
+  "You are meant to control how much of that a manager sees. A three-position privacy " +
+  "slider — full detail, summary only, or off during hours you choose — will set the " +
+  "granularity, and a transparency view will show you exactly what your manager sees, so " +
+  "that you never have to take this document's word for it. Both arrive with Serenify's " +
+  "privacy-controls-and-transparency work. Neither is live yet. There is nothing to " +
+  "configure today, and no setting you could change now would alter what anyone sees; " +
+  "summary only is the default the slider will start from.";
+
+export const PRIVACY_MANAGER_ADMIN =
+  "One thing an administrator can read today, so it should not be a surprise: the account " +
+  "directory — names, email addresses, and roles. That is the whole of it. An " +
+  "administrator cannot read your readings, your sessions, your questionnaire answers, or " +
+  "your conversations, and no rule anywhere would let them.";
+
+// § Where the data lives
+
+const PRIVACY_PROCESSORS_HEADING = "Where your data lives, and who processes it";
+
+export const PRIVACY_PROCESSORS_P1 =
+  "Serenify runs on services operated by other companies. Each processes some of your " +
+  "data on the controller's behalf.";
+
+export const PRIVACY_PROCESSORS_ITEMS: readonly string[] = [
+  "Supabase — the database and the sign-in system. Everything Serenify stores lives here: account details, calibration, readings, questionnaire answers, conversations, and consent records. Hosted inside the European Union, in Frankfurt, Germany.",
+  "Microsoft Azure — the inference service that reads webcam video and returns a band. Runs on Azure Container Apps inside the European Union. Video passes through it and is deleted there; nothing about a clip is stored.",
+  "Groq — the language-model provider behind Ren. Your messages, and the hedged note about a recent reading described above, are sent there to generate each reply. Groq operates from the United States. A self-hosted fallback model stands in when that provider is unavailable.",
+  "Vercel — serves the web application you are reading this on.",
+  "Resend — sends the two account emails: address confirmation and password reset.",
+  "Cloudflare — domain routing and network delivery.",
+];
+
+export const PRIVACY_PROCESSORS_P2 =
+  "Serenify runs no product analytics, no advertising trackers, and no third-party session " +
+  "recording. Nothing on this site is profiling you, and no data is sold or shared with " +
+  "anyone for their own purposes.";
+
+// § Egyptian law
+
+const PRIVACY_EGYPT_HEADING = "Egyptian law";
+
+export const PRIVACY_EGYPT_P1 =
+  "Egypt's Personal Data Protection Law No. 151 of 2020, with the executive regulations " +
+  "issued under Ministerial Decision No. 816 of 2025, governs this processing. Two things " +
+  "make that regime strict rather than routine here. An inference about your psychological " +
+  "state is health-related data, and a face captured on video is biometric data. Both are " +
+  "sensitive personal data under the law, and both attract a requirement of explicit " +
+  "written consent and heightened security.";
+
+export const PRIVACY_EGYPT_P2 =
+  "Serenify also transfers personal data outside Egypt: everything it stores is held in " +
+  "the European Union. Egyptian law requires a controller licence from the Personal Data " +
+  "Protection Centre, and a separate permit before personal data may be transferred abroad. " +
+  "Serenify holds neither. When this was written the Centre's licensing portal was not yet " +
+  "operational, and enforcement of the executive regulations is expected from around " +
+  "November 2026.";
+
+export const PRIVACY_EGYPT_P3 =
+  "Serenify is a demonstration build and is not processing real employee data. Obtaining " +
+  "those licences, and the qualified legal review that would tell us what else is missing, " +
+  "is part of what has to happen before it does.";
+
+// § European law
+
+const PRIVACY_EU_HEADING = "European law";
+
+export const PRIVACY_EU_P1 =
+  "Because the database sits in Frankfurt, the General Data Protection Regulation applies " +
+  "to the data held there. The lawful basis Serenify relies on is your consent, asked for " +
+  "separately for the two things that need it, and recorded against the specific revision " +
+  "of the wording you were shown.";
+
+export const PRIVACY_EU_P2 =
+  "Serenify makes no automated decision that produces a legal or similarly significant " +
+  "effect about you. A reading is shown to you, and nothing is decided on the strength of " +
+  "it. No account is restricted, no report is raised, and nothing is escalated to anyone.";
+
+// § Your rights
+
+const PRIVACY_RIGHTS_HEADING = "Your rights";
+
+export const PRIVACY_RIGHTS_P1 =
+  "Under both regimes you can ask for the following.";
+
+export const PRIVACY_RIGHTS_ITEMS: readonly string[] = [
+  "A copy of the personal data Serenify holds about you.",
+  "Correction of anything inaccurate.",
+  "Deletion of your data.",
+  "Restriction of processing, or objection to it.",
+  "Withdrawal of a consent you previously gave.",
+  "A complaint to Egypt's Personal Data Protection Centre, or to a European supervisory authority.",
+];
+
+export const PRIVACY_RIGHTS_P2 =
+  "Said plainly: none of these is automated. There is no self-service export button and no " +
+  "consent-management screen. Exercising any of these rights means writing to " +
+  "mohamedasem318@gmail.com, and it will be done by hand. Both regimes expect withdrawing " +
+  "consent to be as easy as giving it, and an email is not as easy as a checkbox. That gap " +
+  "is real, it is not being hidden here, and it belongs on the list of things to fix before " +
+  "real user data is processed.";
+
+// § Security
+
+const PRIVACY_SECURITY_HEADING = "How your data is protected";
+
+export const PRIVACY_SECURITY_P1 =
+  "Access control is enforced in the database rather than in application code, which " +
+  "matters because it means a bug in a screen cannot widen it. Every table that holds " +
+  "personal data carries a rule tying each row to the account that owns it, and those " +
+  "rules are applied even to the database's own owner. Consent records go further: they " +
+  "can be created and read by their owner and by no one else, and they cannot be edited or " +
+  "deleted at all, by anyone.";
+
+export const PRIVACY_SECURITY_P2 =
+  "Data is encrypted in transit and at rest by the hosting providers. Serenify is a " +
+  "student project rather than a hardened production system, and it has had no independent " +
+  "security audit.";
+
+// § Children
+
+const PRIVACY_CHILDREN_HEADING = "Children";
+
+export const PRIVACY_CHILDREN_P1 =
+  "Serenify is not designed for children and is not offered to anyone under eighteen. " +
+  "Egyptian law requires a guardian's explicit written consent before the personal data of " +
+  "anyone under fifteen is processed. Serenify has no flow that could obtain or record " +
+  "such consent, and it performs no age verification at all. If you believe a child has " +
+  "created an account, write to the address below and it will be deleted.";
+
+// § Evaluation
+
+const PRIVACY_EVALUATION_HEADING = "How the model was evaluated";
+
+export const PRIVACY_EVALUATION_P1 =
+  "The model behind the readings was trained and evaluated on the StressID dataset, from " +
+  "Inria and EURECOM, under a non-commercial academic licence permitting research and " +
+  "demonstration only. That licence is why Serenify is not and cannot be commercialised " +
+  "while it uses this model.";
+
+export const PRIVACY_EVALUATION_P2 =
+  "Evaluation was subject-disjoint: the people whose recordings the model was tested " +
+  "against never appeared in the recordings it was trained on. That is the honest way to " +
+  "measure this kind of model, because the easy mistake — testing on faces the model has " +
+  "already learned — produces a flattering result that says nothing about a stranger.";
+
+export const PRIVACY_EVALUATION_P3 =
+  "No performance figures appear anywhere on this site, deliberately. A single number " +
+  "invites a confidence the method does not support, and a reading you are shown is a " +
+  "signal to consider, not a measurement to trust.";
+
+export const PRIVACY_EVALUATION_P4 =
+  "No imagery from that dataset is shown anywhere in Serenify. Twelve of its participants " +
+  "withheld consent for their images to be reused, and their recordings appear in no " +
+  "screen, screenshot, or figure this project produces.";
+
+// § Not operating today (FR-049)
+
+const PRIVACY_FORWARD_HEADING = "Planned, and not operating today";
+
+export const PRIVACY_FORWARD_P1 =
+  "This section exists so that nothing above has to be read as a quiet promise about the " +
+  "future. Each of these is designed and none of it runs.";
+
+export const PRIVACY_FORWARD_ITEMS: readonly string[] = [
+  "Audio and physiological signals — the design anticipates reading tone of voice and heart-rate-derived signals alongside video. Neither is captured today. Serenify never accesses a microphone or any sensor.",
+  "Manager dashboards — the views described under what a manager can see. No manager-facing surface is live today.",
+  "The three-position privacy slider and the transparency view — the controls described under what a manager can see. Neither is live yet.",
+  "Suppression of small-team tallies in the weekly work-environment check-in — required before real employee data is collected, and not built.",
+  "Self-service export, deletion, and consent withdrawal — described under your rights, and handled by hand today.",
+];
+
+// § Changes
+
+const PRIVACY_CHANGES_HEADING = "Changes to this policy";
+
+export const PRIVACY_CHANGES_P1 =
+  "Every published revision of this document carries a version identifier and a " +
+  "publication date, shown at the top of this page, and the whole history is kept in the " +
+  "project's public source repository where any revision can be read as it stood. A " +
+  "revision that changes what you agreed to is classified as material, by a person, at the " +
+  "time it is published — and everyone whose recorded acceptance predates it is asked " +
+  "again. A revision that only clarifies wording asks nobody again.";
+
+export const PRIVACY_CHANGES_P2 =
+  "If a future change makes this document say something less protective than it says " +
+  "today, that change is a material one by definition, and you will be asked before it " +
+  "applies to you.";
+
+// § Contact
+
+const PRIVACY_CONTACT_HEADING = "Contact";
+
+export const PRIVACY_CONTACT_P1 =
+  "For anything in this document, to exercise a right, or to report something Serenify did " +
+  "that you did not expect: Mohamed Asem, mohamedasem318@gmail.com. It reaches one person, " +
+  "who wrote this.";
+
+/**
+ * FR-048a mechanism — the passages that describe manager visibility.
+ *
+ * Every member MUST contain one of `NOT_YET_LIVE_MARKERS` within its own text, asserted by
+ * `tests/unit/lib/legal/copy-invariants.test.ts`. A marker in a distant forward-looking
+ * section does not satisfy the requirement and does not satisfy the test: a reader who
+ * reads only the paragraph in front of them must not come away believing a manager can see
+ * their trend today.
+ *
+ * `PRIVACY_MANAGER_ADMIN` is deliberately NOT a member. It describes what an administrator
+ * can read **today** — the account directory, and nothing else — which is a live fact
+ * rather than a description of manager visibility, so a not-yet-live marker would make it
+ * false. `PRIVACY_CHAT_P1` and the crisis passages are likewise absent, and must stay
+ * absent: those are Principle I invariants stated unconditionally (FR-001), and marking
+ * them not-yet-live would be the other-direction flattening Amendment 17 forbids.
+ */
+export const MANAGER_VISIBILITY_PASSAGES: readonly string[] = [
+  PRIVACY_MANAGER_DEFAULT,
+  PRIVACY_MANAGER_HIERARCHY,
+  PRIVACY_MANAGER_CONTROLS,
+];
+
+/**
+ * The approved not-yet-live marker phrases. Each appears verbatim, as a whole sentence,
+ * inside the passage it qualifies. The voice is the one
+ * `components/account/privacy-placeholder.tsx:23–27` already models — name the control,
+ * say what it will let the person do, and close with the fact that there is nothing to
+ * configure yet. That existing string is compliant and MUST NOT be "corrected".
+ */
+export const NOT_YET_LIVE_MARKERS: readonly string[] = [
+  "No manager-facing surface is live today.",
+  "Neither is live yet.",
+];
+
+/** The Privacy Policy, in render order. Anchor ids are stable and linkable. */
+export const PRIVACY_SECTIONS: readonly LegalSection[] = [
+  {
+    id: "who-is-responsible",
+    heading: PRIVACY_CONTROLLER_HEADING,
+    blocks: [p(PRIVACY_CONTROLLER_P1), p(PRIVACY_CONTROLLER_P2)],
+  },
+  {
+    id: "what-serenify-handles",
+    heading: PRIVACY_CATEGORIES_HEADING,
+    blocks: [p(PRIVACY_CATEGORIES_P1), list(PRIVACY_CATEGORIES_ITEMS), p(PRIVACY_CATEGORIES_P2)],
+  },
+  {
+    id: "what-happens-to-your-camera",
+    heading: PRIVACY_CAMERA_HEADING,
+    blocks: [
+      p(PRIVACY_CAMERA_P1),
+      p(PRIVACY_CAMERA_P2),
+      p(PRIVACY_CAMERA_P3),
+      p(PRIVACY_CAMERA_P4),
+      p(PRIVACY_CAMERA_P5),
+    ],
+  },
+  {
+    id: "what-is-kept",
+    heading: PRIVACY_RETENTION_HEADING,
+    blocks: [p(PRIVACY_RETENTION_P1), p(PRIVACY_RETENTION_P2), p(PRIVACY_RETENTION_P3)],
+  },
+  {
+    id: "your-conversations",
+    heading: PRIVACY_CHAT_HEADING,
+    blocks: [p(PRIVACY_CHAT_P1), p(PRIVACY_CHAT_P2), p(PRIVACY_CHAT_P3)],
+  },
+  {
+    id: "crisis",
+    heading: PRIVACY_CRISIS_HEADING,
+    blocks: [p(PRIVACY_CRISIS_P1), p(PRIVACY_CRISIS_P2)],
+  },
+  {
+    id: "weekly-work-environment-check-in",
+    heading: PRIVACY_WEEKLY_HEADING,
+    blocks: [p(PRIVACY_WEEKLY_P1), p(PRIVACY_WEEKLY_P2)],
+  },
+  {
+    id: "what-a-manager-can-see",
+    heading: PRIVACY_MANAGER_HEADING,
+    blocks: [
+      p(PRIVACY_MANAGER_DEFAULT),
+      p(PRIVACY_MANAGER_HIERARCHY),
+      p(PRIVACY_MANAGER_CONTROLS),
+      p(PRIVACY_MANAGER_ADMIN),
+    ],
+  },
+  {
+    id: "where-your-data-lives",
+    heading: PRIVACY_PROCESSORS_HEADING,
+    blocks: [p(PRIVACY_PROCESSORS_P1), list(PRIVACY_PROCESSORS_ITEMS), p(PRIVACY_PROCESSORS_P2)],
+  },
+  {
+    id: "egyptian-law",
+    heading: PRIVACY_EGYPT_HEADING,
+    blocks: [p(PRIVACY_EGYPT_P1), p(PRIVACY_EGYPT_P2), p(PRIVACY_EGYPT_P3)],
+  },
+  {
+    id: "european-law",
+    heading: PRIVACY_EU_HEADING,
+    blocks: [p(PRIVACY_EU_P1), p(PRIVACY_EU_P2)],
+  },
+  {
+    id: "your-rights",
+    heading: PRIVACY_RIGHTS_HEADING,
+    blocks: [p(PRIVACY_RIGHTS_P1), list(PRIVACY_RIGHTS_ITEMS), p(PRIVACY_RIGHTS_P2)],
+  },
+  {
+    id: "how-your-data-is-protected",
+    heading: PRIVACY_SECURITY_HEADING,
+    blocks: [p(PRIVACY_SECURITY_P1), p(PRIVACY_SECURITY_P2)],
+  },
+  {
+    id: "children",
+    heading: PRIVACY_CHILDREN_HEADING,
+    blocks: [p(PRIVACY_CHILDREN_P1)],
+  },
+  {
+    id: "how-the-model-was-evaluated",
+    heading: PRIVACY_EVALUATION_HEADING,
+    blocks: [
+      p(PRIVACY_EVALUATION_P1),
+      p(PRIVACY_EVALUATION_P2),
+      p(PRIVACY_EVALUATION_P3),
+      p(PRIVACY_EVALUATION_P4),
+    ],
+  },
+  {
+    id: "planned-and-not-operating-today",
+    heading: PRIVACY_FORWARD_HEADING,
+    blocks: [p(PRIVACY_FORWARD_P1), list(PRIVACY_FORWARD_ITEMS)],
+  },
+  {
+    id: "changes-to-this-policy",
+    heading: PRIVACY_CHANGES_HEADING,
+    blocks: [p(PRIVACY_CHANGES_P1), p(PRIVACY_CHANGES_P2)],
+  },
+  {
+    id: "privacy-contact",
+    heading: PRIVACY_CONTACT_HEADING,
+    blocks: [p(PRIVACY_CONTACT_P1)],
+  },
+];
+
 /** The Terms of Service, in render order. Anchor ids are stable and linkable. */
 export const TERMS_SECTIONS: readonly LegalSection[] = [
   {
