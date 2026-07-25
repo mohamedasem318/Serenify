@@ -43,6 +43,23 @@ describe("Wordmark", () => {
     expect(renderWordmark()).toHaveClass("lowercase");
   });
 
+  it("keeps the casing even when a caller passes a conflicting one", () => {
+    // The guarantee is structural, not conventional. `cn()` is
+    // tailwind-merge and resolves a conflict in favour of the LAST
+    // utility, so `lowercase` is applied AFTER the caller's className.
+    // Reordering it back in front of `className` would let `capitalize`
+    // win silently and render "Serenify" — this is the assertion that
+    // stops that (FR-030).
+    for (const conflicting of ["capitalize", "uppercase", "normal-case"]) {
+      const wrapper = renderWordmark(`text-2xl ${conflicting}`);
+
+      expect(wrapper, conflicting).toHaveClass("lowercase");
+      expect(wrapper, conflicting).not.toHaveClass(conflicting);
+      // The caller still owns everything that is not casing.
+      expect(wrapper, conflicting).toHaveClass("text-2xl");
+    }
+  });
+
   it("takes size and spacing from the caller's className", () => {
     // The five in-tree sites differ, so the component carries no size
     // class of its own and the caller's classes must reach the wrapper.
