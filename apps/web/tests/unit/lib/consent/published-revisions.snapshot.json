@@ -1,0 +1,19 @@
+{
+  "_comment": [
+    "FROZEN SNAPSHOT — feature 013, T014. Every consent revision that has ever been",
+    "published, field-for-field. registry-guards.test.ts compares CONSENT_REGISTRY",
+    "against this file, so editing or removing a published entry fails CI. History is",
+    "the point (FR-043b), so history is enforced, not trusted.",
+    "",
+    "APPEND ONLY. A published entry in this file is never edited and never removed. A",
+    "new revision is added HERE and to lib/consent/registry.ts in the SAME PR as the",
+    "wording it describes (research.md §6.1). If a guard fails because this file and the",
+    "registry disagree, the registry is what changed illegitimately — fix the registry,",
+    "do not 're-baseline' the snapshot.",
+    "",
+    "Both lists are empty in P2 by design: terms_privacy's first entry lands in P3 with",
+    "the documents (T023), camera_inference's in P4 with the camera wording."
+  ],
+  "terms_privacy": [],
+  "camera_inference": []
+}
