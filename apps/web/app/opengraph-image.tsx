@@ -40,6 +40,18 @@ export default async function OpenGraphImage() {
           height="92"
           style={{ width: 92, height: 92, borderRadius: 18 }}
         />
+        {/*
+          Hand-sync exception 1 (constitution Principle V, Wordmark).
+          This card cannot consume components/brand/wordmark.tsx because
+          Satori cannot load Outfit, so the two-colour split is typed by
+          hand here. The card is dark-themed (background #101214), so
+          both halves carry the DARK token values —
+          tests/unit/brand/wordmark-sync.test.ts reads those values out
+          of app/globals.css and fails if either side drifts.
+
+          `display: "flex"` on the wrapper is load-bearing: Satori
+          requires it on any element with more than one child.
+        */}
         <div
           style={{
             display: "flex",
@@ -49,7 +61,8 @@ export default async function OpenGraphImage() {
             letterSpacing: 0,
           }}
         >
-          serenify
+          <span style={{ color: "#E2E5E8" }}>seren</span>
+          <span style={{ color: "#63B292" }}>ify</span>
         </div>
       </div>
 
