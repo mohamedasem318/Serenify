@@ -1966,20 +1966,37 @@ named person, and no record exists that they agreed to any of it. That is suffic
 its own.
 **Fix scope**: medium (FEATURE work). The requirements are already specified as
 **FR-037–FR-043** in `specs/013-public-surface-and-legal/spec.md` — this entry points at
-them rather than restating them, so the two cannot drift. In summary: a one-time gate
-before a user's first-ever calibration, presented **before** camera access is requested
-and before any capture begins (FR-037/FR-038); the grant persisted with a timestamp
-(FR-039) and not re-shown afterwards (FR-040); declining or abandoning writes **no**
-record and blocks calibration (FR-042). Two constraints matter most and are easy to get
-wrong:
+them rather than restating them, so the two cannot drift. In summary: a gate before a
+user's first-ever calibration, presented **before** camera access is requested
+and before any capture begins (FR-037/FR-038); the grant persisted with **both a
+timestamp and the identity of the consent wording the user was actually shown**
+(FR-039), and not re-shown afterwards until the wording is materially revised (FR-040);
+declining or abandoning writes **no** record for the offered wording and blocks
+calibration and camera-based monitoring sessions (FR-042/FR-043c). Three constraints
+matter most and are easy to get wrong:
 - **No backfill (FR-041).** Existing users have never given camera consent and MUST be
   prompted once on their next session. Consent MUST NOT be backfilled as already-granted
   — recording a fact that never happened is forbidden. Existing readings, sessions, and
-  accounts are left untouched: this is a gate, not a deletion.
+  accounts are left untouched: this is a gate, not a deletion. The same prohibition
+  governs re-consent: an existing record MUST NOT be rolled forward to cover a revision
+  the user was never shown.
+- **Re-consent on material revision (FR-043a–FR-043e).** Consent is **not one-time**.
+  Every published revision of a consented text is classified at publication as
+  **MATERIAL** or **COSMETIC** — a human judgment, not an automatic text comparison.
+  Material re-prompts everyone whose consent predates it; cosmetic re-prompts nobody.
+  Acceptance is recorded as a **new** consent; the earlier record is never overwritten,
+  because the history of what a person agreed to and when is the point. This applies
+  **symmetrically** to the camera wording **and** the Terms/Privacy acknowledgement
+  (FR-035) — one rule, two applications, neither built without the other. Declining
+  blocks only that text's scope (camera → calibration + monitoring sessions, with the
+  weekly work-environment check-in still available; Terms/Privacy → the whole app, while
+  still allowing the user to read both documents and sign out), is **not** withdrawal,
+  is **not** a deletion trigger, and MUST be recoverable.
 - **Withdrawal-ready shape (FR-043).** Withdrawal itself is out of scope and belongs to
   **feature 018** (`privacy-controls-and-transparency`), but the record MUST be shaped so
   withdrawal can be added later without rework. **A shape that can only ever express
-  "granted" is not acceptable.** The concrete schema is a plan decision.
+  "granted" is not acceptable.** The concrete schema is a plan decision. Note that
+  **declining a gate is not withdrawal** and must not be modelled as one.
 **Address by**: **feature 013 (public-surface-and-legal)**, which owns it and closes this
 issue when it ships. Pairs with **#75** (ToS/Privacy + signup consent gate) — both are
 binding pre-real-data gates on the same user journey, and both are owned by 013. Does
