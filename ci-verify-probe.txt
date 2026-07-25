@@ -1,0 +1,2 @@
+Throwaway probe verifying that PRs into 013-public-surface-and-legal run the
+guard checks after #164. Delete after verification.
