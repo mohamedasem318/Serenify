@@ -2,14 +2,29 @@ name: CI
 
 # Phase-1 CI: the cheap, hermetic layer only — lint, typecheck, unit tests.
 # No secrets, no Supabase, no Playwright, no `next build`. Runs on every PR into
-# main and on push to main (so main keeps a green baseline). These checks are
-# intentionally NOT marked required yet — we land non-blocking and watch them go
-# green first.
+# main or into a numbered feature branch, and on push to either (so both keep a
+# green baseline). These checks are intentionally NOT marked required yet — we
+# land non-blocking and watch them go green first.
+#
+# `[0-9][0-9][0-9]-*` matches this repo's feature-branch convention (`001-auth-
+# and-roles` … `013-public-surface-and-legal`). Without it these jobs are SILENT
+# for every PR into a feature branch — only Vercel runs — so a stack of phase PRs
+# would merge into an integration branch with no test signal at all.
+#
+# IMPORTANT — for `pull_request`, GitHub reads the workflow file from the PR's
+# MERGE ref (head merged into base), not from `main`. Landing this on `main` is
+# therefore not enough on its own: a feature branch must also carry this commit
+# (fast-forward or merge it from `main`) before PRs into that branch will run.
+# Verified by experiment, not assumed — see the PR description.
 on:
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - "[0-9][0-9][0-9]-*"
   push:
-    branches: [main]
+    branches:
+      - main
+      - "[0-9][0-9][0-9]-*"
   workflow_dispatch:
 
 # One in-flight run per ref; a newer push to the same branch/PR cancels the older run.
