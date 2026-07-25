@@ -25,8 +25,15 @@ product.
 
 This feature builds that front door and the legal surface behind it: a landing
 page whose centrepiece is an animated, scripted story of the product working; the
-two legal documents; a site footer; and two consent gates — one at signup, one
-before a user's first-ever calibration.
+two legal documents; a site footer; and two consent gates — one for the Terms and
+Privacy Policy, one for camera capture and inference.
+
+**Neither gate is one-time.** Both consented texts can be revised, and a revision
+judged **material** re-prompts everyone whose recorded consent predates it. The
+Terms/Privacy gate therefore blocks the **whole application**, not only account
+creation — an existing signed-in user can meet it mid-life. The camera gate blocks
+only the camera-based features. What a person agreed to, and when, is kept as
+**history** rather than overwritten.
 
 The organising principle is that **Serenify's pitch is a set of refusals**. The
 page's job is not to claim accuracy; it is to show that the system asks before it
@@ -93,14 +100,21 @@ product and its central refusal without signing up.
 
 ---
 
-### User Story 2 - A person is told the truth about their camera before consenting (Priority: P1)
+### User Story 2 - A person consents before anything happens, and again when the terms change (Priority: P1)
 
 A new user signs up. Account creation is blocked until they acknowledge the Terms
 and Privacy Policy, both reachable and readable before they agree. Later, before
 their first-ever calibration — the first moment any inference could occur — they
 are shown a separate, explicit camera-and-inference consent gate that states what
-is transmitted, what is kept, and what is discarded. They must actively agree; the
-agreement is recorded with a timestamp.
+is transmitted, what is kept, and what is discarded. They must actively agree; each
+agreement is recorded with the time and the wording they were shown.
+
+Neither agreement is permanent. When either text is revised in a way judged
+**material**, everyone whose consent predates that revision is asked again, with the
+current wording, and their answer is recorded as a **new** consent alongside the old
+one rather than replacing it. Declining is allowed and is not a trap: it blocks the
+features that text governs and only those, changes nothing that already exists, and
+can be revisited.
 
 **Why this priority**: This is the pre-real-data legal gate (#75). No real user
 data may be processed without it. It is P1 alongside US1 because the landing page's
@@ -108,9 +122,11 @@ data-handling claims and the consent text are the same claims — they must ship
 together and say the same thing.
 
 **Independent Test**: Attempt signup without acknowledgement (blocked); complete
-signup with acknowledgement; then reach calibration as a user who has never
-calibrated and confirm the camera consent gate appears and blocks progress until
-answered. Testable without the landing page existing.
+signup with acknowledgement; reach calibration as a user who has never calibrated
+and confirm the camera consent gate appears and blocks progress until answered;
+then publish a material revision of each text and confirm the matching re-prompt
+appears, that declining blocks the right scope **and only that scope**, and that the
+earlier consent record survives intact. Testable without the landing page existing.
 
 **Acceptance Scenarios**:
 
@@ -124,14 +140,34 @@ answered. Testable without the landing page existing.
    calibration, **Then** the camera/inference consent gate is presented before any
    camera access is requested and before any capture begins.
 4. **Given** the camera consent gate is presented, **When** the user agrees,
-   **Then** the agreement is persisted with a timestamp and the user proceeds to
-   calibration.
+   **Then** the agreement is persisted with a timestamp **and the identity of the
+   wording they were shown**, and the user proceeds to calibration.
 5. **Given** a user who has already given camera consent, **When** they calibrate
    again, **Then** the consent gate is not shown again.
 6. **Given** an existing user who has never given camera consent, **When** they
    next reach calibration, **Then** they are prompted exactly once — their existing
    readings and account are untouched, and no consent record is fabricated for the
    period before they answered.
+7. **Given** a user whose camera consent predates a **material** revision of the
+   consent wording, **When** they next attempt calibration or a monitoring session,
+   **Then** they are re-prompted with the current wording, their acceptance is
+   recorded as a **new** consent against that revision, and the earlier record
+   remains unchanged.
+8. **Given** a **cosmetic** revision of either consented text, **When** a user whose
+   consent predates it uses the product, **Then** they are not re-prompted.
+9. **Given** a user who declines the camera-and-inference consent, **When** they use
+   the product, **Then** calibration and camera-based monitoring sessions are
+   unavailable, the **weekly work-environment check-in remains available**, and their
+   existing readings, sessions, and account are untouched.
+10. **Given** a user whose Terms/Privacy acknowledgement predates a material
+    revision, **When** they sign in, **Then** they cannot use the application until
+    they accept — and while blocked they can still **read both documents in full**
+    and **sign out**.
+11. **Given** a user who has declined either consent, **When** they return, **Then**
+    they can reach that prompt again and accept.
+12. **Given** any decline, first or re-consent, **When** the user's stored data is
+    inspected, **Then** nothing has been deleted and no withdrawal or revocation
+    state has been written.
 
 ---
 
@@ -211,8 +247,18 @@ person is outlined in the photo, and vice versa.
 - **A visitor's browser blocks the team photo or it fails to load**: the name
   cards and supervisor credits remain readable and usable.
 - **A user abandons the camera consent gate** (closes, navigates away, or
-  declines): no consent record is written, no calibration occurs, and they are
-  prompted again next time. Declining must not silently record a grant.
+  declines): no consent record is written for the wording being offered, no
+  calibration or monitoring session occurs, and they are prompted again next time.
+  Declining must not silently record a grant. If they hold an **earlier** consent to
+  a superseded revision, that record survives untouched — it simply no longer
+  unlocks the camera features.
+- **A material revision is published while a user is signed in**: they meet the
+  re-prompt at their next attempt to use the scope that text governs — the
+  Terms/Privacy case blocks the application, the camera case blocks only calibration
+  and monitoring sessions.
+- **A user declines the camera consent and then opens the weekly work-environment
+  check-in**: it is available and works normally. It is not camera-based, so the
+  camera decline does not reach it.
 - **A user completes signup but never calibrates**: they hold a Terms/Privacy
   acknowledgement but no camera consent — this is a valid, expected state.
 - **The hero story is mid-conversation when the thread reaches its cap**: the
@@ -436,29 +482,102 @@ person is outlined in the photo, and vice versa.
   agrees.
 - **FR-035**: The acknowledgement MUST be recorded so it is auditable, capturing at
   minimum **when** it was given and **which version** of each document was accepted.
+  Acknowledgement is **not one-time**: it is subject to the revision and re-consent
+  rules in **FR-043a–FR-043e**, under which a material revision of either document
+  re-prompts every user whose acknowledgement predates it and blocks all application
+  use until they answer.
 - **FR-036**: The consent gate MUST ship together with the real, complete documents —
   never as a checkbox linking to placeholder or empty pages.
 
 ### Consent — camera / inference
 
-- **FR-037**: A **separate**, explicit, one-time camera-and-inference consent gate
-  MUST be presented **before a user's first-ever calibration**, which is the correct
-  hook because calibration is unskippable and precedes any inference.
+- **FR-037**: A **separate**, explicit camera-and-inference consent gate MUST be
+  presented **before a user's first-ever calibration**, which is the correct hook
+  because calibration is unskippable and precedes any inference. It is asked **once
+  per revision of the consent wording, not once per user** — see FR-043a–FR-043e.
 - **FR-038**: The gate MUST be presented **before** camera access is requested and
   **before** any capture begins.
-- **FR-039**: Consent MUST be recorded with a **timestamp** and persisted.
-- **FR-040**: The gate MUST NOT be shown again once consent is recorded.
+- **FR-039**: Consent MUST be persisted, and the record MUST capture at minimum **when**
+  consent was given **and which consent wording the user was actually shown**. The record
+  MUST identify the presented wording well enough that, if that text is later revised, it
+  remains answerable what a given user agreed to. This matches the discipline FR-035
+  already applies to the Terms/Privacy acknowledgement — a consent record that cannot say
+  what was consented to is not auditable. *(How wording revisions are identified and
+  stored is a plan decision.)*
+- **FR-040**: The gate MUST NOT be shown again once consent is recorded, **until a
+  material revision of the consent wording is published** (FR-043a). It MUST NOT be
+  shown again for a cosmetic revision.
 - **FR-041**: **Existing users have never given camera consent.** They MUST be
   prompted **once**, on their next session. Consent MUST NOT be backfilled as
   already-granted for any existing user — recording a fact that never happened is
   forbidden. Existing readings, sessions, and accounts MUST be left untouched: this
   is a gate, not a deletion.
-- **FR-042**: Declining or abandoning the gate MUST leave no consent record and MUST
-  NOT permit calibration to proceed.
+
+  The same prohibition governs **re-consent**: an existing consent record MUST NOT be
+  rolled forward, re-stamped, or otherwise treated as covering a later revision the
+  user was never shown. Consent to a revision exists only if that revision was
+  actually presented and actually accepted, and every record — first or subsequent —
+  captures the wording presented **at that moment** (FR-039).
+- **FR-042**: Declining or abandoning a consent gate MUST NOT create a consent record
+  for the wording being offered, and MUST NOT grant the access that wording governs
+  (FR-043c).
+  - At a **first** consent this leaves the user with no consent record for that text
+    at all.
+  - At a **re-consent** the user's **earlier consent records MUST survive unchanged**.
+    Declining a revision MUST NOT overwrite, edit, delete, or invalidate the record of
+    what they previously agreed to. What blocks access is the **absence of a record
+    for the new revision** — never the destruction of the old one.
 - **FR-043**: Consent **withdrawal is out of scope** (it belongs to
   `018-privacy-controls`). The consent record MUST nonetheless be **shaped so that
   withdrawal can be added later without rework** — the concrete schema is a plan
   decision, but a shape that can only ever express "granted" is not acceptable.
+  **Declining a gate is not withdrawal** and MUST NOT be modelled as one (FR-043e).
+
+### Consent — revision and re-consent
+
+*(These rules apply **symmetrically to both consented texts**: the Terms/Privacy
+acknowledgement of FR-033–FR-036 and the camera-and-inference consent wording of
+FR-037–FR-043. One rule, two applications — neither is built without the other.)*
+
+- **FR-043a**: Every published revision of a consented text MUST be classified, at
+  publication, as either **MATERIAL** or **COSMETIC**. A material revision re-prompts
+  every user whose recorded consent predates it; a cosmetic revision re-prompts
+  nobody. The classification is a **human judgment made when publishing** — it MUST
+  NOT be derived from an automatic comparison of the text. *(How the classification is
+  recorded, and how "predates" is evaluated, are plan decisions.)*
+- **FR-043b**: A user whose recorded consent predates a material revision MUST be
+  re-prompted with the **current** wording, and their acceptance MUST be recorded as a
+  **new** consent against that revision. The earlier record MUST NOT be overwritten,
+  edited, or backfilled. **The history of what a person agreed to, and when, is the
+  point** — a consent trail that keeps only the latest answer cannot establish what was
+  true at the time a given reading was taken.
+- **FR-043c**: Declining blocks a different scope per text, and **only** that scope:
+  - **Camera-and-inference consent declined** → the user MAY NOT run **calibration**,
+    anchor/baseline capture, or any **camera-based monitoring session**. Nothing else
+    is blocked. The **weekly work-environment check-in** is not camera-based and MUST
+    remain available. *(The product UI calls both the monitoring session and the weekly
+    questionnaire a "check-in". This specification never uses that word unqualified,
+    for exactly that reason.)*
+  - **Terms/Privacy acknowledgement declined** → the user MAY NOT use the application
+    at all until they accept. This is the basis on which the product is used, not a
+    feature-level permission.
+- **FR-043d**: A user blocked by a declined Terms/Privacy acknowledgement MUST still be
+  able to **read both documents in full** and to **sign out**. A gate a person cannot
+  read their way out of is a locked account — and an acceptance offered without the
+  ability to open what is being accepted is not meaningful consent.
+- **FR-043e**: Declining is a **pause, not a terminal state**, and destroys nothing:
+  - **Declining is NOT withdrawal.** Existing readings, sessions, and account data MUST
+    be left untouched; the user is blocked from the gated features, nothing is deleted,
+    and **no revocation or withdrawal state is written**. Withdrawal remains out of
+    scope and belongs to feature **018** (FR-043).
+  - **Declining is NOT a deletion trigger.** Data already held remains subject to the
+    standard **90-day reading-retention policy** (BACKLOG #86) — which is time-based,
+    applies to every user regardless of consent status, and whose purge job is not
+    built and is not owned by this feature. Nothing in these requirements may describe,
+    promise, or imply that declining causes deletion. **FR-003's prohibition on
+    implying an automated purge mechanism stands and extends to this text.**
+  - **A decline MUST be recoverable.** The user MUST be able to reach that prompt again
+    and accept. *(Where and how it is reachable again is a plan decision.)*
 
 ### Legal documents
 
@@ -552,15 +671,20 @@ person is outlined in the photo, and vice versa.
 ### Key Entities
 
 - **Terms/Privacy acknowledgement**: a record that a specific user accepted a
-  specific version of each document at a specific time. Created at signup; blocks
-  account creation until present.
+  specific version of each document at a specific time. A user accumulates **one
+  record per accepted revision** — accepting a later revision **adds** a record, it
+  never replaces the earlier one. Created at signup; blocks account creation until
+  present, and blocks all application use while a material revision stands unaccepted.
 - **Camera/inference consent**: a record that a specific user explicitly permitted
-  webcam capture and inference, with the time it was given. Created before first
-  calibration; absent for every existing user until they are prompted. Shaped to
-  accommodate a future withdrawal state without restructuring.
-- **Document version**: the identifier of a published revision of the Terms or
-  Privacy Policy, referenced by acknowledgement records so consent remains auditable
-  when the documents change.
+  webcam capture and inference, capturing the time it was given **and the identity of
+  the consent wording they were shown**. A user likewise accumulates **one record per
+  accepted revision**. Created before first calibration; absent for every existing user
+  until they are prompted. Shaped to accommodate a future withdrawal state without
+  restructuring.
+- **Document version**: the identifier of a published revision of a consented text —
+  the Terms, the Privacy Policy, **or the camera-and-inference consent wording** —
+  carrying its **material/cosmetic** classification (FR-043a) and referenced by consent
+  records so consent remains auditable when that text changes.
 
 ---
 
@@ -582,8 +706,12 @@ person is outlined in the photo, and vice versa.
   legal document.
 - **SC-006**: Account creation cannot be completed without acknowledgement in 100%
   of attempts.
-- **SC-007**: No user reaches calibration capture without a recorded camera consent,
-  and zero consent records exist for users who never answered the gate.
+- **SC-007**: No user reaches calibration **or a camera-based monitoring session**
+  while a **material** revision of the camera wording stands unaccepted by them; zero
+  consent records exist for users who never answered the gate; and every consent record
+  identifies both when it was given and which wording was shown. *(Cosmetic revisions
+  do not enter this criterion — per FR-043a they re-prompt nobody, so holding consent
+  against a cosmetically-superseded wording is correct behaviour, not a violation.)*
 - **SC-008**: At 320px, 375px, 414px, and 768px the public surface produces no
   horizontal scrolling and every tap target is at least 44px and single-line.
 - **SC-009**: Every interactive element on the public surface is reachable by
@@ -593,6 +721,14 @@ person is outlined in the photo, and vice versa.
   auto-advance, and remains fully navigable via chapter markers.
 - **SC-011**: Only the three product band labels appear in the hero readout across a
   full cycle.
+- **SC-012**: After a **material** revision of either consented text, 100% of users
+  whose recorded consent predates it are re-prompted before any further use of the
+  scope that text governs. After a **cosmetic** revision, **zero** users are
+  re-prompted.
+- **SC-013**: Across every decline — first consent or re-consent — **zero** prior
+  consent records are modified or removed, **zero** readings or sessions are deleted,
+  and **zero** withdrawal or revocation states are written. A user who has declined the
+  camera consent can still complete the weekly work-environment check-in.
 
 ---
 
@@ -601,7 +737,11 @@ person is outlined in the photo, and vice versa.
 - **A per-beat progress bar.** Explicitly rejected. Story navigation is chapter
   markers only.
 - **Consent withdrawal / revocation UI.** Belongs to `018-privacy-controls`. This
-  feature only ensures the record's shape does not preclude it (FR-043).
+  feature only ensures the record's shape does not preclude it (FR-043). **Declining a
+  consent gate is not withdrawal** and writes no revocation state (FR-043e).
+- **Deletion on decline.** Declining triggers no deletion of anything. Data already
+  held stays subject to the time-based 90-day retention policy that applies to every
+  user regardless of consent status (FR-043e, FR-003).
 - **The 90-day purge job.** Policy is stated; the enforcement mechanism is not built
   and is not owned here (BACKLOG #86).
 - **Gating `/signup` to invite-only.** That is issue **#62**, a separate auth-posture
@@ -653,10 +793,17 @@ person is outlined in the photo, and vice versa.
 
 ## Dependencies
 
-- **Existing and consumed unchanged**: the signup flow and its server action; the
-  calibration flow and its per-user anchor state; the app header, mobile-nav, and
-  auth-pages layout (which the wordmark change touches); the live monitor's breathing
-  bloom; the app's band definitions; the Graphite token set.
+- **Existing and consumed unchanged**: the calibration flow and its per-user anchor
+  state; the app header, mobile-nav, and auth-pages layout (which the wordmark change
+  touches); the live monitor's breathing bloom; the app's band definitions; the
+  Graphite token set.
+- **Existing and MODIFIED by this feature**: the **signup flow and its server action**,
+  which gains the Terms/Privacy acknowledgement gate (FR-033); and the **authed
+  application shell**, which gains the re-consent entry gate that blocks all
+  application use while a material Terms/Privacy revision stands unaccepted (FR-043c).
+  *(An earlier draft of this section listed the signup flow as consumed unchanged and
+  did not mention the app shell at all. The re-consent model makes both false — recorded
+  here so the plan does not inherit the wrong constraint.)*
 - **Constitution Principle I** is the authority for every data-handling claim.
 - **Feature 018 (`privacy-controls-and-transparency`)** defines data-handling
   substance that will feed these documents; if 018 changes what is collected, seen, or
