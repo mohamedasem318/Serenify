@@ -38,7 +38,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function renderScreen(onGrant = vi.fn(async () => ({ status: "ok" }) as const)) {
+/**
+ * The write action's REAL signature — one argument, no version parameter. Spelling it out
+ * rather than letting `vi.fn` infer from an implementation is what makes
+ * `onGrant.mock.calls[0]` a one-element tuple, so the "passes NO version argument" case
+ * below is a type-level claim as well as a runtime one.
+ */
+type GrantFn = (key: "terms_privacy") => Promise<{ status: "ok" } | { status: "error" }>;
+
+const grantOk = () => vi.fn<GrantFn>(async () => ({ status: "ok" }) as const);
+
+function renderScreen(onGrant: ReturnType<typeof grantOk> = grantOk()) {
   render(<TermsReconsentScreen versionId={VERSION_ID} onGrant={onGrant} />);
   return onGrant;
 }
@@ -139,7 +149,7 @@ describe("accepting", () => {
     // is written against, which would open a second instance of the forgeable-version
     // problem `plan.md` §15 R8 documents on the signup path. The assertion that survives
     // is the call shape — one argument, the key — plus the negative below.
-    const onGrant = vi.fn(async () => ({ status: "ok" }) as const);
+    const onGrant = grantOk();
     renderScreen(onGrant);
 
     return userEvent.click(screen.getByRole("button", { name: /agree and continue/i })).then(
@@ -151,7 +161,7 @@ describe("accepting", () => {
   });
 
   it("passes NO version argument — the version is not the caller's to name", async () => {
-    const onGrant = vi.fn(async () => ({ status: "ok" }) as const);
+    const onGrant = grantOk();
     renderScreen(onGrant);
 
     await userEvent.click(screen.getByRole("button", { name: /agree and continue/i }));
@@ -168,7 +178,7 @@ describe("accepting", () => {
   });
 
   it("surfaces a failed write and does not refresh", async () => {
-    const onGrant = vi.fn(async () => ({ status: "error" }) as const);
+    const onGrant = vi.fn<GrantFn>(async () => ({ status: "error" }) as const);
     renderScreen(onGrant);
 
     await userEvent.click(screen.getByRole("button", { name: /agree and continue/i }));
