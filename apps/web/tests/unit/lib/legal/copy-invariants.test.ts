@@ -187,10 +187,34 @@ describe("(d) FR-004: subject-disjoint is named and carries no numbers", () => {
 // ── The controller contact is real, with no placeholder left (FR-046) ───────
 
 describe("FR-046: the data controller is named, with no placeholder", () => {
-  it("names Mohamed Asem as an individual and gives the real contact address", () => {
+  it("names Mohamed Assem as an individual and gives the real contact address", () => {
     const joined = ALL_STRINGS.map((entry) => entry.text).join(" ");
-    expect(joined).toMatch(/Mohamed Asem, as an individual/);
+    expect(joined).toMatch(/Mohamed Assem, as an individual/);
     expect(joined).toContain("mohamedasem318@gmail.com");
+  });
+
+  it("spells the controller's name one way across both documents", () => {
+    // FR-046 writes "Mohamed Asem"; FR-024's team card writes "Mohamed Assem Adel". The
+    // legal documents use the double-s form for both the controller and the authorship
+    // credit, so a reader never meets the same person spelled two ways across the two
+    // roles. The email address is unaffected — it is a real address, not a name.
+    const names = ALL_STRINGS.filter((entry) => /Mohamed As+em/.test(entry.text));
+    expect(names.length).toBeGreaterThan(0);
+    for (const { path, text } of names) {
+      expect(text, `${path} uses the single-s spelling`).not.toMatch(/Mohamed Asem\b/);
+    }
+  });
+
+  it("distinguishes legal responsibility from authorship", () => {
+    // The authorship credit must never read as a controller designation: "joint
+    // controller" is a legal status with its own duties, and naming four authors must not
+    // confer it on three of them.
+    const joined = ALL_STRINGS.map((entry) => entry.text).join(" ");
+    for (const author of ["Fatma Al-Zahraa Emad", "Hebatullah El Gazoly", "Gehad Mohamed"]) {
+      expect(joined, `${author} must be credited as an author`).toContain(author);
+    }
+    expect(joined).toMatch(/not data controllers, joint controllers, or processors/i);
+    expect(joined).toMatch(/Dr\. Lamees Nasser and Dr\. Safaa Mouneer/);
   });
 
   it("leaves no placeholder token anywhere", () => {
@@ -198,6 +222,44 @@ describe("FR-046: the data controller is named, with no placeholder", () => {
       /\bTBD\b|\bTODO\b|\[insert|\{\{|XXX|PLACEHOLDER|lorem ipsum/i.test(entry.text),
     ).map((entry) => `${entry.path}: "${entry.text}"`);
     expect(offenders).toEqual([]);
+  });
+});
+
+// ── FR-050: the third-party chat processor is disclosed accurately ──────────
+
+describe("FR-050: the language-model processor is described as the code behaves", () => {
+  const joined = ALL_STRINGS.map((entry) => entry.text).join(" ");
+
+  it("names the provider and that it is outside the EU", () => {
+    expect(joined).toMatch(/\bGroq\b/);
+    expect(joined).toMatch(/United States/);
+  });
+
+  it("does NOT claim a fallback model stands in", () => {
+    // The registry's default is fail-clean: it RAISES when the primary errors, and the
+    // fallback is consulted only when LLM_SILENT_FALLBACK is explicitly enabled (off by
+    // default, and `false` in .env.example). An earlier draft of this copy said a
+    // self-hosted model "stands in", which was an affirmative false statement about the
+    // system as shipped — exactly the FR-050 failure the requirement exists to catch.
+    expect(joined).not.toMatch(/fallback model stands in|stands in when that provider/i);
+    expect(joined).toMatch(/the request simply fails|nothing else stands in/i);
+  });
+
+  it("states that a turn sends several requests, not one", () => {
+    expect(joined).toMatch(/several separate requests/i);
+  });
+
+  it("discloses that the first name is transmitted", () => {
+    expect(joined).toMatch(/your first name is included/i);
+  });
+
+  it("states that a crisis disclosure itself reaches the provider", () => {
+    // The strongest claim in the document is that a crisis never notifies anyone and is
+    // never persisted — both true. Staying quiet about the disclosure text reaching a
+    // third party while making that claim would be the worst version of this passage.
+    expect(joined).toMatch(/what you wrote is sent to the language-model provider/i);
+    // ...and the true statement it was added to must survive alongside it.
+    expect(joined).toMatch(/never stored, never notifies anyone/i);
   });
 });
 

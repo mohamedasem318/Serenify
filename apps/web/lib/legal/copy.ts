@@ -109,20 +109,69 @@ export const TERMS_NOT_MEDICAL_P3 =
   "Do not use Serenify as a substitute for medical or psychological care, and do not " +
   "delay seeking care because of anything Serenify showed you.";
 
-// § Who provides Serenify
+// § Who is legally responsible
+//
+// Kept deliberately separate from "Who built Serenify" below, as two sections with two
+// anchors rather than two paragraphs under one heading. Legal responsibility and
+// authorship are different things, and a document that runs them together either
+// under-credits the people who built the project or over-assigns legal obligations to
+// three of them. The structure is what makes the distinction hard to misread.
 
-const TERMS_PROVIDER_HEADING = "Who provides Serenify";
+const TERMS_PROVIDER_HEADING = "Who is legally responsible";
 
 export const TERMS_PROVIDER_P1 =
-  "Serenify is provided by Mohamed Asem, as an individual. There is no company and no " +
+  "Serenify is provided by Mohamed Assem, as an individual. There is no company and no " +
   "legal entity behind it. He is also the data controller for the personal data Serenify " +
   "handles, and he can be reached at mohamedasem318@gmail.com.";
 
 export const TERMS_PROVIDER_P2 =
-  "Serenify is a graduation project carried out in an academic setting, and the people " +
-  "who built it are named on the site. The academic context explains why the project " +
-  "exists; it does not make the university a party to these terms or a controller of your " +
-  "data.";
+  "He is the single point of legal responsibility for Serenify: the data controller under " +
+  "Egypt's Personal Data Protection Law and under the General Data Protection Regulation, " +
+  "the person these terms form an agreement with, and the person to write to about " +
+  "anything in either document. That is a legal role with duties attached, and it rests " +
+  "with him alone.";
+
+// § Who built Serenify
+//
+// Credit, and explicitly NOT a controller designation. "Joint controller" is a defined
+// status under both regimes with its own allocation of duties and liability; naming the
+// team as authors must not be read as conferring it, so the section says so outright
+// rather than leaving a reader to infer it.
+//
+// Spellings are FR-024's. Both legal documents use "Mohamed Assem" throughout — as the
+// named controller and here as an author — so a reader never meets two spellings of the
+// same person across the two roles. FR-046 writes the controller as "Mohamed Asem"; that
+// single-s form is deliberately NOT used in either document. The landing page's team
+// section keeps FR-024's full "Mohamed Assem Adel" and belongs to P7, not this phase.
+
+const TERMS_AUTHORS_HEADING = "Who built Serenify";
+
+export const TERMS_AUTHORS_P1 =
+  "Serenify is a graduation project, and four people built it. Naming only the data " +
+  "controller above would leave the impression that it is one person's work. It is not.";
+
+export const TERMS_AUTHORS_ITEMS: readonly string[] = [
+  "Mohamed Assem Adel",
+  "Fatma Al-Zahraa Emad",
+  "Hebatullah El Gazoly",
+  "Gehad Mohamed",
+];
+
+export const TERMS_AUTHORS_P2 =
+  "The project was supervised by Dr. Lamees Nasser and Dr. Safaa Mouneer.";
+
+export const TERMS_AUTHORS_P3 =
+  "This section is authorship, not data protection law. The three authors other than " +
+  "Mohamed Assem are not data controllers, joint controllers, or processors of your " +
+  "personal data, and nothing here makes them any of those — those are legal designations " +
+  "that carry their own duties, and they rest with the controller named in the previous " +
+  "section. Who built something and who is answerable for what it does with your data are " +
+  "two different questions, and this document answers them separately on purpose.";
+
+export const TERMS_AUTHORS_P4 =
+  "Serenify was carried out in an academic setting. That context explains why the project " +
+  "exists; it does not make the university a party to these terms, a controller of your " +
+  "data, or answerable for anything Serenify does.";
 
 // § Who may use it
 
@@ -261,7 +310,7 @@ const TERMS_CONTACT_HEADING = "Contact";
 
 export const TERMS_CONTACT_P1 =
   "Questions about these terms, about your data, or about anything Serenify did that you " +
-  "did not expect, go to Mohamed Asem at mohamedasem318@gmail.com. There is no support " +
+  "did not expect, go to Mohamed Assem at mohamedasem318@gmail.com. There is no support " +
   "desk behind that address — it reaches one person, who wrote this.";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -281,12 +330,19 @@ export const PRIVACY_LEDE =
 const PRIVACY_CONTROLLER_HEADING = "Who is responsible";
 
 export const PRIVACY_CONTROLLER_P1 =
-  "The data controller is Mohamed Asem, as an individual, reachable at " +
+  "The data controller is Mohamed Assem, as an individual, reachable at " +
   "mohamedasem318@gmail.com. There is no company and no legal entity. Serenify is a " +
   "non-commercial graduation project, and the same person who decided how your data is " +
   "handled is the person who answers that address.";
 
 export const PRIVACY_CONTROLLER_P2 =
+  "Serenify was built by four people, named in the Terms of Service under “Who built " +
+  "Serenify”. Only Mohamed Assem is the data controller. The other three authors are " +
+  "not controllers, joint controllers, or processors of your personal data — controller " +
+  "is a legal role with duties attached, and here it belongs to one person, so there is " +
+  "one person to hold to it.";
+
+export const PRIVACY_CONTROLLER_P3 =
   "Serenify has no registered data protection officer. Given that it processes health-" +
   "related and biometric data, Egyptian law is likely to expect one. That is one of the " +
   "gaps qualified legal review would need to close.";
@@ -378,13 +434,21 @@ export const PRIVACY_CHAT_P1 =
   "wrote them, and there is no second rule granting anyone else a way in.";
 
 export const PRIVACY_CHAT_P2 =
-  "To generate each reply, your messages are sent to a language-model provider, along with " +
-  "a short hedged note about your most recent stored reading when there is one. That note " +
-  "carries a band, never video and never a number. Nothing about the conversation flows " +
-  "back the other way: a stress band derived from a conversation is written only to that " +
-  "conversation and never reaches any camera-side surface.";
+  "Your conversation is sent to a language-model provider. Being precise about how much: " +
+  "a single turn produces several separate requests, not one. Ren's reply is generated by " +
+  "one; a second reads the exchange to judge whether it sounds like strain or like a " +
+  "crisis; two more summarise the conversation and give it a title. Each of those carries " +
+  "a window of the conversation itself — recent messages, not just the line you last " +
+  "typed. Your first name is included too, in the instructions that tell Ren how to " +
+  "address you.";
 
 export const PRIVACY_CHAT_P3 =
+  "Sent with them, when there is one, is a short hedged note about your most recent stored " +
+  "reading. That note carries a band, never video and never a number. Nothing flows back " +
+  "the other way: a stress band derived from a conversation is written only to that " +
+  "conversation and never reaches any camera-side surface.";
+
+export const PRIVACY_CHAT_P4 =
   "Serenify keeps your conversations so you can return to them. You can delete a " +
   "conversation, and deleting it removes its messages.";
 
@@ -403,6 +467,16 @@ export const PRIVACY_CRISIS_P2 =
   "reply, decides whether to show you the support panel, and is gone. No column records " +
   "it, so no report could ever count it. Routing a mental-health crisis into an employer " +
   "chain is a permanent prohibition in this project, not a configuration.";
+
+export const PRIVACY_CRISIS_P3 =
+  "One thing that follows from how the recognition is made, and that you should not have " +
+  "to work out for yourself: what you wrote is sent to the language-model provider. " +
+  "Recognising a crisis is not something Serenify does on its own — it is one of the " +
+  "several requests described above, and the words you typed are in it. Everything in the " +
+  "paragraph before this one remains true: the result is never stored, never notifies " +
+  "anyone, and never leaves a trace in your account. But the disclosure itself reaches a " +
+  "third party in the ordinary course of you being answered, and a policy that stayed " +
+  "quiet about that would be hiding the part that matters most.";
 
 // § Weekly work-environment check-in
 
@@ -469,7 +543,7 @@ export const PRIVACY_PROCESSORS_P1 =
 export const PRIVACY_PROCESSORS_ITEMS: readonly string[] = [
   "Supabase — the database and the sign-in system. Everything Serenify stores lives here: account details, calibration, readings, questionnaire answers, conversations, and consent records. Hosted inside the European Union, in Frankfurt, Germany.",
   "Microsoft Azure — the inference service that reads webcam video and returns a band. Runs on Azure Container Apps inside the European Union. Video passes through it and is deleted there; nothing about a clip is stored.",
-  "Groq — the language-model provider behind Ren. Your messages, and the hedged note about a recent reading described above, are sent there to generate each reply. Groq operates from the United States. A self-hosted fallback model stands in when that provider is unavailable.",
+  "Groq — the language-model provider behind Ren. The conversation content described above is sent there, in several requests per turn, to generate each reply and to score it. Groq operates from the United States, so a companion conversation leaves the European Union in a way nothing else in Serenify does. If Groq is unavailable the request simply fails and Ren cannot answer: nothing else stands in, and your conversation is not quietly rerouted to some other model.",
   "Vercel — serves the web application you are reading this on.",
   "Resend — sends the two account emails: address confirmation and password reset.",
   "Cloudflare — domain routing and network delivery.",
@@ -637,7 +711,7 @@ const PRIVACY_CONTACT_HEADING = "Contact";
 
 export const PRIVACY_CONTACT_P1 =
   "For anything in this document, to exercise a right, or to report something Serenify did " +
-  "that you did not expect: Mohamed Asem, mohamedasem318@gmail.com. It reaches one person, " +
+  "that you did not expect: Mohamed Assem, mohamedasem318@gmail.com. It reaches one person, " +
   "who wrote this.";
 
 /**
@@ -679,7 +753,7 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
   {
     id: "who-is-responsible",
     heading: PRIVACY_CONTROLLER_HEADING,
-    blocks: [p(PRIVACY_CONTROLLER_P1), p(PRIVACY_CONTROLLER_P2)],
+    blocks: [p(PRIVACY_CONTROLLER_P1), p(PRIVACY_CONTROLLER_P2), p(PRIVACY_CONTROLLER_P3)],
   },
   {
     id: "what-serenify-handles",
@@ -705,12 +779,17 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
   {
     id: "your-conversations",
     heading: PRIVACY_CHAT_HEADING,
-    blocks: [p(PRIVACY_CHAT_P1), p(PRIVACY_CHAT_P2), p(PRIVACY_CHAT_P3)],
+    blocks: [
+      p(PRIVACY_CHAT_P1),
+      p(PRIVACY_CHAT_P2),
+      p(PRIVACY_CHAT_P3),
+      p(PRIVACY_CHAT_P4),
+    ],
   },
   {
     id: "crisis",
     heading: PRIVACY_CRISIS_HEADING,
-    blocks: [p(PRIVACY_CRISIS_P1), p(PRIVACY_CRISIS_P2)],
+    blocks: [p(PRIVACY_CRISIS_P1), p(PRIVACY_CRISIS_P2), p(PRIVACY_CRISIS_P3)],
   },
   {
     id: "weekly-work-environment-check-in",
@@ -797,9 +876,20 @@ export const TERMS_SECTIONS: readonly LegalSection[] = [
     blocks: [p(TERMS_NOT_MEDICAL_P1), p(TERMS_NOT_MEDICAL_P2), p(TERMS_NOT_MEDICAL_P3)],
   },
   {
-    id: "who-provides-serenify",
+    id: "who-is-legally-responsible",
     heading: TERMS_PROVIDER_HEADING,
     blocks: [p(TERMS_PROVIDER_P1), p(TERMS_PROVIDER_P2)],
+  },
+  {
+    id: "who-built-serenify",
+    heading: TERMS_AUTHORS_HEADING,
+    blocks: [
+      p(TERMS_AUTHORS_P1),
+      list(TERMS_AUTHORS_ITEMS),
+      p(TERMS_AUTHORS_P2),
+      p(TERMS_AUTHORS_P3),
+      p(TERMS_AUTHORS_P4),
+    ],
   },
   {
     id: "who-may-use-serenify",
