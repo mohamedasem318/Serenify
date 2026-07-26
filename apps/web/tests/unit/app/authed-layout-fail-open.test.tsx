@@ -238,6 +238,41 @@ describe("a gate that THROWS also fails open, under its own reason", () => {
     vi.doUnmock("@/lib/consent/registry");
     vi.resetModules();
   });
+
+  it("fails open when the SECOND evaluator call throws, after blocked is already decided", async () => {
+    // The regression this pins: `currentRevision` used to be resolved in the blocked
+    // branch, OUTSIDE the try, on the argument that reaching it proved `satisfiesConsent`
+    // had returned and so the shared non-empty-registry guard had already held. That was
+    // true, but it made the gate's crash-safety depend on a non-local invariant two
+    // functions away — and a throw there is a crash in every authed route, which is the
+    // one thing this gate must be structurally incapable of. Both calls now sit inside
+    // the try, and `reconsentVersionId` stays null, which IS the fail-open answer.
+    vi.resetModules();
+    vi.doMock("@/lib/consent/evaluate", () => ({
+      satisfiesConsent: () => false, // decided: this user is blocked
+      currentRevision: () => {
+        throw new Error("registry resolved a blocked user but could not name the revision");
+      },
+      bindingRevision: () => {
+        throw new Error("not reached");
+      },
+    }));
+
+    const { default: LayoutWithThrowingRevision } = await import("@/app/(authed)/layout");
+    gate.createClient.mockResolvedValue(supabaseFailing("ok-empty"));
+
+    render(await LayoutWithThrowingRevision({ children: <div data-testid="route-child" /> }));
+
+    expect(screen.getByTestId("app-header")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /have been revised/i })).not.toBeInTheDocument();
+
+    const payload = failOpenCalls()[0]?.[1] as { userId?: string; reason?: string };
+    expect(payload?.reason).toBe("gate-threw");
+    expect(payload?.userId).toBe(USER_ID);
+
+    vi.doUnmock("@/lib/consent/evaluate");
+    vi.resetModules();
+  });
 });
 
 describe("the happy path is SILENT, so the signal means something", () => {
