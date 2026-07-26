@@ -95,12 +95,21 @@ export default async function AuthedLayout({
   // disabled and the read still ran and failed, `[consent-gate] FAIL-OPEN` would fire for
   // a gate nobody is running — and that line's whole value is that a steady stream of it
   // means a real outage. A disabled gate has to be silent, or the signal is worthless.
-  let blocked = false;
+  //
+  // ONE VARIABLE, NOT A BOOLEAN PLUS AN ID. `reconsentVersionId` is non-null if and only
+  // if the user is blocked, and it holds the exact revision the screen will show. A
+  // separate `blocked` flag could disagree with the id beside it; this cannot. It also
+  // means a throw ANYWHERE below leaves it null — and null is the fail-open answer — so
+  // both evaluator calls sit inside the try rather than one of them depending on a
+  // non-local invariant to be unable to throw.
+  let reconsentVersionId: string | null = null;
   if (serverEnv.consentEntryGateEnabled) {
     try {
       const consent = await readHeldConsentVersions(supabase, "terms_privacy");
       if (consent.status === "ok") {
-        blocked = !satisfiesConsent("terms_privacy", consent.heldVersionIds);
+        if (!satisfiesConsent("terms_privacy", consent.heldVersionIds)) {
+          reconsentVersionId = currentRevision("terms_privacy").versionId;
+        }
       } else {
         // `unreadable` is the one shape the read returns for all three failure modes: a
         // Postgrest error, a null `data` with no error, and a client that threw. Note
@@ -117,12 +126,10 @@ export default async function AuthedLayout({
     }
   }
 
-  if (blocked) {
-    // `currentRevision` cannot throw here: reaching this line required `satisfiesConsent`
-    // to have returned, and both resolve through the same non-empty-registry guard.
+  if (reconsentVersionId) {
     return (
       <div className="flex min-h-dvh flex-col bg-bg">
-        <TermsReconsentScreen versionId={currentRevision("terms_privacy").versionId} />
+        <TermsReconsentScreen versionId={reconsentVersionId} />
       </div>
     );
   }
