@@ -28,6 +28,27 @@ export const clientEnvSchema = z.object({
 
 export const serverEnvSchema = clientEnvSchema.extend({
   siteUrl: z.url().default("http://localhost:3000"),
+  /**
+   * Feature 013 (T064) — the app-shell Terms/Privacy gate's kill switch (§7.3 lever 2).
+   *
+   * DEFAULTS TO ENABLED. An absent variable means the gate is ON. A kill switch that
+   * fails to the disabled state is not a safety lever, it is a silent outage: the gate
+   * would be off on every environment that forgot to set it, and nothing would say so.
+   *
+   * NOT `z.coerce.boolean()`, deliberately. That helper applies JavaScript truthiness, so
+   * the string `"false"` — the exact value a person types to switch the gate off — coerces
+   * to `true` and the lever does the opposite of what it says. An explicit two-member enum
+   * cannot make that mistake: the only accepted values are `"true"` and `"false"`, and
+   * anything else fails the parse and throws at boot rather than being guessed at.
+   * Case-sensitive on purpose — `"False"` is a typo, and a typo in a safety lever should
+   * be loud at deploy time rather than silently resolved to one of the two positions.
+   *
+   * ABSENT FROM `clientEnvSchema` above, so it never reaches the browser bundle.
+   */
+  consentEntryGateEnabled: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((value) => value === "true"),
 });
 
 export type ClientEnv = z.infer<typeof clientEnvSchema>;
