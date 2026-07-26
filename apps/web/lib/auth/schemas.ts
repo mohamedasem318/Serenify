@@ -1,4 +1,5 @@
 import { z } from "@/lib/zod";
+import { TERMS_ACK_REQUIRED_MESSAGE } from "@/lib/consent/copy";
 
 // Friendly error copy for the password strength rules. Zod's regex
 // default messages leak the regex source ("Invalid string: must match
@@ -46,6 +47,18 @@ export const signUpSchema = z.object({
     .regex(/[A-Za-z]/, passwordLetterMessage)
     .regex(/[0-9]/, passwordNumberMessage),
   full_name: fullNameSchema,
+  // FR-033 — an ACTIVE choice. A z.literal("on") is the shape a checked HTML checkbox
+  // actually submits, and it is the shape that cannot be satisfied by a default: an
+  // unchecked box submits nothing at all, so the key is absent and parsing fails. A
+  // z.boolean() with .default(false), or an .optional(), would each let a submission
+  // with no acknowledgement through as a well-formed "false" — which is exactly the
+  // pre-checked-by-omission failure FR-033 forbids (contracts/consent-gates.md §7.1).
+  accept_terms: z.literal("on", { message: TERMS_ACK_REQUIRED_MESSAGE }),
+  // The version the page RENDERED. Compared server-side against the registry and never
+  // trusted as the value to store — the action passes its OWN resolved id into
+  // options.data (§7.1 step 3). This field exists to detect a stale page, not to supply
+  // a value.
+  terms_privacy_version: z.string().min(1),
 });
 export type SignUpInput = z.infer<typeof signUpSchema>;
 
