@@ -213,8 +213,21 @@ describe("what is published", () => {
     expect(CONSENT_REGISTRY.terms_privacy.length).toBeGreaterThan(0);
   });
 
-  it("camera_inference is still unpublished — its first entry lands in P4", () => {
-    // Delete this assertion in P4, when the camera-and-inference wording ships with it.
-    expect(CONSENT_REGISTRY.camera_inference).toHaveLength(0);
+  it("camera_inference is published — its wording shipped in the same PR (T040)", () => {
+    // Replaces P2's "still unpublished" assertion, which T040 retired by appending the
+    // first entry. Same publishing rule as terms_privacy: a published entry here means
+    // lib/consent/copy.ts holds the text the entry describes (research.md §6.1).
+    expect(CONSENT_REGISTRY.camera_inference.length).toBeGreaterThan(0);
+  });
+
+  it("both keys are published, so the evaluator's empty-list throw is unreachable", () => {
+    // evaluate.ts throws rather than returning undefined for a key with no revision. That
+    // guard exists for a gate shipped ahead of its wording; from P4 on, neither key can
+    // reach it. Asserted here so removing a key's last entry fails loudly and by name.
+    for (const key of KEYS) {
+      expect(CONSENT_REGISTRY[key].length, `${key} must have a published revision`).toBeGreaterThan(
+        0,
+      );
+    }
   });
 });
