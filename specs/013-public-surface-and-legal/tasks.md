@@ -2,16 +2,17 @@
 
 **Branch**: `013-public-surface-and-legal` | **Date**: 2026-07-25 | **Plan**: [plan.md](./plan.md) | **Spec**: [spec.md](./spec.md)
 
-> ## This file covers **P1, P2, and P3 only**
+> ## This file covers **P1 through P8** — the whole feature
 >
-> Phases **P4–P8** are deliberately **not** generated here. They build on components that
-> P3 has not created yet (the legal documents the signup gate must link to, the public
-> shell the landing page renders inside, the `(public)` group the root route moves into),
-> so writing their tasks now would be guesswork that a later run would regenerate anyway.
+> **P1, P2 and P3 are built and merged** into `013-public-surface-and-legal` (PRs **#168**,
+> **#169**, **#170**). Their tasks — **T001–T037** — are kept verbatim, checkboxes and all,
+> as the record of what shipped. Do not re-open them.
 >
-> **P4–P8 follow in a later `/speckit-tasks` run**, after P3 has landed and the real
-> component names, props, and file shapes exist to point at. Their scope is already fixed
-> in `plan.md` §14 and is not re-opened by this file.
+> **P4–P8 (T038–T149) were deliberately deferred to this second run**, so their tasks could
+> name the modules, exports and props P1–P3 actually created rather than guessing at them.
+> Every path below was verified on disk on **2026-07-26**; where a task creates something
+> new it says so explicitly. Their scope is fixed in `plan.md` §14 and is **not** re-opened
+> by this file.
 
 **Input**: `plan.md` (spine — §0 findings, §4.1 section map, §10.3 approved copy, §13 smoke
 tests, §14 phasing, §15 risks), `research.md`, `data-model.md`, `contracts/wordmark.md`,
@@ -44,6 +45,16 @@ genuinely needs a browser. Nothing in P1–P3 needs one.
 > | **P1** | Wordmark | US1 (partly) | FR-029, FR-030, FR-031 |
 > | **P2** | Consent foundation | US2 (foundation only — no UI) | FR-035, FR-039, FR-041, FR-043a–e |
 > | **P3** | Legal + public shell | US3, and US1's shell | FR-016, FR-018, FR-019, FR-023, FR-044–FR-050 |
+> | **P4** | The two prompting gates | **US2** (the asking half) | FR-033–FR-038, FR-040, FR-042, FR-043a–c, FR-043e · SC-006, SC-007, SC-013 |
+> | **P5** | App-shell entry gate | **US2** (the re-asking half) | FR-043a, FR-043b, FR-043d · SC-012 |
+> | **P6** | Landing page | **US1** | FR-003, FR-005–FR-017, FR-020–FR-022, FR-051–FR-057 · SC-001–SC-005, SC-008–SC-011 |
+> | **P7** | Team section | **US4** | FR-024–FR-028 · SC-008, SC-009 |
+> | **P8** | Wrap — smoke tests, closures, docs, deploy, merge | all four | FR-056 (Principle VII gate 5) · every SC confirmed by a human pass |
+>
+> **US1** = *a visitor understands the product and its boundaries* (Priority P1) · **US2** =
+> *a person consents before anything happens, and again when the terms change* (Priority P1) ·
+> **US3** = *a person can read what actually happens to their data* (Priority P2) · **US4** =
+> *a visitor meets the team* (Priority P3).
 
 ---
 
@@ -342,6 +353,512 @@ footer, are reachable from the footer, and are correct at 320/375/414/768 px in 
 
 ---
 
+## Process — additions binding on P4 through P8
+
+Everything in **Process** and **Constraints that bite at task level** above still applies
+unchanged. These are the additions that come into force from P4 onward.
+
+**Branching.** One branch per phase, cut from `013-public-surface-and-legal`:
+
+| Phase | Branch | PR target |
+|---|---|---|
+| P4 | `p4-consent-gates` | `013-public-surface-and-legal` |
+| P5 | `p5-app-shell-gate` | `013-public-surface-and-legal` |
+| P6 | `p6-landing-page` | `013-public-surface-and-legal` |
+| P7 | `p7-team-section` | `013-public-surface-and-legal` |
+| P8 | `p8-wrap` | `013-public-surface-and-legal`, **then merge to `main`** |
+
+The `[0-9][0-9][0-9]-*` prohibition is unchanged: a branch named `013-p4-…` fires the `push`
+run **and** the `pull_request` run and doubles every check (#164). **Never target `main` before
+P8.** The feature branch merges to `main` exactly once, in T149.
+
+**New from P4: a code-review agent runs at the end of every phase.** It reviews against **that
+phase's own task acceptance criteria and constitution v1.13.0** — not generic code style. Its
+findings go in the PR body. It is its own task, and it runs **before** the "open the PR" task,
+so what it finds is fixed rather than filed.
+
+**New from P4: literal diffs before commits.** Every ship task requires the implementer to show
+the **actual diff** of every file it committed — `git diff --staged` output, not a prose summary
+of what it believes it did.
+
+**New from P4: design skills are a hard first step on every phase that renders anything** — P4,
+P5, P6 and P7. Recorded on T038, T063, T079 and T115, each of which carries the same
+stop-and-report finding: **the `design:*` plugin namespace does not exist on this machine.**
+
+### ⚠ Recorded at generation time — the `design:*` plugins are NOT installed
+
+Verified 2026-07-26 against `C:\Users\moham\.claude\plugins\cache\`. The installed plugin
+marketplaces are `anthropic-cybersecurity-skills`, `claude-plugins-official`
+(`code-review`, `feature-dev`, `frontend-design`, `playwright`, `supabase`, `superpowers`)
+and `ui-ux-pro-max-skill`. **No plugin publishes a `design:*` skill namespace.** What exists
+and is invocable: `hallmark`, `frontend-design:frontend-design`,
+`ui-ux-pro-max:ui-ux-pro-max`, `design-motion-principles`, `responsive-design`, `dataviz`,
+`aidesigner-frontend`.
+
+Per the standing rule, the design tasks below **stop and report** rather than silently
+substituting a different skill for the absent `design:*` plugins.
+
+**A second, unresolved conflict on the same tasks.** The machine's global `CLAUDE.md`
+instructs: *"Do NOT stack `frontend-design:frontend-design` or `responsive-design` on top of
+Hallmark — Hallmark encodes the same source material and enforces stricter responsive gates;
+running them together loads contradictory token and theme systems."* The standing rule for this
+feature requires **hallmark and frontend-design both**. These cannot both be honoured.
+**Mohamed's call, and it is not made here** — each design task names the conflict and stops.
+
+---
+
+## Phase 4: P4 — The two prompting gates (branch `p4-consent-gates`)
+
+**Depends on**: **P2** (the registry and the evaluator) and **P3** (the real `/terms` and
+`/privacy` the acknowledgement links to — **FR-036**: the checkbox never exists in a build
+where the documents do not).
+
+**Goal**: the two gates that *ask*. A server-side signup acknowledgement that covers the JS and
+the no-JS path through one function, and a camera-and-inference gate at **all three** capture
+routes that is presented before `getUserMedia` is ever reached. Declining writes nothing.
+
+**Independent test**: with the box unchecked, signup is refused with a reason and **no account
+exists**; with it checked, exactly one `terms_privacy` row is written. On a browser that has
+never granted camera permission, `/onboarding`, `/app/calibrate` and `/app/monitor` each show
+the consent surface and the browser's permission prompt does **not** fire. Declining leaves the
+weekly work-environment check-in fully usable.
+
+**Reads**: `contracts/consent-gates.md` §7.1 (signup), §7.2 (camera — **fails CLOSED**), §7.4,
+§7.5 · `research.md` §6.1 (the publishing rule), §6.4 (the route back), §6.6 (the signup seam),
+§12.2 · `plan.md` §0.5 (why `/onboarding` is in the list), §13 (ST-9, ST-11, ST-12) ·
+`contracts/consent-evaluate.md`.
+
+> **⚠ Recorded at generation time — the route back is pinned, but not where the request
+> expected.** `contracts/consent-gates.md` **§7.2 does not name a surface** for reaching a
+> declined camera gate again. `research.md` **§6.4** does, exactly and by file: *"the existing
+> **Account → Baseline** section (`components/anchor/baseline-section.tsx`) gains one line when
+> consent is absent, naming the camera-and-inference consent and offering the control that
+> opens it."* Verified on disk: `apps/web/components/anchor/baseline-section.tsx` exists and is
+> rendered by `apps/web/app/(authed)/app/account/page.tsx:63` with a `hasAnchor` prop resolved
+> from `has_anchor` at `:42`. **Nothing was invented**; T052 cites §6.4 as its source.
+
+### Precondition
+
+- [ ] T038 [P4] Invoke the design skills before writing any UI in this phase — the acknowledgement field and the camera consent gate both render. **Done when**: `hallmark` has been invoked and its output applied to the two new surfaces (`components/consent/terms-acknowledgement-field.tsx`, `components/consent/camera-consent-gate.tsx`); **and** the two conflicts recorded in "Process — additions" above have been put to Mohamed rather than resolved by the implementer — (a) the `design:*` plugin namespace **does not exist on this machine** (only `hallmark`, `frontend-design:frontend-design`, `ui-ux-pro-max:ui-ux-pro-max`, `design-motion-principles`, `responsive-design`, `dataviz`, `aidesigner-frontend` are installed), so **stop and report** rather than substituting a different skill, and (b) the global `CLAUDE.md` forbids stacking `frontend-design` on top of `hallmark`, which contradicts this feature's standing rule that both run. **Name in the P4 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+
+### The camera-and-inference wording, and its registry entry
+
+- [ ] T039 [P4] Create the camera-and-inference consent wording at `apps/web/lib/consent/copy.ts` as **named exported constants** — the module `research.md` §6.3 names as the home of this text ("The wording itself lives in `lib/legal/copy.ts` and `lib/consent/copy.ts` in git"). **Done when**: it exports every string the camera gate renders as a named constant with **no string literal in the gate component**; the text says plainly what FR-001 verifies as true and what `lib/legal/copy.ts` already says — video **is transmitted** for inference, **is deleted on every outcome including errors**, is **never persisted**, and **no human, including an admin, can view or replay it**; it names what declining costs (**calibration**, baseline capture, and **monitoring sessions** become unavailable) and what it does not cost (the **weekly work-environment check-in** stays available — FR-043c); it makes no claim about manager visibility at all; it contains **zero** numeric quality metrics (FR-004); and the voice matches Principle V (calm, no exclamation marks, never alarmist). **Terminology is binding** — never bare "check-in". Dependencies: T038.
+
+- [ ] T040 [P4] Append the first `camera_inference` revision to `apps/web/lib/consent/registry.ts` **in this same PR as the wording it describes** (`research.md` §6.1 — the publishing rule; the same rule T023 followed for `terms_privacy`). **Done when**: `CONSENT_REGISTRY.camera_inference` — today `[]` at `registry.ts:57` with the comment "First entry: P4, with the camera-and-inference consent wording" — holds exactly one entry with `materiality: "material"` (the first ask is always material), a non-empty `rationale` naming it as the initial publication and pointing at `lib/consent/copy.ts`, `publishedOn` set to the date this PR lands, and a `versionId` of the form `camera_inference@<publishedOn>.1` (the shape both DB CHECKs at `supabase/migrations/20260726000000_user_consents.sql:28–29` independently constrain); **T014's frozen append-only snapshot fixture is extended to include it**, which is what locks it against ever being edited; and `npm run -w apps/web test registry-guards` is green with all four guards passing. `currentRevision("camera_inference")` and `bindingRevision("camera_inference")` must both return it, and `evaluate.ts:32–41`'s empty-list throw must no longer be reachable for this key. Dependencies: T039.
+
+### The signup acknowledgement — server-side (§7.1)
+
+- [ ] T041 [P4] Extend `signUpSchema` in `apps/web/lib/auth/schemas.ts:41–49` with the two acknowledgement fields, exactly the shape single-sourced in `contracts/consent-gates.md` §7.1. **Done when**: `signUpSchema` gains `accept_terms` (a literal `"on"` with the field-scoped message §7.1 fixes) and `terms_privacy_version` (a non-empty string — **the version the page rendered**, compared server-side and never trusted as the value to store); `email`, `password` and `full_name` are otherwise untouched; `SignUpInput` still infers correctly; `tsc --noEmit` is green. **FR-033 — an active choice**: the field must be impossible to satisfy by a default value, so a `z.boolean()` with a default or an `.optional()` is a FAIL. Dependencies: T037.
+
+- [ ] T042 [P4] Gate `signUp()` in `apps/web/app/(auth)/signup/actions.ts:19–33` at the `signUpSchema.safeParse` step, **before** `supabase.auth.signUp` is reached (`actions.ts:38`). **Done when**: the `safeParse` call — which today passes only `email`, `password`, `full_name` at `:21–23` — additionally passes `formData.get("accept_terms")` and `formData.get("terms_privacy_version")`; an unchecked box returns `{ status: "validation", field: "accept_terms", message: … }` through the existing branch at `:26–33` so **no account is created and the visitor is told why** (Acceptance Scenario 1); a submitted `terms_privacy_version` that does not equal `currentRevision("terms_privacy").versionId` returns a new `{ status: "stale_terms" }` member of `SignUpResult` (`actions.ts:8–12`) rather than recording a mismatch — **it refuses rather than mis-records**; and the `options.data` object at `:42` carries `terms_privacy_version` resolved from **the registry on the server**, never the form's value, alongside the existing `full_name`. The metadata key must be exactly `terms_privacy_version` — `supabase/migrations/20260726000000_user_consents.sql:108–110` reads `NEW.raw_user_meta_data->>'terms_privacy_version'` and a different key writes no consent row at all. Dependencies: T040, T041.
+
+- [ ] T043 [P4] Confirm and assert that the **JavaScript-disabled path is gated by the same code**, in `apps/web/app/(auth)/signup/actions.ts:76–82`. **Done when**: `signUpFromForm` still delegates to `signUp(formData)` at `:78` with **no second validation path added**, so one gate covers both entry points — which is precisely why a client-side checkbox is not a gate and this is (§7.1); the no-JS failure path is verified by hand with JS disabled in the browser (unchecked → no account, and the page re-renders); and the P4 PR body records that walk. **Do not add a parallel schema call, a client-only guard, or an early return inside `signUpFromForm`** — a second path is a second thing to get wrong. Dependencies: T042.
+
+- [ ] T044 [P4] Create the acknowledgement field at `apps/web/components/consent/terms-acknowledgement-field.tsx` (**new file, new directory**). **Done when**: it renders an unchecked-by-default `<input type="checkbox" name="accept_terms">` — **never pre-checked, never inferred** (FR-033) — with a real `<label>` association and a ≥44 px tap target that does not wrap at 320 px (FR-053); it renders links to the **real** `/terms` and `/privacy` P3 shipped, each `target="_blank" rel="noopener noreferrer"` with an accessible name that says so — *"Read the Privacy Policy (opens in a new tab)"* (§7.1, FR-034); it renders a hidden `<input type="hidden" name="terms_privacy_version">` carrying the value the page rendered; it takes the version id as a prop rather than importing the registry itself; it has a visible focus indicator (FR-055); and it uses **no** `localStorage`/`sessionStorage` (FR-051). Dependencies: T038, T040.
+
+- [ ] T045 [P4] Wire the field into `apps/web/app/(auth)/signup/signup-form.tsx`. **Done when**: `<TermsAcknowledgementField>` renders inside the existing `<form>` (`signup-form.tsx:133–218`), above the submit button at `:201`; the `zodResolver(signUpSchema)` at `:42` resolves against the extended schema and the client-side error surfaces through the same `errors` object the other fields use; `onSubmit` at `:52–64` — which today hand-builds a `FormData` with three `form.set` calls at `:55–57` — also sets `accept_terms` and `terms_privacy_version`, **or the react-hook-form path silently submits without them and every JS user is rejected**; the current version id reaches the form as a prop from the `/signup` server component (resolved there via `currentRevision("terms_privacy")`), not imported into the client bundle by hand; a `{ status: "stale_terms" }` result re-renders the form with the **current** documents and an **unchecked** box; and **opening either document loses no entered data** — the form is never unmounted, so no state is preserved anywhere (which matters, because `sessionStorage` is forbidden by FR-051 and a URL round-trip would put a password in a query string). Dependencies: T044, T042.
+
+### The camera / inference gate — fails CLOSED (§7.2)
+
+- [ ] T046 [P4] Create the owner-scoped consent read at `apps/web/lib/consent/read.ts` (**new file**) — the server-side helper both gates call, which does not exist yet. **Done when**: it exports an async function returning the caller's held `document_version` values for one `ConsentTextKey`, selecting from `public.user_consents` under the caller's own session so RLS scopes it (`user_consents_select_self`); it takes the Supabase client as a parameter rather than creating one, so it is testable without a database; the caller composes it as `satisfiesConsent(key, heldVersionIds)` per §7.2; and — **the load-bearing part** — the **failure contract is explicit and CLOSED for the camera key**: `null`, an error, or an unreadable result is surfaced to the caller as an unsatisfied gate, never as satisfied. It must NOT hard-code a fail direction internally: **P5's shell gate fails OPEN on exactly the same read** (§7.3), so the direction belongs to each call site and this module returns a result the caller decides on. Encode that in the return type (a discriminated result, not a bare `string[]`), so a call site cannot conflate "no rows" with "read failed" by accident. Dependencies: T040.
+
+- [ ] T047 [P4] Create the consent-write server action at `apps/web/components/consent/actions.ts` (**new file**, `"use server"`) — colocated with the gate that calls it, because the gate renders at `/onboarding` (outside `(authed)`) as well as inside it, so `app/(authed)/actions.ts` cannot host it. **Done when**: granting inserts exactly one row into `public.user_consents` with `consent_key`, `document_version` **resolved from the registry on the server** (`currentRevision(key).versionId` — never a value taken from the request, §6.3 "Trust boundary"), and `user_id` left to the RLS `WITH CHECK` and the column default; the insert uses `ON CONFLICT DO NOTHING` so a duplicate under `user_consents_one_per_revision` (`…_user_consents.sql:37`) is a **no-op, not an error** — which is what makes fail-closed safe (§7.2); **declining calls this action not at all** and there is **no decline branch, no decline parameter, and no withdrawal path** — `decision` admits only `'granted'` and there is no revocation state to write (FR-042, FR-043e, §7.5); and the writer is injectable (or the module structured) so T055 can assert **zero** write calls on the decline path. Dependencies: T046.
+
+- [ ] T048 [P4] Create the camera consent gate at `apps/web/components/consent/camera-consent-gate.tsx` (**new file**). **Done when**: it renders the T039 wording with an explicit accept control and an explicit decline control, both keyboard-operable with a visible focus indicator and ≥44 px at 320 px; accepting calls the T047 action and then reveals the capturing child; **declining returns the user to `/app` and writes nothing at all** (§6.4); it renders **no** camera preview, requests **no** device permission, and imports nothing that calls `getUserMedia` — the capturing child must not be in the mounted tree at all, not merely hidden (FR-038, ST-11); it uses **no** `localStorage`/`sessionStorage`; and it carries **no** claim about manager visibility. Dependencies: T038, T039, T047.
+
+- [ ] T049 [P4] Gate `/onboarding` at `apps/web/app/(onboarding)/onboarding/page.tsx`, after the auth guard at `:15–17` and before `<OnboardingForm>` is returned at `:25`. **Done when**: an employee with no satisfying `camera_inference` record renders `<CameraConsentGate>` instead of `<OnboardingForm>`, so `onboarding-form.tsx`'s `"anchor"` step — which mounts `<AnchorRecorder>` at `:60` after `setStep("anchor")` at `:48` — is **never reached** without consent; the existing `defaultFullName` pre-fill at `:20–23` is preserved; and the page stays `force-dynamic` (`:8`). **This route is in the gate list for a reason** — `plan.md` §0.5: for a brand-new employee this, not `/app/calibrate`, is the moment of their first-ever calibration, and it is registered in `CAPTURE_ROUTES` (`next.config.ts:103`) and `isCaptureRoute` (`proxy.ts:71–74`) precisely because it calls `getUserMedia`. Gating only `/app/calibrate` would let every new employee's first capture run unconsented. Dependencies: T048, T046.
+
+- [ ] T050 [P4] Gate `/app/calibrate` at `apps/web/app/(authed)/app/calibrate/page.tsx`, **after** the role guard at `:39–44` and **after** `resolveCalibrateMode` at `:62–68`, before `<CalibrateRecorder>` at `:74`. **Done when**: a user with no satisfying `camera_inference` record renders `<CameraConsentGate>` in place of `<CalibrateRecorder>`; **`has_anchor` keeps driving mode reconciliation and the ST-17 redirect exactly as it does today at `:59–68`, unchanged** — no new "has this user ever calibrated" concept is invented and the gate asks one orthogonal question (§7.2); the `?mode=recalibrate` path is unaffected; and the surrounding centring wrapper at `:73` still lays out at 320 px. Dependencies: T048, T046.
+
+- [ ] T051 [P4] Gate `/app/monitor` at `apps/web/app/(authed)/app/monitor/page.tsx`, after the role guard at `:36–40`, before `<MonitoringSession />` at `:42`. **Done when**: a user with no satisfying `camera_inference` record renders `<CameraConsentGate>` instead of `<MonitoringSession>`, so no capture code and no `getUserMedia` call is mounted first (FR-038); the employees-only guard at `:38–40` still runs **first**, so a team lead or admin is still redirected to `/app` and never meets a consent surface for a capture they can never run. Dependencies: T048, T046.
+
+- [ ] T052 [P4] Add the deliberate, discoverable **route back to a declined camera gate** — `apps/web/components/anchor/baseline-section.tsx`, plus the state it needs from `apps/web/app/(authed)/app/account/page.tsx`. **Source: `research.md` §6.4**, which pins the surface by file; `contracts/consent-gates.md` §7.2 does not name one, and none was invented here. **Done when**: the account page resolves the user's `camera_inference` consent alongside the existing `has_anchor` RPC at `page.tsx:42` and passes it to `<BaselineSection>` at `:63`; when consent is **absent**, the section gains **one line** naming the camera-and-inference consent and offering the control that opens it — the shape §6.4 prescribes, in the calm voice the file's own header comment describes; when consent is present the section renders **exactly as it does today**, byte-for-byte in the rendered output; the control is a **full-document `<a href>`, never a `<Link>` or a router transition** — the same invariant `RECALIBRATE_HREF` already holds at `:40`/`:91`/`:117`, because a soft-nav into a capture route keeps the previous route's `camera=()` Permissions-Policy and the camera dies; and the existing `baseline-section.test.tsx` still passes or is extended in the same commit. Dependencies: T048.
+
+### Tests for P4
+
+- [ ] T053 [P] [P4] Signup gate unit tests at `apps/web/tests/unit/lib/auth/signup-consent-gate.test.ts`. **Done when**: it asserts over `signUpSchema` that a missing `accept_terms` fails, that `accept_terms: "off"`/`false`/absent all fail, that only the literal `"on"` passes, and that the failure carries the field-scoped message §7.1 fixes; that a missing or empty `terms_privacy_version` fails; and — the part that proves FR-033 structurally — that **no default value can satisfy the field**, so parsing an object with `accept_terms` simply omitted is a failure rather than a pass. Plus assertions over the action's rejection contract: an unchecked submission returns `{ status: "validation", field: "accept_terms" }` and reaches **no** `supabase.auth.signUp` call, and a stale version returns `{ status: "stale_terms" }` and likewise creates nothing. Dependencies: T042, T041.
+
+- [ ] T054 [P] [P4] Fail-CLOSED unit tests at `apps/web/tests/unit/lib/consent/fail-closed.test.ts`. **Done when**: for the **camera** key, a read that errors, a read that returns `null`, and a read that returns an unreadable result each produce **gate shown** (`blocked`), and only an explicit satisfying row produces gate hidden; the test states in a comment **why this direction** — capturing and inferring video with no recorded consent because a `SELECT` blipped is the exact harm the gate exists to prevent (§7.2) — and asserts the opposite default is **not** used for this key. Pairs with P5's T071, which asserts the inverse for the shell gate; **the asymmetry is deliberate and both directions are pinned so neither can drift.** Dependencies: T046.
+
+- [ ] T055 [P] [P4] Decline-writes-nothing tests at `apps/web/tests/unit/components/consent/decline-writes-nothing.test.tsx` — the server half of `research.md` §12.2. **Done when**: with an **injected fake writer**, the decline path is exercised and the writer records **zero** calls; the abandon path (unmount / navigate away without answering) never invokes the action at all, so zero is trivially provable; and it asserts there is **no** code path in `components/consent/actions.ts` that writes a withdrawal, a revocation, or a `decision` other than `'granted'` — none exists to write (FR-042, FR-043e, §7.5). The DB half is already asserted by T017. Dependencies: T047, T048.
+
+- [ ] T056 [P] [P4] Camera gate component tests at `apps/web/tests/unit/components/consent/camera-consent-gate.test.tsx`. **Done when**: rendering the gate mounts **no** element or module that calls `getUserMedia` — asserted by the capturing child's absence from the tree, not by a hidden attribute (FR-038, ST-11); both controls are reachable by keyboard alone and carry accessible names; accepting invokes the write action exactly once with a version id resolved from the registry and **never one supplied by the render**; declining navigates to `/app`; and the surface is presentable again on a later arrival, because the absence of a satisfying record **is** the state and every evaluating path is therefore a path back to the prompt (§6.4). Dependencies: T048.
+
+- [ ] T057 [P] [P4] Weekly work-environment check-in isolation test at `apps/web/tests/unit/components/consent/questionnaire-unaffected.test.tsx` — the component half of SC-013 (`research.md` §12.2; T016 is the static half). **Done when**: `/app`'s questionnaire path is rendered for a user with **no** `camera_inference` record and the weekly work-environment card renders and submits normally (FR-043c, ST-12); and the test names the concept in prose while quoting any existing `checkin`-containing filename as-is. **Declining blocks that scope and only that scope** — calibration, baseline capture and monitoring sessions become unavailable; nothing else changes. Dependencies: T048.
+
+- [ ] T058 [P] [P4] Extend `apps/web/tests/unit/landing/forbidden-claims.test.ts` to walk `apps/web/lib/consent/copy.ts`. **Done when**: `COPY_MODULES` at `:100–102` — today `[{ name: "lib/legal/copy.ts", module: legalCopy }]`, with the comment at `:99` reserving the slot for P6 — gains the consent copy module; every exported string in it produces **zero** matches for both forbidden families; the four negative fixtures at `:131–152` still fail the detector (they must stay CAUGHT, or the suite is passing vacuously); and the `ALL_STRINGS.length > 50` sanity guard at `:110` still holds. Dependencies: T039.
+
+- [ ] T059 [P] [P4] Widen the web-storage guard at `apps/web/tests/unit/lib/legal/no-web-storage.test.ts` to cover this phase's new directories. **Done when**: the asserted path list additionally covers `apps/web/components/consent/` and the new `apps/web/lib/consent/{copy,read}.ts`, with **zero** occurrences of `localStorage` or `sessionStorage` (FR-051); the pre-existing occurrences outside this feature (`app/layout.tsx:74` theme bootstrap, `components/anchor/device-memory.ts`, `lib/questionnaire/*`, `components/home/recent-chats-card.tsx`) stay out of scope and **MUST NOT** be touched. Dependencies: T048, T046, T039.
+
+### Ship P4
+
+- [ ] T060 [P4] Run a **code-review agent** over the P4 diff, reviewing against **this phase's own task acceptance criteria** (T038–T059) and **constitution v1.13.0** — not generic code style. **Done when**: the agent has specifically checked that the camera gate fails **CLOSED** and the signup gate is **server-side** on both the JS and no-JS path; that the version id written at signup is the server's resolved value and never the form's; that declining writes nothing anywhere; that the `camera_inference` registry entry landed in the same PR as its wording; that terminology is correct throughout (**calibration** / **monitoring session** / **weekly work-environment check-in**, never bare "check-in"); and that no `Claude-Session:` trailer or `claude.ai` URL appears anywhere. Its findings are pasted into the P4 PR body and **fixed before T062**, not filed. Dependencies: T053, T054, T055, T056, T057, T058, T059, T043, T045, T049, T050, T051, T052.
+
+- [ ] T061 [P4] Run the local phase verification. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green, with the output recorded in the P4 PR body (on Windows run Vitest with `--pool=threads` — `quickstart.md` Gotchas); `supabase db reset` still applies cleanly; and the manual walk from `quickstart.md` is done and recorded — unchecked box → refused with a reason and **no account**; documents open in a new tab losing no entered data; all three capture routes show the consent surface **before** the browser permission prompt; declining leaves the weekly work-environment check-in working. Dependencies: T060.
+
+- [ ] T062 [P4] Open the P4 PR from `p4-consent-gates` into `013-public-surface-and-legal`. **Done when**: the **actual diff of every committed file** is shown before committing — `git diff --staged`, not a prose summary; commits are **per-file, never `git add -A`**, each carrying all three co-author trailers; there is no `Claude-Session:` trailer and no `claude.ai` URL anywhere in the commits, the PR body, or any comment; the PR body names which design skills ran (T038) and records both design conflicts as **open questions for Mohamed**; it records the T060 findings, the T061 verification output, and the no-JS walk from T043; it states plainly that **declining writes nothing, deletes nothing, and is not withdrawal** (feature 018 owns withdrawal); and all three CI checks are green. Dependencies: T061.
+
+**Checkpoint**: both prompting gates are live and both fail in the direction that costs least when they fail. **P5 and P6 are unblocked and may run in parallel** — they share no file.
+
+---
+
+## Phase 5: P5 — App-shell entry gate (branch `p5-app-shell-gate`) — **ALONE IN ITS PR**
+
+**Depends on**: **P2** (registry + evaluator), **P3** (the documents a blocked user must still
+be able to read in full), **and P4** — for two modules P4 creates and this phase consumes:
+`apps/web/components/consent/actions.ts`, the consent-write server action **T047** creates and
+**T065** calls, and `apps/web/lib/consent/read.ts`, the owner-scoped consent read **T046**
+creates and **T066** calls. `plan.md` **§14.1** sequences it the same way and says why:
+**"P5 alone and after P4."**
+
+> ### Why this phase ships alone, and why that is not ceremony
+>
+> **This is the highest-blast-radius change in the feature (R2).** `app/(authed)/layout.tsx` is
+> the single shell every authenticated route renders through. A bug here does not degrade a
+> feature — it locks out **every user of the product**. Isolating it in its own PR is the entire
+> mechanism that makes `git revert <sha>` a clean, conflict-free one-command rollback that
+> unwinds **nothing else**: not the schema, not the signup gate, not the camera gate.
+>
+> **Nothing else ships in this PR.** Not a copy tweak, not a lint fix, not a drive-by rename.
+> If something else needs doing, it goes in another PR.
+
+**Goal**: a material Terms/Privacy revision re-prompts every user whose consent predates it, by
+**rendering a different tree** — never by redirecting. It **fails OPEN**, and it says so out
+loud when it does.
+
+**Independent test**: publish a material revision locally → sign in → blocked; both documents
+readable in full and **Sign out** works; accept → unblocked with the earlier row still present.
+Then flip `CONSENT_ENTRY_GATE_ENABLED=false`, and separately `git revert` the gate commit, and
+confirm the app is fully usable after each.
+
+**Reads**: `contracts/consent-gates.md` **§7.3** (the whole section — this phase is that
+section) · `plan.md` §15 **R2** · `plan.md` §13 **ST-10, ST-10a, ST-10b** ·
+`contracts/consent-evaluate.md`.
+
+### Precondition
+
+- [ ] T063 [P5] Invoke the design skills before writing the re-consent screen — it renders, and it is the only surface a locked-out user will ever see. **Done when**: `hallmark` has been invoked and applied to `components/consent/terms-reconsent-screen.tsx`; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`, contradicting this feature's standing rule. **Name in the P5 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+
+### The kill switch
+
+- [ ] T064 [P5] Add `CONSENT_ENTRY_GATE_ENABLED` as a server-only boolean, **defaulting to `true`** — `apps/web/lib/env/schema.ts`, `apps/web/lib/env/server.ts`, and `apps/web/.env.local.example`. **Done when**: `serverEnvSchema` at `schema.ts:29–31` (which today only extends `clientEnvSchema` with `siteUrl`) gains the flag with a default of enabled, so an **absent** variable means the gate is **on** — a kill switch that fails to the disabled state is not a safety lever, it is a silent outage; `loadServerEnv()` in `server.ts` passes `process.env.CONSENT_ENTRY_GATE_ENABLED` into the parse; the flag is **absent from `clientEnvSchema`**, so it never reaches the browser bundle; `.env.local.example` documents it under the existing "Test-only / infrastructure (defaults shown)" block **with no value committed** (Principle IX); and `tsc --noEmit` is green. Dependencies: T063.
+
+### The screen and the gate
+
+- [ ] T065 [P5] Create the re-consent screen at `apps/web/components/consent/terms-reconsent-screen.tsx` (**new file**). **Done when**: it states plainly that the Terms and Privacy Policy have been revised and that continuing requires acknowledging the current wording, in the Principle V voice (calm, no exclamation marks, never alarmist); it renders an accept control that calls the T047 write action with `currentRevision("terms_privacy").versionId` **resolved on the server**; **a blocked user can still read both documents in full** — links to `/terms` and `/privacy` opening in a **new tab** (`target="_blank" rel="noopener noreferrer"` with accessible names saying so), so the accept control is still there when they return (FR-043d); **a blocked user can still sign out** — it renders the existing `<SignOutButton>` from `@/components/sign-out-button`, whose `signOut` server action lives at `app/(authed)/actions.ts:6` and is invoked by POST, so it is not gated by a layout render; it lays out at **320 px** in both themes with every control keyboard-reachable and ≥44 px; and it uses **no** `localStorage`/`sessionStorage`. **There is no decline control** — declining is the absence of accepting, it writes nothing, and the next navigation presents the screen again (§6.4, §7.5). Dependencies: T063, T047.
+
+- [ ] T066 [P5] Add the gate to `apps/web/app/(authed)/layout.tsx` — **it renders a different tree; it never redirects.** **Done when**: after the existing `getUser()` at `:14–20` and the `profiles` read at `:22–26`, the layout performs **one** owner-scoped `user_consents` read via `lib/consent/read.ts` and, when `gateEnabled && blocked`, returns `<div className="flex min-h-dvh flex-col bg-bg"><TermsReconsentScreen … /></div>` **instead of** the normal `Header` + `main` + `ChatPill` shell at `:32–38` — the exact shape §7.3 fixes; there is **no** `redirect()` call added anywhere in the gate path, and **`proxy.ts` is not touched at all**; the existing `redirect("/login")` for an unauthenticated user at `:19` is unchanged; and `/terms` and `/privacy` are untouched by construction, because they live in the `(public)` group and this layout cannot run for them at all (FR-043d). **A redirect-based gate can loop, and a loop here is a total product lockout** — rendering in place cannot loop, and that is the point (§7.3 failure mode 1, `plan.md` §16). Dependencies: T065, T064, T046.
+
+- [ ] T067 [P5] Make the fail-OPEN branch **observable** — its own task, its own assertion, because it is the only thing that makes a silently-disabled gate visible. **Done when**: `null`, an error, or an unreadable consent result in `app/(authed)/layout.tsx` yields **not blocked** (the normal shell renders); and **before** returning that shell the branch emits, server-side, exactly `console.error("[consent-gate] FAIL-OPEN: terms_privacy gate disabled for this request", { userId: user.id, error })` — the string, the user id, and the underlying error, per §7.3. **This log line is not optional.** A *transient* read failure is what fail-open is for; a *persistent* one — an RLS policy wrong after a migration, a dropped grant, a renamed column — silently disables the Terms gate for **every user** with nothing on any surface to say so, and the app looks perfectly healthy while a legal gate is off. `console.error` matches the repo's existing server convention (`[signUp] supabase error:` at `app/(auth)/signup/actions.ts:55`) and surfaces in Vercel function logs. The line is deliberately loud and greppable: one occurrence is noise, a steady stream is an outage. **ST-10b induces the failure and confirms the log fires.** Dependencies: T066.
+
+### Tests for P5
+
+- [ ] T068 [P] [P5] Env kill-switch tests at `apps/web/tests/unit/lib/env/consent-entry-gate.test.ts`. **Done when**: an **absent** `CONSENT_ENTRY_GATE_ENABLED` parses to **enabled** (the gate defaults on — the assertion that matters most); `"false"` parses to disabled; a malformed value is rejected at boot rather than silently coerced; and the flag is asserted **absent** from `clientEnvSchema`, so it cannot leak into the browser bundle. Dependencies: T064.
+
+- [ ] T069 [P] [P5] Re-consent screen tests at `apps/web/tests/unit/components/consent/terms-reconsent-screen.test.tsx` — **FR-043d, asserted rather than trusted**. **Done when**: it asserts a link to `/terms` and a link to `/privacy` are both present, both `target="_blank"` with `rel` containing `noopener`, and both carry accessible names identifying the document **and** the new tab; that a sign-out control is present with an accessible name; that every interactive element is keyboard-reachable with a visible focus indicator; that **no decline control exists**; and that accepting invokes the write action exactly once with a registry-resolved version id. Dependencies: T065.
+
+- [ ] T070 [P] [P5] Shell-gate render tests at `apps/web/tests/unit/app/authed-layout-consent-gate.test.tsx`. **Done when**: against a **stubbed registry**, a user holding the binding `terms_privacy` version renders the normal shell (`Header` present); a user holding only an earlier version, or none, renders `<TermsReconsentScreen>` and **no** `Header` and **no** `ChatPill`; blocked/not-blocked matches `satisfiesConsent()` exactly in every case (`research.md` §12.2); and — structurally — **no `redirect()` is called on any gate path**, asserted by mocking `next/navigation`'s `redirect` and expecting zero calls for both the blocked and unblocked cases. That last assertion is the one that would catch a future "small refactor" reintroducing the lockout loop. Dependencies: T066.
+
+- [ ] T071 [P] [P5] Fail-OPEN tests at `apps/web/tests/unit/app/authed-layout-fail-open.test.tsx`. **Done when**: a consent read that **errors**, one that returns **null**, and one that is otherwise unreadable each render the **normal shell** (not blocked); **and each one emits the `[consent-gate] FAIL-OPEN` line**, asserted on the spied `console.error` including the `userId` and the underlying `error` in the payload; and the happy path emits **no** such line, so the signal means something. Also assert the deliberate asymmetry in a comment and a cross-reference: **this gate fails OPEN while the camera gate (T054) fails CLOSED**, because failing open on Terms costs a user briefly reaching the app before acknowledging, while failing open on camera consent costs a video captured and inferred with no recorded consent. Those are not comparable, so they get opposite defaults, and both are pinned so neither can drift (§7.3). Dependencies: T067.
+
+- [ ] T072 [P] [P5] Kill-switch behaviour test at `apps/web/tests/unit/app/authed-layout-kill-switch.test.tsx`. **Done when**: with `CONSENT_ENTRY_GATE_ENABLED` disabled, a user who **would** be blocked renders the **normal shell**, with the consent read either skipped or ignored; with it enabled (including by default/absence), the same user is blocked. **An untested kill switch is not a kill switch** — this is the unit-level counterpart to ST-10's manual exercise of the same lever. Dependencies: T066, T064.
+
+- [ ] T073 [P] [P5] Widen the web-storage guard at `apps/web/tests/unit/lib/legal/no-web-storage.test.ts` to cover `components/consent/terms-reconsent-screen.tsx` and the modified `app/(authed)/layout.tsx`. **Done when**: **zero** occurrences of `localStorage` or `sessionStorage` in this phase's added and modified files (FR-051); pre-existing occurrences elsewhere stay untouched. Dependencies: T066, T065.
+
+### Ship P5
+
+- [ ] T074 [P5] Verify and record **both revert levers**, so P8's ST-10 / ST-10a / ST-10b can be run against them. **Done when**: the gate is confirmed confined to **one file** (`app/(authed)/layout.tsx`) plus pure modules with no other caller, and `git revert <sha>` of the gate commit is confirmed clean and conflict-free on a scratch branch — **actually run, not reasoned about**; the flag lever is confirmed by starting the app with `CONSENT_ENTRY_GATE_ENABLED=false` and reaching a previously blocked authed route; and **both levers, with the exact commit SHA to revert and the exact env var name and value, are written into the P5 PR body** in a section a person under time pressure can act on without reading the diff. Record the honest caveat §7.3 states: a Vercel environment change requires a redeploy to take effect, so the flag lever is **fast, not instant**. Dependencies: T070, T071, T072.
+
+- [ ] T075 [P5] Run a **code-review agent** over the P5 diff, against **this phase's own task acceptance criteria** (T063–T074) and **constitution v1.13.0**. **Done when**: the agent has specifically checked that the gate **renders a different tree and never redirects**; that it **fails OPEN** and **logs `[consent-gate] FAIL-OPEN`** with the user id and the error on every fail-open path; that the kill switch **defaults to enabled**; that `proxy.ts` is untouched; that **nothing else ships in this PR** — the diff contains the gate, the screen, the env flag, and their tests, and nothing more; and that no `Claude-Session:` trailer or `claude.ai` URL appears anywhere. Findings go in the PR body and are **fixed before T077**. Dependencies: T074.
+
+- [ ] T076 [P5] Run the local phase verification. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green with the output recorded in the P5 PR body (Windows: Vitest with `--pool=threads`); and a manual local rehearsal of **ST-10** is done and recorded — append a second, **material** `terms_privacy` revision to a local-only working copy of the registry, sign in, confirm blocked, read both documents in full, sign out successfully, accept, confirm unblocked **with the earlier row still present** (the history is append-only — nothing is rolled forward or re-stamped, §7.4). Revert the local-only registry edit before committing. Dependencies: T075.
+
+- [ ] T077 [P5] Open the P5 PR from `p5-app-shell-gate` into `013-public-surface-and-legal`. **Done when**: the **actual diff of every committed file** is shown before committing; commits are per-file with all three co-author trailers; no `Claude-Session:` trailer and no `claude.ai` URL anywhere; the PR body names which design skills ran (T063) and records both design conflicts as open questions; it carries the **two revert levers** verbatim from T074 and the T076 ST-10 rehearsal; it states in its opening line that this PR contains the **highest-blast-radius change in the feature** and **ships alone by design (R2)**; and all three CI checks are green. Dependencies: T076.
+
+**Checkpoint**: a material revision re-prompts everyone whose consent predates it, the gate cannot loop, it fails open, and it says so when it does. Both levers are exercised and written down. **US2 is complete.**
+
+---
+
+## Phase 6: P6 — Landing page (branch `p6-landing-page`)
+
+**Depends on**: **P3** (the `(public)` group, the navbar, the footer, `PUBLIC_DESTINATIONS`).
+Independent of P4 and P5 — no shared file.
+
+**Goal**: `/` becomes the landing page without losing either behaviour it has today, and the
+hero story card tells the product's thesis in 17 beats without its outer box moving one pixel.
+
+**Independent test**: signed out, `/` renders the landing page inside the public shell; signed
+in, `/` still reaches `/app`; `/?code=…` still forwards to `/auth/callback?code=…`. The layout
+stability spec passes at **320 / 375 / 414 / 768 px** with zero outer-dimension drift across the
+full cycle and a narration line count of exactly **1** at 320 px for **every** beat.
+
+**Reads**: `contracts/landing-hero-story.md` §9.1 (the primary source) · `plan.md` §10.1 (the
+grep discipline), §10.2 (the three forbidden lines), **§10.3 (the approved copy — verbatim)** ·
+`research.md` §11 (routing), §12.2 (the proofs) · `plan.md` §15 R5, R6, R9, R11, R12 ·
+`plan.md` §13 ST-3, ST-4, ST-5, ST-6, ST-8.
+
+> **This phase is deliberately decomposed into 36 tasks rather than a handful of large ones.**
+> It is the largest and least predictable item in the feature and the one Order A discovers
+> last (`plan.md` §14.2). Coarse tasks here hide overrun until it is too late to cut scope.
+
+> ### The mock is gitignored — the grep discipline, on every task that reads it
+>
+> `docs/mockups/serenify-landing-mock.html` (present, 511 KB) is invisible to a default `rg`.
+> **Every** search of it must pass `--no-ignore` or scope to `*.html`:
+>
+> ```
+> rg --no-ignore "nothing reaches a manager|anonymised group trends|never a manager" docs/mockups/
+> ```
+>
+> **The mock's three forbidden lines (`:442`, `:550`, `:772`) must NEVER be transcribed.** The
+> approved replacements in `plan.md` **§10.3** go in instead, **character-for-character**, and
+> are not re-worded at implementation time. The closing beat's **clause order is load-bearing
+> and must not be reversed** — chat clause first, so the deletion frame does not bleed backwards
+> and imply the conversation was deleted too. It was not: companion chat is **stored**,
+> employee-private. Swapping the clauses would make the line false.
+>
+> The orb is feature **008**'s `apps/web/components/monitor/bloom.tsx`, not 007's. Ren's blue
+> (foggy) state is an **approved liberty (FR-022)** — **do not "correct" it** to the monitor's
+> band colouring.
+
+### Preconditions
+
+- [ ] T078 [P6] Invoke the design skills before writing any landing UI. **Done when**: `hallmark` has been invoked and applied across the hero, the story card, the "Never" cards, how-it-works and the status statement; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`, contradicting this feature's standing rule. Because this phase has real motion (the beat advance, the panel swap, the thread trim), **`design-motion-principles` is additionally in scope** if Mohamed's answer permits layering. **Name in the P6 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+
+- [ ] T079 [P6] Read the Next 16 guides for **route groups** and the **root `page.tsx`** under `node_modules/next/dist/docs/` before writing any route file in this phase (`apps/web/AGENTS.md`: *"This is NOT the Next.js you know"*; `plan.md` §2; R9). **Done when**: the exact guide paths consulted are named in the P6 PR body, and one specific question is answered **from the docs rather than inferred** — *what happens if both `app/page.tsx` and `app/(public)/page.tsx` exist, and is the fix a move or an addition?* T028's header comment in `app/(public)/layout.tsx:28–30` already records the P3 half of this answer ("P3 deliberately adds no `(public)/page.tsx`, which is the one file that WOULD collide with `app/page.tsx` over `/`"); confirm it against the current docs rather than trusting the comment. Do not infer route-group semantics from Next 14/15 habits. Dependencies: T037.
+
+### Shared definitions extracted first (R5, R6) — small, reviewable, zero behaviour change
+
+- [ ] T080 [P] [P6] Create the one band-label definition at `apps/web/lib/bands.ts` (**new file**, FR-015). **Done when**: it exports `BAND_LABEL` exactly as `contracts/landing-hero-story.md` §9.1 fixes it — `tense: "Tense"`, `a_little_tense: "A little tense"`, `at_ease: "At ease"` — typed over the existing `Band` union; it imports nothing from `server-only` so Vitest loads it directly; and `tsc --noEmit` is green. This becomes the **one** definition; the landing readout and the monitor's trend axis both import it, which is precisely "sourced from the app's existing band definitions rather than restated as new literals". Dependencies: T079.
+
+- [ ] T081 [P6] Refactor `apps/web/lib/session-trend-geometry.ts` to import `BAND_LABEL` instead of inlining the three literals. **Done when**: the three string literals at `:324–326` inside `axisFor()` — `"Tense"`, `"A little tense"`, `"At ease"` — are replaced by reads from `BAND_LABEL`; **this is a pure literal extraction with ZERO behaviour change** and the existing `session-trend-geometry` unit suite passes **unmodified** — if any existing assertion needs editing, the refactor is wrong and must be reconsidered rather than the test relaxed (R5); the narrow-width axis-sizing comment at `:86`, which reasons about `"A little tense"` fitting in the 84 px min gutter, still describes the shipped behaviour; and nothing else in the file moves. **This is the live monitor's graph** — it lands here, in P6, where it is reviewable in isolation. Dependencies: T080.
+
+- [ ] T082 [P6] Add **one optional** `color?: string` prop to `apps/web/components/monitor/bloom.tsx` (R6, FR-021, FR-022). **Done when**: the signature at `:42` becomes `{ tone, className, color }` and the inline style at `:47` uses `color ?? TONE_COLOR[tone]` for the `--bloom` custom property; **every existing call site is unchanged** and continues to omit the prop; the default reproduces today's behaviour **byte-identically** for all four tones; and the existing `tests/unit/components/monitor/bloom.test.tsx` passes **unmodified**. This prop is needed because Bloom sets `--bloom` as an **inline style on its own element**, which an ancestor cannot override — FR-021 forbids reimplementing the orb and a landing-only copy would violate it outright (`plan.md` §16). Nothing else in the component changes: not the reduced-motion branch at `:71–91`, not `TONE_COLOR`, not the `aria-hidden`, not the `color-mix` derivations. Dependencies: T079.
+
+- [ ] T083 [P] [P6] Extend `apps/web/tests/unit/components/monitor/bloom.test.tsx` with the default-preservation proof (R6). **Done when**: for **every** `BloomTone` (`ease`, `warming`, `little`, `tense`), rendering **without** `color` yields exactly the `--bloom` value the component produces today, asserted against the `TONE_COLOR` values rather than a hand-copied string; and rendering **with** `color` yields that value instead. The point of the first half is that a future edit to the defaulting cannot silently change the live monitor. Dependencies: T082.
+
+### The root-route takeover (`research.md` §11) — the two existing behaviours must survive
+
+- [ ] T084 [P] [P6] Create the pure routing decision at `apps/web/lib/routing/resolve-root-route.ts` (**new file**) — the same technique `resolveCalibrateMode` uses to make a Server Component's load-bearing decision directly testable (`research.md` §11 "Proof"). **Done when**: it exports `resolveRootRoute({ code, isSignedIn })` returning `{ kind: "callback" | "app" | "landing" }`; the precedence is exactly the order §11 fixes — **`?code=` first**, signed-in second, landing last; it imports nothing from `server-only` and touches no Supabase client; and `tsc --noEmit` is green. **`?code=` must be first**: a signed-in user in another tab clicking a recovery link would otherwise be redirected to `/app` and the code lost. Dependencies: T079.
+
+- [ ] T085 [P] [P6] Unit table for `resolveRootRoute` at `apps/web/tests/unit/lib/routing/resolve-root-route.test.ts`. **Done when**: `{ code: "abc" } → callback` **including when signed in** (the precedence case that matters); `{ isSignedIn: true } → app`; `{} → landing`; an empty-string `code` is treated as absent (matching today's `code.length > 0` check at `app/page.tsx:21`); and an array-valued `code` (Next's `searchParams` can yield `string[]`) does not produce a `callback`. Dependencies: T084.
+
+- [ ] T086 [P6] Perform the root-route takeover: create `apps/web/app/(public)/page.tsx` and **delete `apps/web/app/page.tsx` in the same commit**. **Done when**: only one page resolves to `/` — this is a **move, not an addition**, and both files existing simultaneously is a build-breaking route conflict (§11 "Route-group mechanics"); the new page keeps `export const dynamic = "force-dynamic"` (today at `app/page.tsx:7`; the cost is known and accepted — R11); it drives its terminal branch off `resolveRootRoute`, so the `?code=` forward (today `app/page.tsx:20–23`) and the signed-in redirect to `/app` (today `:25–29`) are preserved **line for line in behaviour**, with only the third branch changing from `redirect("/login")` to rendering the landing page; the landing page therefore renders inside the P3 public shell (`app/(public)/layout.tsx`) with its navbar and footer; and the proxy's onboarding gate still bounces an un-onboarded signed-in user onward exactly as today. **`proxy.ts` is not touched** — §11 rejects moving this into the proxy: its `redirectTo` helper clears `url.search`, which would eat the `?code=`, and it is the highest-blast-radius file in the repo. Dependencies: T084, T079.
+
+- [ ] T087 [P] [P6] Append the two narrow root-route checks to the **existing** auth Playwright specs under `apps/web/tests/e2e/` (`research.md` §12.2 — deliberately two checks appended, not a new suite). **Done when**: a signed-in employee visiting `/` lands on `/app`; `/?code=test` redirects to `/auth/callback?code=test`; both run under the existing `playwright.config.ts` (which has the `globalSetup` these need), **not** under `playwright.layout.config.ts` (which has no database by design). The **real** email-link case is ST-8 and is a human check, not this. Dependencies: T086.
+
+### Landing copy — one reviewable surface, transcribed once
+
+- [ ] T088 [P6] Do the mock transcription pass for the landing sections, applying the `--no-ignore` grep discipline. **Done when**: the source lines for the hero, the "Never" cards, how-it-works, and the status statement have been located in `docs/mockups/serenify-landing-mock.html` with a search that **actually saw the file** (`rg --no-ignore … docs/mockups/`, verified by non-empty output — a silent zero-match here is the failure mode `plan.md` §10.1 exists to prevent); the three forbidden lines `:442`, `:550`, `:772` are located and **explicitly marked NOT-FOR-TRANSCRIPTION** in the working notes; and the notes record, per string, whether it is transcribed from the mock or is one of the four approved §10.3 replacements. **No copy is written into the repo by this task** — this is the read, and it is separated from the write so the forbidden lines are identified before anything is typed. Dependencies: T079.
+
+- [ ] T089 [P6] Create `apps/web/lib/landing/copy.ts` (**new file**) carrying the **three approved §10.3 strings, character-for-character**. **Done when**: the module exists and exports, as named constants: **(1)** the hero lede replacing mock `:442` — the string beginning *"Serenify notices signs of strain during the workday…"*, verbatim from `plan.md` §10.3 Position 1; **(2)** the replacement **"Never"** card — **both** its heading and its body, verbatim from §10.3 Position 2, whose closing sentence is **"Not now, not ever."** and **not** "Not now, not later." (which would read as a deferral of the promise rather than its permanence); **(3)** the closing story beat, verbatim from §10.3 Position 3, **with its two clauses in the approved order — chat clause first**. Each of the three carries a comment naming its §10.3 position and stating that it is **fixed copy under FR-032 and is not re-worded at implementation time**. **These are not paraphrased, not re-punctuated, not re-cased.** If any of them appears to need a change, that is a re-approval request to Mohamed, not an edit (R12). Dependencies: T088.
+
+- [ ] T090 [P6] Complete `apps/web/lib/landing/copy.ts` with **every remaining landing string** (same file, separate commit). **Done when**: every string the landing components render is a named exported constant and **there is no string literal in any landing component** — the forbidden-claim review is then a review of one file, not of a component tree (`plan.md` §10.1 item 1); it includes the approved FR-005 hero data-handling line, the how-it-works copy, the retention/status statement (FR-003 — the 90-day retention stated as a **policy**, with **no** claim of an automated purge; BACKLOG **#86** is not owned here), the two CTA labels, the chapter names, and all 17 beats' narration; it carries **zero** numeric quality metrics (FR-004, SC-005); it makes **no** blanket manager-negation claim and **no** on-device-processing claim (FR-002); and it uses the binding terminology — **calibration**, **monitoring session**, **weekly work-environment check-in**, never bare "check-in". Dependencies: T089.
+
+### The story script — data, not control flow
+
+- [ ] T091 [P6] Create `apps/web/lib/landing/story-script.ts` (**new file**) — the **17 beats as pure data**. **Done when**: it exports a **frozen** array of 17 beats shaped `{ chapter, durationMs, panel, band, narrationKey, threadOp }` exactly as `contracts/landing-hero-story.md` §9.1 fixes, plus the pure helpers `chaptersOf()`, `firstBeatIndexOfChapter()` and `trimThread(messages, 4)`; the structure matches the transcribed table — chapter 0 beats 1–2 (`quiet`), chapter 1 beats 3–4 (`prompt`), **chapter 2 beat 5 — the false alarm resolved, at no cost** (`resolved`), chapter 3 beats 6–8 (`quiet` → `prompt`), chapter 4 beats 9–13 (`ren`), chapter 5 beats 14–17 (`ren` → `quiet`); total duration ≈ **42.1 s**; the panel set is exactly the four named panels; every `band` value is a member of `BAND_LABEL`'s three keys and nothing else; narration is referenced **by key into `lib/landing/copy.ts`**, never inlined; and it imports nothing from `server-only`. **The false-alarm-before-companion ordering is the page's thesis and is not reorderable** (FR-006, SC-002). Dependencies: T090, T080.
+
+- [ ] T092 [P] [P6] Story-script invariant tests at `apps/web/tests/unit/lib/landing/story-script.test.ts` (`research.md` §12.2 "Story invariants"). **Done when**: exactly **17** beats; exactly **6** chapters; total duration ≈ **42 s**; **the chapter containing the resolved false alarm has a strictly lower index than the chapter containing the first companion beat** — asserted as an **invariant, not a convention** (SC-002); the panel set is exactly the four named panels; every band label used is a member of `BAND_LABEL` and nothing else (SC-011); `trimThread` keeps the **4 most recent** messages and drops the oldest; and every `narrationKey` resolves to an actual export of `lib/landing/copy.ts` — a dangling key would render an empty fixed-height row and pass every layout assertion. Dependencies: T091.
+
+### The story card — built region by region, because the geometry is the hard part
+
+- [ ] T093 [P6] Build the story card **shell** at `apps/web/components/landing/story-card.tsx` (**new file**), implementing the three-region structure `contracts/landing-hero-story.md` §9.1 fixes. **Done when**: the card is one outer box with `overflow-hidden` whose outer dimensions **never change**; the **READOUT** region is **permanently visible** — `<Bloom>`, the reading label from `BAND_LABEL`, and the trend — at every beat and under reduced motion (FR-007); the **NARRATION** row has a **FIXED height, not a min-height** (FR-009), so its content changing cannot move anything below it; and the **SWAP AREA** is `position: relative` with an **explicit height** (the tallest panel's, measured once per breakpoint) containing four panels each `position: absolute; inset: 0`, with exactly one carrying `data-active` and `aria-hidden` on the other three (FR-010). **The absolute positioning IS the anti-clipping mechanism and flow layout is NOT an acceptable substitute**: an absolutely positioned panel is out of flow, so it cannot push the card's box no matter how tall its content is, and the swap area's explicit height is what fixes the box. `overflow-hidden` on **both** the card and the swap area guarantees no internal scrollbar at any width. Dependencies: T091, T078, T082, T080.
+
+- [ ] T094 [P6] Build the **four swap panels** under `apps/web/components/landing/panels/` (**new files**) — `quiet`, `prompt`, `resolved`, `ren`. **Done when**: all four exist as separate components, each rendering only strings from `lib/landing/copy.ts`; each is sized to sit inside the T093 swap area without needing the card to grow; **the `resolved` panel carries the false alarm resolved at no cost**, which is the beat the whole page is built around; **no fake device chrome anywhere** — no simulated browser bar, no phone frame, no fake camera preview (FR-052); no panel renders a number or a probability; and each is correct at 320 px in both themes. Dependencies: T093.
+
+- [ ] T095 [P6] Build the **Ren thread** at `apps/web/components/landing/ren-thread.tsx` (**new file**), inside the `ren` panel. **Done when**: it caps at **4 visible bubbles with NO scroll** — the oldest leaves when the cap is reached, driven by `trimThread(messages, 4)` (FR-011); **the card does not resize when the thread trims**, which holds by construction because the thread lives inside an absolutely positioned panel within a fixed-height swap area (FR-008) — assert it rather than assume it; Ren's orb state uses `<Bloom color="var(--color-foggy)" />` via the T082 prop, **the real Graphite token, not a ported mock hex** (FR-057); **this blue state is the approved FR-022 liberty and must NOT be "corrected" to the monitor's band colouring** (flagged for Mohamed's eye in **ST-4**); and the dialogue is **scripted static copy, not a model call** (Principle IV — there is no LLM on this page). Dependencies: T094.
+
+- [ ] T096 [P6] Build the **chapter markers** at `apps/web/components/landing/chapter-markers.tsx` (**new file**). **Done when**: six real `<button>` elements sit in a `<nav aria-label="Story chapters">`, each with an accessible name naming its chapter and `aria-current="true"` on the active one; activating one jumps to `firstBeatIndexOfChapter()`; pointer **and** keyboard both activate (a `<button>` gives Enter and Space for free — a `<div role="button">` is a FAIL); each is **≥44×44 px on touch viewports**; each carries the app's visible focus ring (FR-055); and — explicitly — **chapter markers only, NO per-beat progress bar** (FR-014; a progress bar was rejected in Non-Goals). Dependencies: T093, T091.
+
+- [ ] T097 [P6] Build the **advance and pause mechanism** at `apps/web/components/landing/use-story-clock.ts` (**new file**). **Done when**: advance is **one `setTimeout` chain at ≥1.4 s intervals** — not a `setInterval`, not one timer per beat; pause/resume is **one `IntersectionObserver`** (FR-012) with the repo's known gotcha handled — the observer delivers an initial **synchronous** entry on `observe()` reflecting current visibility, so the implementation holds a `hasDeliveredFirstEntry` ref and **discards that first callback**, leaving only real scroll transitions to drive pause/resume; it **fails safe** — a missing observed element, or one whose measured height is 0 (a collapsed or not-yet-laid-out box), is treated as **visible** and the story keeps playing, because a story frozen forever because a ref was null is worse than one that runs off-screen; and it uses **no** `localStorage`/`sessionStorage`. Resuming must not **jump or double-advance** (ST-6). Dependencies: T093.
+
+- [ ] T098 [P6] Implement the **reduced-motion branch** (FR-013, FR-054, SC-010). **Done when**: reduced motion is read through the **repo hook** — `useMediaQuery("(prefers-reduced-motion: reduce)")` from `@/hooks/use-media-query`, built on `useSyncExternalStore`, which **re-subscribes** to the media query; under it **no timer is armed**, **no transition class is applied**, a **static representative beat renders with the readout visible**, and the **chapter markers remain fully functional** so a visitor can step through deliberately; and **no information exists only in motion**. **framer-motion's `useReducedMotion` snapshots at mount and does not re-subscribe — it is FORBIDDEN here** (`bloom.tsx:5` already models the correct choice, importing the repo hook rather than framer's). This is what **ST-5** verifies by toggling reduced motion at the **OS level mid-session** and expecting the story to stop advancing **immediately**. Dependencies: T097.
+
+- [ ] T099 [P] [P6] Add the forbidden-import assertion at `apps/web/tests/unit/components/landing/no-framer-reduced-motion.test.ts` — the "lint-style unit check" `contracts/landing-hero-story.md` §9.1 requires. **Done when**: it asserts by source inspection that **no file under `apps/web/components/landing/`** imports `useReducedMotion` from `framer-motion`, and that the story clock imports `useMediaQuery` from `@/hooks/use-media-query`. A comment states why: the framer hook snapshots at mount, so a mid-session OS toggle would be missed and ST-5 would fail on a real device long after CI went green. Dependencies: T098.
+
+### The remaining landing sections
+
+- [ ] T100 [P6] Build the **hero** at `apps/web/components/landing/hero.tsx` (**new file**). **Done when**: it renders the approved §10.3 hero lede constant and the approved FR-005 data-handling line beneath it, both from `lib/landing/copy.ts` with **no inline literals**; the two CTAs are labelled **exactly** `"Get started"` (**meadow-filled**) and `"See how it works"` (**outline**) — the labels are fixed by FR-020 and are not re-worded — and **both are centred on mobile**; both are ≥44 px with visible focus indicators and neither label wraps at 320 px (FR-053); it composes the T093 story card; and it uses the existing button component and Graphite tokens rather than new styles (FR-057). Dependencies: T093, T090, T078.
+
+- [ ] T101 [P] [P6] Build the **"Never" cards** at `apps/web/components/landing/never-cards.tsx` (**new file**). **Done when**: the three-card grid and the "Never" tag are preserved from the mock, and the card that replaced mock `:547–551` renders the approved §10.3 Position 2 **heading and body verbatim** — *"Never / Read your conversations."* with the body ending **"Not now, not ever."**; **this is a structural replacement, not a body rewrite** — the heading changed too, because the original card's **premise** was the forbidden claim; the replacement carries **no** not-yet-live marker, correctly, because the chat-and-crisis guarantee is a **Principle I invariant** rather than an unbuilt control (FR-001); and neither of the other two cards makes a blanket manager-negation or on-device-processing claim. Dependencies: T089, T090, T078.
+
+- [ ] T102 [P] [P6] Build the **how-it-works** section at `apps/web/components/landing/how-it-works.tsx` (**new file**). **Done when**: it renders only `lib/landing/copy.ts` constants; it describes **calibration**, the **monitoring session**, and the **weekly work-environment check-in** using exactly those names (never bare "check-in"); it contains **no fake device chrome** (FR-052) and **no** model performance figure (FR-004); and it is correct at 320/375/414/768 px in both themes. Dependencies: T090, T078.
+
+- [ ] T103 [P] [P6] Build the **retention and status statement** at `apps/web/components/landing/status-statement.tsx` (**new file**) — FR-003. **Done when**: it states the **90-day reading retention as a policy** and makes **no claim, promise, or implication of an automated purge** (the purge job is BACKLOG **#86**, unslotted and explicitly not owned here); it states the project's status honestly; and it links to `/privacy` and `/terms` for the full text. Dependencies: T090, T078.
+
+- [ ] T104 [P6] Assemble the landing page in `apps/web/app/(public)/page.tsx` and extend the public destinations. **Done when**: the landing branch of T086's page composes hero → "Never" cards → how-it-works → status statement (the team section is **P7** and its slot is left explicit); the page reads **no user data and makes no authenticated call** on the landing branch (spec Assumptions); `apps/web/components/public/destinations.ts` gains the landing anchors the navbar and footer should offer now that `/` is a real page — the file's own header comment at `:13–14` reserves exactly this ("The landing page takes over `/` in P6 and will extend this list then"); **no authed destination is added** — there is no `/app` entry, no role, and no session, which is what makes FR-018 structural; and the existing `tests/unit/components/public/public-shell.test.tsx` (T034) still passes or is extended in the same commit. Dependencies: T100, T101, T102, T103, T086.
+
+### Tests for P6
+
+- [ ] T105 [P] [P6] Extend `apps/web/tests/unit/landing/forbidden-claims.test.ts` to walk `apps/web/lib/landing/copy.ts` — the extension the file's own comment at `:99` reserves ("P6 appends `lib/landing/copy.ts` here"). **Done when**: `COPY_MODULES` at `:100–102` gains the landing copy module; **zero** matches for both forbidden families across every exported string; **the mock's three literals stay as negative fixtures at `:131–152` and must still be CAUGHT** — if the detector stops biting, every assertion in the file is passing vacuously; the positive fixtures at `:165–196` still pass, so the scoped chat-and-crisis claim FR-001 permits is not flagged; and the `ALL_STRINGS.length > 50` sanity guard at `:110` still holds against the widened set. Dependencies: T090.
+
+- [ ] T106 [P] [P6] Story-card component tests at `apps/web/tests/unit/components/landing/story-card.test.tsx` (`research.md` §12.2 "Unit"). **Done when**: **exactly one** panel carries `data-active` at **every** beat index, 0 through 16 — asserted by stepping the whole script, not spot-checked; the thread **never exceeds 4** bubbles at any beat; the closing beat's narration string matches the approved §10.3 constant **character-for-character** with its **two clauses in the approved order** (chat clause first — reversing them would make the line false); the readout is present at every beat **and** under reduced motion; and under reduced motion no timer is armed and the chapter markers still work. Dependencies: T093, T094, T095, T096, T098.
+
+- [ ] T107 [P6] Create the layout stability spec at `apps/web/tests/layout/landing-hero-stability.spec.ts`, under the **existing** `apps/web/playwright.layout.config.ts` — **real browser, real layout, NO database, chromium only** (the config's `testDir` is already `./tests/layout` and it has no `globalSetup`, deliberately; the landing page is unauthenticated so it needs none). **Done when**, at **320, 375, 414 and 768 px**: the card's `getBoundingClientRect()` is recorded, **all 17 beats** are stepped through via the chapter markers plus clock advance, and after each beat `width` and `height` deltas are **exactly 0** (SC-003, FR-008); `scrollWidth === clientWidth` and `scrollHeight === clientHeight` on **both** the card and the swap area, so there is no internal scrolling at any width; the document has **no horizontal overflow** at each width (SC-008); **and — the R12 assertion — at 320 px the narration element renders on exactly ONE line for EVERY beat**, computed as `Math.round(el.scrollHeight / parseFloat(getComputedStyle(el).lineHeight)) === 1`. The approved closing beat (§10.3 Position 3) is the longest narration string and therefore the binding case. **A failure here is a copy-length problem, not a CSS problem** — it means the string, not the layout, must change, and that requires **re-approval from Mohamed**, not a taller row (FR-009, R12). Dependencies: T104, T096, T098.
+
+- [ ] T108 [P] [P6] Landing accessibility tests at `apps/web/tests/unit/components/landing/landing-a11y.test.tsx` (SC-009). **Done when**: every interactive element on the landing page is reachable and has an accessible name; the chapter markers expose `aria-current` on the active one; the `<nav aria-label="Story chapters">` is present; the two hero CTAs have their exact FR-020 labels; the `<Bloom>` orb stays `aria-hidden` and decorative, carrying no number; and no element depends on hover alone to convey information. Dependencies: T104.
+
+- [ ] T109 [P] [P6] Widen the web-storage guard at `apps/web/tests/unit/lib/legal/no-web-storage.test.ts` to cover `apps/web/components/landing/`, `apps/web/lib/landing/`, `apps/web/lib/bands.ts`, `apps/web/lib/routing/`, and `apps/web/app/(public)/page.tsx`. **Done when**: **zero** occurrences of `localStorage` or `sessionStorage` across them (FR-051); the pre-existing occurrences elsewhere stay untouched. Dependencies: T104.
+
+### Ship P6
+
+- [ ] T110 [P6] Run the manual responsive and motion walk. **Done when**: at **320, 375, 414 and 768 px**, in **both themes**, the landing page has no horizontal scrolling, no tap target under 44 px, and no tap target whose label wraps (FR-053, SC-008); every interactive element is reachable by keyboard alone with a visible focus indicator (FR-055); the full ~42 s cycle runs with nothing clipping and no scrollbar inside the card; scrolling the hero out of view and back pauses and resumes without jumping or double-advancing; toggling reduced motion **mid-session** stops the auto-advance immediately; and `/` signed in still reaches `/app`. Results recorded in the P6 PR body. These rehearse **ST-3, ST-5, ST-6 and ST-8**; the real-device and real-email versions remain P8's human pass. Dependencies: T107, T108.
+
+- [ ] T111 [P6] Run a **code-review agent** over the P6 diff, against **this phase's own task acceptance criteria** (T078–T110) and **constitution v1.13.0**. **Done when**: the agent has specifically checked that **none of the mock's three forbidden lines was transcribed** and that the four approved §10.3 strings are present **character-for-character** with the closing beat's clause order intact; that the `session-trend-geometry` refactor is a pure literal extraction with the existing suite unmodified (R5); that `bloom.tsx` gained **one optional** prop whose default is byte-identical and that no existing call site changed (R6); that only **one** page owns `/`; that the swap panels use `position: absolute; inset: 0` and not flow layout; that reduced motion goes through the repo `useMediaQuery` and **not** framer's; that there are **no string literals in landing components**; and that no `Claude-Session:` trailer or `claude.ai` URL appears anywhere. Findings go in the PR body and are **fixed before T113**. Dependencies: T110, T105, T106, T109, T099, T083, T085, T087, T092.
+
+- [ ] T112 [P6] Run the local phase verification. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green with the output recorded in the P6 PR body (Windows: Vitest with `--pool=threads`); `npm run -w apps/web test:layout -- landing-hero-stability` is green at all four widths; and the existing `session-trend-geometry` and `bloom` suites are confirmed green **unmodified**. Dependencies: T111.
+
+- [ ] T113 [P6] Open the P6 PR from `p6-landing-page` into `013-public-surface-and-legal`. **Done when**: the **actual diff of every committed file** is shown before committing; commits are per-file with all three co-author trailers; no `Claude-Session:` trailer and no `claude.ai` URL anywhere; the PR body names which design skills ran (T078) and records both design conflicts as open questions; it names the Next 16 guide paths consulted (T079); it records the T110 walk, the T111 findings and the T112 output; it states that `app/page.tsx` was **moved, not copied**, and that the two existing root-route behaviours are preserved; and all three CI checks are green. Dependencies: T112.
+
+**Checkpoint**: `/` is the landing page, both prior root-route behaviours survive, and the card's zero-pixel invariant is machine-proven at four widths. **US1 is complete. P7 is unblocked** — the team section renders inside this page.
+
+---
+
+## Phase 7: P7 — Team section (branch `p7-team-section`)
+
+**Depends on**: **P6** — the team section renders inside the landing page P6 creates.
+
+**Goal**: four people, four outlines, eight real links, and a mapping a visitor can obtain
+without ever hovering.
+
+**Independent test**: at 320/375/414/768 px the four name cards, the eight links and the
+supervisor credits are readable and operable; activating a name card highlights the matching
+silhouette **and the highlight persists**; touching or clicking a silhouette highlights the
+matching card; with the photo blocked entirely, nothing collapses.
+
+**Reads**: `contracts/public-surface.md` **§9.2** (the primary source) · `plan.md` §0.2 (the
+mapping verification and its residual), §0.4 (the filename case) · `plan.md` §15 R4, R9 ·
+`plan.md` §13 **ST-7, ST-14, ST-15**.
+
+### Preconditions
+
+- [ ] T114 [P7] Invoke the design skills before writing the team section. **Done when**: `hallmark` has been invoked and applied to the photo/overlay composition, the name cards and the credits; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`. **Name in the P7 PR body exactly which skills ran.** Dependencies: T113 (P6 merged).
+
+- [ ] T115 [P7] Read the Next 16 **`next/image` sizing** guide under `node_modules/next/dist/docs/` before writing the photo component (`apps/web/AGENTS.md`; `plan.md` §2; R9). **Done when**: the exact guide path is named in the P7 PR body, and one specific question is answered **from the docs rather than inferred** — *with explicit `width`/`height` plus `className="h-auto w-full"`, what box does the rendered element occupy, and does it carry the source's exact aspect ratio at every width?* That answer is load-bearing: the `preserveAspectRatio="none"` overlay aligns only if it does. Do not infer `next/image` sizing from Next 14/15 habits. Dependencies: T113.
+
+### The asset
+
+- [ ] T116 [P7] Produce the cropped team photo at `apps/web/public/team/serenify-team-2026.jpg` (**new file, new directory**). **Done when**: the source `apps/web/public/IMG-20260706-WA0054.jpg` (3024×4032, 1.24 MB — **lowercase `.jpg`**, confirmed on disk; the request's `.JPG` is immaterial on Windows and **material on the Linux build host**, `plan.md` §0.4) is cropped `y = 1100…3300` at full width and downscaled to **exactly 1600×1164**; the output is verified against the mock's embedded image (the base64 at `:624` decodes to 1600×1164; the crop reproduces it to a mean per-channel difference of ≈3.86/255 — JPEG recompression noise, not a different crop, R4); it lands in `public/team/`, following the repo's established feature-asset convention (`public/face-detect/` is the only precedent, and `public/` root holds only Next scaffolding and manifest icons); and **the project poster visible in the photo is NOT cropped or edited to remove its performance figures** — **FR-004 accepts it explicitly and forbids editing them out.** Dependencies: T115.
+
+- [ ] T117 [P7] **Delete** `apps/web/public/IMG-20260706-WA0054.jpg` in the same PR. **Done when**: the 1.24 MB original is gone from `public/`; a repo-wide search confirms **nothing references it**; and the build succeeds. It must not ship — anything in `public/` is served. Dependencies: T116.
+
+### The silhouettes — copied verbatim, then frozen
+
+- [ ] T118 [P7] Create `apps/web/lib/landing/team-silhouettes.ts` (**new file**) holding the four `SIL` path strings copied **character-for-character** from `docs/mockups/serenify-landing-mock.html` (~line 671). **Done when**: the four paths are transcribed **verbatim** — **re-deriving, re-tracing, reformatting, or regenerating them by any means is forbidden (FR-026)**; the read used `rg --no-ignore` or an explicit `*.html` scope, because the mock is gitignored and a default `rg` sees nothing (`plan.md` §10.1); the keys are `mohamed`, `fatma`, `hebatullah`, `gehad`; and the file's header records **the mapping and how it was verified** — x-ranges strictly ascending `mohamed` (0.34→21.84, leftmost) < `fatma` (22.16→40.59, second) < `hebatullah` (64.91→81.47, **inner right**, the person wearing glasses) < `gehad` (79.47→97.78, **outer right**, rightmost), matching FR-024's required left-to-right card order and the mock's own `TEAM` array at `:807–812`. **It is NOT reversed** (`plan.md` §0.2).
+
+  **Record the ST-7 residual in the file header, in these terms**: points 1–3 prove the data is **internally consistent and geometrically correct**; they **cannot** catch a mis-labelling made at tracing time that would be wrong in both the `SIL` keys and FR-024 together. **No artefact in this repository establishes which human being is which name.** That single fact is a **human check, not an automatable one** — smoke test **ST-7**, where Mohamed confirms the inner-right outline highlights **Hebatullah** and the outer-right highlights **Gehad**. Dependencies: T114.
+
+- [ ] T119 [P] [P7] Freeze the paths at `apps/web/tests/unit/lib/landing/team-silhouettes.test.ts` (`contracts/public-surface.md` §9.2, R4). **Done when**: each path's **exact character length** and **SHA-256** are asserted against frozen constants, so **any** edit — including a "harmless" reformat or a whitespace normalisation — fails CI; and the x-ranges are asserted **strictly ascending** in the order `mohamed < fatma < hebatullah < gehad`, so a key swap fails CI. Both guards make FR-026 enforceable rather than aspirational. Dependencies: T118.
+
+### The section
+
+- [ ] T120 [P] [P7] Add the team strings to `apps/web/lib/landing/copy.ts` (same module P6 created; **no string literals in components**). **Done when**: it exports the four names in FR-024's fixed left-to-right order — **Mohamed Assem Adel · Fatma Alzahraa · Hebatullah · Gehad**; the caption **verbatim**: **"Choose a name to find them in the photo."**; the supervisor credits **verbatim**: **Dr. Lamees Nasser · Dr. Safaa Mouneer**; and the eight external URLs with their accessible names. **Note in the module, so it is never "fixed" by a future reader**: the legal documents use the single form **"Mohamed Assem"** while the team section keeps the full FR-024 spelling **"Mohamed Assem Adel"** — *the two are deliberately different and neither is a typo.* (`/privacy` separately names the data controller as **Mohamed Asem**, FR-046 — a third deliberate form.) Dependencies: T118.
+
+- [ ] T121 [P7] Build the photo and overlay at `apps/web/components/landing/team-photo.tsx` (**new file**). **Done when**: it uses `next/image` with **explicit `width={1600} height={1164}`** and `className="h-auto w-full"`, so the container box carries the photo's **exact** aspect ratio (this avoids the `@next/next/no-img-element` lint rule the OG route has to disable, and CSP `img-src 'self'` already covers `/_next/image`); the SVG overlay sits over an **exact-aspect box** with `viewBox="0 0 100 100"` and **`preserveAspectRatio="none"`** — **a hard constraint, not a preference: the `SIL` coordinates are normalised to that exact crop, and any other value misaligns every outline** (§9.2); the overlay is `aria-hidden`, because the name cards are the accessible route and duplicating the people in the SVG would double every person in the tab order; and the silhouette paths carry pointer handlers for the **photo → card** direction (FR-025). Dependencies: T116, T118, T115, T114.
+
+- [ ] T122 [P7] Build the name cards and the **bidirectional** highlighting at `apps/web/components/landing/team-cards.tsx` (**new file**) — FR-025, FR-028, Principle VI. **Done when**: each card is a real `<button>` with `aria-pressed`, so **pointer, touch AND keyboard (Enter/Space) all set the active person and the highlight PERSISTS** — which is how **the mapping is obtainable without hover** (SC-009, FR-028); hover and focus additionally *preview* it; activating a silhouette highlights the matching card and activating a card highlights the matching silhouette (**bidirectional**, FR-025); every card carries a **visible focus indicator** (FR-055) and is ≥44 px at 320 px; and the cards render in FR-024's fixed left-to-right order. **A hover-only mapping is a FAIL** — it is unreachable by touch and by keyboard alike. Dependencies: T121, T120.
+
+- [ ] T123 [P] [P7] Wire the **eight external links** into the name cards. **Done when**: each of the four people carries a real **GitHub** and a real **LinkedIn** link to their actual profile; **the mock's inert `href="#"` placeholders must NOT ship**; each of the eight carries an accessible name identifying **both the person and the destination** — `aria-label="Mohamed Assem Adel on GitHub"`, `"Mohamed Assem Adel on LinkedIn"`, and so on — so a screen-reader link list distinguishes all eight; and each opens safely (`rel="noopener noreferrer"`). The URLs themselves are confirmed correct by **ST-15**, which is a human check. Dependencies: T122, T120.
+
+- [ ] T124 [P] [P7] Render the caption and the supervisor credits. **Done when**: the caption renders **verbatim** — **"Choose a name to find them in the photo."**; the supervisors render **verbatim** — **Dr. Lamees Nasser · Dr. Safaa Mouneer** (FR-027); both come from `lib/landing/copy.ts` with no inline literals; and both are **separate DOM from the photo**, so they survive the photo failing to load. Dependencies: T120, T122.
+
+- [ ] T125 [P7] Assemble the team section at `apps/web/components/landing/team-section.tsx` (**new file**) and mount it in `apps/web/app/(public)/page.tsx`. **Done when**: the section composes photo + overlay + cards + links + caption + supervisors and fills the slot T104 left explicit; it is correct at **320/375/414/768 px** in both themes with no horizontal overflow; and **no real teammate name appears anywhere outside this section** — no demo employee, no fixture, no sample manager row uses them (Principle X: the public team section is exactly the use Principle X reserves these names for). Dependencies: T121, T122, T123, T124.
+
+### Tests for P7
+
+- [ ] T126 [P] [P7] Team section tests at `apps/web/tests/unit/components/landing/team-section.test.tsx` (`research.md` §12.2 "Accessibility"). **Done when**: it asserts **exactly eight** links, **eight distinct accessible names**, and **zero `href="#"`**; that activating a name card sets `aria-pressed` and **the highlight persists without hover**; that the silhouette overlay is `aria-hidden` and contributes nothing to the tab order; that all four cards are keyboard-reachable with a visible focus indicator; and that the caption and supervisor strings match their approved constants exactly. Dependencies: T125.
+
+- [ ] T127 [P] [P7] Photo-failure resilience check (**ST-14**). **Done when**: with the photo **blocked** (a unit test rendering with the image failing, plus a manual DevTools request-block pass on a throttled connection), the **four name cards, the eight links and the supervisor credits remain readable and usable** and **the layout does not collapse** — the section keeps its box rather than shrinking to nothing or overlapping; and the manual pass is recorded in the P7 PR body. This works because the cards and credits are separate DOM from the photo (T124) — assert it rather than assume it. Dependencies: T125.
+
+### Ship P7
+
+- [ ] T128 [P7] Run a **code-review agent** over the P7 diff, against **this phase's own task acceptance criteria** (T114–T127) and **constitution v1.13.0**. **Done when**: the agent has specifically checked that the `SIL` paths are **verbatim and frozen** (length + SHA-256 asserted) and that the mapping is **not reversed**; that the overlay uses `preserveAspectRatio="none"` over an exact-aspect box; that the 1.24 MB original is **deleted** and the cropped asset is exactly 1600×1164; that the **poster's performance figures were not edited out** (FR-004); that highlighting is **bidirectional and obtainable without hover**; that the two deliberate name spellings ("Mohamed Assem Adel" in the team section, "Mohamed Assem" in the legal documents) were **not "corrected" into agreement**; and that no `Claude-Session:` trailer or `claude.ai` URL appears anywhere. Findings go in the PR body and are **fixed before T130**. Dependencies: T126, T127, T119.
+
+- [ ] T129 [P7] Run the local phase verification. **Done when**: `npm run -w apps/web lint typecheck test` and `uv run pytest` are green with the output recorded in the P7 PR body (Windows: Vitest with `--pool=threads`); `npm run -w apps/web test:layout -- landing-hero-stability` is **still** green with the team section on the page; and the responsive walk at 320/375/414/768 px in both themes is redone with the section present. Dependencies: T128.
+
+- [ ] T130 [P7] Open the P7 PR from `p7-team-section` into `013-public-surface-and-legal`. **Done when**: the **actual diff of every committed file** is shown before committing; commits are per-file with all three co-author trailers; no `Claude-Session:` trailer and no `claude.ai` URL anywhere; the PR body names which design skills ran (T114), names the `next/image` guide path (T115), records the T127 photo-blocked pass and the T128 findings, and **states the ST-7 residual explicitly** — no repository artefact establishes which human being is which name, so **Mohamed must confirm the inner-right outline is Hebatullah and the outer-right is Gehad** in P8's smoke pass; and all three CI checks are green. Dependencies: T129.
+
+**Checkpoint**: the full public surface is built. **US4 is complete.** Every automatable proof is in place; what remains is the human pass, the deploy, and the closures.
+
+---
+
+## Phase 8: P8 — Wrap (branch `p8-wrap`) — then **merge to `main`**
+
+**Depends on**: **all** of P1–P7.
+
+**Goal**: the human pass automation cannot cover, a deploy protocol with a real abort point,
+three issues closed with their BACKLOG entries in the same change, the documentation trail, and
+**one** merge to `main`.
+
+**Independent test**: `smoke-tests.md` exists with ST-1 through ST-15 transcribed verbatim and
+every one recorded PASS or explained; the hosted database carries the one pending migration and
+a throwaway signup completes through the real surface writing exactly one consent row; #75,
+#157 and #158 are closed with their BACKLOG entries marked resolved.
+
+**Reads**: `plan.md` **§13** (the ST table — the source of `smoke-tests.md`), §14 (P8's scope),
+§15 R8, R11 · `contracts/consent-gates.md` §7.3 (the levers ST-10/10a/10b exercise) ·
+`docs/BACKLOG.md` · `docs/DECISIONS.md` · constitution **Principle VII** gate 5 and
+**Principle VIII**.
+
+> **#62 is not touched.** It stays open. It is a ⛔ pre-production deploy blocker and the root
+> cause of the SC-006 bypass described in **R8**, and it is **out of scope for this feature**.
+> **#86** and **#155** are **referenced, not owned**. Any task below that appears to require
+> touching #62 is a **stop and report**, not a scope decision.
+
+### The human pass
+
+- [ ] T131 [P8] Author `specs/013-public-surface-and-legal/smoke-tests.md` from `plan.md` **§13**, transcribing **ST-1 through ST-15 verbatim**. **Done when**: all fifteen rows — including **ST-10a** and **ST-10b**, which carry the longest and most procedurally specific text in the table and must not be summarised — appear with their wording intact, each with a result field, a date field, and space for observations; the file states that it is run by **Mohamed**, results recorded **inline**, **before the feature branch merges to `main`** (Principle VII gate 5). **If authoring reveals a gap §13 does not cover, add it as ST-16+ and STOP AND REPORT the addition — do not quietly edit §13's meaning.** Dependencies: T130 (P7 merged).
+
+- [ ] T132 [P8] **Mohamed runs the smoke tests.** *(Human owner. This is not an automated task and must not be marked done by an agent on the strength of unit tests.)* **Done when**: every one of ST-1 through ST-15 is recorded PASS, or FAIL with the defect filed; specifically including **ST-7** (the silhouette identity — the one fact no repository artefact can establish, §0.2), **ST-4** (Ren's blue orb reads as calm — Mohamed's aesthetic call, and an approved FR-022 liberty that must not be "corrected"), **ST-2** (a **real** confirmation email and a **real** recovery email, viewed in a light client and a dark client), **ST-8** (a **real** Supabase email link landing on `/` with `?code=`), **ST-13** (both documents read end to end against FR-048a), **ST-15** (all eight links resolve to the correct real profiles), and the three gate tests **ST-10 / ST-10a / ST-10b** against the levers T074 recorded. Results are written into `smoke-tests.md` inline. Dependencies: T131.
+
+### Deploy — verified facts, per-step verification, and one abort point
+
+- [ ] T133 [P8] **Backup posture — surface the choice, do not make it.** *(Decision is Mohamed's; this task stops and reports.)* **Done when**: it is recorded that the hosted project **`excukdzjudslbqmkysrc`** (eu-central-1) is on the **Free tier** — **PITR disabled, no automated backups, branching unavailable** — so a **manual `pg_dump` is the only safety net**; the two options are put to Mohamed plainly — **(a)** enable PITR for the deploy window, or **(b)** accept the manual dump — with their costs; and **no deploy step runs until Mohamed answers.** The task is to surface the choice, not to pick. Dependencies: T132.
+
+- [ ] T134 [P8] **Verify** the committed rollback SQL still matches the shipped migration. **⚠ The file is already committed and this task does NOT create it.** It lives at **`specs/013-public-surface-and-legal/rollback-user-consents.sql`**, committed to the feature branch on **2026-07-26** at task-generation time rather than being deferred to this phase — it existed only in a prior agent session's temporary scratchpad, which is session-scoped and could have been cleaned long before P8 ran, and a rollback script rewritten weeks later from a description is not a rollback script. It was copied **byte-for-byte** (SHA-256 `3FDD9056…1DB393`, 1,914 bytes); **do not re-derive it, re-format it, or "improve" it.**
+
+  **Done when**: the committed file is confirmed still correct against `supabase/migrations/20260726000000_user_consents.sql` on all three properties — **(1)** it restores `public.handle_new_user()` **FIRST**, verbatim from `supabase/migrations/20260517000030_profile_trigger.sql`, because the 013 version inserts into `user_consents` and dropping the table first would make every new signup raise between the two statements; **(2)** it then `DROP TABLE … CASCADE`s `public.user_consents`, which removes the index, both policies, the `user_consents_no_update` trigger and the FK to `auth.users` in one step and touches no other table; **(3)** it drops the now-orphaned `public.user_consents_immutable()`. **Done when additionally**: its header warning is confirmed **still present and unedited** — **it DESTROYS CONSENT HISTORY; `user_consents` is append-only by design (FR-043b) and is the only record of which wording each person accepted and when, so it MUST be `pg_dump`ed before this is ever run**; and it is re-verified to apply cleanly inside a **rolled-back transaction** against **local** Supabase. **If any of the three properties no longer holds — because the migration changed after 2026-07-26 — STOP AND REPORT rather than editing the rollback to match.** Dependencies: T133.
+
+- [ ] T135 [P8] Write the deploy protocol into `smoke-tests.md` (or a sibling `deploy-protocol.md` in the feature directory) from these **verified read-only recon facts**, each of which the protocol re-verifies at run time rather than trusting. **Done when** the protocol records and re-checks: **(a)** exactly **one** migration is pending on hosted — `20260726000000_user_consents` — and **nothing else rides along**; **(b)** `handle_new_user()` has **not drifted** on hosted (byte-identical to `20260517000030_profile_trigger.sql`), so P2's `CREATE OR REPLACE` **reverts nothing** — re-verify by normalised diff immediately before applying, because a drift introduced after recon would be silently overwritten; **(c)** the migration is **additive** — **0 `DROP`, 0 `TRUNCATE`, 0 `ALTER COLUMN`** — and the only existing object whose *definition* changes is `handle_new_user()`; **(d)** `auth.users` **does gain an inbound FK constraint**, so it is **not strictly untouched — expect a brief lock at creation**, and the protocol says when to run it accordingly; **(e)** every step has an explicit verification query and an explicit expected result, so "it seemed fine" is not a valid outcome; **(f)** the rollback path is T134's file, with the `pg_dump` of `user_consents` as its mandatory precondition. Dependencies: T134.
+
+- [ ] T136 [P8] Apply the migration to hosted, step by step. **Done when**: the T133 backup decision is executed (PITR enabled, or the manual `pg_dump` taken and its file path recorded); `supabase/migrations/20260726000000_user_consents.sql` is applied to `excukdzjudslbqmkysrc`; and **each step's verification from T135 is run and its actual output recorded** — not a claim that it passed. **`supabase db reset` MUST NOT be run against the hosted project** — it re-seeds, and those 14 accounts were migrated, not seeded (project memory). Dependencies: T135, T132.
+
+- [ ] T137 [P8] Post-migration verification against hosted. **Done when**: the table, the `user_consents_lookup_idx` index, the immutability trigger, `ENABLE` + `FORCE ROW LEVEL SECURITY`, both owner-self policies, and the exact grants (`SELECT, INSERT` to `authenticated` only — **no UPDATE, no DELETE**) are all confirmed present with their actual output recorded; `handle_new_user()` on hosted now matches the 013 definition; **`user_consents` is empty — zero rows — confirming no backfill occurred** (FR-041, §7.4); and existing `profiles`, `window_readings` and `monitoring_sessions` row counts are **unchanged** from a pre-migration snapshot. Dependencies: T136.
+
+- [ ] T138 [P8] 🛑 **ABORT POINT — the first throwaway signup goes through the real surface.** **Done when**: a throwaway account is created through the **deployed product's own `/signup` page** (not through the API, not through the dashboard) with the acknowledgement checked, and **all** of the following hold: the account is created; **exactly one** `user_consents` row exists for it, with `consent_key = 'terms_privacy'` and a `document_version` that is a **registry member**; the app-shell gate does **not** block that user; and the server log shows **no** `[consent-gate] FAIL-OPEN` line for those requests. Separately confirm a signup with the box **unchecked** is refused with a reason and creates **no account**. **If ANY of these fails, ABORT: do not proceed to T139, do not merge. Restore from the T133 backup or run the T134 rollback (after dumping `user_consents`), and stop and report.** Then delete the throwaway account and its consent row via a privileged path, recording that it was done. Dependencies: T137.
+
+### Closures — issue and BACKLOG entry in the same change (Principle VIII)
+
+- [ ] T139 [P] [P8] Close **#75** and mark its `docs/BACKLOG.md` entry resolved **in the same change**. **Done when**: the BACKLOG entry carries the resolution date and the merging PR/commit, **and** GitHub issue #75 is closed with a comment naming the same; neither is done without the other (Principle VIII; on conflict, BACKLOG wins). #75 is the ⛔ pre-production data-processing blocker that closes when `/terms`, `/privacy` **and** the signup consent gate all ship — **P2 + P3 + P4**, all of which have. No `claude.ai` URL in the comment. Dependencies: T138.
+
+- [ ] T140 [P] [P8] Close **#157** and mark its `docs/BACKLOG.md` entry resolved **in the same change**. **Done when**: the BACKLOG entry carries the resolution date and the merging PR/commit, **and** GitHub issue #157 is closed with a comment naming the same; neither is done without the other (Principle VIII; on conflict, BACKLOG wins); and no `claude.ai` URL appears in the comment. Dependencies: T138.
+
+- [ ] T141 [P] [P8] Close **#158** and mark its `docs/BACKLOG.md` entry (`docs/BACKLOG.md:2006–2045`) resolved **in the same change**. **Done when**: the BACKLOG entry carries the resolution date and the merging PR/commit, **and** GitHub issue #158 is closed with a comment naming the same, neither without the other (Principle VIII), with no `claude.ai` URL in the comment; **and additionally** — the condition specific to this issue — the four `README.md` lines T035 fixed in P3 are re-read against `plan.md` §0.3's acceptance conditions before closing — in particular that **line 11 was SPLIT into two sentences and not appended to**, so the permanent Principle I invariant ("never raw video, never chat content") stands **unqualified in its own sentence, outside the marked one**. **P3 shipped the copy fix and deliberately left #158 open until now** (T035's closing instruction). If the split was done as an append, **do not close** — fix it first. Dependencies: T138.
+
+- [ ] T142 [P] [P8] Log the **TTFB follow-up** as a BACKLOG candidate — **logged, not built** (R11, `research.md` §11). **Done when**: `docs/BACKLOG.md` carries a new entry scoping the follow-up to **moving ONLY the signed-in redirect into `proxy.ts`** — explicitly **not** the `?code=` forward, whose `redirectTo` helper clears `url.search` and would eat the code; the entry records that `/` stays `force-dynamic` today, that this is near-free for anonymous visitors (no session cookie ⇒ `getUser()` short-circuits without a network round-trip), and that it is a scoped follow-up **only if production TTFB disagrees**; and its GitHub issue is opened in the same change with `(#NN)` recorded on the entry (project CLAUDE.md: never one without the other). **No code is written for it here.** Dependencies: T138.
+
+### Documentation
+
+- [ ] T143 [P] [P8] Add the `docs/DECISIONS.md` entries for this feature. **Done when**: the append-only log records the decisions this feature made and closed — **Order A** (legal first, and why); **version identity over timestamp comparison** for re-consent; **the version registry lives in the repo, not in a table**; **the app-shell gate renders in place and fails OPEN while the camera gate fails CLOSED**, and why the two directions differ; **the migration stays one file**; **`decision` admits only `'granted'`**, and that **declining writes nothing, deletes nothing, and is not withdrawal** (feature **018** owns withdrawal); and the **SC-006 residual (R8)** stated honestly — SC-006 holds for 100% of accounts created through the product's own signup surface and **does not hold against a caller bypassing that surface**, whose root cause is **#62**, which **stays open**. Dependencies: T138.
+
+- [ ] T144 [P] [P8] Add the `docs/CHANGELOG.md` entry. **Done when**: it records the public-facing shape of the release — the landing page at `/`, `/terms` and `/privacy`, the public navbar and footer, the two-colour wordmark (**a visible change to three existing surfaces**, R10), the two consent gates, and the app-shell re-consent gate with its kill switch — in the repo's existing changelog voice. Dependencies: T138.
+
+- [ ] T145 [P] [P8] Update `docs/PROGRESS.md`. **Done when**: feature 013 is recorded complete with its eight phases and their PR numbers (#168, #169, #170 for P1–P3, plus P4–P8's), and the three closed issues are noted. Dependencies: T139, T140, T141.
+
+### Merge
+
+- [ ] T146 [P8] Run a **final code-review agent over the whole feature branch** — the accumulated diff of `013-public-surface-and-legal` against `main` — reviewing against **the feature's task acceptance criteria (T001–T145)** and **constitution v1.13.0**. **Done when**: the agent has specifically confirmed the cross-phase invariants no single-phase review could see — that **no `localStorage`/`sessionStorage` was introduced anywhere in this feature** (FR-051) and that the pre-existing occurrences outside it were **not** "fixed"; that the **four approved §10.3 strings** are present character-for-character and the mock's **three forbidden lines** appear nowhere; that the two gates' **opposite fail directions** are both intact; that terminology is correct feature-wide (**calibration** / **monitoring session** / **weekly work-environment check-in**, never bare "check-in"); that **no `Claude-Session:` trailer and no `claude.ai` URL** exists in any commit message on the branch — **this matters most here, because squash-merge concatenates the branch's commit messages by default**; and that the constitution was **not amended** by this feature. Findings go in the merge PR body and are fixed before T148. Dependencies: T143, T144, T145, T142.
+
+- [ ] T147 [P8] Full-feature verification before merge. **Done when**: `npm run -w apps/web lint typecheck test`, `uv run pytest`, `npm run -w apps/web test:layout` and `npm run -w apps/web test:e2e` are all green on the feature branch head with output recorded; `supabase db reset` applies cleanly locally; and `smoke-tests.md` shows every ST recorded. Dependencies: T146, T132.
+
+- [ ] T148 [P8] Merge `013-public-surface-and-legal` into `main` — **one merge, at the end**. **Done when**: the PR into `main` is opened, all three CI checks are green, and it is **squash-merged** (`main` enforces linear history — merge commits are rejected; only Mohamed's identity can land it, agent pushes to `main` are rejected by GH006 and that is expected); **the squash-merge message is inspected and any `Claude-Session:` trailer or `claude.ai` URL is stripped before merging** — squash concatenates the branch's commit messages by default and this repository is **public**; the PR body carries the smoke-test results and the deploy record; and after merge, **#62 is confirmed still open and untouched**, and **#86** and **#155** are confirmed still open (referenced, not owned). Dependencies: T147.
+
+**Checkpoint**: feature 013 is complete and on `main`. The public front door, the legal surface, and both consent gates are live; consent is a history; and the one fact no artefact could prove has been confirmed by a person.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase dependencies
@@ -355,22 +872,55 @@ Phase 1: P1 Wordmark   Phase 2: P2 Consent foundation      ← run in PARALLEL
   │                         │
   └───────────┬─────────────┘
               ▼
-      Phase 3: P3 Legal + public shell
+      Phase 3: P3 Legal + public shell        ✅ MERGED (#170)
               (T020–T037)
               │
+  ┌───────────┴───────────┐
+  ▼                       ▼
+P4 Gates                P6 Landing              ← these two run in PARALLEL
+(T038–T062)             (T078–T113)
+  │                       │
+  ▼                       ▼
+P5 Shell gate          P7 Team section
+(T063–T077, ALONE)        (T114–T130)
+  │                       │
+  └───────────┬───────────┘
               ▼
-      P4 · P5 · P6 · P7 · P8  — NOT in this file
+      P8 Wrap  (T131–T148)
+              │
+              ▼
+           main  ← ONE merge, T148
 ```
 
 - **P1 ∥ P2.** They share no file, no module, and no test. Either may merge first.
 - **P3 needs P1** for `<Wordmark>` (T025/T027) and **P2** for the registry (T023/T024). Under
   Order A both precede it anyway (`quickstart.md` "Build sequence").
+- **P4 ∥ P6.** Both depend only on P3 (P4 also on P2, which precedes it) and share no source
+  file. P4 touches `(auth)/signup/*`, `components/consent/*`, `lib/consent/{copy,read}.ts`, the
+  three capture routes and `baseline-section.tsx`. P6 touches `app/page.tsx` →
+  `app/(public)/page.tsx`, `lib/{bands,landing,routing}/*`, `components/landing/*`, `bloom.tsx`
+  and `session-trend-geometry.ts`.
+- **P5 is AFTER P4, not parallel with it.** It consumes two modules P4 creates —
+  `components/consent/actions.ts` (T047 → T065) and `lib/consent/read.ts` (T046 → T066) —
+  and `plan.md` §14.1 sequences it that way deliberately: **"P5 alone and after P4."**
+  **P4 owns both files; P5 consumes them.**
+- **P5 ships ALONE.** Running after P4 and shipping alone are different claims and both hold:
+  nothing else may enter the P5 PR, or `git revert` stops being a clean one-command rollback
+  (R2).
+- **P7 needs P6** — the team section renders inside the landing page P6 creates, and it extends
+  `lib/landing/copy.ts`, which P6 authors.
+- **P8 needs everything**, and merges to `main` exactly once (T148).
 
 ### Within-phase order
 
 - **P1**: T002 → {T003, T004, T005, T006, T007} → {T008, T009} → T010.
 - **P2**: {T011, T012} → {T013, T014, T016, T017, T018} → T015 → T019.
 - **P3**: T020 → T021 → T022 → T023 → T024 → {T025, T026} → T027 → T028 → {T029, T030} → {T031, T032, T033, T034, T035} → T036 → T037.
+- **P4**: T038 → T039 → T040 → {T041, T046} → T042 → {T043, T044} → T045 → T047 → T048 → {T049, T050, T051, T052} → {T053, T054, T055, T056, T057, T058, T059} → T060 → T061 → T062.
+- **P5**: T063 → T064 → T065 → T066 → T067 → {T068, T069, T070, T071, T072, T073} → T074 → T075 → T076 → T077.
+- **P6**: {T078, T079} → {T080, T082, T084} → {T081, T083, T085} → T086 → T087 → T088 → T089 → T090 → T091 → T092 → T093 → T094 → T095 → T096 → T097 → T098 → T099 → {T100, T101, T102, T103} → T104 → {T105, T106, T108, T109} → T107 → T110 → T111 → T112 → T113.
+- **P7**: {T114, T115} → T116 → T117 → T118 → {T119, T120} → T121 → T122 → {T123, T124} → T125 → {T126, T127} → T128 → T129 → T130.
+- **P8**: T131 → T132 → T133 → T134 → T135 → T136 → T137 → **T138 (ABORT POINT)** → {T139, T140, T141, T142, T143, T144} → T145 → T146 → T147 → T148.
 
 ### Parallel opportunities
 
@@ -407,6 +957,88 @@ T034  tests/unit/components/public/public-shell.test.tsx
 T035  README.md
 ```
 
+**Phase level, P4–P7** — **two tracks, not three**: P4 → P5 on one, P6 → P7 on the other, run
+simultaneously. P5 cannot start before P4 lands `components/consent/actions.ts` (T047) and
+`lib/consent/read.ts` (T046), and `plan.md` §14.1 sequences it after P4 anyway.
+
+**P4**, after T048 — the three capture routes plus the route back are fully disjoint:
+
+```text
+T049  app/(onboarding)/onboarding/page.tsx
+T050  app/(authed)/app/calibrate/page.tsx
+T051  app/(authed)/app/monitor/page.tsx
+T052  components/anchor/baseline-section.tsx + app/(authed)/app/account/page.tsx
+```
+
+then the whole test block, all seven in parallel:
+
+```text
+T053  tests/unit/lib/auth/signup-consent-gate.test.ts
+T054  tests/unit/lib/consent/fail-closed.test.ts
+T055  tests/unit/components/consent/decline-writes-nothing.test.tsx
+T056  tests/unit/components/consent/camera-consent-gate.test.tsx
+T057  tests/unit/components/consent/questionnaire-unaffected.test.tsx
+T058  tests/unit/landing/forbidden-claims.test.ts        (extend)
+T059  tests/unit/lib/legal/no-web-storage.test.ts        (widen)
+```
+
+**P5**, after T067 — six test files, no shared source:
+
+```text
+T068  tests/unit/lib/env/consent-entry-gate.test.ts
+T069  tests/unit/components/consent/terms-reconsent-screen.test.tsx
+T070  tests/unit/app/authed-layout-consent-gate.test.tsx
+T071  tests/unit/app/authed-layout-fail-open.test.tsx
+T072  tests/unit/app/authed-layout-kill-switch.test.tsx
+T073  tests/unit/lib/legal/no-web-storage.test.ts        (widen)
+```
+
+**P6**, three independent tracks that only converge at T104. The extraction track (T080–T083)
+and the routing track (T084–T087) touch nothing the story track touches, so they can be
+reviewed and even landed as separate commits early:
+
+```text
+extraction   T080 lib/bands.ts → T081 session-trend-geometry.ts
+             T082 bloom.tsx    → T083 bloom.test.tsx
+routing      T084 lib/routing/resolve-root-route.ts → T085 its test → T086 the move → T087 e2e
+story        T088 mock read → T089/T090 copy → T091/T092 script → T093…T099 the card
+sections     T100 hero · T101 never-cards · T102 how-it-works · T103 status   ← four in parallel
+```
+
+then, after T104:
+
+```text
+T105  tests/unit/landing/forbidden-claims.test.ts        (extend)
+T106  tests/unit/components/landing/story-card.test.tsx
+T108  tests/unit/components/landing/landing-a11y.test.tsx
+T109  tests/unit/lib/legal/no-web-storage.test.ts        (widen)
+```
+
+(T107, the layout spec, needs a running dev server and is not parallel with the walk in T110.)
+
+**P7**, after T122:
+
+```text
+T123  the eight external links
+T124  caption + supervisor credits
+```
+
+and after T125: `T126` (a11y + links) ∥ `T127` (photo-blocked resilience). `T119` (frozen
+paths) and `T120` (copy) are parallel immediately after T118.
+
+**P8**, after the T138 abort point clears — six closure and documentation tasks, all disjoint:
+
+```text
+T139  #75  + docs/BACKLOG.md
+T140  #157 + docs/BACKLOG.md
+T141  #158 + docs/BACKLOG.md
+T142  TTFB follow-up → docs/BACKLOG.md + new issue
+T143  docs/DECISIONS.md
+T144  docs/CHANGELOG.md
+```
+
+Nothing before T138 is parallel. The deploy is a sequence with an abort point, deliberately.
+
 ---
 
 ## Implementation strategy
@@ -419,8 +1051,27 @@ T035  README.md
    depends on them. Nothing can be built on the consent model until the model is proven.
 3. **P3.** The legally binding half is written and reviewed while schedule pressure is lowest —
    which is the entire point of Order A, because FR-050 exists to stop legal text being written
-   in a hurry.
-4. **Stop.** Regenerate P4–P8 against the components P3 actually created.
+   in a hurry. ✅ **P1–P3 are merged** (#168, #169, #170).
+4. **Two tracks in parallel: P4 → P5, and P6 → P7. Start P6 on day one.** Order A's one accepted
+   cost is that the hero story card, the largest and least predictable item in the feature, is
+   discovered last, against the deadline (`plan.md` §14.2). Running the P6 track concurrently
+   with the P4 track recovers most of that without re-opening the decision: the legal half is
+   already written and reviewed, so nothing is being rushed, and P6's 36 tasks get the calendar
+   they need. **If P6 overruns, it is P6 that gets cut** — the sections in T100–T103 are
+   separable and the story card is not. #75's deploy blocker closes when P4 merges, independent
+   of P6.
+5. **P5 follows P4 on the same track, and ships alone.** It consumes two modules P4 creates
+   (T046, T047), so it cannot start earlier, and `plan.md` §14.1 sequences it after P4 on
+   purpose. Its PR contains the gate, the screen, the env flag and their tests, and nothing
+   else. That constraint is the rollback mechanism, not process theatre (R2).
+6. **P7 after P6.** It renders inside P6's page and extends P6's copy module.
+7. **P8 last, and its deploy is a sequence, not a batch.** T133's backup decision is Mohamed's
+   and blocks everything after it. **T138 is a real abort point** — if the first throwaway
+   signup through the real surface does not produce exactly one valid consent row with no
+   fail-open log line, the answer is to roll back, not to investigate on a live database.
+8. **One merge to `main`, at T148**, with the squash message inspected for `Claude-Session:`
+   trailers first — squash concatenates the branch's commit messages, and this repository is
+   public.
 
 Each phase is one PR, independently buildable, reviewable, and revertible.
 
@@ -474,15 +1125,10 @@ discrepancy that prompted it.
 
 ## Not in this file
 
-**P4–P8**, per `plan.md` §14, to be generated after P3 lands:
+**#62 stays open and untouched** (R8, `plan.md` §3 Principle VIII). It is a ⛔ pre-production
+deploy blocker and the root cause of the SC-006 bypass, and it is out of scope for this feature.
+Any task that appears to require touching it is a **stop and report**, not a scope decision.
 
-| Phase | Scope | Depends on |
-|---|---|---|
-| **P4** | The two prompting gates — signup acknowledgement; camera/inference gate at all three capture routes (`/onboarding`, `/app/calibrate`, `/app/monitor` — §0.5); the Account → Baseline route back | P2, P3 |
-| **P5** | App-shell entry gate; `TermsReconsentScreen`; `CONSENT_ENTRY_GATE_ENABLED`; the fail-open log line. **Alone in its PR** | P2, P3 |
-| **P6** | Landing page — root-route takeover, `lib/bands.ts`, `bloom.tsx`'s optional `color` prop, the hero story card with the three approved strings from §10.3, the layout stability spec | P3 |
-| **P7** | Team section — photo crop, frozen silhouettes, overlay, name cards, links, caption, supervisors | P6 |
-| **P8** | `smoke-tests.md` authored and run; BACKLOG **#75**, **#157**, **#158** resolved and all three issues closed in the same change; `docs/DECISIONS.md` / `CHANGELOG.md` / `PROGRESS.md`; the TTFB follow-up logged; merge to `main` | all |
-
-**#62 stays open and untouched** (R8, `plan.md` §3 Principle VIII). **#86** and **#155** are
-referenced, not owned.
+**#86** (the reading-retention purge job) and **#155** (`--color-on-accent` / `--color-scrim`
+unregistered in Principle V) are **referenced, not owned** — named where they are relevant, and
+neither closed nor built here.
