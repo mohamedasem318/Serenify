@@ -8,6 +8,7 @@ import { SecuritySection } from "@/components/account/security-section";
 import { SignOutSection } from "@/components/account/sign-out-section";
 import { BaselineSection } from "@/components/anchor/baseline-section";
 import { Separator } from "@/components/ui/separator";
+import { readCameraGateDecision } from "@/lib/consent/read";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = { title: "Account — Serenify" };
@@ -38,9 +39,14 @@ export default async function AccountPage() {
   // FR-041). Conservative on null/error: treat as not-set (the safe, additive copy).
   const isEmployee = profile?.role === "employee";
   let hasAnchor = false;
+  // The camera-and-inference consent, resolved alongside has_anchor and passed to the
+  // same section (feature 013, T052 / research.md §6.4). Only for employees, for the
+  // same reason has_anchor is: nobody else has an anchor flow to consent for.
+  let cameraConsent: "allowed" | "blocked" = "allowed";
   if (isEmployee) {
     const { data } = await supabase.rpc("has_anchor", { target_user: user.id });
     hasAnchor = data === true;
+    cameraConsent = await readCameraGateDecision(supabase);
   }
 
   return (
@@ -60,7 +66,7 @@ export default async function AccountPage() {
       {isEmployee && (
         <>
           <Separator />
-          <BaselineSection hasAnchor={hasAnchor} />
+          <BaselineSection hasAnchor={hasAnchor} cameraConsent={cameraConsent} />
         </>
       )}
       <Separator />

@@ -12,6 +12,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  BASELINE_CONSENT_ABSENT_CTA,
+  BASELINE_CONSENT_ABSENT_LINE,
+} from "@/lib/consent/copy";
 
 /**
  * Account "Your calm baseline" section (feature 005 — T025; 📌 DECISION-22/23,
@@ -39,8 +43,26 @@ import {
 // not-yet-calibrated user arriving with this param is treated as first-time (T026).
 const RECALIBRATE_HREF = "/app/calibrate?mode=recalibrate";
 
-export function BaselineSection({ hasAnchor }: { hasAnchor: boolean }) {
+export function BaselineSection({
+  hasAnchor,
+  cameraConsent = "allowed",
+}: {
+  hasAnchor: boolean;
+  /**
+   * The camera-and-inference consent decision for this user (feature 013, T052).
+   *
+   * DEFAULTS TO "allowed" so that a caller which does not pass it renders exactly what
+   * this section rendered before feature 013 — byte-for-byte. That default is also the
+   * right failure posture for this particular surface: it is a signpost, not a gate.
+   * The gate itself lives at the capture route and fails CLOSED (§7.2), so the worst a
+   * missing signpost costs is that the consent surface is a small surprise rather than
+   * an announced one. Failing closed HERE would instead show a "you have not consented"
+   * line to users who have, which is worse and also false.
+   */
+  cameraConsent?: "allowed" | "blocked";
+}) {
   const [headsUpOpen, setHeadsUpOpen] = useState(false);
+  const consentAbsent = cameraConsent === "blocked";
 
   return (
     <section aria-labelledby="account-baseline-heading" className="space-y-6">
@@ -56,6 +78,14 @@ export function BaselineSection({ hasAnchor }: { hasAnchor: boolean }) {
             ? "Serenify has a calm reference for you. You can set a new one whenever you like — it takes about a quiet minute."
             : "Your calm baseline isn’t set yet. Setting it takes about a quiet minute to yourself."}
         </p>
+        {/* ONE line, only when the camera-and-inference consent is absent (§6.4). Not a
+            banner and not a second gate: a sentence that names what is missing and why
+            the control below says what it says. */}
+        {consentAbsent && (
+          <p className="text-sm leading-relaxed text-muted">
+            {BASELINE_CONSENT_ABSENT_LINE}
+          </p>
+        )}
       </header>
 
       {/* Whether-set indicator — set vs not-set ONLY (no date; FR-041 / DECISION-23).
@@ -75,7 +105,22 @@ export function BaselineSection({ hasAnchor }: { hasAnchor: boolean }) {
           </p>
         </div>
 
-        {hasAnchor ? (
+        {consentAbsent ? (
+          // The deliberate route back to a declined camera gate (T052, research.md §6.4).
+          // It reuses RECALIBRATE_HREF rather than inventing a destination: /app/calibrate
+          // is where the gate renders when consent is absent, so this control genuinely
+          // opens it. Same full-document <a href> invariant as the CTAs below — a
+          // soft-nav into a capture route keeps the previous route's camera=()
+          // Permissions-Policy and the camera dies (FR-055 / DECISION-16).
+          //
+          // It REPLACES the ordinary CTA rather than sitting beside it. Both would point
+          // at the same href, and labelling one "Set your baseline" would promise a
+          // capture that cannot start yet — the honest label is the one that says what
+          // actually happens next.
+          <Button asChild variant="meadow" className="h-11 w-full sm:w-auto">
+            <a href={RECALIBRATE_HREF}>{BASELINE_CONSENT_ABSENT_CTA}</a>
+          </Button>
+        ) : hasAnchor ? (
           <Button
             type="button"
             variant="meadow"
