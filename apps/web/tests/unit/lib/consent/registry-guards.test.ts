@@ -197,18 +197,24 @@ describe("guard (d): published history is append-only", () => {
   });
 });
 
-// ── P2 posture: both keys ship empty, and that is the design ─────────────────
+// ── Publication posture: terms_privacy published in P3, camera_inference not yet ──
 
-describe("P2 ships no entries", () => {
+describe("what is published", () => {
   it("declares both keys so no gate can reference a missing one", () => {
     for (const key of KEYS) {
       expect(CONSENT_REGISTRY[key]).toBeDefined();
     }
   });
 
-  it("publishes nothing yet — terms_privacy lands in P3, camera_inference in P4", () => {
-    // Delete this test in P3 when T023 appends the first terms_privacy revision.
-    expect(CONSENT_REGISTRY.terms_privacy).toHaveLength(0);
+  it("terms_privacy is published — its wording shipped in the same PR (T023)", () => {
+    // Replaces P2's "publishes nothing yet" assertion, which T023 retired by appending
+    // the first entry. `research.md` §6.1 fixes publishing as "wording + registry entry
+    // in the same PR", so a published entry here means lib/legal/copy.ts holds the text.
+    expect(CONSENT_REGISTRY.terms_privacy.length).toBeGreaterThan(0);
+  });
+
+  it("camera_inference is still unpublished — its first entry lands in P4", () => {
+    // Delete this assertion in P4, when the camera-and-inference wording ships with it.
     expect(CONSENT_REGISTRY.camera_inference).toHaveLength(0);
   });
 });

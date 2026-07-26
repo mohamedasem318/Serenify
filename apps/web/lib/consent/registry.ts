@@ -12,8 +12,9 @@
  * the exhaustive evaluator suite can cover every registry shape without a database
  * (`contracts/consent-evaluate.md`, "Purity").
  *
- * Ships with BOTH keys and ZERO entries. `terms_privacy`'s first revision lands in P3
- * with the documents it describes; `camera_inference`'s lands in P4 with the camera
+ * `terms_privacy` carries its first revision as of P3, appended in the same PR as the
+ * Terms of Service and Privacy Policy wording it describes (`lib/legal/copy.ts`).
+ * `camera_inference` is still empty; its first revision lands in P4 with the camera
  * wording. An empty entry list is not a bug here — the evaluator throws on one rather
  * than returning `undefined` (`evaluate.ts`), and nothing renders a gate until P4.
  *
@@ -40,8 +41,18 @@ export type ConsentRevision = {
 };
 
 export const CONSENT_REGISTRY: Readonly<Record<ConsentTextKey, readonly ConsentRevision[]>> = {
-  // First entry: P3 (T023), with the Terms and Privacy Policy documents themselves.
-  terms_privacy: [],
+  terms_privacy: [
+    {
+      versionId: "terms_privacy@2026-07-26.1",
+      publishedOn: "2026-07-26",
+      materiality: "material",
+      rationale:
+        "Initial publication of the Terms of Service and the Privacy Policy. The first " +
+        "revision of a text is material by definition — there is no earlier wording anyone " +
+        "could already hold, so every user must be asked. Published together with the " +
+        "documents themselves in lib/legal/copy.ts (feature 013, P3).",
+    },
+  ],
   // First entry: P4, with the camera-and-inference consent wording.
   camera_inference: [],
 };
