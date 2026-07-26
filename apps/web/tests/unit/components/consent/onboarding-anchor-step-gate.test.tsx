@@ -7,7 +7,9 @@ const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 vi.mock("@/hooks/use-media-query", () => ({ useMediaQuery: () => false }));
 
-const completeOnboarding = vi.fn(async (_form: FormData) => ({ status: "ok" as const }));
+const completeOnboarding = vi.fn<(form: FormData) => Promise<{ status: "ok" }>>(async () => ({
+  status: "ok",
+}));
 vi.mock("@/app/(onboarding)/onboarding/actions", () => ({
   completeOnboarding: (form: FormData) => completeOnboarding(form),
 }));
