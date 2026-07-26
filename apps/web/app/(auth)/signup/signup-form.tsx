@@ -73,7 +73,14 @@ export function SignupForm({
       // with no accept_terms at all and be rejected — the gate would look broken rather
       // than strict, and only for the users who have JS.
       form.set("accept_terms", values.accept_terms);
-      form.set("terms_privacy_version", values.terms_privacy_version);
+      // The PROP, not values.terms_privacy_version. react-hook-form captures
+      // defaultValues once at mount and never re-syncs them, but the stale_terms
+      // recovery below deliberately refreshes the server component WITHOUT unmounting
+      // this form (so the typed password survives). Reading RHF's copy would therefore
+      // resubmit the superseded id forever, and only a hard reload would escape — the
+      // no-JS path would recover and the JS path would not. The prop is re-rendered by
+      // the refresh, so it is always the server's current value.
+      form.set("terms_privacy_version", termsVersionId);
       const result = await signUp(form);
       setSubmitState(result);
       if (result.status === "ok") {

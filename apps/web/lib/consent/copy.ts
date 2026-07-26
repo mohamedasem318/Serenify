@@ -110,9 +110,9 @@ export const CAMERA_GATE_SCOPE: readonly string[] = [
   "The weekly work-environment check-in keeps working. It is a text questionnaire about " +
     "your working conditions and it has never involved the camera.",
   "The companion conversation keeps working, exactly as it does now.",
-  "Declining records nothing and deletes nothing. You are not asked again in this " +
-    "session, and the choice is open whenever you want it — the account page carries the " +
-    "way back.",
+  "Declining records nothing and deletes nothing. Because nothing is stored, this is " +
+    "offered again next time you open calibration or a monitoring session, and the " +
+    "account page carries the way back whenever you want it.",
 ];
 
 export const CAMERA_GATE_ACCEPT_LABEL = "Allow camera and inference";

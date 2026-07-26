@@ -197,7 +197,7 @@ describe("guard (d): published history is append-only", () => {
   });
 });
 
-// ── Publication posture: terms_privacy published in P3, camera_inference not yet ──
+// ── Publication posture: both texts published — terms_privacy in P3, camera in P4 ──
 
 describe("what is published", () => {
   it("declares both keys so no gate can reference a missing one", () => {

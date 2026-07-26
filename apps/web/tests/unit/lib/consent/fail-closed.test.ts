@@ -33,36 +33,67 @@ import { currentRevision } from "@/lib/consent/evaluate";
 
 const CURRENT = currentRevision("camera_inference").versionId;
 
+/**
+ * A PostgREST-shaped fake: `.eq()` is chainable AND thenable, exactly as Supabase's
+ * builder is. Modelling it as returning a bare Promise would make these fakes pass while
+ * the real client did something else — the read chains two `.eq()` calls (consent_key
+ * and decision), and a non-chainable fake would have hidden that.
+ */
+function chain(settle: () => Promise<{ data: unknown; error: unknown }>) {
+  const link = {
+    eq: () => link,
+    then: (
+      onFulfilled?: ((value: { data: unknown; error: unknown }) => unknown) | null,
+      onRejected?: ((reason: unknown) => unknown) | null,
+    ) => settle().then(onFulfilled, onRejected),
+  };
+  return link;
+}
+
 /** A client whose query resolves to whatever response shape a test needs. */
 function clientResolving(response: { data: unknown; error: unknown }) {
-  return {
-    from: () => ({
-      select: () => ({
-        eq: () => Promise.resolve(response),
-      }),
-    }),
-  };
+  return { from: () => ({ select: () => chain(async () => response) }) };
 }
 
 /** A client whose query rejects outright. */
 function clientRejecting(reason: unknown) {
   return {
     from: () => ({
-      select: () => ({
-        eq: () => Promise.reject(reason),
-      }),
+      select: () =>
+        chain(() => Promise.reject(reason) as Promise<{ data: unknown; error: unknown }>),
     }),
   };
 }
 
 describe("the read distinguishes 'no rows' from 'unreadable' (T046)", () => {
-  it("an empty result is OK with no held versions — NOT an error", () => {
+  it("an empty result is OK with no held versions — NOT an error", async () => {
     // Every pre-existing user is in exactly this state, because the migration backfills
     // nothing, ever (§7.4, FR-041). Treating it as an error would make the log unusable.
-    return readHeldConsentVersions(clientResolving({ data: [], error: null }), "camera_inference")
-      .then((result) => {
-        expect(result).toEqual({ status: "ok", heldVersionIds: [] });
-      });
+    const result = await readHeldConsentVersions(
+      clientResolving({ data: [], error: null }),
+      "camera_inference",
+    );
+    expect(result).toEqual({ status: "ok", heldVersionIds: [] });
+  });
+
+  it("filters to granted decisions, so a future withdrawal row cannot satisfy a gate", async () => {
+    // The filter is a no-op against today's CHECK, which admits only 'granted'. It is
+    // asserted anyway: feature 018 widens that CHECK, and this is the assertion that
+    // will fail if someone removes the filter while making that change.
+    const eqCalls: [string, string][] = [];
+    const link = {
+      eq: (column: string, value: string) => {
+        eqCalls.push([column, value]);
+        return link;
+      },
+      then: (onFulfilled?: ((v: { data: unknown; error: unknown }) => unknown) | null) =>
+        Promise.resolve({ data: [], error: null }).then(onFulfilled),
+    };
+
+    await readHeldConsentVersions({ from: () => ({ select: () => link }) }, "camera_inference");
+
+    expect(eqCalls).toContainEqual(["consent_key", "camera_inference"]);
+    expect(eqCalls).toContainEqual(["decision", "granted"]);
   });
 
   it("an error response is unreadable, and carries the underlying error", async () => {

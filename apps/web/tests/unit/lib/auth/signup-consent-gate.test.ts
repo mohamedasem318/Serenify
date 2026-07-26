@@ -148,6 +148,7 @@ describe("signUp() — an unacknowledged submission creates nothing", () => {
   it("passes the SERVER's version id into options.data, never the form's", async () => {
     const { signUp } = await import("@/app/(auth)/signup/actions");
     const { currentRevision } = await import("@/lib/consent/evaluate");
+    const serverVersion = currentRevision("terms_privacy").versionId;
 
     await signUp(
       formOf({ ...credentials, accept_terms: "on", terms_privacy_version: VALID_VERSION }),
@@ -157,9 +158,29 @@ describe("signUp() — an unacknowledged submission creates nothing", () => {
     const options = signUpMock.mock.calls[0]?.[0]?.options;
     // The metadata KEY is load-bearing: handle_new_user() reads exactly this name, and
     // a different one writes no consent row at all.
-    expect(options.data.terms_privacy_version).toBe(
-      currentRevision("terms_privacy").versionId,
-    );
+    expect(options.data.terms_privacy_version).toBe(serverVersion);
     expect(options.data.full_name).toBe("Alex");
+  });
+
+  it("cannot be satisfied by a form value that merely LOOKS current", async () => {
+    // The previous assertion alone is weak: because a submission only survives the
+    // staleness check when its version already equals the server's, forwarding the
+    // form's value and forwarding the server's are indistinguishable there. This one
+    // separates them — the form carries a value that differs only in an invisible way
+    // (leading whitespace), which must be REJECTED outright rather than trimmed and
+    // stored. If the action ever forwarded parsed.data instead of its own resolved id,
+    // a padded value would sail through and be written verbatim.
+    const { signUp } = await import("@/app/(auth)/signup/actions");
+
+    const result = await signUp(
+      formOf({
+        ...credentials,
+        accept_terms: "on",
+        terms_privacy_version: ` ${VALID_VERSION}`,
+      }),
+    );
+
+    expect(result).toEqual({ status: "stale_terms" });
+    expect(signUpMock).not.toHaveBeenCalled();
   });
 });

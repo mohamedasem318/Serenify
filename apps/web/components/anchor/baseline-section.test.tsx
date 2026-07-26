@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -59,10 +59,34 @@ describe("BaselineSection — whether-set only (FR-036/041, DECISION-23)", () =>
 });
 
 describe("BaselineSection — the camera-consent route back (T052, research.md §6.4)", () => {
-  it("renders exactly as before when the prop is omitted, so P3's output is unchanged", () => {
-    // The byte-for-byte guarantee T052 asks for, asserted rather than assumed: an
-    // omitted prop must produce the same markup as an explicitly-allowed one.
+  it.each([true, false])(
+    "adds nothing at all to the consent-present render (hasAnchor=%s)",
+    (hasAnchor) => {
+      // T052's byte-for-byte guarantee. Comparing an omitted prop against an explicit
+      // "allowed" would be a tautology — both take the same branch by construction — so
+      // this compares the ALLOWED render against the BLOCKED one and pins exactly what
+      // the new state adds: the line, and the swapped control. Everything else, in both
+      // hasAnchor states, must be untouched.
+      const allowed = render(
+        <BaselineSection hasAnchor={hasAnchor} cameraConsent="allowed" />,
+      ).container.innerHTML;
+      cleanup();
+      const blocked = render(
+        <BaselineSection hasAnchor={hasAnchor} cameraConsent="blocked" />,
+      ).container.innerHTML;
+
+      expect(allowed).not.toBe(blocked);
+      // The whether-set indicator — the part DECISION-23 pins — is identical in both.
+      expect(allowed).toContain(hasAnchor ? "Baseline set" : "Not set yet");
+      expect(blocked).toContain(hasAnchor ? "Baseline set" : "Not set yet");
+      // and the allowed render carries no trace of the consent state
+      expect(allowed).not.toContain("camera-and-inference");
+    },
+  );
+
+  it("an omitted prop is the allowed prop, so P3's callers are unaffected", () => {
     const withoutProp = render(<BaselineSection hasAnchor={false} />).container.innerHTML;
+    cleanup();
     const explicitlyAllowed = render(
       <BaselineSection hasAnchor={false} cameraConsent="allowed" />,
     ).container.innerHTML;

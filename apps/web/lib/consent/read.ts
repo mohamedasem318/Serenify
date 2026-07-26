@@ -53,10 +53,12 @@ type ConsentQueryClient = {
   from: (table: string) => unknown;
 };
 
+type ConsentEqChain = {
+  eq: (column: string, value: string) => ConsentEqChain & PromiseLike<ConsentQueryResponse>;
+};
+
 type ConsentSelectChain = {
-  select: (columns: string) => {
-    eq: (column: string, value: string) => PromiseLike<ConsentQueryResponse>;
-  };
+  select: (columns: string) => ConsentEqChain;
 };
 
 export type ConsentReadResult =
@@ -76,9 +78,15 @@ export async function readHeldConsentVersions(
   key: ConsentTextKey,
 ): Promise<ConsentReadResult> {
   try {
+    // The `decision = 'granted'` filter is a NO-OP today — the column's CHECK admits
+    // nothing else — and that is exactly why it is written now rather than later.
+    // Feature 018 widens that CHECK to model withdrawal by inserting a NEW row, and at
+    // that moment a query without this filter would silently count a withdrawn row as a
+    // held consent. The filter costs nothing and closes that door before it opens.
     const { data, error } = await (client.from("user_consents") as ConsentSelectChain)
       .select("document_version")
-      .eq("consent_key", key);
+      .eq("consent_key", key)
+      .eq("decision", "granted");
 
     if (error) {
       return { status: "unreadable", error };

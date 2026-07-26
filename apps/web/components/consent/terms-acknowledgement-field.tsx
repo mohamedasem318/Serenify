@@ -76,8 +76,17 @@ export function TermsAcknowledgementField({
       <div className="flex items-start gap-3">
         {/* The 44px tap target (FR-053) is the padding, and the negative margin hangs it
             outside the flow so the 20px box still aligns optically with the first line of
-            the label. Sizing the checkbox itself to 44px would read as a crate. */}
-        <span className="-m-3 grid shrink-0 p-3">
+            the label. Sizing the checkbox itself to 44px would read as a crate.
+
+            This wrapper is a <label>, not a <span>. As a span the padded ring swallowed
+            clicks and toggled nothing, so the real hit area was the bare 20px box and
+            the 44px claim was decoration. Two labels for one control is valid HTML — the
+            second one below carries the text — and it is what makes the padding
+            genuinely clickable. */}
+        <label
+          htmlFor="accept_terms"
+          className="-m-3 grid shrink-0 cursor-pointer p-3"
+        >
           <input
             id="accept_terms"
             name="accept_terms"
@@ -95,7 +104,7 @@ export function TermsAcknowledgementField({
               focus-visible:ring-offset-2 focus-visible:ring-offset-bg
               disabled:cursor-not-allowed disabled:opacity-60"
           />
-        </span>
+        </label>
 
         <label
           htmlFor="accept_terms"

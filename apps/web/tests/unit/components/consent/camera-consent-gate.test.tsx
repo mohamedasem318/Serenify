@@ -133,9 +133,13 @@ describe("accepting", () => {
     fireEvent.click(screen.getByRole("button", { name: CAMERA_GATE_ACCEPT_LABEL }));
 
     await waitFor(() => expect(writer).toHaveBeenCalled());
-    const args = writer.mock.calls[0] ?? [];
-    expect(args).toHaveLength(1);
-    expect(args[0]).not.toBe(currentRevision("camera_inference").versionId);
+    // toHaveBeenCalledWith compares the FULL argument list, so this simultaneously
+    // proves the argument is the key and that no version id rode along beside it.
+    expect(writer).toHaveBeenCalledWith("camera_inference");
+    expect(writer).not.toHaveBeenCalledWith(
+      "camera_inference",
+      currentRevision("camera_inference").versionId,
+    );
   });
 
   it("re-runs the gating server component on success rather than navigating", async () => {
