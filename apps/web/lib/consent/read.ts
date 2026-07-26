@@ -26,18 +26,36 @@ import type { ConsentTextKey } from "./registry";
  * does anyone created during the P8 deploy window. It means *not consented*, not *broken*.
  */
 
-/** The minimal shape of the Supabase client this read needs — injected, never created. */
+/**
+ * The minimal shape of the Supabase client this read needs — injected, never created.
+ *
+ * `data` is `unknown` on purpose, and not `{ document_version: string }[] | null`. Two
+ * reasons, one practical and one principled. Practically, a precise row type here makes
+ * the assignability check against Supabase's deeply-generic query builder blow the
+ * compiler's instantiation limit (TS2589) at the call sites. Principled: this module
+ * treats the response as untrusted and validates its shape below, which is what lets it
+ * distinguish "no rows" from "something unreadable came back" honestly rather than by
+ * assertion.
+ */
+type ConsentQueryResponse = { data: unknown; error: unknown };
+
+/**
+ * The contract is only `from`, and its return is `unknown`. Spelling the whole
+ * `.select().eq()` chain out here made the assignability check against Supabase's
+ * deeply-generic `PostgrestQueryBuilder` exceed the compiler's instantiation limit
+ * (TS2589) in `app/(authed)/app/calibrate/page.tsx`, which already does enough generic
+ * Supabase work in one file to sit near it. Narrowing the contract to `from` and
+ * asserting the chain shape at ONE controlled point below keeps the check trivial, keeps
+ * a hand-written fake trivial to construct in a test, and costs nothing in safety — the
+ * response is validated at runtime either way, which is the actual guarantee.
+ */
 type ConsentQueryClient = {
-  from: (table: string) => {
-    select: (columns: string) => {
-      eq: (
-        column: string,
-        value: string,
-      ) => PromiseLike<{
-        data: { document_version: string }[] | null;
-        error: unknown;
-      }>;
-    };
+  from: (table: string) => unknown;
+};
+
+type ConsentSelectChain = {
+  select: (columns: string) => {
+    eq: (column: string, value: string) => PromiseLike<ConsentQueryResponse>;
   };
 };
 
@@ -58,8 +76,7 @@ export async function readHeldConsentVersions(
   key: ConsentTextKey,
 ): Promise<ConsentReadResult> {
   try {
-    const { data, error } = await client
-      .from("user_consents")
+    const { data, error } = await (client.from("user_consents") as ConsentSelectChain)
       .select("document_version")
       .eq("consent_key", key);
 
@@ -73,10 +90,18 @@ export async function readHeldConsentVersions(
       return { status: "unreadable", error: new Error("consent read returned no rows array") };
     }
 
+    // Each row is validated rather than asserted. A row whose document_version is not a
+    // string is dropped, not coerced — a malformed value must never become a held
+    // version id, because `satisfiesConsent` checks membership and a garbage entry that
+    // happened to match would satisfy a gate it has no business satisfying (R7/R8).
     return {
       status: "ok",
       heldVersionIds: data
-        .map((row) => row?.document_version)
+        .map((row) =>
+          row && typeof row === "object" && "document_version" in row
+            ? (row as { document_version: unknown }).document_version
+            : undefined,
+        )
         .filter((version): version is string => typeof version === "string"),
     };
   } catch (error) {
