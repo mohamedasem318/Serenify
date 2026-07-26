@@ -32,8 +32,14 @@ How to build, run, and validate this feature locally. This is the only artifact 
 # Apply the migration locally
 supabase db reset
 
-# Database privacy gate — static parse of the migration, no live DB
-uv run pytest apps/api/tests/test_consent_privacy.py
+# Database privacy gate — static parse of the migration, no live DB.
+# NOTE the --directory: the Python project and its .venv live in apps/api, so
+# `uv run pytest …` from the repo root exits "Failed to spawn: pytest … program
+# not found". Corrected 2026-07-26.
+uv run --directory apps/api pytest tests/test_consent_privacy.py
+
+# …or the whole Python suite
+uv run --directory apps/api pytest
 
 # Web: lint, types, unit + component tests
 npm --workspace web run lint
