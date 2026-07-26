@@ -108,10 +108,18 @@ describe("signUpSchema", () => {
   });
 
   it("accepts a valid signup payload", () => {
+    // Feature 013 T041 added the two acknowledgement fields to this schema, so a
+    // credentials-only payload is no longer complete. That is the gate working, not a
+    // regression: FR-033 requires the acknowledgement to be an active choice, which
+    // means a submission that never made it cannot parse. The acknowledgement's own
+    // rejection cases live in tests/unit/lib/auth/signup-consent-gate.test.ts (T053);
+    // this suite keeps its original subject, which is the credential rules.
     const result = signUpSchema.safeParse({
       email: "alex@example.com",
       password: "Goodpass1",
       full_name: "Alex",
+      accept_terms: "on",
+      terms_privacy_version: "terms_privacy@2026-07-26.1",
     });
     expect(result.success).toBe(true);
   });
