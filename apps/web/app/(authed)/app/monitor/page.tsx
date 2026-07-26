@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import { MonitoringSession } from "@/components/monitor/monitoring-session";
+import { readCameraGateDecision } from "@/lib/consent/read";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -37,6 +39,15 @@ export default async function MonitorPage() {
   }
   if (profile.role !== "employee") {
     redirect("/app"); // employees-only (FR-010) — never a manager/admin surface
+  }
+
+  // The camera-and-inference gate (T051, §7.2), placed AFTER the employees-only guard so
+  // a team lead or admin is still redirected and never meets a consent surface for a
+  // capture they can never run. Returning the gate instead of <MonitoringSession> means
+  // no capture code and no getUserMedia call is mounted first (FR-038).
+  // Fails CLOSED — an unreadable read shows the gate (lib/consent/read.ts).
+  if ((await readCameraGateDecision(supabase)) === "blocked") {
+    return <CameraConsentGate />;
   }
 
   return <MonitoringSession />;
