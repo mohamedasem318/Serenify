@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 import { describe, expect, it } from "vitest";
@@ -28,15 +28,42 @@ import { describe, expect, it } from "vitest";
 
 const WEB_ROOT = join(__dirname, "..", "..", "..", "..");
 
-/** Directories this feature owns. Later phases add to this list; they do not replace it. */
+/**
+ * T059 (P4) — THE ONLY PHASE THAT EDITS THIS FILE.
+ *
+ * Every directory this feature creates is enumerated here in one change, including the
+ * ones that do not exist yet, so that P4, P5 and P6 cannot collide on one small test
+ * file. P5 (T073) and P6 (T109) VERIFY this list and promote their own paths; they add
+ * nothing else.
+ *
+ * The list is split rather than flat, because "a path entry matching nothing is inert"
+ * would have been a bad guarantee to build on: the coverage assertion below deliberately
+ * FAILS on a declared-but-empty directory, so that a renamed or mistyped path cannot
+ * silently turn the whole guard into a no-op that passes. Both properties are wanted, so
+ * both are stated separately.
+ */
+
+/** Directories that exist NOW and must contain source. A miss here is a broken guard. */
 const FEATURE_DIRS: readonly string[] = [
   "app/(public)",
   "components/public",
   "components/legal",
   "components/brand",
+  "components/consent",
   "lib/legal",
   "lib/consent",
 ];
+
+/**
+ * Directories a LATER phase creates. P6 creates both of these with the landing page.
+ *
+ * They are asserted ABSENT, not scanned — and that assertion is the point. The moment
+ * P6 creates one, this test fails and names it, so promoting the path into FEATURE_DIRS
+ * becomes a mechanical CI-enforced step rather than a remembered one. It is the same
+ * mechanism as the wordmark sync test and the registry's append-only snapshot: the guard
+ * that protects a future change is the one that fails when the future arrives.
+ */
+const RESERVED_FOR_LATER_PHASES: readonly string[] = ["components/landing", "lib/landing"];
 
 const SOURCE_EXTENSIONS = [".ts", ".tsx"];
 
@@ -61,6 +88,37 @@ describe("the scan actually covers this feature's files", () => {
       const inDir = FEATURE_FILES.filter((file) => file.startsWith(join(WEB_ROOT, dir)));
       expect(inDir.length, `no source files found under ${dir} — has it moved?`).toBeGreaterThan(0);
     }
+  });
+
+  it("the reserved paths do not exist yet — promote them the moment they do", () => {
+    // The reciprocal of the assertion above, and the reason the split is safe. When P6
+    // creates components/landing/ or lib/landing/, this fails by name and the fix is
+    // one line: move that entry into FEATURE_DIRS. Nobody has to remember.
+    for (const dir of RESERVED_FOR_LATER_PHASES) {
+      expect(
+        existsSync(join(WEB_ROOT, dir)),
+        `${dir} now exists — move it from RESERVED_FOR_LATER_PHASES into FEATURE_DIRS ` +
+          `so FR-051 actually covers it (T073 for P5, T109 for P6).`,
+      ).toBe(false);
+    }
+  });
+
+  it("declares every directory this feature creates, in one place", () => {
+    // The enumeration T059 fixes. Stated as a set comparison so an accidental deletion
+    // from either list fails here rather than silently narrowing the guard's reach.
+    expect([...FEATURE_DIRS, ...RESERVED_FOR_LATER_PHASES].sort()).toEqual(
+      [
+        "app/(public)",
+        "components/brand",
+        "components/consent",
+        "components/landing",
+        "components/legal",
+        "components/public",
+        "lib/consent",
+        "lib/landing",
+        "lib/legal",
+      ].sort(),
+    );
   });
 });
 
