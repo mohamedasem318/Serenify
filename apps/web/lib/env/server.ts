@@ -13,6 +13,7 @@ function loadServerEnv(): ServerEnv {
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     siteUrl: process.env.SITE_URL,
+    consentEntryGateEnabled: process.env.CONSENT_ENTRY_GATE_ENABLED,
   });
   if (!result.success) {
     throw new Error(
