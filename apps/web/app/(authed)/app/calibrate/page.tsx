@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import { resolveCalibrateMode } from "@/lib/anchor/calibrate-mode";
+import { readCameraGateDecision } from "@/lib/consent/read";
 import { createClient } from "@/lib/supabase/server";
 
 import { CalibrateRecorder } from "./calibrate-recorder";
@@ -67,11 +69,19 @@ export default async function CalibratePage({
     redirect("/app");
   }
 
+  // The camera-and-inference gate (T050, §7.2), placed AFTER mode reconciliation so it
+  // changes nothing about it. has_anchor keeps driving both the ST-17 redirect and the
+  // recalibrate reconciliation above, exactly as before — no new "has this user ever
+  // calibrated" concept is invented here. The gate asks one orthogonal question: is
+  // there a consent record. A recalibrating user with consent sees no difference.
+  // Fails CLOSED — an unreadable read shows the gate (lib/consent/read.ts).
+  const cameraGate = await readCameraGateDecision(supabase);
+
   return (
     // Centre the calm capture in the viewport below the header (FR — balanced,
     // not crammed to the top). The header + main padding take ~7rem.
     <div className="mx-auto flex min-h-[calc(100dvh-7rem)] w-full max-w-2xl flex-col justify-center pb-8">
-      <CalibrateRecorder mode={mode} />
+      {cameraGate === "blocked" ? <CameraConsentGate /> : <CalibrateRecorder mode={mode} />}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -58,6 +58,70 @@ describe("BaselineSection — whether-set only (FR-036/041, DECISION-23)", () =>
   });
 });
 
+describe("BaselineSection — the camera-consent route back (T052, research.md §6.4)", () => {
+  it.each([true, false])(
+    "adds nothing at all to the consent-present render (hasAnchor=%s)",
+    (hasAnchor) => {
+      // T052's byte-for-byte guarantee. Comparing an omitted prop against an explicit
+      // "allowed" would be a tautology — both take the same branch by construction — so
+      // this compares the ALLOWED render against the BLOCKED one and pins exactly what
+      // the new state adds: the line, and the swapped control. Everything else, in both
+      // hasAnchor states, must be untouched.
+      const allowed = render(
+        <BaselineSection hasAnchor={hasAnchor} cameraConsent="allowed" />,
+      ).container.innerHTML;
+      cleanup();
+      const blocked = render(
+        <BaselineSection hasAnchor={hasAnchor} cameraConsent="blocked" />,
+      ).container.innerHTML;
+
+      expect(allowed).not.toBe(blocked);
+      // The whether-set indicator — the part DECISION-23 pins — is identical in both.
+      expect(allowed).toContain(hasAnchor ? "Baseline set" : "Not set yet");
+      expect(blocked).toContain(hasAnchor ? "Baseline set" : "Not set yet");
+      // and the allowed render carries no trace of the consent state
+      expect(allowed).not.toContain("camera-and-inference");
+    },
+  );
+
+  it("an omitted prop is the allowed prop, so P3's callers are unaffected", () => {
+    const withoutProp = render(<BaselineSection hasAnchor={false} />).container.innerHTML;
+    cleanup();
+    const explicitlyAllowed = render(
+      <BaselineSection hasAnchor={false} cameraConsent="allowed" />,
+    ).container.innerHTML;
+    expect(withoutProp).toBe(explicitlyAllowed);
+  });
+
+  it("says nothing about camera consent while consent is present", () => {
+    const { container } = render(<BaselineSection hasAnchor cameraConsent="allowed" />);
+    expect(container.textContent ?? "").not.toMatch(/camera-and-inference|permission/i);
+    expect(screen.queryByRole("link", { name: /review camera permission/i })).toBeNull();
+  });
+
+  it("gains one line naming the consent, and the control that opens it, when absent", () => {
+    render(<BaselineSection hasAnchor={false} cameraConsent="blocked" />);
+    expect(screen.getByText(/camera-and-inference permission/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /review camera permission/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("offers ONE destination, not a duplicate CTA beside it", () => {
+    // Both controls would point at the same href, and "Set your baseline" would promise
+    // a capture that cannot start yet. The honest label is the only one shown.
+    render(<BaselineSection hasAnchor={false} cameraConsent="blocked" />);
+    expect(screen.queryByRole("link", { name: /set your baseline/i })).toBeNull();
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+  });
+
+  it("stays calm — no alarm, no exclamation, no implication of live monitoring", () => {
+    const { container } = render(<BaselineSection hasAnchor={false} cameraConsent="blocked" />);
+    expect(container.textContent ?? "").not.toContain("!");
+    expect(container.textContent ?? "").not.toMatch(/denied|blocked|refused|must|required/i);
+  });
+});
+
 describe("BaselineSection — replace heads-up (FR-037)", () => {
   it("opens an honest heads-up before replacing an existing baseline", () => {
     render(<BaselineSection hasAnchor />);
@@ -101,6 +165,15 @@ describe("BaselineSection — full-document recalibrate navigation (FR-055, DECI
   it("when no baseline is set, the CTA navigates straight in as a full-document <a href>", () => {
     render(<BaselineSection hasAnchor={false} />);
     const cta = screen.getByRole("link", { name: /set your baseline/i });
+    expect(cta.tagName).toBe("A");
+    expect(cta).toHaveAttribute("href", RECALIBRATE_HREF);
+  });
+
+  it("the consent route-back is a full-document <a href> too (T052)", () => {
+    render(<BaselineSection hasAnchor={false} cameraConsent="blocked" />);
+    const cta = screen.getByRole("link", { name: /review camera permission/i });
+    // Same invariant as the recalibrate CTAs, for the same reason: a soft-nav into a
+    // capture route keeps the previous route's camera=() Permissions-Policy.
     expect(cta.tagName).toBe("A");
     expect(cta).toHaveAttribute("href", RECALIBRATE_HREF);
   });

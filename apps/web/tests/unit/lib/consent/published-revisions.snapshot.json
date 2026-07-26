@@ -12,8 +12,8 @@
     "do not 're-baseline' the snapshot.",
     "",
     "terms_privacy@2026-07-26.1 is the first entry this snapshot has ever locked (P3,",
-    "T023). From here it can never be edited. camera_inference is still empty; its first",
-    "entry lands in P4 with the camera wording."
+    "T023). camera_inference@2026-07-26.1 was locked next (P4, T040), alongside the camera",
+    "wording in lib/consent/copy.ts. From here neither can ever be edited."
   ],
   "terms_privacy": [
     {
@@ -23,5 +23,12 @@
       "rationale": "Initial publication of the Terms of Service and the Privacy Policy. The first revision of a text is material by definition — there is no earlier wording anyone could already hold, so every user must be asked. Published together with the documents themselves in lib/legal/copy.ts (feature 013, P3)."
     }
   ],
-  "camera_inference": []
+  "camera_inference": [
+    {
+      "versionId": "camera_inference@2026-07-26.1",
+      "publishedOn": "2026-07-26",
+      "materiality": "material",
+      "rationale": "Initial publication of the camera-and-inference consent. The first revision of a text is material by definition — there is no earlier wording anyone could already hold, so every user must be asked before a calibration or a monitoring session captures anything. Published together with the wording itself in lib/consent/copy.ts (feature 013, P4)."
+    }
+  ]
 }

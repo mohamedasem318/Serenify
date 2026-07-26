@@ -14,9 +14,9 @@
  *
  * `terms_privacy` carries its first revision as of P3, appended in the same PR as the
  * Terms of Service and Privacy Policy wording it describes (`lib/legal/copy.ts`).
- * `camera_inference` is still empty; its first revision lands in P4 with the camera
- * wording. An empty entry list is not a bug here — the evaluator throws on one rather
- * than returning `undefined` (`evaluate.ts`), and nothing renders a gate until P4.
+ * `camera_inference` carries its first revision as of P4, appended in the same PR as the
+ * camera-and-inference wording it describes (`lib/consent/copy.ts`). Both keys are now
+ * published, so `evaluate.ts`'s empty-list throw is no longer reachable for either.
  *
  * `versionId` is the join key into the database: `user_consents.document_version` holds
  * exactly this string, and two CHECKs constrain its shape independently of this file
@@ -53,6 +53,17 @@ export const CONSENT_REGISTRY: Readonly<Record<ConsentTextKey, readonly ConsentR
         "documents themselves in lib/legal/copy.ts (feature 013, P3).",
     },
   ],
-  // First entry: P4, with the camera-and-inference consent wording.
-  camera_inference: [],
+  camera_inference: [
+    {
+      versionId: "camera_inference@2026-07-26.1",
+      publishedOn: "2026-07-26",
+      materiality: "material",
+      rationale:
+        "Initial publication of the camera-and-inference consent. The first revision of " +
+        "a text is material by definition — there is no earlier wording anyone could " +
+        "already hold, so every user must be asked before a calibration or a monitoring " +
+        "session captures anything. Published together with the wording itself in " +
+        "lib/consent/copy.ts (feature 013, P4).",
+    },
+  ],
 };
