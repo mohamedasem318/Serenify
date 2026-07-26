@@ -123,13 +123,16 @@ function supabaseFailing(mode: FailureMode) {
   };
 }
 
-let consoleError: ReturnType<typeof vi.spyOn>;
+/** Inferred from the call rather than annotated, so `mock.calls` keeps its real shape. */
+const spyOnConsoleError = () => vi.spyOn(console, "error").mockImplementation(() => {});
+
+let consoleError: ReturnType<typeof spyOnConsoleError>;
 
 beforeEach(() => {
   gate.redirect.mockClear();
   gate.createClient.mockReset();
   gate.env.consentEntryGateEnabled = true;
-  consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  consoleError = spyOnConsoleError();
 });
 
 afterEach(() => {
