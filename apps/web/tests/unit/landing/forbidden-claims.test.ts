@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import * as consentCopy from "@/lib/consent/copy";
 import * as legalCopy from "@/lib/legal/copy";
 
 /**
@@ -99,6 +100,11 @@ function collectStrings(
 // P6 appends `lib/landing/copy.ts` here (plan.md §10.1).
 const COPY_MODULES: readonly { readonly name: string; readonly module: unknown }[] = [
   { name: "lib/legal/copy.ts", module: legalCopy },
+  // T058 (P4). The camera gate's wording is the single most tempting place in the
+  // product to tell family (a)'s lie — it is the surface asking permission to use a
+  // webcam, where "the video never leaves your machine" is exactly the reassurance a
+  // reader most wants. It does leave. This walks that module too.
+  { name: "lib/consent/copy.ts", module: consentCopy },
 ];
 
 const ALL_STRINGS = COPY_MODULES.flatMap(({ name, module }) => collectStrings(module, name));
@@ -181,6 +187,26 @@ describe("the detector does not flag the claims FR-001 permits", () => {
   it("passes the manager-visibility passages, which state the visibility rather than deny it", () => {
     for (const passage of legalCopy.MANAGER_VISIBILITY_PASSAGES) {
       expect(violations(passage), `flagged: "${passage}"`).toEqual([]);
+    }
+  });
+
+  it("passes the consent gate's own camera wording, which also says video IS transmitted", () => {
+    // T058. Same inverse risk as the Privacy Policy passage below, but sharper here:
+    // this is the text a person reads in the moment they decide. Its first fact is
+    // pinned so a later "reassuring" rewrite fails rather than ships.
+    const facts = consentCopy.CAMERA_GATE_WHAT_HAPPENS;
+    for (const fact of facts) {
+      expect(violations(fact), `flagged: "${fact}"`).toEqual([]);
+    }
+    expect(facts[0]).toMatch(/video is transmitted/i);
+  });
+
+  it("the consent gate's wording mentions no manager at all", () => {
+    // Not "makes no forbidden manager claim" — mentions none. The gate asks one
+    // question, and a visibility claim bolted onto it would be a digression at best.
+    for (const value of Object.values(consentCopy)) {
+      const text = Array.isArray(value) ? value.join(" ") : String(value);
+      expect(text).not.toMatch(/manager|team lead|employer|supervisor/i);
     }
   });
 
