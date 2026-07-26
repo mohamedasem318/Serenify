@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import { readCameraGateDecision } from "@/lib/consent/read";
 import { createClient } from "@/lib/supabase/server";
 import { OnboardingForm } from "./onboarding-form";
@@ -25,13 +24,16 @@ export default async function OnboardingPage() {
   // getUserMedia. Gating only /app/calibrate would let every new employee's first
   // capture run unconsented.
   //
-  // Returning the gate INSTEAD of <OnboardingForm> is what keeps that true: the form's
-  // "anchor" step mounts <AnchorRecorder> (onboarding-form.tsx:60) once setStep("anchor")
-  // runs at :48, and neither can happen while the form is not in the tree (FR-038).
-  // Fails CLOSED — an unreadable read shows the gate (lib/consent/read.ts).
-  if ((await readCameraGateDecision(supabase)) === "blocked") {
-    return <CameraConsentGate />;
-  }
+  // THE DECISION IS PASSED DOWN, NOT APPLIED HERE. Replacing the whole <OnboardingForm>
+  // with the gate also removes the NAME step — the only thing that ever writes
+  // profiles.full_name — and declining then pushed to /app, where proxy.ts:203 bounces a
+  // null-full_name user straight back to /onboarding. That was an unescapable loop and a
+  // total product lockout. FR-043c blocks camera capture "and nothing else"; a text field
+  // is not camera capture. So the form owns the gate at its anchor step, where the
+  // capture actually is, and the name step runs regardless.
+  //
+  // Fails CLOSED — an unreadable read blocks (lib/consent/read.ts).
+  const cameraBlocked = (await readCameraGateDecision(supabase)) === "blocked";
 
   // Pre-fill from auth.users.user_metadata.full_name if signup carried it.
   const defaultFullName =
@@ -39,5 +41,5 @@ export default async function OnboardingPage() {
       ? user.user_metadata.full_name
       : undefined;
 
-  return <OnboardingForm defaultFullName={defaultFullName} />;
+  return <OnboardingForm defaultFullName={defaultFullName} cameraBlocked={cameraBlocked} />;
 }
