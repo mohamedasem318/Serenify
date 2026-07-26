@@ -381,29 +381,38 @@ so what it finds is fixed rather than filed.
 the **actual diff** of every file it committed — `git diff --staged` output, not a prose summary
 of what it believes it did.
 
-**New from P4: design skills are a hard first step on every phase that renders anything** — P4,
-P5, P6 and P7. Recorded on T038, T063, T079 and T115, each of which carries the same
-stop-and-report finding: **the `design:*` plugin namespace does not exist on this machine.**
+**New from P4: a design skill is a hard first step on every phase that renders anything** — P4,
+P5, P6 and P7. Carried by **T038, T063, T078 and T114**. The rule below is **decided**; those
+four tasks are executable and none of them stops.
 
-### ⚠ Recorded at generation time — the `design:*` plugins are NOT installed
+### ✅ DECIDED — Hallmark is the only design skill invoked on this feature
 
-Verified 2026-07-26 against `C:\Users\moham\.claude\plugins\cache\`. The installed plugin
-marketplaces are `anthropic-cybersecurity-skills`, `claude-plugins-official`
-(`code-review`, `feature-dev`, `frontend-design`, `playwright`, `supabase`, `superpowers`)
-and `ui-ux-pro-max-skill`. **No plugin publishes a `design:*` skill namespace.** What exists
-and is invocable: `hallmark`, `frontend-design:frontend-design`,
-`ui-ux-pro-max:ui-ux-pro-max`, `design-motion-principles`, `responsive-design`, `dataviz`,
-`aidesigner-frontend`.
+**Invoke `hallmark`, with theme selection SKIPPED.** Serenify already has a theme. Hallmark's
+genre detection, macrostructure, responsive gates and pre-emit slop test all apply; its theme
+step does not, because the theme is registered in constitution **Principle V** and is not this
+feature's to choose. What every design task tells Hallmark:
 
-Per the standing rule, the design tasks below **stop and report** rather than silently
-substituting a different skill for the absent `design:*` plugins.
+| Hallmark's discipline | How it binds here |
+|---|---|
+| **Token block / theme** | The token block is **`apps/web/app/globals.css`**; the theme is **Graphite**. Skip theme selection. |
+| **#3 locked tokens — no mid-render improvisation** | **Harder-edged here than Hallmark normally enforces.** Every colour and every `font-family` must reference a token that **already exists** in `globals.css`. Hallmark's usual escape hatch — *lift the value into the token block as a new named variable* — is **NOT available**: registering a new token requires a **constitution amendment**, and this feature must not amend the constitution (`plan.md` §0.7). If a design needs a colour that does not exist, the design changes, not the token block. |
+| **#5 mobile floor** | **320 / 375 / 414 / 768 px** — exactly **FR-053** and **SC-008**. Lean on Hallmark's gate rather than re-deriving the widths. |
+| **#4 re-drawn chrome forbidden** | This is **FR-052**: no fake browser bars, no phone frames, no fake IDE chrome, anywhere on the landing page. |
+| **#2 honest copy — no fabricated content** | This is **FR-001 / FR-002 / FR-004**: no invented metric, no invented testimonial, **zero model performance figures**. And in this feature **copy is not Hallmark's to write at all** — every string comes from `lib/landing/copy.ts`, `lib/legal/copy.ts` or `lib/consent/copy.ts`, and the four approved strings in `plan.md` **§10.3** are verbatim and **unrewordable**. |
 
-**A second, unresolved conflict on the same tasks.** The machine's global `CLAUDE.md`
-instructs: *"Do NOT stack `frontend-design:frontend-design` or `responsive-design` on top of
-Hallmark — Hallmark encodes the same source material and enforces stricter responsive gates;
-running them together loads contradictory token and theme systems."* The standing rule for this
-feature requires **hallmark and frontend-design both**. These cannot both be honoured.
-**Mohamed's call, and it is not made here** — each design task names the conflict and stops.
+**`frontend-design` is NOT invoked on this feature.** Its documented process is to brainstorm a
+new palette and type pairing for the brief; Serenify's tokens are registered in constitution
+Principle V, so generating a second token system is the exact move Principle V forbids. It stays
+installed and is **not** to be uninstalled or otherwise touched. This also settles the machine's
+global `CLAUDE.md` rule against stacking `frontend-design` on Hallmark: **there is no stacking —
+there is one skill.**
+
+**The `design:*` plugin requirement is DROPPED.** Verified 2026-07-26 against
+`C:\Users\moham\.claude\plugins\cache\`: no installed marketplace publishes a `design:*`
+namespace, and **this feature does not block on it.** The only two that would have applied are
+**`design:design-critique`** and **`design:accessibility-review`**; both are **optional and
+non-blocking**. If they are installed before P6, they may be run at **T111** and **T128**
+alongside the code-review agent. Nothing waits on them.
 
 ---
 
@@ -439,7 +448,7 @@ weekly work-environment check-in fully usable.
 
 ### Precondition
 
-- [ ] T038 [P4] Invoke the design skills before writing any UI in this phase — the acknowledgement field and the camera consent gate both render. **Done when**: `hallmark` has been invoked and its output applied to the two new surfaces (`components/consent/terms-acknowledgement-field.tsx`, `components/consent/camera-consent-gate.tsx`); **and** the two conflicts recorded in "Process — additions" above have been put to Mohamed rather than resolved by the implementer — (a) the `design:*` plugin namespace **does not exist on this machine** (only `hallmark`, `frontend-design:frontend-design`, `ui-ux-pro-max:ui-ux-pro-max`, `design-motion-principles`, `responsive-design`, `dataviz`, `aidesigner-frontend` are installed), so **stop and report** rather than substituting a different skill, and (b) the global `CLAUDE.md` forbids stacking `frontend-design` on top of `hallmark`, which contradicts this feature's standing rule that both run. **Name in the P4 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+- [ ] T038 [P4] Invoke **`hallmark`, with theme selection skipped**, before writing any UI in this phase — the acknowledgement field and the camera consent gate both render. **Theme selection is skipped because Serenify already has a theme** (constitution Principle V; see "Process — additions"). **Done when**: Hallmark has run against the two new surfaces (`apps/web/components/consent/terms-acknowledgement-field.tsx`, `apps/web/components/consent/camera-consent-gate.tsx`) having been told that the token block is **`apps/web/app/globals.css`** and the theme is **Graphite**; its **#3 locked-tokens** discipline was applied with **no new token invented** — every colour and `font-family` references a variable already in `globals.css`, and the "lift it into the token block" escape hatch was **not** used, because a new token needs a constitution amendment this feature must not make (`plan.md` §0.7); its **#5 mobile floor** was taken as **320 / 375 / 414 / 768 px** (FR-053, SC-008); its **#2 honest-copy** discipline was satisfied structurally, since **Hallmark writes no copy here** — every string comes from `lib/consent/copy.ts` (T039); and **`frontend-design` was NOT invoked** (see "Process — additions" for why). **Name in the P4 PR body which skill ran and confirm theme selection was skipped.** Dependencies: T037 (P3 merged).
 
 ### The camera-and-inference wording, and its registry entry
 
@@ -538,7 +547,7 @@ section) · `plan.md` §15 **R2** · `plan.md` §13 **ST-10, ST-10a, ST-10b** ·
 
 ### Precondition
 
-- [ ] T063 [P5] Invoke the design skills before writing the re-consent screen — it renders, and it is the only surface a locked-out user will ever see. **Done when**: `hallmark` has been invoked and applied to `components/consent/terms-reconsent-screen.tsx`; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`, contradicting this feature's standing rule. **Name in the P5 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+- [ ] T063 [P5] Invoke **`hallmark`, with theme selection skipped**, before writing the re-consent screen — it renders, and it is the only surface a locked-out user will ever see. **Theme selection is skipped because Serenify already has a theme** (constitution Principle V). **Done when**: Hallmark has run against `apps/web/components/consent/terms-reconsent-screen.tsx` having been told the token block is **`apps/web/app/globals.css`** and the theme is **Graphite**; its **#3 locked-tokens** discipline was applied with **no new token invented** — the "lift it into the token block" escape hatch is unavailable, because a new token needs a constitution amendment this feature must not make (`plan.md` §0.7); its **#5 mobile floor** was taken as **320 / 375 / 414 / 768 px** (FR-053, SC-008), which matters unusually much here because this screen is the **entire** experience for a blocked user at the narrowest width; **Hallmark writes no copy** — the strings are this task's own calm-voice prose reviewed against Principle V, and the document links and sign-out control are fixed by FR-043d, not by the design pass; and **`frontend-design` was NOT invoked**. **Name in the P5 PR body which skill ran and confirm theme selection was skipped.** Dependencies: T037 (P3 merged).
 
 ### The kill switch
 
@@ -633,7 +642,7 @@ grep discipline), §10.2 (the three forbidden lines), **§10.3 (the approved cop
 
 ### Preconditions
 
-- [ ] T078 [P6] Invoke the design skills before writing any landing UI. **Done when**: `hallmark` has been invoked and applied across the hero, the story card, the "Never" cards, how-it-works and the status statement; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`, contradicting this feature's standing rule. Because this phase has real motion (the beat advance, the panel swap, the thread trim), **`design-motion-principles` is additionally in scope** if Mohamed's answer permits layering. **Name in the P6 PR body exactly which skills ran.** Dependencies: T037 (P3 merged).
+- [ ] T078 [P6] Invoke **`hallmark`, with theme selection skipped**, before writing any landing UI. **Theme selection is skipped because Serenify already has a theme** (constitution Principle V). **Done when**: Hallmark has run across the hero, the story card, the "Never" cards, how-it-works and the status statement, having been told the token block is **`apps/web/app/globals.css`** and the theme is **Graphite**; its **#3 locked-tokens** discipline was applied with **no new token invented** — this is the phase most likely to want one, and the answer is that the design changes, not the token block, because a new token needs a constitution amendment this feature must not make (`plan.md` §0.7; note that `--color-on-accent` and `--color-scrim` are **already-used-but-unregistered**, issue **#155**, referenced and **not** fixed here); its **#5 mobile floor** was taken as **320 / 375 / 414 / 768 px** (FR-053, SC-008) rather than re-derived; its **#4 re-drawn-chrome-forbidden** discipline was applied as **FR-052** — no fake browser bar, no phone frame, no fake IDE chrome anywhere on this page, and specifically **no simulated camera preview** in any swap panel; its **#2 honest-copy** discipline was satisfied structurally, because **Hallmark writes no copy here** — every string comes from `lib/landing/copy.ts` (T089/T090) and the three approved `plan.md` §10.3 strings are **verbatim and unrewordable**; and **`frontend-design` was NOT invoked**. **Name in the P6 PR body which skill ran and confirm theme selection was skipped.** Dependencies: T037 (P3 merged).
 
 - [ ] T079 [P6] Read the Next 16 guides for **route groups** and the **root `page.tsx`** under `node_modules/next/dist/docs/` before writing any route file in this phase (`apps/web/AGENTS.md`: *"This is NOT the Next.js you know"*; `plan.md` §2; R9). **Done when**: the exact guide paths consulted are named in the P6 PR body, and one specific question is answered **from the docs rather than inferred** — *what happens if both `app/page.tsx` and `app/(public)/page.tsx` exist, and is the fix a move or an addition?* T028's header comment in `app/(public)/layout.tsx:28–30` already records the P3 half of this answer ("P3 deliberately adds no `(public)/page.tsx`, which is the one file that WOULD collide with `app/page.tsx` over `/`"); confirm it against the current docs rather than trusting the comment. Do not infer route-group semantics from Next 14/15 habits. Dependencies: T037.
 
@@ -743,7 +752,7 @@ mapping verification and its residual), §0.4 (the filename case) · `plan.md` �
 
 ### Preconditions
 
-- [ ] T114 [P7] Invoke the design skills before writing the team section. **Done when**: `hallmark` has been invoked and applied to the photo/overlay composition, the name cards and the credits; **and** the two conflicts recorded in "Process — additions" are put to Mohamed rather than resolved here — the `design:*` plugin namespace **does not exist on this machine**, so **stop and report** rather than substituting; and the global `CLAUDE.md` forbids stacking `frontend-design` on `hallmark`. **Name in the P7 PR body exactly which skills ran.** Dependencies: T113 (P6 merged).
+- [ ] T114 [P7] Invoke **`hallmark`, with theme selection skipped**, before writing the team section. **Theme selection is skipped because Serenify already has a theme** (constitution Principle V). **Done when**: Hallmark has run against the photo/overlay composition, the name cards and the credits, having been told the token block is **`apps/web/app/globals.css`** and the theme is **Graphite**; its **#3 locked-tokens** discipline was applied with **no new token invented** — the silhouette highlight state in particular must be expressed through existing tokens, since a new one needs a constitution amendment this feature must not make (`plan.md` §0.7); its **#5 mobile floor** was taken as **320 / 375 / 414 / 768 px** (FR-053, SC-008); its **#4 re-drawn-chrome-forbidden** discipline is **FR-052** — the photo is a real photograph in a plain container, with no device frame around it; and **Hallmark writes no copy** — the four names, the caption and the supervisor credits are **verbatim constants** from `lib/landing/copy.ts` (T120) fixed by FR-024 and FR-027. **The design pass must not alter the overlay's geometry**: `preserveAspectRatio="none"` over an exact-aspect box is a correctness constraint from `contracts/public-surface.md` §9.2, not a style choice, and every outline misaligns if it is changed. **`frontend-design` was NOT invoked.** **Name in the P7 PR body which skill ran and confirm theme selection was skipped.** Dependencies: T113 (P6 merged).
 
 - [ ] T115 [P7] Read the Next 16 **`next/image` sizing** guide under `node_modules/next/dist/docs/` before writing the photo component (`apps/web/AGENTS.md`; `plan.md` §2; R9). **Done when**: the exact guide path is named in the P7 PR body, and one specific question is answered **from the docs rather than inferred** — *with explicit `width`/`height` plus `className="h-auto w-full"`, what box does the rendered element occupy, and does it carry the source's exact aspect ratio at every width?* That answer is load-bearing: the `preserveAspectRatio="none"` overlay aligns only if it does. Do not infer `next/image` sizing from Next 14/15 habits. Dependencies: T113.
 
@@ -872,7 +881,13 @@ a throwaway signup completes through the real surface writing exactly one consen
 
 - [ ] T143 [P] [P8] Add the `docs/DECISIONS.md` entries for this feature. **Done when**: the append-only log records the decisions this feature made and closed — **Order A** (legal first, and why); **version identity over timestamp comparison** for re-consent; **the version registry lives in the repo, not in a table**; **the app-shell gate renders in place and fails OPEN while the camera gate fails CLOSED**, and why the two directions differ; **the migration stays one file**; **`decision` admits only `'granted'`**, and that **declining writes nothing, deletes nothing, and is not withdrawal** (feature **018** owns withdrawal); and the **SC-006 residual (R8)** stated honestly — SC-006 holds for 100% of accounts created through the product's own signup surface and **does not hold against a caller bypassing that surface**, whose root cause is **#62**, which **stays open**.
 
-  **Done when additionally — the open-signup posture is recorded as a DECISION, not left as an omission.** The entry must state, in its own words and unmistakably: that the demo deployment at **serenify.tech ships KNOWINGLY with open self-serve signup**; that **#62 stays open DELIBERATELY** until adoption, as an accepted posture for the demo window rather than an oversight or a backlog item that slipped; and that **R8's SC-006 bypass is therefore LIVE and ACCEPTED for that window**, with the blast radius R8 already states — **one forged consent row for the forger's own account, RLS-scoped to `auth.uid()`, no cross-user write, no privilege escalation, and nothing else in the product unlocked by it.** The reason this must be written down: **someone reading R8 later must not conclude this was missed.** R8 describes the bypass as a residual whose root cause "must close before real user data is processed" — a reader who then finds `/signup` open on a live site will reasonably assume the gate was forgotten. It was not; it was weighed and accepted for a demo, and the decision log is where that distinction survives. Dependencies: T138.
+  **Done when additionally — the open-signup posture is recorded as a DECISION, not left as an omission.** The entry must state, in its own words and unmistakably: that the demo deployment at **serenify.tech ships KNOWINGLY with open self-serve signup**; that **#62 stays open DELIBERATELY** until adoption, as an accepted posture for the demo window rather than an oversight or a backlog item that slipped; and that **R8's SC-006 bypass is therefore LIVE and ACCEPTED for that window**, with the blast radius R8 already states — **one forged consent row for the forger's own account, RLS-scoped to `auth.uid()`, no cross-user write, no privilege escalation, and nothing else in the product unlocked by it.** The reason this must be written down: **someone reading R8 later must not conclude this was missed.** R8 describes the bypass as a residual whose root cause "must close before real user data is processed" — a reader who then finds `/signup` open on a live site will reasonably assume the gate was forgotten. It was not; it was weighed and accepted for a demo, and the decision log is where that distinction survives.
+
+  **Done when additionally — the R7 residual is recorded as NARROWER than `plan.md` §15 R7 describes, with the two cases separated.** R7 reads: *"a malformed signup consent version could be written… shape-constrained by two DB CHECKs; a non-registry value never satisfies `satisfiesConsent()`."* That blurs two outcomes which are not the same, established by reading the shipped trigger:
+  - **Well-formed but non-registry** (e.g. `terms_privacy@2099-01-01.1`) — **is** written, and is inert exactly as R7 says: `satisfiesConsent` does a membership check (`evaluate.ts:74–77`, `findIndex` → `-1`), so it never satisfies the gate, and the §6.3 reconciliation query lists it.
+  - **Malformed** (fails the format regex at `…_user_consents.sql:28`, or JSON `null` against the `NOT NULL` at `:27`) — is **never written at all.** It raises **`23514`** / **`23502`**; `on_auth_user_created` is `AFTER INSERT ON auth.users FOR EACH ROW` (`20260517000030_profile_trigger.sql:27–29`), so the statement aborts and the `auth.users` row is **rolled back — that signup fails outright**. **`ON CONFLICT DO NOTHING` (`:111`) does not swallow it**: it covers unique and exclusion violations only.
+
+  **Do NOT edit `plan.md` to match.** R7 **overstates** a risk rather than understating one, and the plan is not amended mid-build. The DECISIONS entry is where the correction lives. Dependencies: T138.
 
 - [ ] T144 [P] [P8] Add the `docs/CHANGELOG.md` entry. **Done when**: it records the public-facing shape of the release — the landing page at `/`, `/terms` and `/privacy`, the public navbar and footer, the two-colour wordmark (**a visible change to three existing surfaces**, R10), the two consent gates, and the app-shell re-consent gate with its kill switch — in the repo's existing changelog voice. Dependencies: T138.
 
