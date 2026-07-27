@@ -45,6 +45,7 @@
 
 import type { Band } from "@/lib/api/monitoring-client";
 import type { SkipCause } from "@/lib/api/monitoring-reads";
+import { BAND_LABEL } from "@/lib/bands";
 
 // ── Geometry constants (locked to docs/mockups/serenify-live-session-graph-mock.html) ───────────────
 
@@ -321,9 +322,9 @@ function axisFor(
   const lx = left - labelGutter;
   return {
     labels: [
-      { text: "Tense", x: lx, y: BAND_Y.tense + 3, anchor: "end" },
-      { text: "A little tense", x: lx, y: BAND_Y.a_little_tense + 3, anchor: "end" },
-      { text: "At ease", x: lx, y: BAND_Y.at_ease + 3, anchor: "end" },
+      { text: BAND_LABEL.tense, x: lx, y: BAND_Y.tense + 3, anchor: "end" },
+      { text: BAND_LABEL.a_little_tense, x: lx, y: BAND_Y.a_little_tense + 3, anchor: "end" },
+      { text: BAND_LABEL.at_ease, x: lx, y: BAND_Y.at_ease + 3, anchor: "end" },
     ],
     gridlines: [
       { x1: left, x2: right, y: BAND_Y.tense },
