@@ -2065,12 +2065,10 @@ and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
 ## From feature 013 implementation (public-surface-and-legal) — captured 2026-07-27
 
 Four items surfaced while implementing feature 013 that are **not** 013's work. They are logged
-here so the feature ships without absorbing them. **Three of the four carry no GitHub issue** —
-see the note repeated on each; that is a deliberate, recorded departure from Principle VIII's
-1:1 BACKLOG↔Issues mirror, not an oversight.
+here so the feature ships without absorbing them, and each is mirrored to its own GitHub issue.
 
-### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live
-**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live (#176)
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN.** GitHub issue **#176 OPEN**.
 **Category**: dependencies / security posture
 **Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
 counts below were then verified directly against the Dependabot API.
@@ -2125,11 +2123,6 @@ transitive and should resolve without a manifest change. Verify with the full
 16.2.7–16.2.11 release notes before shipping**: the middleware/proxy-bypass fix touches App Router
 routing, and `apps/web/proxy.ts` is load-bearing for authentication. Confirm the fix does not
 change proxy semantics.
-
-**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
-logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
-departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
-decision rather than an oversight. If an issue is opened later, add its number to this heading.
 
 **Address by**: a dedicated dependency branch **after feature 013 merges to `main`**, and before
 any further production deploy. Re-run the counts at that point. Pairs with **#36** (the older
@@ -2244,8 +2237,8 @@ whichever feature owns the invite UX (feature 017 `team-lead-dashboard` or the a
 work), and should be scheduled alongside **#60**, **#61** and **#63**, which are all follow-ups on
 this same endpoint and are unactionable until it exists.
 
-### The WebKit Playwright runner hangs on Windows — ⚠ WebKit is dropped from the feature-013 P8 sign-off bar
-**Status**: deferred-tooling (`type:tooling` / `area:web`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+### The WebKit Playwright runner hangs on Windows — ⚠ WebKit is dropped from the feature-013 P8 sign-off bar (#177)
+**Status**: deferred-tooling (`type:tooling` / `area:web`) — **OPEN.** GitHub issue **#177 OPEN**.
 **Category**: test harness / browser coverage
 **Observed**: 2026-07-27, twice, while measuring the Playwright suite before and after the e2e
 consent-fixture fix (PR #173). Chromium and Firefox completed normally on the same machine, in the
@@ -2301,17 +2294,12 @@ pipe-buffering deadlock with `tail`) and **#55** (dev-server memory bloat across
 runs) — three separate harness pathologies now sit between this repo and a trustworthy local matrix
 run.
 
-**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
-logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
-departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
-decision rather than an oversight. If an issue is opened later, add its number to this heading.
-
 **Address by**: before WebKit can return to any sign-off bar — so, not during feature 013.
 Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux runner may close the
 coverage hole without the local hang ever being solved.
 
-### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it
-**Status**: bug (`type:bug` / `area:web`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it (#178)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#178 OPEN**.
 **Category**: responsive layout / test masking
 **Observed**: 2026-07-27, after fixing the e2e fixtures blocked by feature 013's app-shell consent
 gate (PR #173). The failure appeared only *because* that fix unblocked the page.
@@ -2348,11 +2336,6 @@ ordering is already correct — or (b) widen the tolerance if the 8 px offset is
 desktop `3fr/2fr` split has collapsed, and a tolerance loose enough to hide a real regression is
 worse than a red test. Verify at the feature-013 mobile floor — 320 / 375 / 414 / 768 px — not only
 at 360.
-
-**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
-logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
-departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
-decision rather than an oversight. If an issue is opened later, add its number to this heading.
 
 **Address by**: any responsive-layout pass after 013 merges. Natural pairing with the mobile /
 tablet typography bump (**#45**) and the rest of the standing design-system queue, since all of them
