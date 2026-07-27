@@ -2340,3 +2340,43 @@ at 360.
 **Address by**: any responsive-layout pass after 013 merges. Natural pairing with the mobile /
 tablet typography bump (**#45**) and the rest of the standing design-system queue, since all of them
 touch the same card surfaces at the same widths.
+
+### e2e `SUPABASE_SERVICE_ROLE_KEY` is undocumented — and `.env.local.example` is the wrong home for it (#179)
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#179 OPEN**.
+**Category**: contributor setup / test infrastructure documentation
+**Observed**: 2026-07-27, while recording the pre-bump Playwright baseline for the Next
+16.2.6 → 16.2.11 patch bump (#176). Cost one full aborted suite run before it was diagnosed.
+**Description**: a clean checkout cannot run the Playwright e2e suite. `globalSetup` dies at once
+with `Error: supabaseKey is required.` from `tests/e2e/setup/admin-client.ts:22`, which builds the
+admin client out of `SUPABASE_SERVICE_ROLE_KEY`. `playwright.config.ts:9` loads
+`apps/web/.env.local` into the runner process precisely so that key is present — but nothing tells
+a contributor to set it. `apps/web/.env.local.example` lists exactly four variables
+(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`, `SITE_URL`)
+and the service-role key is not among them.
+
+**⚠ The obvious fix — adding it to `.env.local.example` — is the wrong one, and is actively
+guarded against.** `.env.local.example` is the **runtime** env example; the service-role key is
+deliberately not part of the runtime surface. **#142** removed the runtime service-role path
+(`apps/web/lib/supabase/admin.ts` no longer exists), and
+`apps/web/tests/unit/runtime-secret-posture.test.ts` stands guard over that removal: it fails if
+the literal token `SUPABASE_SERVICE_ROLE_KEY` (or `service_role`, `createAdminClient`,
+`/auth/v1/admin/`, …) appears anywhere under `apps/web/app/` or `apps/web/lib/`, and separately
+asserts that `lib/supabase/admin.ts` is absent. Documenting the key in the runtime example would
+advertise a runtime capability the codebase has deliberately deleted, and would invite exactly the
+regression that test exists to catch. **The key is e2e test infrastructure and belongs in the e2e
+setup documentation, not in the runtime env example.**
+
+**Fix scope**: small — a doc change plus a decision on which home. Either (a) extend the
+`global-setup.ts` header comment (`:1-16`), which already carries the other e2e prerequisite
+(`npx playwright install --with-deps chromium firefox webkit`) and sits where the failure
+originates, or (b) add a short `docs/testing/e2e-setup.md` (none exists today) covering the local
+Supabase stack, the browser-binary install, and this key. Whichever lands must state **where the
+value comes from** — `npx supabase status` against the local stack, a published Supabase CLI
+local-dev constant, never a hosted project's key — and must say plainly that it is test-only, so
+the next person does not mirror it into the runtime example. Worth naming the localhost guard at
+`global-setup.ts:5-6` in the doc: it refuses to run against a non-localhost
+`NEXT_PUBLIC_SUPABASE_URL`, which is what bounds the blast radius and makes this safe to write down.
+
+**Address by**: any contributor-onboarding or test-infrastructure pass. Not urgent while the
+current machines already have a working `.env.local`, but it is a hard stop for a fresh clone —
+including CI, if a Playwright job ever lands (**#41**).

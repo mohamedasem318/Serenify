@@ -827,6 +827,19 @@ a throwaway signup completes through the real surface writing exactly one consen
 > **#86** and **#155** are **referenced, not owned**. Any task below that appears to require
 > touching #62 is a **stop and report**, not a scope decision.
 
+> **P8 prep — carry into T135's read-only recon, before the deploy.** Next **16.2.6 carries a
+> `FormData`-dropping bug**, fixed upstream in **16.2.7** by `[16.2.x] Don't drop FormData entries`
+> (#94240, a sync of `facebook/react#36468`) and shipped here by the 16.2.6 → 16.2.11 bump (#176).
+> `apps/web/app/(auth)/signup/actions.ts` reads **`terms_privacy_version` off `FormData`** (`:33`),
+> and `handle_new_user()` writes a `user_consents` row **only** when the signup metadata carries
+> that key (`20260726000000_user_consents.sql:108-112`) — so a dropped entry is a **silently
+> missing consent row**, not an error. Before the P8 deploy, run a **READ-ONLY** count on hosted of
+> `auth.users` rows with no `user_consents` row of type `terms_privacy`, and record the number.
+> **Read-only: a `SELECT` count only — no backfill, no INSERT, no repair.** FR-041 forbids
+> backfill, and T137 separately asserts `user_consents` is **empty** post-migration; this count is
+> a **measurement to record**, and if it is non-zero that is a finding to report, not a thing to
+> fix in P8. Recorded here 2026-07-27 during the #176 bump so it is not lost — **no action now.**
+
 ### The human pass
 
 - [ ] T131 [P8] Author `specs/013-public-surface-and-legal/smoke-tests.md` from `plan.md` **§13**, transcribing **ST-1 through ST-15 verbatim**. **Done when**: all fifteen rows — including **ST-10a** and **ST-10b**, which carry the longest and most procedurally specific text in the table and must not be summarised — appear with their wording intact, each with a result field, a date field, and space for observations; the file states that it is run by **Mohamed**, results recorded **inline**, **before the feature branch merges to `main`** (Principle VII gate 5). **If authoring reveals a gap §13 does not cover, add it as ST-16+ and STOP AND REPORT the addition — do not quietly edit §13's meaning.** Dependencies: T130 (P7 merged).
