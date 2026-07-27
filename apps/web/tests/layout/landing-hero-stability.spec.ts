@@ -39,6 +39,8 @@ interface Sample {
   readonly narrationRowHeight: number;
   readonly narrationLines: number;
   readonly documentOverflows: boolean;
+  readonly threadClipped: number;
+  readonly activePanelClipped: boolean;
 }
 
 for (const width of WIDTHS) {
@@ -75,6 +77,28 @@ for (const width of WIDTHS) {
           const lineHeight = parseFloat(getComputedStyle(textEl).lineHeight);
           const root = document.documentElement;
 
+          /*
+           * CONTENT CLIPPING — the check the drift assertions structurally cannot make.
+           *
+           * The panels are absolutely positioned inside an `overflow-hidden` box, which is
+           * exactly what guarantees zero drift — and it also means content that does not
+           * fit is silently destroyed rather than overflowing or scrolling. Every
+           * assertion above stays green while a bubble sits outside the panel. This one
+           * measures the bubbles against the panel box, which is the only way to see it.
+           * A review found the Ren thread clipped at all four widths against a spec that
+           * was passing 5/5.
+           */
+          const activePanel = document.querySelector<HTMLElement>("[data-panel][data-active]");
+          const panelRect = activePanel?.getBoundingClientRect();
+          const thread = document.querySelector<HTMLElement>('[data-testid="ren-thread"]');
+          const bubblesOutside =
+            thread && panelRect
+              ? Array.from(thread.querySelectorAll("li")).filter((li) => {
+                  const r = li.getBoundingClientRect();
+                  return r.bottom > panelRect.bottom + 0.5 || r.top < panelRect.top - 0.5;
+                }).length
+              : 0;
+
           return {
             beat: beatIndex,
             // Rounded to a tenth: sub-pixel jitter from fractional viewport scaling is
@@ -88,6 +112,10 @@ for (const width of WIDTHS) {
             narrationRowHeight: Math.round(rowEl.getBoundingClientRect().height * 10) / 10,
             narrationLines: Math.round(textEl.scrollHeight / lineHeight),
             documentOverflows: root.scrollWidth > root.clientWidth,
+            threadClipped: bubblesOutside,
+            activePanelClipped: activePanel
+              ? activePanel.scrollHeight > activePanel.clientHeight + 1
+              : false,
           };
         }, beat),
       );
@@ -108,6 +136,20 @@ for (const width of WIDTHS) {
       expect(sample.swapScrolls, `beat ${sample.beat}: the swap area scrolls internally`).toBe(
         false,
       );
+    }
+
+    // ── FR-011 / FR-008: nothing is CLIPPED. Zero drift is not the same as visible. ──
+    for (const sample of samples) {
+      expect(
+        sample.threadClipped,
+        `beat ${sample.beat}: ${sample.threadClipped} Ren bubble(s) fall outside the panel ` +
+          `box. FR-011 requires 4 VISIBLE bubbles with no scroll — clipped is neither.`,
+      ).toBe(0);
+      expect(
+        sample.activePanelClipped,
+        `beat ${sample.beat}: the active panel's content overflows its box and is being ` +
+          `cut off by overflow-hidden. The swap area is too short for the tallest panel.`,
+      ).toBe(false);
     }
 
     // ── SC-008: no horizontal overflow anywhere on the document ──
