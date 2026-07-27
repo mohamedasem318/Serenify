@@ -90,6 +90,10 @@ export function StoryCard() {
       <section
         ref={containerRef}
         data-testid="story-card"
+        // The beat index, exposed so the layout spec can step deterministically through
+        // all 17 beats. Narration repeats across beats (five share one line), so text
+        // changes are not a reliable beat signal and polling would silently skip beats.
+        data-beat={index}
         aria-label={STORY_CARD_LABEL}
         className="overflow-hidden rounded-lg border border-border bg-surface p-3.5 shadow-soft sm:p-4"
       >
