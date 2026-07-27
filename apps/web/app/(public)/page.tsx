@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 
+import { Hero } from "@/components/landing/hero";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { NeverCards } from "@/components/landing/never-cards";
+import { StatusStatement } from "@/components/landing/status-statement";
 import { resolveRootRoute } from "@/lib/routing/resolve-root-route";
 import { createClient } from "@/lib/supabase/server";
 
@@ -64,8 +68,15 @@ export default async function LandingPage({ searchParams }: { searchParams: Sear
     redirect("/app");
   }
 
-  // T104 composes hero → "Never" cards → how-it-works → status statement here, and
-  // leaves the team section's slot explicit for P7. No user data is read and no
-  // authenticated call is made on this branch.
-  return <div />;
+  // The landing branch (T104). No user data is read and no authenticated call is made
+  // past this point — everything below is static copy from `lib/landing/copy.ts`.
+  return (
+    <>
+      <Hero />
+      <NeverCards />
+      <HowItWorks />
+      <StatusStatement />
+      {/* P7 renders the team section here, between the status statement and the footer. */}
+    </>
+  );
 }
