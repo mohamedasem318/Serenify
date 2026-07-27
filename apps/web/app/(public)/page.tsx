@@ -4,6 +4,7 @@ import { Hero } from "@/components/landing/hero";
 import { HowItWorks } from "@/components/landing/how-it-works";
 import { NeverCards } from "@/components/landing/never-cards";
 import { StatusStatement } from "@/components/landing/status-statement";
+import { TeamSection } from "@/components/landing/team-section";
 import { resolveRootRoute } from "@/lib/routing/resolve-root-route";
 import { createClient } from "@/lib/supabase/server";
 
@@ -76,7 +77,7 @@ export default async function LandingPage({ searchParams }: { searchParams: Sear
       <NeverCards />
       <HowItWorks />
       <StatusStatement />
-      {/* P7 renders the team section here, between the status statement and the footer. */}
+      <TeamSection />
     </>
   );
 }
