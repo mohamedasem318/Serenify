@@ -1,5 +1,7 @@
 import { type Page, expect } from "@playwright/test";
 
+import { currentRevision } from "../../lib/consent/evaluate";
+
 export async function signInAs(
   page: Page,
   credentials: { email: string; password: string; fullName?: string },
@@ -32,6 +34,61 @@ export async function signOut(page: Page) {
 export function randomEmail(role: string) {
   const stamp = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   return `${role}-${stamp}@example.com`;
+}
+
+/**
+ * The signup metadata that makes a fixture user land past the Terms/Privacy entry gate
+ * (feature 013, P5 — `contracts/consent-gates.md` §7.3).
+ *
+ * WHY EVERY FIXTURE NEEDS THIS. `app/(authed)/layout.tsx` is the shell every authenticated
+ * route renders through, and since P5 it renders `<TermsReconsentScreen>` instead of that
+ * shell for any user without a current `terms_privacy` consent. Fixture users are created
+ * with the admin API, which does not go through the signup form — so without this metadata
+ * they have no consent row, and a spec that meant to test the dashboard fails on a missing
+ * header instead.
+ *
+ * IT GOES THROUGH THE REAL TRIGGER, NOT AROUND IT. `handle_new_user()` writes the
+ * `user_consents` row when — and only when — the signup metadata carries
+ * `terms_privacy_version` (`20260726000000_user_consents.sql:108-112`), which is exactly
+ * what the production signup path does (`app/(auth)/signup/actions.ts:68`). Spreading this
+ * into `user_metadata` therefore exercises the trigger rather than side-stepping it with a
+ * direct insert, so the fixtures prove the consent write works instead of hiding a
+ * regression in it. That is also why this is a metadata helper and not a
+ * `seedTermsConsent()` row-inserter: the admin API can carry metadata, so it should.
+ *
+ * THE VERSION IS RESOLVED FROM THE REGISTRY, never hardcoded — same discipline as
+ * `seedCameraConsent` in `anchor-helpers.ts`. `currentRevision` rather than
+ * `bindingRevision` because that is what a real signup records; both satisfy the gate, but
+ * only one matches what production writes. When a future revision is published these
+ * fixtures follow it automatically instead of going silently stale and re-breaking every
+ * authed spec at once.
+ *
+ * A spec that wants to SEE the gate must omit this — see `consent-entry-gate.spec.ts`.
+ */
+export function termsConsentMetadata(): { terms_privacy_version: string } {
+  return { terms_privacy_version: currentRevision("terms_privacy").versionId };
+}
+
+/**
+ * Tick the Terms/Privacy acknowledgement on the signup form (feature 013, P4 — §7.1).
+ *
+ * A SECOND, DISTINCT GATE FROM THE ONE ABOVE. `termsConsentMetadata()` is for fixtures
+ * created through the admin API, which never sees a form. This is for the four specs that
+ * drive the REAL signup form, where P4 made the acknowledgement mandatory: the checkbox is
+ * unchecked by default and cannot be satisfied by a default value (FR-033), and
+ * `signUpSchema` requires the literal `"on"`, so a submission without it is rejected
+ * server-side and no account is created.
+ *
+ * Those specs were left submitting the form without it, so signup silently failed and they
+ * died on the "Check your email" heading that never came — a failure that looks like a
+ * broken OTP flow and is nothing of the sort.
+ *
+ * Queried by id rather than by label: the field carries TWO `<label>` elements for one
+ * input (the padded 44px tap target and the text), which is valid HTML and deliberate, but
+ * makes `getByLabel` ambiguous.
+ */
+export async function acceptTermsOnSignup(page: Page) {
+  await page.locator("#accept_terms").check();
 }
 
 /**
