@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import * as consentCopy from "@/lib/consent/copy";
+import * as landingCopy from "@/lib/landing/copy";
 import * as legalCopy from "@/lib/legal/copy";
 
 /**
@@ -97,9 +98,14 @@ function collectStrings(
   return found;
 }
 
-// P6 appends `lib/landing/copy.ts` here (plan.md §10.1).
+// P6 appends `lib/landing/copy.ts` here (plan.md §10.1) — done, below.
 const COPY_MODULES: readonly { readonly name: string; readonly module: unknown }[] = [
   { name: "lib/legal/copy.ts", module: legalCopy },
+  // T105 (P6). The landing page is the surface a stranger meets first and the one with
+  // the strongest pull toward reassurance, so it is the likeliest place for either
+  // forbidden family to reappear. Walking it here rather than reviewing components by eye
+  // is the whole point of confining landing copy to one module (plan.md §10.1 item 1).
+  { name: "lib/landing/copy.ts", module: landingCopy },
   // T058 (P4). The camera gate's wording is the single most tempting place in the
   // product to tell family (a)'s lie — it is the surface asking permission to use a
   // webcam, where "the video never leaves your machine" is exactly the reassurance a
@@ -218,6 +224,100 @@ describe("the detector does not flag the claims FR-001 permits", () => {
     expect(legalCopy.PRIVACY_CAMERA_P2).toMatch(/video is transmitted/i);
     expect(legalCopy.PRIVACY_CAMERA_P2).toMatch(
       /the reading is not computed on your device|not.{0,30}on your device/i,
+    );
+  });
+
+  it("passes the landing page's replacement Never card, the scoped claim FR-001 permits", () => {
+    // T105 (P6). This card is the ONLY place the landing page says anything about who
+    // sees what, and it is the approved §10.3 Position 2 string. It must pass — if the
+    // detector ever flags it, the detector has widened into the permitted claim and
+    // every other assertion in this file is suspect.
+    expect(violations(landingCopy.NEVER_CARD_CHAT_BODY)).toEqual([]);
+    expect(landingCopy.NEVER_CARD_CHAT_BODY).toMatch(
+      /never reaches a manager, an admin, or an employer/i,
+    );
+    // The trap §10.3 names: "Not now, not later." would read as a deferral of the
+    // promise rather than its permanence.
+    expect(landingCopy.NEVER_CARD_CHAT_BODY.endsWith("Not now, not ever.")).toBe(true);
+  });
+});
+
+// ── T105 (P6) — the landing-specific invariants ──────────────────────────────
+
+describe("FR-004 / SC-005: the landing copy quotes no model performance figure", () => {
+  const LANDING_STRINGS = collectStrings(landingCopy, "lib/landing/copy.ts");
+
+  it("has no digit adjacent to a quality metric", () => {
+    // The number nobody should be able to quote back at us. Retention days and a window
+    // length are facts about the system; an F1 or an accuracy is a claim about the model,
+    // and research.md §12.2 makes its absence a copy invariant.
+    const METRIC = /(F1|AUC|ROC|recall|accuracy|precision)[^.!?]{0,20}[0-9]|[0-9][^.!?]{0,20}(F1|AUC|ROC|recall|accuracy|precision)|[0-9]\s*%/i;
+    const offenders = LANDING_STRINGS.filter((entry) => METRIC.test(entry.text)).map(
+      (entry) => `${entry.path}: "${entry.text}"`,
+    );
+    expect(offenders, `numeric quality metric(s):\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("keeps 'subject-disjoint' and keeps it free of numbers", () => {
+    // The honest half of the same invariant: the detector must not be satisfiable by copy
+    // that simply says nothing about evaluation.
+    const note = landingCopy.STATUS_NOTE;
+    expect(note).toMatch(/subject-disjoint/i);
+    expect(note).not.toMatch(/[0-9]/);
+  });
+});
+
+describe("terminology is binding across the landing copy", () => {
+  const LANDING_STRINGS = collectStrings(landingCopy, "lib/landing/copy.ts");
+
+  it("never uses a bare 'check-in' for the weekly work-environment check-in", () => {
+    // "calibration" / "monitoring session" / "weekly work-environment check-in" are the
+    // three names, and the third is the one that decays: the mock used bare "check-in" in
+    // two places, both meaning the monitoring session's prompt rather than the
+    // questionnaire — the word was wrong twice over.
+    const BARE = /check[-\s]?in/i;
+    const FULL = /weekly work-environment check-in/i;
+    const offenders = LANDING_STRINGS.filter(
+      (entry) => BARE.test(entry.text) && !FULL.test(entry.text),
+    )
+      // The approved §10.3 hero lede contains the VERB "checks in with the person". It is
+      // fixed copy under FR-032, unrewordable, and names no questionnaire.
+      .filter((entry) => entry.text !== landingCopy.HERO_LEDE)
+      .map((entry) => `${entry.path}: "${entry.text}"`);
+
+    expect(offenders, `bare "check-in":\n  ${offenders.join("\n  ")}`).toEqual([]);
+  });
+
+  it("names all three surfaces somewhere on the page", () => {
+    const all = LANDING_STRINGS.map((entry) => entry.text).join(" ");
+    expect(all).toMatch(/calibration/i);
+    expect(all).toMatch(/monitoring session/i);
+    expect(all).toMatch(/weekly work-environment check-in/i);
+  });
+});
+
+describe("the approved §10.3 strings are present character-for-character", () => {
+  it("the hero lede is the approved Position 1 string", () => {
+    expect(landingCopy.HERO_LEDE).toBe(
+      "Serenify notices signs of strain during the workday and checks in with the person first. What happens next is always their call.",
+    );
+  });
+
+  it("the Never card is the approved Position 2 heading and body", () => {
+    expect(landingCopy.NEVER_CARD_CHAT_HEADING).toBe("Read your conversations.");
+    expect(landingCopy.NEVER_CARD_CHAT_BODY).toBe(
+      "What you say to Ren is yours. Companion chat, and anything you disclose in a crisis, never reaches a manager, an admin, or an employer. Not now, not ever.",
+    );
+  });
+
+  it("the closing beat is the approved Position 3 string, clauses in the approved order", () => {
+    expect(landingCopy.STORY_CLOSING_BEAT).toBe(
+      "What you said stays yours. The video was read and forgotten.",
+    );
+    // Chat clause FIRST. Reversed, the deletion frame bleeds backwards and implies the
+    // conversation was deleted too — it was not, so the line would be false.
+    expect(landingCopy.STORY_CLOSING_BEAT.indexOf("stays yours")).toBeLessThan(
+      landingCopy.STORY_CLOSING_BEAT.indexOf("read and forgotten"),
     );
   });
 });
