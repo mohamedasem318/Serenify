@@ -5247,3 +5247,102 @@ moves under earlier PRs, so the post-merge state is worth re-checking. Dropping
 #163 (probes, closed, branches deleted); PR #165 (post-merge verification, closed);
 `.github/workflows/ci.yml` header comment (the finding is recorded there so it need
 not be rediscovered); `specs/013-public-surface-and-legal/plan.md` §15 R1.
+
+---
+
+## 2026-07-27 — Next 16 does **not** error when `app/page.tsx` and `app/(public)/page.tsx` both exist — it silently prefers the ungrouped file
+
+**Context**: P6 (T086) moves the root route into the `(public)` route group. `tasks.md`
+T086 and `research.md` §11 both justify deleting `app/page.tsx` in the same commit by
+asserting that **"both files existing simultaneously is a build-breaking route conflict"**.
+That justification is wrong on Next **16.2.11**, and the truth is a stronger argument for
+the same action.
+
+**What the docs on disk actually say** (`node_modules/next/dist/docs/`, read at 16.2.11):
+
+- `01-app/01-getting-started/02-project-structure.md:77` — `app/page.tsx` → `/`.
+- same file `:97` — `app/(marketing)/page.tsx` → `/`, "Group omitted from URL".
+- `01-app/03-api-reference/03-file-conventions/route-groups.md:12` — a parenthesised
+  folder "should **not be included** in the route's URL path".
+- same file `:31` — "**Conflicting paths**: Routes **in different groups** should not
+  resolve to the same URL path … and cause an error."
+
+The conflicting-paths caveat is scoped to **group vs group**. `app/page.tsx` is in no
+group, so the documented error case does not cover this pair — and empirically it does
+not error.
+
+**How it was proved.** `app/page.tsx` was temporarily recreated alongside
+`app/(public)/page.tsx` and the app was built and served:
+
+1. `npm run -w apps/web build` — **exit 0**, no error, no warning, no conflict message.
+2. Next's own route table listed **`ƒ /` exactly once**.
+3. `next start` served `/` from **`app/page.tsx`** — the probe text rendered and the
+   public shell's `<nav>` did **not**.
+
+The probe file was then deleted; the tree matched HEAD.
+
+**Why this matters more than the correction.** The real failure mode is *silent
+precedence*, which is worse than a build error. Had the takeover been done as a **copy**
+rather than a **move**, `tsc` would be green, `next build` would be green, every unit test
+would be green — and the landing page would simply never render, outside the public shell,
+with no navbar and no footer. Nothing in the suite would have noticed.
+
+**Decision**: the move stands, for this reason rather than the one given. The check is
+made permanent as a unit test —
+`apps/web/tests/unit/app/one-page-owns-root.test.ts` — asserting that exactly one route
+file resolves to `/` and that it is `(public)/page.tsx`. It is deliberately narrow: one
+assertion about one URL, **not** a general route-table test, which would re-derive Next's
+routing semantics somewhere nobody would maintain.
+
+**Not done**: `research.md` §11 and `plan.md` are **not** edited. Planning artifacts are
+not edited mid-build; this entry is the record.
+
+---
+
+## 2026-07-27 — The landing narration row is two lines below 768 px: the "one line at 320 px" rule was written without measuring and is unachievable
+
+**Context**: `plan.md` §10.3 constraint 2, R12, and T107 all require the hero card's
+narration to render on **exactly one line at 320 px for every beat**, and all three state
+that a failure is "a copy-length problem, not a CSS problem" whose fix is **re-approval of
+the string, not a taller row**.
+
+**Measured, before any of the card was built** — real Chromium, 320 px viewport, the app's
+own `next/font` Inter, against the approved §10.3 Position 3 string ("What you said stays
+yours. The video was read and forgotten.", 60 chars):
+
+| Font size | Width required |
+|---|---|
+| 17 px (`--text-base`) | 496.7 px |
+| 14 px | 409.0 px |
+| **13 px (`--text-xs`, the smallest token that exists)** | **379.8 px** |
+
+A card at a 320 px viewport has roughly **260 px** of inner width (16 px page padding +
+14 px card padding per side). The string needs **379.8 px at the smallest legible token**
+and would fit only at **~8.8 px**. The conclusion survives every layout choice: spanning
+the full 320 px viewport with **zero** padding it still needs ~11 px. It is not only 320 px
+either — at 13 px the string needs a viewport of roughly **440 px**, so the rule as written
+fails at **320, 375 and 414** and passes only at 768.
+
+A second string was over too: `backToAtEase` ("Back to at ease — because they were asked,
+not told.", transcribed from mock `:771`) at 329.0 px. The other ten fit at 13 px.
+
+**Decision (Mohamed, 2026-07-27)**: **hold the copy, move the layout rule.** The approved
+§10.3 strings stay byte-exact; `backToAtEase` is left as transcribed. The narration row is
+**fixed at two lines below 768 px and one line at and above it** — fixed at every width,
+never content-dependent. Single-line strings are vertically centred so the shorter beats do
+not hang off the top.
+
+**Why this does not violate "not a taller row".** The harm those three passages name is
+*dynamic* height — "breaking the fixed-height narration row", "force the fixed height up",
+"clip". FR-009's guarantee is that **content changing cannot move anything below it**. A
+row fixed at two lines never changes height with content, so that guarantee holds
+unchanged; only the line budget moved.
+
+**T107's assertion** changes accordingly: below 768 px it asserts the row height is
+**constant across all 17 beats** and that no string exceeds two lines; at 768 px it asserts
+exactly one line. Zero outer-dimension drift remains the bar at all four widths.
+**Re-measured after implementation**: all 12 narration strings fit within two lines at 320,
+375 and 414 px and one line at 768 px — nothing needs three. All five layout tests pass.
+
+**Not done**: `plan.md` is **not** edited and T107's text is unchanged beyond the
+assertion itself. The amendment is noted in the P6 PR body.
