@@ -423,6 +423,30 @@ person is outlined in the photo, and vice versa.
   and MUST be reused **verbatim**. Re-deriving, re-tracing, or regenerating them by
   any means is **forbidden**. *(Where the data lives and how it is applied is
   plan-level.)*
+
+  **AMENDED 2026-07-27, by Mohamed, during P7 — one spent exception for `gehad`.**
+  The premise "already derived and verified" held for three of the four outlines and
+  not for the fourth. The mock's `gehad` path covered her entire left edge with a
+  **single straight segment spanning ~28 viewBox units** (`L 79.47 68.64` to
+  `L 82.72 40.98`); every other segment in all four paths is short. That one segment
+  sliced across her shoulder and upper arm and clipped the corner of her blazer where
+  it overlaps Hebatullah — so reusing it verbatim would have shipped a visibly wrong
+  outline on a public page, which is not what this requirement is for.
+
+  `gehad` was therefore re-traced **once**, and Mohamed placed the final elbow and hem
+  vertices himself. Scope of the exception, all of which was verified before it landed:
+
+  - It applies to **`gehad` only**. `mohamed`, `fatma` and `hebatullah` remain
+    byte-identical to the mock and are still covered by the unamended rule above.
+  - Within `gehad`, vertices **0–6** and everything from `L 83.38 39.05` onward are
+    **byte-identical** to the mock. Only the defective span changed.
+  - `gehad`'s x-max is unchanged at **97.78**; its x-min moved 79.47 → **77.28**,
+    recovering the blazer. The four x-ranges are still strictly ascending on both min
+    and max.
+
+  **The exception is spent.** `tests/unit/lib/landing/team-silhouettes.test.ts` freezes
+  all four paths again by length and SHA-256. A further re-trace of any outline —
+  including this one — needs a further amendment; it is not licensed by this one.
 - **FR-027**: The team section MUST credit the supervisors: **Dr. Lamees Nasser ·
   Dr. Safaa Mouneer**.
 - **FR-028**: The team section MUST be fully keyboard operable with visible focus,
