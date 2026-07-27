@@ -69,11 +69,23 @@ export function StatusStatement() {
         <div className="mt-10 rounded-lg border border-border bg-bg p-5">
           <h3 className="text-base font-semibold text-ink">{RETENTION_HEADING}</h3>
           <p className="mt-2 max-w-prose text-sm leading-relaxed text-muted">{RETENTION_BODY}</p>
-          <p className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-sm">
-            <Link href="/privacy" className="text-meadow-text underline underline-offset-4">
+          {/*
+           * 44 px tall, not 20 (FR-053). These read as inline prose links but they are
+           * tap targets, and the same `inline-flex min-h-11 items-center` idiom the public
+           * footer uses is what keeps them thumb-sized without turning them into buttons.
+           * The walk at 320 px caught them at 93×20 and 113×20.
+           */}
+          <p className="mt-1 flex flex-wrap items-center gap-x-5 text-sm">
+            <Link
+              href="/privacy"
+              className="inline-flex min-h-11 items-center text-meadow-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
               {RETENTION_LINK_PRIVACY}
             </Link>
-            <Link href="/terms" className="text-meadow-text underline underline-offset-4">
+            <Link
+              href="/terms"
+              className="inline-flex min-h-11 items-center text-meadow-text underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
               {RETENTION_LINK_TERMS}
             </Link>
           </p>
