@@ -2240,3 +2240,69 @@ the kind of drive-by that this repo's PR-isolation discipline exists to prevent.
 whichever feature owns the invite UX (feature 017 `team-lead-dashboard` or the admin-dashboard
 work), and should be scheduled alongside **#60**, **#61** and **#63**, which are all follow-ups on
 this same endpoint and are unactionable until it exists.
+
+### The WebKit Playwright runner hangs on Windows — ⚠ WebKit is dropped from the feature-013 P8 sign-off bar
+**Status**: deferred-tooling (`type:tooling` / `area:web`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+**Category**: test harness / browser coverage
+**Observed**: 2026-07-27, twice, while measuring the Playwright suite before and after the e2e
+consent-fixture fix (PR #173). Chromium and Firefox completed normally on the same machine, in the
+same session, against the same dev server and the same local Supabase.
+**Description**: **The signature, recorded verbatim — this is the only diagnostic anyone will
+have:**
+
+> Two hangs, identical signature: output frozen 17+ min, orphaned `WebKitNetworkProcess` at 0.1
+> CPU-sec, no live browser process, stopping at a different test each run. Chromium and Firefox
+> complete on the same machine.
+
+Expanded, so the signature is readable without the shorthand:
+
+- The reporter stops emitting. No new test lines, no failure, no timeout — the process simply sits.
+  Observed frozen for **17+ minutes** on both attempts before being killed.
+- `WebKitNetworkProcess.exe` orphans remain in the process table, each showing roughly **0.1
+  CPU-seconds** consumed *since launch* — i.e. they did essentially nothing and then stopped, rather
+  than spinning.
+- **No WebKit browser process is alive** at that point. Only the network-process orphans and the
+  runner remain, so the runner is waiting on a browser that has already gone.
+- **It stops at a different test each run** — once mid-`anchor-flow`, once at 28/50. There is no
+  single reproducing spec, which rules out a spec-level fix and points at the harness.
+- `taskkill` will not terminate the orphans; PowerShell
+  `Invoke-CimMethod -InputObject $cp -MethodName Terminate` does.
+
+Chromium (43 passed / 3 failed / 4 skipped) and Firefox (42 passed / 4 failed / 4 skipped)
+complete on the same machine, so this is **WebKit-on-Windows, not the suite** and not any change in
+feature 013. Environment: `@playwright/test ^1.60.0`, `workers: 1`,
+`{ name: "webkit", use: { ...devices["Desktop Safari"] } }` (`apps/web/playwright.config.ts:30`),
+Windows 11.
+
+**⚠ DECISION: WebKit is dropped from the feature-013 P8 sign-off bar. P8 signs off on Chromium and
+Firefox.** This is a **knowingly accepted coverage hole on a live product**, written down rather
+than assumed. It is stated in those words deliberately: **nobody may later read P8's green tick as
+meaning all three browsers passed.** P8's sign-off covers two of the three configured Playwright
+projects, and the third was never measured.
+
+**What the hole actually costs.** WebKit is the only project standing in for Safari, and Safari is
+not a hypothetical for this product: the calibration and monitoring-session capture paths behave
+measurably differently there (iOS Safari's `MediaRecorder` output and the server-side decode of it
+have their own history in this repo). Nothing about the Safari capture path is covered by an
+automated run today. The mitigation that exists is manual: the feature-008 device gate was
+validated on real Chrome **and real Safari/iOS**, and P8's smoke tests are performed by hand. That
+is a genuine mitigation, but it is a person, not a gate.
+
+**Fix scope**: unknown until diagnosed — start with `DEBUG=pw:browser*` on a single-spec WebKit run
+to catch the disconnect, then try a newer Playwright, a re-download of the WebKit binary
+(`npx playwright install --force webkit`), and `--workers=1 --max-failures=1` on individual specs to
+see whether the hang follows the browser lifecycle rather than any spec. If it reproduces cleanly,
+it is worth an upstream report; if it is Windows-specific, running WebKit in CI on Linux is the
+cheaper route to the coverage than fixing the local runner. Pairs with **#54** (Playwright
+pipe-buffering deadlock with `tail`) and **#55** (dev-server memory bloat across stacked full-suite
+runs) — three separate harness pathologies now sit between this repo and a trustworthy local matrix
+run.
+
+**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
+logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
+departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
+decision rather than an oversight. If an issue is opened later, add its number to this heading.
+
+**Address by**: before WebKit can return to any sign-off bar — so, not during feature 013.
+Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux runner may close the
+coverage hole without the local hang ever being solved.
