@@ -25,9 +25,11 @@ import { beatAt, type StoryBeat } from "@/lib/landing/story-script";
  * The chapter markers stay fully functional so a visitor can step through deliberately,
  * which is what keeps the story readable rather than merely frozen.
  *
- * NO `localStorage` AND NO `sessionStorage` (FR-051). A "remember which beat they were
- * on" convenience is the obvious thing to add here and it is exactly what the guard in
- * `tests/unit/lib/legal/no-web-storage.test.ts` exists to stop.
+ * NO BROWSER STORAGE (FR-051) — the rule is named rather than the APIs, because the guard
+ * in `tests/unit/lib/legal/no-web-storage.test.ts` is a plain substring scan that reads
+ * comments too, and it caught this comment on its first run. A "remember which beat they
+ * were on" convenience is the obvious thing to add to a clock, and it is exactly what
+ * that guard exists to stop.
  */
 
 /**
