@@ -2059,3 +2059,284 @@ point-of-use not-yet-live discipline on the landing page, both legal documents, 
 consent gates — `README.md` is simply not one of 013's surfaces, so it needs its own fix.
 See `.specify/memory/constitution.md` Principle I (public-communication rule, Amendment 17)
 and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
+
+---
+
+## From feature 013 implementation (public-surface-and-legal) — captured 2026-07-27
+
+Four items surfaced while implementing feature 013 that are **not** 013's work. They are logged
+here so the feature ships without absorbing them, and each is mirrored to its own GitHub issue.
+
+### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live (#176)
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN.** GitHub issue **#176 OPEN**.
+**Category**: dependencies / security posture
+**Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
+counts below were then verified directly against the Dependabot API.
+**Description**: **Two GitHub surfaces disagree, concurrently, and both were read on 2026-07-27.**
+The push-time banner (`remote:` output on `git push`) says **22 open (11 high, 11 moderate)**. The
+Dependabot REST API, queried the same day, says **21 open (11 high, 10 moderate)**, spanning **12
+distinct advisories** across **three packages**. This is not drift between two dates — it is the
+banner and the API reporting different numbers at the same moment. One alert (`brace-expansion`,
+GHSA-mh99-v99m-4gvg) was **auto-dismissed on 2026-07-25**, inside the same window, which plausibly
+explains the total but not the severity split. **Treat every figure here as a snapshot, not a fixed
+number**, and re-count from the Dependabot security tab before acting. The per-advisory breakdown
+below is from the API and is the reliable part.
+
+They sit on **`main`**. **None was introduced by feature 013**, which adds no dependency and
+carries an empty `package.json` diff; every alert traces to `next`, `postcss`, or `sharp`, all of
+which predate the feature.
+
+- **`next` — 9 advisories, 18 of the 21 alerts.** Each is counted twice, once against
+  `package-lock.json` and once against `apps/web/package.json`. **4 high**: SSRF in Server Actions
+  on custom servers (GHSA-89xv-2m56-2m9x), SSRF in rewrites via an attacker-controlled destination
+  hostname (GHSA-p9j2-gv94-2wf4), middleware/proxy bypass in App Router applications using
+  Turbopack and a single locale (GHSA-6gpp-xcg3-4w24), DoS in App Router Server Actions
+  (GHSA-m99w-x7hq-7vfj). **5 moderate**: two response-body cache confusions (GHSA-68g3-v927-f742,
+  GHSA-4633-3j49-mh5q), unbounded Server Action payload on the Edge runtime (GHSA-4c39-4ccg-62r3),
+  unauthenticated disclosure of internal Server Function endpoints (GHSA-955p-x3mx-jcvp), and DoS
+  in the Image Optimization API via SVGs (GHSA-q8wf-6r8g-63ch). **All nine are fixed in 16.2.11**;
+  the repo pins **16.2.6** (`apps/web/package.json:30`). **One patch-level bump inside 16.2.x
+  clears 18 of the 21 alerts.**
+- **`postcss` — 2 high**, both `sourceMappingURL` handling: arbitrary `.map` file disclosure via
+  path traversal in previous-source-map auto-loading (GHSA-r28c-9q8g-f849) and arbitrary file read
+  via an attacker-controlled `sourceMappingURL` in a CSS comment (GHSA-6g55-p6wh-862q). Fixed in
+  8.5.18. Transitive; lockfile manifest only. **Distinct from the older PostCSS advisory already
+  logged as #36** (GHSA-qx2v-qp2m-jg93) — do not treat #36 as covering these.
+- **`sharp` — 1 high**, inherited libvips CVEs (GHSA-f88m-g3jw-g9cj). Fixed in 0.35.0. Transitive;
+  lockfile manifest only.
+
+**⚠ Do not attempt any upgrade while feature 013 is unmerged.** A dependency bump underneath an
+in-flight feature-branch stack costs days: every open branch inherits a lockfile conflict, and a
+`next` upgrade landing in the same window as feature 013's change to `app/(authed)/layout.tsx` —
+the shell **every** authenticated route renders through — makes any resulting regression ambiguous
+between the two. The upgrade is worth doing; it is not worth doing here.
+
+**⚠ This is NOT a P8 blocker.** P8 (T131–T148) ships feature 013 to production. These alerts are
+separate work, on `main`, with their own risk profile and their own verification. Nothing in this
+entry gates the feature, and it must not be folded into P8 — a dependency upgrade landing inside a
+deployment phase is the fastest way to turn a feature deploy into a debugging session.
+
+**Fix scope**: small-to-medium, on its own branch, **after 013 merges**. Sequence: `next`
+16.2.6 → 16.2.11 first (patch-level, clears 18 of 21), then `postcss` and `sharp`, which are
+transitive and should resolve without a manifest change. Verify with the full
+`npm run -w apps/web lint typecheck test` plus a Playwright chromium + firefox pass, and **read the
+16.2.7–16.2.11 release notes before shipping**: the middleware/proxy-bypass fix touches App Router
+routing, and `apps/web/proxy.ts` is load-bearing for authentication. Confirm the fix does not
+change proxy semantics.
+
+**Address by**: a dedicated dependency branch **after feature 013 merges to `main`**, and before
+any further production deploy. Re-run the counts at that point. Pairs with **#36** (the older
+PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing dependency
+items.
+
+### Restore `POST /api/admin/invite` — deleted in #142; there is no in-app path left to create a `team_lead` or an `admin` (#174)
+**Status**: deferred-feature (`type:feature` / `area:web` / `area:db`) — **OPEN.** GitHub issue **#174 OPEN**.
+**Category**: product / auth surface
+**Observed**: 2026-07-27, while fixing the e2e fixtures blocked by feature 013's app-shell
+consent gate (PR #173). `admin-seeded.spec.ts` and `team-lead-seeded.spec.ts` still
+`POST /api/admin/invite` and assert `201`. They get **404**, and they fail *at the POST* —
+not at anything downstream. `apps/web/app` today contains exactly one route file,
+`auth/callback/route.ts`.
+**Description**: `apps/web/app/api/admin/invite/route.ts` (152 lines) was deleted in
+`ffb3a96` — the squash of PR #142, *"chore(deploy): prepare Serenify production cutover"*,
+merged 2026-07-12. It was the only in-app way to create a `team_lead` or an `admin`: it
+invited through the service-role admin client (creating the `auth.users` row, which
+`handle_new_user` seeded as `role='employee'`), then called the `admin_update_role` and
+`admin_update_manager` SECURITY DEFINER RPCs **through the caller's session client**, so
+`auth.uid()` resolved to the verified admin and Postgres re-checked `is_admin()` on its own
+side. With it gone, role assignment above `employee` has no application surface at all.
+
+**Why it was removed — the reason is recorded, but not in the commit or the PR body.**
+The squash carries the bare subject line `* fix(web): remove runtime admin service-role
+path` with no body, and PR #142's description says only *"remove the runtime admin/service-role
+path and keep production access RLS-as-user"* and *"no service-role secret is required by the
+production web/API runtime"*. **Neither names the route.** The docs shipped in the same PR do
+name it, and they give the reason — `docs/CHANGELOG.md:2553`:
+
+> **Security posture.** Removed the runtime admin/service-role path entirely — deleted
+> `apps/web/lib/supabase/admin.ts` and `apps/web/app/api/admin/invite/route.ts`. Production
+> access is now **RLS-as-user throughout**, and inference replay runs as the authenticated
+> user. Locked by a new `apps/web/tests/unit/runtime-secret-posture.test.ts`; deploy no longer
+> requires a service-role key at all.
+
+`docs/PROGRESS.md:90` repeats it. So this was a **deliberate security-posture cut, not
+collateral**: the route was the sole runtime consumer of `lib/supabase/admin.ts`, and removing
+the service-role client from the production runtime necessarily removed the route.
+
+What is **not** recorded anywhere — not the commit, not the PR body, not `docs/DECISIONS.md` —
+is any discussion of the **consequence**: that the product loses its only invite path, that
+three open follow-ups now hang off an endpoint that no longer exists (**#60** invite audit log,
+**#61** concurrent-duplicate idempotency, **#63** app-layer rate limiting), that **#62**'s
+"funnel all entry through `/api/admin/invite`" resolution becomes unavailable, and that two e2e
+specs are left asserting `201` against a 404. **The removal is documented; its product cost is
+not.**
+
+**Decision: restore, not retire.** The invite flow is wanted. This entry is not a request to
+delete the two specs or to close the endpoint's follow-ups — it is a request to bring the
+capability back.
+
+**⚠ The restore cannot be a `git revert`.** `apps/web/tests/unit/runtime-secret-posture.test.ts`
+now fails the build if any of `SUPABASE_SERVICE_ROLE_KEY`, `service_role`, `service-role`,
+`createAdminClient`, `supabaseServiceRoleKey`, or `/auth/v1/admin/` appears anywhere under
+`apps/web/app/` or `apps/web/lib/`, and separately asserts that `lib/supabase/admin.ts` does not
+exist. Reinstating the old handler re-introduces precisely what #142 removed and turns that
+guard red. **The design question the spec has to answer is how an admin invites a user without a
+runtime service-role key** — a Supabase Edge Function holding the key outside the web runtime, an
+`invites` table plus a self-serve claim flow, a SECURITY DEFINER RPC that provisions without
+GoTrue admin, or something else. That question is the reason this is not a small change.
+
+**This is product code with an auth surface, so it needs its own spec → plan → tasks, after 013
+ships.** Not a drive-by fix. The deleted handler carried three controls that were each the
+outcome of a security-audit finding and must be re-derived rather than copy-pasted back:
+
+1. **Auth-then-authz before any body work** — an unauthenticated caller got a clean 401 with no
+   schema disclosure, a non-admin got 403, and only a verified admin ever reached Zod validation
+   (slice 3, Findings 1 & 3).
+2. **An `Origin` allowlist** as defence-in-depth over the `SameSite=Lax` session cookie — Route
+   Handlers get no automatic same-origin check from Next.js the way Server Actions do (slice 3,
+   Finding 1).
+3. **Error hygiene** — no branch forwarded raw Supabase / RPC / Zod text to the client; failures
+   were logged server-side and responses carried a fixed error code only (slice 3, Finding 2).
+
+See `docs/DECISIONS.md` (2026-05-25 — Security slice 3) and
+`docs/security/01-rls-and-security-definer.md`.
+
+**Open question — recorded here, deliberately not answered: does restoring this re-open #62?**
+**#62** (`/signup` is open self-serve → gate to invite-only, ⛔ pre-production deploy blocker)
+names `/api/admin/invite` as *"a **parallel** privileged path, not the only way in"*, and offers
+as one of its two resolutions *"make a product decision to remove `/signup` entirely and funnel
+all entry through `/api/admin/invite`"* — a resolution that is currently impossible, because the
+funnel does not exist. Whether restoring the endpoint re-opens that option, partially satisfies
+#62, or is fully independent of it **is not decided here**. It needs the same product/auth
+decision #62 is already waiting on. Do not read this entry as closing or advancing #62.
+
+**Stale references left behind** (breadcrumbs for whoever picks this up — listed so they are
+found together, **not** as a request to clean them up piecemeal):
+- `apps/web/lib/auth/schemas.ts:117` — `adminInviteSchema` survives with no consumer.
+- `apps/web/tests/e2e/helpers.ts:11` — comment still says seeded users arrive "via
+  `/api/admin/invite`".
+- `docs/DECISIONS.md` (2026-05-26 — Security slice 7, decision 3) defers a per-admin throttle and
+  points at `apps/web/app/api/admin/invite/route.ts:37`, a file that no longer exists;
+  `docs/CHANGELOG.md:825` carries the same dangling line reference.
+- `docs/security/01-rls-and-security-definer.md:28` and `:107` describe the route's
+  caller-session-client pattern and the zero-admin hazard in the present tense.
+
+**The two e2e specs are skipped, not deleted.** `apps/web/tests/e2e/admin-seeded.spec.ts` and
+`apps/web/tests/e2e/team-lead-seeded.spec.ts` are marked `test.skip` with a comment naming #174.
+**Un-skipping them is part of this entry's definition of done** — they are the only end-to-end
+coverage of admin-invites-admin (201), employee-invites-anyone (403), and
+team_lead-invites-anyone (403), and the role-placeholder assertions for both privileged roles ride
+along with them.
+**Fix scope**: medium-to-large (FEATURE work). Own spec → plan → tasks. Must not re-introduce a
+runtime service-role dependency (see the guard above), must re-derive the three security controls,
+and must un-skip the two e2e specs. Suggested issue labels: `type:feature`, `area:web`, `area:db`.
+**Address by**: **after feature 013 (`public-surface-and-legal`) ships.** Not before — 013 owns
+the public front door and the two consent gates, and an auth-surface change mid-feature is exactly
+the kind of drive-by that this repo's PR-isolation discipline exists to prevent. Likely pairs with
+whichever feature owns the invite UX (feature 017 `team-lead-dashboard` or the admin-dashboard
+work), and should be scheduled alongside **#60**, **#61** and **#63**, which are all follow-ups on
+this same endpoint and are unactionable until it exists.
+
+### The WebKit Playwright runner hangs on Windows — ⚠ WebKit is dropped from the feature-013 P8 sign-off bar (#177)
+**Status**: deferred-tooling (`type:tooling` / `area:web`) — **OPEN.** GitHub issue **#177 OPEN**.
+**Category**: test harness / browser coverage
+**Observed**: 2026-07-27, twice, while measuring the Playwright suite before and after the e2e
+consent-fixture fix (PR #173). Chromium and Firefox completed normally on the same machine, in the
+same session, against the same dev server and the same local Supabase.
+**Description**: **The signature, recorded verbatim — this is the only diagnostic anyone will
+have:**
+
+> Two hangs, identical signature: output frozen 17+ min, orphaned `WebKitNetworkProcess` at 0.1
+> CPU-sec, no live browser process, stopping at a different test each run. Chromium and Firefox
+> complete on the same machine.
+
+Expanded, so the signature is readable without the shorthand:
+
+- The reporter stops emitting. No new test lines, no failure, no timeout — the process simply sits.
+  Observed frozen for **17+ minutes** on both attempts before being killed.
+- `WebKitNetworkProcess.exe` orphans remain in the process table, each showing roughly **0.1
+  CPU-seconds** consumed *since launch* — i.e. they did essentially nothing and then stopped, rather
+  than spinning.
+- **No WebKit browser process is alive** at that point. Only the network-process orphans and the
+  runner remain, so the runner is waiting on a browser that has already gone.
+- **It stops at a different test each run** — once mid-`anchor-flow`, once at 28/50. There is no
+  single reproducing spec, which rules out a spec-level fix and points at the harness.
+- `taskkill` will not terminate the orphans; PowerShell
+  `Invoke-CimMethod -InputObject $cp -MethodName Terminate` does.
+
+Chromium (43 passed / 3 failed / 4 skipped) and Firefox (42 passed / 4 failed / 4 skipped)
+complete on the same machine, so this is **WebKit-on-Windows, not the suite** and not any change in
+feature 013. Environment: `@playwright/test ^1.60.0`, `workers: 1`,
+`{ name: "webkit", use: { ...devices["Desktop Safari"] } }` (`apps/web/playwright.config.ts:30`),
+Windows 11.
+
+**⚠ DECISION: WebKit is dropped from the feature-013 P8 sign-off bar. P8 signs off on Chromium and
+Firefox.** This is a **knowingly accepted coverage hole on a live product**, written down rather
+than assumed. It is stated in those words deliberately: **nobody may later read P8's green tick as
+meaning all three browsers passed.** P8's sign-off covers two of the three configured Playwright
+projects, and the third was never measured.
+
+**What the hole actually costs.** WebKit is the only project standing in for Safari, and Safari is
+not a hypothetical for this product: the calibration and monitoring-session capture paths behave
+measurably differently there (iOS Safari's `MediaRecorder` output and the server-side decode of it
+have their own history in this repo). Nothing about the Safari capture path is covered by an
+automated run today. The mitigation that exists is manual: the feature-008 device gate was
+validated on real Chrome **and real Safari/iOS**, and P8's smoke tests are performed by hand. That
+is a genuine mitigation, but it is a person, not a gate.
+
+**Fix scope**: unknown until diagnosed — start with `DEBUG=pw:browser*` on a single-spec WebKit run
+to catch the disconnect, then try a newer Playwright, a re-download of the WebKit binary
+(`npx playwright install --force webkit`), and `--workers=1 --max-failures=1` on individual specs to
+see whether the hang follows the browser lifecycle rather than any spec. If it reproduces cleanly,
+it is worth an upstream report; if it is Windows-specific, running WebKit in CI on Linux is the
+cheaper route to the coverage than fixing the local runner. Pairs with **#54** (Playwright
+pipe-buffering deadlock with `tail`) and **#55** (dev-server memory bloat across stacked full-suite
+runs) — three separate harness pathologies now sit between this repo and a trustworthy local matrix
+run.
+
+**Address by**: before WebKit can return to any sign-off bar — so, not during feature 013.
+Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux runner may close the
+coverage hole without the local hang ever being solved.
+
+### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it (#178)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#178 OPEN**.
+**Category**: responsive layout / test masking
+**Observed**: 2026-07-27, after fixing the e2e fixtures blocked by feature 013's app-shell consent
+gate (PR #173). The failure appeared only *because* that fix unblocked the page.
+**Description**: `apps/web/tests/e2e/employee-dashboard-shell.spec.ts:191` — *"employee shell at
+360px: hamburger menu, single-column cards, icon-only chat pill"* — probes the single-column stack
+by bounding box: the three card headings must share an x origin within a **4 px** tolerance
+(`:226-227`), which is what distinguishes the mobile stack from the desktop `3fr/2fr` split. At
+360 px the measured x-origin delta is **8 px**, so the assertion fails. The y-ordering assertions
+above it pass, so the cards *are* stacking — the stack is simply not left-aligned to within the
+tolerance the test was written against. Whether the fix is the layout or the tolerance is a
+product/layout call, not a test call, which is why this is logged rather than patched.
+
+**Pre-existing — proven, not assumed.** Checked out **`eefe83f`** (the P4 merge commit, before any
+P5 gate code exists) and ran that single test there. It fails identically: same assertion, same
+numbers. Nothing in feature 013 causes it.
+
+**⚠ The interesting part: the consent gate had been masking it, and it may not be the only one.**
+Before PR #173, every Playwright fixture user landed on P5's Terms/Privacy re-consent screen
+instead of the page under test, so this spec died at the `/app` URL assertion — long before it
+reached line 226. The failure did not "start"; it became *visible*. **A suite that fails early
+reports the gate, not the defect underneath it**, and roughly 12 of 17 specs were failing early.
+Any other pre-existing failure downstream of a blocked point was equally invisible for the same
+reason, and some of it may still be hidden behind the residual failures that remain.
+
+The general rule this establishes, worth applying to any future gate: **when a change blocks
+fixture users, re-baseline the suite against the pre-gate commit before concluding that a newly-red
+test is new.** The reverse also holds — when a gate is *removed* or fixtures are unblocked,
+expect previously-masked failures to surface, and do not attribute them to the unblocking change.
+
+**Fix scope**: small, but it needs a decision first. Either (a) fix the layout so the three headings
+share an x origin at 360 px — likely a per-card padding or grid-gutter asymmetry, since the y
+ordering is already correct — or (b) widen the tolerance if the 8 px offset is intentional design.
+**Do not simply widen the tolerance to make the suite green**: the 4 px bar exists to prove the
+desktop `3fr/2fr` split has collapsed, and a tolerance loose enough to hide a real regression is
+worse than a red test. Verify at the feature-013 mobile floor — 320 / 375 / 414 / 768 px — not only
+at 360.
+
+**Address by**: any responsive-layout pass after 013 merges. Natural pairing with the mobile /
+tablet typography bump (**#45**) and the rest of the standing design-system queue, since all of them
+touch the same card surfaces at the same widths.

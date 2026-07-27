@@ -5,7 +5,8 @@ import { randomEmail, signInAs, signOut } from "./helpers";
 
 const TEST_PASSWORD = "SeededLead123!";
 
-test("seeded team_lead can be invited and signs in to their role placeholder", async ({
+// Skipped: POST /api/admin/invite was deleted in #142 and returns 404 — un-skip with #174.
+test.skip("seeded team_lead can be invited and signs in to their role placeholder", async ({
   page,
 }) => {
   const admin = createAdminClient();

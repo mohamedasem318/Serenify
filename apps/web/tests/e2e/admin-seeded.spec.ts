@@ -5,7 +5,8 @@ import { randomEmail, signInAs, signOut } from "./helpers";
 
 const TEST_PASSWORD = "SeededAdmin123!";
 
-test("seeded admin can invite another admin; employee invite caller is 403", async ({
+// Skipped: POST /api/admin/invite was deleted in #142 and returns 404 — un-skip with #174.
+test.skip("seeded admin can invite another admin; employee invite caller is 403", async ({
   page,
 }) => {
   const admin = createAdminClient();
