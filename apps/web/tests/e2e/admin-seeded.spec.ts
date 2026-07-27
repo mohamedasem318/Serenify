@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createAdminClient } from "./setup/admin-client";
-import { randomEmail, signInAs, signOut } from "./helpers";
+import { randomEmail, signInAs, signOut, termsConsentMetadata } from "./helpers";
 
 const TEST_PASSWORD = "SeededAdmin123!";
 
@@ -64,7 +64,7 @@ test.skip("seeded admin can invite another admin; employee invite caller is 403"
     email: newEmployeeEmail,
     password: TEST_PASSWORD,
     email_confirm: true,
-    user_metadata: { full_name: "Test Employee" },
+    user_metadata: { full_name: "Test Employee", ...termsConsentMetadata() },
   });
   expect(employee.user).toBeTruthy();
   await signInAs(page, { email: newEmployeeEmail, password: TEST_PASSWORD });

@@ -11,6 +11,10 @@ import {
   SYNTHETIC_ANCHOR_MODEL_VERSION,
   syntheticAnchorHex,
 } from "./lib/synthetic-anchor.js";
+// The one import this script takes from the web app. `evaluate.ts` and `registry.ts` are
+// both pure — no `server-only`, no env binding — so tsx loads them here as readily as
+// Vitest does, and the demo cohort's consent version cannot drift from the app's.
+import { currentRevision } from "../apps/web/lib/consent/evaluate.js";
 
 const SEED = 1729;
 const SHARED_PASSWORD = "DemoUser123!";
@@ -84,7 +88,16 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
       email: u.email,
       password: SHARED_PASSWORD,
       email_confirm: true,
-      user_metadata: { full_name: u.full_name },
+      // Terms/Privacy consent, recorded by handle_new_user() from this metadata exactly
+      // as a real signup does (feature 013 §7.3). Without it every demo user lands on the
+      // re-consent screen instead of the app, which breaks the demo cohort AND the two
+      // e2e specs that select users by the @demo.serenify.local suffix
+      // (cross-tab-auth-sync, demo-coexistence). Resolved from the registry, never a
+      // literal, so a future revision does not silently strand the whole cohort.
+      user_metadata: {
+        full_name: u.full_name,
+        terms_privacy_version: currentRevision("terms_privacy").versionId,
+      },
     });
     if (error || !data.user) {
       process.stderr.write(`createUser failed for ${u.email}: ${error?.message ?? "no user returned"}\n`);
