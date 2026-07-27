@@ -5,6 +5,7 @@ import * as copy from "@/lib/landing/copy";
 import {
   STORY_BEATS,
   THREAD_CAP,
+  beatAt,
   chaptersOf,
   firstBeatIndexOfChapter,
   trimThread,
@@ -110,7 +111,7 @@ describe("narration keys resolve to real copy", () => {
   });
 
   it("closes on the approved §10.3 string, with its clauses in the approved order", () => {
-    const closing = copy.NARRATION[STORY_BEATS[STORY_BEATS.length - 1].narrationKey];
+    const closing = copy.NARRATION[beatAt(STORY_BEATS.length - 1).narrationKey];
     expect(closing).toBe(copy.STORY_CLOSING_BEAT);
     // Chat clause FIRST. Reversed, the deletion frame bleeds backwards and implies the
     // conversation was deleted too — it was not, so the line would be false.
@@ -119,12 +120,13 @@ describe("narration keys resolve to real copy", () => {
 });
 
 describe("chapter navigation", () => {
-  it("firstBeatIndexOfChapter lands on each chapter's first beat", () => {
+  it("firstBeatIndexOfChapter lands on each chapter's FIRST beat, not just any of them", () => {
     expect(firstBeatIndexOfChapter(0)).toBe(0);
     for (const chapter of chaptersOf()) {
       const index = firstBeatIndexOfChapter(chapter);
-      expect(STORY_BEATS[index].chapter).toBe(chapter);
-      expect(index === 0 || STORY_BEATS[index - 1].chapter).not.toBe(chapter);
+      expect(beatAt(index).chapter).toBe(chapter);
+      // The beat before it must belong to a different chapter, or there is none.
+      if (index > 0) expect(beatAt(index - 1).chapter).not.toBe(chapter);
     }
   });
 
