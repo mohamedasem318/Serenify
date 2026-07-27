@@ -16,6 +16,7 @@
 // before the webServer block tries to launch them.
 
 import { createAdminClient } from "./admin-client";
+import { termsConsentMetadata } from "../helpers";
 
 const TEST_ADMIN_EMAIL = "test-admin@example.com";
 const TEST_ADMIN_PASSWORD = "TestAdmin123!";
@@ -57,7 +58,11 @@ export default async function globalSetup() {
       email: TEST_ADMIN_EMAIL,
       password: TEST_ADMIN_PASSWORD,
       email_confirm: true,
-      user_metadata: { full_name: "Test Admin" },
+      // The consent metadata makes handle_new_user() record the Terms/Privacy
+      // acceptance, so the test admin lands past the P5 entry gate rather than on
+      // the re-consent screen. See termsConsentMetadata() for why it goes through
+      // the trigger rather than a direct insert.
+      user_metadata: { full_name: "Test Admin", ...termsConsentMetadata() },
     });
   if (createErr || !created.user) {
     throw createErr ?? new Error("createUser returned no user");
