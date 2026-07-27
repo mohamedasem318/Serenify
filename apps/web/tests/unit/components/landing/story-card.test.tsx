@@ -94,6 +94,34 @@ describe("the readout is permanently visible (FR-007)", () => {
     render(<StoryCard />);
     expect(screen.getByTestId("story-readout")).toBeInTheDocument();
     expect(screen.getByTestId("story-reading").textContent).toBeTruthy();
+    expect(screen.getByTestId("story-trend")).toBeInTheDocument();
+  });
+
+  it("shows ALL THREE parts — orb, reading label AND trend — at every beat", async () => {
+    // FR-007 names three, and the first implementation shipped two. The trend was absent
+    // and nothing failed: the readout assertions checked only the orb and the label, so
+    // the gap was invisible to CI and would have surfaced in P8's human pass.
+    render(<StoryCard />);
+    for (let index = 0; index < STORY_BEATS.length; index++) {
+      const readout = screen.getByTestId("story-readout");
+      expect(within(readout).getByTestId("bloom"), `beat ${index}: no orb`).toBeInTheDocument();
+      expect(
+        within(readout).getByTestId("story-reading").textContent,
+        `beat ${index}: no reading label`,
+      ).toBeTruthy();
+      expect(within(readout).getByTestId("story-trend"), `beat ${index}: no trend`).toBeInTheDocument();
+      await advanceOneBeat(index);
+    }
+  });
+
+  it("the trend carries no number and is decorative", () => {
+    // It plots the story's own band history. The meaning is carried in words by the
+    // reading label beside it, so nothing exists only as a graphic (SC-009), and there is
+    // no figure to mistake for a score (FR-004).
+    render(<StoryCard />);
+    const trend = screen.getByTestId("story-trend");
+    expect(trend).toHaveAttribute("aria-hidden");
+    expect(trend.textContent ?? "").not.toMatch(/[0-9]/);
   });
 });
 
