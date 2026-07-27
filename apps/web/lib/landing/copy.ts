@@ -298,14 +298,21 @@ export const RETENTION_LINK_TERMS = "Terms of Service";
 // the mock in the same pass that produced everything above; the caption, the four names,
 // the eight URLs and the two supervisor credits are FIXED and are not re-worded.
 //
-// TWO NAME FORMS EXIST ON PURPOSE — DO NOT RECONCILE THEM.
+// TWO NAME FORMS SHIP, ON PURPOSE — DO NOT RECONCILE THEM.
 //
 //  · The team section below uses the full FR-024 spelling "Mohamed Assem Adel".
-//  · The legal documents (`lib/legal/copy.ts`) use the single form "Mohamed Assem".
-//  · `/privacy` separately names the data controller as "Mohamed Asem" (FR-046).
+//  · The legal documents (`lib/legal/copy.ts`) use "Mohamed Assem" throughout — as the
+//    named data controller and as an author — so a reader never meets two spellings of
+//    the same person across the two roles.
 //
-// Three deliberate forms, none of them a typo. A future reader who "fixes" one of them
-// into agreement with the others breaks a tested invariant in the other module.
+// Neither is a typo, and "fixing" either into agreement with the other breaks a tested
+// invariant in the other module.
+//
+// A THIRD form exists in the SPEC but deliberately ships NOWHERE: FR-046 writes the
+// controller as "Mohamed Asem", single s. P5 decided against using it
+// (`lib/legal/copy.ts:141–145`) and `tests/unit/lib/legal/copy-invariants.test.ts:204`
+// asserts that no legal string matches `/Mohamed Asem\b/`. So do not "restore" it here or
+// in the legal copy on the strength of reading FR-046 — that change fails CI.
 //
 // The mock's caption read "Hover a name to find them — or hover the photo." FR-024
 // supersedes it: it named an interaction that touch and keyboard users do not have, and
@@ -335,6 +342,16 @@ export const TEAM_PHOTO_ALT =
  * rather than reading "GitHub" four times. The URLs are real profiles — the mock's inert
  * `href="#"` placeholders must not ship — and are confirmed correct by ST-15, a human
  * check.
+ *
+ * SOURCE OF THE URLS, and a deliberate two-character divergence from FR-024: these eight
+ * were supplied directly by Mohamed on 2026-07-27. Six match FR-024's table
+ * character-for-character. Two — Hebatullah's and Gehad's LinkedIn — carry a TRAILING
+ * SLASH that FR-024's table omits. That is not drift: it is what he supplied, LinkedIn
+ * serves both forms identically, and his message is the more recent authority. Do not
+ * "correct" them against the spec table.
+ *
+ * They are frozen as literals in `tests/unit/components/landing/team-section.test.tsx`,
+ * so a later typo fails CI instead of quietly pointing a public page at a stranger.
  */
 export const TEAM_MEMBERS = [
   {
@@ -374,4 +391,14 @@ export const TEAM_MEMBERS = [
 /** FR-027, verbatim. Rendered as separate DOM from the photo so it survives a failed image. */
 export const TEAM_SUPERVISORS_LABEL = "Supervised by";
 export const TEAM_SUPERVISORS = ["Dr. Lamees Nasser", "Dr. Safaa Mouneer"] as const;
+
+/**
+ * The rendered supervisor line, separator included.
+ *
+ * The separator lives HERE rather than as a `.join(" · ")` in the component, because a
+ * `join` in the component is a string literal in a component — the one thing this module
+ * exists to prevent — and it would leave the "·" as the single piece of rendered team
+ * copy that FR-002's detector never walks.
+ */
+export const TEAM_SUPERVISORS_LINE = "Dr. Lamees Nasser · Dr. Safaa Mouneer";
 
