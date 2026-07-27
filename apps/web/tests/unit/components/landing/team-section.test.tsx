@@ -6,8 +6,8 @@ import { TeamSection } from "@/components/landing/team-section";
 import {
   TEAM_CAPTION,
   TEAM_MEMBERS,
-  TEAM_SUPERVISORS,
   TEAM_SUPERVISORS_LABEL,
+  TEAM_SUPERVISORS_LINE,
 } from "@/lib/landing/copy";
 import { TEAM_KEYS } from "@/lib/landing/team-silhouettes";
 
@@ -92,6 +92,60 @@ describe("T126: the eight external links", () => {
         member.linkedin,
       );
     }
+  });
+
+  /**
+   * FROZEN, and deliberately duplicated rather than imported.
+   *
+   * The assertion above is circular on its own: it renders an anchor FROM
+   * `member.github` and then checks the anchor's href EQUALS `member.github`, which is
+   * true no matter what the constant says. A typo in `copy.ts` — `hebatullah003` mistyped
+   * as `hebatullah03` — keeps every test in this file green while a public page sends a
+   * visitor to a stranger's account or a 404.
+   *
+   * These eight literals are what breaks that circle. They are transcribed from the URLs
+   * Mohamed supplied directly on 2026-07-27, which is also the source `copy.ts` used.
+   * Six match `spec.md` FR-024's table character-for-character; Hebatullah's and Gehad's
+   * LinkedIn carry a trailing slash the table omits, which is what he supplied and is
+   * correct — see the note in `copy.ts`.
+   *
+   * If a change makes this fail, the change is wrong. Re-baselining the table restores
+   * the circularity and defeats the point.
+   */
+  const FROZEN_URLS: Readonly<Record<string, readonly [string, string]>> = {
+    mohamed: [
+      "https://github.com/mohamedasem318",
+      "https://www.linkedin.com/in/mohamedasem318/",
+    ],
+    fatma: [
+      "https://github.com/Fatma-Alzahraaa",
+      "https://www.linkedin.com/in/fatma-al-zahraa-emad-326b64234",
+    ],
+    hebatullah: [
+      "https://github.com/hebatullah003",
+      "https://www.linkedin.com/in/hebatullah-elgazoly-308ab2243/",
+    ],
+    gehad: [
+      "https://github.com/gehaddmohamedd",
+      "https://www.linkedin.com/in/gehad-mohamed-2a4946252/",
+    ],
+  };
+
+  it("pins all eight URLs to frozen literals, so a typo cannot pass CI", () => {
+    expect(Object.keys(FROZEN_URLS)).toEqual(TEAM_MEMBERS.map((m) => m.key));
+    for (const member of TEAM_MEMBERS) {
+      const [github, linkedin] = FROZEN_URLS[member.key]!;
+      expect(member.github, `${member.name} GitHub`).toBe(github);
+      expect(member.linkedin, `${member.name} LinkedIn`).toBe(linkedin);
+    }
+  });
+
+  it("renders those frozen URLs, so the freeze reaches the DOM and not just the module", () => {
+    const { container } = render(<TeamSection />);
+    const hrefs = Array.from(container.querySelectorAll("a[href]")).map((a) =>
+      a.getAttribute("href"),
+    );
+    expect(hrefs.sort()).toEqual(Object.values(FROZEN_URLS).flat().sort());
   });
 });
 
@@ -253,15 +307,19 @@ describe("T126: the fixed copy renders exactly as approved", () => {
   it("renders both supervisor credits verbatim (FR-027)", () => {
     render(<TeamSection />);
     expect(screen.getByText(TEAM_SUPERVISORS_LABEL)).toBeInTheDocument();
-    expect(screen.getByText(TEAM_SUPERVISORS.join(" · "))).toBeInTheDocument();
-    expect(TEAM_SUPERVISORS).toEqual(["Dr. Lamees Nasser", "Dr. Safaa Mouneer"]);
+    expect(screen.getByText(TEAM_SUPERVISORS_LINE)).toBeInTheDocument();
+    // Pinned as a literal, separator included. FR-027 fixes the rendered line, and
+    // asserting it against `TEAM_SUPERVISORS.join(" · ")` would only prove the join
+    // ran — not that the middle dot is the character FR-027 asks for.
+    expect(TEAM_SUPERVISORS_LINE).toBe("Dr. Lamees Nasser · Dr. Safaa Mouneer");
   });
 
   it("keeps the two deliberate spellings of the first name apart", () => {
     render(<TeamSection />);
-    // The team section carries the full FR-024 form. The legal documents use
-    // "Mohamed Assem" and /privacy uses "Mohamed Asem" — three deliberate forms, and
-    // reconciling them would break a tested invariant in `lib/legal/copy.ts`.
+    // The team section carries the full FR-024 form; the legal documents use
+    // "Mohamed Assem" throughout. Two shipped forms, deliberately different, and
+    // reconciling them breaks a tested invariant in `lib/legal/copy.ts`. (FR-046's
+    // single-s "Mohamed Asem" ships nowhere — see the note in `lib/landing/copy.ts`.)
     expect(screen.getByRole("button", { name: "Mohamed Assem Adel" })).toBeInTheDocument();
     expect(TEAM_MEMBERS[0].name).toBe("Mohamed Assem Adel");
   });
@@ -281,7 +339,7 @@ describe("T127 (ST-14): the section survives the photo failing to load", () => {
     expect(inside.queryAllByRole("button")).toHaveLength(0);
     expect(photoBox.querySelectorAll("a[href]")).toHaveLength(0);
     expect(inside.queryByText(TEAM_CAPTION)).toBeNull();
-    expect(inside.queryByText(TEAM_SUPERVISORS.join(" · "))).toBeNull();
+    expect(inside.queryByText(TEAM_SUPERVISORS_LINE)).toBeNull();
   });
 
   it("leaves everything readable and operable after the image errors", async () => {
@@ -295,7 +353,7 @@ describe("T127 (ST-14): the section survives the photo failing to load", () => {
     expect(container.querySelectorAll("a[href]")).toHaveLength(8);
     expect(screen.getAllByRole("button")).toHaveLength(4);
     expect(screen.getByText(TEAM_CAPTION)).toBeInTheDocument();
-    expect(screen.getByText(TEAM_SUPERVISORS.join(" · "))).toBeInTheDocument();
+    expect(screen.getByText(TEAM_SUPERVISORS_LINE)).toBeInTheDocument();
 
     // Still operable, not merely still present.
     const card = screen.getByRole("button", { name: TEAM_MEMBERS[2].name });
