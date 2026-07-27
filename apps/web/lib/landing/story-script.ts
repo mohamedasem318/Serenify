@@ -201,6 +201,21 @@ export const STORY_BEATS: readonly StoryBeat[] = Object.freeze([
   { chapter: 5, durationMs: 2800, panel: "quiet", band: "at_ease", narrationKey: "closing" },
 ]);
 
+/**
+ * The beat at an index, wrapping in both directions.
+ *
+ * Exists so no consumer indexes the array raw. `noUncheckedIndexedAccess` is on, so
+ * `STORY_BEATS[i]` is `StoryBeat | undefined` at every call site, and the honest options
+ * are a non-null assertion (which lies) or this (which wraps, which is what the looping
+ * clock wants anyway).
+ */
+export function beatAt(index: number, beats: readonly StoryBeat[] = STORY_BEATS): StoryBeat {
+  const wrapped = ((index % beats.length) + beats.length) % beats.length;
+  const beat = beats[wrapped];
+  if (!beat) throw new Error(`story-script: no beat at index ${index} of ${beats.length}`);
+  return beat;
+}
+
 /** The chapter indices in order of first appearance. */
 export function chaptersOf(beats: readonly StoryBeat[] = STORY_BEATS): readonly number[] {
   const seen: number[] = [];
