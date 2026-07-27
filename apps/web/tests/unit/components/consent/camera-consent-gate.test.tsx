@@ -157,8 +157,21 @@ describe("accepting", () => {
       expect(screen.getByRole("alert")).toHaveTextContent(CAMERA_GATE_WRITE_ERROR),
     );
     expect(refresh).not.toHaveBeenCalled();
-    // still answerable — a failed write must not strand the user on a dead surface
-    expect(screen.getByRole("button", { name: CAMERA_GATE_ACCEPT_LABEL })).toBeEnabled();
+    // Still answerable — a failed write must not strand the user on a dead surface.
+    //
+    // WAITED FOR, NOT ASSERTED OUTRIGHT, AND THAT IS THE FLAKE FIX. The gate disables its
+    // buttons on `pending` from `useTransition`, and `setFailed(true)` runs INSIDE the
+    // transition scope. React is therefore free to commit the alert while `pending` is
+    // still true and to settle the transition in a LATER commit — so the alert becoming
+    // visible does not imply the button is re-enabled yet. Asserting immediately after
+    // awaiting the alert made this test pass or fail on commit scheduling, which is what
+    // failed the first web run of PR #182 and went green on re-run at the same SHA.
+    //
+    // The button DOES re-enable; only the moment is not ours to pin down. This is a test
+    // bug, not a race in the gate — the component is deliberately left untouched.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: CAMERA_GATE_ACCEPT_LABEL })).toBeEnabled(),
+    );
   });
 });
 
