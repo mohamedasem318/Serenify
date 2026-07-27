@@ -50,20 +50,35 @@ const FEATURE_DIRS: readonly string[] = [
   "components/legal",
   "components/brand",
   "components/consent",
+  "components/landing",
   "lib/legal",
   "lib/consent",
+  "lib/landing",
+  "lib/routing",
 ];
 
 /**
- * Directories a LATER phase creates. P6 creates both of these with the landing page.
+ * Directories a LATER phase creates.
  *
- * They are asserted ABSENT, not scanned — and that assertion is the point. The moment
- * P6 creates one, this test fails and names it, so promoting the path into FEATURE_DIRS
- * becomes a mechanical CI-enforced step rather than a remembered one. It is the same
- * mechanism as the wordmark sync test and the registry's append-only snapshot: the guard
- * that protects a future change is the one that fails when the future arrives.
+ * EMPTY SINCE P6 (T109). It held `components/landing` and `lib/landing`, asserted ABSENT
+ * rather than scanned — and that assertion was the point. The moment P6 created them this
+ * test failed and named them, so promoting them became a mechanical CI-enforced step
+ * rather than a remembered one. It worked exactly as designed: the guard that protects a
+ * future change is the one that fails when the future arrives.
+ *
+ * P6 also added `lib/routing` (`resolve-root-route.ts`), which T059 could not have
+ * reserved because the module was not designed yet. T109 anticipated the gap.
+ *
+ * `lib/bands.ts` is DELIBERATELY NOT COVERED, and the reason is recorded rather than
+ * left to be rediscovered. The walker takes DIRECTORIES; bands.ts is a single file at the
+ * root of `lib/`, and the only ways to reach it are to scan all of `lib/` — which holds
+ * pre-existing web storage this feature must not "fix" (see the header) — or to reshape
+ * the walker to accept files. Reshaping a safety guard to admit one file is worse than
+ * the gap it closes: the file is three string constants with no plausible web-storage
+ * surface, while a walker that takes two kinds of input is a walker that can be given the
+ * wrong kind. Noted in the P6 PR body.
  */
-const RESERVED_FOR_LATER_PHASES: readonly string[] = ["components/landing", "lib/landing"];
+const RESERVED_FOR_LATER_PHASES: readonly string[] = [];
 
 const SOURCE_EXTENSIONS = [".ts", ".tsx"];
 
@@ -91,9 +106,9 @@ describe("the scan actually covers this feature's files", () => {
   });
 
   it("the reserved paths do not exist yet — promote them the moment they do", () => {
-    // The reciprocal of the assertion above, and the reason the split is safe. When P6
-    // creates components/landing/ or lib/landing/, this fails by name and the fix is
-    // one line: move that entry into FEATURE_DIRS. Nobody has to remember.
+    // The reciprocal of the assertion above, and the reason the split is safe. The list
+    // is empty since P6 promoted both of its entries; the assertion stays because a
+    // later phase reserving a directory gets the same mechanism for free.
     for (const dir of RESERVED_FOR_LATER_PHASES) {
       expect(
         existsSync(join(WEB_ROOT, dir)),
@@ -104,8 +119,10 @@ describe("the scan actually covers this feature's files", () => {
   });
 
   it("declares every directory this feature creates, in one place", () => {
-    // The enumeration T059 fixes. Stated as a set comparison so an accidental deletion
-    // from either list fails here rather than silently narrowing the guard's reach.
+    // The enumeration T059 fixes, widened by T109 with the two promoted paths and with
+    // `lib/routing` (P6's resolve-root-route), which T059 could not have reserved because
+    // the module was not designed yet. Stated as a set comparison so an accidental
+    // deletion from either list fails here rather than silently narrowing the guard.
     expect([...FEATURE_DIRS, ...RESERVED_FOR_LATER_PHASES].sort()).toEqual(
       [
         "app/(public)",
@@ -117,6 +134,7 @@ describe("the scan actually covers this feature's files", () => {
         "lib/consent",
         "lib/landing",
         "lib/legal",
+        "lib/routing",
       ].sort(),
     );
   });
