@@ -1,6 +1,6 @@
 "use client";
 
-import { REN_MESSAGES } from "@/lib/landing/copy";
+import { REN_MESSAGES, REN_THREAD_LABEL } from "@/lib/landing/copy";
 import { THREAD_CAP, trimThread } from "@/lib/landing/story-script";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +33,7 @@ export function RenThread({ messages }: { messages: readonly ThreadMessage[] }) 
     <ul
       data-testid="ren-thread"
       className="flex list-none flex-col gap-1.5 overflow-hidden"
-      aria-label="An example conversation with Ren"
+      aria-label={REN_THREAD_LABEL}
     >
       {visible.map((message, position) => (
         <li
@@ -42,7 +42,7 @@ export function RenThread({ messages }: { messages: readonly ThreadMessage[] }) 
           key={`${message.messageKey}-${position}`}
           data-from={message.from}
           className={cn(
-            "max-w-[85%] rounded-lg px-2.5 py-1.5 text-xs leading-snug",
+            "max-w-[93%] rounded-lg px-2.5 py-1 text-xs leading-snug",
             message.from === "ren"
               ? "self-start bg-foggy/12 text-ink"
               : "self-end bg-bg text-ink border border-border",
