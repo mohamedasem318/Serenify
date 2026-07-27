@@ -16,8 +16,15 @@
  * WHY ONLY "HOME". The landing page's other reachable anchor is its how-it-works section,
  * and it is deliberately NOT listed: the hero's second CTA already goes there with the
  * label FR-020 fixes, and any label short enough to satisfy the single-word rule below
- * ("How", "Product") would name the section worse than the CTA already does. A shell
- * destination that duplicates a CTA is not navigation, it is noise.
+ * ("How", "Product") would name the section worse than the CTA already does.
+ *
+ * "Home" DOES sit next to the navbar wordmark, which also links to `/`, and that
+ * duplication is deliberate rather than an oversight. The two are not the same
+ * affordance: the wordmark is a brand mark that experienced users know is clickable, and
+ * it is absent from BOTH the mobile sheet and the footer's link row — which is where this
+ * list is actually read. A named row there is the only home link a phone user gets. The
+ * how-it-works case is different precisely because its alternative, the hero CTA, is on
+ * the same screen and better labelled.
  *
  * Still PUBLIC ONLY — `/` is the signed-out landing page. No `/app`, no role, no session.
  *
