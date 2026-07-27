@@ -6,6 +6,7 @@ import { QuietPanel } from "@/components/landing/panels/quiet-panel";
 import { PromptPanel } from "@/components/landing/panels/prompt-panel";
 import { RenPanel } from "@/components/landing/panels/ren-panel";
 import { ResolvedPanel } from "@/components/landing/panels/resolved-panel";
+import { StoryTrend } from "@/components/landing/story-trend";
 import type { ThreadMessage } from "@/components/landing/ren-thread";
 import { useStoryClock } from "@/components/landing/use-story-clock";
 import type { BloomTone } from "@/components/monitor/use-monitoring-session";
@@ -109,6 +110,10 @@ export function StoryCard() {
             </p>
             <p className="truncate text-[0.6875rem] text-muted">{READOUT_WINDOW_LABEL}</p>
           </div>
+          {/* The third part of the readout (FR-007): orb, reading label, AND trend. */}
+          <div className="ml-auto w-20 shrink-0 sm:w-24">
+            <StoryTrend beatIndex={index} />
+          </div>
         </div>
 
         {/* ── NARRATION — FIXED height (2 lines < md, 1 line ≥ md). Never min-height. ── */}
@@ -127,7 +132,7 @@ export function StoryCard() {
         {/* ── SWAP AREA — relative + explicit height; four absolute panels ── */}
         <div
           data-testid="story-swap"
-          className="relative mt-3 h-[13.5rem] overflow-hidden sm:h-[12.5rem]"
+          className="relative mt-3 h-[20.5rem] overflow-hidden md:h-[16.5rem]"
         >
           {PANELS.map((panel) => {
             const isActive = panel === beat.panel;
