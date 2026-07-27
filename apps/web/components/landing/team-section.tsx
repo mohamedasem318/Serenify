@@ -8,8 +8,8 @@ import {
   TEAM_CAPTION,
   TEAM_HEADING,
   TEAM_SUB,
-  TEAM_SUPERVISORS,
   TEAM_SUPERVISORS_LABEL,
+  TEAM_SUPERVISORS_LINE,
 } from "@/lib/landing/copy";
 import { type TeamKey } from "@/lib/landing/team-silhouettes";
 
@@ -83,7 +83,7 @@ export function TeamSection() {
             {TEAM_SUPERVISORS_LABEL}
           </span>
           <span className="min-w-0 text-sm text-ink [overflow-wrap:anywhere]">
-            {TEAM_SUPERVISORS.join(" · ")}
+            {TEAM_SUPERVISORS_LINE}
           </span>
         </div>
       </div>

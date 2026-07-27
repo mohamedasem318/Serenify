@@ -58,14 +58,25 @@ export function TeamPhoto({ active, onPreview, onSelect }: TeamPhotoProps) {
   return (
     // `overflow-hidden` clips the photo to the rounded corner. It is safe here — unlike
     // the P6 panels — because the SVG is `inset-0` on the same box the image fills and
-    // every coordinate is inside the 0–100 viewBox, so there is nothing to clip away.
+    // every path COORDINATE is inside the 0–100 viewBox.
+    //
+    // The strokes are not, and the distinction matters: the glow is 7 CSS px wide with
+    // `non-scaling-stroke`, so 3.5 px sits either side of the path, and the lowest points
+    // (y = 99.91) leave only ~1.2–1.6 px of headroom. About 2 px of the glow's outer edge
+    // is therefore flat-clipped along the bottom, at every width, for every person. That
+    // is intentional and invisible — but do not reuse "the coordinates are inside the
+    // viewBox" as a reason some OTHER overhang is safe. It is not the same claim.
     <div className="relative overflow-hidden rounded-card border border-border bg-surface leading-none">
       <Image
         src="/team/serenify-team-2026.jpg"
         alt={TEAM_PHOTO_ALT}
         width={1600}
         height={1164}
-        sizes="(min-width: 64rem) 64rem, 100vw"
+        // Measured, not guessed: the rendered width is the viewport minus the section's
+        // `px-4 sm:px-6` below 1024 px, and 974 px inside the `max-w-5xl` container above
+        // it — never `100vw`, never a full `64rem`. Declaring either over-fetches a
+        // larger `/_next/image` candidate than the layout can ever use.
+        sizes="(min-width: 64rem) 61rem, calc(100vw - 2rem)"
         className="h-auto w-full"
       />
 
@@ -125,11 +136,20 @@ export function TeamPhoto({ active, onPreview, onSelect }: TeamPhotoProps) {
                * The hit area. `fill="transparent"` rather than `fill="none"`, because
                * `none` does not receive pointer events and the whole body — not just its
                * 2 px edge — has to be tappable on a phone.
+               *
+               * DELIBERATELY `nonzero`, unlike the two stroked paths above. `mohamed` and
+               * `fatma` each carry a second subpath for the gap between their legs; under
+               * `evenodd` that subpath becomes a HOLE, and taps landing in it — a region
+               * roughly a third of `mohamed`'s height — would hit nothing at all. The
+               * stroked paths keep `evenodd` because there the gap should be drawn; the
+               * hit area wants the silhouette solid. The mock used `evenodd` for both,
+               * which is the bug this avoids rather than a fidelity constraint: FR-026
+               * freezes the path DATA, and the `d` attribute here is byte-identical.
                */}
               <path
                 d={TEAM_SILHOUETTES[key]}
                 fill="transparent"
-                fillRule="evenodd"
+                fillRule="nonzero"
                 className="pointer-events-auto cursor-pointer"
                 onPointerEnter={() => onPreview(key)}
                 onPointerLeave={() => onPreview(null)}
