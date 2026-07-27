@@ -2059,3 +2059,76 @@ point-of-use not-yet-live discipline on the landing page, both legal documents, 
 consent gates — `README.md` is simply not one of 013's surfaces, so it needs its own fix.
 See `.specify/memory/constitution.md` Principle I (public-communication rule, Amendment 17)
 and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
+
+---
+
+## From feature 013 implementation (public-surface-and-legal) — captured 2026-07-27
+
+Four items surfaced while implementing feature 013 that are **not** 013's work. They are logged
+here so the feature ships without absorbing them. **Three of the four carry no GitHub issue** —
+see the note repeated on each; that is a deliberate, recorded departure from Principle VIII's
+1:1 BACKLOG↔Issues mirror, not an oversight.
+
+### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+**Category**: dependencies / security posture
+**Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
+counts below were then verified directly against the Dependabot API.
+**Description**: GitHub reported **22 open alerts (11 high, 11 moderate)** at push time. The
+Dependabot API on 2026-07-27 reports **21 open (11 high, 10 moderate)**, spanning **12 distinct
+advisories** across **three packages**. One alert (`brace-expansion`, GHSA-mh99-v99m-4gvg) was
+**auto-dismissed on 2026-07-25**, inside the same window, which accounts for the total moving but
+not for the severity split. **Treat both figures as snapshots, not fixed numbers** — re-count
+before acting.
+
+They sit on **`main`**. **None was introduced by feature 013**, which adds no dependency and
+carries an empty `package.json` diff; every alert traces to `next`, `postcss`, or `sharp`, all of
+which predate the feature.
+
+- **`next` — 9 advisories, 18 of the 21 alerts.** Each is counted twice, once against
+  `package-lock.json` and once against `apps/web/package.json`. **4 high**: SSRF in Server Actions
+  on custom servers (GHSA-89xv-2m56-2m9x), SSRF in rewrites via an attacker-controlled destination
+  hostname (GHSA-p9j2-gv94-2wf4), middleware/proxy bypass in App Router applications using
+  Turbopack and a single locale (GHSA-6gpp-xcg3-4w24), DoS in App Router Server Actions
+  (GHSA-m99w-x7hq-7vfj). **5 moderate**: two response-body cache confusions (GHSA-68g3-v927-f742,
+  GHSA-4633-3j49-mh5q), unbounded Server Action payload on the Edge runtime (GHSA-4c39-4ccg-62r3),
+  unauthenticated disclosure of internal Server Function endpoints (GHSA-955p-x3mx-jcvp), and DoS
+  in the Image Optimization API via SVGs (GHSA-q8wf-6r8g-63ch). **All nine are fixed in 16.2.11**;
+  the repo pins **16.2.6** (`apps/web/package.json:30`). **One patch-level bump inside 16.2.x
+  clears 18 of the 21 alerts.**
+- **`postcss` — 2 high**, both `sourceMappingURL` handling: arbitrary `.map` file disclosure via
+  path traversal in previous-source-map auto-loading (GHSA-r28c-9q8g-f849) and arbitrary file read
+  via an attacker-controlled `sourceMappingURL` in a CSS comment (GHSA-6g55-p6wh-862q). Fixed in
+  8.5.18. Transitive; lockfile manifest only. **Distinct from the older PostCSS advisory already
+  logged as #36** (GHSA-qx2v-qp2m-jg93) — do not treat #36 as covering these.
+- **`sharp` — 1 high**, inherited libvips CVEs (GHSA-f88m-g3jw-g9cj). Fixed in 0.35.0. Transitive;
+  lockfile manifest only.
+
+**⚠ Do not attempt any upgrade while feature 013 is unmerged.** A dependency bump underneath an
+in-flight feature-branch stack costs days: every open branch inherits a lockfile conflict, and a
+`next` upgrade landing in the same window as feature 013's change to `app/(authed)/layout.tsx` —
+the shell **every** authenticated route renders through — makes any resulting regression ambiguous
+between the two. The upgrade is worth doing; it is not worth doing here.
+
+**⚠ This is NOT a P8 blocker.** P8 (T131–T148) ships feature 013 to production. These alerts are
+separate work, on `main`, with their own risk profile and their own verification. Nothing in this
+entry gates the feature, and it must not be folded into P8 — a dependency upgrade landing inside a
+deployment phase is the fastest way to turn a feature deploy into a debugging session.
+
+**Fix scope**: small-to-medium, on its own branch, **after 013 merges**. Sequence: `next`
+16.2.6 → 16.2.11 first (patch-level, clears 18 of 21), then `postcss` and `sharp`, which are
+transitive and should resolve without a manifest change. Verify with the full
+`npm run -w apps/web lint typecheck test` plus a Playwright chromium + firefox pass, and **read the
+16.2.7–16.2.11 release notes before shipping**: the middleware/proxy-bypass fix touches App Router
+routing, and `apps/web/proxy.ts` is load-bearing for authentication. Confirm the fix does not
+change proxy semantics.
+
+**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
+logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
+departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
+decision rather than an oversight. If an issue is opened later, add its number to this heading.
+
+**Address by**: a dedicated dependency branch **after feature 013 merges to `main`**, and before
+any further production deploy. Re-run the counts at that point. Pairs with **#36** (the older
+PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing dependency
+items.
