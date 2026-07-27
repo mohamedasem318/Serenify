@@ -10,8 +10,16 @@
  * because it has no authed destination to render (FR-018). A future phase adding a public
  * page adds it here; a future phase must not add an authed one.
  *
- * In P3 the public surface is exactly the two legal documents. The landing page takes
- * over `/` in P6 and will extend this list then; nothing here pre-empts that decision.
+ * In P3 the public surface was exactly the two legal documents. P6 (T104) took `/` over
+ * for the landing page and added it here — ONE entry, not several.
+ *
+ * WHY ONLY "HOME". The landing page's other reachable anchor is its how-it-works section,
+ * and it is deliberately NOT listed: the hero's second CTA already goes there with the
+ * label FR-020 fixes, and any label short enough to satisfy the single-word rule below
+ * ("How", "Product") would name the section worse than the CTA already does. A shell
+ * destination that duplicates a CTA is not navigation, it is noise.
+ *
+ * Still PUBLIC ONLY — `/` is the signed-out landing page. No `/app`, no role, no session.
  *
  * Labels are single words on purpose: they sit inside 44 px tap targets at 320 px in both
  * the navbar row and the sheet, and FR-053 forbids a tap target whose label wraps.
@@ -23,6 +31,7 @@ export type PublicDestination = {
 };
 
 export const PUBLIC_DESTINATIONS: readonly PublicDestination[] = [
+  { href: "/", label: "Home" },
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ];
