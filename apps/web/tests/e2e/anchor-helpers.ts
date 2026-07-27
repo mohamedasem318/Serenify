@@ -1,6 +1,6 @@
 import { type Page, expect } from "@playwright/test";
 
-import { randomEmail } from "./helpers";
+import { randomEmail, termsConsentMetadata } from "./helpers";
 // Relative, not the `@/` alias: no other file under tests/e2e/ uses the alias, and
 // Playwright resolves this module with its own transform rather than Next's. Matching
 // the directory's existing convention keeps the helper working under both runners.
@@ -324,6 +324,10 @@ export async function createOnboardingEmployee({
     email,
     password,
     email_confirm: true,
+    // Terms/Privacy consent only. NO full_name — this fixture exists precisely to
+    // route through /onboarding, and the trigger reads full_name from this same
+    // metadata, so adding one here would silently skip the step under test.
+    user_metadata: termsConsentMetadata(),
   });
   if (error || !data.user) throw error ?? new Error("createUser failed");
   if (withCameraConsent) await seedCameraConsent(data.user.id);
@@ -434,6 +438,8 @@ export async function createManager(role: "team_lead" | "admin") {
     email,
     password,
     email_confirm: true,
+    // As above: consent only, full_name deliberately left NULL for this fixture.
+    user_metadata: termsConsentMetadata(),
   });
   if (error || !data.user) throw error ?? new Error("createUser failed");
   const { error: roleErr } = await admin
