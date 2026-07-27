@@ -292,3 +292,86 @@ export const RETENTION_BODY =
 export const RETENTION_LINK_PRIVACY = "Privacy Policy";
 export const RETENTION_LINK_TERMS = "Terms of Service";
 
+// ── The team section ─────────────────────────────────────────────────────────────────
+//
+// T120 (P7). FR-024 and FR-027. The heading and the sub-heading are transcribed from
+// the mock in the same pass that produced everything above; the caption, the four names,
+// the eight URLs and the two supervisor credits are FIXED and are not re-worded.
+//
+// TWO NAME FORMS EXIST ON PURPOSE — DO NOT RECONCILE THEM.
+//
+//  · The team section below uses the full FR-024 spelling "Mohamed Assem Adel".
+//  · The legal documents (`lib/legal/copy.ts`) use the single form "Mohamed Assem".
+//  · `/privacy` separately names the data controller as "Mohamed Asem" (FR-046).
+//
+// Three deliberate forms, none of them a typo. A future reader who "fixes" one of them
+// into agreement with the others breaks a tested invariant in the other module.
+//
+// The mock's caption read "Hover a name to find them — or hover the photo." FR-024
+// supersedes it: it named an interaction that touch and keyboard users do not have, and
+// FR-028 forbids a hover-only mapping outright.
+
+export const TEAM_HEADING = "Built as a graduation project.";
+export const TEAM_SUB =
+  "Biomedical Engineering, Capital University. Four of us built Serenify end to end — the models, the dataset work, and the app you are looking at.";
+
+/** FR-024, verbatim. */
+export const TEAM_CAPTION = "Choose a name to find them in the photo.";
+
+/**
+ * Alt text for the photograph. Describes who is in it, left to right, because that is
+ * the information the outline overlay carries visually and the overlay is `aria-hidden`.
+ * It quotes no figure from the poster behind the group (FR-004).
+ */
+export const TEAM_PHOTO_ALT =
+  "The four members of the Serenify team standing either side of the project poster.";
+
+/**
+ * The four people, in FR-024's fixed left-to-right order, keyed to match
+ * `lib/landing/team-silhouettes.ts`.
+ *
+ * `githubLabel` / `linkedinLabel` are the accessible names. Each identifies BOTH the
+ * person and the destination, so a screen reader's link list distinguishes all eight
+ * rather than reading "GitHub" four times. The URLs are real profiles — the mock's inert
+ * `href="#"` placeholders must not ship — and are confirmed correct by ST-15, a human
+ * check.
+ */
+export const TEAM_MEMBERS = [
+  {
+    key: "mohamed",
+    name: "Mohamed Assem Adel",
+    github: "https://github.com/mohamedasem318",
+    githubLabel: "Mohamed Assem Adel on GitHub",
+    linkedin: "https://www.linkedin.com/in/mohamedasem318/",
+    linkedinLabel: "Mohamed Assem Adel on LinkedIn",
+  },
+  {
+    key: "fatma",
+    name: "Fatma Al-Zahraa Emad",
+    github: "https://github.com/Fatma-Alzahraaa",
+    githubLabel: "Fatma Al-Zahraa Emad on GitHub",
+    linkedin: "https://www.linkedin.com/in/fatma-al-zahraa-emad-326b64234",
+    linkedinLabel: "Fatma Al-Zahraa Emad on LinkedIn",
+  },
+  {
+    key: "hebatullah",
+    name: "Hebatullah El Gazoly",
+    github: "https://github.com/hebatullah003",
+    githubLabel: "Hebatullah El Gazoly on GitHub",
+    linkedin: "https://www.linkedin.com/in/hebatullah-elgazoly-308ab2243/",
+    linkedinLabel: "Hebatullah El Gazoly on LinkedIn",
+  },
+  {
+    key: "gehad",
+    name: "Gehad Mohamed",
+    github: "https://github.com/gehaddmohamedd",
+    githubLabel: "Gehad Mohamed on GitHub",
+    linkedin: "https://www.linkedin.com/in/gehad-mohamed-2a4946252/",
+    linkedinLabel: "Gehad Mohamed on LinkedIn",
+  },
+] as const;
+
+/** FR-027, verbatim. Rendered as separate DOM from the photo so it survives a failed image. */
+export const TEAM_SUPERVISORS_LABEL = "Supervised by";
+export const TEAM_SUPERVISORS = ["Dr. Lamees Nasser", "Dr. Safaa Mouneer"] as const;
+
