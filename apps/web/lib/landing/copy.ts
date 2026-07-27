@@ -133,6 +133,9 @@ export const PANEL_RESOLVED_TITLE = "Set aside";
 export const PANEL_RESOLVED_BODY =
   "No follow-up, and nothing to explain. Serenify goes quiet and keeps watching.";
 
+/** Accessible name for the scripted thread; it is an illustration, not a live chat. */
+export const REN_THREAD_LABEL = "An example conversation with Ren";
+
 export const PANEL_REN_NAME = "Ren";
 export const PANEL_REN_SUBTITLE = "here to listen";
 /** Kept from the mock deliberately: the AI disclosure belongs on the surface. */
@@ -284,7 +287,7 @@ export const STATUS_NOTE =
  */
 export const RETENTION_HEADING = "What is kept, and for how long.";
 export const RETENTION_BODY =
-  "Readings are kept for 90 days under our retention policy. The video they were computed from is not kept at all. The full detail is in the Privacy Policy and the Terms of Service.";
+  "Readings are kept for 90 days. Stated precisely, because the distinction matters: that is a policy, not a mechanism — no purge job runs on a schedule today, and this page does not promise one. The video they were computed from is not kept at all. The full detail is in the Privacy Policy and the Terms of Service.";
 
 export const RETENTION_LINK_PRIVACY = "Privacy Policy";
 export const RETENTION_LINK_TERMS = "Terms of Service";
