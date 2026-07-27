@@ -1,12 +1,34 @@
 /**
  * The four team-photo silhouette outlines (feature 013, US4 — T118; FR-026).
  *
- * COPIED CHARACTER-FOR-CHARACTER from `docs/mockups/serenify-landing-mock.html`
- * (~line 671, the `const SIL={…}` literal). FR-026 forbids re-deriving, re-tracing,
- * reformatting, or regenerating these strings by any means — they are already derived
- * and verified, and a "harmless" reformat is a silent geometry change. The mock is
- * gitignored, so reading it needs `rg --no-ignore` or an explicit `*.html` scope; a
- * default `rg` sees nothing (`plan.md` §10.1).
+ * THREE OF THE FOUR are copied CHARACTER-FOR-CHARACTER from
+ * `docs/mockups/serenify-landing-mock.html` (~line 671, the `const SIL={…}` literal).
+ * `mohamed`, `fatma` and `hebatullah` are byte-identical to it and must stay that way:
+ * FR-026 forbids re-deriving, re-tracing, reformatting or regenerating them by any means,
+ * and a "harmless" reformat is a silent geometry change. The mock is gitignored, so
+ * reading it needs `rg --no-ignore` or an explicit `*.html` scope; a default `rg` sees
+ * nothing (`plan.md` §10.1).
+ *
+ * ── `gehad` IS RE-TRACED, UNDER AN AMENDMENT TO FR-026 ───────────────────────────────
+ *
+ * The mock's `gehad` outline covered its left edge with ONE straight segment spanning
+ * ~28 viewBox units — `L 79.47 68.64` to `L 82.72 40.98` — which sliced across her
+ * shoulder and upper arm and cut off the corner of her (oversized) blazer where it
+ * overlaps Hebatullah. Every other segment in all four paths is short; that one was the
+ * whole defect.
+ *
+ * Mohamed identified it, directed the re-trace, placed the final elbow and hem vertices
+ * himself in a point editor, and approved the result on 2026-07-27. FR-026 was amended in
+ * the same change to permit exactly this, scoped to `gehad` and no more (`spec.md`
+ * FR-026, and `tasks.md` T118). Five automated segmentation passes failed before the
+ * hand-placement worked, which is recorded so nobody re-attempts them: the two greys
+ * either side of that boundary differ by a few L* units, and a garment's own shadowed
+ * edge is darker than its middle by more than that, so every photometric "this darker
+ * pixel must be the other person" rule also eats into the person it is tracing.
+ *
+ * Vertices 0–6 and everything from `L 83.38 39.05` onward are byte-identical to the
+ * mock. Only the span between them changed, and `gehad`'s x-max is still exactly 97.78.
+ * The re-trace is NOT a licence to touch the other three, or to re-trace this one again.
  *
  * The coordinates are normalised to the 1600×1164 crop and are consumed under
  * `viewBox="0 0 100 100"` with `preserveAspectRatio="none"` over an exact-aspect box
@@ -23,7 +45,10 @@
  *       mohamed     0.34 → 21.84   (leftmost)
  *       fatma      22.16 → 40.59   (second)
  *       hebatullah 64.91 → 81.47   (INNER right, the person wearing glasses)
- *       gehad      79.47 → 97.78   (OUTER right, rightmost)
+ *       gehad      77.28 → 97.78   (OUTER right, rightmost)
+ *     `gehad` and `hebatullah` overlap between 77.28 and 81.47 and that is CORRECT, not
+ *     a defect: Gehad's blazer is oversized and genuinely covers part of Hebatullah.
+ *     `gehad` is drawn last, so in the overlap its hit area sits on top.
  *     The gap between 40.59 and 64.91 is the poster standing between the two pairs.
  *  2. That order matches FR-024's required left-to-right card order.
  *  3. It matches the mock's own `TEAM` array (`:807–812`), which pairs the same keys
@@ -66,5 +91,5 @@ export const TEAM_SILHOUETTES: Readonly<Record<TeamKey, string>> = {
   hebatullah:
     "M 67.47 99.91 L 66.72 95.36 L 66.53 90.29 L 66.22 87.97 L 65.72 78.87 L 65.34 76.2 L 65.47 67.18 L 65.41 66.75 L 64.91 66.07 L 64.91 64.86 L 65.59 60.82 L 65.59 58.42 L 65.28 57.3 L 65.34 54.55 L 65.03 52.58 L 65.03 51.46 L 65.34 50.43 L 65.84 49.57 L 66.09 47.08 L 66.66 45.36 L 66.53 40.89 L 66.94 40.25 L 68.38 39.05 L 70.31 37.93 L 71.72 36.43 L 71.34 35.74 L 70.91 34.19 L 70.84 31.27 L 70.53 29.81 L 71.16 28.95 L 71.53 27.66 L 72.25 26.59 L 73.31 25.64 L 74.31 25.39 L 75.25 25.39 L 76.81 26.25 L 77.66 27.49 L 78.03 28.78 L 78.22 30.84 L 78.09 34.28 L 77.09 36.6 L 77.69 37.07 L 79.44 37.5 L 81.47 38.49 L 81.34 39.43 L 80.78 40.98 L 77.53 68.64 L 77.84 71.91 L 77.22 73.54 L 76.91 74.91 L 76.28 79.73 L 76.28 82.04 L 76.59 83.85 L 76.84 86.86 L 76.84 91.75 L 77.16 92.7 L 77.66 96.65 L 78.66 98.28 L 79.09 99.91 Z",
   gehad:
-    "M 82.47 99.91 L 82.16 97.16 L 81.47 83.68 L 80.66 75.6 L 80.53 71.82 L 80.19 71.26 L 79.66 70.88 L 79.47 68.64 L 82.72 40.98 L 83.38 39.05 L 84.75 38.7 L 86.84 37.03 L 85.66 35.31 L 85.03 33.68 L 84.66 31.53 L 84.59 28.95 L 85.03 27.92 L 85.94 26.85 L 86.88 26.25 L 88.06 26.07 L 89.25 26.25 L 90.25 26.93 L 90.91 27.92 L 91.47 29.38 L 92.09 31.7 L 92.41 34.02 L 92.41 36.0 L 92.22 37.63 L 94.88 39.13 L 95.88 40.25 L 97.5 41.19 L 97.78 41.67 L 97.78 50.43 L 97.47 58.08 L 96.22 63.57 L 97.16 74.83 L 96.75 75.21 L 95.0 75.21 L 94.59 75.43 L 94.34 76.03 L 93.78 80.33 L 93.59 87.11 L 93.72 92.01 L 94.28 96.65 L 94.09 99.91 Z",
+    "M 82.47 99.91 L 82.16 97.16 L 81.47 83.68 L 80.66 75.6 L 80.53 71.82 L 80.19 71.26 L 79.66 70.88 L 79.27 70.51 L 78.65 70.09 L 77.28 69.1 L 78.12 66.58 L 78.19 65.72 L 78.81 63.49 L 78.98 63.23 L 79.34 62.11 L 80.01 60.15 L 79.59 56.97 L 79.62 54.73 L 79.88 53.18 L 80.31 47.16 L 80.56 46.82 L 80.88 43.99 L 81.75 40.12 L 82.31 39.35 L 83.38 39.18 L 83.38 39.05 L 84.75 38.7 L 86.84 37.03 L 85.66 35.31 L 85.03 33.68 L 84.66 31.53 L 84.59 28.95 L 85.03 27.92 L 85.94 26.85 L 86.88 26.25 L 88.06 26.07 L 89.25 26.25 L 90.25 26.93 L 90.91 27.92 L 91.47 29.38 L 92.09 31.7 L 92.41 34.02 L 92.41 36.0 L 92.22 37.63 L 94.88 39.13 L 95.88 40.25 L 97.5 41.19 L 97.78 41.67 L 97.78 50.43 L 97.47 58.08 L 96.22 63.57 L 97.16 74.83 L 96.75 75.21 L 95.0 75.21 L 94.59 75.43 L 94.34 76.03 L 93.78 80.33 L 93.59 87.11 L 93.72 92.01 L 94.28 96.65 L 94.09 99.91 Z",
 } as const;

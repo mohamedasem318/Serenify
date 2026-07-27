@@ -27,12 +27,22 @@ import { TEAM_KEYS, TEAM_SILHOUETTES } from "@/lib/landing/team-silhouettes";
  */
 
 /**
- * Frozen at T118 from `docs/mockups/serenify-landing-mock.html` (~line 671).
+ * Frozen at T118.
  *
- * These are not "the current values written down". They are the mock's values, and the
- * mock is the authority. If a change makes this table fail, the change is wrong — the
- * table is not to be re-baselined to make CI green. Re-deriving the paths by any means
- * is forbidden (FR-026), and re-baselining is re-deriving with extra steps.
+ * `mohamed`, `fatma` and `hebatullah` are the mock's own values
+ * (`docs/mockups/serenify-landing-mock.html`, ~line 671), and the mock is the authority
+ * for them. If a change makes one of those three fail, the change is wrong — they are
+ * not to be re-baselined to make CI green. Re-deriving them is forbidden (FR-026), and
+ * re-baselining is re-deriving with extra steps.
+ *
+ * `gehad` is the ONE exception, re-baselined once on 2026-07-27 under the amendment to
+ * FR-026 that Mohamed authorised: the mock's version covered her left edge with a single
+ * ~28-unit straight segment that sliced across her shoulder and clipped her blazer, and
+ * he placed the replacement vertices himself. Vertices 0–6 and everything from
+ * `L 83.38 39.05` onward are still byte-identical to the mock; only the span between them
+ * moved. See the header of `lib/landing/team-silhouettes.ts` for the full account.
+ *
+ * That exception is spent. This table is frozen again for all four.
  */
 const FROZEN = {
   mohamed: {
@@ -48,8 +58,8 @@ const FROZEN = {
     sha256: "c2e0f614c04cddf72a948d0c719b26c76091add783f40fe29cf990ff925d3128",
   },
   gehad: {
-    length: 625,
-    sha256: "6ff965dff5658b83711488523e0a5e00acae246899e2f4f3635313e8f71cb581",
+    length: 848,
+    sha256: "aefeaf58ab3e0b9b8784dd055355f10c606e53da5a5dfc28089f5aba4e8a908f",
   },
 } as const;
 
@@ -133,7 +143,7 @@ describe("T119: the mapping is not reversed and no two keys are swapped", () => 
       mohamed: [0.34, 21.84],
       fatma: [22.16, 40.59],
       hebatullah: [64.91, 81.47],
-      gehad: [79.47, 97.78],
+      gehad: [77.28, 97.78],
     };
     for (const key of TEAM_KEYS) {
       const { min, max } = xRange(TEAM_SILHOUETTES[key]);
@@ -147,6 +157,16 @@ describe("T119: the mapping is not reversed and no two keys are swapped", () => 
     // something has been re-traced.
     expect(xRange(TEAM_SILHOUETTES.hebatullah).min).toBeGreaterThan(
       xRange(TEAM_SILHOUETTES.fatma).max + 20,
+    );
+  });
+
+  it("keeps gehad's blazer overlapping hebatullah, because it really does", () => {
+    // The two right-hand outlines overlap between 77.28 and 81.47, and that is the
+    // photograph, not a tracing error: Gehad's blazer is oversized and covers part of
+    // Hebatullah. An edit that separated them would be clipping a real garment — which
+    // is exactly the mistake one of the rejected re-trace attempts made.
+    expect(xRange(TEAM_SILHOUETTES.gehad).min).toBeLessThan(
+      xRange(TEAM_SILHOUETTES.hebatullah).max,
     );
   });
 });
