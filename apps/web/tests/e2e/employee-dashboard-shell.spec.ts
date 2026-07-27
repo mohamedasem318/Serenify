@@ -277,3 +277,31 @@ test("employee dashboard: today recap expands in place to the axis-labelled plot
     "false",
   );
 });
+
+/**
+ * Feature 013 / P6 — T087: the first of the two root-route checks the landing-page
+ * takeover has to survive (`research.md` §12.2).
+ *
+ * `/` used to redirect every signed-in visitor to `/app`; since T086 it renders the
+ * landing page for anonymous visitors instead of redirecting to `/login`. That is a
+ * one-branch change, and this asserts the branch it did NOT touch: a signed-in employee
+ * typing `/` still lands in the application rather than on the marketing page.
+ *
+ * It is appended here rather than put in a new suite deliberately — this file already
+ * provisions a signed-in employee against the same globalSetup, and §12.2 asks for two
+ * narrow checks, not a root-route suite. It runs under `playwright.config.ts` (which has
+ * the globalSetup and the database it needs), never under `playwright.layout.config.ts`.
+ */
+test("root route: a signed-in employee visiting / still reaches /app", async ({ page }) => {
+  const { email } = await createEmployee();
+
+  await page.goto("/login");
+  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(/\/app$/);
+
+  // The actual check: navigate to `/` with a live session and end up at /app.
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/app$/);
+});
