@@ -143,15 +143,17 @@ export const PANEL_REN_FOOTNOTE =
 //
 // Scripted static copy, NOT a model call. There is no LLM on this page (Principle IV).
 
-export const REN_MSG_1 = "Thanks for saying so. What has today been like?";
-export const REN_MSG_2 = "Back to back calls since nine. I have not stopped.";
-export const REN_MSG_3 =
-  "Six hours without a gap is a lot to carry. Is there a stretch this afternoon that is yours?";
-export const REN_MSG_4 = "Maybe twenty minutes at four.";
-export const REN_MSG_5 =
-  "Then let us keep it. Step away from the screen, and we can pick this up whenever you want.";
-export const REN_MSG_6 = "Took the twenty minutes. That actually helped.";
-export const REN_MSG_7 = "I am really glad. That was yours to take, and you took it.";
+export const REN_MESSAGES = {
+  renOpens: "Thanks for saying so. What has today been like?",
+  personBackToBack: "Back to back calls since nine. I have not stopped.",
+  renSixHours:
+    "Six hours without a gap is a lot to carry. Is there a stretch this afternoon that is yours?",
+  personTwentyMinutes: "Maybe twenty minutes at four.",
+  renKeepIt:
+    "Then let us keep it. Step away from the screen, and we can pick this up whenever you want.",
+  personTookIt: "Took the twenty minutes. That actually helped.",
+  renGlad: "I am really glad. That was yours to take, and you took it.",
+} as const;
 
 // ── Story card — the six chapter names ───────────────────────────────────────────────
 //
