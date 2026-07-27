@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 import { createCalibratedEmployee, signInToApp } from "./anchor-helpers";
 import { seedRetrospectiveSession } from "./monitoring-helpers";
 import { createAdminClient } from "./setup/admin-client";
-import { randomEmail } from "./helpers";
+import { randomEmail, termsConsentMetadata } from "./helpers";
 
 /**
  * Employee dashboard shell happy-path (T064 / SC-012, covers US1+US2+US3).
@@ -41,7 +41,7 @@ async function createEmployee(): Promise<{ email: string }> {
     email,
     password: PASSWORD,
     email_confirm: true,
-    user_metadata: { full_name: INITIAL_FULL_NAME },
+    user_metadata: { full_name: INITIAL_FULL_NAME, ...termsConsentMetadata() },
   });
   if (error) throw error;
   return { email };
