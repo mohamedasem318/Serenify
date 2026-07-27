@@ -2074,12 +2074,15 @@ see the note repeated on each; that is a deliberate, recorded departure from Pri
 **Category**: dependencies / security posture
 **Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
 counts below were then verified directly against the Dependabot API.
-**Description**: GitHub reported **22 open alerts (11 high, 11 moderate)** at push time. The
-Dependabot API on 2026-07-27 reports **21 open (11 high, 10 moderate)**, spanning **12 distinct
-advisories** across **three packages**. One alert (`brace-expansion`, GHSA-mh99-v99m-4gvg) was
-**auto-dismissed on 2026-07-25**, inside the same window, which accounts for the total moving but
-not for the severity split. **Treat both figures as snapshots, not fixed numbers** — re-count
-before acting.
+**Description**: **Two GitHub surfaces disagree, concurrently, and both were read on 2026-07-27.**
+The push-time banner (`remote:` output on `git push`) says **22 open (11 high, 11 moderate)**. The
+Dependabot REST API, queried the same day, says **21 open (11 high, 10 moderate)**, spanning **12
+distinct advisories** across **three packages**. This is not drift between two dates — it is the
+banner and the API reporting different numbers at the same moment. One alert (`brace-expansion`,
+GHSA-mh99-v99m-4gvg) was **auto-dismissed on 2026-07-25**, inside the same window, which plausibly
+explains the total but not the severity split. **Treat every figure here as a snapshot, not a fixed
+number**, and re-count from the Dependabot security tab before acting. The per-advisory breakdown
+below is from the API and is the reliable part.
 
 They sit on **`main`**. **None was introduced by feature 013**, which adds no dependency and
 carries an empty `package.json` diff; every alert traces to `next`, `postcss`, or `sharp`, all of
