@@ -2306,3 +2306,51 @@ decision rather than an oversight. If an issue is opened later, add its number t
 **Address by**: before WebKit can return to any sign-off bar — so, not during feature 013.
 Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux runner may close the
 coverage hole without the local hang ever being solved.
+
+### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it
+**Status**: bug (`type:bug` / `area:web`) — **OPEN. No GitHub issue filed** (see the note at the end of this entry).
+**Category**: responsive layout / test masking
+**Observed**: 2026-07-27, after fixing the e2e fixtures blocked by feature 013's app-shell consent
+gate (PR #173). The failure appeared only *because* that fix unblocked the page.
+**Description**: `apps/web/tests/e2e/employee-dashboard-shell.spec.ts:191` — *"employee shell at
+360px: hamburger menu, single-column cards, icon-only chat pill"* — probes the single-column stack
+by bounding box: the three card headings must share an x origin within a **4 px** tolerance
+(`:226-227`), which is what distinguishes the mobile stack from the desktop `3fr/2fr` split. At
+360 px the measured x-origin delta is **8 px**, so the assertion fails. The y-ordering assertions
+above it pass, so the cards *are* stacking — the stack is simply not left-aligned to within the
+tolerance the test was written against. Whether the fix is the layout or the tolerance is a
+product/layout call, not a test call, which is why this is logged rather than patched.
+
+**Pre-existing — proven, not assumed.** Checked out **`eefe83f`** (the P4 merge commit, before any
+P5 gate code exists) and ran that single test there. It fails identically: same assertion, same
+numbers. Nothing in feature 013 causes it.
+
+**⚠ The interesting part: the consent gate had been masking it, and it may not be the only one.**
+Before PR #173, every Playwright fixture user landed on P5's Terms/Privacy re-consent screen
+instead of the page under test, so this spec died at the `/app` URL assertion — long before it
+reached line 226. The failure did not "start"; it became *visible*. **A suite that fails early
+reports the gate, not the defect underneath it**, and roughly 12 of 17 specs were failing early.
+Any other pre-existing failure downstream of a blocked point was equally invisible for the same
+reason, and some of it may still be hidden behind the residual failures that remain.
+
+The general rule this establishes, worth applying to any future gate: **when a change blocks
+fixture users, re-baseline the suite against the pre-gate commit before concluding that a newly-red
+test is new.** The reverse also holds — when a gate is *removed* or fixtures are unblocked,
+expect previously-masked failures to surface, and do not attribute them to the unblocking change.
+
+**Fix scope**: small, but it needs a decision first. Either (a) fix the layout so the three headings
+share an x origin at 360 px — likely a per-card padding or grid-gutter asymmetry, since the y
+ordering is already correct — or (b) widen the tolerance if the 8 px offset is intentional design.
+**Do not simply widen the tolerance to make the suite green**: the 4 px bar exists to prove the
+desktop `3fr/2fr` split has collapsed, and a tolerance loose enough to hide a real regression is
+worse than a red test. Verify at the feature-013 mobile floor — 320 / 375 / 414 / 768 px — not only
+at 360.
+
+**⚠ No GitHub issue is filed for this entry.** Deliberate, at Mohamed's instruction in the PR that
+logged it (issues were scoped to the `/api/admin/invite` item alone). This is a **known, accepted
+departure from Principle VIII's 1:1 BACKLOG↔Issues mirror**, recorded here so it reads as a
+decision rather than an oversight. If an issue is opened later, add its number to this heading.
+
+**Address by**: any responsive-layout pass after 013 merges. Natural pairing with the mobile /
+tablet typography bump (**#45**) and the rest of the standing design-system queue, since all of them
+touch the same card surfaces at the same widths.
