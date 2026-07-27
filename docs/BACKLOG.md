@@ -2132,3 +2132,111 @@ decision rather than an oversight. If an issue is opened later, add its number t
 any further production deploy. Re-run the counts at that point. Pairs with **#36** (the older
 PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing dependency
 items.
+
+### Restore `POST /api/admin/invite` — deleted in #142; there is no in-app path left to create a `team_lead` or an `admin` (#174)
+**Status**: deferred-feature (`type:feature` / `area:web` / `area:db`) — **OPEN.** GitHub issue **#174 OPEN**.
+**Category**: product / auth surface
+**Observed**: 2026-07-27, while fixing the e2e fixtures blocked by feature 013's app-shell
+consent gate (PR #173). `admin-seeded.spec.ts` and `team-lead-seeded.spec.ts` still
+`POST /api/admin/invite` and assert `201`. They get **404**, and they fail *at the POST* —
+not at anything downstream. `apps/web/app` today contains exactly one route file,
+`auth/callback/route.ts`.
+**Description**: `apps/web/app/api/admin/invite/route.ts` (152 lines) was deleted in
+`ffb3a96` — the squash of PR #142, *"chore(deploy): prepare Serenify production cutover"*,
+merged 2026-07-12. It was the only in-app way to create a `team_lead` or an `admin`: it
+invited through the service-role admin client (creating the `auth.users` row, which
+`handle_new_user` seeded as `role='employee'`), then called the `admin_update_role` and
+`admin_update_manager` SECURITY DEFINER RPCs **through the caller's session client**, so
+`auth.uid()` resolved to the verified admin and Postgres re-checked `is_admin()` on its own
+side. With it gone, role assignment above `employee` has no application surface at all.
+
+**Why it was removed — the reason is recorded, but not in the commit or the PR body.**
+The squash carries the bare subject line `* fix(web): remove runtime admin service-role
+path` with no body, and PR #142's description says only *"remove the runtime admin/service-role
+path and keep production access RLS-as-user"* and *"no service-role secret is required by the
+production web/API runtime"*. **Neither names the route.** The docs shipped in the same PR do
+name it, and they give the reason — `docs/CHANGELOG.md:2553`:
+
+> **Security posture.** Removed the runtime admin/service-role path entirely — deleted
+> `apps/web/lib/supabase/admin.ts` and `apps/web/app/api/admin/invite/route.ts`. Production
+> access is now **RLS-as-user throughout**, and inference replay runs as the authenticated
+> user. Locked by a new `apps/web/tests/unit/runtime-secret-posture.test.ts`; deploy no longer
+> requires a service-role key at all.
+
+`docs/PROGRESS.md:90` repeats it. So this was a **deliberate security-posture cut, not
+collateral**: the route was the sole runtime consumer of `lib/supabase/admin.ts`, and removing
+the service-role client from the production runtime necessarily removed the route.
+
+What is **not** recorded anywhere — not the commit, not the PR body, not `docs/DECISIONS.md` —
+is any discussion of the **consequence**: that the product loses its only invite path, that
+three open follow-ups now hang off an endpoint that no longer exists (**#60** invite audit log,
+**#61** concurrent-duplicate idempotency, **#63** app-layer rate limiting), that **#62**'s
+"funnel all entry through `/api/admin/invite`" resolution becomes unavailable, and that two e2e
+specs are left asserting `201` against a 404. **The removal is documented; its product cost is
+not.**
+
+**Decision: restore, not retire.** The invite flow is wanted. This entry is not a request to
+delete the two specs or to close the endpoint's follow-ups — it is a request to bring the
+capability back.
+
+**⚠ The restore cannot be a `git revert`.** `apps/web/tests/unit/runtime-secret-posture.test.ts`
+now fails the build if any of `SUPABASE_SERVICE_ROLE_KEY`, `service_role`, `service-role`,
+`createAdminClient`, `supabaseServiceRoleKey`, or `/auth/v1/admin/` appears anywhere under
+`apps/web/app/` or `apps/web/lib/`, and separately asserts that `lib/supabase/admin.ts` does not
+exist. Reinstating the old handler re-introduces precisely what #142 removed and turns that
+guard red. **The design question the spec has to answer is how an admin invites a user without a
+runtime service-role key** — a Supabase Edge Function holding the key outside the web runtime, an
+`invites` table plus a self-serve claim flow, a SECURITY DEFINER RPC that provisions without
+GoTrue admin, or something else. That question is the reason this is not a small change.
+
+**This is product code with an auth surface, so it needs its own spec → plan → tasks, after 013
+ships.** Not a drive-by fix. The deleted handler carried three controls that were each the
+outcome of a security-audit finding and must be re-derived rather than copy-pasted back:
+
+1. **Auth-then-authz before any body work** — an unauthenticated caller got a clean 401 with no
+   schema disclosure, a non-admin got 403, and only a verified admin ever reached Zod validation
+   (slice 3, Findings 1 & 3).
+2. **An `Origin` allowlist** as defence-in-depth over the `SameSite=Lax` session cookie — Route
+   Handlers get no automatic same-origin check from Next.js the way Server Actions do (slice 3,
+   Finding 1).
+3. **Error hygiene** — no branch forwarded raw Supabase / RPC / Zod text to the client; failures
+   were logged server-side and responses carried a fixed error code only (slice 3, Finding 2).
+
+See `docs/DECISIONS.md` (2026-05-25 — Security slice 3) and
+`docs/security/01-rls-and-security-definer.md`.
+
+**Open question — recorded here, deliberately not answered: does restoring this re-open #62?**
+**#62** (`/signup` is open self-serve → gate to invite-only, ⛔ pre-production deploy blocker)
+names `/api/admin/invite` as *"a **parallel** privileged path, not the only way in"*, and offers
+as one of its two resolutions *"make a product decision to remove `/signup` entirely and funnel
+all entry through `/api/admin/invite`"* — a resolution that is currently impossible, because the
+funnel does not exist. Whether restoring the endpoint re-opens that option, partially satisfies
+#62, or is fully independent of it **is not decided here**. It needs the same product/auth
+decision #62 is already waiting on. Do not read this entry as closing or advancing #62.
+
+**Stale references left behind** (breadcrumbs for whoever picks this up — listed so they are
+found together, **not** as a request to clean them up piecemeal):
+- `apps/web/lib/auth/schemas.ts:117` — `adminInviteSchema` survives with no consumer.
+- `apps/web/tests/e2e/helpers.ts:11` — comment still says seeded users arrive "via
+  `/api/admin/invite`".
+- `docs/DECISIONS.md` (2026-05-26 — Security slice 7, decision 3) defers a per-admin throttle and
+  points at `apps/web/app/api/admin/invite/route.ts:37`, a file that no longer exists;
+  `docs/CHANGELOG.md:825` carries the same dangling line reference.
+- `docs/security/01-rls-and-security-definer.md:28` and `:107` describe the route's
+  caller-session-client pattern and the zero-admin hazard in the present tense.
+
+**The two e2e specs are skipped, not deleted.** `apps/web/tests/e2e/admin-seeded.spec.ts` and
+`apps/web/tests/e2e/team-lead-seeded.spec.ts` are marked `test.skip` with a comment naming #174.
+**Un-skipping them is part of this entry's definition of done** — they are the only end-to-end
+coverage of admin-invites-admin (201), employee-invites-anyone (403), and
+team_lead-invites-anyone (403), and the role-placeholder assertions for both privileged roles ride
+along with them.
+**Fix scope**: medium-to-large (FEATURE work). Own spec → plan → tasks. Must not re-introduce a
+runtime service-role dependency (see the guard above), must re-derive the three security controls,
+and must un-skip the two e2e specs. Suggested issue labels: `type:feature`, `area:web`, `area:db`.
+**Address by**: **after feature 013 (`public-surface-and-legal`) ships.** Not before — 013 owns
+the public front door and the two consent gates, and an auth-surface change mid-feature is exactly
+the kind of drive-by that this repo's PR-isolation discipline exists to prevent. Likely pairs with
+whichever feature owns the invite UX (feature 017 `team-lead-dashboard` or the admin-dashboard
+work), and should be scheduled alongside **#60**, **#61** and **#63**, which are all follow-ups on
+this same endpoint and are unactionable until it exists.
