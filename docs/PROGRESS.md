@@ -4,6 +4,72 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Fix — Production sign-out: proxy re-POSTed Server Actions (merged to main)
+
+**Branches**: `fix/signout-race-and-feedback`, `chore/vercel-region-fra1`
+**Status**: **merged to `main`** via **PR #204** (squash-merged 2026-07-28T20:53:32Z → `c1f6535`) and
+**PR #206** (squash-merged 2026-07-28T21:01:14Z → `bdbff5f`), and **verified live in production**.
+Issue **#200**, closed.
+**Date**: 2026-07-28
+
+**The bug.** `proxy.ts`'s route gate answered unauthenticated requests on protected paths with
+`NextResponse.redirect(...)`, which **defaults to 307** — method- and body-preserving. Next dispatches
+Server Actions as a POST to the route they are used on, so the matcher covered them, and a sign-out
+whose session was revoked mid-flight by a sibling tab got
+`POST /app → 307 → POST /login → 404 "Server action not found."`. `server-action-reducer.js` throws
+E394 on that (neither RSC nor an `x-action-redirect`), and with no error boundary anywhere in
+`apps/web/app` it fell through to Next's built-in root fallback. Reproduced against production before
+the fix.
+
+**A 303 was considered and rejected**: the followed GET is still neither RSC nor an
+`x-action-redirect`, so the identical throw fires with different copy. A transport-level redirect is
+invisible to the router by construction — `fetch` follows it silently, and the only channel Next has
+for action-driven navigation is the `x-action-redirect` header on the action's **own** response.
+
+**Shipped in two deploys on purpose.** `main` is production and squash-merges, so one PR is one
+deploy. Splitting the auth fix from the region pin meant a regression against the ~20 live accounts
+would have one suspect rather than two.
+
+| PR | Contents |
+|---|---|
+| **#204** | C1 proxy method guard (GET/HEAD only) · C2 `scope: "local"` + cookie clearing on failed revoke · C3 pending state on all five sign-out call sites · C4 `app/error.tsx` · F1 review follow-up · all tracking docs |
+| **#206** | C5 `apps/web/vercel.json` → `"regions": ["fra1"]`, co-located with Supabase `eu-central-1` |
+
+### Measured outcome
+
+| | Before | After |
+|---|---|---|
+| Single tab, warm | **1.61 s** (devtools "waiting for server response") | **near-instantaneous** |
+| Two tabs | ~5 s, then Next's error screen on the originating tab | completes cleanly, **no error screen** |
+
+**Stated precisely, because the two halves are not equally solid**: the before-figures are captured
+devtools measurements; the after-state is **human observation, not a captured figure**. The claim is
+"near-instant, observed" and should not be quoted as a number. The `chore(deploy)` PR body had said
+"expected to reduce sign-out latency, magnitude not measured" — this closes that caveat only as far
+as observation allows, and the two columns differ in **two** variables (transport fix *and* region
+pin), so this is not an attribution of the win between them.
+
+**Two things learned that outlive the fix**, both filed rather than left in a commit message:
+
+- **Next 16's Proxy defaults to the Node.js runtime**, not Edge, and cannot set `runtime` at all
+  (`node_modules/next/dist/docs/.../file-conventions/proxy.md` § Runtime). `proxy.ts` is a Node
+  function in the deployment's function region. Believing otherwise produced a wrong latency model
+  during diagnosis. Stale claims of the opposite still sit in four docs — **#202**.
+- **`supabase.auth.signOut()` defaults to `scope: "global"`**, revoking every session on every
+  device, and it **returns** `{ error }` rather than throwing when the auth server is unreachable —
+  in which case supabase-js never clears the local session and there is no public API to force it.
+  Both call sites now pass `"local"` and clear the `sb-*` cookies themselves on failure. Recorded in
+  `DECISIONS.md` 2026-07-28 (fourth pass) as a security-posture decision, since it changes who gets
+  logged out.
+
+**Follow-ups left open, all deliberate**: **#201** (recent-chats empty-vs-loading state — goes
+through the Azure API, so cold start rather than DB latency, and the `fra1` pin does not help it),
+**#202** (stale Edge-runtime claims), **#203** (no `global-error.tsx`), **#205** (the onboarding
+*flow* gate no longer applying to POSTs — not an authorization gate, GET still gated, accepted with
+reasons).
+
+---
+
 ## Feature 013 — Public Surface and Legal (merged to main)
 
 **Branch**: `013-public-surface-and-legal`
