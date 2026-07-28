@@ -115,12 +115,22 @@ export function TermsReconsentScreen({
     // because this screen is all a blocked user has (FR-053, SC-008).
     <main
       aria-label={COPY.regionLabel}
-      className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-8 px-4 py-12 sm:px-6 sm:py-16"
+      className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-4 py-12 sm:px-6 sm:py-16"
     >
-      <header className="space-y-5">
+      {/* THREE SPACING STEPS, EACH LARGER THAN THE LAST — 16 / 24 / 40 px. The header's
+          internal rhythm has to stay smaller than the gap that separates it from the card
+          below, or the wordmark reads as a sibling of the heading rather than as the mark
+          above it. `leading-none` on the wordmark is what makes the first step need to be
+          this large: it collapses the glyph box to exactly the font size, so the optical
+          gap is the full 24 px with nothing given back by the line box. */}
+      <header className="space-y-6">
         <Wordmark className="text-3xl leading-none sm:text-4xl" />
-        <div className="space-y-3">
-          <h1 className="text-balance font-display text-2xl leading-tight text-ink sm:text-3xl">
+        <div className="space-y-4">
+          {/* `leading-snug`, not `leading-tight`. This title wraps to two lines at every
+              width the screen supports and to three at 320 px, and 1.25 sets those lines
+              close enough to read as one block. The house display idiom is `leading-tight`
+              for single-line headings; a multi-line one takes the next step up. */}
+          <h1 className="text-balance font-display text-2xl leading-snug text-ink sm:text-3xl">
             {COPY.title}
           </h1>
           <p className="text-pretty text-base leading-relaxed text-muted">{COPY.lede}</p>
