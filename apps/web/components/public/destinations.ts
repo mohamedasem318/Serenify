@@ -42,3 +42,22 @@ export const PUBLIC_DESTINATIONS: readonly PublicDestination[] = [
   { href: "/terms", label: "Terms" },
   { href: "/privacy", label: "Privacy" },
 ];
+
+/**
+ * The two ways IN, defined here for the same reason the destinations above are: the navbar
+ * shows them and the mobile sheet shows them, and a visitor on a phone must not get a
+ * smaller set of doors than a visitor on a laptop.
+ *
+ * NOT part of `PUBLIC_DESTINATIONS`, deliberately. That list is the *pages* — it drives the
+ * navbar's centre row, the sheet's page list AND the footer's link column, and an auth
+ * action does not belong in a footer's site map. Keeping them separate is also what lets
+ * the shell test keep asserting that the destination list contains nothing authed.
+ *
+ * `/login` and `/signup` are UNAUTHENTICATED routes under `app/(auth)/`. They are not `/app`
+ * and they are not role-gated — a signed-out stranger is exactly who they are for — so
+ * naming them here does not put an authed destination on the public surface (FR-018).
+ */
+export const PUBLIC_AUTH_ACTIONS = {
+  signIn: { href: "/login", label: "Sign in" },
+  signUp: { href: "/signup", label: "Sign up" },
+} as const satisfies Record<string, PublicDestination>;

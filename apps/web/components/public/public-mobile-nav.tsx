@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 
 import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { PUBLIC_DESTINATIONS } from "@/components/public/destinations";
+import { PUBLIC_AUTH_ACTIONS, PUBLIC_DESTINATIONS } from "@/components/public/destinations";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
@@ -63,6 +64,28 @@ export function PublicMobileNav() {
             );
           })}
         </nav>
+
+        {/*
+         * THE TWO DOORS, ALWAYS REACHABLE HERE. The navbar drops "Sign in" below 420 px to
+         * keep the bar inside the viewport, so at the narrowest widths this sheet is the
+         * ONLY place a returning visitor can find it. That is precisely why it is not
+         * conditional on anything: the bar's width budget is not this panel's problem.
+         *
+         * Separated from the page list by a rule because they are a different KIND of
+         * thing — those navigate the public site, these leave it for the application.
+         */}
+        <div className="mt-6 flex flex-col gap-2 border-t border-border pt-6">
+          <SheetClose asChild>
+            <Button asChild variant="default" size="lg" className="w-full">
+              <Link href={PUBLIC_AUTH_ACTIONS.signUp.href}>{PUBLIC_AUTH_ACTIONS.signUp.label}</Link>
+            </Button>
+          </SheetClose>
+          <SheetClose asChild>
+            <Button asChild variant="outline" size="lg" className="w-full">
+              <Link href={PUBLIC_AUTH_ACTIONS.signIn.href}>{PUBLIC_AUTH_ACTIONS.signIn.label}</Link>
+            </Button>
+          </SheetClose>
+        </div>
       </SheetContent>
     </Sheet>
   );
