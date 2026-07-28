@@ -1,10 +1,21 @@
 # Smoke Tests: Public Surface and Legal (Feature 013)
 
-**Status: PARTIALLY RUN — 11 of 17 checks recorded (2026-07-28). ST-9 is FAILED and
-KNOWINGLY ACCEPTED (#184) — read that as failed, because it is. ST-7 is confirmed by
-Mohamed. Six checks still await him.** Authored by T131; T132 (Mohamed's full pass) is
-**not** complete. Where the agent ran a check, the Observations field says exactly how,
-so the method can be judged alongside the result.
+**Status: 16 of 17 checks recorded (2026-07-28). ST-9 is FAILED and KNOWINGLY ACCEPTED
+(#184) — read that as failed, because it is. ONE check remains: ST-8, which cannot run
+before the merge and is scheduled for production verification immediately after it.**
+Authored by T131. **T132 does not close until ST-8 is recorded.**
+
+**Read the Observations fields for their kind, not just their verdict.** Three sorts of
+evidence appear in this file and they are not interchangeable:
+
+- **Agent-run checks** (ST-1, ST-5, ST-6, ST-10/10a/10b, ST-11, ST-12, ST-14, and the href
+  half of ST-15) state their **method** in full, so it can be judged alongside the result.
+- **Mohamed's attestations** (ST-2, ST-3, ST-4, ST-7, ST-13, the identity half of ST-15) are
+  recorded as attestations and **say so**. For ST-4 and ST-7 that is the only possible form of
+  evidence and the right one. For ST-2, ST-3 and ST-13 the write-up is **thinner than this
+  file's own standard** — that is stated at each site rather than dressed up, so a later reader
+  can weigh it accordingly.
+- **ST-9** is a recorded **failure**, not a soft pass.
 
 These are the checks **automation cannot catch** — the ones that need a real human eye, a
 real device, a real inbox, or a judgement call no repository artefact can settle. They are
@@ -63,13 +74,23 @@ Two-colour wordmark reads correctly at all five in-tree sites (public navbar, pu
 
 The two hand-sync exceptions match by eye: fetch the OG card, and trigger a **real** confirmation email and a **real** recovery email, viewed in a light client and a dark client.
 
-- **Result**: NOT RUN
-- **Date**: —
-- **Observations**: Not run — and not runnable by an agent. This needs a **real** confirmation email
-  and a **real** recovery email opened in a light client and a dark client, plus the OG
-  card fetched and compared by eye. The local stack captures mail in Inbucket, which is
-  not a real client and cannot answer the "match by eye" question the check is asking.
-  **Mohamed.**
+- **Result**: **PASS** — Mohamed, 2026-07-28
+- **Date**: 2026-07-28
+- **Observations**: **Run by Mohamed and recorded from his attestation.** He reports the check
+  passes with **no issues found**.
+
+  **Recorded honestly as an attestation rather than a transcribed observation.** An earlier
+  report of this result mentioned "a cosmetic follow-up"; on being asked what it was, Mohamed
+  confirmed **there is none and no issue needs filing**. That is recorded here so a later reader
+  who remembers the first phrasing does not go looking for a missing ticket.
+
+  This check was never an agent's to run: it needs a **real** confirmation email and a **real**
+  recovery email opened in a light client and a dark client, plus the OG card fetched and compared
+  by eye. The local stack captures mail in Inbucket, which is not a real client and cannot answer
+  the "match by eye" question. **The hosted email templates were separately a real defect** — see
+  **#189**, whose content half was fixed and verified live on 2026-07-28 (both Preview panes render
+  `seren` in ink and `ify` in meadow); the *mechanism* half, and the *Confirm sign up* **subject**
+  field, remain open on that issue.
 
 ---
 
@@ -77,12 +98,18 @@ The two hand-sync exceptions match by eye: fetch the OG card, and trigger a **re
 
 Hero story, full ~42 s cycle on a real phone at 320 / 375 / 414 and a tablet at 768: the false-alarm beat resolves **before** any companion beat; nothing clips; no scrollbar appears inside the card; the card does not resize when the thread trims to 4.
 
-- **Result**: NOT RUN
-- **Date**: —
-- **Observations**: Not run. The check names a **real phone** at 320/375/414 and a **tablet at 768**
-  for a full ~42 s cycle. Viewport emulation is not the same instrument — it cannot show
-  clipping from a real font fallback, a real scrollbar, or a real rubber-band scroll.
-  **Mohamed.**
+- **Result**: **PASS** — Mohamed, 2026-07-28
+- **Date**: 2026-07-28
+- **Observations**: **Run by Mohamed on real devices and recorded from his attestation** — "all
+  good". The four conditions this check carries are the false-alarm beat resolving **before** any
+  companion beat, nothing clipping, no scrollbar appearing inside the card, and the card not
+  resizing when the thread trims to 4.
+
+  **Recorded as an attestation, not a transcribed observation** — the per-condition detail was not
+  captured, and this file's own standard says "looks fine" is not an observation. What makes the
+  result trustworthy is the instrument rather than the write-up: viewport emulation cannot show
+  clipping from a real font fallback, a real scrollbar, or a real rubber-band scroll, which is
+  exactly why this check was reserved for real hardware and why no agent run could have replaced it.
 
 ---
 
@@ -90,12 +117,17 @@ Hero story, full ~42 s cycle on a real phone at 320 / 375 / 414 and a tablet at 
 
 Ren's blue orb (foggy) reads as intended and calm next to the meadow/amber band states — **FR-022 approved liberty; do not "correct" it to the monitor's band colouring.** Mohamed's aesthetic call.
 
-- **Result**: NOT RUN
-- **Date**: —
-- **Observations**: Not run, and explicitly not an agent's to sign off — the check says so. Whether
-  Ren's foggy blue orb "reads as intended and calm" next to the meadow/amber band states
-  is **Mohamed's aesthetic call**, and it is an approved FR-022 liberty that must not be
-  "corrected" toward the monitor's band colouring. **Mohamed.**
+- **Result**: **PASS** — Mohamed, 2026-07-28
+- **Date**: 2026-07-28
+- **Observations**: **Mohamed's aesthetic call, made and recorded**: the foggy blue orb reads as
+  intended and calm next to the meadow/amber band states.
+
+  **This is the correct form of evidence for this check**, unlike ST-2 and ST-3 where an
+  attestation is thinner than the file's standard. Nothing in the repository can establish whether
+  a colour "reads as calm" — the check exists precisely to have a human say so, and a human has.
+
+  **Standing warning, unchanged**: this is an **approved FR-022 liberty**. Ren's orb must **not**
+  be "corrected" toward the monitor's band colouring by anyone who later notices it differs.
 
 ---
 
@@ -175,11 +207,16 @@ Scroll the hero out of view and back: the story pauses and resumes, and does **n
 
 Root route on a real deployment: a signed-in visitor at `/` reaches the app without re-authenticating; a **real** Supabase email link landing on `/` with `?code=` completes the sign-in.
 
-- **Result**: NOT RUN
+- **Result**: NOT RUN — **scheduled for production verification, immediately after the merge**
 - **Date**: —
-- **Observations**: Not run. The check requires a **real deployment** and a **real Supabase email
-  link** landing on `/` with `?code=`. Neither exists on localhost. This belongs to the
-  preview-deployment checks in P8 Stage 3 and to production in Stage 4. **Mohamed.**
+- **Observations**: Not run **yet**, and deliberately so. The check requires a **real deployment**
+  and a **real Supabase email link** landing on `/` with `?code=`. Neither exists on localhost.
+
+  **It cannot run before the merge**, because production deploys from `main` and the landing page
+  at `/` does not exist on `serenify.tech` until 013 lands (`deploy-protocol.md` §3). The
+  throwaway signup in production verification sends a real confirmation email and therefore
+  exercises exactly this path — the signed-in-visitor half and the `?code=` half both. **This is
+  the last check outstanding, and T132 does not close until it is recorded here with its result.**
 
 ---
 
@@ -418,13 +455,27 @@ Decline the camera consent, then complete a **weekly work-environment check-in**
 
 Mohamed reads `/terms` and `/privacy` end to end against FR-048a: manager visibility stated plainly, never softened or buried, with its not-yet-live marker **in the same passage**; the no-legal-review notice is unmissable; zero performance figures.
 
-- **Result**: NOT RUN
-- **Date**: —
-- **Observations**: Not run. This is a careful end-to-end **read** of both documents against FR-048a —
-  manager visibility stated plainly and never softened or buried, its not-yet-live marker in
-  the *same passage*, the no-legal-review notice unmissable, zero performance figures. That
-  is a judgement about wording, and an agent asserting it would be asserting exactly the
-  thing the check exists to have a human confirm. **Mohamed.**
+- **Result**: **PASS** — Mohamed, 2026-07-28
+- **Date**: 2026-07-28
+- **Observations**: **Read end to end by Mohamed and recorded from his attestation** — both
+  documents read, and good.
+
+  The four FR-048a conditions this check carries: manager visibility stated **plainly**, never
+  softened or buried, with its **not-yet-live marker in the same passage**; the no-legal-review
+  notice **unmissable**; and **zero performance figures**.
+
+  **Recorded as an attestation rather than a per-condition transcript.** This is a judgement about
+  wording, and an agent asserting it would be asserting exactly the thing the check exists to have
+  a human confirm — so the thinness of the write-up does not undermine it the way it would for a
+  measurable check. **Two of the four conditions do have independent machine backing** and passed:
+  the copy-invariant suite (`tests/unit/lib/legal/copy-invariants.test.ts`) and the forbidden-claims
+  suite (`tests/unit/landing/forbidden-claims.test.ts`) pin the manager-visibility phrasing and the
+  absence of performance figures. The "plainly, never buried" and "unmissable" halves are the
+  irreducibly human ones, and those are Mohamed's.
+
+  (For orientation only: `/terms` renders 10,153 characters across 14 `h2` sections and
+  `/privacy` 19,392 across 20, both opening with "An informed draft, not reviewed by a
+  lawyer" and closing with "Contact".)
 
   (For orientation only: `/terms` renders 10,153 characters across 14 `h2` sections and
   `/privacy` 19,392 across 20, both opening with "An informed draft, not reviewed by a
@@ -464,7 +515,8 @@ Team section with the photo **blocked** (DevTools request blocking) and on a thr
 
 All eight external links open the correct real GitHub and LinkedIn profiles.
 
-- **Result**: PARTIAL — hrefs verified, identities are Mohamed's to confirm
+- **Result**: **PASS** — upgraded from PARTIAL on 2026-07-28. Mohamed opened the links and
+  confirmed the identities; the agent's href verification below stands as the other half.
 - **Date**: 2026-07-28
 - **Observations**: Run by the agent as far as an agent can take it. **Exactly 8** external links
   render, each `target="_blank" rel="noopener noreferrer"` with a name-bearing `aria-label`:
@@ -480,8 +532,12 @@ All eight external links open the correct real GitHub and LinkedIn profiles.
   every commit (`Fatma-Alzahraaa`, `gehaddmohamedd`, `hebatullah003`) plus the repository
   owner — independent corroboration that those four are right.
 
-  **The links were not opened, and the LinkedIn identities are not corroborated by anything
-  in the repository.** "Open the correct real profiles" needs **Mohamed**.
+  **The links were not opened by the agent, and no LinkedIn identity is corroborated by anything
+  in the repository** — "open the correct real profiles" was always Mohamed's half.
+
+  **Closed 2026-07-28**: Mohamed opened all eight and confirmed they resolve to the correct real
+  profiles. The check is now **PASS** on both halves — the hrefs machine-verified above, the
+  identities human-verified.
 
 ---
 

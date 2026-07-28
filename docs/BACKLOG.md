@@ -2728,3 +2728,51 @@ runs on every request regardless. The saving on offer is static generation, not 
 
 **Address by**: **only if measured production TTFB on `/` disagrees** with the paragraph above — a
 number, not an impression. Absent that number, the correct action is to close #193 as not-needed.
+
+### The Terms/Privacy gate is absent from `(onboarding)/layout.tsx` — FR-043c gap, currently zero-population (#195)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN, knowingly accepted for the 013 release.** GitHub issue **#195 OPEN.**
+**Category**: feature 013 P5 consent gates / FR-043c
+**Observed**: 2026-07-28, by the **T146 final review**, immediately before 013's merge.
+
+**Description**: the Terms/Privacy app-shell gate lives in `apps/web/app/(authed)/layout.tsx`.
+**`apps/web/app/(onboarding)/layout.tsx` has no consent gate at all** — zero consent references —
+and `(onboarding)` is a **sibling** route group, not a child of `(authed)`. Nothing in the
+onboarding flow sits behind the Terms/Privacy acknowledgement. **FR-043c** is unambiguous:
+*"Terms/Privacy acknowledgement declined → the user MAY NOT use the application at all until they
+accept."* Onboarding is part of the application.
+
+**Who can reach it**: `apps/web/proxy.ts:200-208` makes `/onboarding` reachable **only** when
+`profiles.full_name IS NULL` — `needsOnboarding` redirects into it, and its negation redirects out
+to `/app`. Post-013 signups set `full_name` **and** receive a `terms_privacy` row in the same
+`handle_new_user()` transaction, so they never qualify. The population is pre-013 accounts with a
+null `full_name`.
+
+**The population was MEASURED, not assumed — it is ZERO.** Against hosted, 2026-07-28, immediately
+before the merge: `null_full_name_users` = **0**, `null_name_and_unconsented` = **0**,
+`total_users` = **20**. All 20 existing accounts have `full_name` set, so none of them can reach
+`/onboarding`; every one meets the gate at `/app` correctly. **The gap is structural, not
+populated.** Re-run those queries before assuming the number is still zero.
+
+**What is and is not exposed.** *Exposed*: a qualifying user could complete the name step and run a
+**first-ever calibration capture** without meeting the Terms/Privacy gate. *Not exposed*: the
+**camera-and-inference gate IS present** at `/onboarding` and **fails closed**, so capture is still
+consented — just not under Terms/Privacy; and the window closes on its own, since completing
+onboarding sets `full_name` and the proxy then routes to `/app` where the gate catches them. One
+flow wide, not the whole application.
+
+**Why it was not fixed at the deploy boundary — deliberate, and the precedent is T049.** The last
+time `/onboarding` was gated broadly it produced a **permanent lockout for every new employee**,
+caught only because the task was refused as written rather than implemented. Mirroring a second
+high-blast-radius gate into that same layout, at the deploy boundary, **unexercised** —
+ST-10/ST-10a/ST-10b were all run against the `(authed)` gate only — is that identical risk, against
+an exposure the camera gate already covers and a population measured at zero.
+
+**Fix scope**: mirror the `(authed)` gate into `(onboarding)/layout.tsx` — the same fail-open
+`read.ts` consent read plus `<TermsReconsentScreen>`. **It MUST fail OPEN**, exactly as the
+app-shell gate does; a fail-closed gate on the onboarding layout recreates the T049 lockout
+precisely. **Do not ship it without an ST-10-equivalent exercise** — a deliberate lockout and a
+proven recovery through both Lever 0 and Lever 1, against this gate specifically. That exercise,
+not the code, is the expensive half.
+
+**Address by**: its own change after 013 is merged and settled, paired with the ST-10 re-exercise so
+the onboarding layout is opened once rather than twice.

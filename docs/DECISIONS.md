@@ -5713,3 +5713,66 @@ immediately after the merge, unbroken, with **Lever 0** (`vercel rollback` to th
 deployment — an alias flip, seconds, no rebuild, destroys no consent history) armed beforehand.
 The window between "013 is live" and "013 is verified" is the risk this ordering creates; the
 mitigation is to keep it short and to hold the rollback in hand before starting.
+
+### 10. RESIDUAL — the Terms/Privacy gate does not cover `(onboarding)`, and that ships knowingly with a measured population of ZERO
+
+Found by the **T146 final review**, immediately before the merge. Recorded here rather than fixed,
+and the reasoning matters more than the verdict.
+
+**The gap.** The app-shell gate lives in `apps/web/app/(authed)/layout.tsx`.
+`apps/web/app/(onboarding)/layout.tsx` has **no consent gate at all**, and `(onboarding)` is a
+**sibling** route group rather than a child of `(authed)`. **FR-043c** says a user who has not
+accepted *"MAY NOT use the application at all"*, and onboarding is part of the application.
+
+**The population is measured, not asserted.** `apps/web/proxy.ts:200-208` makes `/onboarding`
+reachable **only** when `profiles.full_name IS NULL`. Against hosted on 2026-07-28, immediately
+before the merge:
+
+```
+ null_full_name_users        →  0
+ null_name_and_unconsented   →  0
+ total_users                 → 20
+```
+
+**Zero.** All 20 existing accounts have `full_name` set and therefore cannot reach `/onboarding` at
+all; each meets the gate at `/app` correctly. Post-013 signups set `full_name` **and** write a
+consent row in the same `handle_new_user()` transaction, so they never qualify either. The gap is
+**structural, not populated** — and it is written down with its number precisely because *a known
+gap with an unmeasured size is the bad kind of record.*
+
+**Why it was not fixed at the deploy boundary — and this is the load-bearing reason.** The
+precedent is **T049**: the last time `/onboarding` was gated broadly, it created a **permanent
+lockout for every new employee**, and that was caught only because the task was refused as written
+rather than implemented. Mirroring a second high-blast-radius gate into that same layout, at the
+deploy boundary, **unexercised** — ST-10, ST-10a and ST-10b were every one of them run against the
+`(authed)` gate only — is that same failure mode, incurred against an exposure that the
+**camera-and-inference gate already covers** (it is present at `/onboarding` and fails **closed**,
+so capture is consented regardless) and a population measured at zero.
+
+**The residual, stated so it cannot be mistaken for an oversight**: for the 013 release, a user in
+that state *could* complete onboarding and a first calibration without meeting the Terms/Privacy
+gate. Nobody is in that state. The window closes by itself the moment onboarding completes and the
+proxy routes to `/app`. Tracked as **#195**, to be fixed in its own change **with** an
+ST-10-equivalent lockout-and-recovery exercise — because on this layout the exercise, not the code,
+is the expensive half.
+
+### 11. The data controller is named "Mohamed Assem" in both legal documents, deliberately, against FR-046's spelling
+
+Raised by the T146 review as a possible defect; it is not one, and the reason is recorded so it is
+not re-raised.
+
+Both legal documents write the controller as **"Mohamed Assem"** (`lib/legal/copy.ts:123`, `:333`),
+while **FR-046** writes **"Mohamed Asem"**. The divergence is **intentional and documented at the
+site** (`lib/legal/copy.ts:141-145`): FR-024 names the same person as *"Mohamed Assem Adel"* in the
+authors list, and the documents use one spelling throughout **so that a reader never meets two
+spellings of the same person across the controller role and the author role**. The
+`copy-invariants` suite pins the double-s form, so code and tests agree.
+
+**Confirmed by Mohamed on 2026-07-28: "Mohamed Assem" is correct.** The constitution (`:555`),
+`README.md:67` and FR-024 already use it; FR-046's single-s form is the outlier.
+
+**`spec.md` is deliberately NOT edited to match**, on the same principle as the R7 correction above:
+a requirement whose wording is narrower or looser than what shipped is corrected **in the decision
+log**, not by amending the spec mid-build. FR-046 identifies the right person; it spells the name
+one way and the shipped documents spell it the other, and this entry is the record of which one is
+authoritative.
