@@ -2513,9 +2513,13 @@ across 16–18 — and the dashboard's own Preview pane renders the mark as a si
 both. Hosted is the repo template **at its pre-T007 revision**.
 
 Everything else compared matches the repo: `<title>`, headline, body copy, CTA label, the OTP line,
-the dark-block colour values. One unrelated divergence: the *Confirm sign up* **subject** is
+the dark-block colour values. One unrelated divergence: the *Confirm sign up* **subject** was
 `Confirm your Serenify account` on hosted against `Confirm your Serenify email` in
 `supabase/config.toml`; recovery's subject matches.
+
+**Ruled 2026-07-28 (Mohamed): the repo version wins — `Confirm your Serenify email`.** The point of
+this entry is making production match the repo; opening a new divergence while closing one would
+defeat it.
 
 **Root cause — two layers.** `supabase/config.toml` wires both templates via `content_path`, but
 that is **local-dev config**. Nothing in the repo and nothing in CI ever transmits
@@ -2533,8 +2537,15 @@ re-opens silently the next time the wordmark changes; candidates, in rising cost
 release-checklist step, a `supabase config push` in the deploy runbook, or a check that pulls the
 hosted template through the Management API and diffs it against the repo file.
 
-**Address by**: (1) before Stage 4 ships anything user-facing that sends mail. (2) the same pass
-that does #190, so the email surfaces are touched once.
+**Progress 2026-07-28**: **both template BODIES pasted and saved by Mohamed, and verified live** — the
+dashboard Source now carries `.wordmark-seren` / `.wordmark-ify` in the dark block on both templates,
+and both Preview panes render `seren` in ink and `ify` in meadow. The FR-029 content breach is
+**closed**. **Still outstanding**: the *Confirm sign up* **subject** is still `Confirm your Serenify
+account` and must be set to `Confirm your Serenify email` per the ruling above — the subject is a
+separate dashboard field, so pasting the body did not touch it.
+
+**Address by**: (1) subject field, before Stage 4 ships anything that sends mail. (2) the mechanism
+gap — the same pass that does #190, so the email surfaces are touched once.
 
 ### The OTP verification tick vanishes immediately — it should linger (#190)
 **Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#190 OPEN.**
@@ -2553,10 +2564,27 @@ copy change implied.
 `013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
 #189 so those surfaces are opened once rather than twice.
 
-### Landing chapter-marker dots are 24×24 px tap targets, not 44×44 — T096's acceptance condition is unmet (#191)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#191 OPEN.**
+### ~~Landing chapter-marker dots are 24×24 px tap targets, not 44×44~~ — WITHDRAWN, not a defect (#191)
+**Status**: **WITHDRAWN 2026-07-28 — not a defect.** GitHub issue **#191 CLOSED as superseded.**
 **Category**: feature 013 P6 landing page / FR-053
-**Observed**: 2026-07-28, on the driven P8 responsive walk for PR #188.
+**Observed**: 2026-07-28, on the driven P8 responsive walk for PR #188. **Ruling: Mohamed, same day.**
+
+**The measurement was right and the conclusion was wrong.** The markers really are 24×24 at every
+width — but that is **deliberate and compliant**, not a miss. FR-053 was amended on 2026-07-28 with a
+**spent 24×24 px exception scoped to `components/landing/chapter-markers.tsx` only**
+(`spec.md` FR-053; `docs/DECISIONS.md`, "FR-053 gains a spent 24×24 exception for the chapter
+markers"). 24×24 satisfies **WCAG 2.5.8 (AA)**, the markers are a convenience rather than a path,
+and they keep their focus ring — all recorded in the amendment.
+
+**What was actually stale was T096**, which still demanded "≥44×44 px on touch viewports" while marked
+`[X]`. That text has been corrected in place to cite the amendment, so the contradiction is gone
+rather than left for someone to "fix" by growing the targets and undoing a deliberate decision.
+
+**Lesson worth keeping**: the walk checked `tasks.md` and the constitution but not FR-053's own text in
+`spec.md`, where the amendment lives. A tap-target finding must be read against the amended FR, not
+against the task that predates it.
+
+<details><summary>Original report, retained for the record</summary>
 
 **Description**: the six chapter-marker buttons at
 `apps/web/components/landing/chapter-markers.tsx:65` set their hit area with an unconditional
@@ -2587,3 +2615,5 @@ still reads at the larger size.
 **Address by**: any landing-page pass after 013 merges. Not a deploy blocker — the markers are a
 convenience and the story advances on its own — but it should not stay closed against a task that
 claims it.
+
+</details>
