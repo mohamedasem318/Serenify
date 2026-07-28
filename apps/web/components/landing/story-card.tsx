@@ -50,6 +50,16 @@ import { cn } from "@/lib/utils";
  * (FR-032); the layout rule was written without measuring. Single-line strings are
  * vertically centred so the ten shorter beats do not hang off the top of the row.
  * Recorded in `docs/DECISIONS.md`.
+ *
+ * THE NARRATION IS `--text-xs` AT EVERY WIDTH, AND THE ABSENCE OF A `md:` STEP IS THE FIX,
+ * NOT AN OVERSIGHT. P6 stepped it to `--text-base` (17 px) at `md`, which has no
+ * counterpart in the mock — the mock's `.vo` is 12.5 px at every width. The step was
+ * measured only where the hero is ONE column and the card is therefore full width; at
+ * `lg` the card becomes a ~520 px column, the 17 px closing beat needs more room than that,
+ * and it wrapped to two lines inside the one-line row and was sliced in half by
+ * `overflow-hidden`. Measured 2026-07-28: 51 px of text in a 25.5 px row at 1024, 1280 and
+ * 1440. `tests/layout/landing-hero-stability.spec.ts` now measures 1280 and asserts the
+ * narration fits its row; both were added red against the old size.
  */
 
 /** Which Bloom tone renders a band. The orb's own vocabulary, mapped once. */
@@ -60,6 +70,20 @@ const BAND_TONE: Record<StoryBeat["band"], BloomTone> = {
 };
 
 const PANELS: readonly StoryPanel[] = ["quiet", "prompt", "resolved", "ren"];
+
+/**
+ * The reading label's colour, which is the mock's `.reading-v` mood rule expressed from the
+ * script rather than from a `data-mood` attribute the app does not have.
+ *
+ * The mock had four moods; three of them are recoverable from the beat. `calm` is the
+ * at-ease band, `rising`/`tense` are the two strained bands and share `--amber-text`, and
+ * `talk` is exactly "the Ren panel is showing" — which is why the panel is checked before
+ * the band. Every value is an existing Graphite token (FR-057).
+ */
+function readingTone(beat: StoryBeat): string {
+  if (beat.panel === "ren") return "text-foggy";
+  return beat.band === "at_ease" ? "text-ink" : "text-amber-text";
+}
 
 /**
  * The thread as of a beat, replayed from the script rather than accumulated in state.
@@ -96,35 +120,44 @@ export function StoryCard() {
         // changes are not a reliable beat signal and polling would silently skip beats.
         data-beat={index}
         aria-label={STORY_CARD_LABEL}
-        className="overflow-hidden rounded-lg border border-border bg-surface p-3.5 shadow-soft sm:p-4"
+        className="overflow-hidden rounded-lg border border-border bg-surface p-4 shadow-soft sm:p-5"
       >
         {/* ── READOUT — permanently visible, every beat, reduced motion included ── */}
-        <div data-testid="story-readout" className="flex items-center gap-3">
+        <div data-testid="story-readout" className="flex items-center gap-3 sm:gap-4">
           <Bloom tone={BAND_TONE[beat.band]} className="size-12 shrink-0 sm:size-12" />
-          <div className="min-w-0">
+          {/*
+           * The trend sits UNDER the reading label inside this column, spanning its full
+           * width, which is where the mock puts it — not in a fixed narrow column pinned to
+           * the card's right edge. `min-w-0` is what lets the column actually shrink so the
+           * trend can be fluid instead of squeezing the label.
+           */}
+          <div className="min-w-0 flex-1">
             <p className="text-[0.6875rem] uppercase tracking-wide text-muted">
               {READOUT_HEADING}
             </p>
-            <p data-testid="story-reading" className="text-sm font-medium text-ink">
+            <p
+              data-testid="story-reading"
+              className={cn(
+                "font-display text-xl leading-tight font-semibold transition-colors duration-1000 sm:text-2xl",
+                readingTone(beat),
+              )}
+            >
               {BAND_LABEL[beat.band]}
             </p>
             <p className="truncate text-[0.6875rem] text-muted">{READOUT_WINDOW_LABEL}</p>
-          </div>
-          {/* The third part of the readout (FR-007): orb, reading label, AND trend. */}
-          <div className="ml-auto w-20 shrink-0 sm:w-24">
-            <StoryTrend beatIndex={index} />
+            {/* The third part of the readout (FR-007): orb, reading label, AND trend. */}
+            <div className="mt-2.5">
+              <StoryTrend beatIndex={index} />
+            </div>
           </div>
         </div>
 
         {/* ── NARRATION — FIXED height (2 lines < md, 1 line ≥ md). Never min-height. ── */}
         <div
           data-testid="story-narration-row"
-          className="mt-3 flex h-[2.275rem] items-center overflow-hidden md:h-[1.59375rem]"
+          className="mt-4 flex h-[2.275rem] items-center overflow-hidden md:h-[1.1375rem]"
         >
-          <p
-            data-testid="story-narration"
-            className="text-xs leading-[1.4] text-ink md:text-base md:leading-[1.5]"
-          >
+          <p data-testid="story-narration" className="text-xs leading-[1.4] text-ink">
             {NARRATION[beat.narrationKey]}
           </p>
         </div>
@@ -144,7 +177,16 @@ export function StoryCard() {
                 aria-hidden={!isActive}
                 inert={!isActive}
                 className={cn(
-                  "absolute inset-0 overflow-hidden rounded-md border border-border bg-bg p-3",
+                  "absolute inset-0 overflow-hidden",
+                  /*
+                   * The neutral ground is the DEFAULT, not a universal. The prompt panel
+                   * draws its own tinted box on the same `inset-0` footprint (the mock's
+                   * `.panel.prompt`), so giving it this one too would nest a border and a
+                   * padding inside its own. Positioning stays on the wrapper for every
+                   * panel, which is what the out-of-flow assertion in
+                   * `tests/layout/landing-hero-stability.spec.ts` measures.
+                   */
+                  panel === "prompt" ? "" : "rounded-md border border-border bg-bg p-3",
                   isActive ? "opacity-100" : "pointer-events-none opacity-0",
                   // Opacity only, and only when motion is welcome. Nothing that moves.
                   reducedMotion ? "" : "transition-opacity duration-500",
