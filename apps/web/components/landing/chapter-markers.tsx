@@ -19,6 +19,23 @@ import { cn } from "@/lib/utils";
  * area is padded out to the full target and the focus ring is the app's own (FR-055).
  * They stay fully functional under reduced motion — that is what makes the reduced-motion
  * branch a readable story rather than a frozen one (T098).
+ *
+ * ── THE RESTING DOT IS `--color-muted`, NOT `--color-border` (2026-07-28) ──────────────
+ *
+ * A DELIBERATE DIVERGENCE FROM THE MOCK, ON ACCESSIBILITY GROUNDS. The mock's `.dots i`
+ * rest on `var(--border)`, and transcribing that is what shipped a control nobody could
+ * see: measured against the page, `--color-border` on `--color-bg` is **1.19:1 in light**
+ * and **1.25:1 in dark**. WCAG 1.4.11 requires **3:1** for the visible part of a UI
+ * component, and these are the story's ONLY control, on a public page.
+ *
+ * `--color-muted` is an already-registered Graphite token — nothing new — and measures
+ * **5.58:1 light / 6.58:1 dark** against the same background. The mock is the authority for
+ * how the page looks, not for whether its controls are perceivable.
+ *
+ * SHAPE FOLLOWS THE MOCK: uniform 6 px round dots that SCALE when active rather than P6's
+ * mix of a 20 px pill and 6 px dots, which read as two different controls in one row.
+ * The 44 px hit areas are unchanged and set the row's width — see the PR for why the
+ * mock's literal 6 px gaps are not reachable while FR-053 stands.
  */
 export function ChapterMarkers({
   activeChapter,
@@ -28,7 +45,7 @@ export function ChapterMarkers({
   onSelect: (chapter: number) => void;
 }) {
   return (
-    <nav aria-label={CHAPTER_NAV_LABEL} className="flex items-center justify-center gap-0.5">
+    <nav aria-label={CHAPTER_NAV_LABEL} className="flex items-center justify-center">
       {CHAPTER_NAMES.map((name, chapter) => {
         const isActive = chapter === activeChapter;
         return (
@@ -44,8 +61,10 @@ export function ChapterMarkers({
             <span
               aria-hidden
               className={cn(
-                "block h-1.5 rounded-full transition-all",
-                isActive ? "w-5 bg-meadow" : "w-1.5 bg-border",
+                // `transition`, not `transition-all`: transform and colour, never a
+                // layout property. The mock's active dot scales rather than stretching.
+                "block size-1.5 rounded-full transition duration-300",
+                isActive ? "scale-[1.35] bg-meadow" : "bg-muted",
               )}
             />
             <span className="sr-only">{name}</span>
