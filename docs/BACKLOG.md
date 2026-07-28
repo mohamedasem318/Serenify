@@ -2776,3 +2776,35 @@ not the code, is the expensive half.
 
 **Address by**: its own change after 013 is merged and settled, paired with the ST-10 re-exercise so
 the onboarding layout is opened once rather than twice.
+
+### T146 review follow-ups: list semantics on the landing page, plus five small items (#196)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#196 OPEN.**
+**Category**: feature 013 T146 final review / a11y + hygiene
+**Observed**: 2026-07-28, by the T146 final review of feature 013, immediately before its merge.
+
+**Description**: six findings judged **not worth changing code for at the deploy boundary**. The
+headline one is **a11y**: six new landing lists (`team-cards.tsx:79`, `never-cards.tsx:47`,
+`how-it-works.tsx:26`, `status-statement.tsx:43`, `panels/prompt-panel.tsx:107`,
+`ren-thread.tsx:177`) lack `role="list"`. Tailwind preflight strips `list-style`, so
+Safari/VoiceOver **drops list semantics** — WCAG 1.3.1, on the public marketing page.
+
+**Why logged rather than fixed in 013**: `role="list"` appears **nowhere in `apps/web`**. This is an
+app-wide pattern, not a 013 regression, and fixing only these six would leave the landing page
+announcing lists while every authenticated surface does not. It wants one a11y pass across the app,
+which is also the right moment to audit for the same problem elsewhere.
+
+The other five are LOW: a migration comment at `…_user_consents.sql:111` that overstates what
+`ON CONFLICT DO NOTHING` absorbs (it covers unique and exclusion violations only — a malformed
+value raises 23514/23502 and aborts the whole signup); `seed-demo.ts:97-100` writing consent rows
+for demo users who never saw the documents (correct for that cohort, wants a demo-only note);
+`team-photo.tsx:79`'s `sizes` disagreeing with `team-section.tsx:61`'s `px-4 sm:px-6`; the two
+public navs computing "current page" differently, which will diverge the moment a `/terms/*`
+sub-route exists; and `supabase-email-templates.test.ts:131` having no explicit timeout, which
+flakes under load exactly as **#187** does.
+
+**Two findings from the same review were NOT folded in here**: the `(onboarding)` consent gap is
+**#195**, and the two README bare-"check-in" terminology violations were **fixed in 013 itself** —
+terminology is binding, and `:11` was a line this feature had already edited.
+
+**Address by**: opportunistically, or as one housekeeping change. The a11y item has the only real
+user impact and should lead.

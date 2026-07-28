@@ -8,7 +8,7 @@
 
 **Workplace stress, gently noticed.** A privacy-first web app that helps employees notice and reflect on work stress — without turning it into surveillance. Live at **[serenify.tech](https://serenify.tech)**.
 
-Serenify reads short, calibrated webcam check-ins for signs of stress, confirms with a light questionnaire, offers a supportive chat companion, and shows each person their own trend over time. Managers are designed to see graded trends for their reports; no manager-facing surface is live today. Raw video and chat content never reach a manager — that one is permanent, and true right now.
+Serenify reads short, calibrated webcam monitoring sessions for signs of stress, confirms with a light questionnaire, offers a supportive chat companion, and shows each person their own trend over time. Managers are designed to see graded trends for their reports; no manager-facing surface is live today. Raw video and chat content never reach a manager — that one is permanent, and true right now.
 
 Most workplace-wellbeing tools are either surveys nobody fills in or monitoring nobody consented to. The bet here is that stress signals should reach the *person feeling them* — "be heard and felt," not "be watched." So privacy is the architecture, not a setting:
 
@@ -20,7 +20,7 @@ Most workplace-wellbeing tools are either surveys nobody fills in or monitoring 
 ## How it works
 
 1. **Detect** — a one-time calibration anchors the model to *your* baseline; sessions then score 60-second windows server-side into a smoothed three-band read (calm / a little tense / tense). No probability or raw signal reaches the browser.
-2. **Confirm** — when a tense pattern sustains, a short, calm check-in asks you to confirm. The model never has the last word alone.
+2. **Confirm** — when a tense pattern sustains, a short, calm prompt asks you to confirm. The model never has the last word alone.
 3. **Talk** — "Ren," a supportive LLM companion for reflection, with live-only crisis-resource escalation. Private to the employee.
 4. **Reflect** — your own session trend and history, in a fixed-pixel SVG chart built to read honestly at a glance.
 
