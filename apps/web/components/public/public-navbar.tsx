@@ -92,8 +92,13 @@ export function PublicNavbar() {
         </ul>
       </nav>
 
+      {/*
+       * ORDER IS SIGN IN · SIGN UP · THEME TOGGLE, with the toggle in the far-right corner.
+       * The two actions read left-to-right in the order a stranger needs them, and the
+       * toggle — a preference, not a destination — sits outboard of both rather than
+       * between the wordmark and the way in.
+       */}
       <div className="flex items-center gap-1 sm:gap-2">
-        <ThemeToggle />
         {/*
          * Sign in hides below 420 px and Sign up does not — the mock's own rule, and the
          * right one: at 320 px the bar is already carrying a hamburger, a wordmark and a
@@ -108,6 +113,7 @@ export function PublicNavbar() {
         <Button asChild variant="default" size="default" className="h-11 px-4">
           <Link href={PUBLIC_AUTH_ACTIONS.signUp.href}>{PUBLIC_AUTH_ACTIONS.signUp.label}</Link>
         </Button>
+        <ThemeToggle />
       </div>
     </header>
   );
