@@ -398,7 +398,8 @@ SELECT column_name, data_type, is_nullable, column_default
  WHERE table_schema='public' AND table_name='user_consents' ORDER BY ordinal_position;
 
 -- constraints (expect: PK, FK→auth.users ON DELETE CASCADE, UNIQUE one_per_revision,
--- and the three CHECKs: consent_key, document_version format, decision='granted')
+-- and FOUR CHECKs: consent_key, document_version format, document_version-matches-key,
+-- decision='granted' — see the correction note under this step)
 SELECT conname, pg_get_constraintdef(oid)
   FROM pg_constraint WHERE conrelid='public.user_consents'::regclass ORDER BY conname;
 
@@ -423,7 +424,16 @@ SELECT grantee, privilege_type FROM information_schema.role_table_grants
  WHERE table_name='user_consents' AND grantee IN ('anon','authenticated') ORDER BY 1,2;
 ```
 
-**Expect**: 7 columns; the FK, UNIQUE and three CHECKs present; the index present; the trigger
+> **CORRECTED 2026-07-28, mid-execution.** T135 said "the **three** CHECKs". The migration
+> defines **four**: `document_version` carries **two** — the format regex at
+> `20260726000000_user_consents.sql:28` **and** `CHECK (document_version LIKE consent_key || '@%')`
+> at `:29`, which is what stops a `camera_inference@…` string being recorded under
+> `consent_key = 'terms_privacy'`. Counting three would make a verifier either accept a table
+> missing that constraint, or abort on a correct one. Expect **7 constraint rows** in total:
+> PK + FK + UNIQUE + 4 CHECKs. (`NOT NULL` does not appear here — PostgreSQL 17 still records it
+> on the attribute, not in `pg_constraint`.)
+
+**Expect**: 7 columns; the FK, UNIQUE and **four** CHECKs present; the index present; the trigger
 present; **both** `relrowsecurity` and `relforcerowsecurity` `true`; `user_consents_select_self`
 (SELECT) and `user_consents_insert_self` (INSERT), each scoped `(SELECT auth.uid()) = user_id`;
 grants **exactly** `authenticated: INSERT` and `authenticated: SELECT` — **and nothing for
