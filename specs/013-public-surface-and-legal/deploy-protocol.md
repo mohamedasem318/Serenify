@@ -601,6 +601,17 @@ to investigate calmly.
 | Task | Steps here |
 |---|---|
 | T136 — apply the migration | §5 steps 1–9 |
-| T137 — post-migration verification | §5 steps 10–12 |
+| T137 — post-migration verification | §5 steps **10–13** |
 | T138 — abort point, throwaway signup on **preview** | Stage 3; **A6** |
 | Rollback (T134's file) | §7 |
+
+> **CORRECTED 2026-07-28.** This map left **step 13 unmapped**: T137 was written as steps 10–12
+> and T138 is the *preview* signup in Stage 3, so the **live-site** signup at step 13 belonged to
+> no task at all. A step owned by no task is a step that gets skipped — and this is the one that
+> demonstrates the entire premise of migration-first. Step 13 is T137's, and was run: see
+> `deploy-log-2026-07-28.md`.
+>
+> **Execution record.** T136 requires each verification's *actual output* recorded rather than a
+> claim that it passed. That record is **`deploy-log-2026-07-28.md`**, a sibling of this file —
+> verbatim outputs for steps 1–13 of the 2026-07-28 run, plus the corrections made to this
+> protocol while executing it. This file is the **procedure**; that file is the **evidence**.
