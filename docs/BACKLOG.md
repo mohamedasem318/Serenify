@@ -2552,3 +2552,38 @@ copy change implied.
 **Address by**: the design pass over the transactional email and OTP surfaces after
 `013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
 #189 so those surfaces are opened once rather than twice.
+
+### Landing chapter-marker dots are 24×24 px tap targets, not 44×44 — T096's acceptance condition is unmet (#191)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#191 OPEN.**
+**Category**: feature 013 P6 landing page / FR-053
+**Observed**: 2026-07-28, on the driven P8 responsive walk for PR #188.
+
+**Description**: the six chapter-marker buttons at
+`apps/web/components/landing/chapter-markers.tsx:65` set their hit area with an unconditional
+`size-6` — **24×24 px**. No `@media (pointer: coarse)` rule exists anywhere in
+`apps/web/app/globals.css`, so 24 px is what every viewport gets, phone included.
+
+Measured at 320 / 375 / 414 / 768 / 1280 px in both themes: all six report a 24 px box at every
+width, in both themes. They are the **only** sub-44 px controls on any public route — `/terms`,
+`/privacy` and the re-consent screen all report zero.
+
+**Why it is more than a nicety**: T096's acceptance conditions require "each is **≥44×44 px on
+touch viewports**" (`specs/013-public-surface-and-legal/tasks.md:693`), FR-053 sets the same bar,
+and **T096 is marked `[X]`**. This is a checked-off condition that was not met, not an unlogged
+nice-to-have.
+
+The instinct in the code was right — the comment above the line reads "The hit area is the button;
+the dot is only what you see" — `size-6` just does not carry it far enough, growing the target from
+the 1.5 px dot to 24 px and stopping short of 44.
+
+The six sit contiguously in a `flex items-center justify-center` with no gap, so at 24 px they do
+clear WCAG 2.5.8's 24 px AA floor. The project's own bar is the stricter one.
+
+**Fix scope**: small. `size-6` → `size-11` on the button, dot stays `size-1.5` — the dot is already
+a separate `<span>`, so nothing visual changes, only the invisible hit area. Re-check the row width
+at 320 px afterwards (6 × 44 = 264 px, inside the 288 px content column) and that the focus ring
+still reads at the larger size.
+
+**Address by**: any landing-page pass after 013 merges. Not a deploy blocker — the markers are a
+convenience and the story advances on its own — but it should not stay closed against a task that
+claims it.
