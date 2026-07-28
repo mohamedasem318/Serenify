@@ -2808,3 +2808,40 @@ terminology is binding, and `:11` was a line this feature had already edited.
 
 **Address by**: opportunistically, or as one housekeeping change. The a11y item has the only real
 user impact and should lead.
+
+### `anchor-egress.spec.ts` fails on firefox against Next's dev-only `__nextjs_original-stack-frames` — harness gap, proven pre-existing (#197)
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#197 OPEN.**
+**Category**: e2e harness / FR-050 · SC-014
+**Observed**: 2026-07-28, in feature 013's T147 pre-merge e2e run.
+
+**Description**: `apps/web/tests/e2e/anchor-egress.spec.ts:153` fails on **firefox** with
+`POST http://localhost:3000/__nextjs_original-stack-frames [text/plain;charset=UTF-8]` recorded as
+unexpected outbound data.
+
+**It is NOT a privacy defect.** The two assertions that actually protect FR-050/SC-014 both
+**pass** — `videoEgress` is `[]` and `anchorClipPosts` is `[]`. The failing third assertion is a
+deliberately broad catch-all for any mutating or bodied request to a non-allowlisted destination,
+and what it caught is the **Next.js development error-overlay endpoint**, which the dev server calls
+to symbolicate a stack trace. It is **localhost → the dev server itself**, its payload is a
+`text/plain` stack frame rather than video or user data, and **it does not exist in a production
+build** — `serenify.tech` has no such route.
+
+**Proven pre-existing, not caused by 013.** The identical spec was run against the pre-013 base
+**`cbb7f81`** with **identical `node_modules`**, so Next stayed at 16.2.11 and app code was the only
+variable: the branch (`64c423a`) fails with **one** stack-frame POST, `cbb7f81` fails with **two**.
+It fails *worse* on the older tree. This needed proving rather than assuming, because 013 **does**
+touch that route — `app/(authed)/app/calibrate/page.tsx` and `components/anchor/baseline-section.tsx`
+both gained the camera consent gate. Reproducible in isolation, so **not** a load flake like #187.
+
+**Still unknown, and the more interesting half**: *why* the dev overlay symbolicates during the
+green room at all, and why only on firefox. Something logs an error or warning that chromium does
+not — plausibly a `getUserMedia` error-shape difference. That console message has **not** been
+identified; the failing assertion is only the messenger.
+
+**Fix scope**: (1) allowlist `/__nextjs_*` in `isBenignDataDestination()` — **narrowly**, since the
+value of that assertion is its breadth; (2) find and fix the console message that triggers
+symbolication on firefox. **Do not loosen the third assertion generally** — it is the only check
+covering egress to destinations nobody thought to enumerate.
+
+**Address by**: whenever the e2e suite is next opened. Pairs with **#187** and the untimed test in
+**#196** as the three "the suite is honest but noisy on Windows" items.
