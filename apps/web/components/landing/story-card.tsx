@@ -212,10 +212,10 @@ export function StoryCard() {
                   reducedMotion ? "" : "transition-opacity duration-500",
                 )}
               >
-                {panel === "quiet" && <QuietPanel />}
+                {panel === "quiet" && <QuietPanel band={beat.band} />}
                 {panel === "prompt" && <PromptPanel highlight={beat.highlight} />}
                 {panel === "resolved" && <ResolvedPanel />}
-                {panel === "ren" && <RenPanel messages={messages} />}
+                {panel === "ren" && <RenPanel messages={messages} reducedMotion={reducedMotion} />}
               </div>
             );
           })}
