@@ -179,14 +179,24 @@
     font-size: var(--text-base);
   }
 
-  /* Feature 013 — clears the public navbar when an in-page anchor is jumped to.
-     The public shell's header became sticky on 2026-07-28 (see public-navbar.tsx), and
-     the hero's "See how it works" CTA targets #how-it-works: without this, the browser
-     scrolls the section's top edge to y=0, which is UNDER the 64px bar, and the heading
-     the visitor asked for is the one thing they cannot see. 4rem is the header's own
-     h-16. Harmless on the authed surfaces, whose header is not sticky and which have no
-     in-page anchors — scroll-padding affects nothing until something scrolls to a
-     fragment. */
+  /* Feature 013 — clears the sticky header when an in-page anchor is jumped to.
+     The public shell's header became sticky on 2026-07-28 (see public-navbar.tsx) and the
+     APP header on 2026-07-29 (see header/header.tsx); both are h-16, so 4rem is right for
+     both and this rule is now load-bearing on BOTH surfaces rather than only the public
+     one. The authed anchor it now serves is /app/account#notifications
+     (account/notifications-placeholder.tsx), reached from feature 012's `needed_quiet`
+     session-end action. Without it the browser scrolls a section's top edge to y=0, which
+     is UNDER the 64px bar, and the heading the visitor asked for is the one thing they
+     cannot see.
+
+     THIS RULE IS LOAD-BEARING — DO NOT DELETE IT. scroll-padding-top ADDS to a target's
+     own scroll-margin rather than maxing with it, so the two split the work: this clears
+     the 64px bar, and each section's scroll-mt-* is breathing room on top of it. The
+     legal document's sections are scroll-mt-8 (32px) and would land UNDER the bar without
+     this. Making each section self-sufficient instead was tried on 2026-07-29 and
+     reverted: at scroll-mt-20 the heading landed 119.6px below the bar rather than 71.6,
+     which is ~15% of an 800px viewport spent on dead space. One global that tracks the
+     bar's height beats repeating the bar's height at every anchor. */
   html {
     scroll-padding-top: 4rem;
   }

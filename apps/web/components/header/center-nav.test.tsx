@@ -63,6 +63,69 @@ describe("CenterNav", () => {
   });
 });
 
+/**
+ * The pill treatment, asserted as CONCRETE PROPERTIES rather than by comparing this
+ * component's class string to `PublicDesktopNav`'s.
+ *
+ * A string comparison between the two components would pass whenever both drift together,
+ * which is the failure mode that matters here — the two are meant to stay identical, so a
+ * change is overwhelmingly likely to be applied to both at once. The mirror-image block in
+ * `tests/unit/components/public/public-shell.test.tsx` asserts the same three facts
+ * independently, so either file fails on its own if either component moves.
+ */
+describe("CenterNav — the pill treatment (2026-07-29)", () => {
+  beforeEach(() => {
+    mockPathname = "/app";
+  });
+
+  function pill(name: string): HTMLElement {
+    return screen.getByRole("link", { name });
+  }
+
+  it("gives every destination a 44 px tap target", () => {
+    // Raised from h-9 (36 px) on 2026-07-29. This row was the only sub-44px interactive
+    // element in the header — the avatar button beside it has always been 44. FR-053
+    // requires 44 px on the public surface and its one exception is spent, so parity with
+    // that row had to be reached by raising this one.
+    render(<CenterNav role="employee" />);
+    for (const label of ["Home", "Chat"]) {
+      expect(pill(label).className).toMatch(/\bh-11\b/);
+      expect(pill(label).className).not.toMatch(/\bh-9\b/);
+    }
+  });
+
+  it("marks the current destination with bg-surface", () => {
+    render(<CenterNav role="employee" />);
+    expect(pill("Home").className).toMatch(/\bbg-surface\b/);
+  });
+
+  it("leaves non-current destinations without the active fill", () => {
+    render(<CenterNav role="employee" />);
+    const chat = pill("Chat").className;
+    // `hover:bg-surface` is present on every pill and must not be mistaken for the
+    // active fill, so match the bare utility rather than a substring.
+    expect(chat.split(/\s+/)).not.toContain("bg-surface");
+  });
+
+  it("carries no underline on any destination, current or not", () => {
+    // The public nav's underline was dropped on 2026-07-29 so the two bars render
+    // identically; this asserts the app nav never grows one either, which would
+    // re-open the divergence from the other side.
+    render(<CenterNav role="employee" />);
+    for (const label of ["Home", "Chat"]) {
+      expect(pill(label).className).not.toMatch(/\bunderline\b/);
+    }
+  });
+
+  it("uses rounded-md and the ink resting colour", () => {
+    render(<CenterNav role="employee" />);
+    for (const label of ["Home", "Chat"]) {
+      expect(pill(label).className).toMatch(/\brounded-md\b/);
+      expect(pill(label).className).toMatch(/\btext-ink\b/);
+    }
+  });
+});
+
 describe("CenterNav — employee-only Chat item (FR-016)", () => {
   beforeEach(() => {
     mockPathname = "/app";

@@ -5851,3 +5851,198 @@ A user who wants to end **all** their sessions no longer has a control that does
 was never offered deliberately — it was a side effect of the default — and no UI ever described it,
 so nothing shipped is now inaccurate. If "sign out everywhere" is wanted, it should be built as its
 own explicit control with its own copy, not restored by widening this scope.
+
+---
+
+## 2026-07-29 — The public navbar becomes SOLID (reversing the translucency of the day before), the app header becomes sticky, and the two destination rows become one treatment
+
+**Status**: Accepted. Branch `fix/navbar-chrome-and-active-state`. Not a SpecKit feature —
+a follow-up fix branch in the manner of PR #113, with no `specs/` directory of its own.
+
+### 1. Translucency and the backdrop blur are REVERSED; stickiness is kept
+
+This **reverses part of the 2026-07-28 entry above**, "The public navbar becomes sticky and
+gains Sign in / Sign up". That entry made the bar `sticky top-0 z-50` over
+`color-mix(in srgb, var(--color-bg) 88%, transparent)` with a 12 px `backdrop-blur-md`,
+following the signed-off landing mock. **Only the translucency is reversed.** Stickiness,
+`h-16`, `border-b border-border`, the wordmark size, the three-slot rhythm, the trailing
+theme toggle and the Sign in / Sign up pair are all unchanged, and item 2 of that entry
+(the auth actions) is untouched and still stands.
+
+The bar is now plain `bg-bg` — the same opaque token `components/header/header.tsx` uses.
+Two reasons, and the first is the load-bearing one:
+
+- **The inline `style={{ background: "color-mix(…)" }}` was a colour declaration bypassing
+  the token utilities.** FR-057 requires the landing page to reuse the real design tokens
+  rather than port the mock's CSS; an inline `color-mix` computed against a token is a
+  *derived* value written into the component, which is the seam FR-057 exists to close. A
+  token utility (`bg-bg`) is the shape the rule asks for.
+- **An 88 % veil over scrolling body copy bought nothing.** A sticky bar's job is to cover
+  what passes under it. Measured after the change on `/terms` at scroll y=700: every pixel
+  in an empty region of the bar is exactly the bar's own background, with no second colour.
+  Before, body copy blended through.
+
+### 2. `docs/mockups/serenify-landing-mock.html` is SPENT as the authority for this element's background
+
+**Scoped narrowly and deliberately.** The mock remains authoritative everywhere else — its
+type, spacing, section rhythm, hero composition and colour usage are all still the
+reference. What it no longer decides is **the public navbar's background treatment**:
+opacity, `backdrop-filter`, or any translucent ground on that one element.
+
+This is recorded because **the mock is gitignored and untracked**, so it cannot be
+corrected by a pull request. Without this entry the next fidelity pass reads the mock's
+`nav` rule, sees an 88 %-opaque blurred bar, finds an opaque one in the code, and "fixes"
+the translucency back in — with the same reasoning that put it there on 2026-07-28. The
+mock is not wrong; it is simply no longer the decider for this property.
+
+### 3. The app header becomes sticky, so the two bars match in both directions
+
+`components/header/header.tsx` gains `sticky top-0 z-50`. It was already `bg-bg` and
+already `h-16`, so no background or height change was needed — confirmed rather than
+assumed. `app/(authed)/layout.tsx` is untouched: the header is already the first child of
+a `flex min-h-dvh flex-col` column with no transform, filter or opacity, so it creates no
+stacking context and `sticky` resolves against the document scroller.
+
+The 2026-07-28 entry justified the divergence by arguing that `/` is a long scrolling
+narrative while the app sits above short task-shaped screens. That argument is not
+withdrawn — it explains why the public bar went first — but "matching means matching
+behaviour too" is the better rule, and the way to honour it is to make both sticky rather
+than neither.
+
+**Measured consequences, in real Chromium, before the line was added** — recorded because
+the class-level prediction that preceded them was wrong in both magnitude and target:
+
+- On `/app/chat`, the only thing that passes under the bar is the page `<h1>`, and only
+  below a **624 px** viewport height. The chat card itself is only touched below **576 px**,
+  and above **656 px** the route does not scroll at all. An earlier reading derived "~688 px"
+  from `h-[calc(100dvh-8rem)]` in isolation; that is wrong, because `min-h-[35rem]` binds
+  below 688 px and the `calc` never applies there. **The ~32 px of slack between the
+  reserved `8rem` and the real 96 px of chrome is therefore inert in the range where the
+  overlay happens, and the arithmetic is deliberately left alone.**
+- The open `ChatPill` panel is also `z-50` but later in DOM order, so it **paints on top of**
+  the header where they overlap, which begins below a **444 px** viewport height. Confirmed
+  with `elementFromPoint`, not inferred from the spec. Not a defect; a modal-ish overlay
+  covering chrome is correct, and the outcome is unchanged from before (the header was
+  already covered there — it just scrolled rather than stuck).
+
+### 4. The two destination rows become ONE treatment — and the mirror runs UPWARD
+
+`components/public/public-desktop-nav.tsx` now renders a class string **character-identical**
+to `components/header/center-nav.tsx`'s (124 bytes, byte-compared, not eyeballed):
+
+```
+"inline-flex h-11 items-center rounded-md px-3 text-sm text-ink transition-colors hover:bg-surface",
+active && "bg-surface",
+```
+
+Dropped from the public row: `underline decoration-2 underline-offset-4`, `text-muted` as
+the resting colour, `rounded-control`, `whitespace-nowrap`, and the
+`focus-visible:outline-none … ring-2 …` chain.
+
+**The underline is a knowing accessibility trade, ruled on explicitly rather than
+overlooked.** `public-desktop-nav.tsx` previously carried a thirty-line argument for it,
+and the argument is correct: `bg-surface` on `bg-bg` measures **1.094:1 in light**
+(`#F4F5F6` on `#EAEBEC`) and **1.085:1 in dark** (`#181B1E` on `#101214`), against the
+**3:1** WCAG 1.4.11 asks of a non-text indicator — and `hover:bg-surface` renders
+pixel-identically to the active fill, so "the page you are on" and "the link under your
+cursor" look the same. Both were true of `CenterNav` all along. The ruling: the two bars
+are made identical, and this is a **shared, known property of the house pill** rather than
+something one file fixes unilaterally. `aria-current="page"` is unaffected and remains the
+machine-readable half. Pinned by tests in both components so it cannot drift silently.
+
+**`CenterNav` was RAISED to `h-11`, not the public row lowered to `h-9`.** This is the part
+that decided the direction. FR-053 requires a 44 px tap target on the public surface and
+its single exception — the landing chapter markers, 2026-07-28 — is explicitly **spent**:
+"It licenses no other sub-44px target anywhere on the public surface; a further one needs a
+further amendment." Lowering the public row to 36 px would have needed that amendment, to
+make a target *smaller*, on a row live from 768 px up (which includes touch tablets, and
+768 px is one of the four widths FR-053 names). Raising the app row costs nothing and
+satisfies the constraint. **No spec is amended by this change, and `docs/CHANGELOG.md`
+therefore gets no entry.**
+
+Measured across 12 combinations (768/820/1024/1280 px × employee two-pill and admin
+one-pill × `/app` and `/app/chat`): the header box stays 64 px, nothing overflows, pill
+widths are byte-identical, labels stay on one line box, and **every other piece of header
+furniture — hamburger, wordmark link, wordmark glyph, theme toggle, avatar — is unchanged
+in height, top, centre and x-extent.** The right-hand cluster was *already* 44 px, so
+`h-9` had made the nav pills the only sub-44 interactive element in that bar.
+
+**The custom focus ring's removal is not a regression, and was checked before the removal
+rather than after.** Nothing in `globals.css` resets outlines, and Tailwind v4's preflight
+contains exactly one outline declaration — `:-moz-focusring { outline: auto }` at
+`preflight.css:172-174`, which *restores* a ring. Tabbing to a `CenterNav` link in real
+Chromium yields `outline: auto 1px rgb(28, 32, 35)`, visible in both themes. FR-055 is
+satisfied by the UA ring. The trade is that the ring is now browser-dependent where the
+meadow ring was identical everywhere.
+
+**`components/public/public-mobile-nav.tsx` is deliberately NOT changed.** It uses a third,
+weaker rule — `pathname === href`, exact-only, no prefix branch. Left for a separate
+decision rather than folded in silently.
+
+### 5. The legal contents rail clears the bar; the anchor split of labour is made explicit
+
+`components/legal/legal-document.tsx`'s contents rail was `lg:sticky lg:top-8` — 32 px
+against a 64 px bar. Measured at `lg` on `/terms` at two scroll positions: **32 px of the
+rail sat under the bar, the "Contents" heading was entirely hidden, and the first link's
+top edge was 0.8 px from being clipped.** Now `lg:top-20` (80 px = the bar plus a 16 px
+gap), with `lg:max-h-[calc(100dvh-4rem)]` becoming `lg:max-h-[calc(100dvh-6rem)]` so the
+reserve tracks the offset instead of letting the rail grow past the viewport bottom by the
+amount the offset grew.
+
+The sections stay at **`scroll-mt-8`**. Raising them to `scroll-mt-20` was tried and
+**reverted after measuring the result**. The reasoning for raising was self-sufficiency:
+`html { scroll-padding-top: 4rem }` ADDS to a target's `scroll-margin` rather than maxing
+with it, so 32 px of scroll-margin was only clearing the bar because of a global declared
+in another file for another surface. True, but the cure cost more than the disease — at
+`scroll-mt-20` an anchored heading landed **119.6 px** below the bar instead of **71.6 px**,
+about 15 % of an 800 px viewport spent on dead space, on the common path. Speculative
+robustness is not worth a visible regression.
+
+The division of labour stands, and is now documented at both ends instead of being
+implicit: **`scroll-padding-top` clears the bar; each section's `scroll-mt-*` is breathing
+room on top of it.** `globals.css`'s comment now says the rule is load-bearing and must not
+be deleted, and `legal-document.tsx` records why the larger value was rejected.
+
+The `globals.css` comment claiming the rule is "harmless on the authed surfaces, whose
+header is not sticky and which have no in-page anchors" was false in both halves after
+item 3 and is rewritten. The **value** `4rem` is unchanged and still correct for both bars.
+
+### What this change is NOT
+
+**It does not make the public navbar auth-aware.** A signed-in visitor still sees
+"Sign in / Sign up" on `/`. That is a separate change, kept apart deliberately because it
+adds a `profiles` read to public routes and the deploy should carry one suspect at a time.
+
+### Two pre-existing defects found while verifying, filed rather than fixed
+
+- **#208** — `service_role` holds no DML on **any** `public` table, so Playwright's
+  `globalSetup` aborts at `42501` and **zero e2e specs run**. The cause is the project's
+  `pg_default_acl` for relations created by `postgres` (`Dxtm` only — no `arwd`), not a
+  revoke; the grant is absent from all 16 migrations. No runtime path uses the service-role
+  key, so production is unaffected. Combined with the fact that **CI has never run the e2e
+  suite** (`ci.yml:4` — "No secrets, no Supabase, no Playwright"), there is currently **no
+  environment in which e2e can execute**.
+- **#209** — `--color-border` self-references inside `@theme inline`
+  (`globals.css:124`), making it cyclic. In **light mode** it computes invalid and all 81
+  `border-border` usages across 47 files fall back to `currentColor` (ink) instead of
+  `#D7D9DC`. Dark mode is unaffected, because `:root.dark` re-declares the token
+  non-cyclically — so the default mode is the broken one. A one-line deletion fixes it, but
+  a palette token touches every surface, which is a wider blast radius than a navbar change
+  should carry.
+
+### How this change is verified, stated honestly
+
+- **Unit (Vitest)** — 1460 tests across 133 files, green. Seven new assertions were
+  confirmed **red against `main`** first.
+- **Layout (`playwright.layout.config.ts`)** — a new `tests/layout/public-chrome.spec.ts`,
+  5 tests, of which **3 were confirmed red against `main`**. The other 2 are guards, not
+  fix-tests, and are labelled as such.
+- **The app header's stickiness is covered by CLASS-LIST ASSERTIONS ONLY.** `/app` is
+  authed, and the layout config has no `globalSetup` precisely so it needs no Supabase —
+  which also means it cannot log in. The rendered behaviour was measured by hand in real
+  Chromium (the viewport thresholds in item 3) and is recorded, not asserted.
+- **The layout specs are NOT a gate.** CI does not invoke that config. They are a local
+  instrument a human has to remember to run with `npm run -w apps/web test:layout`.
+- **No e2e evidence exists for this change**, per #208. The four files touched have no e2e
+  coverage today regardless: the only spec that mentions the nav asserts hamburger
+  visibility at 360 px, below `md`, where the nav is not rendered.

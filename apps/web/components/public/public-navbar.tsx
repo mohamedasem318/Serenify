@@ -15,15 +15,23 @@ import { ThemeToggle } from "@/app/theme-toggle";
  * the same trailing position — `components/header/header.tsx` on every property FR-018
  * names.
  *
- * ── TWO DELIBERATE DIVERGENCES FROM FR-018, BOTH FROM THE MOCK (2026-07-28) ────────────
+ * ── ONE DELIBERATE DIVERGENCE FROM FR-018 (2026-07-28, narrowed 2026-07-29) ────────────
  *
- * 1. IT IS STICKY, AND TRANSLUCENT WITH IT. The mock's `nav` is `position:sticky; top:0`
- *    over an 88 %-opaque `--bg` with a 12 px backdrop blur. The app header is neither, and
- *    P3 matched that on the reasoning that matching means matching behaviour too. On a
- *    signed-out LANDING page that reasoning inverts: this is a long scrolling page whose
- *    whole job is to get a stranger to the two buttons below, and a bar that scrolls away
- *    takes them with it. The app header sits above short, task-shaped screens where
- *    sticky buys nothing.
+ * 1. IT IS STICKY — AND SO IS THE APP HEADER NOW, SO THIS IS NO LONGER A DIVERGENCE AT
+ *    ALL. `/` is a long scrolling narrative whose whole job is to get a stranger to the
+ *    two buttons in this bar, and a bar that scrolls away takes them with it. That was
+ *    the 2026-07-28 argument for making this one sticky while the app header was not.
+ *    On 2026-07-29 the app header became sticky too (`components/header/header.tsx`),
+ *    which resolves the divergence in the direction of parity rather than away from it.
+ *
+ *    THE TRANSLUCENCY IS GONE. Until 2026-07-29 this bar sat on an 88 %-opaque `--bg`
+ *    via an inline `color-mix` plus a 12 px `backdrop-blur-md`, copied from the mock. It
+ *    is now plain `bg-bg` — the same opaque token the app header uses. Two reasons. The
+ *    inline `style` was a colour declaration bypassing the token utilities, which is the
+ *    thing FR-057 exists to prevent; and an 88 % veil over scrolling body copy is a
+ *    legibility cost the bar was not buying anything with. **The mock is spent as the
+ *    authority for this element's background** — see `docs/DECISIONS.md` 2026-07-29. It
+ *    remains authoritative elsewhere.
  *
  * 2. IT CARRIES SIGN IN AND SIGN UP. The trailing slot was a theme toggle alone, which
  *    left a returning visitor on `/` with no way into the product at all — the hero's CTA
@@ -50,13 +58,7 @@ import { ThemeToggle } from "@/app/theme-toggle";
  */
 export function PublicNavbar() {
   return (
-    <header
-      className="sticky top-0 z-50 flex h-16 items-center justify-between gap-2 border-b border-border px-4 backdrop-blur-md sm:gap-4 sm:px-6"
-      // The mock's translucent ground. `color-mix` over the SAME `--color-bg` token the
-      // opaque header used — a percentage of an existing token, not a new one (FR-057) —
-      // so the bar still reads as the page's own surface when content slides under it.
-      style={{ background: "color-mix(in srgb, var(--color-bg) 88%, transparent)" }}
-    >
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between gap-2 border-b border-border bg-bg px-4 sm:gap-4 sm:px-6">
       <div className="flex items-center gap-2">
         <div className="md:hidden">
           <PublicMobileNav />
