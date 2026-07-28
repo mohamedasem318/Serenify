@@ -1,8 +1,8 @@
 # Smoke Tests: Public Surface and Legal (Feature 013)
 
-**Status: PARTIALLY RUN — 10 of 17 checks executed and recorded (2026-07-28); 1 FAIL
-(ST-9, partial); 6 await Mohamed, and ST-7 and ST-15 need his confirmation of a
-fact no repository artefact holds.** Authored by T131; T132 (Mohamed's pass) is
+**Status: PARTIALLY RUN — 11 of 17 checks recorded (2026-07-28). ST-9 is FAILED and
+KNOWINGLY ACCEPTED (#184) — read that as failed, because it is. ST-7 is confirmed by
+Mohamed. Six checks still await him.** Authored by T131; T132 (Mohamed's full pass) is
 **not** complete. Where the agent ran a check, the Observations field says exactly how,
 so the method can be judged alongside the result.
 
@@ -142,9 +142,14 @@ Scroll the hero out of view and back: the story pauses and resumes, and does **n
 
 **Silhouette identity** — Mohamed confirms the inner-right outline highlights **Hebatullah** and the outer-right highlights **Gehad** (§0.2: the one fact no repository artefact can establish). Also: all four outlines register on a real touch screen.
 
-- **Result**: NOT RUN — AWAITING MOHAMED
-- **Date**: —
-- **Observations**: **The agent cannot verify this and does not claim to.** No repository artefact
+- **Result**: PASS — **verified visually by Mohamed, and still unprovable from the repo alone**
+- **Date**: 2026-07-28
+- **Observations**: **Mohamed confirmed the mapping on 2026-07-28: inner-right is Hebatullah
+  El Gazoly, outer-right is Gehad Mohamed.** That confirmation is the evidence — it is a
+  human identifying two people in a photograph, and **nothing in this repository can
+  establish it**. Do not restate this as plain "verified" without that qualifier.
+
+  **The agent could not verify it and did not claim to.** No repository artefact
   establishes which human in the photograph carries which name; §0.2 settled the mapping
   by inspection, and only Mohamed can confirm it against the people.
 
@@ -182,10 +187,10 @@ Root route on a real deployment: a signed-in visitor at `/` reaches the app with
 
 Signup gate end to end, including **with JavaScript disabled** (the `signUpFromForm` progressive-enhancement path): unchecked → blocked with a reason and no account; opening `/terms` and `/privacy` loses no entered data; checked → account created and exactly one consent row exists.
 
-- **Result**: FAIL (partial) — see below
+- **Result**: **FAIL — knowingly accepted for feature 013 (#184).** Not passed. Not partial.
 - **Date**: 2026-07-28
-- **Observations**: Run by the agent, end to end, on the local dev server. **This is the one check
-  here that did not fully pass.**
+- **Observations**: Run by the agent, end to end, on the local dev server. **This check FAILED.**
+  It is the only one that did, and it is accepted rather than fixed — see the ruling below.
 
   **How JavaScript was disabled**: the Playwright browser context was created with
   `javaScriptEnabled: false`, which disables script execution for every document in the
@@ -221,9 +226,20 @@ Signup gate end to end, including **with JavaScript disabled** (the `signUpFromF
   `void` on failure ("On failure, the page re-renders without error UI",
   `app/(auth)/signup/actions.ts`) — but it does not meet ST-9 as written. **The gate itself
   is sound**: the account is refused server-side, which is the security property. What is
-  missing is the explanation. Reachability is narrow (JS disabled, or hydration failed).
-  **Mohamed's call: fix it, or accept it and file a BACKLOG entry + issue in the same
-  change.**
+  missing is the explanation.
+
+  **⚠ RULED 2026-07-28 (Mohamed): FAILED and KNOWINGLY ACCEPTED. Not fixed for 013.** Same
+  treatment as WebKit in **#177** — written down rather than assumed, so **nobody may later
+  read P8's green tick as meaning ST-9 passed.** The refusal fails **closed** (no account, no
+  consent row), so the harm is confusion for a small population — JavaScript disabled, or
+  JavaScript that failed to load behind a proxy or on a flaky network — not mishandled data.
+  Repairing it means editing `signup/actions.ts`, the most sensitive file in this feature,
+  **during the deploy window**, risking the ~99% JavaScript path to serve the ~1%
+  no-JavaScript path. **`signup/actions.ts` was not touched.**
+
+  Logged as **#184** with a matching `docs/BACKLOG.md` entry in the same change. The fix, when
+  it comes as its own change after 013 merges, is **surfacing the existing reason** — the
+  JavaScript-on message quoted above is already correct — not inventing new copy.
 
 ---
 
@@ -259,8 +275,13 @@ App-shell gate: publish a **material** revision locally → sign in → blocked;
     `terms_privacy@2026-07-26.1 @00:47:16` and `terms_privacy@2026-07-28.1 @00:54:12`. The
     history was appended to, never overwritten.
 
-  **Both revert levers** were exercised — against the harder ST-10a state rather than this
-  one, which is a strictly stronger test. See ST-10a.
+  **Both revert levers were exercised — and deliberately against the ST-10a silent-lockout
+  state rather than this one. That is STRICTLY HARDER than what ST-10 asks for, and the
+  stronger result should not be lost.** ST-10's own state is a user blocked because a genuinely
+  material revision was published — the gate working as designed. ST-10a's state is a *universal
+  lockout produced by a defect that emits no error at all*: every user blocked, fail-open never
+  firing, nothing on any surface saying so. A lever proven to recover the app from **that** state
+  necessarily recovers it from this one. Full evidence under ST-10a.
 
 ---
 
@@ -430,6 +451,13 @@ Team section with the photo **blocked** (DevTools request blocking) and on a thr
     section 1440 × 1198.0 px — within a third of a pixel of the unthrottled height.
     Screenshot: `st14-throttled.png`.
 
+  **The check passes; one cosmetic remainder was logged rather than fixed.** With the photo
+  blocked, the reserved area stays a **large empty box** — the `next/image` explicit
+  `width={1600} height={1164}` reserving the aspect ratio, which is exactly *why* the layout
+  does not collapse. It is correct behaviour that reads as a blank rather than a graceful
+  placeholder. Filed as **#185** with a matching `docs/BACKLOG.md` entry. **Not fixed now** —
+  and any fix must keep the reservation, or it trades a blemish for real layout shift.
+
 ---
 
 ## ST-15
@@ -456,3 +484,24 @@ All eight external links open the correct real GitHub and LinkedIn profiles.
   in the repository.** "Open the correct real profiles" needs **Mohamed**.
 
 ---
+
+## Observed during Stage-1 verification — not a check, recorded so it is not re-diagnosed
+
+**A one-off firefox failure in `employee-monitoring.spec.ts:35`** — *"employee happy path: start
+→ permission → warming-up → reading → end → today recap expands in place"*. Clicking "Start
+check-in" never left `/app`: `toHaveURL(/\/app\/monitor$/)` polled the unchanged URL 62 times
+across its 30 s budget.
+
+**It is a suite-order flake, and it was chased far enough to say so with evidence:**
+
+- **Did not recur.** A second full firefox run of the whole suite came back with only the two
+  known exclusions — `employee-dashboard-shell.spec.ts:191` (**#178**) and
+  `anchor-egress.spec.ts:100`. This spec passed.
+- **Passes in isolation** — 10.3 s, against the 32.8 s it burned before failing.
+- **The diff could not have caused it.** Every commit on the branch at that point was
+  markdown under `specs/`. No application code differed from the tree P7 merged.
+
+**Do not chase it.** It is noted here only so the next person who sees it recognises it rather
+than re-diagnosing it from scratch, and so it is not mistaken for a consent-gate regression —
+which is what a monitoring-route navigation failure looks like at first glance. It is consistent
+with the repo's standing pattern of firefox load-timing flakes under full-suite load.
