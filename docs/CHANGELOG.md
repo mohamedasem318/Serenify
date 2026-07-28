@@ -2802,3 +2802,62 @@ feature.
 Cross-references: `.specify/memory/constitution.md` Amendment 17; `docs/DECISIONS.md` 2026-07-24
 (Amendment 17); `docs/BACKLOG.md` "From constitution Amendment 17"; GitHub issue #155;
 `specs/013-public-surface-and-legal/spec.md` OQ-1 and OQ-3.
+
+## 2026-07-28 — feat(013-public-surface-and-legal) — feature complete (merged to main, PR #194)
+
+Serenify gets a front door. Until now `serenify.tech` opened straight onto an auth screen and the
+product made promises — about privacy, about what a manager can see — that existed only in a README
+and a constitution. This feature puts the public surface and the legal surface in front of users,
+and puts a gate between users and the app that those documents can actually bind.
+
+**The public surface**
+
+- **A landing page at `/`**, taking the root route over from the redirect that lived there. A hero
+  story card that plays a ~42-second narrative in 17 beats, chapter markers to step through it, and
+  a team section.
+- **`/terms` and `/privacy`** — two real documents, written against FR-048a: manager visibility
+  stated plainly and never softened or buried, its not-yet-live marker in the *same* passage, an
+  unmissable "informed draft, not reviewed by a lawyer" notice, and zero performance figures.
+- **A public navbar and footer** across the public routes, footer reading "© 2026 Serenify".
+- **The two-colour wordmark** — `seren` in ink, `ify` in meadow — now rendered from one shared
+  component. This is a **visible change to three surfaces that previously shipped single-colour**
+  (the app header, the auth pages, and onboarding), not only a new-page addition. The two hand-sync
+  exceptions that cannot consume the component remain exactly two.
+
+**The legal gates — and neither is one-time**
+
+- **Terms/Privacy**, gating the **whole application** rather than just signup. A user whose recorded
+  consent predates a revision judged **material** meets a re-consent screen rendered **in place** —
+  no redirect — with both documents readable from it and sign-out available.
+- **Camera-and-inference**, gating all three capture routes: `/onboarding`, `/app/calibrate` and
+  `/app/monitor`.
+- **The two fail in opposite directions on purpose.** The app-shell gate **fails OPEN** and says so
+  in the logs; the camera gate **fails CLOSED**. A shell gate failing closed would be a
+  self-inflicted outage over a database blip; a camera gate failing open would turn a camera on for
+  someone who never agreed.
+- **A kill switch**, `CONSENT_ENTRY_GATE_ENABLED=false`, with the app-shell gate shipped **alone**
+  in its own PR (#172) so a single `git revert` unwinds it.
+
+**Consent is a history, not a flag.** `public.user_consents` records one append-only row per
+accepted revision and never overwrites: owner-only RLS, an immutability trigger, and no UPDATE or
+DELETE grant to `authenticated`. Which revision binds is decided by **version identity against an
+in-repo registry**, never by comparing timestamps — materiality is a human judgement recorded at
+publish time, never derived from a text diff or a date. **Declining writes nothing**: no row, no
+deletion, no withdrawal state. Feature **018** owns withdrawal, and will add a new row rather than
+change an old one.
+
+**No backfill.** Every pre-existing account has zero consent records, by design (FR-041), so all 20
+existing users meet the re-consent screen when this ships and clear it themselves.
+
+**Shipped knowingly imperfect, and said out loud rather than buried:** the no-JavaScript signup
+refusal is silent (**ST-9 FAILED, knowingly accepted, #184** — it fails *closed*, so the harm is
+confusion rather than data); sign-off covers **Chromium and Firefox only** (#177); and `/signup`
+stays **open self-serve** for the demo window (#62, deliberate), which keeps the SC-006 bypass live
+and accepted — one forged consent row, for the forger's own account, RLS-scoped, no escalation.
+
+Closes **#75**, **#157**, **#158**. Implements constitution 1.13.0 Amendment 17; **the constitution
+is not amended by this feature**.
+
+Cross-references: `docs/DECISIONS.md` 2026-07-28 (third pass); `docs/PROGRESS.md` "Feature 013";
+`specs/013-public-surface-and-legal/` (`plan.md`, `deploy-protocol.md`, `smoke-tests.md`, and the
+three deploy logs).

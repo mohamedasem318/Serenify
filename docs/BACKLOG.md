@@ -1438,8 +1438,10 @@ These two items were not deferred from a single feature; they are product-wide
 concerns surfaced during the feature 007 / 008 window and logged here so the
 roadmap pulls them in at the right gate rather than re-deriving them.
 
-### Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction) — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#75)
-**Status**: deferred-feature
+### ~~Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction)~~ — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#75)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#75 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: all three of #75's conditions shipped — **`/terms`** and **`/privacy`** (P3) and the **signup consent gate** (P4). The gate is not one-time: consent is recorded as an append-only **history** in `public.user_consents`, one row per accepted revision, and a revision judged **material** re-prompts everyone whose recorded consent predates it. The Terms/Privacy gate blocks the **whole application**, not just signup. The Egypt PDPL framing that opened this entry is answered by the documents themselves rather than by this entry. **Note the residual, recorded honestly**: SC-006 holds for accounts created through the product's own `/signup` surface and **not** against a caller bypassing it — root cause **#62**, which stays open deliberately (`docs/DECISIONS.md`, 2026-07-28 third pass).
+**Original status**: deferred-feature
 **Category**: legal / compliance / consent
 **Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
 **Description**: The app needs a **Terms of Service** and a **Privacy Policy**, plus an
@@ -1938,8 +1940,10 @@ Amendment 17, `docs/DECISIONS.md` 2026-07-24 (Amendment 17), and `docs/DECISIONS
 
 ## From feature 013 spec (public-surface-and-legal) — captured 2026-07-25
 
-### Camera + inference consent gate — no consent is recorded for webcam capture or inference — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#157)
-**Status**: deferred-feature (`type:feature` / `area:web` / `area:db` / `priority:blocker`) — **OPEN.** GitHub issue **#157 OPEN**.
+### ~~Camera + inference consent gate — no consent is recorded for webcam capture or inference~~ — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#157)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#157 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: the camera-and-inference consent is now its own registry key (`camera_inference`) with its own recorded history, gating **all three** capture routes — `/onboarding`, `/app/calibrate` and `/app/monitor` — not just the two obvious ones (`plan.md` §0.5: `/onboarding` mounts `<AnchorRecorder>` and is a calibration surface, so gating only `/app/calibrate` would let every new employee's first-ever capture run unconsented). **This gate fails CLOSED**, deliberately and oppositely to the Terms/Privacy shell gate: a failed or unreadable consent read means no capture happens. The asymmetry is reasoned in `docs/DECISIONS.md` (2026-07-28, third pass) — a shell gate failing closed is a self-inflicted outage, whereas a camera gate failing open turns a camera on for someone who never agreed.
+**Original status**: deferred-feature (`type:feature` / `area:web` / `area:db` / `priority:blocker`)
 **Category**: legal / compliance / consent
 **Observed**: 2026-07-25, while resolving the open questions in `specs/013-public-surface-and-legal/spec.md` (OQ-7 point 3). New scope — this had no issue and no BACKLOG entry.
 **Description**: The app requests camera access via `getUserMedia` at the calibration
@@ -2003,8 +2007,12 @@ binding pre-real-data gates on the same user journey, and both are owned by 013.
 **not** pair with **#62** (`/signup` invite-only): #62 governs *who may hold an account
 at all* and is an unrelated auth-posture/tenancy blocker that 013 does not address.
 
-### `README.md` states manager visibility + the privacy slider as present-tense fact, violating the merged Principle I public-communication rule (#158)
-**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#158 OPEN**.
+### ~~`README.md` states manager visibility + the privacy slider as present-tense fact, violating the merged Principle I public-communication rule~~ (#158)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#158 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: the copy fix shipped as a **P3 ride-along** (T035); the issue was deliberately held open until P8 so the result could be re-read against `plan.md` §0.3 rather than closed on the strength of the commit. **Re-read and verified 2026-07-28**, all four lines:
+- **`:11` was SPLIT, not appended to** — the load-bearing condition. It now reads *"Managers are designed to see graded trends for their reports; no manager-facing surface is live today."* followed by a **separate sentence**, *"Raw video and chat content never reach a manager — that one is permanent, and true right now."* The permanent Principle I invariant therefore stands **unqualified, in its own sentence, outside the marked one**. Appending a marker would have dragged the invariant under it and implied the raw-video and chat guarantees were merely planned — the other-direction flattening Amendment 17 forbids.
+- **`:15`, `:16`, `:18`** each carry one added sentence marking the block as the designed end-state (`:15`, `:16`) or naming feature 018 and stating there is nothing to configure yet (`:18`).
+**Original status**: tech-debt (`type:tech-debt` / `area:docs`)
 **Category**: docs / public-facing copy compliance
 **Observed**: 2026-07-24, during the constitution Amendment 17 copy sweep; logged 2026-07-25 once the amendment merged and the rule went live.
 **Description**: Constitution **Amendment 17** added a **public-communication rule** to
