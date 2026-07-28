@@ -2,6 +2,17 @@
 
 **Read §0 to §4 before touching anything. Then work §5 top to bottom.**
 
+> **RE-VALIDATED 2026-07-28 against `c4696b8`** (the post-#186 tip of
+> `013-public-surface-and-legal`), before P8 Stage 2 executed. This document was authored
+> *before* #186 merged, so every claim in it was re-checked rather than trusted. What changed:
+> **§1** gained two rows (**#187**, and the FR-053 spent exception) — it was incomplete, not
+> wrong; **§5 steps 1 and 3** and **§7 step 1** had the database password inline in a
+> connection URI and now prompt for it instead (and stopped writing the dump into the repo
+> root, which contradicted their own warning); **§0** states the credential-handling
+> shape the deploy actually runs under. Re-verified and **unchanged**: §2 Lever 2 still applies
+> cleanly, §7's rollback file still hashes as recorded, §5 step 6 still returns 0, and §1's
+> `#176` count still holds. Details are recorded at each site.
+
 This is written to be **followed**, not read. Every step has a verification and an abort
 condition. If a verification does not produce its expected result, **stop at that step** —
 do not improvise forward. "It seemed fine" is not a valid outcome anywhere in this file.
@@ -18,10 +29,41 @@ below runs against real people's accounts.
 | | |
 |---|---|
 | Hosted project ref | `excukdzjudslbqmkysrc` (eu-central-1, **Free tier**) |
-| Hosted DB password | Mohamed supplies it. Not in the repo, not in `.env.local`. |
+| Hosted DB password | Mohamed supplies it. Not in the repo, not in `.env.local`. **Never inline in a command — see "Credential handling" below.** |
 | Connection host | `aws-1-eu-central-1.pooler.supabase.com:5432`, user `postgres.excukdzjudslbqmkysrc`, db `postgres` |
+| Supabase CLI login | **already logged in** — the access token lives in **Windows Credential Manager** (`LegacyGeneric:target=Supabase CLI:supabase`), not in `~/.supabase/access-token`. An absent token *file* is therefore not evidence of being logged out. |
 | Local Supabase | **running** (`supabase_db_Serenify` healthy) — the dump is restored into it |
-| Branch | `013-public-surface-and-legal`, clean tree |
+| Branch | `013-public-surface-and-legal`, **no uncommitted tracked changes**. Untracked paths unrelated to the feature (e.g. local scratch notes) are acceptable and need not be removed; what must be clean is anything git would carry into a commit or a revert. |
+
+**Credential handling — added 2026-07-28, and it constrains how every command below is written.**
+
+The password must not reach a process's **argv**. On this host that is not a theoretical
+concern: PowerShell's PSReadLine persists command history to disk, so a connection URI with the
+password in it survives in a file neither operator would think to clean up, and argv is also
+visible to `ps` and to any agent transcript that echoes the command.
+
+**Therefore every hosted command in this document passes the password by environment or by
+prompt — never inline in a `postgresql://…` URI.** Where a URI appeared, it has been rewritten
+to the flag form (`-h/-p/-U/-d`) with the secret supplied out of band. This is a **correction to
+the original T135 text**, applied at §5 steps 1 and 3 and at §7 step 1.
+
+**P8 Stage 2 executed under an operator-runs-hosted-commands split** (Mohamed's ruling,
+2026-07-28): every command that authenticates to the hosted database is run by the operator in
+their own terminal and its output pasted back, so the password is never held by the agent
+session at all. Everything that does not authenticate to hosted — the local restore, the
+comparisons, the diffing, the verification arithmetic — is driven by the agent.
+
+**Which steps are operator steps under that split**: §5 steps **1**, **2**, **3**, **5**, **8**,
+**9**, **10**, **11**, **12**, all of §6's queries, and §7 step 1 — i.e. **every** step that
+opens a connection to hosted, not merely the three that write. Steps **2, 8, 10, 11, 12** and
+§6 are pure `SELECT`s and can all be pasted into **one** already-authenticated `psql` session,
+so the credential is typed **once**, not once per step. Steps 3 and 9 authenticate separately
+because `pg_dump` and `supabase db push` cannot run inside a psql session.
+
+If a later deploy is run single-handed, the fallback is an environment variable sourced from a
+file **outside the repo** (`PGPASSWORD` for psql/`pg_dump`, `SUPABASE_DB_PASSWORD` for the CLI),
+passed to the container by name — `docker exec -e PGPASSWORD …` — so the value is still absent
+from argv, from history and from any transcript.
 
 **`pg_dump` note, because it will otherwise waste twenty minutes at 2am.** There is **no
 `pg_dump` on the Windows host.** The local Supabase container has **pg_dump 17.6**, which
@@ -49,6 +91,8 @@ Ship this list knowing it, or do not ship.
 | **WebKit / Safari has no automated coverage** (**#177**) | Dropped from the sign-off bar. P8 signed off on **Chromium and Firefox only**. Nobody may read the green tick as "all three browsers passed". |
 | **360 px card alignment misses by 8 px** (**#178**) | Pre-existing, proven against the pre-gate commit. Fails on both browsers. |
 | **Self-serve signup is open** (**#62**) | **Deliberate. Do not gate signup during this deploy.** |
+| **The layout suite has an intermittent false negative** (**#187**) — *added 2026-07-28* | **OPEN, and it makes the suite's green tick conditional.** The two **dark** variants of `cold-start-readiness.spec.tsx` race `next-themes` for the `dark` class and fail under load; the failure presents as a contrast assertion (`Expected >= 4.5, Received 4.336…`) measuring a **torn palette**, not a colour regression — no token value changed. Pre-existing in the 009 spec; #186's fifth viewport (1280px) only makes the race lose more often. Measured: **3/3 clean** full-suite runs on this branch vs **3 failures across ~8 runs** on the PR branch, **6/6 clean** once the machine was idle. **A red layout suite in this window is not automatically your deploy** — re-run the spec in isolation before treating it as signal. It is a false *negative* only: it never passes when it should fail, so it cannot hide a real regression. |
+| **One deliberate sub-44px target on the public surface** (FR-053, **amended 2026-07-28**) — *added 2026-07-28* | **Shipping by amendment — not broken, but not what the original bar said.** The hero's six chapter markers use a **24×24px** minimum target, because 44×44 forces the cluster to **264px** against the mock's ~66px. **24×24 satisfies WCAG 2.5.8 (AA)** — a step from AAA to AA on one control, not a drop below conformance. Scope: `components/landing/chapter-markers.tsx` **only**; every other public interactive element stays at **44px** and the responsive walk still asserts it. The markers are a **convenience, not a path** — the story auto-advances and every beat is reachable by waiting. **The exception is spent.** Do not read the green responsive walk as "everything is 44px". |
 
 Also open and deliberately unfixed: **#185** (blocked team photo leaves an empty reserved
 box), **#86**, **#155**, **#174**, **#179**. **#176** is *updated*, not closed — 3 advisories
@@ -97,6 +141,14 @@ git revert afa20d8
 it fails open out loud, and it ships alone so one command unwinds it"* (PR #172). It ships
 alone precisely so this works. Verified 2026-07-28: it applies **cleanly, no conflicts**
 (`tasks.md` auto-merges), and removes the gate entirely.
+
+> **RE-VERIFIED 2026-07-28 against `c4696b8`**, i.e. *after* #186 merged — the original
+> verification predated it and could not have covered it. Still **clean, no conflicts**;
+> `tasks.md` still auto-merges. This holds for a structural reason worth recording rather than
+> re-testing blindly: `afa20d8` touches the app-shell gate, its env schema and its tests, and
+> the **only** path it shares with #186 is `specs/…/tasks.md`. #186's landing work and the gate
+> commit are disjoint in code. Re-run the check (`git revert --no-commit afa20d8`, inspect,
+> `git reset --hard HEAD`) if anything further merges before the lever is needed.
 
 Then push and let Vercel deploy. **This reverts only the gate**, not the migration, not the
 landing page, not the legal documents.
@@ -172,11 +224,19 @@ deploying code rather than trusting this document's snapshot of hosted state.**
 **1. Confirm the container can reach the hosted database.**
 
 ```
-docker exec supabase_db_Serenify psql "postgresql://postgres.excukdzjudslbqmkysrc:<PW>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres" -Atc "select current_database(), version();"
+docker exec -it supabase_db_Serenify psql \
+  -h aws-1-eu-central-1.pooler.supabase.com -p 5432 \
+  -U postgres.excukdzjudslbqmkysrc -d postgres -W \
+  -Atc "select current_database(), version();"
 ```
 
 **Expect**: `postgres|PostgreSQL 17.6…`. **Abort if**: connection refused or auth failure — fix
 credentials/network before anything else.
+
+> **Corrected 2026-07-28** from an inline `postgresql://…:<PW>@…` URI (§0, Credential handling).
+> `-W` makes psql **prompt** for the password and it is never echoed, never in argv, never in
+> shell history. `-it` is required for the prompt to be interactive — without a TTY, `-W` reads
+> EOF and the connection fails with an auth error that looks like a wrong password.
 
 ---
 
@@ -198,9 +258,17 @@ knowing before you deploy, not after.
 **3. Take the dump.**
 
 ```
-docker exec supabase_db_Serenify pg_dump "postgresql://postgres.excukdzjudslbqmkysrc:<PW>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres" -Fc -f /tmp/serenify-pre-013.dump
-docker cp supabase_db_Serenify:/tmp/serenify-pre-013.dump ./serenify-pre-013-<YYYYMMDD-HHMM>.dump
+docker exec -it supabase_db_Serenify pg_dump \
+  -h aws-1-eu-central-1.pooler.supabase.com -p 5432 \
+  -U postgres.excukdzjudslbqmkysrc -d postgres -W \
+  -Fc -f /tmp/serenify-pre-013.dump
+docker cp supabase_db_Serenify:/tmp/serenify-pre-013.dump <path-outside-the-repo>/serenify-pre-013-<YYYYMMDD-HHMM>.dump
 ```
+
+> **Corrected 2026-07-28**, twice. (1) The URI form is replaced by `-W` prompting, as in step 1.
+> (2) The original `docker cp` target was `./`, i.e. **the repository root** — which contradicts
+> the note immediately below it. The dump contains real user data; write it somewhere outside
+> the working tree so it cannot be staged by an absent-minded `git add -A`.
 
 **Record**: full file path, **byte size**, timestamp. **Abort if**: `pg_dump` errors, or the
 file is implausibly small.
@@ -250,6 +318,20 @@ npx supabase migration list --linked
 
 **Expect**: `20260726000000_user_consents` is the **only** row present locally and absent
 remotely. **Abort if** anything else is pending → **A3**.
+
+> **Note added 2026-07-28.** This command **authenticates to hosted** and will prompt for the
+> database password — T135 listed it under "pre-flight, read-only", which is true of its effect
+> but obscured that it needs the credential. Under the operator-runs-hosted-commands split (§0)
+> it is an operator command. The same answer can be read from an already-open psql session
+> without a second authentication:
+>
+> ```sql
+> SELECT version FROM supabase_migrations.schema_migrations ORDER BY version DESC LIMIT 5;
+> ```
+>
+> Compare against `ls supabase/migrations/` — local has **8** migration files, the newest being
+> `20260726000000_user_consents.sql` (verified 2026-07-28). Hosted must show the other seven and
+> **not** `20260726000000`.
 
 ---
 
@@ -441,9 +523,15 @@ occurrence is noise. **A sustained stream is an outage with the legal gate silen
 **1. Dump the consent table — mandatory precondition:**
 
 ```
-docker exec supabase_db_Serenify pg_dump "postgresql://postgres.excukdzjudslbqmkysrc:<PW>@aws-1-eu-central-1.pooler.supabase.com:5432/postgres" --data-only --table=public.user_consents -f /tmp/user_consents_backup.sql
-docker cp supabase_db_Serenify:/tmp/user_consents_backup.sql ./user_consents_backup-<YYYYMMDD-HHMM>.sql
+docker exec -it supabase_db_Serenify pg_dump \
+  -h aws-1-eu-central-1.pooler.supabase.com -p 5432 \
+  -U postgres.excukdzjudslbqmkysrc -d postgres -W \
+  --data-only --table=public.user_consents -f /tmp/user_consents_backup.sql
+docker cp supabase_db_Serenify:/tmp/user_consents_backup.sql <path-outside-the-repo>/user_consents_backup-<YYYYMMDD-HHMM>.sql
 ```
+
+> **Corrected 2026-07-28**: URI → `-W` prompt, and `./` → outside the repo (§0, §5 step 3). This
+> file is consent history for real people; it must not land in the working tree.
 
 Confirm the file exists and is non-empty **before** step 2.
 
