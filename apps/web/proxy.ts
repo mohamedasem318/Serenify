@@ -47,9 +47,17 @@ const CSP_HEADER = "content-security-policy";
 
 /**
  * Build the per-request CSP string. The 128-bit nonce (CSP3 floor) is generated
- * with the Edge-runtime-safe global Web Crypto `getRandomValues` (the Node
- * `crypto.randomBytes` import is unavailable in the Edge runtime middleware runs
- * in); `Buffer` is polyfilled by Next in the Edge runtime.
+ * with the global Web Crypto `getRandomValues`, which every runtime provides.
+ *
+ * Correction 2026-07-28: an earlier version of this comment said the nonce was
+ * written that way because "the middleware runs in the Edge runtime". That was
+ * true through Next 15 and is NOT true here — Next 16 renamed middleware to
+ * Proxy and **Proxy defaults to the Node.js runtime**; the `runtime` option
+ * cannot be set in a Proxy file at all (setting it throws). See
+ * `node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md`
+ * § Runtime. This file is therefore a Node function that runs in the
+ * deployment's function region, not at the edge. The `getRandomValues` call is
+ * still correct — just not for the reason previously given.
  */
 function buildCsp(nonce: string, pathname: string): string {
   const isDev = process.env.NODE_ENV !== "production";
@@ -168,10 +176,48 @@ export async function proxy(request: NextRequest) {
   };
 
   // getUser() contacts the auth server and verifies the JWT — required
-  // for authorization decisions (getSession() returns unverified data).
+  // for authorization decisions (getSession() returns unverified data). It also
+  // rotates an expiring session and writes the refreshed cookies through the
+  // setAll adapter above, which is why it runs for every method and not only
+  // for the navigations gated below.
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  // ── Navigation-only gate (2026-07-28) ──────────────────────────────────────
+  // Everything past this point answers with a redirect, and a redirect is only
+  // a coherent reply to a document navigation. Stop here for anything else.
+  //
+  // Server Functions are NOT separate routes: Next dispatches them as a POST to
+  // the route they are used on, so this matcher covers them. And
+  // `NextResponse.redirect` defaults to 307, which preserves method and body —
+  // so redirecting a Server Action POST re-POSTs it to the target, where the
+  // action id does not resolve:
+  //
+  //     POST /app  ->  307  ->  POST /login  ->  404 "Server action not found."
+  //
+  // The client router cannot recover from that. `fetch` follows the redirect
+  // silently, and the only channel Next has for action-driven navigation is the
+  // `x-action-redirect` header on the action's OWN response. The reducer throws
+  // E394 instead and Next's root error boundary renders "This page couldn't
+  // load" — the production sign-out bug this guard fixes.
+  //
+  // 303 is NOT an alternative fix: the followed GET is still neither an RSC
+  // response nor an `x-action-redirect`, so the same throw fires with different
+  // copy. Verified against production before choosing this shape.
+  //
+  // Skipping the gate here costs no authorization. Every Server Action reachable
+  // on a protected path already runs its own `getUser()` and handles the
+  // no-session case (account, chat, onboarding, consent, sign-out), which is
+  // what Next's docs require regardless: "Always verify authentication and
+  // authorization inside each Server Function rather than relying on Proxy
+  // alone" (`node_modules/next/dist/.../file-conventions/proxy.md`).
+  //
+  // Covered by tests/unit/proxy-method-guard.test.ts — including the GET half,
+  // so a future simplification that drops the method check turns those red.
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    return response;
+  }
 
   const { pathname } = request.nextUrl;
   const isAuthPage = AUTH_PAGES.has(pathname);
