@@ -229,3 +229,62 @@ readability:
    and a separate insert survives all three.
 
 **(2) is the real pre-production item. It was never a logging problem.**
+
+---
+
+## §6. ADDENDUM — the probe ran. Console output IS readable.
+
+Added after §5 was written. §5 left the question at *"unproven, not unreadable"*; this settles it.
+
+**Method**: a temporary `app/log-probe/route.ts` on the preview, emitting at two console levels
+with a payload shaped like `failOpen()`'s — a nested object AND a real `Error`, because that
+docstring specifically worries a synthesised `Error` may arrive as `{}` in a structured pipeline.
+Guarded to 404 in production. **Committed `d8da2fc`, removed again in the same PR before merge.**
+
+Request: `GET /log-probe` → `{"ok":true,"stamp":"2026-07-28T10:42:28.053Z","emitted":["warn","error"]}`
+
+**What the Vercel dashboard showed for that request** (`2 Total · 1 Error`):
+
+```
+10:42:28.057  [log-probe] WARN level reached, stamp=2026-07-28T10:42:28.053Z
+10:42:28.062  [log-probe] ERROR level reached, stamp=2026-07-28T10:42:28.053Z {  reason: 'deliberate-probe',  nested: {
+                  objectPayloadSurvives: true
+                }
+              syntheticError: Error: probe: does an Error serialise, or arrive as  {?
+                }
+              at f (.next/server/chunks/[root-of-the-server]__1q3r7ey._.js:1:1609)}
+```
+
+Four findings:
+
+1. **Server-side `console.*` output is readable on this project.** It lands in the per-request
+   `Messages` column and increments the `Contains Console Level` facet — the Error counter went
+   0 → 1.
+2. **Both levels are captured and distinguished** — `console.warn` and `console.error` arrived
+   separately, and the row is classified `1 Error`.
+3. **Object payloads survive intact** — `nested: { objectPayloadSurvives: true }` rendered in full.
+4. **A synthesised `Error` does NOT arrive as `{}`** — its message and a stack frame both
+   survived. This is the specific fear recorded in `failOpen()`'s docstring
+   (`app/(authed)/layout.tsx`), and on Vercel's actual pipeline it does not materialise. The
+   defensive `reason` string remains good practice, but the feared mode is not what happens here.
+
+### T138's §8 clause — MET
+
+The clause is *"the server log shows no `[consent-gate] FAIL-OPEN` line for those requests"*.
+
+Filtering the same 30-minute window to `level:error` returns **exactly one line — the deliberate
+probe.** That window covers the **entire Stage 3b exercise**: the gate render, *Agree and
+continue*, and the subsequent `/app`, `/app/account` and `/app/chat` requests at 13:31–13:33 local
+(10:31–10:33 UTC). **Zero `FAIL-OPEN`, in a channel with a valid positive control.**
+
+**Stated precisely, because the distinction matters**: Stage 3's original window (08:12–08:40 UTC)
+has aged out — Hobby retention is short — so this clause is satisfied by the **Stage 3b
+re-exercise**, not by retroactively reading Stage 3's logs. The re-exercise covers the same code
+paths and more (it adds *Agree and continue* and a deep authed route, which Stage 3 never ran), so
+it is a superset rather than a substitute. What made Stage 3's evidence worthless was the absence
+of a working control, and that is now supplied.
+
+**A5 remains a separate, unsolved problem.** Being able to *read* the line on request is not the
+same as being able to *watch* for a sustained stream of it — Hobby has no Log Drains and short
+retention. That is deferred by decision to after 013 merges (**#192**), and covered meanwhile by
+the lagging consent-row detector now in `deploy-protocol.md` §6.4.
