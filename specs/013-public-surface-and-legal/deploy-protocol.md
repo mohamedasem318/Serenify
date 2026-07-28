@@ -119,6 +119,23 @@ That deployment id is **`cbb7f81`** — the pre-013 production deployment, built
 `serenify-nh50dnnm8-mohamed-asems-projects-7436e57f.vercel.app`. It is **already built**. This
 command re-points `serenify.tech` at it; it does not compile anything.
 
+> # ⚠ A LEVER-0 ROLLBACK IS SILENTLY UNDONE BY THE NEXT PUSH TO `main`.
+>
+> **This is a trap for whoever is on next, and it is the most important thing on this page.**
+>
+> Lever 0 changes **nothing in git**. After you run it, `main` still holds 013 while production
+> serves `cbb7f81` — the repository and the live site now disagree, and **nothing anywhere records
+> that you rolled back**. The next push to `main`, by anyone, for any reason, rebuilds 013 and
+> re-deploys it over the top. The incident silently reopens, and the person who pushed will have no
+> idea they caused it.
+>
+> **So: if the rollback needs to survive longer than the next few minutes, immediately follow it
+> with Lever 2** (`git revert afa20d8`, push) so that `main` and production agree again. Lever 0 is
+> how you stop the bleeding; Lever 2 is how you keep it stopped.
+>
+> **And tell someone.** A rollback that exists only as a Vercel alias, with no commit and no note,
+> is invisible to every other person and to every future you.
+
 **Why this lever exists and why it is first.** Levers 1 and 2 both require a **production
 rebuild** before they take effect — Lever 1 because Vercel env changes do not touch running
 deployments, Lever 2 because a revert commit has to build. Lever 0 changes no code, no
@@ -133,10 +150,8 @@ skipped, and no error is raised. The migration stays applied and `user_consents`
 
 **Four caveats:**
 
-1. **It is a Vercel-side operation with no git footprint.** After a rollback, `main` still holds
-   013 while production serves `cbb7f81`. **Anything that subsequently pushes to `main` will
-   rebuild and re-deploy 013 over the top**, silently undoing the rollback. If the rollback needs
-   to hold for more than a moment, follow it with Lever 2 so the two agree.
+1. **No git footprint** — stated in full in the warning box above, because it is the one that
+   bites someone other than you.
 2. **Not exercised on this project.** Levers 1 and 2 were proven under ST-10a; this one was not.
    The mechanism is Vercel's standard instant-rollback and the target deployment is `READY`, but
    that is reasoning, not a test. `npx vercel rollback status` reports whether it landed —
@@ -210,7 +225,7 @@ landing page, not the legal documents.
 
 | The problem is… | Reach for | Because |
 |---|---|---|
-| **013 is hurting real users right now** — anything broad, anything you cannot diagnose in the moment | **Lever 0** | Seconds, no rebuild, no code change, destroys no consent history. Buys time to think. **Follow with Lever 2 if it must hold** (caveat 1). |
+| **013 is hurting real users right now** — anything broad, anything you cannot diagnose in the moment | **Lever 0**, then **Lever 2** | Seconds, no rebuild, no code change, destroys no consent history. Buys time to think. **Lever 0 alone is temporary: the next push to `main` silently undoes it.** Follow it with Lever 2 unless you are certain nobody will push. |
 | The **gate decision** is wrong — the app is otherwise healthy and you want people through it | **Lever 1** | A config change, not a code change. Reversible by deleting the variable again. Costs a production rebuild. |
 | The **gate code** is wrong | **Lever 2** | Removes the gate entirely and leaves `main` and production agreeing. Costs a revert commit and a build. |
 | The **migration** is wrong | **§7** | The only path that touches schema — **and the only one that destroys consent history.** Dump first. |
