@@ -329,9 +329,9 @@ remotely. **Abort if** anything else is pending → **A3**.
 > SELECT version FROM supabase_migrations.schema_migrations ORDER BY version DESC LIMIT 5;
 > ```
 >
-> Compare against `ls supabase/migrations/` — local has **8** migration files, the newest being
-> `20260726000000_user_consents.sql` (verified 2026-07-28). Hosted must show the other seven and
-> **not** `20260726000000`.
+> Compare against `ls supabase/migrations/` — local has **16** migration files, the newest being
+> `20260726000000_user_consents.sql` (counted 2026-07-28). Hosted must therefore show **15**
+> applied versions, the newest being `20260703000000`, and must **not** show `20260726000000`.
 
 ---
 
