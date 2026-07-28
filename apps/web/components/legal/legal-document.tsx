@@ -1,3 +1,4 @@
+import { WordmarkInText } from "@/components/brand/wordmark-in-text";
 import { currentRevision } from "@/lib/consent/evaluate";
 import {
   LEGAL_REVIEW_NOTICE_BODY,
@@ -145,8 +146,14 @@ export function LegalDocument({ title, lede, sections }: LegalDocumentProps) {
         <article className="max-w-[68ch]">
           {sections.map((section) => (
             <section key={section.id} id={section.id} className="scroll-mt-8 pt-10 first:pt-0">
+              {/*
+               * The five legal section headings that name the product render it as the
+               * shared wordmark. The contents index above deliberately does NOT — it is a
+               * nav list, not a heading, and a two-tone mark repeated down a sidebar is
+               * exactly the wallpaper effect the treatment is being kept away from.
+               */}
               <h2 className="font-display text-xl leading-snug text-ink [overflow-wrap:anywhere] sm:text-2xl">
-                {section.heading}
+                <WordmarkInText text={section.heading} />
               </h2>
               {section.blocks.map((block, index) =>
                 block.kind === "p" ? (
