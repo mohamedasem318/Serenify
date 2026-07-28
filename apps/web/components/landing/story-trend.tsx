@@ -49,6 +49,22 @@ const BAND_FILL: Record<StoryBeat["band"], string> = {
 };
 
 /*
+ * REN'S BEATS ARE BLUE — FR-022, and the mock's `[data-mood="talk"]` rules.
+ *
+ * The mock recolours the whole readout for the conversation: `.trend-path`, `.trend-band`
+ * AND `.trend-dot` all go foggy alongside the orb, because during those beats the readout
+ * is reporting who is speaking rather than how strained the person is. P6 left the line on
+ * the strain band, so the card read amber right through the conversation while the orb
+ * beside it was meant to be blue.
+ *
+ * `--color-foggy` is the registered token the Ren panel and the reading label already use;
+ * the 12 % band tint is the mock's own `[data-mood="talk"] .trend-band` percentage. No new
+ * token.
+ */
+const REN_STROKE = "var(--color-foggy)";
+const REN_FILL = "color-mix(in srgb, var(--color-foggy) 12%, transparent)";
+
+/*
  * 320×34 IS THE MOCK'S VIEWBOX AND THE WIDTH IS LOAD-BEARING, NOT COSMETIC.
  * `preserveAspectRatio="none"` stretches the box to the element, which is what lets the
  * trend be fluid at a fixed 34 px height — and it stretches the DOT with it. At the 120
@@ -83,6 +99,11 @@ export function StoryTrend({ beatIndex }: { beatIndex: number }) {
     ...history,
   ];
   const points = padded.map((beat, index) => [index * step, BAND_Y[beat.band]] as const);
+
+  // The mock's `talk` mood: Ren's panel showing means the readout is blue, not banded.
+  const isRen = current.panel === "ren";
+  const stroke = isRen ? REN_STROKE : BAND_STROKE[current.band];
+  const fill = isRen ? REN_FILL : BAND_FILL[current.band];
   const line = points.map(([x, y], i) => `${i ? "L" : "M"} ${x.toFixed(2)} ${y}`).join(" ");
   // The band closes the line down to the baseline and back, exactly as the mock does.
   const lastX = points[points.length - 1]![0];
@@ -99,14 +120,14 @@ export function StoryTrend({ beatIndex }: { beatIndex: number }) {
     >
       <path
         d={band}
-        fill={BAND_FILL[current.band]}
+        fill={fill}
         stroke="none"
         style={{ transition: "fill 1.2s ease" }}
       />
       <path
         d={line}
         fill="none"
-        stroke={BAND_STROKE[current.band]}
+        stroke={stroke}
         strokeWidth="1.9"
         strokeLinecap="round"
         strokeLinejoin="round"
@@ -122,7 +143,7 @@ export function StoryTrend({ beatIndex }: { beatIndex: number }) {
         cx={dotX.toFixed(2)}
         cy={dotY}
         r="3"
-        fill={BAND_STROKE[current.band]}
+        fill={stroke}
         stroke="var(--color-surface)"
         strokeWidth="2"
         vectorEffect="non-scaling-stroke"

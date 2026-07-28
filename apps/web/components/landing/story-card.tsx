@@ -72,6 +72,21 @@ const BAND_TONE: Record<StoryBeat["band"], BloomTone> = {
 const PANELS: readonly StoryPanel[] = ["quiet", "prompt", "resolved", "ren"];
 
 /**
+ * WHETHER THIS BEAT IS REN'S — the mock's `talk` mood, and FR-022's blue state.
+ *
+ * FR-022 makes Ren's blue orb on the landing page a deliberate, approved liberty that
+ * "MUST NOT be corrected" to the monitor's band colouring. P6 implemented it only on the
+ * small avatar inside the Ren panel; the hero readout's own orb and trend kept rendering
+ * the strain band, so through the whole conversation the card still read amber while Ren
+ * was speaking. That is the requirement going unmet, not a new decision — and the hook for
+ * it already existed: `Bloom`'s `color` prop was added by T082 for exactly this, and its
+ * docstring names `var(--color-foggy)` as the value. Nothing about `bloom.tsx` changes.
+ */
+function isRenBeat(beat: StoryBeat): boolean {
+  return beat.panel === "ren";
+}
+
+/**
  * The reading label's colour, which is the mock's `.reading-v` mood rule expressed from the
  * script rather than from a `data-mood` attribute the app does not have.
  *
@@ -81,7 +96,7 @@ const PANELS: readonly StoryPanel[] = ["quiet", "prompt", "resolved", "ren"];
  * the band. Every value is an existing Graphite token (FR-057).
  */
 function readingTone(beat: StoryBeat): string {
-  if (beat.panel === "ren") return "text-foggy";
+  if (isRenBeat(beat)) return "text-foggy";
   return beat.band === "at_ease" ? "text-ink" : "text-amber-text";
 }
 
@@ -124,7 +139,12 @@ export function StoryCard() {
       >
         {/* ── READOUT — permanently visible, every beat, reduced motion included ── */}
         <div data-testid="story-readout" className="flex items-center gap-3 sm:gap-4">
-          <Bloom tone={BAND_TONE[beat.band]} className="size-12 shrink-0 sm:size-12" />
+          <Bloom
+            tone={BAND_TONE[beat.band]}
+            // FR-022: Ren's beats are blue, through the prop rather than a landing-only orb.
+            color={isRenBeat(beat) ? "var(--color-foggy)" : undefined}
+            className="size-12 shrink-0 sm:size-12"
+          />
           {/*
            * The trend sits UNDER the reading label inside this column, spanning its full
            * width, which is where the mock puts it — not in a fixed narrow column pinned to
