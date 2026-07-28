@@ -5418,3 +5418,92 @@ additions were confirmed **red** against the old code before the fix.
 
 **Not done**: `plan.md`, `spec.md` and `research.md` are not edited. This entry is the
 record.
+
+---
+
+## 2026-07-28 (second pass) — FR-053 gains a spent 24×24 exception for the chapter markers; the wordmark enters headings; the Ren thread types
+
+Four changes from the landing fidelity pass's follow-up round. Only **one** of them edits a
+planning artifact: FR-053, at Mohamed's explicit instruction. `plan.md` and `research.md`
+are untouched, and nothing else in `spec.md` changed.
+
+### 1. FR-053 — a 24×24 px exception, scoped to the chapter markers, spent
+
+**Context**: the 44px tap-target floor made the mock's chapter-marker treatment
+unreachable. Six controls in one row means the cluster is **264px wide at 44×44** however
+small the dot is drawn, because the *hit area* sets the width — against the mock's ~66px.
+The row read as scattered rather than as a cluster. Reported as a constraint conflict
+rather than resolved unilaterally, since shrinking a stated floor was not mine to decide.
+
+**Decision (Mohamed, 2026-07-28)**: amend FR-053 with an exception permitting **24×24px**
+targets for `components/landing/chapter-markers.tsx` **only**, marked spent, in the same
+shape as FR-026's single-silhouette exception. The reasoning recorded in the amendment:
+24×24 satisfies **WCAG 2.5.8 (AA)** — a step from AAA to AA on one control, not a drop
+below conformance — the markers are a **convenience rather than a path** (the story
+auto-advances without them, so no beat is reachable only through a marker), and they must
+stay keyboard-reachable with a visible focus ring.
+
+**Measured after**: markers are **24×24**, the cluster is **144px** (was 264px), the
+resting dot holds **5.58:1 light / 6.58:1 dark**, and a focused marker still renders the
+app's focus ring. Every other interactive element on the public surface remains ≥44px and
+the walk asserts it, exempting only these six.
+
+The mock's literal ~66px is still not reached and cannot be without going below 24px. 144px
+is the floor under the amended rule.
+
+### 2. The wordmark renders inside headings — without widening FR-029's site table
+
+Six headings name the product: one on the landing page and five across the two legal
+documents. They now render it through the shared `<Wordmark />` via a new
+`components/brand/wordmark-in-text.tsx`, which splits the copy string and delegates.
+
+**Why this is not a new FR-029 site.** FR-029's table is exhaustive about the *chrome*
+surfaces that render the wordmark as a standing brand mark, and — load-bearingly — about
+the two that **cannot** consume the shared component and are therefore named hand-sync
+exceptions. A heading containing the product name in a sentence introduces no hand-sync
+exception: it consumes the one definition, so the rule the table exists to protect (one
+definition, reused, never re-typed) is satisfied rather than stretched. Writing the two-tone
+markup at each of the six call sites would have been the actual violation.
+
+**Deliberately not applied anywhere else.** Body copy, section labels and the legal
+documents' contents index stay plain. The contents index is a nav list rather than a
+heading, and a two-tone mark repeated down a sidebar is the wallpaper effect that costs the
+hero the effect it exists to carry.
+
+### 3. The quiet panel's bars follow the band
+
+They were pinned to meadow, so the panel stayed green while the reading beside it said
+"A little tense" and the sparkline had already gone amber — three parts of one readout
+disagreeing about the same moment. Same three tokens and the same mapping `story-trend.tsx`
+uses. Following the band is not encoding a value: the bars still carry no number and their
+heights are unchanged.
+
+### 4. The Ren thread types — and the drift invariant was never traded for it
+
+The person's messages type character by character and Ren shows a typing indicator before
+each reply. The obvious hazard is a growing element inside a box whose whole guarantee is
+that nothing moves.
+
+**The bubble reserves its final size and fills in.** Each animating bubble is a 1×1 grid
+holding two children in the SAME cell: an `invisible` copy of the complete message, which
+is what the grid measures, and the revealed prefix painted over it. The box is the finished
+box from the first character, and the prefix wraps where the finished text wraps because
+both lay out at the same width.
+
+**Measured, because "it looks fine" is not the bar here.** Sampled mid-type and after, at
+320/414/768/1280: the bubble is **324.3×27.9 / 299.5×45.8 / 212×45.8 identical in both
+samples**, painted 13–17 of 50 characters at the mid sample, with the card's own box
+unchanged, nothing outside the panel, no thread scrolling, and the 4-bubble cap intact.
+Ren's indicator is the one thing that changes size and it only grows *toward* the
+already-measured finished state, in the same slot — never a fifth list item.
+
+**Reduced motion is absence, not slowness**: no typing, no indicator, and no dependence on
+a timer having fired, so a visitor stepping through with the markers sees complete text at
+every beat. The answer is threaded down from `use-story-clock.ts` rather than queried
+again — T099 asserts exactly one landing module reads that query, and a second reader could
+disagree with the clock on the render where they resolve.
+
+**The indicator is an animation, not copy**: it is `aria-hidden`, and every bubble carries
+its full text in an `sr-only` span from mount, so a screen reader gets each message once,
+statically, and hears nothing as it types. A live region would have re-announced a growing
+string on every frame.

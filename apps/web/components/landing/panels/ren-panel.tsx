@@ -19,7 +19,14 @@ import { PANEL_REN_FOOTNOTE, PANEL_REN_NAME, PANEL_REN_SUBTITLE } from "@/lib/la
  * The AI disclosure stays on the surface: Ren is named as a companion and explicitly not
  * a substitute for professional care.
  */
-export function RenPanel({ messages }: { messages: readonly ThreadMessage[] }) {
+export function RenPanel({
+  messages,
+  reducedMotion,
+}: {
+  messages: readonly ThreadMessage[];
+  /** Threaded through from the story clock — see `ren-thread.tsx` (T099). */
+  reducedMotion: boolean;
+}) {
   return (
     <div className="flex h-full flex-col gap-2">
       <div className="flex items-center gap-2">
@@ -30,7 +37,7 @@ export function RenPanel({ messages }: { messages: readonly ThreadMessage[] }) {
         </div>
       </div>
 
-      <RenThread messages={messages} />
+      <RenThread messages={messages} reducedMotion={reducedMotion} />
 
       <p className="mt-auto text-[0.6875rem] leading-snug text-muted">{PANEL_REN_FOOTNOTE}</p>
     </div>
