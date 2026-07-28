@@ -259,6 +259,28 @@ describe("vertical rhythm", () => {
     expect(wordmarkToHeading).toBeLessThan(headerToCard);
   });
 
+  it("blockifies the wordmark, or the header's spacing silently does nothing", () => {
+    /**
+     * The regression that actually shipped, and the one the ordering case above cannot
+     * see. `Wordmark` renders an INLINE `<span>`, and Tailwind v4's `space-y-*` works by
+     * putting a vertical margin on the child — but **vertical margins do not apply to
+     * inline boxes**, so the margin was discarded and the gap was whatever the line box
+     * happened to give. Measured at 375 px, the heading's box sat 0.5 px *above* the
+     * wordmark's; they overlapped. The class list said `space-y-5` the whole time.
+     *
+     * So the spacing utilities are necessary and not sufficient: this asserts the one
+     * property that makes them take effect at all.
+     */
+    renderScreen();
+    const wordmark = document.querySelector("main > header > span");
+
+    expect(wordmark, "the wordmark must be a direct child of the header").not.toBeNull();
+    expect(wordmark?.className).toMatch(/\bblock\b/);
+    // `leading-none` collapses the line box to the font size while the glyphs need more,
+    // so the descender hangs outside the box the margin is measured from.
+    expect(wordmark?.className).not.toMatch(/\bleading-none\b/);
+  });
+
   it("sets the title at a multi-line leading, not the single-line one", () => {
     // The title wraps to two lines at every supported width and three at 320 px.
     // `leading-tight` (1.25) is the house idiom for headings that do not wrap.
