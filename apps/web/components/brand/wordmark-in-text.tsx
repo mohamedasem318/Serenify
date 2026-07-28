@@ -14,13 +14,18 @@ import { Wordmark } from "@/components/brand/wordmark";
  * wordmark's markup, its colours and its `lowercase` rule are still defined in exactly one
  * place, and this file contains none of them.
  *
- * IT DOES NOT WIDEN FR-029's EXHAUSTIVE SITE TABLE. That table enumerates the *chrome*
- * surfaces that render the wordmark as a standing brand mark — and, load-bearingly, the two
- * that cannot consume the component and are therefore named hand-sync exceptions. A heading
- * that happens to contain the product name in a sentence is not a new hand-sync exception:
- * it consumes the shared definition, so the rule the table exists to protect — one
- * definition, reused, never re-typed — is satisfied rather than stretched. Recorded in
- * `docs/DECISIONS.md`; `spec.md` is not edited for it.
+ * IT DOES NOT WIDEN FR-029's SITE TABLE, AND FR-029 NOW SAYS SO. That table enumerates the
+ * *chrome* surfaces that render the wordmark as a standing brand mark — and, load-bearingly,
+ * the two that cannot consume the component and are therefore named hand-sync exceptions. A
+ * heading that happens to contain the product name in a sentence is not a new hand-sync
+ * exception: it consumes the shared definition, so the rule the table exists to protect —
+ * one definition, reused, never re-typed — is satisfied rather than stretched.
+ *
+ * That reading was accepted and FR-029 was **amended on 2026-07-28** to state it, because
+ * "exhaustively" read as a closed list of every place the wordmark may appear. The
+ * amendment clarifies rather than allows: in-prose usage through the shared definition is
+ * permitted, re-typing the markup at such a site is still a violation, and the hand-sync
+ * exceptions remain exactly two.
  *
  * HEADINGS ONLY, AND DELIBERATELY NOT ANYWHERE ELSE. The two-tone treatment was considered
  * for body copy and section labels and rejected: repeated everywhere it becomes wallpaper

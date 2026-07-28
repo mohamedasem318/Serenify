@@ -481,6 +481,23 @@ person is outlined in the photo, and vice versa.
   "defined once everywhere" universal that the constitution deliberately does not —
   hence this restatement. All three in-tree sites that exist today render the
   wordmark single-colour; the two-colour treatment is implemented nowhere yet.)*
+
+  **AMENDED 2026-07-28, by Mohamed, during the landing fidelity pass — a
+  clarification, not a new allowance.** "Exhaustively" reads as a closed list of every
+  place the wordmark may appear, and it was written to mean something narrower. The
+  table enumerates the surfaces that carry the wordmark as **standing chrome** — a
+  persistent brand mark in a header, a footer, a layout or a template — and its
+  load-bearing purpose is to close the list of **hand-sync exceptions** at exactly two.
+
+  **In-prose usage is permitted and is not a new site.** Where the product name occurs
+  inside a heading, it MAY render as the wordmark **through the one shared definition**.
+  Doing so introduces **no new hand-sync exception**, because such a usage consumes the
+  shared component rather than restating it — which is precisely the property this
+  requirement protects. Re-typing the two-tone markup at such a site remains a
+  violation, exactly as it is at a chrome site.
+
+  The two hand-sync exceptions remain **exactly two**: the `next/og` social card and the
+  Supabase transactional email templates. This clarification adds none and licenses none.
 - **FR-030**: The wordmark MUST always render lowercase and MUST NOT carry a dot or
   other terminal punctuation.
 - **FR-031**: **Resolved — the amendment was required and has landed.** This change

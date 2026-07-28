@@ -5465,6 +5465,13 @@ exception: it consumes the one definition, so the rule the table exists to prote
 definition, reused, never re-typed) is satisfied rather than stretched. Writing the two-tone
 markup at each of the six call sites would have been the actual violation.
 
+**Superseded in part, 2026-07-28:** this reading was accepted and **FR-029 was amended** to
+state it, because "exhaustively" read as a closed list of every place the wordmark may
+appear. The amendment clarifies rather than allows — in-prose usage through the shared
+definition is permitted, re-typing the markup at such a site remains a violation, and the
+hand-sync exceptions remain exactly two. So the sentence above saying `spec.md` is not
+edited for this held on the day it was written and no longer does.
+
 **Deliberately not applied anywhere else.** Body copy, section labels and the legal
 documents' contents index stay plain. The contents index is a nav list rather than a
 heading, and a two-tone mark repeated down a sidebar is the wallpaper effect that costs the
