@@ -2911,7 +2911,8 @@ not measured**, and measuring it is the whole reason it is a second deploy. **Th
 until PR B merges** — the auth bug itself is fixed by PR A.
 
 **Left open deliberately**: #201 (recent-chats loading state), #202 (stale Edge-runtime claims),
-#203 (`global-error.tsx`).
+#203 (`global-error.tsx`), #205 (the onboarding flow gate no longer applying to POSTs — a consequence
+of C1, accepted with reasons).
 
 ### Recent chats card asserts "no recent chats" before the query resolves — a definitive empty state where a loading state belongs (#201)
 **Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#201 OPEN.**
@@ -2990,3 +2991,35 @@ approved.
 
 **Address by**: no deadline. **Low priority** — the trigger is a root-layout failure, which is rare,
 and the consequence is the pre-#200 status quo rather than anything worse.
+
+### Onboarding flow gate no longer applies to POSTs after the proxy method guard — accepted deliberately (#205)
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN, knowingly accepted.** GitHub issue **#205 OPEN.**
+**Category**: consequence of #200 PR A (`proxy.ts` method guard)
+**Observed**: not observed — identified while reviewing the C1 diff, before merge
+
+**Description**: the method guard makes the route gate apply to **GET/HEAD only**. Steps 2 and 3 (the
+auth redirects) lose nothing, because every Server Action on a protected path already runs its own
+`getUser()`. **Steps 4 and 5 — the onboarding gate — are different**: they are a *flow* gate, and a
+user whose `profiles.full_name IS NULL` can now invoke `grantConsent` or the chat actions **by action
+id** without having completed onboarding.
+
+**Why it is accepted rather than fixed, and this is the load-bearing part**: it is **not an
+authorization gate and exposes nothing**. Every reachable action self-guards on *identity* —
+`components/consent/actions.ts:66-71` resolves `user_id` from `getUser()` and never takes it as a
+parameter; `app/(authed)/app/chat/actions.ts:14-24` returns `UNAUTH` without a session and forwards
+the user's own access token so **RLS scopes every row as that user**. And **the GET is still gated,
+so no UI can fire it** — `/app` and `/app/chat` still bounce to `/onboarding`, the pages never
+render, and no button exists to press. Exercising this needs a hand-crafted POST carrying a valid
+session and a known action id. The worst outcome is a user writing their own consent row or their own
+message slightly earlier in the flow than intended, inside their own RLS scope.
+
+**It cannot simply be put back.** Restoring the gate for POSTs means re-introducing the exact
+redirect-on-POST that caused #200. A fix has to be a different mechanism — an in-action
+`full_name IS NULL` check returning the `UNAUTH` shape those actions already return.
+
+**Adjacent to #195** (the Terms/Privacy gate absent from `(onboarding)/layout.tsx`) — the same
+gate-coverage question around the onboarding surface, with likely the same answer: check in the
+action, not with another proxy redirect. If either is picked up, look at both.
+
+**Fix scope**: small. **Address by**: no deadline; filed so the consequence cannot later read as an
+oversight.
