@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 
 import { signOut } from "@/app/(authed)/actions";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -31,6 +31,14 @@ function deriveDisplayName(fullName: string | null, email: string): string {
 
 export function ProfileDropdown({ fullName, email }: ProfileDropdownProps) {
   const formRef = useRef<HTMLFormElement>(null);
+  // The menu item is a SIBLING of the form (the form lives outside the Radix
+  // portal), so `useFormStatus` — which only reads from inside a form — cannot
+  // see it. This local flag is the equivalent signal for that one control.
+  //
+  // It is never reset. Both outcomes of the action navigate away: success
+  // redirects to /login, and a failed revoke now clears cookies and redirects
+  // anyway. Nothing returns the user to this menu with the flag still set.
+  const [signingOut, setSigningOut] = useState(false);
   const initials = deriveInitials(fullName, email);
   const displayName = deriveDisplayName(fullName, email);
 
@@ -55,19 +63,27 @@ export function ProfileDropdown({ fullName, email }: ProfileDropdownProps) {
             {displayName}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
+          {/* min-h-11 on both items: 44px touch targets. The base
+              DropdownMenuItem is ~32px, and sizing only the sign-out row would
+              leave the menu visibly uneven. */}
+          <DropdownMenuItem asChild className="min-h-11">
             <Link href="/app/account" data-testid="profile-dropdown-account">
               Account
             </Link>
           </DropdownMenuItem>
           <DropdownMenuItem
             data-testid="profile-dropdown-signout"
+            className="min-h-11"
+            disabled={signingOut}
             onSelect={(event) => {
+              // preventDefault keeps the menu open — Radix would otherwise
+              // close it on select, hiding the pending state we just set.
               event.preventDefault();
+              setSigningOut(true);
               formRef.current?.requestSubmit();
             }}
           >
-            Sign out
+            {signingOut ? "Signing out…" : "Sign out"}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -108,4 +108,50 @@ describe("ProfileDropdown", () => {
 
     expect(requestSubmitSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("shows a pending label on the item once sign-out is under way", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProfileDropdown fullName="Jane Doe" email="jane@demo.serenify.local" />,
+    );
+
+    await user.click(screen.getByLabelText("Open profile menu"));
+    await user.click(screen.getByTestId("profile-dropdown-signout"));
+
+    // The item is a sibling of the form, outside the Radix portal, so
+    // useFormStatus cannot see it — this is its equivalent signal.
+    expect(screen.getByTestId("profile-dropdown-signout")).toHaveTextContent(
+      "Signing out…",
+    );
+  });
+
+  it("disables the item while signing out, so it cannot fire twice", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProfileDropdown fullName="Jane Doe" email="jane@demo.serenify.local" />,
+    );
+
+    await user.click(screen.getByLabelText("Open profile menu"));
+    await user.click(screen.getByTestId("profile-dropdown-signout"));
+
+    expect(screen.getByTestId("profile-dropdown-signout")).toHaveAttribute(
+      "data-disabled",
+    );
+  });
+
+  it("gives both menu items a 44px touch target", async () => {
+    const user = userEvent.setup();
+    render(
+      <ProfileDropdown fullName="Jane Doe" email="jane@demo.serenify.local" />,
+    );
+
+    await user.click(screen.getByLabelText("Open profile menu"));
+
+    expect(screen.getByTestId("profile-dropdown-account").className).toMatch(
+      /min-h-11/,
+    );
+    expect(screen.getByTestId("profile-dropdown-signout").className).toMatch(
+      /min-h-11/,
+    );
+  });
 });

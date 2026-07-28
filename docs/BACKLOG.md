@@ -2856,3 +2856,170 @@ covering egress to destinations nobody thought to enumerate.
 
 **Address by**: whenever the e2e suite is next opened. Pairs with **#187** and the untimed test in
 **#196** as the three "the suite is honest but noisy on Windows" items.
+
+## From the production sign-out fix — captured 2026-07-28
+
+### Sign-out on production hangs then shows Next's error screen — `proxy.ts` 307s the Server Action POST into a re-POST (#200)
+**Status**: bug (`type:bug` / `area:web`) — **fix merged in PR A; entry stays OPEN until PR B lands.**
+GitHub issue **#200 OPEN.**
+
+**Why this is split across two PRs.** `main` is production and squash-merges, so **one PR is one
+deploy**. The auth fix and the region pin are shipped separately so that a regression against the ~20
+live accounts has **one suspect, not two** — and so the region change can actually be measured, which
+it cannot be if the sign-out path moved in the same deploy. **PR A** (C1–C4 + F1) carries the fix and
+all tracking. **PR B** carries `apps/web/vercel.json` alone and merges only after A is verified. The
+two branch independently off `main` and are mergeable in either order.
+**Category**: not a feature — a production defect found by report
+**Observed**: reported against `serenify.tech`, 2026-07-28; reproduced live before the fix
+
+**Not 013 fallout.** Every mechanism predates feature 013: the proxy route gate is feature 001, the
+cross-tab sign-out handler is feature 003, and the sign-out action has been unchanged since. It has
+been **live since the July production deploy** and simply had no reporter — two tabs open on one
+account is not a shape local testing produces, and the whole failure needs a slow server round-trip
+to open the race window at all.
+
+**Description**: `proxy.ts`'s route gate answered every unauthenticated request on a protected path
+with `NextResponse.redirect(...)`, which **defaults to 307** — and 307 preserves method and body.
+Server Functions are not separate routes; Next dispatches them as a POST to the route they are used
+on, so the matcher covers them. When a sibling tab's broadcast completed its own revoke first (a
+direct browser-to-Frankfurt call, ~100 ms) while the originating tab's Server Action was still in
+flight (~1.6-2 s), the proxy saw no user and redirected the POST:
+
+    POST /app  ->  307  ->  POST /login  ->  404 "Server action not found."
+
+`server-action-reducer.js` throws E394 on that (neither RSC nor an `x-action-redirect`), and with no
+error boundary anywhere in `apps/web/app` it fell through to Next's built-in root fallback.
+
+**A 303 is not a fix**, and this is the part worth remembering: the followed GET is still neither RSC
+nor an `x-action-redirect`, so the identical throw fires with different copy. The Server Action
+protocol requires the action's *own* response — `fetch` follows redirects silently, so a redirect at
+the proxy layer is invisible to the router by construction.
+
+**Fixed in PR A**: five independently revertible commits.
+- **C1** — the fix. `proxy.ts` gates on GET/HEAD only. No authorization is lost: every Server Action
+  reachable on a protected path already runs its own `getUser()`, which Next's docs require anyway.
+  Also skips the `profiles` lookup on non-navigations (redirect-only gate, so it was pure latency).
+- **C2** — `scope: "local"` at both call sites, and the revoke result is no longer discarded; on
+  error the action clears the `sb-*` cookies itself and still redirects. See DECISIONS 2026-07-28.
+- **C3** — pending state on all five sign-out call sites.
+- **C4** — an app error boundary (`app/error.tsx`).
+- **F1** — review follow-up: the sibling tab was discarding its revoke error too.
+
+**Ships separately in PR B, NOT in PR A**: **C5** — `apps/web/vercel.json` pinning Vercel functions
+to `fra1`, co-located with Supabase `eu-central-1`. Expected to reduce sign-out latency; **magnitude
+not measured**, and measuring it is the whole reason it is a second deploy. **This entry stays open
+until PR B merges** — the auth bug itself is fixed by PR A.
+
+**Left open deliberately**: #201 (recent-chats loading state), #202 (stale Edge-runtime claims),
+#203 (`global-error.tsx`), #205 (the onboarding flow gate no longer applying to POSTs — a consequence
+of C1, accepted with reasons).
+
+### Recent chats card asserts "no recent chats" before the query resolves — a definitive empty state where a loading state belongs (#201)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#201 OPEN.**
+**Category**: chat / home surface
+**Observed**: while diagnosing #200 on `serenify.tech`, 2026-07-28
+
+**Description**: The home "Recent chats" card renders its **definitive empty state** before the query
+resolves, so a user with conversations is briefly told they have none. A definitive empty state is a
+claim about the data; until the query returns, the true answer is "not known yet".
+
+`components/home/recent-chats-card.tsx` initialises `conversations` to `[]` and carries **no loading
+flag**, so line 124's `conversations.length === 0` cannot distinguish "still loading" from "genuinely
+empty".
+
+**Which dependency is the cause — asked explicitly, because it changes the fix.** It goes through the
+**Azure API, not Supabase directly**: `recent-chats-card.tsx:44` (client `useEffect`) →
+`loadConversations()` in `app/(authed)/app/chat/actions.ts` → the typed FastAPI client, whose base is
+`${clientEnv.apiUrl}/chat` (`lib/api/chat-client.ts:13`, i.e. `NEXT_PUBLIC_API_URL`) → FastAPI →
+Supabase. Two hops sit in front of the database and the first is a container that can be cold, so
+**cold start is the likely dominant cause rather than database latency** — which also fits the flash
+being variable rather than a steady ~200 ms. **Pinning Vercel functions to `fra1` will not fix this**
+whenever that lands (#200 PR B); the Azure hop is the one that matters, and it is not Vercel's.
+
+**Fix scope**: small — a third state. Either a `loading` boolean or `ConversationSummary[] | null`
+with `null` meaning unresolved, rendering a skeleton or nothing until the query returns.
+
+**Address by**: next time the home surface or the chat client is opened. Not urgent — it is a brief
+wrong claim, not a broken flow.
+
+### Stale pre-Next-16 claims that `proxy.ts` runs on the Edge runtime (#202)
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#202 OPEN.**
+**Category**: docs accuracy / Next 16 migration residue
+**Observed**: during the #200 investigation, 2026-07-28
+
+**Description**: Several comments and docs state that `proxy.ts` runs on the **Edge runtime**. True
+through Next 15; **false on the installed Next 16.2.11**. From
+`node_modules/next/dist/docs/01-app/03-api-reference/03-file-conventions/proxy.md` § Runtime:
+*"Proxy defaults to using the Node.js runtime. The `runtime` config option is not available in Proxy
+files. Setting the `runtime` config option in Proxy will throw an error."*
+
+**Not cosmetic.** This belief produced a wrong latency model during #200 — the assumption that only
+the Server Action crosses to Supabase, when the proxy's `getUser()` and `profiles` lookup are in the
+function region too. It cost a round of analysis.
+
+**Sites.** `apps/web/proxy.ts:50-52` is **already corrected** in #200 (folded in — one comment in a
+file that PR touches anyway). Still open: `docs/DECISIONS.md:1293-1295`,
+`docs/security/05-csp-header.md:155-156`, `docs/security/07-rate-limits-and-parity.md:364` and `:477`.
+Historical `specs/001-auth-and-roles/*` references to `middleware.ts` are the record of that feature
+and are correctly left alone.
+
+**Fix scope**: small, docs only. One judgement call: **DECISIONS.md is append-only**, so it needs a
+new dated correction entry rather than an edit of the original.
+
+**Address by**: next docs pass. No behaviour depends on it.
+
+### No `global-error.tsx` — a root-layout failure still falls through to Next's default screen (#203)
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#203 OPEN.**
+**Category**: follow-up to #200 C4
+**Observed**: not observed — logged as a known gap when the error boundary was added
+
+**Description**: #200 added `app/error.tsx`, which catches uncaught errors in the route tree.
+`global-error.tsx` is the only boundary that catches a failure in the **root layout itself** — when
+that throws, `error.tsx` cannot render, because it lives inside the tree that just failed, and Next
+falls back to `DefaultGlobalError`: the unstyled "This page couldn't load" screen #200 set out to
+stop showing users.
+
+**Why it was not folded into #200.** It is genuinely different work, not a second copy of
+`error.tsx`: it renders its own `<html>`/`<body>` (it *replaces* the root layout), so it cannot use
+the app's providers — no `next-themes`, no fonts loaded the usual way — and putting Serenify's voice
+and the Mist & Meadow palette on a page with none of the app's styling infrastructure needs its own
+decisions. Inside a fix PR that would have meant either a bare page no better than Next's, or a lot
+of duplicated scaffolding.
+
+**Fix scope**: small-to-medium, one self-contained file. Copy can reuse `app/error.tsx`'s, already
+approved.
+
+**Address by**: no deadline. **Low priority** — the trigger is a root-layout failure, which is rare,
+and the consequence is the pre-#200 status quo rather than anything worse.
+
+### Onboarding flow gate no longer applies to POSTs after the proxy method guard — accepted deliberately (#205)
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN, knowingly accepted.** GitHub issue **#205 OPEN.**
+**Category**: consequence of #200 PR A (`proxy.ts` method guard)
+**Observed**: not observed — identified while reviewing the C1 diff, before merge
+
+**Description**: the method guard makes the route gate apply to **GET/HEAD only**. Steps 2 and 3 (the
+auth redirects) lose nothing, because every Server Action on a protected path already runs its own
+`getUser()`. **Steps 4 and 5 — the onboarding gate — are different**: they are a *flow* gate, and a
+user whose `profiles.full_name IS NULL` can now invoke `grantConsent` or the chat actions **by action
+id** without having completed onboarding.
+
+**Why it is accepted rather than fixed, and this is the load-bearing part**: it is **not an
+authorization gate and exposes nothing**. Every reachable action self-guards on *identity* —
+`components/consent/actions.ts:66-71` resolves `user_id` from `getUser()` and never takes it as a
+parameter; `app/(authed)/app/chat/actions.ts:14-24` returns `UNAUTH` without a session and forwards
+the user's own access token so **RLS scopes every row as that user**. And **the GET is still gated,
+so no UI can fire it** — `/app` and `/app/chat` still bounce to `/onboarding`, the pages never
+render, and no button exists to press. Exercising this needs a hand-crafted POST carrying a valid
+session and a known action id. The worst outcome is a user writing their own consent row or their own
+message slightly earlier in the flow than intended, inside their own RLS scope.
+
+**It cannot simply be put back.** Restoring the gate for POSTs means re-introducing the exact
+redirect-on-POST that caused #200. A fix has to be a different mechanism — an in-action
+`full_name IS NULL` check returning the `UNAUTH` shape those actions already return.
+
+**Adjacent to #195** (the Terms/Privacy gate absent from `(onboarding)/layout.tsx`) — the same
+gate-coverage question around the onboarding surface, with likely the same answer: check in the
+action, not with another proxy redirect. If either is picked up, look at both.
+
+**Fix scope**: small. **Address by**: no deadline; filed so the consequence cannot later read as an
+oversight.
