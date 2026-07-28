@@ -5776,3 +5776,78 @@ a requirement whose wording is narrower or looser than what shipped is corrected
 log**, not by amending the spec mid-build. FR-046 identifies the right person; it spells the name
 one way and the shipped documents spell it the other, and this entry is the record of which one is
 authoritative.
+
+## 2026-07-28 (fourth pass) — Sign-out revokes **only the current session**, not every device: `scope: "local"` replaces supabase-js's `"global"` default
+
+Recorded as a **security-posture decision**, not a typo fix. It changes who gets logged out by a
+sign-out, which is session-invalidation behaviour and is exactly the kind of change that should not
+appear in a diff without a written reason.
+
+### What changed
+
+Both sign-out call sites now pass `{ scope: "local" }`:
+
+- `app/(authed)/actions.ts` — the Server Action behind all five sign-out controls
+- `components/cross-tab-auth.tsx` — the sibling-tab handler that clears cookies before navigating
+
+Previously both called `supabase.auth.signOut()` with no argument. From the installed
+`@supabase/auth-js` 2.106.2 (`dist/main/GoTrueClient.js:3176`):
+
+```js
+async signOut(options = { scope: 'global' }) {
+```
+
+The scope is a **server-side GoTrue parameter**, not a client-side filter — `GoTrueAdminApi.js:73`
+issues `POST ${url}/logout?scope=${scope}`. `global` revokes the refresh token for **every session
+the user holds, on every device**. The library's own docstring, twenty lines above the default, says
+the opposite is usually wanted: *"`{ scope: 'local' }` to only sign out the current session. This is
+usually what apps want on a 'Sign out' button, especially when users sign in from multiple devices
+and do not expect signing out of one to terminate the others."*
+
+Serenify had the behaviour the docstring warns about. Signing out on a laptop ended the session on
+the user's phone. For a wellbeing app that people are expected to keep signed in on a personal
+device, that is a real surprise, and nobody chose it — it was the default arriving unexamined.
+
+### What this does **not** fix, stated because it is the easy misreading
+
+**It does not narrow the cross-tab race** that caused #200, and it must not be described as doing so.
+
+Two tabs in one browser share one cookie jar, therefore one refresh token, therefore **one session**.
+A `local` revoke from a sibling tab ends *precisely the session the originating tab is using* — the
+same outcome `global` produced for that tab. The only difference is blast radius **across devices**.
+
+The race was survivable only after the transport fix in `proxy.ts` (#200 C1). Anyone reading this
+entry as "we fixed the race by narrowing the scope" would draw the wrong conclusion about why the
+sign-out failure stopped.
+
+### The sibling tab still calls `signOut` at all — deliberately
+
+Considered removing it, since the originating tab's action now clears the cookies authoritatively
+and both tabs share the jar. Rejected: `proxy.ts`'s `user && isAuthPage → /app` rule is a **GET**
+gate after C1, and `router.push` **is** a GET. A sibling that navigates to `/login` while the cookies
+are still valid is bounced straight back to `/app`. The call is what guarantees the cookies are gone
+before the navigation, which is the race-condition guard the original comment describes.
+
+### Forced cookie clearing, and why it lives in app code
+
+The revoke result was previously discarded. supabase-js clears the local session **only** when the
+logout request succeeds or fails with 401/403/404 (`GoTrueClient.js:3186-3200`); on anything else —
+a network timeout surfaces as `AuthRetryableFetchError`, which is not an `AuthApiError` — `_signOut`
+returns early **without** clearing, and `_removeSession` is private. **There is no public API to
+force it.**
+
+So the action clears the cookies itself, matching on the `sb-` prefix (the base cookie is
+`sb-<project-ref>-auth-token`; an oversized session splits across `<name>.0`, `<name>.1`, …), and
+redirects either way. This is the fix for the reported *"sometimes a manual refresh doesn't land on
+the login screen"*: before it, a failed revoke left the user on `/login` holding valid cookies, and
+the proxy bounced them back to `/app`.
+
+The alternative — reaching into `_removeSession` — was rejected. A private underscore method is not
+a contract, and a supabase-js patch release could remove it silently.
+
+### Consequence to be aware of
+
+A user who wants to end **all** their sessions no longer has a control that does it. That capability
+was never offered deliberately — it was a side effect of the default — and no UI ever described it,
+so nothing shipped is now inaccurate. If "sign out everywhere" is wanted, it should be built as its
+own explicit control with its own copy, not restored by widening this scope.
