@@ -212,7 +212,7 @@ deploying code rather than trusting this document's snapshot of hosted state.**
 | **A2** | `handle_new_user()` on hosted has **drifted** from `20260517000030_profile_trigger.sql` | **STOP and report.** Do **not** reconcile it yourself — `CREATE OR REPLACE` would silently overwrite whatever the drift was. |
 | **A3** | More than one migration is pending, or `db push` wants to apply anything else | **STOP.** Nothing rides along. |
 | **A4** | **Live signups begin failing at any point after the migration is applied** | **IMMEDIATE ROLLBACK** (§7). Not a thing to debug while real people cannot create accounts. |
-| **A5** | A **sustained stream** of `[consent-gate] FAIL-OPEN` after the code deploy | **IMMEDIATE ROLLBACK** (§7) — or Lever 1 if the app is otherwise healthy. One occurrence is noise; a steady stream is an outage with the legal gate silently off. |
+| **A5** | **Returning users reaching the app without writing a consent row** — §6.4 query (c) growing while (a) grows. (The original signal, a sustained stream of `[consent-gate] FAIL-OPEN` in the logs, is **not usable on this project**: never proven readable, and unwatchable on Hobby — §6.4.) | **IMMEDIATE ROLLBACK** (§7) — or Lever 1 if the app is otherwise healthy. One row is noise; a growing gap is an outage with the legal gate silently off. **Lagging, not real-time** — zero sign-ins means no information, not good news. |
 | **A6** | The T138 throwaway signup misbehaves **in any way** | **ABORT the deploy.** Do not proceed, do not merge. |
 
 ---
@@ -516,9 +516,71 @@ SELECT count(*) FROM auth.users u
 
 **Expect**: `0`. Anything else means the trigger is failing → **A4**.
 
-**4. After the code deploy — `[consent-gate] FAIL-OPEN`** in Vercel function logs. One
-occurrence is noise. **A sustained stream is an outage with the legal gate silently off** →
-**A5**.
+**4. After the code deploy — is the gate actually gating? (A5)**
+
+**This replaced a log-based check, because the log-based check is not usable here.** The
+original instruction was to watch Vercel function logs for `[consent-gate] FAIL-OPEN`. Two
+things are wrong with that on this project:
+
+- **It was never proven readable.** The Stage 3 "positive control" that concluded the channel
+  was dead never emitted a line — `app/(auth)/login/actions.ts` returns at the
+  invalid-credentials branch (`:33`) *before* its `console.error` (`:39`). See
+  `deploy-log-stage3-2026-07-28.md` §8 and the correction in `deploy-log-stage3b-2026-07-28.md`
+  §5.
+- **Even readable, it is not watchable.** The Vercel account is **Hobby**: Log Drains are Pro+
+  and retention is short, so "a sustained stream" is something a person would have to *happen
+  to be looking at*. There is no alerting to hang A5 on.
+
+**So use the detector the feature already gives us.** If the gate works, the 20 existing users
+write a consent row as they return. If it is failing open, they reach the app and write
+nothing. The rows are the evidence, and they are in a database we can query on any plan.
+
+```sql
+-- (a) the population: who has come back since the deploy
+SELECT count(*) AS signed_in_since_deploy
+  FROM auth.users
+ WHERE last_sign_in_at > '<deploy timestamp>'::timestamptz;
+
+-- (b) how many of those now hold the CURRENT terms_privacy consent
+SELECT count(DISTINCT u.id) AS consented_since_deploy
+  FROM auth.users u
+  JOIN public.user_consents c ON c.user_id = u.id
+ WHERE u.last_sign_in_at > '<deploy timestamp>'::timestamptz
+   AND c.consent_key      = 'terms_privacy'
+   AND c.document_version = 'terms_privacy@2026-07-26.1';
+
+-- (c) THE ALARM: signed in since the deploy, still no consent row
+SELECT u.id, u.email, u.last_sign_in_at
+  FROM auth.users u
+ WHERE u.last_sign_in_at > '<deploy timestamp>'::timestamptz
+   AND NOT EXISTS (
+         SELECT 1 FROM public.user_consents c
+          WHERE c.user_id          = u.id
+            AND c.consent_key      = 'terms_privacy'
+            AND c.document_version = 'terms_privacy@2026-07-26.1')
+ ORDER BY u.last_sign_in_at DESC;
+```
+
+**Reading it**: (b) should climb toward (a) as people return. **(c) growing while (a) grows —
+users reaching the app and writing nothing — is A5.** Record all three at the start, middle and
+end of the window, per the rule at the top of this section.
+
+**⚠ Its limits, stated honestly — this is a LAGGING indicator, not a real-time one:**
+
+- **It reports only after someone signs in.** With 20 users returning over hours or days, a
+  gate that is failing open can stay undetected for hours simply because nobody has come back
+  yet. **Zero sign-ins means zero information**, not good news.
+- **No single row is conclusive.** A user sitting on the re-consent screen without clicking
+  *Agree and continue*, or who signed out from it, appears in (c) identically to one who slipped
+  past a broken gate. **The signal is the aggregate trend, not any individual row** — which is
+  the same shape as the original "one occurrence is noise, a stream is an outage" rule.
+- **It cannot distinguish fail-open from a quiet product.** Cross-check against (a).
+- **The version literal is hard-coded.** When a new revision is published, `document_version`
+  here must be updated to match `apps/web/lib/consent/registry.ts` or (b) silently reads zero
+  and (c) silently reads everyone.
+
+A real-time detector needs `failOpen()` to record its own occurrences somewhere queryable.
+That is deliberately **deferred to after 013 merges** — see BACKLOG/#192 for the reasoning.
 
 ---
 

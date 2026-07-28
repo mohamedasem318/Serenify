@@ -2497,3 +2497,166 @@ the race; the manual `classList.toggle` cannot be made reliable while the provid
 
 **Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
 than a missed regression, and it never passes when it should fail.
+
+## From feature 013 P8 Stage 3 review — captured 2026-07-28
+
+### Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)
+**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **OPEN.** GitHub issue **#189 OPEN.**
+**Category**: constitution Principle V (Amendment 17) / FR-029 / ops
+**Observed**: 2026-07-28, reading the Supabase dashboard for `excukdzjudslbqmkysrc` directly.
+
+**Description**: the **hosted** transactional email templates render `serenify` in **one colour**.
+The two-colour wordmark Amendment 17 requires is **not in production**. Both *Confirm sign up* and
+*Reset password* declare `.wordmark` alone in their `@media (prefers-color-scheme: dark)` block —
+hosted line 16 is `.wordmark`, line 17 is `.headline`, where the repo file carries three rules
+across 16–18 — and the dashboard's own Preview pane renders the mark as a single uniform grey in
+both. Hosted is the repo template **at its pre-T007 revision**.
+
+Everything else compared matches the repo: `<title>`, headline, body copy, CTA label, the OTP line,
+the dark-block colour values. One unrelated divergence: the *Confirm sign up* **subject** was
+`Confirm your Serenify account` on hosted against `Confirm your Serenify email` in
+`supabase/config.toml`; recovery's subject matches.
+
+**Ruled 2026-07-28 (Mohamed): the repo version wins — `Confirm your Serenify email`.** The point of
+this entry is making production match the repo; opening a new divergence while closing one would
+defeat it.
+
+**Root cause — two layers.** `supabase/config.toml` wires both templates via `content_path`, but
+that is **local-dev config**. Nothing in the repo and nothing in CI ever transmits
+`supabase/templates/*.html` to a hosted project: no workflow references Supabase at all, and there
+is no `supabase config push` anywhere. Hosted templates are dashboard-only.
+
+Beneath that, `apps/web/tests/unit/brand/wordmark-sync.test.ts` — the mechanism Principle V relies
+on to stop exactly this drift — reads `supabase/templates/*.html` **off disk**. It can only ever
+prove the repo agrees with itself. The hand-sync exception has been unenforced on the one side that
+reaches users, which is why this survived T007 and every run since.
+
+**Fix scope**: two separable pieces. (1) **Content** — paste the current repo templates into the
+dashboard; operator action, cheap, and the urgent half. (2) **Mechanism** — the gap is permanent and
+re-opens silently the next time the wordmark changes; candidates, in rising cost, are a documented
+release-checklist step, a `supabase config push` in the deploy runbook, or a check that pulls the
+hosted template through the Management API and diffs it against the repo file.
+
+**Progress 2026-07-28**: **both template BODIES pasted and saved by Mohamed, and verified live** — the
+dashboard Source now carries `.wordmark-seren` / `.wordmark-ify` in the dark block on both templates,
+and both Preview panes render `seren` in ink and `ify` in meadow. The FR-029 content breach is
+**closed**. **Still outstanding**: the *Confirm sign up* **subject** is still `Confirm your Serenify
+account` and must be set to `Confirm your Serenify email` per the ruling above — the subject is a
+separate dashboard field, so pasting the body did not touch it.
+
+**Address by**: (1) subject field, before Stage 4 ships anything that sends mail. (2) the mechanism
+gap — the same pass that does #190, so the email surfaces are touched once.
+
+### The OTP verification tick vanishes immediately — it should linger (#190)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#190 OPEN.**
+**Category**: auth surfaces / motion
+**Observed**: 2026-07-28, entering the emailed code on the preview's own form
+(`deploy-log-stage3-2026-07-28.md` §3).
+
+**Description**: on a correct 6-digit code the form shows "✓ Verified" and moves on essentially at
+once. The tick is gone before it registers as an acknowledgement — and the moment it marks, the
+user learning the code they typed was right, is precisely the one that should read as reassurance.
+
+**Fix scope**: motion only — a hold before the transition, honouring `prefers-reduced-motion`. No
+copy change implied.
+
+**Address by**: the design pass over the transactional email and OTP surfaces after
+`013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
+#189 so those surfaces are opened once rather than twice.
+
+### ~~Landing chapter-marker dots are 24×24 px tap targets, not 44×44~~ — WITHDRAWN, not a defect (#191)
+**Status**: **WITHDRAWN 2026-07-28 — not a defect.** GitHub issue **#191 CLOSED as superseded.**
+**Category**: feature 013 P6 landing page / FR-053
+**Observed**: 2026-07-28, on the driven P8 responsive walk for PR #188. **Ruling: Mohamed, same day.**
+
+**The measurement was right and the conclusion was wrong.** The markers really are 24×24 at every
+width — but that is **deliberate and compliant**, not a miss. FR-053 was amended on 2026-07-28 with a
+**spent 24×24 px exception scoped to `components/landing/chapter-markers.tsx` only**
+(`spec.md` FR-053; `docs/DECISIONS.md`, "FR-053 gains a spent 24×24 exception for the chapter
+markers"). 24×24 satisfies **WCAG 2.5.8 (AA)**, the markers are a convenience rather than a path,
+and they keep their focus ring — all recorded in the amendment.
+
+**What was actually stale was T096**, which still demanded "≥44×44 px on touch viewports" while marked
+`[X]`. That text has been corrected in place to cite the amendment, so the contradiction is gone
+rather than left for someone to "fix" by growing the targets and undoing a deliberate decision.
+
+**Lesson worth keeping**: the walk checked `tasks.md` and the constitution but not FR-053's own text in
+`spec.md`, where the amendment lives. A tap-target finding must be read against the amended FR, not
+against the task that predates it.
+
+<details><summary>Original report, retained for the record</summary>
+
+**Description**: the six chapter-marker buttons at
+`apps/web/components/landing/chapter-markers.tsx:65` set their hit area with an unconditional
+`size-6` — **24×24 px**. No `@media (pointer: coarse)` rule exists anywhere in
+`apps/web/app/globals.css`, so 24 px is what every viewport gets, phone included.
+
+Measured at 320 / 375 / 414 / 768 / 1280 px in both themes: all six report a 24 px box at every
+width, in both themes. They are the **only** sub-44 px controls on any public route — `/terms`,
+`/privacy` and the re-consent screen all report zero.
+
+**Why it is more than a nicety**: T096's acceptance conditions require "each is **≥44×44 px on
+touch viewports**" (`specs/013-public-surface-and-legal/tasks.md:693`), FR-053 sets the same bar,
+and **T096 is marked `[X]`**. This is a checked-off condition that was not met, not an unlogged
+nice-to-have.
+
+The instinct in the code was right — the comment above the line reads "The hit area is the button;
+the dot is only what you see" — `size-6` just does not carry it far enough, growing the target from
+the 1.5 px dot to 24 px and stopping short of 44.
+
+The six sit contiguously in a `flex items-center justify-center` with no gap, so at 24 px they do
+clear WCAG 2.5.8's 24 px AA floor. The project's own bar is the stricter one.
+
+**Fix scope**: small. `size-6` → `size-11` on the button, dot stays `size-1.5` — the dot is already
+a separate `<span>`, so nothing visual changes, only the invisible hit area. Re-check the row width
+at 320 px afterwards (6 × 44 = 264 px, inside the 288 px content column) and that the focus ring
+still reads at the larger size.
+
+**Address by**: any landing-page pass after 013 merges. Not a deploy blocker — the markers are a
+convenience and the story advances on its own — but it should not stay closed against a task that
+claims it.
+
+</details>
+
+### `failOpen()` is unobservable on Hobby — A5 has no real-time detector (#192)
+**Status**: tech debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN, DEFERRED BY DECISION.**
+GitHub issue **#192 OPEN.**
+**Category**: feature 013 consent gate / deploy observability
+**Observed**: 2026-07-28, during P8 Stage 3b.
+
+**Description**: `failOpen()` (`apps/web/app/(authed)/layout.tsx:62`) records a fail-open — the
+Terms/Privacy gate silently disabling itself for a request — with `console.error` alone, and
+abort condition **A5** is defined as "a sustained stream" of that line. **On this project that is
+not observable**: the Vercel account is **Hobby**, where Log Drains are Pro+ and retention is
+short, so a sustained stream is something someone would have to happen to be watching. There is
+nothing to alert on.
+
+Distinct from the *method* bug corrected in `deploy-log-stage3b-2026-07-28.md` §5 (the earlier
+positive control returned before the line it was testing). This entry is about the **plan**, which
+is unobservable even with perfectly readable logs.
+
+**Deferred deliberately — ruled by Mohamed, 2026-07-28.** `failOpen()` lives in the file **P5
+shipped alone, specifically to keep `git revert` clean**: Lever 2 of the deploy protocol is a
+`git revert` of the gate commit, and that lever's value depends on the commit staying surgical.
+Reopening that file days before production — for a failure mode that **requires a schema change to
+occur at all** (wrong RLS policy after a migration, dropped grant, renamed column) — trades a real
+and immediate risk for a hypothetical one. Not because it isn't real; because the cure is riskier
+than the disease this week.
+
+**What covers it in the meantime**: `deploy-protocol.md` §6.4 now carries a **lagging** detector
+needing no code change and working on any plan — if the gate works the 20 returning users write
+consent rows, and if it is failing open they reach the app and write nothing. Query (c), signed in
+since the deploy with no consent row, growing while (a) grows, is the alarm. Its limits are
+documented there and are real: it reports only after someone signs in, no single row is conclusive
+(a user sitting on the screen looks identical to one who slipped past), and **zero sign-ins means
+zero information, not good news**.
+
+**Fix scope**: have `failOpen()` also record its own occurrence somewhere queryable — a small
+append-only table or a counter — so "sustained stream" becomes a SQL query that survives retention
+and needs no plan upgrade. **Caveat to design around**: it fires *because* a consent read failed,
+so a total database outage blocks that write too; it is not a universal net. But the three modes the
+docstring names are all specific to the `user_consents` SELECT under RLS, and a separate INSERT
+survives all three — which is the point. Worth pairing with whatever replaces the `console.error`,
+so the file is opened once.
+
+**Address by**: after `013-public-surface-and-legal` merges, as its own change.

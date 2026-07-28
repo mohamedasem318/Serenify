@@ -219,3 +219,75 @@ describe("accessibility floor (FR-053)", () => {
     }
   });
 });
+
+describe("vertical rhythm", () => {
+  /**
+   * Regression. This screen shipped with the wordmark sitting directly on the heading —
+   * `space-y-5` against a `leading-none` mark, which collapses the glyph box to exactly
+   * the font size and gives none of that gap back — and with a two-line title set at
+   * `leading-tight`. It is the whole experience of a blocked user and the first thing
+   * every existing account sees when a revision lands, so the spacing is load-bearing.
+   *
+   * Asserted as an ORDERING rather than as three literal values: the invariant is that
+   * the header's internal steps stay smaller than the gap separating it from the card
+   * below, so the wordmark reads as the mark above the heading and not as its sibling.
+   * A future tuning pass can move all three and still pass; only flattening fails.
+   *
+   * Class-level, for the reason the focus-ring case above gives — happy-dom does not run
+   * the Tailwind build, so the class list is the honest thing to read.
+   */
+  function step(element: Element | null | undefined, utility: "gap" | "space-y"): number {
+    const found = element?.className.match(new RegExp(`\\b${utility}-(\\d+)\\b`))?.[1];
+    if (found === undefined) {
+      throw new Error(`no ${utility}-* on ${element?.tagName ?? "a missing element"}`);
+    }
+    return Number(found);
+  }
+
+  it("opens up each step outward: lede < wordmark < the card below", () => {
+    renderScreen();
+
+    const main = document.querySelector("main");
+    const header = main?.querySelector("header");
+    const headingBlock = header?.querySelector("div");
+
+    const headingToLede = step(headingBlock, "space-y");
+    const wordmarkToHeading = step(header, "space-y");
+    const headerToCard = step(main, "gap");
+
+    expect(headingToLede).toBeLessThan(wordmarkToHeading);
+    expect(wordmarkToHeading).toBeLessThan(headerToCard);
+  });
+
+  it("blockifies the wordmark, or the header's spacing silently does nothing", () => {
+    /**
+     * The regression that actually shipped, and the one the ordering case above cannot
+     * see. `Wordmark` renders an INLINE `<span>`, and Tailwind v4's `space-y-*` works by
+     * putting a vertical margin on the child — but **vertical margins do not apply to
+     * inline boxes**, so the margin was discarded and the gap was whatever the line box
+     * happened to give. Measured at 375 px, the heading's box sat 0.5 px *above* the
+     * wordmark's; they overlapped. The class list said `space-y-5` the whole time.
+     *
+     * So the spacing utilities are necessary and not sufficient: this asserts the one
+     * property that makes them take effect at all.
+     */
+    renderScreen();
+    const wordmark = document.querySelector("main > header > span");
+
+    expect(wordmark, "the wordmark must be a direct child of the header").not.toBeNull();
+    expect(wordmark?.className).toMatch(/\bblock\b/);
+    // `leading-none` collapses the line box to the font size while the glyphs need more,
+    // so the descender hangs outside the box the margin is measured from.
+    expect(wordmark?.className).not.toMatch(/\bleading-none\b/);
+  });
+
+  it("sets the title at a multi-line leading, not the single-line one", () => {
+    // The title wraps to two lines at every supported width and three at 320 px.
+    // `leading-tight` (1.25) is the house idiom for headings that do not wrap.
+    renderScreen();
+    const title = screen.getByRole("heading", { level: 1 });
+
+    expect(title.className).toMatch(/\bleading-snug\b/);
+    expect(title.className).not.toMatch(/\bleading-tight\b/);
+  });
+});

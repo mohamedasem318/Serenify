@@ -1,7 +1,8 @@
 import Link from "next/link";
 
 import { Wordmark } from "@/components/brand/wordmark";
-import { PUBLIC_AUTH_ACTIONS, PUBLIC_DESTINATIONS } from "@/components/public/destinations";
+import { PUBLIC_AUTH_ACTIONS } from "@/components/public/destinations";
+import { PublicDesktopNav } from "@/components/public/public-desktop-nav";
 import { PublicMobileNav } from "@/components/public/public-mobile-nav";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/app/theme-toggle";
@@ -77,20 +78,10 @@ export function PublicNavbar() {
         </Link>
       </div>
 
-      <nav aria-label="Public pages" className="hidden md:flex">
-        <ul className="flex items-center gap-1">
-          {PUBLIC_DESTINATIONS.map(({ href, label }) => (
-            <li key={href}>
-              <Link
-                href={href}
-                className="inline-flex h-11 items-center whitespace-nowrap rounded-control px-3 text-sm text-muted transition-colors hover:bg-surface hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                {label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {/* The destination row marks the current page, which needs `usePathname` — so it is
+          its own client component, exactly as the app header keeps `CenterNav` separate
+          from the otherwise-server `Header`. */}
+      <PublicDesktopNav />
 
       {/*
        * ORDER IS SIGN IN · SIGN UP · THEME TOGGLE, with the toggle in the far-right corner.
@@ -100,17 +91,27 @@ export function PublicNavbar() {
        */}
       <div className="flex items-center gap-1 sm:gap-2">
         {/*
-         * Sign in hides below 420 px and Sign up does not — the mock's own rule, and the
-         * right one: at 320 px the bar is already carrying a hamburger, a wordmark and a
-         * theme toggle, and two buttons would push the row past the viewport. The one that
-         * survives is the one for people who do not have an account yet, because the other
-         * is one tap away in the sheet, which is where BOTH also live (FR-019). `h-11`
-         * keeps each at a 44 px tap target and neither label wraps (FR-053).
+         * ONE OF THE TWO HIDES BELOW 420 px, AND IT IS SIGN UP. At 320 px the bar already
+         * carries a hamburger, a wordmark and a theme toggle; a second button pushes the
+         * row past the viewport. `h-11` keeps each at a 44 px tap target and neither label
+         * wraps (FR-053). Both live in the sheet at every width regardless (FR-019).
+         *
+         * P3 kept Sign up and dropped Sign in, following the mock. That was the wrong one
+         * to keep. The landing hero's primary CTA IS the signup path, so at narrow widths
+         * a navbar Sign up is the second signup control on the screen while a returning
+         * visitor — who has no hero CTA of their own — is left with none. Keeping Sign in
+         * gives each visitor exactly one door: the hero for people without an account, the
+         * bar for people with one.
+         *
+         * Sign in stays `outline` rather than promoting itself to the filled variant now
+         * that it is the sole survivor. On a phone the hero's "Get started" should be the
+         * only filled control above the fold; two competing fills is what the narrow width
+         * was protecting against in the first place.
          */}
-        <Button asChild variant="outline" size="default" className="hidden h-11 px-4 min-[420px]:inline-flex">
+        <Button asChild variant="outline" size="default" className="h-11 px-4">
           <Link href={PUBLIC_AUTH_ACTIONS.signIn.href}>{PUBLIC_AUTH_ACTIONS.signIn.label}</Link>
         </Button>
-        <Button asChild variant="default" size="default" className="h-11 px-4">
+        <Button asChild variant="default" size="default" className="hidden h-11 px-4 min-[420px]:inline-flex">
           <Link href={PUBLIC_AUTH_ACTIONS.signUp.href}>{PUBLIC_AUTH_ACTIONS.signUp.label}</Link>
         </Button>
         <ThemeToggle />
