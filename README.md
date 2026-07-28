@@ -44,11 +44,13 @@ A working demo, honestly incomplete.
 
 **End to end today** (employee experience): auth & onboarding, per-user calibration, live monitoring, confirmatory questionnaire, companion chat, personal dashboard.
 
+**Public and legal surface** — a landing page at [serenify.tech](https://serenify.tech), a [Terms of Service](https://serenify.tech/terms) and a [Privacy Policy](https://serenify.tech/privacy), and two consent gates: one for the Terms and Privacy Policy, which blocks the whole application until it is acknowledged, and one for camera capture and inference. Consent is recorded as a history — one append-only row per accepted revision — so a materially revised document re-asks everyone who only ever agreed to the older wording. Both documents are **an informed draft, not reviewed by a lawyer**, and say so at the top.
+
 **Not yet built:**
 - Manager & admin dashboards — `team_lead` and `admin` roles render a "coming soon" screen.
 - Notification and privacy-transparency settings — placeholder panels.
 - Audio and physiological modalities, and multi-modal fusion — roadmap only; the shipped model is video-only despite the multi-modal design.
-- Signup is open (no invite gate), and there's no formal Terms or Privacy Policy yet.
+- Signup is open, with no invite gate. That is a deliberate posture for the demo window rather than an oversight, and it is why the Terms and Privacy Policy acknowledgement is enforced in the application rather than assumed at the door.
 
 It's a thesis demo, not a production service — please treat it as one.
 

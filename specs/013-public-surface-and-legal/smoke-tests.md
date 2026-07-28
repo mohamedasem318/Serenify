@@ -1,9 +1,17 @@
 # Smoke Tests: Public Surface and Legal (Feature 013)
 
-**Status: 16 of 17 checks recorded (2026-07-28). ST-9 is FAILED and KNOWINGLY ACCEPTED
-(#184) — read that as failed, because it is. ONE check remains: ST-8, which cannot run
-before the merge and is scheduled for production verification immediately after it.**
-Authored by T131. **T132 does not close until ST-8 is recorded.**
+**Status: COMPLETE — all 17 checks recorded (2026-07-28). ST-9 is FAILED and KNOWINGLY
+ACCEPTED (#184) — read that as failed, because it is. Every other check passes.**
+Authored by T131; **T132 closed 2026-07-28** once ST-8 was run on production after the
+merge.
+
+> **P8's sign-off does NOT mean ST-9 passed.** It failed, it is recorded as failed, and it
+> shipped that way deliberately: the no-JavaScript signup refusal is **silent**. It fails
+> **closed** — no account, no consent row — so the harm is confusion, not data. Anyone
+> reading this file as "013 passed its smoke tests" must read this sentence with it.
+>
+> **Nor does it mean three browsers passed.** Sign-off covers **Chromium and Firefox only**;
+> WebKit has no automated coverage (**#177**).
 
 **Read the Observations fields for their kind, not just their verdict.** Three sorts of
 evidence appear in this file and they are not interchangeable:
@@ -207,16 +215,34 @@ Scroll the hero out of view and back: the story pauses and resumes, and does **n
 
 Root route on a real deployment: a signed-in visitor at `/` reaches the app without re-authenticating; a **real** Supabase email link landing on `/` with `?code=` completes the sign-in.
 
-- **Result**: NOT RUN — **scheduled for production verification, immediately after the merge**
-- **Date**: —
-- **Observations**: Not run **yet**, and deliberately so. The check requires a **real deployment**
-  and a **real Supabase email link** landing on `/` with `?code=`. Neither exists on localhost.
+- **Result**: **PASS** — run on **production** (`serenify.tech`, deployment `124192a`), 2026-07-28,
+  after the merge. Both halves.
+- **Date**: 2026-07-28
+- **Observations**: Run by the agent driving a real browser against **production**, with Mohamed
+  performing the signup and clicking the emailed link (an agent may not create accounts or enter
+  passwords).
 
-  **It cannot run before the merge**, because production deploys from `main` and the landing page
-  at `/` does not exist on `serenify.tech` until 013 lands (`deploy-protocol.md` §3). The
-  throwaway signup in production verification sends a real confirmation email and therefore
-  exercises exactly this path — the signed-in-visitor half and the `?code=` half both. **This is
-  the last check outstanding, and T132 does not close until it is recorded here with its result.**
+  **Half 1 — a signed-in visitor at `/` reaches the app without re-authenticating.** Navigated to
+  `https://serenify.tech/` while signed in as the throwaway; landed on `/app`, still
+  authenticated, no login prompt. Observed **twice**, once for each account exercised.
+
+  **Half 2 — a real Supabase email link landing on `/` with `?code=` completes the sign-in.** A
+  genuine confirmation email for `mohamedasem318+p8prod@gmail.com` was clicked, and the account
+  went from unconfirmed to **signed in at `/app`**. The sign-in was completed *by the email link* —
+  that is the substance of the check, and it happened.
+
+  **Stated honestly: the intermediate `/?code=<real>` URL was NOT captured** — the screenshot was
+  taken after the redirect had settled. So the routing was proven **separately**, with a
+  deliberately invalid code: navigating to `https://serenify.tech/?code=p8-invalid-probe` produced
+  a URL of `/app`, i.e. the `?code=` was **consumed and forwarded rather than ignored** (the
+  landing page did not render), and the pre-existing session **survived the failed exchange**.
+  Together — a real link that completed a real sign-in, plus a probe showing `?code=` is routed —
+  the check holds; a single screenshot of the transient URL would have added nothing either proved.
+
+  **Also demonstrated in the same pass** (recorded here because this is where it was seen): the
+  throwaway reached `/app` **without meeting the re-consent screen**, which is the signup-writes-a-
+  consent-row path confirmed at the UI level, and the confirmation email's subject read
+  **`Confirm your Serenify email`** — closing the outstanding half of **#189**.
 
 ---
 

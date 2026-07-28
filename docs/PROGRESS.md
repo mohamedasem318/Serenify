@@ -7,8 +7,9 @@ Per-feature implementation log. Append-only, newest first.
 ## Feature 013 — Public Surface and Legal (merged to main)
 
 **Branch**: `013-public-surface-and-legal`
-**Status**: **merged to `main`** via **PR #194** (squash-merged; `main` enforces linear history).
-All 148 tasks (T001–T148) complete. The public front door and the legal surface behind it: the
+**Status**: **merged to `main`** via **PR #194** (squash-merged 2026-07-28T12:56:13Z → `124192a`;
+`main` enforces linear history), and **verified live in production** — evidence in
+`deploy-log-production-2026-07-28.md`, record PR **#199**. All 148 tasks (T001–T148) complete. The public front door and the legal surface behind it: the
 landing page at `/`, `/terms`, `/privacy`, a public navbar + footer, and **two consent gates** —
 Terms/Privacy and camera-and-inference — neither of which is one-time. Consent is a **history**
 (`20260726000000_user_consents.sql`): one append-only row per accepted revision, never overwritten,
@@ -62,7 +63,54 @@ marker), **#193** (the TTFB follow-up logged, not built).
   own account, RLS-scoped. Recorded as a decision so it cannot later be read as an oversight.
 - **#176 updated, not closed** — the 18 `next` alerts clear on this merge; `postcss` × 2 and
   `sharp` × 1 remain and this bump does not touch them.
-- Also open: **#86, #155, #174, #178, #179, #185, #187, #189, #190, #192, #193**.
+- Also open: **#86, #155, #174, #178, #179, #185, #187, #190, #192, #193**.
+- **#189** — the hosted email templates. **Both content halves are now closed**: the template
+  bodies were pasted and verified live, and the *Confirm sign up* **subject** was verified on a
+  **delivered** production email as `Confirm your Serenify email`. It stays open for the
+  **mechanism** half — nothing in the repo or CI transmits `supabase/templates/*.html` to a hosted
+  project, and `wordmark-sync.test.ts` reads them off disk, so it can only prove the repo agrees
+  with itself.
+
+### Opened during P8's close-out and production verification
+
+- **#193** — landing `/` stays `force-dynamic`; move *only* the signed-in redirect into `proxy.ts`
+  **if** measured production TTFB disagrees. Logged, not built.
+- **#195** — the Terms/Privacy gate does **not** cover `(onboarding)`. **Knowingly accepted**, with
+  the population **measured at zero**. Held on the **T049** precedent, since gating that layout
+  broadly once produced a permanent lockout for every new employee.
+- **#196** — T146 review follow-ups, led by six landing lists missing `role="list"` (WCAG 1.3.1).
+  Logged rather than patched because `role="list"` appears nowhere in `apps/web` — an app-wide
+  pass, not a 013 regression.
+- **#197** — `anchor-egress.spec.ts` fails on firefox against Next's **dev-only**
+  `__nextjs_original-stack-frames`. **Proven pre-existing** by re-running the identical spec against
+  `cbb7f81` with identical `node_modules`, where it fails *worse* (two such POSTs, not one).
+- **#198** — the signed-in dashboard says **"Start check-in"** while the Terms this feature shipped
+  distinguish a **monitoring session** from a **weekly work-environment check-in**. 39 bare uses,
+  pre-existing (feature 008), but 013 is what makes it a visible contradiction.
+
+### Verified in production — the evidence, not a claim
+
+**`specs/013-public-surface-and-legal/deploy-log-production-2026-07-28.md`** records the whole pass.
+Production deployment `dpl_AiMeacUNLYknQwkNvQ1yoS9MDWFR` (`124192a`), verified immediately after the
+merge with **Lever 0 armed**.
+
+Demonstrated: all five approved §10.3 strings verbatim and all three forbidden mock lines absent on
+the live site; **30/30** responsive combinations with zero horizontal overflow; the gate blocking
+**in place** on four authed routes with the URL unchanged, rendering **exactly four interactive
+elements** on a deep route — a different tree, not a hidden one; no camera UI on any capture route;
+both documents readable **while blocked**; acceptance writing **exactly one row** at
+`terms_privacy@2026-07-26.1`; **ST-8** on both halves; and the throwaway's deletion taking its
+consent row with it (**2 → 1**), demonstrating `ON DELETE CASCADE` rather than assuming it. **§6.4
+baseline: (a) 1, (b) 1, (c) 0 rows.**
+
+**Recorded as NOT proven, deliberately**: the `[consent-gate] FAIL-OPEN` log check returned **zero
+lines over a full 5-minute window — a third consecutive empty one** — and is logged as **no-signal,
+never as a pass**, because absence of a channel is not absence of an event. And the intermediate
+`/?code=` URL was **never captured**; the routing was proven separately with an invalid-code probe
+rather than claiming a screenshot that was not taken.
+
+**Worth knowing**: the closing story beat is **absent from the server HTML** and renders only
+client-side — a `curl`-based check would call it missing.
 
 ### Decisions logged in DECISIONS.md (2026-07-28, third pass)
 

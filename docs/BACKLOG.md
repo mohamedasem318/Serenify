@@ -2582,7 +2582,18 @@ and both Preview panes render `seren` in ink and `ify` in meadow. The FR-029 con
 account` and must be set to `Confirm your Serenify email` per the ruling above — the subject is a
 separate dashboard field, so pasting the body did not touch it.
 
-**Address by**: (1) subject field, before Stage 4 ships anything that sends mail. (2) the mechanism
+**Progress 2026-07-28 (P8 Stage 4 production verification) — the SUBJECT half is CLOSED.** A real
+confirmation email sent from production (`serenify.tech`, `124192a`) arrived with the subject
+**`Confirm your Serenify email`** — the repo wording, matching the ruling above that the repo
+version wins. Verified on a **delivered email**, not by reading the dashboard field (reading the
+field would have needed the Supabase Management API token out of Windows Credential Manager, which
+was blocked; the delivered mail is the stronger evidence anyway). **The issue stays OPEN for the
+mechanism half** — nothing in the repo or CI transmits `supabase/templates/*.html` to a hosted
+project, and `wordmark-sync.test.ts` reads them off disk, so it can only prove the repo agrees with
+itself. The next wordmark change re-opens the same drift with nothing to catch it.
+
+**Address by**: (1) ~~subject field, before Stage 4 ships anything that sends mail~~ — **DONE
+2026-07-28**. (2) the mechanism
 gap — the same pass that does #190, so the email surfaces are touched once.
 
 ### The OTP verification tick vanishes immediately — it should linger (#190)

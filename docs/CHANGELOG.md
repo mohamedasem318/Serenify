@@ -2858,6 +2858,14 @@ and accepted — one forged consent row, for the forger's own account, RLS-scope
 Closes **#75**, **#157**, **#158**. Implements constitution 1.13.0 Amendment 17; **the constitution
 is not amended by this feature**.
 
+**Live and verified in production the same day.** Because Vercel builds production from `main`,
+merging PR #194 *was* the release — deployment `dpl_AiMeacUNLYknQwkNvQ1yoS9MDWFR` (`124192a`),
+verified immediately afterwards with a rollback lever armed. Two things are recorded as **not**
+proven rather than glossed: the `[consent-gate] FAIL-OPEN` log check returned zero lines over a full
+five-minute window (a third consecutive empty one) and is logged as **no-signal, not a pass**; and
+the intermediate `/?code=` URL was never captured, so that routing was proven with a separate
+invalid-code probe instead. Evidence: `deploy-log-production-2026-07-28.md`, record PR **#199**.
+
 Cross-references: `docs/DECISIONS.md` 2026-07-28 (third pass); `docs/PROGRESS.md` "Feature 013";
 `specs/013-public-surface-and-legal/` (`plan.md`, `deploy-protocol.md`, `smoke-tests.md`, and the
-three deploy logs).
+four deploy logs — Stage 2, Stage 3, Stage 3b and production).
