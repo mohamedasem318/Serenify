@@ -205,12 +205,32 @@ export function CrossTabAuth(): null {
         // session on the user's phone. See docs/DECISIONS.md 2026-07-28.
         void (async () => {
           try {
-            await createClient().auth.signOut({ scope: "local" });
-          } catch {
-            // Auth server unreachable or already-cleared session —
-            // navigate anyway so the user isn't stuck on the authed
-            // surface.
+            // signOut RETURNS { error } — it does not reject — for an
+            // unreachable auth server: a fetch failure becomes an
+            // AuthRetryableFetchError and _signOut returns early
+            // (GoTrueClient `_signOut`), leaving the session in place.
+            // Discarding it here would repeat the bug the Server Action
+            // just fixed, so log it: a sibling tab whose revoke keeps
+            // failing is otherwise undiagnosable.
+            const { error } = await createClient().auth.signOut({
+              scope: "local",
+            });
+            if (error) {
+              console.error(
+                "[cross-tab] local revoke failed; navigating anyway",
+                error,
+              );
+            }
+          } catch (error) {
+            // Kept for a genuine throw (a client that fails to
+            // construct). Navigate anyway so the user isn't stuck on the
+            // authed surface.
+            console.error("[cross-tab] sign-out threw; navigating anyway", error);
           }
+          // Cookies are deliberately NOT hand-cleared here. The originating
+          // tab's Server Action clears the SHARED jar authoritatively, and
+          // duplicating @supabase/ssr's cookie naming client-side would be a
+          // second source of truth for a format the library owns.
           router.push("/login");
         })();
       }

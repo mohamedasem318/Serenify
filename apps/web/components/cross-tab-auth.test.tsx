@@ -146,7 +146,28 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
     });
   });
 
+  it("logs and still navigates when the revoke RETURNS an error", async () => {
+    // The shape the real client actually produces for an unreachable auth
+    // server: signOut resolves with { error }, it does not reject. The
+    // rejection case below is the genuine-throw branch, not this one — and
+    // testing only that one would have missed the discarded error entirely.
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+    signOutMock.mockResolvedValueOnce({
+      error: { name: "AuthRetryableFetchError", status: 0, message: "fetch failed" },
+    });
+    pathnameHolder.value = "/app";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:654" });
+
+    await waitFor(() => {
+      expect(pushMock).toHaveBeenCalledWith("/login");
+    });
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it("navigates even if local signOut rejects (auth-server unreachable)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     signOutMock.mockRejectedValueOnce(new Error("network down"));
     pathnameHolder.value = "/app";
     render(<CrossTabAuth />);
