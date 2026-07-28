@@ -2859,16 +2859,25 @@ covering egress to destinations nobody thought to enumerate.
 
 ## From the production sign-out fix — captured 2026-07-28
 
-### Sign-out on production hangs then shows Next's error screen — `proxy.ts` 307s the Server Action POST into a re-POST (#200)
-**Status**: bug (`type:bug` / `area:web`) — **fix merged in PR A; entry stays OPEN until PR B lands.**
-GitHub issue **#200 OPEN.**
+### ~~Sign-out on production hangs then shows Next's error screen — `proxy.ts` 307s the Server Action POST into a re-POST~~ — resolved (#200)
+**Status**: bug (`type:bug` / `area:web`) — **RESOLVED and verified in production 2026-07-28.**
+GitHub issue **#200 CLOSED.**
+**Resolved**: **PR #204** (squash-merged `c1f6535`, 2026-07-28T20:53:32Z) and **PR #206**
+(squash-merged `bdbff5f`, 2026-07-28T21:01:14Z).
 
-**Why this is split across two PRs.** `main` is production and squash-merges, so **one PR is one
-deploy**. The auth fix and the region pin are shipped separately so that a regression against the ~20
-live accounts has **one suspect, not two** — and so the region change can actually be measured, which
-it cannot be if the sign-out path moved in the same deploy. **PR A** (C1–C4 + F1) carries the fix and
-all tracking. **PR B** carries `apps/web/vercel.json` alone and merges only after A is verified. The
-two branch independently off `main` and are mergeable in either order.
+**Shipped as two PRs, deliberately.** `main` is production and squash-merges, so **one PR is one
+deploy**. The auth fix and the region pin went separately so a regression against the ~20 live
+accounts would have **one suspect, not two** — and so the region change could actually be measured,
+which it could not be if the sign-out path moved in the same deploy. **PR #204** carried C1–C4 + F1
+and all tracking; **PR #206** carried `apps/web/vercel.json` alone. Both branched off `main`
+independently.
+
+**Note on the issue closing early.** #200 closed at 20:53:33Z — one second after #204 merged, before
+#206 had landed. #204's body was edited from *"Closes #200"* to *"Part of #200"* before merge, but
+GitHub kept the closing link established when the PR was opened. The end state is correct (both PRs
+merged), and the plan was only ever that #200 close after both. Recorded because the mechanism will
+repeat: **editing a closing keyword out of a PR body does not reliably unlink the issue** — remove
+the link from the PR's Development sidebar instead.
 **Category**: not a feature — a production defect found by report
 **Observed**: reported against `serenify.tech`, 2026-07-28; reproduced live before the fix
 
@@ -2905,10 +2914,20 @@ the proxy layer is invisible to the router by construction.
 - **C4** — an app error boundary (`app/error.tsx`).
 - **F1** — review follow-up: the sibling tab was discarding its revoke error too.
 
-**Ships separately in PR B, NOT in PR A**: **C5** — `apps/web/vercel.json` pinning Vercel functions
-to `fra1`, co-located with Supabase `eu-central-1`. Expected to reduce sign-out latency; **magnitude
-not measured**, and measuring it is the whole reason it is a second deploy. **This entry stays open
-until PR B merges** — the auth bug itself is fixed by PR A.
+**Shipped separately as PR #206**: **C5** — `apps/web/vercel.json` pinning Vercel functions to
+`fra1`, co-located with Supabase `eu-central-1`.
+
+**Measured outcome** (2026-07-28, after both PRs, on `serenify.tech`):
+
+| | Before | After |
+|---|---|---|
+| Single tab, warm | **1.61 s** (devtools "waiting for server response") | **near-instantaneous** |
+| Two tabs | ~5 s, then Next's error screen on the originating tab | completes cleanly, **no error screen** |
+
+**The "after" figures are human observation, not a captured devtools measurement.** The claim is
+"near-instant, observed" and should not be quoted as a number. The before-figures are real captures.
+Also note the two columns differ in **two** variables — the transport fix and the region pin — so the
+split bought a clean regression signal, not an isolated attribution of the latency win between them.
 
 **Left open deliberately**: #201 (recent-chats loading state), #202 (stale Edge-runtime claims),
 #203 (`global-error.tsx`), #205 (the onboarding flow gate no longer applying to POSTs — a consequence
