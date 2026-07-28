@@ -2497,3 +2497,58 @@ the race; the manual `classList.toggle` cannot be made reliable while the provid
 
 **Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
 than a missed regression, and it never passes when it should fail.
+
+## From feature 013 P8 Stage 3 review — captured 2026-07-28
+
+### Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)
+**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **OPEN.** GitHub issue **#189 OPEN.**
+**Category**: constitution Principle V (Amendment 17) / FR-029 / ops
+**Observed**: 2026-07-28, reading the Supabase dashboard for `excukdzjudslbqmkysrc` directly.
+
+**Description**: the **hosted** transactional email templates render `serenify` in **one colour**.
+The two-colour wordmark Amendment 17 requires is **not in production**. Both *Confirm sign up* and
+*Reset password* declare `.wordmark` alone in their `@media (prefers-color-scheme: dark)` block —
+hosted line 16 is `.wordmark`, line 17 is `.headline`, where the repo file carries three rules
+across 16–18 — and the dashboard's own Preview pane renders the mark as a single uniform grey in
+both. Hosted is the repo template **at its pre-T007 revision**.
+
+Everything else compared matches the repo: `<title>`, headline, body copy, CTA label, the OTP line,
+the dark-block colour values. One unrelated divergence: the *Confirm sign up* **subject** is
+`Confirm your Serenify account` on hosted against `Confirm your Serenify email` in
+`supabase/config.toml`; recovery's subject matches.
+
+**Root cause — two layers.** `supabase/config.toml` wires both templates via `content_path`, but
+that is **local-dev config**. Nothing in the repo and nothing in CI ever transmits
+`supabase/templates/*.html` to a hosted project: no workflow references Supabase at all, and there
+is no `supabase config push` anywhere. Hosted templates are dashboard-only.
+
+Beneath that, `apps/web/tests/unit/brand/wordmark-sync.test.ts` — the mechanism Principle V relies
+on to stop exactly this drift — reads `supabase/templates/*.html` **off disk**. It can only ever
+prove the repo agrees with itself. The hand-sync exception has been unenforced on the one side that
+reaches users, which is why this survived T007 and every run since.
+
+**Fix scope**: two separable pieces. (1) **Content** — paste the current repo templates into the
+dashboard; operator action, cheap, and the urgent half. (2) **Mechanism** — the gap is permanent and
+re-opens silently the next time the wordmark changes; candidates, in rising cost, are a documented
+release-checklist step, a `supabase config push` in the deploy runbook, or a check that pulls the
+hosted template through the Management API and diffs it against the repo file.
+
+**Address by**: (1) before Stage 4 ships anything user-facing that sends mail. (2) the same pass
+that does #190, so the email surfaces are touched once.
+
+### The OTP verification tick vanishes immediately — it should linger (#190)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#190 OPEN.**
+**Category**: auth surfaces / motion
+**Observed**: 2026-07-28, entering the emailed code on the preview's own form
+(`deploy-log-stage3-2026-07-28.md` §3).
+
+**Description**: on a correct 6-digit code the form shows "✓ Verified" and moves on essentially at
+once. The tick is gone before it registers as an acknowledgement — and the moment it marks, the
+user learning the code they typed was right, is precisely the one that should read as reassurance.
+
+**Fix scope**: motion only — a hold before the transition, honouring `prefers-reduced-motion`. No
+copy change implied.
+
+**Address by**: the design pass over the transactional email and OTP surfaces after
+`013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
+#189 so those surfaces are opened once rather than twice.
