@@ -6046,3 +6046,83 @@ adds a `profiles` read to public routes and the deploy should carry one suspect 
 - **No e2e evidence exists for this change**, per #208. The four files touched have no e2e
   coverage today regardless: the only spec that mentions the nav asserts hamburger
   visibility at 360 px, below `md`, where the nav is not rendered.
+
+---
+
+## 2026-07-29 (second pass) — `Co-authored-by:` trailers are rescinded; merged history keeps its own
+
+**Status**: Accepted, on Mohamed's explicit confirmation. Reverses the blanket co-author
+rule that had stood since the early features.
+
+### The rule that is being reversed
+
+`CLAUDE.md` carried a blanket instruction:
+
+> - Co-author trailers: add all three teammates (`Fatma-Alzahraaa`, `gehaddmohamedd`,
+>   `hebatullah003`) as `Co-authored-by:` trailers on every commit.
+
+It is replaced by the opposite: **do not add `Co-authored-by:` trailers.**
+
+### Why
+
+**They are redundant.** All three teammates are direct contributors to this repository
+now. A trailer exists to credit someone who has no commit of their own on the work; that
+is no longer the situation.
+
+**And they were actively misattributing.** GitHub matches a co-author to an account by
+**email**, not by the handle in the angle brackets. The trailers written onto the
+`fix/navbar-chrome-and-active-state` commit used three addresses that appear **nowhere** in
+`main`'s history:
+
+```
+written:   fatma.alzahraa@users.noreply.github.com
+           gehad.mohamed@users.noreply.github.com
+           hebatullah@users.noreply.github.com
+
+on main:   190964222+Fatma-Alzahraaa@users.noreply.github.com   (+ 3 other variants)
+           147542332+gehaddmohamedd@users.noreply.github.com    (+ 3 other variants)
+           198823283+hebatullah003@users.noreply.github.com     (+ 2 other variants)
+```
+
+None of the three matches a real account, so they credited nobody. `main`'s history also
+shows **eleven distinct spellings** across the three people — four for one of them — which
+is the deeper problem: a rule that says "add three trailers" without pinning the exact
+addresses cannot be followed correctly from memory, and was not.
+
+### Scope, exactly
+
+- **Commits on `fix/navbar-chrome-and-active-state` (PR #210)**: trailers stripped, by
+  amending in place and force-pushing with `--force-with-lease`. The rest of the message is
+  byte-identical.
+- **All future commits**: no trailers.
+- **Merged history is NOT rewritten.** Every commit already on `main` keeps its trailers,
+  correct or not. Published history is not rewritten for a convention change — the same
+  posture `CLAUDE.md` already takes toward the two `Claude-Session:` trailers that exist on
+  older feature commits (`#23`, `#118`).
+
+### What is unaffected
+
+**The `Claude-Session:` / `claude.ai` URL prohibition stands unchanged and is unrelated.**
+That rule exists because this repository is public and those URLs link to private agent
+sessions. Nothing here touches it. Verified on this branch after the amend: zero
+`Co-authored-by` lines, and zero `Claude-Session` trailers or `claude.ai` URLs in either the
+commit message or the PR body.
+
+### Nothing enforced this, and nothing enforces the reversal
+
+Searched before changing anything. The rule lived in exactly one operative place —
+`CLAUDE.md` — plus one historical restatement in
+`specs/013-public-surface-and-legal/tasks.md`. It is **not** in
+`.specify/memory/constitution.md` (so this is a `CLAUDE.md` edit, not a constitutional
+amendment), there is no `.gitmessage` or `commit.template`, the only two git hooks are
+graphify's graph-rebuild hooks which never read a commit message, and `.codex/hooks.json`
+holds only the disabled graphify guard.
+
+CI does not check commit messages either. The `speckit-skills guard` job runs
+`scripts/check-speckit-skills.mjs`, which verifies that the speckit skill files exist and
+that `.gitignore`'s `.claude` entry is narrow — nothing else. So the force-push cost only a
+CI re-run, and no check will fail for the absence of trailers going forward.
+
+Descriptive mentions in `docs/PROGRESS.md`, `docs/CHANGELOG.md`, `RECON_2026-07-21.md` and
+`specs/013/smoke-tests.md` are left alone: they are records of what past commits carried,
+not instructions, and editing them would falsify the record.
