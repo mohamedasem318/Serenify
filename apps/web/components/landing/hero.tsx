@@ -27,19 +27,36 @@ import {
  *
  * Both CTAs are centred on mobile and neither label wraps at 320 px (FR-053); `size="lg"`
  * is 44 px tall, and the button component already carries the app's focus ring (FR-055).
+ *
+ * ── SCALE RESTORED TO THE MOCK (2026-07-28) ───────────────────────────────────────────
+ *
+ * P6 shipped this section a size or two under the signed-off mock at every knob at once —
+ * a 1024 px container against the mock's 1120, a 30/38 px headline against its
+ * clamp(34, 5.6vw, 56), semibold against its bold, and a 448 px card column against its
+ * 520 — and the compounding is why the hero read small rather than merely tight. The
+ * headline uses a `clamp()` because the mock does: it is the one place on the page where
+ * type should track the viewport rather than step at a breakpoint, and stepping was part
+ * of what made the top of the page feel flat. `clamp()` is a CSS function, not a design
+ * token, so nothing new is registered (FR-057).
+ *
+ * The lg breakpoint is KEPT rather than moved to the mock's 980 px: the single-column
+ * reasoning above still holds, and 1024 is the token the rest of the page steps at.
  */
 export function Hero() {
   return (
-    <section className="mx-auto w-full max-w-5xl px-4 pt-10 pb-14 sm:px-6 sm:pt-14">
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:gap-12">
+    <section className="mx-auto w-full max-w-[70rem] px-4 pt-14 pb-20 sm:px-6">
+      <div className="flex flex-col gap-9 lg:flex-row lg:items-center lg:gap-13">
         <div className="lg:flex-1">
-          <h1 className="font-display text-3xl leading-tight font-semibold text-ink sm:text-4xl">
+          <h1
+            className="font-display leading-[1.06] font-bold tracking-tight text-ink"
+            style={{ fontSize: "clamp(2.125rem, 5.6vw, 3.5rem)" }}
+          >
             {HERO_HEADLINE_LEAD} <span className="text-meadow-text">{HERO_HEADLINE_ACCENT}</span>
           </h1>
 
-          <p className="mt-4 max-w-prose text-base leading-relaxed text-muted">{HERO_LEDE}</p>
+          <p className="mt-5 max-w-prose text-base leading-relaxed text-muted">{HERO_LEDE}</p>
 
-          <div className="mt-6 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
+          <div className="mt-7 flex flex-col items-stretch gap-3 sm:flex-row sm:items-center">
             <Button asChild variant="meadow" size="lg" className="w-full sm:w-auto">
               <Link href="/signup">{CTA_PRIMARY}</Link>
             </Button>
@@ -48,10 +65,10 @@ export function Hero() {
             </Button>
           </div>
 
-          <p className="mt-5 text-sm text-muted">{HERO_DATA_LINE}</p>
+          <p className="mt-6 text-sm text-muted">{HERO_DATA_LINE}</p>
         </div>
 
-        <div className="w-full lg:max-w-md lg:flex-1">
+        <div className="w-full lg:max-w-[32.5rem] lg:flex-1">
           <StoryCard />
         </div>
       </div>
