@@ -2660,3 +2660,33 @@ survives all three — which is the point. Worth pairing with whatever replaces 
 so the file is opened once.
 
 **Address by**: after `013-public-surface-and-legal` merges, as its own change.
+
+## From feature 013 P8 Stage 4 close-out — captured 2026-07-28
+
+### Landing `/` stays `force-dynamic` — move ONLY the signed-in redirect into `proxy.ts` if production TTFB disagrees (#193)
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `status:watch`) — **OPEN.** GitHub issue **#193 OPEN.**
+**Category**: feature 013 P6 landing page / R11 (`research.md` §11)
+**Observed**: not observed — **logged as a candidate by T142, deliberately not built.**
+
+**Description**: `app/(public)/page.tsx` carries `export const dynamic = "force-dynamic"`, so the
+landing page is not statically generated. The follow-up, **if it is ever justified**, is to move
+**only the signed-in redirect** into `proxy.ts` — the proxy already computes `user` for every
+matched request, so the redirect would be free there and `/` could drop `force-dynamic`.
+
+**What it must NOT touch, and this is the load-bearing part**: **not the `?code=` forward.**
+`proxy.ts`'s `redirectTo` helper **clears `url.search`**, so moving that half into the proxy would
+eat the auth code arriving on a real Supabase email link — the exact path ST-8 checks. The two
+behaviours at `/` are separable and only one of them is a candidate. `research.md` §11 rejected
+moving *both* because it would put the two behaviours FR-017 protects into the file with the
+highest blast radius in the repo; that rejection stands unchanged.
+
+**Why it is probably not worth doing.** `force-dynamic` sounds worse than it is here. For an
+**anonymous** visitor — who is who the landing page is for — there is no session cookie, so
+`supabase.auth.getUser()` **short-circuits without a network round-trip**, and the proxy already
+runs on every request regardless. The saving on offer is static generation, not a saved round-trip.
+
+**Fix scope**: small and strictly bounded — the signed-in redirect only, plus dropping
+`force-dynamic`. **No code was written for it in feature 013.**
+
+**Address by**: **only if measured production TTFB on `/` disagrees** with the paragraph above — a
+number, not an impression. Absent that number, the correct action is to close #193 as not-needed.
