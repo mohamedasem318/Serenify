@@ -5514,3 +5514,202 @@ disagree with the clock on the render where they resolve.
 its full text in an `sr-only` span from mount, so a screen reader gets each message once,
 statically, and hears nothing as it types. A live region would have re-announced a growing
 string on every frame.
+
+---
+
+## 2026-07-28 (third pass) — Feature 013's closing decisions: what the consent design settled, and the two residuals it ships knowingly
+
+Recorded by T143 as feature 013 closes. Eight of these are decisions the feature made and
+closed; the last two are **residuals it ships with open eyes**, written down here precisely so
+that a later reader does not mistake either one for an oversight.
+
+### 1. Order A — the legal half first, and the hero story last
+
+Decided 2026-07-25 (`plan.md` §14.2). The two candidate orders traded the same scarce thing —
+which half of the feature gets built while there is still slack — and the feature chose to spend
+that slack on the Terms of Service and Privacy Policy rather than on the landing hero.
+
+**The reason is that the two risks are different in kind, not merely in size.** The hero story
+card is the largest and least predictable *implementation* item in the feature — 17 beats, four
+absolutely positioned panels, a zero-pixel-drift geometry contract at four widths, reduced
+motion, an `IntersectionObserver` with a known repo gotcha, chapter markers. Its risk is
+**schedule** risk: bounded, visible while it is happening, and cuttable. The legal text's risk is
+**correctness** risk on a **durable public promise** — the kind that is invisible on the day and
+expensive later, and the kind FR-050 exists to stop being incurred in a hurry.
+
+The cost was accepted rather than argued away: building the hero last means discovering it last,
+and if it overran it would overrun at the end, against the deadline. It did not, but the decision
+would have been the same either way — a late hero is a schedule problem, and hurried legal text
+is a promise nobody can take back.
+
+### 2. Re-consent is decided by version IDENTITY, never by comparing timestamps
+
+`user_consents.document_version` holds a version id (`terms_privacy@2026-07-26.1`), and the gate
+asks whether the id a person holds is **at or past the binding revision's position in the
+registry** — `satisfiesConsent()` at `apps/web/lib/consent/evaluate.ts:67–79`, a `findIndex`
+membership test against `CONSENT_REGISTRY`.
+
+**A timestamp comparison would have been the obvious implementation and it is wrong**, for a
+reason worth stating because it recurs: "consent recorded before the document changed" is not the
+same question as "consent recorded against wording we now consider superseded". A clock
+comparison answers the first. It gets the second wrong every time the two diverge — a cosmetic
+revision would re-prompt everyone who consented before it, and a material revision published with
+a backdated timestamp would re-prompt nobody. Materiality is a **human judgment made at publish
+time** and recorded on the revision (`registry.ts`, `materiality` + a required `rationale`); it is
+never derived from a text diff, a content hash, or a date (FR-043a).
+
+`publishedOn` exists on every revision and is **evidence only** — the registry's own comment says
+so, and nothing in the gate reads it.
+
+### 3. The version registry lives in the repository, not in a database table
+
+`apps/web/lib/consent/registry.ts` is a constants module (`research.md` §6.3).
+
+**What this buys.** Publishing a revision is a pull request and **zero migrations**: the wording
+edit and the registry entry describing it land in the **same PR** (`research.md` §6.1), so a
+reviewer reads the new text directly beside its materiality classification and the stated reason
+for that classification. Put the registry in a table and those two things separate — the wording
+ships in a deploy, the classification is typed into a database by whoever remembers, and the
+review that is the entire safeguard never happens in one place.
+
+**What it costs, stated plainly.** The registry cannot be edited at runtime. Correcting a
+misclassification means a deploy. That is the right trade for something that is supposed to be
+slow and reviewed.
+
+The module is deliberately **pure** — it imports nothing from `server-only`, so Vitest loads it
+directly and the evaluator suite covers every registry shape without a database. Its invariants
+(explicit materiality, non-empty rationale, unique well-formed self-prefixed ids, ascending
+publication order, append-only against a frozen snapshot) are CI-enforced in
+`tests/unit/lib/consent/registry-guards.test.ts`.
+
+### 4. The two gates fail in OPPOSITE directions, and the asymmetry is the design
+
+- **The app-shell Terms/Privacy gate fails OPEN** (§7.3). If the consent read errors, the user
+  reaches the app and `failOpen()` says so in the logs.
+- **The camera-and-inference gate fails CLOSED** (§7.2, `lib/consent/read.ts`). If the read
+  errors, no capture happens.
+
+**Why they differ.** The failure modes are not symmetric in consequence. A broken read at the
+shell gate, failing closed, locks **every user out of the entire product** over a database blip —
+an outage manufactured by a safety mechanism. Failing open costs a window in which someone browses
+the app under wording they have not re-acknowledged: recoverable, and detectable. A broken read at
+the camera gate, failing open, means **a camera turns on and inference runs against someone who
+has not agreed to it.** That is not recoverable and not detectable after the fact. So the shell
+gate optimises for availability and the camera gate optimises for restraint, and neither direction
+is a default anyone should "make consistent" later.
+
+**`lib/consent/read.ts` deliberately hard-codes neither direction.** It returns a discriminated
+result, so "no rows" and "read failed" cannot be conflated by accident, and **the call site owns
+the fail direction**. That is why the same module can serve both gates without either one
+inheriting the other's answer.
+
+**"No rows" is a real, expected answer, not a malfunction** — every pre-existing user has zero
+consent records (FR-041, §7.4), and so does anyone created during the deploy window. It means *not
+consented*; it does not mean *broken*.
+
+### 5. The migration stays one file
+
+`supabase/migrations/20260726000000_user_consents.sql` carries the table, its constraints, its
+index, its immutability trigger, RLS, the grants, and the `CREATE OR REPLACE` of
+`handle_new_user()` — all of it. It was not split.
+
+**Because a split has no partial state worth landing in.** The table without its RLS policies is a
+table anyone can read; the trigger without the table raises on every signup. Every intermediate
+state of a split is worse than either endpoint, and splitting only creates the opportunity to stop
+halfway. One file has one outcome: applied, or not.
+
+### 6. `decision` admits only `'granted'` — and declining is not withdrawal
+
+The column is `NOT NULL DEFAULT 'granted' CHECK (decision IN ('granted'))`
+(`…_user_consents.sql:32`).
+
+**Declining writes nothing** (FR-042): no row, no deletion, no withdrawal state, no tombstone.
+`'declined'` is deliberately **absent from the CHECK**, and the migration says why in place —
+admitting the value would invite writing the row. There is no "declined" record because a decline
+is the absence of a consent, not a kind of consent.
+
+**The seam is left open on purpose.** Feature **018** owns withdrawal, and it widens this CHECK and
+inserts a **new** row — never updates an old one. The table is append-only by design (FR-043b) and
+carries an immutability trigger plus no UPDATE or DELETE grant to `authenticated`, so consent is a
+**history**: one row per accepted revision, and the record of what someone agreed to in the past
+survives them changing their mind.
+
+### 7. RESIDUAL — SC-006 holds for the product's own signup surface, and NOT against a caller who bypasses it. Open signup is a DELIBERATE posture, not an omission.
+
+**This is the entry a later reader is most likely to misread, so it is stated flatly.**
+
+SC-006 — every account has a consent row — **holds for 100% of accounts created through the
+product's own `/signup` surface.** It **does not hold** against a caller who goes around that
+surface and calls the auth API directly. The consent row is written by `handle_new_user()` only
+when the signup supplied `terms_privacy_version` in its user metadata; a caller who omits it
+creates an account with no consent row, and a caller who supplies a well-formed value forges one.
+
+**The root cause is that `/signup` is open self-serve — issue #62 — and #62 STAYS OPEN,
+deliberately.**
+
+`plan.md` §15 R8 describes this residual as one whose root cause "must close before real user data
+is processed". A reader who takes that at face value, then visits the live site and finds `/signup`
+open, will reasonably conclude the gate was forgotten. **It was not forgotten. It was weighed and
+accepted.** The demo deployment at **serenify.tech ships knowingly with open self-serve signup**
+for the demo window; #62 is held open as an accepted posture until adoption, not as a backlog item
+that slipped; and **R8's SC-006 bypass is therefore LIVE and ACCEPTED for that window.**
+
+**The blast radius, unchanged from R8 and worth repeating because it is what makes the posture
+defensible:** one forged consent row, **for the forger's own account**, RLS-scoped to
+`auth.uid()`. No cross-user write. No privilege escalation. Nothing else in the product unlocked
+by it. A person can lie about having read the Terms — on their own behalf, to their own row.
+
+### 8. RESIDUAL — R7 is NARROWER than `plan.md` §15 says, and the two cases are not the same
+
+`plan.md` §15 R7 reads: *"a malformed signup consent version could be written… shape-constrained by
+two DB CHECKs; a non-registry value never satisfies `satisfiesConsent()`."* That sentence blurs two
+outcomes which differ completely. Established by reading the shipped trigger and constraints:
+
+- **Well-formed but non-registry** (e.g. `terms_privacy@2099-01-01.1`) — **is written**, and is
+  **inert** exactly as R7 says. `satisfiesConsent` is a membership test
+  (`evaluate.ts:74–77`, `findIndex` → `-1`), and `-1` is never `>=` a valid binding index, so it
+  never satisfies the gate. The §6.3 reconciliation query lists it.
+- **Malformed** (fails the format regex at `…_user_consents.sql:28`, or arrives as JSON `null`
+  against the `NOT NULL` at `:27`) — **is never written at all.** It raises **`23514`** /
+  **`23502`**. `on_auth_user_created` is `AFTER INSERT ON auth.users FOR EACH ROW`
+  (`20260517000030_profile_trigger.sql:27–29`), so the exception aborts the statement and **the
+  `auth.users` row is rolled back — that signup fails outright.** `ON CONFLICT DO NOTHING`
+  (`:111`) does **not** swallow it: it covers unique and exclusion violations only.
+
+So the first case is a junk row that can never unlock anything, and the second is not a row at all
+— it is a failed signup. Neither is "a malformed value written to the database", which is what R7
+reads as.
+
+**`plan.md` is deliberately NOT edited to match.** R7 **overstates** a risk rather than
+understating one, and the plan is not amended mid-build. This entry is where the correction lives.
+
+### 9. Production deploys from `main`, so the merge IS the deploy — and production verification therefore happens AFTER it
+
+Established 2026-07-28 during P8 Stage 4, read from the Vercel API. The `serenify` project has
+`productionBranch: "main"`, no deploy hooks, and the last **13** production deployments are all
+`source: git` from `main`.
+
+**Consequence: "deploy, verify, then merge" is not achievable on this platform**, and P8's phasing
+should not be read as implying it was. T138 had already said as much in passing — *"serenify.tech
+does not have it until T148 merges"* — without recording the mechanism behind it.
+
+**The CLI escape hatch was considered and rejected**, because it does not buy the order it appears
+to. `vercel --prod` from the feature branch would produce a genuine production deployment without
+merging; but the merge then triggers a **fresh** production build from `main`, and *that* build —
+not the verified one — is what serves users. There is no sequence here in which the artefact you
+verified and the artefact serving users are the same object **and** the merge comes last. Merging
+first is the only order in which they are the same object.
+
+**Promoting the branch preview was also rejected**, and the reason is an honest "cannot prove it".
+A preview deployment is built with **preview** environment variables and `NEXT_PUBLIC_*` are
+inlined at build time, so promoting it would serve preview-scoped values to real users — `SITE_URL`
+in particular, which drives auth redirect and confirmation-email links. An attempt to establish
+whether the preview and production values actually differ was **inconclusive**: the Vercel API
+returns them encrypted even with `decrypt=true`, so a hash comparison proves nothing in either
+direction. Unprovable-as-safe was treated as reason enough not to take it.
+
+**What follows from this** is recorded in `deploy-protocol.md` §3: production verification runs
+immediately after the merge, unbroken, with **Lever 0** (`vercel rollback` to the pre-013
+deployment — an alias flip, seconds, no rebuild, destroys no consent history) armed beforehand.
+The window between "013 is live" and "013 is verified" is the risk this ordering creates; the
+mitigation is to keep it short and to hold the rollback in hand before starting.
