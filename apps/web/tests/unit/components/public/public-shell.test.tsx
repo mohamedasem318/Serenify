@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 // The theme toggle is the app header's component, reused here so the two bars match
 // (FR-018). It owns its own accessible name and has its own coverage; stubbing it keeps
@@ -99,6 +100,93 @@ describe("PublicNavbar", () => {
   it("renders the theme toggle, matching the app header's placement", () => {
     render(<PublicNavbar />);
     expect(screen.getByTestId("theme-toggle")).toBeInTheDocument();
+  });
+
+  /**
+   * At widths where only one auth control fits, that control must be SIGN IN.
+   *
+   * P3 kept Sign up, following the mock. On the landing page that leaves a returning
+   * visitor with no door at all on a phone — the hero's CTA is the signup path, so a
+   * navbar Sign up is the second signup control on the screen while Sign in has none.
+   *
+   * Asserted on the class list rather than by measuring: happy-dom does not run the
+   * Tailwind build, so `hidden` / `min-[420px]:inline-flex` is the honest thing to read.
+   */
+  describe("the narrow-width auth control (below 420 px)", () => {
+    function authLink(label: string): HTMLElement {
+      const link = screen.getByRole("link", { name: label });
+      // The utility pair lives on the Button that wraps the link via `asChild`, which
+      // merges its className onto the anchor itself.
+      return link;
+    }
+
+    it("keeps Sign in visible at every width", () => {
+      render(<PublicNavbar />);
+      expect(authLink("Sign in").className).not.toMatch(/\bhidden\b/);
+    });
+
+    it("hides Sign up below 420 px, where the hero already carries the signup path", () => {
+      render(<PublicNavbar />);
+      const signUp = authLink("Sign up").className;
+      expect(signUp).toMatch(/\bhidden\b/);
+      expect(signUp).toMatch(/min-\[420px\]:inline-flex/);
+    });
+
+    it("still offers BOTH doors in the sheet, at every width (FR-019)", async () => {
+      // The bar's width budget is not the sheet's problem — whichever control the bar
+      // drops, the hamburger must still carry it. The panel is unmounted until opened,
+      // so this has to actually open it rather than query a closed Sheet.
+      render(<PublicMobileNav />);
+      await userEvent.click(screen.getByLabelText("Open menu"));
+
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+      expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup");
+    });
+  });
+
+  /**
+   * The desktop destination row marks the page you are on — and marks it with something
+   * other than colour (WCAG 1.4.1). `bg-surface` alone would fail twice over: it is a
+   * colour-only cue, and in dark mode it is a ~4 % lightness difference that is barely
+   * visible to anyone. The underline is the cue that survives both.
+   */
+  describe("the desktop nav marks the current page", () => {
+    // The module-level mock puts the pathname at /terms.
+    it("sets aria-current='page' on exactly the current destination", () => {
+      const { container } = render(<PublicNavbar />);
+      const current = container.querySelectorAll("a[aria-current='page']");
+
+      expect(current.length).toBe(1);
+      expect(current[0]).toHaveAttribute("href", "/terms");
+    });
+
+    it("marks it with a non-colour cue, not a background tint alone", () => {
+      const { container } = render(<PublicNavbar />);
+      const current = container.querySelector<HTMLElement>("a[aria-current='page']");
+
+      expect(current?.className).toMatch(/\bunderline\b/);
+    });
+
+    it("does not mark Home on a descendant route", () => {
+      // Every path starts with "/", so a prefix match on Home would light it up on
+      // /terms and /privacy too. This is the assertion that catches that.
+      const { container } = render(<PublicNavbar />);
+      const home = container.querySelector<HTMLElement>("a[href='/']:not([aria-label])");
+
+      expect(home?.getAttribute("aria-current")).toBeNull();
+    });
+
+    it("leaves the inactive destinations with no underline, so hover cannot mimic it", () => {
+      const { container } = render(<PublicNavbar />);
+      const inactive = Array.from(
+        container.querySelectorAll<HTMLElement>("nav[aria-label='Public pages'] a"),
+      ).filter((a) => a.getAttribute("aria-current") === null);
+
+      expect(inactive.length).toBeGreaterThan(0);
+      for (const link of inactive) {
+        expect(link.className).not.toMatch(/\bunderline\b/);
+      }
+    });
   });
 });
 
