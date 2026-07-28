@@ -118,13 +118,24 @@ export function TermsReconsentScreen({
       className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center gap-10 px-4 py-12 sm:px-6 sm:py-16"
     >
       {/* THREE SPACING STEPS, EACH LARGER THAN THE LAST — 16 / 24 / 40 px. The header's
-          internal rhythm has to stay smaller than the gap that separates it from the card
+          internal rhythm has to stay smaller than the gap separating it from the card
           below, or the wordmark reads as a sibling of the heading rather than as the mark
-          above it. `leading-none` on the wordmark is what makes the first step need to be
-          this large: it collapses the glyph box to exactly the font size, so the optical
-          gap is the full 24 px with nothing given back by the line box. */}
+          above it.
+
+          `block` ON THE WORDMARK IS THE ACTUAL FIX — not the spacing numbers. `Wordmark`
+          renders an INLINE `<span>`, and Tailwind v4's `space-y-*` works by putting a
+          vertical margin on the child. **Vertical margins do not apply to inline boxes**,
+          so that margin was silently discarded and the wordmark→heading gap was whatever
+          the line box happened to give: measured at 375 px, the heading's box sat 0.5 px
+          ABOVE the wordmark's. They genuinely overlapped. `space-y-5` had never done
+          anything here, which is why the screen looked cramped no matter what the number
+          said. `block` gives the mark a block box, and the margin then lands.
+          `leading-none` is dropped for the same honesty: it collapses the line box to the
+          font size (30 px) while the glyphs need 38 px, so the "y" descender hangs outside
+          the box the margin is measured from. It is right in the navbar, where a tight
+          24 px bar is the point; on a standalone display mark it just makes spacing lie. */}
       <header className="space-y-6">
-        <Wordmark className="text-3xl leading-none sm:text-4xl" />
+        <Wordmark className="block text-3xl sm:text-4xl" />
         <div className="space-y-4">
           {/* `leading-snug`, not `leading-tight`. This title wraps to two lines at every
               width the screen supports and to three at 320 px, and 1.25 sets those lines
