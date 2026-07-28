@@ -101,10 +101,52 @@ remain (`sharp`, and both `postcss`, which no `next` bump can clear because 16.2
 
 ---
 
-## §2. The two revert levers — verbatim, and their caveats
+## §2. The revert levers — verbatim, and their caveats
 
-**Both have been exercised** (ST-10a, 2026-07-28) against a *universal silent lockout* — a
-harder state than anything this deploy is likely to produce. Both recovered a fully usable app.
+**Levers 1 and 2 have been exercised** (ST-10a, 2026-07-28) against a *universal silent lockout* —
+a harder state than anything this deploy is likely to produce. Both recovered a fully usable app.
+**Lever 0 was added 2026-07-28 during P8 Stage 4** and is the fastest of the three; it is a Vercel
+alias operation and has **not** been exercised on this project (see its caveats).
+
+### Lever 0 — flip the production alias back (seconds, no rebuild)
+
+```
+npx vercel rollback dpl_Gi3noVxtWWXwwW7FzwVaP5RYxkQM
+```
+
+That deployment id is **`cbb7f81`** — the pre-013 production deployment, built from `main` on
+2026-07-25T02:15:32Z, state `READY`, URL
+`serenify-nh50dnnm8-mohamed-asems-projects-7436e57f.vercel.app`. It is **already built**. This
+command re-points `serenify.tech` at it; it does not compile anything.
+
+**Why this lever exists and why it is first.** Levers 1 and 2 both require a **production
+rebuild** before they take effect — Lever 1 because Vercel env changes do not touch running
+deployments, Lever 2 because a revert commit has to build. Lever 0 changes no code, no
+configuration and no database state; it moves an alias. When the question is *"get real users off
+013 right now"*, it is the correct first reach.
+
+**Why it is safe by construction.** Rolling back to `cbb7f81` puts **pre-013 code against the
+post-013 schema** — which is the exact combination §3 proves is safe. The `?` guard at
+`20260726000000_user_consents.sql:108` is false for pre-013 signups, the consent INSERT is
+skipped, and no error is raised. The migration stays applied and `user_consents` is left intact:
+**Lever 0 destroys no consent history**, unlike §7.
+
+**Four caveats:**
+
+1. **It is a Vercel-side operation with no git footprint.** After a rollback, `main` still holds
+   013 while production serves `cbb7f81`. **Anything that subsequently pushes to `main` will
+   rebuild and re-deploy 013 over the top**, silently undoing the rollback. If the rollback needs
+   to hold for more than a moment, follow it with Lever 2 so the two agree.
+2. **Not exercised on this project.** Levers 1 and 2 were proven under ST-10a; this one was not.
+   The mechanism is Vercel's standard instant-rollback and the target deployment is `READY`, but
+   that is reasoning, not a test. `npx vercel rollback status` reports whether it landed —
+   **check it, do not assume.**
+3. **It reverts the code, not the schema.** `user_consents` still exists and the 013
+   `handle_new_user()` is still live. That is intended (see "safe by construction"), but it means
+   Lever 0 is **not** a substitute for §7 if the problem is the *migration* rather than the *app*.
+4. **Deployment ids age.** `dpl_Gi3noVxtWWXwwW7FzwVaP5RYxkQM` is correct as long as `cbb7f81` is
+   the last pre-013 production deployment. Re-read it with
+   `npx vercel ls serenify --prod` if anything else has shipped since.
 
 ### Lever 1 — the kill switch (fast, but not instant)
 
@@ -116,18 +158,27 @@ Set it in the Vercel project's environment variables, then **redeploy** — Verc
 do **not** take effect on running deployments. Budget the redeploy, do not assume it is
 immediate.
 
-**Four caveats, all of which have bitten someone somewhere:**
+**Five caveats, all of which have bitten someone somewhere:**
 
 1. **ABSENT MEANS ENABLED.** The schema defaults to `"true"`. Deleting the variable does not
    disable the gate — it enables it. To switch the gate **off** you must set the literal
    string `false`.
-2. **Case-sensitive.** `"False"`, `"FALSE"`, `"0"`, `"no"` are all **invalid**.
-3. **A typo throws at boot.** The value is a two-member enum, not a truthiness coercion — an
+2. **⚠ THE VARIABLE IS NOT SET IN VERCEL AT ALL — verified 2026-07-28 via the Vercel API.** The
+   `serenify` project defines **exactly four** environment variables (`NEXT_PUBLIC_API_URL`,
+   `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SITE_URL`), on both `preview`
+   and `production`. `CONSENT_ENTRY_GATE_ENABLED` appears on neither. Combined with caveat 1
+   this is **correct** — the gate ships **on**, which is what 013 intends — but it changes what
+   Lever 1 *is*: **you are ADDING a new variable under pressure, not editing an existing one.**
+   There is no existing entry to flip, nothing in the dashboard to find, and no prior value to
+   restore afterwards. Budget for that at 3am, and note that "undo Lever 1" means **deleting**
+   the variable again, not setting it back to `true`.
+3. **Case-sensitive.** `"False"`, `"FALSE"`, `"0"`, `"no"` are all **invalid**.
+4. **A typo throws at boot.** The value is a two-member enum, not a truthiness coercion — an
    invalid value fails the parse and the app **fails to start**. That is deliberate (a lever
    that silently does the opposite of what it says is worse than one that refuses), but it
    means a fat-fingered value at 2am takes the site down rather than half-working. **Type it
    carefully, and watch the deploy come up.**
-4. **A disabled gate is SILENT.** The kill switch is checked *before* the consent read, so
+5. **A disabled gate is SILENT.** The kill switch is checked *before* the consent read, so
    `[consent-gate] FAIL-OPEN` will **not** appear once it is off. Absence of that line after
    flipping this is correct, not evidence the gate is still running.
 
@@ -153,9 +204,20 @@ alone precisely so this works. Verified 2026-07-28: it applies **cleanly, no con
 Then push and let Vercel deploy. **This reverts only the gate**, not the migration, not the
 landing page, not the legal documents.
 
-**Prefer Lever 1.** It is a config change, not a code change, and it is reversible by flipping
-the value back. Reach for Lever 2 when the problem is the gate *code* rather than the gate
-*decision*.
+### Choosing between them
+
+**Match the lever to the question you are answering.**
+
+| The problem is… | Reach for | Because |
+|---|---|---|
+| **013 is hurting real users right now** — anything broad, anything you cannot diagnose in the moment | **Lever 0** | Seconds, no rebuild, no code change, destroys no consent history. Buys time to think. **Follow with Lever 2 if it must hold** (caveat 1). |
+| The **gate decision** is wrong — the app is otherwise healthy and you want people through it | **Lever 1** | A config change, not a code change. Reversible by deleting the variable again. Costs a production rebuild. |
+| The **gate code** is wrong | **Lever 2** | Removes the gate entirely and leaves `main` and production agreeing. Costs a revert commit and a build. |
+| The **migration** is wrong | **§7** | The only path that touches schema — **and the only one that destroys consent history.** Dump first. |
+
+**Levers 0, 1 and 2 all leave `user_consents` intact.** Only §7 does not. If you are unsure which
+you are facing, take Lever 0 first: it is the cheapest to undo and it is the only one that costs
+nothing to have been wrong about.
 
 ---
 
@@ -184,6 +246,45 @@ ways at once:
   The app looks perfectly healthy while the legal gate is silently off.
 
 That is exactly the R2 failure ST-10b exists to make visible. Do not create it deliberately.
+
+### How the code deploy actually happens — established 2026-07-28, P8 Stage 4
+
+**Vercel builds production from `main`. Merging IS the deploy.** There is no separate deploy step
+to schedule, approve or verify ahead of the merge.
+
+Read from the Vercel API, read-only:
+
+| | |
+|---|---|
+| Project | `serenify`, root directory `apps/web`, framework `nextjs` |
+| Git link | `github:mohamedasem318/Serenify`, **`productionBranch: "main"`** |
+| Deploy hooks | **none** |
+| Production at the time of writing | `cbb7f81` — `source: git`, `branch: main`, i.e. `main` HEAD |
+| History | the last **13** production deployments (2026-07-13 → 07-25) are **all** `source: git`, `branch: main`. The only `source: cli` production deploy in the project's history is 2026-07-12 — the original cutover, before the git integration was wired. |
+
+**This has three consequences the rest of this document must be read against.**
+
+1. **"Deploy, verify, then merge" is not achievable here**, and P8's phasing should not be read as
+   implying it is. T138 already said as much in passing — *"serenify.tech does not have it until
+   T148 merges"* — this section is where the mechanism behind that sentence is written down.
+2. **Even the CLI escape hatch does not buy the order it appears to.** `vercel --prod` from the
+   branch would produce a genuine production deployment without merging; but the merge then
+   triggers a **fresh** production build from `main`, and *that* build — not the verified one —
+   is what serves users. There is no sequence on this platform where the artefact you verified
+   and the artefact serving users are the same object **and** the merge comes last. Merging first
+   is the only order in which they are the same object.
+3. **Therefore production verification happens AFTER the merge, immediately and unbroken**, with
+   **Lever 0 armed** before the merge is clicked. The window between "013 is live" and "013 is
+   verified" is the risk this ordering creates, and the only mitigation is to make that window
+   short and to have the rollback already in hand.
+
+> **Not chosen: promoting the branch preview.** `vercel promote` exists, but a preview deployment
+> is **built with `preview` environment variables**, and `NEXT_PUBLIC_*` are inlined at build
+> time. Serving that bundle on `serenify.tech` would ship preview-scoped values to real users —
+> `SITE_URL` in particular, which drives auth redirect and confirmation-email links. An attempt to
+> establish whether the preview and production values actually differ was **inconclusive**: the
+> Vercel API returns these values **encrypted** even with `decrypt=true`, so comparing them by
+> hash proves nothing in either direction. Unprovable-as-safe is reason enough not to take it.
 
 ### The gap between the migration and the code deploy
 
