@@ -2124,10 +2124,40 @@ transitive and should resolve without a manifest change. Verify with the full
 routing, and `apps/web/proxy.ts` is load-bearing for authentication. Confirm the fix does not
 change proxy semantics.
 
+**Progress 2026-07-28 (P8 Stage 4 close-out) — UPDATED, NOT CLOSED. Two paragraphs above are now
+superseded and are left in place for the record.**
+
+**The `next` bump landed inside feature 013 after all**, as **PR #180** (`8f6b523`,
+*"chore(deps): next 16.2.6 → 16.2.11 — nine advisories, no behaviour change reaching P6/P7"*), and
+was taken deliberately ahead of P6 rather than deferred: P6 reads the Next 16 routing guides out of
+`node_modules/next/dist/docs/` (T079) and performs a root-route takeover (T086), and 16.2.10 ships
+a docs backport correcting the two files that answer T079's mandated question. So **"⚠ Do not
+attempt any upgrade while feature 013 is unmerged" and "carries an empty `package.json` diff" no
+longer hold** — they were right when written and were overtaken by a reasoned decision.
+
+**Where the counts stand, verified against the Dependabot API on 2026-07-28.** **21 alerts are
+still open**, because Dependabot evaluates the **default branch** and `main` still pins
+`next@16.2.6` (`apps/web/package.json:30` on `origin/main`). The feature branch pins **16.2.11**.
+So: **the 18 `next` alerts are cleared by the branch and close when 013 merges — they are not
+cleared yet.** Do not read "18 cleared" as a present-tense fact about `main` before the merge.
+
+**Three alerts remain and the branch does not touch them** — verified from the branch lockfile:
+
+- **`postcss` × 2 high** (GHSA-r28c-9q8g-f849, GHSA-6g55-p6wh-862q). **`next@16.2.11` still vendors
+  `postcss@8.4.31`** at `node_modules/next/node_modules/postcss` — the fix is 8.5.18. The
+  repository's own top-level `postcss` is already **8.5.14 (dev)** and is not what the alerts point
+  at. **Stated precisely, because the shorthand is misleading**: it is not that *no* `next` release
+  could ever clear these — it is that **this** bump does not, and clearing them needs either a
+  `next` release that itself moves its vendored `postcss` to ≥8.5.18, or a deliberate lockfile
+  override. Neither is a patch bump.
+- **`sharp` × 1 high** (GHSA-f88m-g3jw-g9cj, inherited libvips CVEs). Lockfile resolves
+  **0.34.5**; the fix is 0.35.0. Transitive, and untouched by the `next` bump.
+
 **Address by**: a dedicated dependency branch **after feature 013 merges to `main`**, and before
-any further production deploy. Re-run the counts at that point. Pairs with **#36** (the older
-PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing dependency
-items.
+any further production deploy. **Re-count first** — the merge should drop the total from 21 to 3 on
+its own, and the remaining work is only the `postcss` and `sharp` items above. Pairs with **#36**
+(the older PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing
+dependency items.
 
 ### Restore `POST /api/admin/invite` — deleted in #142; there is no in-app path left to create a `team_lead` or an `admin` (#174)
 **Status**: deferred-feature (`type:feature` / `area:web` / `area:db`) — **OPEN.** GitHub issue **#174 OPEN**.
