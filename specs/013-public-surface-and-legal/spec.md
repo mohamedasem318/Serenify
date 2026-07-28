@@ -481,6 +481,23 @@ person is outlined in the photo, and vice versa.
   "defined once everywhere" universal that the constitution deliberately does not —
   hence this restatement. All three in-tree sites that exist today render the
   wordmark single-colour; the two-colour treatment is implemented nowhere yet.)*
+
+  **AMENDED 2026-07-28, by Mohamed, during the landing fidelity pass — a
+  clarification, not a new allowance.** "Exhaustively" reads as a closed list of every
+  place the wordmark may appear, and it was written to mean something narrower. The
+  table enumerates the surfaces that carry the wordmark as **standing chrome** — a
+  persistent brand mark in a header, a footer, a layout or a template — and its
+  load-bearing purpose is to close the list of **hand-sync exceptions** at exactly two.
+
+  **In-prose usage is permitted and is not a new site.** Where the product name occurs
+  inside a heading, it MAY render as the wordmark **through the one shared definition**.
+  Doing so introduces **no new hand-sync exception**, because such a usage consumes the
+  shared component rather than restating it — which is precisely the property this
+  requirement protects. Re-typing the two-tone markup at such a site remains a
+  violation, exactly as it is at a chrome site.
+
+  The two hand-sync exceptions remain **exactly two**: the `next/og` social card and the
+  Supabase transactional email templates. This clarification adds none and licenses none.
 - **FR-030**: The wordmark MUST always render lowercase and MUST NOT carry a dot or
   other terminal punctuation.
 - **FR-031**: **Resolved — the amendment was required and has landed.** This change
@@ -684,6 +701,34 @@ FR-037–FR-043. One rule, two applications — neither is built without the oth
 - **FR-053**: The public surface MUST be correct at **320px, 375px, 414px, and
   768px**: no horizontal scrolling, no tap target smaller than 44px, and no tap
   target whose label wraps to two lines.
+
+  **AMENDED 2026-07-28, by Mohamed, during the landing fidelity pass — one spent
+  exception for the hero story's chapter markers.** The 44px floor made the mock's
+  chapter-marker treatment unreachable: the markers are six controls in one row, so at
+  44×44 the cluster is **264px wide** however small the dot inside it is drawn, against
+  the mock's ~66px. The row read as sparse and scattered rather than as the tight
+  cluster the mock composes, and shrinking the dot does not help because the *hit area*
+  is what sets the width.
+
+  The chapter markers — and **only** the chapter markers — may therefore use a **24×24px**
+  minimum target. Scope of the exception:
+
+  - It applies to `components/landing/chapter-markers.tsx` **only**. Every other
+    interactive element on the public surface — the navbar's links and auth actions, the
+    hamburger, the hero CTAs, the footer links, the legal contents index, the retention
+    links — stays at **44px**, and the walk that asserts it is unchanged apart from
+    exempting these six.
+  - **24×24 satisfies WCAG 2.5.8 (AA)**. This is a step from AAA down to AA on one
+    control, not a drop below conformance. The six targets sit flush, so a 24px circle
+    centred on any one of them does not intersect another.
+  - The markers are a **convenience, not a path**: the story auto-advances without them
+    and every beat is reachable by waiting, so nothing on the page is only obtainable
+    through a marker.
+  - They MUST remain **keyboard reachable with a visible focus ring** (FR-055), and MUST
+    keep meeting the 3:1 non-text contrast bar (WCAG 1.4.11) that the same pass fixed.
+
+  **The exception is spent.** It licenses no other sub-44px target anywhere on the public
+  surface; a further one needs a further amendment.
 - **FR-054**: `prefers-reduced-motion` MUST be respected across the whole feature.
 - **FR-055**: The whole feature MUST be keyboard accessible with a visible focus
   indicator on every interactive element.

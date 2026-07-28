@@ -1,19 +1,36 @@
 import Link from "next/link";
 
 import { Wordmark } from "@/components/brand/wordmark";
-import { PUBLIC_DESTINATIONS } from "@/components/public/destinations";
+import { PUBLIC_AUTH_ACTIONS, PUBLIC_DESTINATIONS } from "@/components/public/destinations";
 import { PublicMobileNav } from "@/components/public/public-mobile-nav";
+import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/app/theme-toggle";
 
 /**
  * Feature 013 — the public navbar (T027, FR-018).
  *
- * VISUALLY IDENTICAL TO THE APP HEADER, DELIBERATELY. Same `h-16` (64 px), same
- * `border-b border-border`, same NON-TRANSLUCENT `bg-bg`, same wordmark size
- * (`text-2xl leading-none`), same three-slot rhythm, and the theme toggle in the same
- * trailing position — matching `components/header/header.tsx` line for line on every
- * property FR-018 names. It is also not sticky, because the app header is not sticky;
- * matching means matching the behaviour that produces the look, not just the classes.
+ * MATCHES THE APP HEADER'S RHYTHM: same `h-16` (64 px), same `border-b border-border`, same
+ * wordmark size (`text-2xl leading-none`), same three-slot layout, and the theme toggle in
+ * the same trailing position — `components/header/header.tsx` on every property FR-018
+ * names.
+ *
+ * ── TWO DELIBERATE DIVERGENCES FROM FR-018, BOTH FROM THE MOCK (2026-07-28) ────────────
+ *
+ * 1. IT IS STICKY, AND TRANSLUCENT WITH IT. The mock's `nav` is `position:sticky; top:0`
+ *    over an 88 %-opaque `--bg` with a 12 px backdrop blur. The app header is neither, and
+ *    P3 matched that on the reasoning that matching means matching behaviour too. On a
+ *    signed-out LANDING page that reasoning inverts: this is a long scrolling page whose
+ *    whole job is to get a stranger to the two buttons below, and a bar that scrolls away
+ *    takes them with it. The app header sits above short, task-shaped screens where
+ *    sticky buys nothing.
+ *
+ * 2. IT CARRIES SIGN IN AND SIGN UP. The trailing slot was a theme toggle alone, which
+ *    left a returning visitor on `/` with no way into the product at all — the hero's CTA
+ *    is the only door on the whole route, and it is below the fold on a phone. That is a
+ *    functional gap on the root route of a live product, not a style question. The app
+ *    header has no such pair because everyone reading it is already signed in.
+ *
+ * Both are recorded in `docs/DECISIONS.md` rather than by editing the spec mid-build.
  *
  * AND A SEPARATE COMPONENT, DELIBERATELY. The two headers look the same and mean
  * different things: `Header` takes a name, an email, and a role, and renders `CenterNav`,
@@ -32,7 +49,13 @@ import { ThemeToggle } from "@/app/theme-toggle";
  */
 export function PublicNavbar() {
   return (
-    <header className="flex h-16 items-center justify-between gap-4 border-b border-border bg-bg px-4 sm:px-6">
+    <header
+      className="sticky top-0 z-50 flex h-16 items-center justify-between gap-2 border-b border-border px-4 backdrop-blur-md sm:gap-4 sm:px-6"
+      // The mock's translucent ground. `color-mix` over the SAME `--color-bg` token the
+      // opaque header used — a percentage of an existing token, not a new one (FR-057) —
+      // so the bar still reads as the page's own surface when content slides under it.
+      style={{ background: "color-mix(in srgb, var(--color-bg) 88%, transparent)" }}
+    >
       <div className="flex items-center gap-2">
         <div className="md:hidden">
           <PublicMobileNav />
@@ -69,7 +92,27 @@ export function PublicNavbar() {
         </ul>
       </nav>
 
-      <div className="flex items-center gap-1">
+      {/*
+       * ORDER IS SIGN IN · SIGN UP · THEME TOGGLE, with the toggle in the far-right corner.
+       * The two actions read left-to-right in the order a stranger needs them, and the
+       * toggle — a preference, not a destination — sits outboard of both rather than
+       * between the wordmark and the way in.
+       */}
+      <div className="flex items-center gap-1 sm:gap-2">
+        {/*
+         * Sign in hides below 420 px and Sign up does not — the mock's own rule, and the
+         * right one: at 320 px the bar is already carrying a hamburger, a wordmark and a
+         * theme toggle, and two buttons would push the row past the viewport. The one that
+         * survives is the one for people who do not have an account yet, because the other
+         * is one tap away in the sheet, which is where BOTH also live (FR-019). `h-11`
+         * keeps each at a 44 px tap target and neither label wraps (FR-053).
+         */}
+        <Button asChild variant="outline" size="default" className="hidden h-11 px-4 min-[420px]:inline-flex">
+          <Link href={PUBLIC_AUTH_ACTIONS.signIn.href}>{PUBLIC_AUTH_ACTIONS.signIn.label}</Link>
+        </Button>
+        <Button asChild variant="default" size="default" className="h-11 px-4">
+          <Link href={PUBLIC_AUTH_ACTIONS.signUp.href}>{PUBLIC_AUTH_ACTIONS.signUp.label}</Link>
+        </Button>
         <ThemeToggle />
       </div>
     </header>

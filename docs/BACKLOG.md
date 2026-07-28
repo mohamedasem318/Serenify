@@ -2380,3 +2380,120 @@ the next person does not mirror it into the runtime example. Worth naming the lo
 **Address by**: any contributor-onboarding or test-infrastructure pass. Not urgent while the
 current machines already have a working `.env.local`, but it is a hard stop for a fresh clone —
 including CI, if a Playwright job ever lands (**#41**).
+
+### Signup refusal is silent on the no-JavaScript path — ST-9 FAILED and knowingly accepted (#184)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#184 OPEN**.
+**Category**: progressive enhancement / consent gate UX
+**Observed**: 2026-07-28, running **ST-9** during feature-013 P8 Stage 1
+(`specs/013-public-surface-and-legal/smoke-tests.md`).
+**Description**: with JavaScript disabled — or hydration not yet complete, or failed behind a proxy
+or on a flaky network — submitting `/signup` with the Terms and Privacy acknowledgement **unchecked**
+is correctly refused, but the refusal is **silent**. The page re-renders with **zero `[role="alert"]`
+nodes** and **every field cleared**: a blank form and no explanation.
+
+**⚠ DECISION: ST-9 is recorded as FAILED and knowingly accepted for feature 013 — never as passed,
+and never as partial.** Same treatment as **#177**: a knowingly accepted hole on a live product,
+written down rather than assumed, so nobody later reads P8's green tick as meaning ST-9 passed.
+
+**Why it is accepted rather than fixed now.** The refusal is **safe** — it fails closed: no account
+and no consent row, because `signUpSchema` refuses at the parse step before `supabase.auth.signUp` is
+reached. The harm is **confusion for a small population**, not mishandled data. Fixing it means
+editing `apps/web/app/(auth)/signup/actions.ts` — the most sensitive file in this feature — during
+the deploy window, risking the ~99% JavaScript path to repair the ~1% no-JavaScript path.
+
+**How it was measured, because the method matters here.** Playwright, context created with
+`javaScriptEnabled: false`. That setting was **verified rather than assumed**: `page.evaluate()` is
+not a valid probe of it — the call runs through the debugger protocol and keeps working with script
+execution disabled — so the probe used a side effect of the page's own scripts. JavaScript off:
+`window.__next_f` `undefined`, no `__react*` keys on the checkbox. JavaScript on (control): both
+present. Anyone re-running this should use the same probe; a `page.evaluate`-based one will report
+the opposite and be wrong.
+
+The rest of ST-9 passed on that same run: unchecked → **0** rows in `auth.users`; `/terms` and
+`/privacy` open in a new tab (`target="_blank"`) and lose **no** entered data — email, full name, a
+17-character password and the ticked box all survived; checked → account created with **exactly one**
+`user_consents` row (`terms_privacy@2026-07-26.1`).
+
+**Fix scope**: small, and it is **surfacing an existing message, not inventing one** — the
+JavaScript-on path already renders the correct string, *"Please accept the Terms and Privacy Policy
+to continue."*, so the work is carrying that reason across the no-JavaScript seam. Two server-side
+shapes are worth weighing: redirect back to `/signup` with a **non-sensitive** status marker in the
+query string (the `?state=check_email` pattern already in that file — note the current path returns
+`void` precisely so credentials never reach the URL), or render the reason from the server component
+on re-render. Whichever lands must preserve `signUpFromForm`'s deliberate design: it adds **no**
+validation of its own and delegates entirely to `signUp()`, and a parallel guard there is a second
+thing to get wrong — the one nobody exercises.
+
+**Address by**: its own change, after `013-public-surface-and-legal` merges. **Not** during the
+deploy window.
+
+### Blocked team photo leaves a large empty reserved box — no graceful placeholder (#185)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#185 OPEN**.
+**Category**: landing page / failure-state presentation
+**Observed**: 2026-07-28, running **ST-14** during feature-013 P8 Stage 1.
+**Description**: when the landing page's team photograph fails to load, the space it occupied stays
+as a **large empty box** — roughly 1440 × 700 px at desktop — bordered and blank. Everything around
+it is unaffected.
+
+**This is correct behaviour, and that is the point.** `apps/web/components/landing/team-photo.tsx`
+renders `next/image` with explicit `width={1600} height={1164}`, which reserves the aspect ratio and
+prevents cumulative layout shift — and that reservation is exactly why the layout does **not**
+collapse when the image is missing. What is missing is the *graceful* half: the reserved area reads
+as a blank rather than as a deliberate placeholder.
+
+**ST-14 itself PASSED** and this entry is the cosmetic remainder, logged so it is not lost. With the
+photo blocked (every image request and `/_next/image` aborted): 4 name cards, 8 external links, the
+caption "Choose a name to find them in the photo." and the supervisor credits all present, section
+1440 × 1197.8 px. Throttled (50 kB/s down, 500 ms RTT): same content, 1440 × 1198.0 px — within a
+third of a pixel of the unthrottled height.
+
+**Fix scope**: small and self-contained — a placeholder state on the reserved area (a surface-token
+fill so the box reads as intentional, a short acknowledgement that the photo did not load, or
+`next/image`'s `onError` driving a styled fallback). **Must keep the explicit width/height
+reservation**: removing it to avoid the blank box would trade a cosmetic blemish for real layout
+shift, which is the worse outcome.
+
+**Address by**: any landing-page polish pass after 013 merges. Low priority — it appears only when
+the image fails, and the section stays fully functional when it does.
+
+### `cold-start-readiness.spec.tsx` fights next-themes for the `dark` class — intermittent under load (#187)
+**Status**: test defect (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#187 OPEN.**
+**Category**: layout test suite / feature 009
+**Observed**: 2026-07-28, while verifying `fix-landing-fidelity` (PR #186).
+
+**Description**: the two **dark** variants of `apps/web/tests/layout/cold-start-readiness.spec.tsx`
+fail intermittently in a full `playwright.layout.config.ts` run, and pass every time in isolation.
+The failure is a contrast assertion — `Expected: >= 4.5`, `Received: 4.336…` — which looks like a
+colour regression and is not one. No token value changed.
+
+**Root cause**: the spec sets the theme by hand, immediately after `page.goto`:
+
+```ts
+await page.evaluate((dark) => {
+  document.documentElement.classList.toggle("dark", dark);
+}, theme === "dark");
+```
+
+`/cold-start-harness` lives under `app/`, so it is wrapped by `Providers` →
+`ThemeProvider attribute="class" defaultTheme="system"`. **next-themes owns that class.** When its
+hydration effect runs *after* the test's toggle — which is what happens once the machine is busy —
+it resolves the system preference (light, Playwright's default) and reverts the class. The dark
+test then measures a light or partially-reverted palette, and 4.336 is that torn state rather than
+either theme's real value.
+
+**Why it surfaced now, and why it is not PR #186's defect**: that PR adds a fifth viewport (1280 px)
+to `landing-hero-stability.spec.ts` — a 17-beat test that adds ~40 s of wall clock and CPU to the
+same four-worker pool. That extra contention is what makes the pre-existing race land on the losing
+side. Measured: **3/3 clean full-suite runs on `013-public-surface-and-legal`** vs **3 intermittent
+failures across ~8 full-suite runs on `fix-landing-fidelity`**, with **6/6 clean** on the branch once
+the machine was otherwise idle. The race is in the 009 spec; the new width only changes how often it
+loses. Every landing-owned assertion passed in every run.
+
+**Fix scope**: small. Drive the theme the way the browser actually does rather than by racing the
+provider — `await page.emulateMedia({ colorScheme: theme })` before `goto`, which is what the
+feature-013 walks use and what next-themes then resolves *to* rather than away from. Alternatively
+await a settled signal (`html.dark` present AND hydration complete) before measuring. Either removes
+the race; the manual `classList.toggle` cannot be made reliable while the provider owns the class.
+
+**Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
+than a missed regression, and it never passes when it should fail.

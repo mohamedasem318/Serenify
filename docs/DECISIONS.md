@@ -5346,3 +5346,171 @@ exactly one line. Zero outer-dimension drift remains the bar at all four widths.
 
 **Not done**: `plan.md` is **not** edited and T107's text is unchanged beyond the
 assertion itself. The amendment is noted in the P6 PR body.
+
+---
+
+## 2026-07-28 — The public navbar becomes sticky and gains Sign in / Sign up; the story card's narration returns to `--text-xs` at every width
+
+Three divergences from the spec, recorded here rather than by editing `plan.md`,
+`spec.md` or `research.md` mid-build. All three came out of a fidelity pass against the
+signed-off mock (`docs/mockups/serenify-landing-mock.html`), which is the authority for
+how the page **looks** — never for what it **says**.
+
+### 1. The navbar is sticky and translucent (diverges from FR-018)
+
+**Context**: FR-018 requires the public navbar to be visually identical to the app header,
+and P3 read that as covering behaviour too — so it was neither sticky nor translucent,
+because `components/header/header.tsx` is neither.
+
+**Decision**: on the public shell it is now `sticky top-0 z-50` over
+`color-mix(in srgb, var(--color-bg) 88%, transparent)` with a 12 px backdrop blur, which is
+what the mock's `nav` rule does. The reasoning that produced the original choice inverts on
+a landing page: `/` is a long scrolling narrative whose entire job is to deliver a stranger
+to the two buttons in the bar, and a bar that scrolls away takes them with it. The app
+header sits above short, task-shaped screens where sticky buys nothing. Everything else
+FR-018 names — `h-16`, `border-b border-border`, the wordmark size, the three-slot rhythm,
+the trailing theme toggle — is unchanged.
+
+`html { scroll-padding-top: 4rem }` is added in `globals.css` as a direct consequence: the
+hero's second CTA targets `#how-it-works`, and without it the browser parks that heading
+underneath the now-fixed bar.
+
+### 2. The navbar carries Sign in and Sign up (a functional gap, not a style choice)
+
+**Context**: the trailing slot held the theme toggle alone. A returning visitor landing on
+`/` therefore had **no way into the product from the navigation at all** — the hero's
+"Get started" CTA was the only door on the route, and on a phone it is below the fold.
+
+**Decision**: `Sign in` (outlined) and `Sign up` (solid ink) are added, sourced from a new
+`PUBLIC_AUTH_ACTIONS` in `components/public/destinations.ts`. They are deliberately **not**
+members of `PUBLIC_DESTINATIONS`: that list also drives the footer's site map, where an auth
+action does not belong, and keeping them separate is what lets the shell test go on
+asserting the destination list contains nothing authed. `/login` and `/signup` are
+unauthenticated routes under `app/(auth)/` — not `/app`, not role-gated — so this does not
+put an authed destination on the public surface.
+
+Per the mock, `Sign in` hides below 420 px so the bar still fits at 320 px; **both** appear
+in the mobile sheet, so the narrowest viewport loses nothing (FR-019).
+
+### 3. The narration is `--text-xs` at every width — the `md:` step is removed
+
+**Context**: P6 stepped the story card's narration to `--text-base` (17 px) at `md`. The
+mock's `.vo` is 12.5 px at every width; the step has no counterpart there.
+
+**Measured 2026-07-28, real Chromium**: at 1024, 1280 and 1440 px the closing beats
+(`backToAtEase` and the approved §10.3 Position 3 string) rendered **51 px of text inside
+the 25.5 px one-line row** and were sliced in half by `overflow-hidden`. The cause is the
+two-column hero: at `lg` the card becomes a ~520 px column, and 17 px copy needs more room
+than that. The four widths T107 measured — 320/375/414/768 — are all **single-column**,
+where the card is full width and the string fits, which is why the suite passed 5/5 while
+the page was visibly broken.
+
+**Decision**: the narration returns to `--text-xs` at every width. This is a **reversal of
+a P6 regression, not a new size** — it restores the mock's own value, and it changes no
+copy. The 2026-07-27 amendment above is untouched: the row is still two lines below 768 px
+and one line at and above it.
+
+`tests/layout/landing-hero-stability.spec.ts` gains **1280 px** to its width list and a new
+`narrationClipped` assertion (text `scrollHeight` against row `clientHeight`), because the
+existing checks structurally could not see this: a fixed row height is exactly what does
+*not* change when content is clipped, and "wrapped" and "clipped" are different facts. Both
+additions were confirmed **red** against the old code before the fix.
+
+**Not done**: `plan.md`, `spec.md` and `research.md` are not edited. This entry is the
+record.
+
+---
+
+## 2026-07-28 (second pass) — FR-053 gains a spent 24×24 exception for the chapter markers; the wordmark enters headings; the Ren thread types
+
+Four changes from the landing fidelity pass's follow-up round. Only **one** of them edits a
+planning artifact: FR-053, at Mohamed's explicit instruction. `plan.md` and `research.md`
+are untouched, and nothing else in `spec.md` changed.
+
+### 1. FR-053 — a 24×24 px exception, scoped to the chapter markers, spent
+
+**Context**: the 44px tap-target floor made the mock's chapter-marker treatment
+unreachable. Six controls in one row means the cluster is **264px wide at 44×44** however
+small the dot is drawn, because the *hit area* sets the width — against the mock's ~66px.
+The row read as scattered rather than as a cluster. Reported as a constraint conflict
+rather than resolved unilaterally, since shrinking a stated floor was not mine to decide.
+
+**Decision (Mohamed, 2026-07-28)**: amend FR-053 with an exception permitting **24×24px**
+targets for `components/landing/chapter-markers.tsx` **only**, marked spent, in the same
+shape as FR-026's single-silhouette exception. The reasoning recorded in the amendment:
+24×24 satisfies **WCAG 2.5.8 (AA)** — a step from AAA to AA on one control, not a drop
+below conformance — the markers are a **convenience rather than a path** (the story
+auto-advances without them, so no beat is reachable only through a marker), and they must
+stay keyboard-reachable with a visible focus ring.
+
+**Measured after**: markers are **24×24**, the cluster is **144px** (was 264px), the
+resting dot holds **5.58:1 light / 6.58:1 dark**, and a focused marker still renders the
+app's focus ring. Every other interactive element on the public surface remains ≥44px and
+the walk asserts it, exempting only these six.
+
+The mock's literal ~66px is still not reached and cannot be without going below 24px. 144px
+is the floor under the amended rule.
+
+### 2. The wordmark renders inside headings — without widening FR-029's site table
+
+Six headings name the product: one on the landing page and five across the two legal
+documents. They now render it through the shared `<Wordmark />` via a new
+`components/brand/wordmark-in-text.tsx`, which splits the copy string and delegates.
+
+**Why this is not a new FR-029 site.** FR-029's table is exhaustive about the *chrome*
+surfaces that render the wordmark as a standing brand mark, and — load-bearingly — about
+the two that **cannot** consume the shared component and are therefore named hand-sync
+exceptions. A heading containing the product name in a sentence introduces no hand-sync
+exception: it consumes the one definition, so the rule the table exists to protect (one
+definition, reused, never re-typed) is satisfied rather than stretched. Writing the two-tone
+markup at each of the six call sites would have been the actual violation.
+
+**Superseded in part, 2026-07-28:** this reading was accepted and **FR-029 was amended** to
+state it, because "exhaustively" read as a closed list of every place the wordmark may
+appear. The amendment clarifies rather than allows — in-prose usage through the shared
+definition is permitted, re-typing the markup at such a site remains a violation, and the
+hand-sync exceptions remain exactly two. So the sentence above saying `spec.md` is not
+edited for this held on the day it was written and no longer does.
+
+**Deliberately not applied anywhere else.** Body copy, section labels and the legal
+documents' contents index stay plain. The contents index is a nav list rather than a
+heading, and a two-tone mark repeated down a sidebar is the wallpaper effect that costs the
+hero the effect it exists to carry.
+
+### 3. The quiet panel's bars follow the band
+
+They were pinned to meadow, so the panel stayed green while the reading beside it said
+"A little tense" and the sparkline had already gone amber — three parts of one readout
+disagreeing about the same moment. Same three tokens and the same mapping `story-trend.tsx`
+uses. Following the band is not encoding a value: the bars still carry no number and their
+heights are unchanged.
+
+### 4. The Ren thread types — and the drift invariant was never traded for it
+
+The person's messages type character by character and Ren shows a typing indicator before
+each reply. The obvious hazard is a growing element inside a box whose whole guarantee is
+that nothing moves.
+
+**The bubble reserves its final size and fills in.** Each animating bubble is a 1×1 grid
+holding two children in the SAME cell: an `invisible` copy of the complete message, which
+is what the grid measures, and the revealed prefix painted over it. The box is the finished
+box from the first character, and the prefix wraps where the finished text wraps because
+both lay out at the same width.
+
+**Measured, because "it looks fine" is not the bar here.** Sampled mid-type and after, at
+320/414/768/1280: the bubble is **324.3×27.9 / 299.5×45.8 / 212×45.8 identical in both
+samples**, painted 13–17 of 50 characters at the mid sample, with the card's own box
+unchanged, nothing outside the panel, no thread scrolling, and the 4-bubble cap intact.
+Ren's indicator is the one thing that changes size and it only grows *toward* the
+already-measured finished state, in the same slot — never a fifth list item.
+
+**Reduced motion is absence, not slowness**: no typing, no indicator, and no dependence on
+a timer having fired, so a visitor stepping through with the markers sees complete text at
+every beat. The answer is threaded down from `use-story-clock.ts` rather than queried
+again — T099 asserts exactly one landing module reads that query, and a second reader could
+disagree with the clock on the render where they resolve.
+
+**The indicator is an animation, not copy**: it is `aria-hidden`, and every bubble carries
+its full text in an `sr-only` span from mount, so a screen reader gets each message once,
+statically, and hears nothing as it types. A live region would have re-announced a growing
+string on every frame.

@@ -1,3 +1,4 @@
+import { WordmarkInText } from "@/components/brand/wordmark-in-text";
 import {
   NEVER_CARD_CHAT_BODY,
   NEVER_CARD_CHAT_HEADING,
@@ -39,7 +40,7 @@ export function NeverCards() {
     <section className="border-t border-border bg-surface/40">
       <div className="mx-auto w-full max-w-5xl px-4 py-14 sm:px-6">
         <h2 className="font-display text-2xl font-semibold text-ink sm:text-3xl">
-          {NEVER_SECTION_HEADING}
+          <WordmarkInText text={NEVER_SECTION_HEADING} />
         </h2>
         <p className="mt-3 max-w-prose text-base text-muted">{NEVER_SECTION_SUB}</p>
 

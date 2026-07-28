@@ -64,7 +64,19 @@ export function StatusStatement() {
           ))}
         </ul>
 
-        <p className="mt-8 max-w-prose text-sm leading-relaxed text-muted">{STATUS_NOTE}</p>
+        {/*
+         * THE NOTE SITS IN A BOX BECAUSE EVERY OTHER PIECE OF TEXT AROUND IT DOES.
+         *
+         * As a bare paragraph it started at the section's own left edge while the three
+         * modality cards above and the retention box below both inset their text by the
+         * same `p-5` — so the one paragraph that carries the section's actual argument was
+         * the one paragraph visibly out of line with everything near it. The mock gives
+         * `.status-note` a bordered, padded ground for exactly this reason. Same box as its
+         * neighbours, so the left inset is shared rather than approximated.
+         */}
+        <div className="mt-8 rounded-lg border border-border bg-bg p-5">
+          <p className="max-w-prose text-sm leading-relaxed text-muted">{STATUS_NOTE}</p>
+        </div>
 
         <div className="mt-10 rounded-lg border border-border bg-bg p-5">
           <h3 className="text-base font-semibold text-ink">{RETENTION_HEADING}</h3>
