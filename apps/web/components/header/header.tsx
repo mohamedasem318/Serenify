@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { Wordmark } from "@/components/brand/wordmark";
 import { CenterNav } from "@/components/header/center-nav";
 import { MobileMenu } from "@/components/header/mobile-menu";
 import { ProfileDropdown } from "@/components/header/profile-dropdown";
@@ -23,9 +24,7 @@ export function Header({ fullName, email, role }: HeaderProps) {
           aria-label="Go to home"
           className="inline-flex items-baseline gap-2"
         >
-          <span className="font-display text-2xl leading-none tracking-tight text-ink">
-            serenify
-          </span>
+          <Wordmark className="text-2xl leading-none" />
         </Link>
       </div>
 

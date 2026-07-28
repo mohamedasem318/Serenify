@@ -25,7 +25,7 @@ import type { BloomTone } from "./use-monitoring-session";
  * amber tokens via `color-mix` rather than the mock's raw hex; warming-up = meadow.
  */
 
-const TONE_COLOR: Record<BloomTone, string> = {
+export const TONE_COLOR: Record<BloomTone, string> = {
   ease: "var(--color-meadow)",
   warming: "var(--color-meadow)",
   // The mock's `--bloom-little` mid-gold expressed through the real tokens (not raw hex).
@@ -39,12 +39,28 @@ const CORE_BG =
 const HALO_BG =
   "radial-gradient(circle, color-mix(in srgb, var(--bloom) 40%, transparent) 0%, transparent 62%)";
 
-export function Bloom({ tone, className }: { tone: BloomTone; className?: string }) {
+export function Bloom({
+  tone,
+  className,
+  color,
+}: {
+  tone: BloomTone;
+  className?: string;
+  /**
+   * OPTIONAL colour override for `--bloom` (feature 013 — T082, R6; FR-021/FR-022).
+   * Omitted by every monitor call site, which keeps `TONE_COLOR[tone]` and today's
+   * behaviour byte-identically. It exists because `--bloom` is set as an INLINE style
+   * on this element, which an ancestor cannot override — and FR-021 forbids the landing
+   * page reimplementing the orb, so a landing-only copy was never an option. The landing
+   * page passes `var(--color-foggy)` for Ren's blue state (an approved FR-022 liberty).
+   */
+  color?: string;
+}) {
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
 
   // Sizing: the monitoring-stage bloom by default (≈220px → 288px), overridable.
   const box = cn("relative grid size-56 place-items-center sm:size-72", className);
-  const style = { ["--bloom" as string]: TONE_COLOR[tone] };
+  const style = { ["--bloom" as string]: color ?? TONE_COLOR[tone] };
 
   const halo = (
     <span

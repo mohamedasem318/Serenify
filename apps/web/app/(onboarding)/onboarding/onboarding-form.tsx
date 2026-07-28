@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 
 import { AnchorRecorder } from "@/components/anchor/anchor-recorder";
+import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import {
   onboardingSchema,
   type OnboardingInput,
@@ -20,7 +21,24 @@ function goToApp() {
   window.location.replace("/app");
 }
 
-export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }) {
+export function OnboardingForm({
+  defaultFullName,
+  cameraBlocked = false,
+}: {
+  defaultFullName?: string;
+  /**
+   * The camera-and-inference consent decision, resolved on the server (feature 013,
+   * T049). It gates the ANCHOR STEP ONLY.
+   *
+   * The name step below runs regardless, and that is the whole point. FR-043c blocks
+   * calibration, baseline capture and monitoring sessions — "and nothing else". Gating
+   * the name step too would exceed the requirement and, worse, would strand the user:
+   * this step is the only thing that writes profiles.full_name, and proxy.ts:203 bounces
+   * a null-full_name user back to /onboarding from everywhere. Declining would then loop
+   * forever with no exit.
+   */
+  cameraBlocked?: boolean;
+}) {
   const [step, setStep] = useState<"name" | "anchor">("name");
   const [pending, startTransition] = useTransition();
   const [submitState, setSubmitState] = useState<OnboardingResult | null>(null);
@@ -57,7 +75,16 @@ export function OnboardingForm({ defaultFullName }: { defaultFullName?: string }
     // capture vertically (the onboarding <main> is already a min-h-dvh flex col).
     return (
       <div className="flex flex-1 flex-col justify-center">
-        <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
+        {cameraBlocked ? (
+          // FR-038, structurally: <AnchorRecorder> is not rendered at all, so nothing
+          // that could call getUserMedia is in the mounted tree. Not hidden, not
+          // disabled — absent. Accepting refreshes the server component, which re-reads
+          // the consent and flips cameraBlocked, and this step then renders the recorder
+          // without the visitor losing their place (router.refresh keeps client state).
+          <CameraConsentGate />
+        ) : (
+          <AnchorRecorder context="onboarding" onComplete={goToApp} onSkip={goToApp} />
+        )}
       </div>
     );
   }

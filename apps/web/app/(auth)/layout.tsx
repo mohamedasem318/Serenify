@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Wordmark } from "@/components/brand/wordmark";
+
 import { ThemeToggle } from "../theme-toggle";
 
 /**
@@ -38,9 +40,7 @@ export default function AuthLayout({
           href="/login"
           className="inline-flex items-baseline gap-2"
         >
-          <span className="font-display text-4xl leading-none tracking-tight text-ink sm:text-5xl">
-            serenify
-          </span>
+          <Wordmark className="text-4xl leading-none sm:text-5xl" />
         </Link>
         <ThemeToggle />
       </header>

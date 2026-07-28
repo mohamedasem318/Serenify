@@ -179,6 +179,18 @@
     font-size: var(--text-base);
   }
 
+  /* Feature 013 — clears the public navbar when an in-page anchor is jumped to.
+     The public shell's header became sticky on 2026-07-28 (see public-navbar.tsx), and
+     the hero's "See how it works" CTA targets #how-it-works: without this, the browser
+     scrolls the section's top edge to y=0, which is UNDER the 64px bar, and the heading
+     the visitor asked for is the one thing they cannot see. 4rem is the header's own
+     h-16. Harmless on the authed surfaces, whose header is not sticky and which have no
+     in-page anchors — scroll-padding affects nothing until something scrolls to a
+     fragment. */
+  html {
+    scroll-padding-top: 4rem;
+  }
+
   /* Respect prefers-reduced-motion per Constitution Principle VI. Capping the iteration
      count is load-bearing: shortening only the duration leaves an INFINITE animation
      (e.g. the recording pill's animate-pulse) looping every 0.01ms — i.e. flickering

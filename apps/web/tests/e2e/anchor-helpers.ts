@@ -1,6 +1,11 @@
 import { type Page, expect } from "@playwright/test";
 
-import { randomEmail } from "./helpers";
+import { randomEmail, termsConsentMetadata } from "./helpers";
+// Relative, not the `@/` alias: no other file under tests/e2e/ uses the alias, and
+// Playwright resolves this module with its own transform rather than Next's. Matching
+// the directory's existing convention keeps the helper working under both runners.
+import { bindingRevision } from "../../lib/consent/evaluate";
+
 import { createAdminClient } from "./setup/admin-client";
 
 export const MODEL_VERSION = "serenify-video-lbptop-motion-rf-calibrated@2.0.0";
@@ -276,8 +281,42 @@ export async function recordAnchor(page: Page) {
 /** Wall-clock budget for a recording: 60s capture + upload + cold /app compile. */
 export const RECORD_AND_LAND_TIMEOUT = 80_000;
 
-/** A confirmed employee with NULL profile full_name (routes through onboarding). */
-export async function createOnboardingEmployee() {
+/**
+ * Record the camera-and-inference consent for a fixture user (feature 013, P4).
+ *
+ * Every capture route now gates on this and FAILS CLOSED, so a fixture without a consent
+ * row lands on `<CameraConsentGate>` instead of its recorder and the spec fails on a
+ * missing element rather than on anything it meant to test.
+ *
+ * THE VERSION IS RESOLVED FROM THE REGISTRY, never hardcoded. `bindingRevision` is the
+ * revision the gate actually requires, so when a future material revision is published
+ * these fixtures follow it automatically instead of going silently stale and re-breaking
+ * the same five specs.
+ *
+ * Written with the service role deliberately: this is fixture setup, not a code path
+ * under test. The gate's own read still runs under the user's session and its RLS.
+ */
+export async function seedCameraConsent(userId: string) {
+  const admin = createAdminClient();
+  const { error } = await admin.from("user_consents").insert({
+    user_id: userId,
+    consent_key: "camera_inference",
+    document_version: bindingRevision("camera_inference").versionId,
+  });
+  if (error) throw error;
+}
+
+/**
+ * A confirmed employee with NULL profile full_name (routes through onboarding).
+ *
+ * Carries the camera consent, because these fixtures exist to exercise the ANCHOR flow
+ * and the consent gate is not what they are testing. A spec that wants to see the gate
+ * should create a user without calling this, or use `createOnboardingEmployee({
+ * withCameraConsent: false })`.
+ */
+export async function createOnboardingEmployee({
+  withCameraConsent = true,
+}: { withCameraConsent?: boolean } = {}) {
   const admin = createAdminClient();
   const email = randomEmail("anchor-emp");
   const password = "Employee123!";
@@ -285,8 +324,13 @@ export async function createOnboardingEmployee() {
     email,
     password,
     email_confirm: true,
+    // Terms/Privacy consent only. NO full_name — this fixture exists precisely to
+    // route through /onboarding, and the trigger reads full_name from this same
+    // metadata, so adding one here would silently skip the step under test.
+    user_metadata: termsConsentMetadata(),
   });
   if (error || !data.user) throw error ?? new Error("createUser failed");
+  if (withCameraConsent) await seedCameraConsent(data.user.id);
   return { email, password, id: data.user.id };
 }
 
@@ -298,6 +342,8 @@ export async function createOnboardingEmployee() {
  * happens to exercise.
  */
 export async function createCalibratableEmployee(fullName = "Calibrate Test") {
+  // Inherits the camera consent from createOnboardingEmployee, so /app/calibrate and
+  // /app/monitor render their recorders rather than the consent gate.
   const emp = await createOnboardingEmployee();
   const admin = createAdminClient();
   const { error } = await admin
@@ -392,6 +438,8 @@ export async function createManager(role: "team_lead" | "admin") {
     email,
     password,
     email_confirm: true,
+    // As above: consent only, full_name deliberately left NULL for this fixture.
+    user_metadata: termsConsentMetadata(),
   });
   if (error || !data.user) throw error ?? new Error("createUser failed");
   const { error: roleErr } = await admin

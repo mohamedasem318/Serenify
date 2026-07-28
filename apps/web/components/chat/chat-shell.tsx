@@ -15,6 +15,7 @@ import {
 } from "@/app/(authed)/app/chat/actions";
 import { BandChip } from "@/components/chat/band-chip";
 import { CrisisResourcePanel } from "@/components/chat/crisis-panel";
+import { RenAvatar } from "@/components/chat/ren-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -56,20 +57,6 @@ type Props = {
    */
   handoffOpener?: string;
 };
-
-function RenAvatar({ size = 34 }: { size?: number }) {
-  return (
-    <span
-      aria-hidden
-      style={{ width: size, height: size }}
-      // dark:text-bg mirrors the Button meadow idiom — near-white "R" in light mode, deep
-      // ink "R" on the lighter dark-mode meadow (bare text-on-accent washes out ~1.9:1).
-      className="grid shrink-0 place-items-center rounded-full bg-meadow font-display font-bold text-on-accent dark:text-bg"
-    >
-      R
-    </span>
-  );
-}
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const isUser = message.role === "user";

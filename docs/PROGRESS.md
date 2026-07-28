@@ -4,6 +4,77 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 013 — Public Surface and Legal (merged to main)
+
+**Branch**: `013-public-surface-and-legal`
+**Status**: **merged to `main`** via **PR #194** (squash-merged; `main` enforces linear history).
+All 148 tasks (T001–T148) complete. The public front door and the legal surface behind it: the
+landing page at `/`, `/terms`, `/privacy`, a public navbar + footer, and **two consent gates** —
+Terms/Privacy and camera-and-inference — neither of which is one-time. Consent is a **history**
+(`20260726000000_user_consents.sql`): one append-only row per accepted revision, never overwritten,
+owner-only RLS, an immutability trigger, and no UPDATE/DELETE grant.
+**Date**: 2026-07-28
+
+**Merging is the production deploy.** Vercel builds production from `main`, so PR #194 landing *is*
+the release — there is no separate deploy step (`deploy-protocol.md` §3, `docs/DECISIONS.md`
+2026-07-28 third pass). The migration was applied to hosted **ahead** of the code, deliberately and
+safely: pre-013 code sends no `terms_privacy_version`, so the trigger's `?` key-existence guard
+skips the consent INSERT and raises nothing.
+
+### Phases and their PRs
+
+| Phase | Tasks | PR |
+|---|---|---|
+| Spec / plan / tasks | T001 | #160, #166, #167 |
+| **P1** — Wordmark: one shared two-colour definition, both hand-sync exceptions | T002–T010 | **#168** |
+| **P2** — Consent foundation: append-only history + version-identity evaluator | T011–T019 | **#169** |
+| **P3** — Legal + public shell: two real documents and the shell they live in | T020–T037 | **#170** |
+| **P4** — The two prompting gates: server-side signup acknowledgement, fail-closed camera gate | T038–T062 | **#171** |
+| **P5** — The app-shell entry gate (**ships alone**, so one `git revert` unwinds it) | T063–T077 | **#172** |
+| **P6** — The landing page takes over `/` | T078–T113 | **#181** |
+| **P7** — The team section | T114–T130 | **#182** |
+| **P8** — Wrap, deploy, close-out | T131–T148 | **#194** |
+
+Supporting PRs on the branch: **#173** and **#175** (e2e fixtures consented against P5's gate, with
+one user left deliberately blocked), **#180** (`next` 16.2.6 → 16.2.11, nine advisories, taken ahead
+of P6 because P6 reads the Next 16 routing docs out of `node_modules`), **#183**, **#186** (landing
+made faithful to the mock), **#188** (re-consent screen rhythm, narrow-width auth door, current-page
+marker), **#193** (the TTFB follow-up logged, not built).
+
+### Issues closed
+
+- **#75** — ToS + Privacy Policy + signup consent gate (Egypt PDPL). The ⛔ pre-production
+  data-processing blocker. All three conditions shipped across P3 and P4.
+- **#157** — camera + inference consent gate. All three capture routes gated, including
+  `/onboarding`, which is a calibration surface and easy to miss.
+- **#158** — `README.md` present-tense manager-visibility claims. Fixed as a P3 ride-along and held
+  open until P8 so the result could be re-read against `plan.md` §0.3 rather than closed on the
+  strength of the commit.
+
+### Shipped knowingly broken, or knowingly open
+
+- **ST-9 FAILED and knowingly accepted (#184)** — the no-JavaScript signup refusal is silent. It
+  fails **closed** (no account, no consent row), so the harm is confusion, not data. **P8's sign-off
+  does not mean ST-9 passed.**
+- **WebKit has no automated coverage (#177)** — sign-off was **Chromium and Firefox only**.
+- **#62 stays open deliberately** — `/signup` remains open self-serve for the demo window, and R8's
+  SC-006 bypass is live and accepted with it. Blast radius: one forged consent row, for the forger's
+  own account, RLS-scoped. Recorded as a decision so it cannot later be read as an oversight.
+- **#176 updated, not closed** — the 18 `next` alerts clear on this merge; `postcss` × 2 and
+  `sharp` × 1 remain and this bump does not touch them.
+- Also open: **#86, #155, #174, #178, #179, #185, #187, #189, #190, #192, #193**.
+
+### Decisions logged in DECISIONS.md (2026-07-28, third pass)
+
+Order A (legal first) · version identity over timestamp comparison · the registry in the repo rather
+than a table · the two gates' **opposite** fail directions and why · one migration file ·
+`decision` admitting only `'granted'`, with declining writing nothing and feature 018 owning
+withdrawal · the **R8** residual and the deliberate open-signup posture · the **R7** correction
+(narrower than `plan.md` §15 states — `plan.md` deliberately not edited) · production deploying from
+`main`.
+
+---
+
 ## Milestone — Production deployment: Serenify is live at https://serenify.tech
 
 **Backfilled 2026-07-22.** The three entries below (this one, cold-start readiness, and brand

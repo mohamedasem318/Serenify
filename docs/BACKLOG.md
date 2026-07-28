@@ -1438,8 +1438,10 @@ These two items were not deferred from a single feature; they are product-wide
 concerns surfaced during the feature 007 / 008 window and logged here so the
 roadmap pulls them in at the right gate rather than re-deriving them.
 
-### Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction) — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#75)
-**Status**: deferred-feature
+### ~~Terms of Service, Privacy Policy, and signup consent gate (Egyptian jurisdiction)~~ — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#75)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#75 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: all three of #75's conditions shipped — **`/terms`** and **`/privacy`** (P3) and the **signup consent gate** (P4). The gate is not one-time: consent is recorded as an append-only **history** in `public.user_consents`, one row per accepted revision, and a revision judged **material** re-prompts everyone whose recorded consent predates it. The Terms/Privacy gate blocks the **whole application**, not just signup. The Egypt PDPL framing that opened this entry is answered by the documents themselves rather than by this entry. **Note the residual, recorded honestly**: SC-006 holds for accounts created through the product's own `/signup` surface and **not** against a caller bypassing it — root cause **#62**, which stays open deliberately (`docs/DECISIONS.md`, 2026-07-28 third pass).
+**Original status**: deferred-feature
 **Category**: legal / compliance / consent
 **Observed**: 2026-06-19, product-wide capture (cross-cutting, not deferred from a single feature)
 **Description**: The app needs a **Terms of Service** and a **Privacy Policy**, plus an
@@ -1938,8 +1940,10 @@ Amendment 17, `docs/DECISIONS.md` 2026-07-24 (Amendment 17), and `docs/DECISIONS
 
 ## From feature 013 spec (public-surface-and-legal) — captured 2026-07-25
 
-### Camera + inference consent gate — no consent is recorded for webcam capture or inference — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#157)
-**Status**: deferred-feature (`type:feature` / `area:web` / `area:db` / `priority:blocker`) — **OPEN.** GitHub issue **#157 OPEN**.
+### ~~Camera + inference consent gate — no consent is recorded for webcam capture or inference~~ — ⛔ PRE-PRODUCTION DATA-PROCESSING GATE (#157)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#157 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: the camera-and-inference consent is now its own registry key (`camera_inference`) with its own recorded history, gating **all three** capture routes — `/onboarding`, `/app/calibrate` and `/app/monitor` — not just the two obvious ones (`plan.md` §0.5: `/onboarding` mounts `<AnchorRecorder>` and is a calibration surface, so gating only `/app/calibrate` would let every new employee's first-ever capture run unconsented). **This gate fails CLOSED**, deliberately and oppositely to the Terms/Privacy shell gate: a failed or unreadable consent read means no capture happens. The asymmetry is reasoned in `docs/DECISIONS.md` (2026-07-28, third pass) — a shell gate failing closed is a self-inflicted outage, whereas a camera gate failing open turns a camera on for someone who never agreed.
+**Original status**: deferred-feature (`type:feature` / `area:web` / `area:db` / `priority:blocker`)
 **Category**: legal / compliance / consent
 **Observed**: 2026-07-25, while resolving the open questions in `specs/013-public-surface-and-legal/spec.md` (OQ-7 point 3). New scope — this had no issue and no BACKLOG entry.
 **Description**: The app requests camera access via `getUserMedia` at the calibration
@@ -1966,28 +1970,49 @@ named person, and no record exists that they agreed to any of it. That is suffic
 its own.
 **Fix scope**: medium (FEATURE work). The requirements are already specified as
 **FR-037–FR-043** in `specs/013-public-surface-and-legal/spec.md` — this entry points at
-them rather than restating them, so the two cannot drift. In summary: a one-time gate
-before a user's first-ever calibration, presented **before** camera access is requested
-and before any capture begins (FR-037/FR-038); the grant persisted with a timestamp
-(FR-039) and not re-shown afterwards (FR-040); declining or abandoning writes **no**
-record and blocks calibration (FR-042). Two constraints matter most and are easy to get
-wrong:
+them rather than restating them, so the two cannot drift. In summary: a gate before a
+user's first-ever calibration, presented **before** camera access is requested
+and before any capture begins (FR-037/FR-038); the grant persisted with **both a
+timestamp and the identity of the consent wording the user was actually shown**
+(FR-039), and not re-shown afterwards until the wording is materially revised (FR-040);
+declining or abandoning writes **no** record for the offered wording and blocks
+calibration and camera-based monitoring sessions (FR-042/FR-043c). Three constraints
+matter most and are easy to get wrong:
 - **No backfill (FR-041).** Existing users have never given camera consent and MUST be
   prompted once on their next session. Consent MUST NOT be backfilled as already-granted
   — recording a fact that never happened is forbidden. Existing readings, sessions, and
-  accounts are left untouched: this is a gate, not a deletion.
+  accounts are left untouched: this is a gate, not a deletion. The same prohibition
+  governs re-consent: an existing record MUST NOT be rolled forward to cover a revision
+  the user was never shown.
+- **Re-consent on material revision (FR-043a–FR-043e).** Consent is **not one-time**.
+  Every published revision of a consented text is classified at publication as
+  **MATERIAL** or **COSMETIC** — a human judgment, not an automatic text comparison.
+  Material re-prompts everyone whose consent predates it; cosmetic re-prompts nobody.
+  Acceptance is recorded as a **new** consent; the earlier record is never overwritten,
+  because the history of what a person agreed to and when is the point. This applies
+  **symmetrically** to the camera wording **and** the Terms/Privacy acknowledgement
+  (FR-035) — one rule, two applications, neither built without the other. Declining
+  blocks only that text's scope (camera → calibration + monitoring sessions, with the
+  weekly work-environment check-in still available; Terms/Privacy → the whole app, while
+  still allowing the user to read both documents and sign out), is **not** withdrawal,
+  is **not** a deletion trigger, and MUST be recoverable.
 - **Withdrawal-ready shape (FR-043).** Withdrawal itself is out of scope and belongs to
   **feature 018** (`privacy-controls-and-transparency`), but the record MUST be shaped so
   withdrawal can be added later without rework. **A shape that can only ever express
-  "granted" is not acceptable.** The concrete schema is a plan decision.
+  "granted" is not acceptable.** The concrete schema is a plan decision. Note that
+  **declining a gate is not withdrawal** and must not be modelled as one.
 **Address by**: **feature 013 (public-surface-and-legal)**, which owns it and closes this
 issue when it ships. Pairs with **#75** (ToS/Privacy + signup consent gate) — both are
 binding pre-real-data gates on the same user journey, and both are owned by 013. Does
 **not** pair with **#62** (`/signup` invite-only): #62 governs *who may hold an account
 at all* and is an unrelated auth-posture/tenancy blocker that 013 does not address.
 
-### `README.md` states manager visibility + the privacy slider as present-tense fact, violating the merged Principle I public-communication rule (#158)
-**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#158 OPEN**.
+### ~~`README.md` states manager visibility + the privacy slider as present-tense fact, violating the merged Principle I public-communication rule~~ (#158)
+**Status**: **RESOLVED 2026-07-28 — feature `013-public-surface-and-legal`, PR #194.** GitHub issue **#158 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: the copy fix shipped as a **P3 ride-along** (T035); the issue was deliberately held open until P8 so the result could be re-read against `plan.md` §0.3 rather than closed on the strength of the commit. **Re-read and verified 2026-07-28**, all four lines:
+- **`:11` was SPLIT, not appended to** — the load-bearing condition. It now reads *"Managers are designed to see graded trends for their reports; no manager-facing surface is live today."* followed by a **separate sentence**, *"Raw video and chat content never reach a manager — that one is permanent, and true right now."* The permanent Principle I invariant therefore stands **unqualified, in its own sentence, outside the marked one**. Appending a marker would have dragged the invariant under it and implied the raw-video and chat guarantees were merely planned — the other-direction flattening Amendment 17 forbids.
+- **`:15`, `:16`, `:18`** each carry one added sentence marking the block as the designed end-state (`:15`, `:16`) or naming feature 018 and stating there is nothing to configure yet (`:18`).
+**Original status**: tech-debt (`type:tech-debt` / `area:docs`)
 **Category**: docs / public-facing copy compliance
 **Observed**: 2026-07-24, during the constitution Amendment 17 copy sweep; logged 2026-07-25 once the amendment merged and the rule went live.
 **Description**: Constitution **Amendment 17** added a **public-communication rule** to
@@ -2042,3 +2067,781 @@ point-of-use not-yet-live discipline on the landing page, both legal documents, 
 consent gates — `README.md` is simply not one of 013's surfaces, so it needs its own fix.
 See `.specify/memory/constitution.md` Principle I (public-communication rule, Amendment 17)
 and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
+
+---
+
+## From feature 013 implementation (public-surface-and-legal) — captured 2026-07-27
+
+Four items surfaced while implementing feature 013 that are **not** 013's work. They are logged
+here so the feature ships without absorbing them, and each is mirrored to its own GitHub issue.
+
+### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live (#176)
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN.** GitHub issue **#176 OPEN**.
+**Category**: dependencies / security posture
+**Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
+counts below were then verified directly against the Dependabot API.
+**Description**: **Two GitHub surfaces disagree, concurrently, and both were read on 2026-07-27.**
+The push-time banner (`remote:` output on `git push`) says **22 open (11 high, 11 moderate)**. The
+Dependabot REST API, queried the same day, says **21 open (11 high, 10 moderate)**, spanning **12
+distinct advisories** across **three packages**. This is not drift between two dates — it is the
+banner and the API reporting different numbers at the same moment. One alert (`brace-expansion`,
+GHSA-mh99-v99m-4gvg) was **auto-dismissed on 2026-07-25**, inside the same window, which plausibly
+explains the total but not the severity split. **Treat every figure here as a snapshot, not a fixed
+number**, and re-count from the Dependabot security tab before acting. The per-advisory breakdown
+below is from the API and is the reliable part.
+
+They sit on **`main`**. **None was introduced by feature 013**, which adds no dependency and
+carries an empty `package.json` diff; every alert traces to `next`, `postcss`, or `sharp`, all of
+which predate the feature.
+
+- **`next` — 9 advisories, 18 of the 21 alerts.** Each is counted twice, once against
+  `package-lock.json` and once against `apps/web/package.json`. **4 high**: SSRF in Server Actions
+  on custom servers (GHSA-89xv-2m56-2m9x), SSRF in rewrites via an attacker-controlled destination
+  hostname (GHSA-p9j2-gv94-2wf4), middleware/proxy bypass in App Router applications using
+  Turbopack and a single locale (GHSA-6gpp-xcg3-4w24), DoS in App Router Server Actions
+  (GHSA-m99w-x7hq-7vfj). **5 moderate**: two response-body cache confusions (GHSA-68g3-v927-f742,
+  GHSA-4633-3j49-mh5q), unbounded Server Action payload on the Edge runtime (GHSA-4c39-4ccg-62r3),
+  unauthenticated disclosure of internal Server Function endpoints (GHSA-955p-x3mx-jcvp), and DoS
+  in the Image Optimization API via SVGs (GHSA-q8wf-6r8g-63ch). **All nine are fixed in 16.2.11**;
+  the repo pins **16.2.6** (`apps/web/package.json:30`). **One patch-level bump inside 16.2.x
+  clears 18 of the 21 alerts.**
+- **`postcss` — 2 high**, both `sourceMappingURL` handling: arbitrary `.map` file disclosure via
+  path traversal in previous-source-map auto-loading (GHSA-r28c-9q8g-f849) and arbitrary file read
+  via an attacker-controlled `sourceMappingURL` in a CSS comment (GHSA-6g55-p6wh-862q). Fixed in
+  8.5.18. Transitive; lockfile manifest only. **Distinct from the older PostCSS advisory already
+  logged as #36** (GHSA-qx2v-qp2m-jg93) — do not treat #36 as covering these.
+- **`sharp` — 1 high**, inherited libvips CVEs (GHSA-f88m-g3jw-g9cj). Fixed in 0.35.0. Transitive;
+  lockfile manifest only.
+
+**⚠ Do not attempt any upgrade while feature 013 is unmerged.** A dependency bump underneath an
+in-flight feature-branch stack costs days: every open branch inherits a lockfile conflict, and a
+`next` upgrade landing in the same window as feature 013's change to `app/(authed)/layout.tsx` —
+the shell **every** authenticated route renders through — makes any resulting regression ambiguous
+between the two. The upgrade is worth doing; it is not worth doing here.
+
+**⚠ This is NOT a P8 blocker.** P8 (T131–T148) ships feature 013 to production. These alerts are
+separate work, on `main`, with their own risk profile and their own verification. Nothing in this
+entry gates the feature, and it must not be folded into P8 — a dependency upgrade landing inside a
+deployment phase is the fastest way to turn a feature deploy into a debugging session.
+
+**Fix scope**: small-to-medium, on its own branch, **after 013 merges**. Sequence: `next`
+16.2.6 → 16.2.11 first (patch-level, clears 18 of 21), then `postcss` and `sharp`, which are
+transitive and should resolve without a manifest change. Verify with the full
+`npm run -w apps/web lint typecheck test` plus a Playwright chromium + firefox pass, and **read the
+16.2.7–16.2.11 release notes before shipping**: the middleware/proxy-bypass fix touches App Router
+routing, and `apps/web/proxy.ts` is load-bearing for authentication. Confirm the fix does not
+change proxy semantics.
+
+**Progress 2026-07-28 (P8 Stage 4 close-out) — UPDATED, NOT CLOSED. Two paragraphs above are now
+superseded and are left in place for the record.**
+
+**The `next` bump landed inside feature 013 after all**, as **PR #180** (`8f6b523`,
+*"chore(deps): next 16.2.6 → 16.2.11 — nine advisories, no behaviour change reaching P6/P7"*), and
+was taken deliberately ahead of P6 rather than deferred: P6 reads the Next 16 routing guides out of
+`node_modules/next/dist/docs/` (T079) and performs a root-route takeover (T086), and 16.2.10 ships
+a docs backport correcting the two files that answer T079's mandated question. So **"⚠ Do not
+attempt any upgrade while feature 013 is unmerged" and "carries an empty `package.json` diff" no
+longer hold** — they were right when written and were overtaken by a reasoned decision.
+
+**Where the counts stand, verified against the Dependabot API on 2026-07-28.** **21 alerts are
+still open**, because Dependabot evaluates the **default branch** and `main` still pins
+`next@16.2.6` (`apps/web/package.json:30` on `origin/main`). The feature branch pins **16.2.11**.
+So: **the 18 `next` alerts are cleared by the branch and close when 013 merges — they are not
+cleared yet.** Do not read "18 cleared" as a present-tense fact about `main` before the merge.
+
+**Three alerts remain and the branch does not touch them** — verified from the branch lockfile:
+
+- **`postcss` × 2 high** (GHSA-r28c-9q8g-f849, GHSA-6g55-p6wh-862q). **`next@16.2.11` still vendors
+  `postcss@8.4.31`** at `node_modules/next/node_modules/postcss` — the fix is 8.5.18. The
+  repository's own top-level `postcss` is already **8.5.14 (dev)** and is not what the alerts point
+  at. **Stated precisely, because the shorthand is misleading**: it is not that *no* `next` release
+  could ever clear these — it is that **this** bump does not, and clearing them needs either a
+  `next` release that itself moves its vendored `postcss` to ≥8.5.18, or a deliberate lockfile
+  override. Neither is a patch bump.
+- **`sharp` × 1 high** (GHSA-f88m-g3jw-g9cj, inherited libvips CVEs). Lockfile resolves
+  **0.34.5**; the fix is 0.35.0. Transitive, and untouched by the `next` bump.
+
+**Address by**: a dedicated dependency branch **after feature 013 merges to `main`**, and before
+any further production deploy. **Re-count first** — the merge should drop the total from 21 to 3 on
+its own, and the remaining work is only the `postcss` and `sharp` items above. Pairs with **#36**
+(the older PostCSS advisory, `watch`) and **#35** (the Node 22.13+ upgrade), the other two standing
+dependency items.
+
+### Restore `POST /api/admin/invite` — deleted in #142; there is no in-app path left to create a `team_lead` or an `admin` (#174)
+**Status**: deferred-feature (`type:feature` / `area:web` / `area:db`) — **OPEN.** GitHub issue **#174 OPEN**.
+**Category**: product / auth surface
+**Observed**: 2026-07-27, while fixing the e2e fixtures blocked by feature 013's app-shell
+consent gate (PR #173). `admin-seeded.spec.ts` and `team-lead-seeded.spec.ts` still
+`POST /api/admin/invite` and assert `201`. They get **404**, and they fail *at the POST* —
+not at anything downstream. `apps/web/app` today contains exactly one route file,
+`auth/callback/route.ts`.
+**Description**: `apps/web/app/api/admin/invite/route.ts` (152 lines) was deleted in
+`ffb3a96` — the squash of PR #142, *"chore(deploy): prepare Serenify production cutover"*,
+merged 2026-07-12. It was the only in-app way to create a `team_lead` or an `admin`: it
+invited through the service-role admin client (creating the `auth.users` row, which
+`handle_new_user` seeded as `role='employee'`), then called the `admin_update_role` and
+`admin_update_manager` SECURITY DEFINER RPCs **through the caller's session client**, so
+`auth.uid()` resolved to the verified admin and Postgres re-checked `is_admin()` on its own
+side. With it gone, role assignment above `employee` has no application surface at all.
+
+**Why it was removed — the reason is recorded, but not in the commit or the PR body.**
+The squash carries the bare subject line `* fix(web): remove runtime admin service-role
+path` with no body, and PR #142's description says only *"remove the runtime admin/service-role
+path and keep production access RLS-as-user"* and *"no service-role secret is required by the
+production web/API runtime"*. **Neither names the route.** The docs shipped in the same PR do
+name it, and they give the reason — `docs/CHANGELOG.md:2553`:
+
+> **Security posture.** Removed the runtime admin/service-role path entirely — deleted
+> `apps/web/lib/supabase/admin.ts` and `apps/web/app/api/admin/invite/route.ts`. Production
+> access is now **RLS-as-user throughout**, and inference replay runs as the authenticated
+> user. Locked by a new `apps/web/tests/unit/runtime-secret-posture.test.ts`; deploy no longer
+> requires a service-role key at all.
+
+`docs/PROGRESS.md:90` repeats it. So this was a **deliberate security-posture cut, not
+collateral**: the route was the sole runtime consumer of `lib/supabase/admin.ts`, and removing
+the service-role client from the production runtime necessarily removed the route.
+
+What is **not** recorded anywhere — not the commit, not the PR body, not `docs/DECISIONS.md` —
+is any discussion of the **consequence**: that the product loses its only invite path, that
+three open follow-ups now hang off an endpoint that no longer exists (**#60** invite audit log,
+**#61** concurrent-duplicate idempotency, **#63** app-layer rate limiting), that **#62**'s
+"funnel all entry through `/api/admin/invite`" resolution becomes unavailable, and that two e2e
+specs are left asserting `201` against a 404. **The removal is documented; its product cost is
+not.**
+
+**Decision: restore, not retire.** The invite flow is wanted. This entry is not a request to
+delete the two specs or to close the endpoint's follow-ups — it is a request to bring the
+capability back.
+
+**⚠ The restore cannot be a `git revert`.** `apps/web/tests/unit/runtime-secret-posture.test.ts`
+now fails the build if any of `SUPABASE_SERVICE_ROLE_KEY`, `service_role`, `service-role`,
+`createAdminClient`, `supabaseServiceRoleKey`, or `/auth/v1/admin/` appears anywhere under
+`apps/web/app/` or `apps/web/lib/`, and separately asserts that `lib/supabase/admin.ts` does not
+exist. Reinstating the old handler re-introduces precisely what #142 removed and turns that
+guard red. **The design question the spec has to answer is how an admin invites a user without a
+runtime service-role key** — a Supabase Edge Function holding the key outside the web runtime, an
+`invites` table plus a self-serve claim flow, a SECURITY DEFINER RPC that provisions without
+GoTrue admin, or something else. That question is the reason this is not a small change.
+
+**This is product code with an auth surface, so it needs its own spec → plan → tasks, after 013
+ships.** Not a drive-by fix. The deleted handler carried three controls that were each the
+outcome of a security-audit finding and must be re-derived rather than copy-pasted back:
+
+1. **Auth-then-authz before any body work** — an unauthenticated caller got a clean 401 with no
+   schema disclosure, a non-admin got 403, and only a verified admin ever reached Zod validation
+   (slice 3, Findings 1 & 3).
+2. **An `Origin` allowlist** as defence-in-depth over the `SameSite=Lax` session cookie — Route
+   Handlers get no automatic same-origin check from Next.js the way Server Actions do (slice 3,
+   Finding 1).
+3. **Error hygiene** — no branch forwarded raw Supabase / RPC / Zod text to the client; failures
+   were logged server-side and responses carried a fixed error code only (slice 3, Finding 2).
+
+See `docs/DECISIONS.md` (2026-05-25 — Security slice 3) and
+`docs/security/01-rls-and-security-definer.md`.
+
+**Open question — recorded here, deliberately not answered: does restoring this re-open #62?**
+**#62** (`/signup` is open self-serve → gate to invite-only, ⛔ pre-production deploy blocker)
+names `/api/admin/invite` as *"a **parallel** privileged path, not the only way in"*, and offers
+as one of its two resolutions *"make a product decision to remove `/signup` entirely and funnel
+all entry through `/api/admin/invite`"* — a resolution that is currently impossible, because the
+funnel does not exist. Whether restoring the endpoint re-opens that option, partially satisfies
+#62, or is fully independent of it **is not decided here**. It needs the same product/auth
+decision #62 is already waiting on. Do not read this entry as closing or advancing #62.
+
+**Stale references left behind** (breadcrumbs for whoever picks this up — listed so they are
+found together, **not** as a request to clean them up piecemeal):
+- `apps/web/lib/auth/schemas.ts:117` — `adminInviteSchema` survives with no consumer.
+- `apps/web/tests/e2e/helpers.ts:11` — comment still says seeded users arrive "via
+  `/api/admin/invite`".
+- `docs/DECISIONS.md` (2026-05-26 — Security slice 7, decision 3) defers a per-admin throttle and
+  points at `apps/web/app/api/admin/invite/route.ts:37`, a file that no longer exists;
+  `docs/CHANGELOG.md:825` carries the same dangling line reference.
+- `docs/security/01-rls-and-security-definer.md:28` and `:107` describe the route's
+  caller-session-client pattern and the zero-admin hazard in the present tense.
+
+**The two e2e specs are skipped, not deleted.** `apps/web/tests/e2e/admin-seeded.spec.ts` and
+`apps/web/tests/e2e/team-lead-seeded.spec.ts` are marked `test.skip` with a comment naming #174.
+**Un-skipping them is part of this entry's definition of done** — they are the only end-to-end
+coverage of admin-invites-admin (201), employee-invites-anyone (403), and
+team_lead-invites-anyone (403), and the role-placeholder assertions for both privileged roles ride
+along with them.
+**Fix scope**: medium-to-large (FEATURE work). Own spec → plan → tasks. Must not re-introduce a
+runtime service-role dependency (see the guard above), must re-derive the three security controls,
+and must un-skip the two e2e specs. Suggested issue labels: `type:feature`, `area:web`, `area:db`.
+**Address by**: **after feature 013 (`public-surface-and-legal`) ships.** Not before — 013 owns
+the public front door and the two consent gates, and an auth-surface change mid-feature is exactly
+the kind of drive-by that this repo's PR-isolation discipline exists to prevent. Likely pairs with
+whichever feature owns the invite UX (feature 017 `team-lead-dashboard` or the admin-dashboard
+work), and should be scheduled alongside **#60**, **#61** and **#63**, which are all follow-ups on
+this same endpoint and are unactionable until it exists.
+
+### The WebKit Playwright runner hangs on Windows — ⚠ WebKit is dropped from the feature-013 P8 sign-off bar (#177)
+**Status**: deferred-tooling (`type:tooling` / `area:web`) — **OPEN.** GitHub issue **#177 OPEN**.
+**Category**: test harness / browser coverage
+**Observed**: 2026-07-27, twice, while measuring the Playwright suite before and after the e2e
+consent-fixture fix (PR #173). Chromium and Firefox completed normally on the same machine, in the
+same session, against the same dev server and the same local Supabase.
+**Description**: **The signature, recorded verbatim — this is the only diagnostic anyone will
+have:**
+
+> Two hangs, identical signature: output frozen 17+ min, orphaned `WebKitNetworkProcess` at 0.1
+> CPU-sec, no live browser process, stopping at a different test each run. Chromium and Firefox
+> complete on the same machine.
+
+Expanded, so the signature is readable without the shorthand:
+
+- The reporter stops emitting. No new test lines, no failure, no timeout — the process simply sits.
+  Observed frozen for **17+ minutes** on both attempts before being killed.
+- `WebKitNetworkProcess.exe` orphans remain in the process table, each showing roughly **0.1
+  CPU-seconds** consumed *since launch* — i.e. they did essentially nothing and then stopped, rather
+  than spinning.
+- **No WebKit browser process is alive** at that point. Only the network-process orphans and the
+  runner remain, so the runner is waiting on a browser that has already gone.
+- **It stops at a different test each run** — once mid-`anchor-flow`, once at 28/50. There is no
+  single reproducing spec, which rules out a spec-level fix and points at the harness.
+- `taskkill` will not terminate the orphans; PowerShell
+  `Invoke-CimMethod -InputObject $cp -MethodName Terminate` does.
+
+Chromium (43 passed / 3 failed / 4 skipped) and Firefox (42 passed / 4 failed / 4 skipped)
+complete on the same machine, so this is **WebKit-on-Windows, not the suite** and not any change in
+feature 013. Environment: `@playwright/test ^1.60.0`, `workers: 1`,
+`{ name: "webkit", use: { ...devices["Desktop Safari"] } }` (`apps/web/playwright.config.ts:30`),
+Windows 11.
+
+**⚠ DECISION: WebKit is dropped from the feature-013 P8 sign-off bar. P8 signs off on Chromium and
+Firefox.** This is a **knowingly accepted coverage hole on a live product**, written down rather
+than assumed. It is stated in those words deliberately: **nobody may later read P8's green tick as
+meaning all three browsers passed.** P8's sign-off covers two of the three configured Playwright
+projects, and the third was never measured.
+
+**What the hole actually costs.** WebKit is the only project standing in for Safari, and Safari is
+not a hypothetical for this product: the calibration and monitoring-session capture paths behave
+measurably differently there (iOS Safari's `MediaRecorder` output and the server-side decode of it
+have their own history in this repo). Nothing about the Safari capture path is covered by an
+automated run today. The mitigation that exists is manual: the feature-008 device gate was
+validated on real Chrome **and real Safari/iOS**, and P8's smoke tests are performed by hand. That
+is a genuine mitigation, but it is a person, not a gate.
+
+**Fix scope**: unknown until diagnosed — start with `DEBUG=pw:browser*` on a single-spec WebKit run
+to catch the disconnect, then try a newer Playwright, a re-download of the WebKit binary
+(`npx playwright install --force webkit`), and `--workers=1 --max-failures=1` on individual specs to
+see whether the hang follows the browser lifecycle rather than any spec. If it reproduces cleanly,
+it is worth an upstream report; if it is Windows-specific, running WebKit in CI on Linux is the
+cheaper route to the coverage than fixing the local runner. Pairs with **#54** (Playwright
+pipe-buffering deadlock with `tail`) and **#55** (dev-server memory bloat across stacked full-suite
+runs) — three separate harness pathologies now sit between this repo and a trustworthy local matrix
+run.
+
+**Address by**: before WebKit can return to any sign-off bar — so, not during feature 013.
+Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux runner may close the
+coverage hole without the local hang ever being solved.
+
+### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it (#178)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#178 OPEN**.
+**Category**: responsive layout / test masking
+**Observed**: 2026-07-27, after fixing the e2e fixtures blocked by feature 013's app-shell consent
+gate (PR #173). The failure appeared only *because* that fix unblocked the page.
+**Description**: `apps/web/tests/e2e/employee-dashboard-shell.spec.ts:191` — *"employee shell at
+360px: hamburger menu, single-column cards, icon-only chat pill"* — probes the single-column stack
+by bounding box: the three card headings must share an x origin within a **4 px** tolerance
+(`:226-227`), which is what distinguishes the mobile stack from the desktop `3fr/2fr` split. At
+360 px the measured x-origin delta is **8 px**, so the assertion fails. The y-ordering assertions
+above it pass, so the cards *are* stacking — the stack is simply not left-aligned to within the
+tolerance the test was written against. Whether the fix is the layout or the tolerance is a
+product/layout call, not a test call, which is why this is logged rather than patched.
+
+**Pre-existing — proven, not assumed.** Checked out **`eefe83f`** (the P4 merge commit, before any
+P5 gate code exists) and ran that single test there. It fails identically: same assertion, same
+numbers. Nothing in feature 013 causes it.
+
+**⚠ The interesting part: the consent gate had been masking it, and it may not be the only one.**
+Before PR #173, every Playwright fixture user landed on P5's Terms/Privacy re-consent screen
+instead of the page under test, so this spec died at the `/app` URL assertion — long before it
+reached line 226. The failure did not "start"; it became *visible*. **A suite that fails early
+reports the gate, not the defect underneath it**, and roughly 12 of 17 specs were failing early.
+Any other pre-existing failure downstream of a blocked point was equally invisible for the same
+reason, and some of it may still be hidden behind the residual failures that remain.
+
+The general rule this establishes, worth applying to any future gate: **when a change blocks
+fixture users, re-baseline the suite against the pre-gate commit before concluding that a newly-red
+test is new.** The reverse also holds — when a gate is *removed* or fixtures are unblocked,
+expect previously-masked failures to surface, and do not attribute them to the unblocking change.
+
+**Fix scope**: small, but it needs a decision first. Either (a) fix the layout so the three headings
+share an x origin at 360 px — likely a per-card padding or grid-gutter asymmetry, since the y
+ordering is already correct — or (b) widen the tolerance if the 8 px offset is intentional design.
+**Do not simply widen the tolerance to make the suite green**: the 4 px bar exists to prove the
+desktop `3fr/2fr` split has collapsed, and a tolerance loose enough to hide a real regression is
+worse than a red test. Verify at the feature-013 mobile floor — 320 / 375 / 414 / 768 px — not only
+at 360.
+
+**Address by**: any responsive-layout pass after 013 merges. Natural pairing with the mobile /
+tablet typography bump (**#45**) and the rest of the standing design-system queue, since all of them
+touch the same card surfaces at the same widths.
+
+### e2e `SUPABASE_SERVICE_ROLE_KEY` is undocumented — and `.env.local.example` is the wrong home for it (#179)
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#179 OPEN**.
+**Category**: contributor setup / test infrastructure documentation
+**Observed**: 2026-07-27, while recording the pre-bump Playwright baseline for the Next
+16.2.6 → 16.2.11 patch bump (#176). Cost one full aborted suite run before it was diagnosed.
+**Description**: a clean checkout cannot run the Playwright e2e suite. `globalSetup` dies at once
+with `Error: supabaseKey is required.` from `tests/e2e/setup/admin-client.ts:22`, which builds the
+admin client out of `SUPABASE_SERVICE_ROLE_KEY`. `playwright.config.ts:9` loads
+`apps/web/.env.local` into the runner process precisely so that key is present — but nothing tells
+a contributor to set it. `apps/web/.env.local.example` lists exactly four variables
+(`NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `NEXT_PUBLIC_API_URL`, `SITE_URL`)
+and the service-role key is not among them.
+
+**⚠ The obvious fix — adding it to `.env.local.example` — is the wrong one, and is actively
+guarded against.** `.env.local.example` is the **runtime** env example; the service-role key is
+deliberately not part of the runtime surface. **#142** removed the runtime service-role path
+(`apps/web/lib/supabase/admin.ts` no longer exists), and
+`apps/web/tests/unit/runtime-secret-posture.test.ts` stands guard over that removal: it fails if
+the literal token `SUPABASE_SERVICE_ROLE_KEY` (or `service_role`, `createAdminClient`,
+`/auth/v1/admin/`, …) appears anywhere under `apps/web/app/` or `apps/web/lib/`, and separately
+asserts that `lib/supabase/admin.ts` is absent. Documenting the key in the runtime example would
+advertise a runtime capability the codebase has deliberately deleted, and would invite exactly the
+regression that test exists to catch. **The key is e2e test infrastructure and belongs in the e2e
+setup documentation, not in the runtime env example.**
+
+**Fix scope**: small — a doc change plus a decision on which home. Either (a) extend the
+`global-setup.ts` header comment (`:1-16`), which already carries the other e2e prerequisite
+(`npx playwright install --with-deps chromium firefox webkit`) and sits where the failure
+originates, or (b) add a short `docs/testing/e2e-setup.md` (none exists today) covering the local
+Supabase stack, the browser-binary install, and this key. Whichever lands must state **where the
+value comes from** — `npx supabase status` against the local stack, a published Supabase CLI
+local-dev constant, never a hosted project's key — and must say plainly that it is test-only, so
+the next person does not mirror it into the runtime example. Worth naming the localhost guard at
+`global-setup.ts:5-6` in the doc: it refuses to run against a non-localhost
+`NEXT_PUBLIC_SUPABASE_URL`, which is what bounds the blast radius and makes this safe to write down.
+
+**Address by**: any contributor-onboarding or test-infrastructure pass. Not urgent while the
+current machines already have a working `.env.local`, but it is a hard stop for a fresh clone —
+including CI, if a Playwright job ever lands (**#41**).
+
+### Signup refusal is silent on the no-JavaScript path — ST-9 FAILED and knowingly accepted (#184)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#184 OPEN**.
+**Category**: progressive enhancement / consent gate UX
+**Observed**: 2026-07-28, running **ST-9** during feature-013 P8 Stage 1
+(`specs/013-public-surface-and-legal/smoke-tests.md`).
+**Description**: with JavaScript disabled — or hydration not yet complete, or failed behind a proxy
+or on a flaky network — submitting `/signup` with the Terms and Privacy acknowledgement **unchecked**
+is correctly refused, but the refusal is **silent**. The page re-renders with **zero `[role="alert"]`
+nodes** and **every field cleared**: a blank form and no explanation.
+
+**⚠ DECISION: ST-9 is recorded as FAILED and knowingly accepted for feature 013 — never as passed,
+and never as partial.** Same treatment as **#177**: a knowingly accepted hole on a live product,
+written down rather than assumed, so nobody later reads P8's green tick as meaning ST-9 passed.
+
+**Why it is accepted rather than fixed now.** The refusal is **safe** — it fails closed: no account
+and no consent row, because `signUpSchema` refuses at the parse step before `supabase.auth.signUp` is
+reached. The harm is **confusion for a small population**, not mishandled data. Fixing it means
+editing `apps/web/app/(auth)/signup/actions.ts` — the most sensitive file in this feature — during
+the deploy window, risking the ~99% JavaScript path to repair the ~1% no-JavaScript path.
+
+**How it was measured, because the method matters here.** Playwright, context created with
+`javaScriptEnabled: false`. That setting was **verified rather than assumed**: `page.evaluate()` is
+not a valid probe of it — the call runs through the debugger protocol and keeps working with script
+execution disabled — so the probe used a side effect of the page's own scripts. JavaScript off:
+`window.__next_f` `undefined`, no `__react*` keys on the checkbox. JavaScript on (control): both
+present. Anyone re-running this should use the same probe; a `page.evaluate`-based one will report
+the opposite and be wrong.
+
+The rest of ST-9 passed on that same run: unchecked → **0** rows in `auth.users`; `/terms` and
+`/privacy` open in a new tab (`target="_blank"`) and lose **no** entered data — email, full name, a
+17-character password and the ticked box all survived; checked → account created with **exactly one**
+`user_consents` row (`terms_privacy@2026-07-26.1`).
+
+**Fix scope**: small, and it is **surfacing an existing message, not inventing one** — the
+JavaScript-on path already renders the correct string, *"Please accept the Terms and Privacy Policy
+to continue."*, so the work is carrying that reason across the no-JavaScript seam. Two server-side
+shapes are worth weighing: redirect back to `/signup` with a **non-sensitive** status marker in the
+query string (the `?state=check_email` pattern already in that file — note the current path returns
+`void` precisely so credentials never reach the URL), or render the reason from the server component
+on re-render. Whichever lands must preserve `signUpFromForm`'s deliberate design: it adds **no**
+validation of its own and delegates entirely to `signUp()`, and a parallel guard there is a second
+thing to get wrong — the one nobody exercises.
+
+**Address by**: its own change, after `013-public-surface-and-legal` merges. **Not** during the
+deploy window.
+
+### Blocked team photo leaves a large empty reserved box — no graceful placeholder (#185)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#185 OPEN**.
+**Category**: landing page / failure-state presentation
+**Observed**: 2026-07-28, running **ST-14** during feature-013 P8 Stage 1.
+**Description**: when the landing page's team photograph fails to load, the space it occupied stays
+as a **large empty box** — roughly 1440 × 700 px at desktop — bordered and blank. Everything around
+it is unaffected.
+
+**This is correct behaviour, and that is the point.** `apps/web/components/landing/team-photo.tsx`
+renders `next/image` with explicit `width={1600} height={1164}`, which reserves the aspect ratio and
+prevents cumulative layout shift — and that reservation is exactly why the layout does **not**
+collapse when the image is missing. What is missing is the *graceful* half: the reserved area reads
+as a blank rather than as a deliberate placeholder.
+
+**ST-14 itself PASSED** and this entry is the cosmetic remainder, logged so it is not lost. With the
+photo blocked (every image request and `/_next/image` aborted): 4 name cards, 8 external links, the
+caption "Choose a name to find them in the photo." and the supervisor credits all present, section
+1440 × 1197.8 px. Throttled (50 kB/s down, 500 ms RTT): same content, 1440 × 1198.0 px — within a
+third of a pixel of the unthrottled height.
+
+**Fix scope**: small and self-contained — a placeholder state on the reserved area (a surface-token
+fill so the box reads as intentional, a short acknowledgement that the photo did not load, or
+`next/image`'s `onError` driving a styled fallback). **Must keep the explicit width/height
+reservation**: removing it to avoid the blank box would trade a cosmetic blemish for real layout
+shift, which is the worse outcome.
+
+**Address by**: any landing-page polish pass after 013 merges. Low priority — it appears only when
+the image fails, and the section stays fully functional when it does.
+
+### `cold-start-readiness.spec.tsx` fights next-themes for the `dark` class — intermittent under load (#187)
+**Status**: test defect (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#187 OPEN.**
+**Category**: layout test suite / feature 009
+**Observed**: 2026-07-28, while verifying `fix-landing-fidelity` (PR #186).
+
+**Description**: the two **dark** variants of `apps/web/tests/layout/cold-start-readiness.spec.tsx`
+fail intermittently in a full `playwright.layout.config.ts` run, and pass every time in isolation.
+The failure is a contrast assertion — `Expected: >= 4.5`, `Received: 4.336…` — which looks like a
+colour regression and is not one. No token value changed.
+
+**Root cause**: the spec sets the theme by hand, immediately after `page.goto`:
+
+```ts
+await page.evaluate((dark) => {
+  document.documentElement.classList.toggle("dark", dark);
+}, theme === "dark");
+```
+
+`/cold-start-harness` lives under `app/`, so it is wrapped by `Providers` →
+`ThemeProvider attribute="class" defaultTheme="system"`. **next-themes owns that class.** When its
+hydration effect runs *after* the test's toggle — which is what happens once the machine is busy —
+it resolves the system preference (light, Playwright's default) and reverts the class. The dark
+test then measures a light or partially-reverted palette, and 4.336 is that torn state rather than
+either theme's real value.
+
+**Why it surfaced now, and why it is not PR #186's defect**: that PR adds a fifth viewport (1280 px)
+to `landing-hero-stability.spec.ts` — a 17-beat test that adds ~40 s of wall clock and CPU to the
+same four-worker pool. That extra contention is what makes the pre-existing race land on the losing
+side. Measured: **3/3 clean full-suite runs on `013-public-surface-and-legal`** vs **3 intermittent
+failures across ~8 full-suite runs on `fix-landing-fidelity`**, with **6/6 clean** on the branch once
+the machine was otherwise idle. The race is in the 009 spec; the new width only changes how often it
+loses. Every landing-owned assertion passed in every run.
+
+**Fix scope**: small. Drive the theme the way the browser actually does rather than by racing the
+provider — `await page.emulateMedia({ colorScheme: theme })` before `goto`, which is what the
+feature-013 walks use and what next-themes then resolves *to* rather than away from. Alternatively
+await a settled signal (`html.dark` present AND hydration complete) before measuring. Either removes
+the race; the manual `classList.toggle` cannot be made reliable while the provider owns the class.
+
+**Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
+than a missed regression, and it never passes when it should fail.
+
+## From feature 013 P8 Stage 3 review — captured 2026-07-28
+
+### Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)
+**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **OPEN.** GitHub issue **#189 OPEN.**
+**Category**: constitution Principle V (Amendment 17) / FR-029 / ops
+**Observed**: 2026-07-28, reading the Supabase dashboard for `excukdzjudslbqmkysrc` directly.
+
+**Description**: the **hosted** transactional email templates render `serenify` in **one colour**.
+The two-colour wordmark Amendment 17 requires is **not in production**. Both *Confirm sign up* and
+*Reset password* declare `.wordmark` alone in their `@media (prefers-color-scheme: dark)` block —
+hosted line 16 is `.wordmark`, line 17 is `.headline`, where the repo file carries three rules
+across 16–18 — and the dashboard's own Preview pane renders the mark as a single uniform grey in
+both. Hosted is the repo template **at its pre-T007 revision**.
+
+Everything else compared matches the repo: `<title>`, headline, body copy, CTA label, the OTP line,
+the dark-block colour values. One unrelated divergence: the *Confirm sign up* **subject** was
+`Confirm your Serenify account` on hosted against `Confirm your Serenify email` in
+`supabase/config.toml`; recovery's subject matches.
+
+**Ruled 2026-07-28 (Mohamed): the repo version wins — `Confirm your Serenify email`.** The point of
+this entry is making production match the repo; opening a new divergence while closing one would
+defeat it.
+
+**Root cause — two layers.** `supabase/config.toml` wires both templates via `content_path`, but
+that is **local-dev config**. Nothing in the repo and nothing in CI ever transmits
+`supabase/templates/*.html` to a hosted project: no workflow references Supabase at all, and there
+is no `supabase config push` anywhere. Hosted templates are dashboard-only.
+
+Beneath that, `apps/web/tests/unit/brand/wordmark-sync.test.ts` — the mechanism Principle V relies
+on to stop exactly this drift — reads `supabase/templates/*.html` **off disk**. It can only ever
+prove the repo agrees with itself. The hand-sync exception has been unenforced on the one side that
+reaches users, which is why this survived T007 and every run since.
+
+**Fix scope**: two separable pieces. (1) **Content** — paste the current repo templates into the
+dashboard; operator action, cheap, and the urgent half. (2) **Mechanism** — the gap is permanent and
+re-opens silently the next time the wordmark changes; candidates, in rising cost, are a documented
+release-checklist step, a `supabase config push` in the deploy runbook, or a check that pulls the
+hosted template through the Management API and diffs it against the repo file.
+
+**Progress 2026-07-28**: **both template BODIES pasted and saved by Mohamed, and verified live** — the
+dashboard Source now carries `.wordmark-seren` / `.wordmark-ify` in the dark block on both templates,
+and both Preview panes render `seren` in ink and `ify` in meadow. The FR-029 content breach is
+**closed**. **Still outstanding**: the *Confirm sign up* **subject** is still `Confirm your Serenify
+account` and must be set to `Confirm your Serenify email` per the ruling above — the subject is a
+separate dashboard field, so pasting the body did not touch it.
+
+**Address by**: (1) subject field, before Stage 4 ships anything that sends mail. (2) the mechanism
+gap — the same pass that does #190, so the email surfaces are touched once.
+
+### The OTP verification tick vanishes immediately — it should linger (#190)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#190 OPEN.**
+**Category**: auth surfaces / motion
+**Observed**: 2026-07-28, entering the emailed code on the preview's own form
+(`deploy-log-stage3-2026-07-28.md` §3).
+
+**Description**: on a correct 6-digit code the form shows "✓ Verified" and moves on essentially at
+once. The tick is gone before it registers as an acknowledgement — and the moment it marks, the
+user learning the code they typed was right, is precisely the one that should read as reassurance.
+
+**Fix scope**: motion only — a hold before the transition, honouring `prefers-reduced-motion`. No
+copy change implied.
+
+**Address by**: the design pass over the transactional email and OTP surfaces after
+`013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
+#189 so those surfaces are opened once rather than twice.
+
+### ~~Landing chapter-marker dots are 24×24 px tap targets, not 44×44~~ — WITHDRAWN, not a defect (#191)
+**Status**: **WITHDRAWN 2026-07-28 — not a defect.** GitHub issue **#191 CLOSED as superseded.**
+**Category**: feature 013 P6 landing page / FR-053
+**Observed**: 2026-07-28, on the driven P8 responsive walk for PR #188. **Ruling: Mohamed, same day.**
+
+**The measurement was right and the conclusion was wrong.** The markers really are 24×24 at every
+width — but that is **deliberate and compliant**, not a miss. FR-053 was amended on 2026-07-28 with a
+**spent 24×24 px exception scoped to `components/landing/chapter-markers.tsx` only**
+(`spec.md` FR-053; `docs/DECISIONS.md`, "FR-053 gains a spent 24×24 exception for the chapter
+markers"). 24×24 satisfies **WCAG 2.5.8 (AA)**, the markers are a convenience rather than a path,
+and they keep their focus ring — all recorded in the amendment.
+
+**What was actually stale was T096**, which still demanded "≥44×44 px on touch viewports" while marked
+`[X]`. That text has been corrected in place to cite the amendment, so the contradiction is gone
+rather than left for someone to "fix" by growing the targets and undoing a deliberate decision.
+
+**Lesson worth keeping**: the walk checked `tasks.md` and the constitution but not FR-053's own text in
+`spec.md`, where the amendment lives. A tap-target finding must be read against the amended FR, not
+against the task that predates it.
+
+<details><summary>Original report, retained for the record</summary>
+
+**Description**: the six chapter-marker buttons at
+`apps/web/components/landing/chapter-markers.tsx:65` set their hit area with an unconditional
+`size-6` — **24×24 px**. No `@media (pointer: coarse)` rule exists anywhere in
+`apps/web/app/globals.css`, so 24 px is what every viewport gets, phone included.
+
+Measured at 320 / 375 / 414 / 768 / 1280 px in both themes: all six report a 24 px box at every
+width, in both themes. They are the **only** sub-44 px controls on any public route — `/terms`,
+`/privacy` and the re-consent screen all report zero.
+
+**Why it is more than a nicety**: T096's acceptance conditions require "each is **≥44×44 px on
+touch viewports**" (`specs/013-public-surface-and-legal/tasks.md:693`), FR-053 sets the same bar,
+and **T096 is marked `[X]`**. This is a checked-off condition that was not met, not an unlogged
+nice-to-have.
+
+The instinct in the code was right — the comment above the line reads "The hit area is the button;
+the dot is only what you see" — `size-6` just does not carry it far enough, growing the target from
+the 1.5 px dot to 24 px and stopping short of 44.
+
+The six sit contiguously in a `flex items-center justify-center` with no gap, so at 24 px they do
+clear WCAG 2.5.8's 24 px AA floor. The project's own bar is the stricter one.
+
+**Fix scope**: small. `size-6` → `size-11` on the button, dot stays `size-1.5` — the dot is already
+a separate `<span>`, so nothing visual changes, only the invisible hit area. Re-check the row width
+at 320 px afterwards (6 × 44 = 264 px, inside the 288 px content column) and that the focus ring
+still reads at the larger size.
+
+**Address by**: any landing-page pass after 013 merges. Not a deploy blocker — the markers are a
+convenience and the story advances on its own — but it should not stay closed against a task that
+claims it.
+
+</details>
+
+### `failOpen()` is unobservable on Hobby — A5 has no real-time detector (#192)
+**Status**: tech debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN, DEFERRED BY DECISION.**
+GitHub issue **#192 OPEN.**
+**Category**: feature 013 consent gate / deploy observability
+**Observed**: 2026-07-28, during P8 Stage 3b.
+
+**Description**: `failOpen()` (`apps/web/app/(authed)/layout.tsx:62`) records a fail-open — the
+Terms/Privacy gate silently disabling itself for a request — with `console.error` alone, and
+abort condition **A5** is defined as "a sustained stream" of that line. **On this project that is
+not observable**: the Vercel account is **Hobby**, where Log Drains are Pro+ and retention is
+short, so a sustained stream is something someone would have to happen to be watching. There is
+nothing to alert on.
+
+Distinct from the *method* bug corrected in `deploy-log-stage3b-2026-07-28.md` §5 (the earlier
+positive control returned before the line it was testing). This entry is about the **plan**, which
+is unobservable even with perfectly readable logs.
+
+**Deferred deliberately — ruled by Mohamed, 2026-07-28.** `failOpen()` lives in the file **P5
+shipped alone, specifically to keep `git revert` clean**: Lever 2 of the deploy protocol is a
+`git revert` of the gate commit, and that lever's value depends on the commit staying surgical.
+Reopening that file days before production — for a failure mode that **requires a schema change to
+occur at all** (wrong RLS policy after a migration, dropped grant, renamed column) — trades a real
+and immediate risk for a hypothetical one. Not because it isn't real; because the cure is riskier
+than the disease this week.
+
+**What covers it in the meantime**: `deploy-protocol.md` §6.4 now carries a **lagging** detector
+needing no code change and working on any plan — if the gate works the 20 returning users write
+consent rows, and if it is failing open they reach the app and write nothing. Query (c), signed in
+since the deploy with no consent row, growing while (a) grows, is the alarm. Its limits are
+documented there and are real: it reports only after someone signs in, no single row is conclusive
+(a user sitting on the screen looks identical to one who slipped past), and **zero sign-ins means
+zero information, not good news**.
+
+**Fix scope**: have `failOpen()` also record its own occurrence somewhere queryable — a small
+append-only table or a counter — so "sustained stream" becomes a SQL query that survives retention
+and needs no plan upgrade. **Caveat to design around**: it fires *because* a consent read failed,
+so a total database outage blocks that write too; it is not a universal net. But the three modes the
+docstring names are all specific to the `user_consents` SELECT under RLS, and a separate INSERT
+survives all three — which is the point. Worth pairing with whatever replaces the `console.error`,
+so the file is opened once.
+
+**Address by**: after `013-public-surface-and-legal` merges, as its own change.
+
+## From feature 013 P8 Stage 4 close-out — captured 2026-07-28
+
+### Landing `/` stays `force-dynamic` — move ONLY the signed-in redirect into `proxy.ts` if production TTFB disagrees (#193)
+**Status**: tech-debt (`type:tech-debt` / `area:web` / `status:watch`) — **OPEN.** GitHub issue **#193 OPEN.**
+**Category**: feature 013 P6 landing page / R11 (`research.md` §11)
+**Observed**: not observed — **logged as a candidate by T142, deliberately not built.**
+
+**Description**: `app/(public)/page.tsx` carries `export const dynamic = "force-dynamic"`, so the
+landing page is not statically generated. The follow-up, **if it is ever justified**, is to move
+**only the signed-in redirect** into `proxy.ts` — the proxy already computes `user` for every
+matched request, so the redirect would be free there and `/` could drop `force-dynamic`.
+
+**What it must NOT touch, and this is the load-bearing part**: **not the `?code=` forward.**
+`proxy.ts`'s `redirectTo` helper **clears `url.search`**, so moving that half into the proxy would
+eat the auth code arriving on a real Supabase email link — the exact path ST-8 checks. The two
+behaviours at `/` are separable and only one of them is a candidate. `research.md` §11 rejected
+moving *both* because it would put the two behaviours FR-017 protects into the file with the
+highest blast radius in the repo; that rejection stands unchanged.
+
+**Why it is probably not worth doing.** `force-dynamic` sounds worse than it is here. For an
+**anonymous** visitor — who is who the landing page is for — there is no session cookie, so
+`supabase.auth.getUser()` **short-circuits without a network round-trip**, and the proxy already
+runs on every request regardless. The saving on offer is static generation, not a saved round-trip.
+
+**Fix scope**: small and strictly bounded — the signed-in redirect only, plus dropping
+`force-dynamic`. **No code was written for it in feature 013.**
+
+**Address by**: **only if measured production TTFB on `/` disagrees** with the paragraph above — a
+number, not an impression. Absent that number, the correct action is to close #193 as not-needed.
+
+### The Terms/Privacy gate is absent from `(onboarding)/layout.tsx` — FR-043c gap, currently zero-population (#195)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN, knowingly accepted for the 013 release.** GitHub issue **#195 OPEN.**
+**Category**: feature 013 P5 consent gates / FR-043c
+**Observed**: 2026-07-28, by the **T146 final review**, immediately before 013's merge.
+
+**Description**: the Terms/Privacy app-shell gate lives in `apps/web/app/(authed)/layout.tsx`.
+**`apps/web/app/(onboarding)/layout.tsx` has no consent gate at all** — zero consent references —
+and `(onboarding)` is a **sibling** route group, not a child of `(authed)`. Nothing in the
+onboarding flow sits behind the Terms/Privacy acknowledgement. **FR-043c** is unambiguous:
+*"Terms/Privacy acknowledgement declined → the user MAY NOT use the application at all until they
+accept."* Onboarding is part of the application.
+
+**Who can reach it**: `apps/web/proxy.ts:200-208` makes `/onboarding` reachable **only** when
+`profiles.full_name IS NULL` — `needsOnboarding` redirects into it, and its negation redirects out
+to `/app`. Post-013 signups set `full_name` **and** receive a `terms_privacy` row in the same
+`handle_new_user()` transaction, so they never qualify. The population is pre-013 accounts with a
+null `full_name`.
+
+**The population was MEASURED, not assumed — it is ZERO.** Against hosted, 2026-07-28, immediately
+before the merge: `null_full_name_users` = **0**, `null_name_and_unconsented` = **0**,
+`total_users` = **20**. All 20 existing accounts have `full_name` set, so none of them can reach
+`/onboarding`; every one meets the gate at `/app` correctly. **The gap is structural, not
+populated.** Re-run those queries before assuming the number is still zero.
+
+**What is and is not exposed.** *Exposed*: a qualifying user could complete the name step and run a
+**first-ever calibration capture** without meeting the Terms/Privacy gate. *Not exposed*: the
+**camera-and-inference gate IS present** at `/onboarding` and **fails closed**, so capture is still
+consented — just not under Terms/Privacy; and the window closes on its own, since completing
+onboarding sets `full_name` and the proxy then routes to `/app` where the gate catches them. One
+flow wide, not the whole application.
+
+**Why it was not fixed at the deploy boundary — deliberate, and the precedent is T049.** The last
+time `/onboarding` was gated broadly it produced a **permanent lockout for every new employee**,
+caught only because the task was refused as written rather than implemented. Mirroring a second
+high-blast-radius gate into that same layout, at the deploy boundary, **unexercised** —
+ST-10/ST-10a/ST-10b were all run against the `(authed)` gate only — is that identical risk, against
+an exposure the camera gate already covers and a population measured at zero.
+
+**Fix scope**: mirror the `(authed)` gate into `(onboarding)/layout.tsx` — the same fail-open
+`read.ts` consent read plus `<TermsReconsentScreen>`. **It MUST fail OPEN**, exactly as the
+app-shell gate does; a fail-closed gate on the onboarding layout recreates the T049 lockout
+precisely. **Do not ship it without an ST-10-equivalent exercise** — a deliberate lockout and a
+proven recovery through both Lever 0 and Lever 1, against this gate specifically. That exercise,
+not the code, is the expensive half.
+
+**Address by**: its own change after 013 is merged and settled, paired with the ST-10 re-exercise so
+the onboarding layout is opened once rather than twice.
+
+### T146 review follow-ups: list semantics on the landing page, plus five small items (#196)
+**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#196 OPEN.**
+**Category**: feature 013 T146 final review / a11y + hygiene
+**Observed**: 2026-07-28, by the T146 final review of feature 013, immediately before its merge.
+
+**Description**: six findings judged **not worth changing code for at the deploy boundary**. The
+headline one is **a11y**: six new landing lists (`team-cards.tsx:79`, `never-cards.tsx:47`,
+`how-it-works.tsx:26`, `status-statement.tsx:43`, `panels/prompt-panel.tsx:107`,
+`ren-thread.tsx:177`) lack `role="list"`. Tailwind preflight strips `list-style`, so
+Safari/VoiceOver **drops list semantics** — WCAG 1.3.1, on the public marketing page.
+
+**Why logged rather than fixed in 013**: `role="list"` appears **nowhere in `apps/web`**. This is an
+app-wide pattern, not a 013 regression, and fixing only these six would leave the landing page
+announcing lists while every authenticated surface does not. It wants one a11y pass across the app,
+which is also the right moment to audit for the same problem elsewhere.
+
+The other five are LOW: a migration comment at `…_user_consents.sql:111` that overstates what
+`ON CONFLICT DO NOTHING` absorbs (it covers unique and exclusion violations only — a malformed
+value raises 23514/23502 and aborts the whole signup); `seed-demo.ts:97-100` writing consent rows
+for demo users who never saw the documents (correct for that cohort, wants a demo-only note);
+`team-photo.tsx:79`'s `sizes` disagreeing with `team-section.tsx:61`'s `px-4 sm:px-6`; the two
+public navs computing "current page" differently, which will diverge the moment a `/terms/*`
+sub-route exists; and `supabase-email-templates.test.ts:131` having no explicit timeout, which
+flakes under load exactly as **#187** does.
+
+**Two findings from the same review were NOT folded in here**: the `(onboarding)` consent gap is
+**#195**, and the two README bare-"check-in" terminology violations were **fixed in 013 itself** —
+terminology is binding, and `:11` was a line this feature had already edited.
+
+**Address by**: opportunistically, or as one housekeeping change. The a11y item has the only real
+user impact and should lead.
+
+### `anchor-egress.spec.ts` fails on firefox against Next's dev-only `__nextjs_original-stack-frames` — harness gap, proven pre-existing (#197)
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#197 OPEN.**
+**Category**: e2e harness / FR-050 · SC-014
+**Observed**: 2026-07-28, in feature 013's T147 pre-merge e2e run.
+
+**Description**: `apps/web/tests/e2e/anchor-egress.spec.ts:153` fails on **firefox** with
+`POST http://localhost:3000/__nextjs_original-stack-frames [text/plain;charset=UTF-8]` recorded as
+unexpected outbound data.
+
+**It is NOT a privacy defect.** The two assertions that actually protect FR-050/SC-014 both
+**pass** — `videoEgress` is `[]` and `anchorClipPosts` is `[]`. The failing third assertion is a
+deliberately broad catch-all for any mutating or bodied request to a non-allowlisted destination,
+and what it caught is the **Next.js development error-overlay endpoint**, which the dev server calls
+to symbolicate a stack trace. It is **localhost → the dev server itself**, its payload is a
+`text/plain` stack frame rather than video or user data, and **it does not exist in a production
+build** — `serenify.tech` has no such route.
+
+**Proven pre-existing, not caused by 013.** The identical spec was run against the pre-013 base
+**`cbb7f81`** with **identical `node_modules`**, so Next stayed at 16.2.11 and app code was the only
+variable: the branch (`64c423a`) fails with **one** stack-frame POST, `cbb7f81` fails with **two**.
+It fails *worse* on the older tree. This needed proving rather than assuming, because 013 **does**
+touch that route — `app/(authed)/app/calibrate/page.tsx` and `components/anchor/baseline-section.tsx`
+both gained the camera consent gate. Reproducible in isolation, so **not** a load flake like #187.
+
+**Still unknown, and the more interesting half**: *why* the dev overlay symbolicates during the
+green room at all, and why only on firefox. Something logs an error or warning that chromium does
+not — plausibly a `getUserMedia` error-shape difference. That console message has **not** been
+identified; the failing assertion is only the messenger.
+
+**Fix scope**: (1) allowlist `/__nextjs_*` in `isBenignDataDestination()` — **narrowly**, since the
+value of that assertion is its breadth; (2) find and fix the console message that triggers
+symbolication on firefox. **Do not loosen the third assertion generally** — it is the only check
+covering egress to destinations nobody thought to enumerate.
+
+**Address by**: whenever the e2e suite is next opened. Pairs with **#187** and the untimed test in
+**#196** as the three "the suite is honest but noisy on Windows" items.

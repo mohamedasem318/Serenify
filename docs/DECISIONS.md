@@ -5186,3 +5186,593 @@ All four are the honest end-state, correctly un-flattened; the only defect is th
 **Not mirrored into `CLAUDE.md`** — unlike Amendment 16's Privacy-Policy/ToS rule, which is a per-PR procedural gate. Both of these are design/copy rules, and the stated rationale for putting the wordmark in the constitution at all is that the constitution is read on every SpecKit feature. Keeping `CLAUDE.md` lean was the explicit call.
 
 **Cross-references**: `.specify/memory/constitution.md` Amendment 17 (Sync Impact Report + Principle I public-communication bullet + Principle V Typography/Wordmark blocks + version line `1.13.0`); `docs/CHANGELOG.md` 2026-07-24 (Amendment 17); `docs/BACKLOG.md` "From constitution Amendment 17" section; GitHub issue #155; `specs/013-public-surface-and-legal/spec.md` OQ-1 (resolved: Option B) and OQ-3 (resolved: an amendment is required); `docs/DECISIONS.md` 2026-06-18 (`--color-meadow-text` origin) and 2026-06-17 (filled-accent CTA foreground).
+
+---
+
+## 2026-07-25 — GitHub resolves a `pull_request` workflow from the PR's **merge ref**, not from the base branch or `main`
+
+**Status**: Accepted (measured, not inferred).
+
+**Context**: `.github/workflows/ci.yml` triggered only on `main`, so all three
+checks — `python (ruff · pytest)`, `web (lint · typecheck · vitest)` and
+`speckit-skills guard` — were silent for every PR into a feature branch; only
+Vercel ran. Confirmed on PR #160 (base `013-public-surface-and-legal`): two
+Vercel contexts, zero Actions checks — against PR #159 (base `main`) running all
+three. Feature 013 lands as ~9 stacked PRs including a migration and an
+application-wide entry gate, so this was a precondition
+(`specs/013-public-surface-and-legal/plan.md` §15, R1). Fixed in PR #164 by adding
+`[0-9][0-9][0-9]-*` — this repo's feature-branch convention, `001-auth-and-roles`
+through `013-public-surface-and-legal` — to both `pull_request` and `push`.
+
+**Finding**: For a `pull_request` event, GitHub reads the workflow file from the
+PR's **merge ref** (head merged into base). It does **not** read it from the base
+branch alone, and it does **not** read it from the default branch. Landing a
+trigger change on `main` therefore does not, by itself, make checks appear on PRs
+into a feature branch that was cut before that change.
+
+**Evidence** — three throwaway PRs, all with a `013-*` base, opened **before** #164
+merged so `main` could not be a confounder. All were closed and their branches
+deleted:
+
+| Probe | Base has the fix | Head has the fix | Guard checks ran? | Evidence |
+|---|---|---|---|---|
+| A (#161) | yes | yes | **yes**, all three green | run `30139855625` (`pull_request`) |
+| B (#162) | no | no | **no** — Vercel only | no CI run was created for that branch at all |
+| C (#163) | no | **yes** | **yes**, all three green | run `30139858220` (`pull_request`) |
+
+Probe C is the discriminator: the base branch carried no trigger change and the
+checks still ran, because the head carried it into the merge ref. Probe B is the
+control — not a cancelled or failed run, but no run created at all.
+
+**Consequence**: a feature branch cut **before** the trigger fix must have the
+commit merged into it before PRs into it run checks. `013-public-surface-and-legal`
+was 1 commit ahead of `main` and 0 behind, so this was **not** a fast-forward — it
+took merge commit `528f70e`. Branches cut from `main` **after** `cbb7f81` (the #164
+squash merge) inherit the trigger automatically and need nothing.
+
+Verified afterwards on PR #165 (head `chore/ci-verify-013-probe`, cut from
+`013-public-surface-and-legal` exactly as a phase branch will be, and deliberately
+named so it does **not** match `[0-9][0-9][0-9]-*`): all three checks ran from a
+single `pull_request` run `30140145032`, each listed once.
+
+**Side-effect, accepted**: a head branch whose own name matches `[0-9][0-9][0-9]-*`
+now also gets a `push` run, so its PR check list shows each check **twice** — once
+from `push`, once from `pull_request`. Both must pass; it is cosmetic noise, not a
+correctness problem. The `push` half is kept because an integration branch
+accumulating a 9-PR stack deserves the same green baseline `main` has: the base
+moves under earlier PRs, so the post-merge state is worth re-checking. Dropping
+`[0-9][0-9][0-9]-*` from the `push` trigger removes the duplication at that cost.
+
+**Cross-references**: PR #164 (the fix, squash-merged as `cbb7f81`); PRs #161, #162,
+#163 (probes, closed, branches deleted); PR #165 (post-merge verification, closed);
+`.github/workflows/ci.yml` header comment (the finding is recorded there so it need
+not be rediscovered); `specs/013-public-surface-and-legal/plan.md` §15 R1.
+
+---
+
+## 2026-07-27 — Next 16 does **not** error when `app/page.tsx` and `app/(public)/page.tsx` both exist — it silently prefers the ungrouped file
+
+**Context**: P6 (T086) moves the root route into the `(public)` route group. `tasks.md`
+T086 and `research.md` §11 both justify deleting `app/page.tsx` in the same commit by
+asserting that **"both files existing simultaneously is a build-breaking route conflict"**.
+That justification is wrong on Next **16.2.11**, and the truth is a stronger argument for
+the same action.
+
+**What the docs on disk actually say** (`node_modules/next/dist/docs/`, read at 16.2.11):
+
+- `01-app/01-getting-started/02-project-structure.md:77` — `app/page.tsx` → `/`.
+- same file `:97` — `app/(marketing)/page.tsx` → `/`, "Group omitted from URL".
+- `01-app/03-api-reference/03-file-conventions/route-groups.md:12` — a parenthesised
+  folder "should **not be included** in the route's URL path".
+- same file `:31` — "**Conflicting paths**: Routes **in different groups** should not
+  resolve to the same URL path … and cause an error."
+
+The conflicting-paths caveat is scoped to **group vs group**. `app/page.tsx` is in no
+group, so the documented error case does not cover this pair — and empirically it does
+not error.
+
+**How it was proved.** `app/page.tsx` was temporarily recreated alongside
+`app/(public)/page.tsx` and the app was built and served:
+
+1. `npm run -w apps/web build` — **exit 0**, no error, no warning, no conflict message.
+2. Next's own route table listed **`ƒ /` exactly once**.
+3. `next start` served `/` from **`app/page.tsx`** — the probe text rendered and the
+   public shell's `<nav>` did **not**.
+
+The probe file was then deleted; the tree matched HEAD.
+
+**Why this matters more than the correction.** The real failure mode is *silent
+precedence*, which is worse than a build error. Had the takeover been done as a **copy**
+rather than a **move**, `tsc` would be green, `next build` would be green, every unit test
+would be green — and the landing page would simply never render, outside the public shell,
+with no navbar and no footer. Nothing in the suite would have noticed.
+
+**Decision**: the move stands, for this reason rather than the one given. The check is
+made permanent as a unit test —
+`apps/web/tests/unit/app/one-page-owns-root.test.ts` — asserting that exactly one route
+file resolves to `/` and that it is `(public)/page.tsx`. It is deliberately narrow: one
+assertion about one URL, **not** a general route-table test, which would re-derive Next's
+routing semantics somewhere nobody would maintain.
+
+**Not done**: `research.md` §11 and `plan.md` are **not** edited. Planning artifacts are
+not edited mid-build; this entry is the record.
+
+---
+
+## 2026-07-27 — The landing narration row is two lines below 768 px: the "one line at 320 px" rule was written without measuring and is unachievable
+
+**Context**: `plan.md` §10.3 constraint 2, R12, and T107 all require the hero card's
+narration to render on **exactly one line at 320 px for every beat**, and all three state
+that a failure is "a copy-length problem, not a CSS problem" whose fix is **re-approval of
+the string, not a taller row**.
+
+**Measured, before any of the card was built** — real Chromium, 320 px viewport, the app's
+own `next/font` Inter, against the approved §10.3 Position 3 string ("What you said stays
+yours. The video was read and forgotten.", 60 chars):
+
+| Font size | Width required |
+|---|---|
+| 17 px (`--text-base`) | 496.7 px |
+| 14 px | 409.0 px |
+| **13 px (`--text-xs`, the smallest token that exists)** | **379.8 px** |
+
+A card at a 320 px viewport has roughly **260 px** of inner width (16 px page padding +
+14 px card padding per side). The string needs **379.8 px at the smallest legible token**
+and would fit only at **~8.8 px**. The conclusion survives every layout choice: spanning
+the full 320 px viewport with **zero** padding it still needs ~11 px. It is not only 320 px
+either — at 13 px the string needs a viewport of roughly **440 px**, so the rule as written
+fails at **320, 375 and 414** and passes only at 768.
+
+A second string was over too: `backToAtEase` ("Back to at ease — because they were asked,
+not told.", transcribed from mock `:771`) at 329.0 px. The other ten fit at 13 px.
+
+**Decision (Mohamed, 2026-07-27)**: **hold the copy, move the layout rule.** The approved
+§10.3 strings stay byte-exact; `backToAtEase` is left as transcribed. The narration row is
+**fixed at two lines below 768 px and one line at and above it** — fixed at every width,
+never content-dependent. Single-line strings are vertically centred so the shorter beats do
+not hang off the top.
+
+**Why this does not violate "not a taller row".** The harm those three passages name is
+*dynamic* height — "breaking the fixed-height narration row", "force the fixed height up",
+"clip". FR-009's guarantee is that **content changing cannot move anything below it**. A
+row fixed at two lines never changes height with content, so that guarantee holds
+unchanged; only the line budget moved.
+
+**T107's assertion** changes accordingly: below 768 px it asserts the row height is
+**constant across all 17 beats** and that no string exceeds two lines; at 768 px it asserts
+exactly one line. Zero outer-dimension drift remains the bar at all four widths.
+**Re-measured after implementation**: all 12 narration strings fit within two lines at 320,
+375 and 414 px and one line at 768 px — nothing needs three. All five layout tests pass.
+
+**Not done**: `plan.md` is **not** edited and T107's text is unchanged beyond the
+assertion itself. The amendment is noted in the P6 PR body.
+
+---
+
+## 2026-07-28 — The public navbar becomes sticky and gains Sign in / Sign up; the story card's narration returns to `--text-xs` at every width
+
+Three divergences from the spec, recorded here rather than by editing `plan.md`,
+`spec.md` or `research.md` mid-build. All three came out of a fidelity pass against the
+signed-off mock (`docs/mockups/serenify-landing-mock.html`), which is the authority for
+how the page **looks** — never for what it **says**.
+
+### 1. The navbar is sticky and translucent (diverges from FR-018)
+
+**Context**: FR-018 requires the public navbar to be visually identical to the app header,
+and P3 read that as covering behaviour too — so it was neither sticky nor translucent,
+because `components/header/header.tsx` is neither.
+
+**Decision**: on the public shell it is now `sticky top-0 z-50` over
+`color-mix(in srgb, var(--color-bg) 88%, transparent)` with a 12 px backdrop blur, which is
+what the mock's `nav` rule does. The reasoning that produced the original choice inverts on
+a landing page: `/` is a long scrolling narrative whose entire job is to deliver a stranger
+to the two buttons in the bar, and a bar that scrolls away takes them with it. The app
+header sits above short, task-shaped screens where sticky buys nothing. Everything else
+FR-018 names — `h-16`, `border-b border-border`, the wordmark size, the three-slot rhythm,
+the trailing theme toggle — is unchanged.
+
+`html { scroll-padding-top: 4rem }` is added in `globals.css` as a direct consequence: the
+hero's second CTA targets `#how-it-works`, and without it the browser parks that heading
+underneath the now-fixed bar.
+
+### 2. The navbar carries Sign in and Sign up (a functional gap, not a style choice)
+
+**Context**: the trailing slot held the theme toggle alone. A returning visitor landing on
+`/` therefore had **no way into the product from the navigation at all** — the hero's
+"Get started" CTA was the only door on the route, and on a phone it is below the fold.
+
+**Decision**: `Sign in` (outlined) and `Sign up` (solid ink) are added, sourced from a new
+`PUBLIC_AUTH_ACTIONS` in `components/public/destinations.ts`. They are deliberately **not**
+members of `PUBLIC_DESTINATIONS`: that list also drives the footer's site map, where an auth
+action does not belong, and keeping them separate is what lets the shell test go on
+asserting the destination list contains nothing authed. `/login` and `/signup` are
+unauthenticated routes under `app/(auth)/` — not `/app`, not role-gated — so this does not
+put an authed destination on the public surface.
+
+Per the mock, `Sign in` hides below 420 px so the bar still fits at 320 px; **both** appear
+in the mobile sheet, so the narrowest viewport loses nothing (FR-019).
+
+### 3. The narration is `--text-xs` at every width — the `md:` step is removed
+
+**Context**: P6 stepped the story card's narration to `--text-base` (17 px) at `md`. The
+mock's `.vo` is 12.5 px at every width; the step has no counterpart there.
+
+**Measured 2026-07-28, real Chromium**: at 1024, 1280 and 1440 px the closing beats
+(`backToAtEase` and the approved §10.3 Position 3 string) rendered **51 px of text inside
+the 25.5 px one-line row** and were sliced in half by `overflow-hidden`. The cause is the
+two-column hero: at `lg` the card becomes a ~520 px column, and 17 px copy needs more room
+than that. The four widths T107 measured — 320/375/414/768 — are all **single-column**,
+where the card is full width and the string fits, which is why the suite passed 5/5 while
+the page was visibly broken.
+
+**Decision**: the narration returns to `--text-xs` at every width. This is a **reversal of
+a P6 regression, not a new size** — it restores the mock's own value, and it changes no
+copy. The 2026-07-27 amendment above is untouched: the row is still two lines below 768 px
+and one line at and above it.
+
+`tests/layout/landing-hero-stability.spec.ts` gains **1280 px** to its width list and a new
+`narrationClipped` assertion (text `scrollHeight` against row `clientHeight`), because the
+existing checks structurally could not see this: a fixed row height is exactly what does
+*not* change when content is clipped, and "wrapped" and "clipped" are different facts. Both
+additions were confirmed **red** against the old code before the fix.
+
+**Not done**: `plan.md`, `spec.md` and `research.md` are not edited. This entry is the
+record.
+
+---
+
+## 2026-07-28 (second pass) — FR-053 gains a spent 24×24 exception for the chapter markers; the wordmark enters headings; the Ren thread types
+
+Four changes from the landing fidelity pass's follow-up round. Only **one** of them edits a
+planning artifact: FR-053, at Mohamed's explicit instruction. `plan.md` and `research.md`
+are untouched, and nothing else in `spec.md` changed.
+
+### 1. FR-053 — a 24×24 px exception, scoped to the chapter markers, spent
+
+**Context**: the 44px tap-target floor made the mock's chapter-marker treatment
+unreachable. Six controls in one row means the cluster is **264px wide at 44×44** however
+small the dot is drawn, because the *hit area* sets the width — against the mock's ~66px.
+The row read as scattered rather than as a cluster. Reported as a constraint conflict
+rather than resolved unilaterally, since shrinking a stated floor was not mine to decide.
+
+**Decision (Mohamed, 2026-07-28)**: amend FR-053 with an exception permitting **24×24px**
+targets for `components/landing/chapter-markers.tsx` **only**, marked spent, in the same
+shape as FR-026's single-silhouette exception. The reasoning recorded in the amendment:
+24×24 satisfies **WCAG 2.5.8 (AA)** — a step from AAA to AA on one control, not a drop
+below conformance — the markers are a **convenience rather than a path** (the story
+auto-advances without them, so no beat is reachable only through a marker), and they must
+stay keyboard-reachable with a visible focus ring.
+
+**Measured after**: markers are **24×24**, the cluster is **144px** (was 264px), the
+resting dot holds **5.58:1 light / 6.58:1 dark**, and a focused marker still renders the
+app's focus ring. Every other interactive element on the public surface remains ≥44px and
+the walk asserts it, exempting only these six.
+
+The mock's literal ~66px is still not reached and cannot be without going below 24px. 144px
+is the floor under the amended rule.
+
+### 2. The wordmark renders inside headings — without widening FR-029's site table
+
+Six headings name the product: one on the landing page and five across the two legal
+documents. They now render it through the shared `<Wordmark />` via a new
+`components/brand/wordmark-in-text.tsx`, which splits the copy string and delegates.
+
+**Why this is not a new FR-029 site.** FR-029's table is exhaustive about the *chrome*
+surfaces that render the wordmark as a standing brand mark, and — load-bearingly — about
+the two that **cannot** consume the shared component and are therefore named hand-sync
+exceptions. A heading containing the product name in a sentence introduces no hand-sync
+exception: it consumes the one definition, so the rule the table exists to protect (one
+definition, reused, never re-typed) is satisfied rather than stretched. Writing the two-tone
+markup at each of the six call sites would have been the actual violation.
+
+**Superseded in part, 2026-07-28:** this reading was accepted and **FR-029 was amended** to
+state it, because "exhaustively" read as a closed list of every place the wordmark may
+appear. The amendment clarifies rather than allows — in-prose usage through the shared
+definition is permitted, re-typing the markup at such a site remains a violation, and the
+hand-sync exceptions remain exactly two. So the sentence above saying `spec.md` is not
+edited for this held on the day it was written and no longer does.
+
+**Deliberately not applied anywhere else.** Body copy, section labels and the legal
+documents' contents index stay plain. The contents index is a nav list rather than a
+heading, and a two-tone mark repeated down a sidebar is the wallpaper effect that costs the
+hero the effect it exists to carry.
+
+### 3. The quiet panel's bars follow the band
+
+They were pinned to meadow, so the panel stayed green while the reading beside it said
+"A little tense" and the sparkline had already gone amber — three parts of one readout
+disagreeing about the same moment. Same three tokens and the same mapping `story-trend.tsx`
+uses. Following the band is not encoding a value: the bars still carry no number and their
+heights are unchanged.
+
+### 4. The Ren thread types — and the drift invariant was never traded for it
+
+The person's messages type character by character and Ren shows a typing indicator before
+each reply. The obvious hazard is a growing element inside a box whose whole guarantee is
+that nothing moves.
+
+**The bubble reserves its final size and fills in.** Each animating bubble is a 1×1 grid
+holding two children in the SAME cell: an `invisible` copy of the complete message, which
+is what the grid measures, and the revealed prefix painted over it. The box is the finished
+box from the first character, and the prefix wraps where the finished text wraps because
+both lay out at the same width.
+
+**Measured, because "it looks fine" is not the bar here.** Sampled mid-type and after, at
+320/414/768/1280: the bubble is **324.3×27.9 / 299.5×45.8 / 212×45.8 identical in both
+samples**, painted 13–17 of 50 characters at the mid sample, with the card's own box
+unchanged, nothing outside the panel, no thread scrolling, and the 4-bubble cap intact.
+Ren's indicator is the one thing that changes size and it only grows *toward* the
+already-measured finished state, in the same slot — never a fifth list item.
+
+**Reduced motion is absence, not slowness**: no typing, no indicator, and no dependence on
+a timer having fired, so a visitor stepping through with the markers sees complete text at
+every beat. The answer is threaded down from `use-story-clock.ts` rather than queried
+again — T099 asserts exactly one landing module reads that query, and a second reader could
+disagree with the clock on the render where they resolve.
+
+**The indicator is an animation, not copy**: it is `aria-hidden`, and every bubble carries
+its full text in an `sr-only` span from mount, so a screen reader gets each message once,
+statically, and hears nothing as it types. A live region would have re-announced a growing
+string on every frame.
+
+---
+
+## 2026-07-28 (third pass) — Feature 013's closing decisions: what the consent design settled, and the two residuals it ships knowingly
+
+Recorded by T143 as feature 013 closes. Eight of these are decisions the feature made and
+closed; the last two are **residuals it ships with open eyes**, written down here precisely so
+that a later reader does not mistake either one for an oversight.
+
+### 1. Order A — the legal half first, and the hero story last
+
+Decided 2026-07-25 (`plan.md` §14.2). The two candidate orders traded the same scarce thing —
+which half of the feature gets built while there is still slack — and the feature chose to spend
+that slack on the Terms of Service and Privacy Policy rather than on the landing hero.
+
+**The reason is that the two risks are different in kind, not merely in size.** The hero story
+card is the largest and least predictable *implementation* item in the feature — 17 beats, four
+absolutely positioned panels, a zero-pixel-drift geometry contract at four widths, reduced
+motion, an `IntersectionObserver` with a known repo gotcha, chapter markers. Its risk is
+**schedule** risk: bounded, visible while it is happening, and cuttable. The legal text's risk is
+**correctness** risk on a **durable public promise** — the kind that is invisible on the day and
+expensive later, and the kind FR-050 exists to stop being incurred in a hurry.
+
+The cost was accepted rather than argued away: building the hero last means discovering it last,
+and if it overran it would overrun at the end, against the deadline. It did not, but the decision
+would have been the same either way — a late hero is a schedule problem, and hurried legal text
+is a promise nobody can take back.
+
+### 2. Re-consent is decided by version IDENTITY, never by comparing timestamps
+
+`user_consents.document_version` holds a version id (`terms_privacy@2026-07-26.1`), and the gate
+asks whether the id a person holds is **at or past the binding revision's position in the
+registry** — `satisfiesConsent()` at `apps/web/lib/consent/evaluate.ts:67–79`, a `findIndex`
+membership test against `CONSENT_REGISTRY`.
+
+**A timestamp comparison would have been the obvious implementation and it is wrong**, for a
+reason worth stating because it recurs: "consent recorded before the document changed" is not the
+same question as "consent recorded against wording we now consider superseded". A clock
+comparison answers the first. It gets the second wrong every time the two diverge — a cosmetic
+revision would re-prompt everyone who consented before it, and a material revision published with
+a backdated timestamp would re-prompt nobody. Materiality is a **human judgment made at publish
+time** and recorded on the revision (`registry.ts`, `materiality` + a required `rationale`); it is
+never derived from a text diff, a content hash, or a date (FR-043a).
+
+`publishedOn` exists on every revision and is **evidence only** — the registry's own comment says
+so, and nothing in the gate reads it.
+
+### 3. The version registry lives in the repository, not in a database table
+
+`apps/web/lib/consent/registry.ts` is a constants module (`research.md` §6.3).
+
+**What this buys.** Publishing a revision is a pull request and **zero migrations**: the wording
+edit and the registry entry describing it land in the **same PR** (`research.md` §6.1), so a
+reviewer reads the new text directly beside its materiality classification and the stated reason
+for that classification. Put the registry in a table and those two things separate — the wording
+ships in a deploy, the classification is typed into a database by whoever remembers, and the
+review that is the entire safeguard never happens in one place.
+
+**What it costs, stated plainly.** The registry cannot be edited at runtime. Correcting a
+misclassification means a deploy. That is the right trade for something that is supposed to be
+slow and reviewed.
+
+The module is deliberately **pure** — it imports nothing from `server-only`, so Vitest loads it
+directly and the evaluator suite covers every registry shape without a database. Its invariants
+(explicit materiality, non-empty rationale, unique well-formed self-prefixed ids, ascending
+publication order, append-only against a frozen snapshot) are CI-enforced in
+`tests/unit/lib/consent/registry-guards.test.ts`.
+
+### 4. The two gates fail in OPPOSITE directions, and the asymmetry is the design
+
+- **The app-shell Terms/Privacy gate fails OPEN** (§7.3). If the consent read errors, the user
+  reaches the app and `failOpen()` says so in the logs.
+- **The camera-and-inference gate fails CLOSED** (§7.2, `lib/consent/read.ts`). If the read
+  errors, no capture happens.
+
+**Why they differ.** The failure modes are not symmetric in consequence. A broken read at the
+shell gate, failing closed, locks **every user out of the entire product** over a database blip —
+an outage manufactured by a safety mechanism. Failing open costs a window in which someone browses
+the app under wording they have not re-acknowledged: recoverable, and detectable. A broken read at
+the camera gate, failing open, means **a camera turns on and inference runs against someone who
+has not agreed to it.** That is not recoverable and not detectable after the fact. So the shell
+gate optimises for availability and the camera gate optimises for restraint, and neither direction
+is a default anyone should "make consistent" later.
+
+**`lib/consent/read.ts` deliberately hard-codes neither direction.** It returns a discriminated
+result, so "no rows" and "read failed" cannot be conflated by accident, and **the call site owns
+the fail direction**. That is why the same module can serve both gates without either one
+inheriting the other's answer.
+
+**"No rows" is a real, expected answer, not a malfunction** — every pre-existing user has zero
+consent records (FR-041, §7.4), and so does anyone created during the deploy window. It means *not
+consented*; it does not mean *broken*.
+
+### 5. The migration stays one file
+
+`supabase/migrations/20260726000000_user_consents.sql` carries the table, its constraints, its
+index, its immutability trigger, RLS, the grants, and the `CREATE OR REPLACE` of
+`handle_new_user()` — all of it. It was not split.
+
+**Because a split has no partial state worth landing in.** The table without its RLS policies is a
+table anyone can read; the trigger without the table raises on every signup. Every intermediate
+state of a split is worse than either endpoint, and splitting only creates the opportunity to stop
+halfway. One file has one outcome: applied, or not.
+
+### 6. `decision` admits only `'granted'` — and declining is not withdrawal
+
+The column is `NOT NULL DEFAULT 'granted' CHECK (decision IN ('granted'))`
+(`…_user_consents.sql:32`).
+
+**Declining writes nothing** (FR-042): no row, no deletion, no withdrawal state, no tombstone.
+`'declined'` is deliberately **absent from the CHECK**, and the migration says why in place —
+admitting the value would invite writing the row. There is no "declined" record because a decline
+is the absence of a consent, not a kind of consent.
+
+**The seam is left open on purpose.** Feature **018** owns withdrawal, and it widens this CHECK and
+inserts a **new** row — never updates an old one. The table is append-only by design (FR-043b) and
+carries an immutability trigger plus no UPDATE or DELETE grant to `authenticated`, so consent is a
+**history**: one row per accepted revision, and the record of what someone agreed to in the past
+survives them changing their mind.
+
+### 7. RESIDUAL — SC-006 holds for the product's own signup surface, and NOT against a caller who bypasses it. Open signup is a DELIBERATE posture, not an omission.
+
+**This is the entry a later reader is most likely to misread, so it is stated flatly.**
+
+SC-006 — every account has a consent row — **holds for 100% of accounts created through the
+product's own `/signup` surface.** It **does not hold** against a caller who goes around that
+surface and calls the auth API directly. The consent row is written by `handle_new_user()` only
+when the signup supplied `terms_privacy_version` in its user metadata; a caller who omits it
+creates an account with no consent row, and a caller who supplies a well-formed value forges one.
+
+**The root cause is that `/signup` is open self-serve — issue #62 — and #62 STAYS OPEN,
+deliberately.**
+
+`plan.md` §15 R8 describes this residual as one whose root cause "must close before real user data
+is processed". A reader who takes that at face value, then visits the live site and finds `/signup`
+open, will reasonably conclude the gate was forgotten. **It was not forgotten. It was weighed and
+accepted.** The demo deployment at **serenify.tech ships knowingly with open self-serve signup**
+for the demo window; #62 is held open as an accepted posture until adoption, not as a backlog item
+that slipped; and **R8's SC-006 bypass is therefore LIVE and ACCEPTED for that window.**
+
+**The blast radius, unchanged from R8 and worth repeating because it is what makes the posture
+defensible:** one forged consent row, **for the forger's own account**, RLS-scoped to
+`auth.uid()`. No cross-user write. No privilege escalation. Nothing else in the product unlocked
+by it. A person can lie about having read the Terms — on their own behalf, to their own row.
+
+### 8. RESIDUAL — R7 is NARROWER than `plan.md` §15 says, and the two cases are not the same
+
+`plan.md` §15 R7 reads: *"a malformed signup consent version could be written… shape-constrained by
+two DB CHECKs; a non-registry value never satisfies `satisfiesConsent()`."* That sentence blurs two
+outcomes which differ completely. Established by reading the shipped trigger and constraints:
+
+- **Well-formed but non-registry** (e.g. `terms_privacy@2099-01-01.1`) — **is written**, and is
+  **inert** exactly as R7 says. `satisfiesConsent` is a membership test
+  (`evaluate.ts:74–77`, `findIndex` → `-1`), and `-1` is never `>=` a valid binding index, so it
+  never satisfies the gate. The §6.3 reconciliation query lists it.
+- **Malformed** (fails the format regex at `…_user_consents.sql:28`, or arrives as JSON `null`
+  against the `NOT NULL` at `:27`) — **is never written at all.** It raises **`23514`** /
+  **`23502`**. `on_auth_user_created` is `AFTER INSERT ON auth.users FOR EACH ROW`
+  (`20260517000030_profile_trigger.sql:27–29`), so the exception aborts the statement and **the
+  `auth.users` row is rolled back — that signup fails outright.** `ON CONFLICT DO NOTHING`
+  (`:111`) does **not** swallow it: it covers unique and exclusion violations only.
+
+So the first case is a junk row that can never unlock anything, and the second is not a row at all
+— it is a failed signup. Neither is "a malformed value written to the database", which is what R7
+reads as.
+
+**`plan.md` is deliberately NOT edited to match.** R7 **overstates** a risk rather than
+understating one, and the plan is not amended mid-build. This entry is where the correction lives.
+
+### 9. Production deploys from `main`, so the merge IS the deploy — and production verification therefore happens AFTER it
+
+Established 2026-07-28 during P8 Stage 4, read from the Vercel API. The `serenify` project has
+`productionBranch: "main"`, no deploy hooks, and the last **13** production deployments are all
+`source: git` from `main`.
+
+**Consequence: "deploy, verify, then merge" is not achievable on this platform**, and P8's phasing
+should not be read as implying it was. T138 had already said as much in passing — *"serenify.tech
+does not have it until T148 merges"* — without recording the mechanism behind it.
+
+**The CLI escape hatch was considered and rejected**, because it does not buy the order it appears
+to. `vercel --prod` from the feature branch would produce a genuine production deployment without
+merging; but the merge then triggers a **fresh** production build from `main`, and *that* build —
+not the verified one — is what serves users. There is no sequence here in which the artefact you
+verified and the artefact serving users are the same object **and** the merge comes last. Merging
+first is the only order in which they are the same object.
+
+**Promoting the branch preview was also rejected**, and the reason is an honest "cannot prove it".
+A preview deployment is built with **preview** environment variables and `NEXT_PUBLIC_*` are
+inlined at build time, so promoting it would serve preview-scoped values to real users — `SITE_URL`
+in particular, which drives auth redirect and confirmation-email links. An attempt to establish
+whether the preview and production values actually differ was **inconclusive**: the Vercel API
+returns them encrypted even with `decrypt=true`, so a hash comparison proves nothing in either
+direction. Unprovable-as-safe was treated as reason enough not to take it.
+
+**What follows from this** is recorded in `deploy-protocol.md` §3: production verification runs
+immediately after the merge, unbroken, with **Lever 0** (`vercel rollback` to the pre-013
+deployment — an alias flip, seconds, no rebuild, destroys no consent history) armed beforehand.
+The window between "013 is live" and "013 is verified" is the risk this ordering creates; the
+mitigation is to keep it short and to hold the rollback in hand before starting.
+
+### 10. RESIDUAL — the Terms/Privacy gate does not cover `(onboarding)`, and that ships knowingly with a measured population of ZERO
+
+Found by the **T146 final review**, immediately before the merge. Recorded here rather than fixed,
+and the reasoning matters more than the verdict.
+
+**The gap.** The app-shell gate lives in `apps/web/app/(authed)/layout.tsx`.
+`apps/web/app/(onboarding)/layout.tsx` has **no consent gate at all**, and `(onboarding)` is a
+**sibling** route group rather than a child of `(authed)`. **FR-043c** says a user who has not
+accepted *"MAY NOT use the application at all"*, and onboarding is part of the application.
+
+**The population is measured, not asserted.** `apps/web/proxy.ts:200-208` makes `/onboarding`
+reachable **only** when `profiles.full_name IS NULL`. Against hosted on 2026-07-28, immediately
+before the merge:
+
+```
+ null_full_name_users        →  0
+ null_name_and_unconsented   →  0
+ total_users                 → 20
+```
+
+**Zero.** All 20 existing accounts have `full_name` set and therefore cannot reach `/onboarding` at
+all; each meets the gate at `/app` correctly. Post-013 signups set `full_name` **and** write a
+consent row in the same `handle_new_user()` transaction, so they never qualify either. The gap is
+**structural, not populated** — and it is written down with its number precisely because *a known
+gap with an unmeasured size is the bad kind of record.*
+
+**Why it was not fixed at the deploy boundary — and this is the load-bearing reason.** The
+precedent is **T049**: the last time `/onboarding` was gated broadly, it created a **permanent
+lockout for every new employee**, and that was caught only because the task was refused as written
+rather than implemented. Mirroring a second high-blast-radius gate into that same layout, at the
+deploy boundary, **unexercised** — ST-10, ST-10a and ST-10b were every one of them run against the
+`(authed)` gate only — is that same failure mode, incurred against an exposure that the
+**camera-and-inference gate already covers** (it is present at `/onboarding` and fails **closed**,
+so capture is consented regardless) and a population measured at zero.
+
+**The residual, stated so it cannot be mistaken for an oversight**: for the 013 release, a user in
+that state *could* complete onboarding and a first calibration without meeting the Terms/Privacy
+gate. Nobody is in that state. The window closes by itself the moment onboarding completes and the
+proxy routes to `/app`. Tracked as **#195**, to be fixed in its own change **with** an
+ST-10-equivalent lockout-and-recovery exercise — because on this layout the exercise, not the code,
+is the expensive half.
+
+### 11. The data controller is named "Mohamed Assem" in both legal documents, deliberately, against FR-046's spelling
+
+Raised by the T146 review as a possible defect; it is not one, and the reason is recorded so it is
+not re-raised.
+
+Both legal documents write the controller as **"Mohamed Assem"** (`lib/legal/copy.ts:123`, `:333`),
+while **FR-046** writes **"Mohamed Asem"**. The divergence is **intentional and documented at the
+site** (`lib/legal/copy.ts:141-145`): FR-024 names the same person as *"Mohamed Assem Adel"* in the
+authors list, and the documents use one spelling throughout **so that a reader never meets two
+spellings of the same person across the controller role and the author role**. The
+`copy-invariants` suite pins the double-s form, so code and tests agree.
+
+**Confirmed by Mohamed on 2026-07-28: "Mohamed Assem" is correct.** The constitution (`:555`),
+`README.md:67` and FR-024 already use it; FR-046's single-s form is the outlier.
+
+**`spec.md` is deliberately NOT edited to match**, on the same principle as the R7 correction above:
+a requirement whose wording is narrower or looser than what shipped is corrected **in the decision
+log**, not by amending the spec mid-build. FR-046 identifies the right person; it spells the name
+one way and the shipped documents spell it the other, and this entry is the record of which one is
+authoritative.

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fetchLatestOtp, randomEmail } from "./helpers";
+import { acceptTermsOnSignup, fetchLatestOtp, randomEmail } from "./helpers";
 
 const PASSWORD = "Employee123!";
 
@@ -14,6 +14,7 @@ test("employee can sign up, confirm OTP, and see the employee app", async ({
   await page.getByLabel("Full name").fill("Employee One");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await acceptTermsOnSignup(page);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
 

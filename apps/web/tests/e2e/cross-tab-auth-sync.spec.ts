@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createAdminClient } from "./setup/admin-client";
-import { fetchLatestOtp, randomEmail } from "./helpers";
+import { acceptTermsOnSignup, fetchLatestOtp, randomEmail } from "./helpers";
 
 /**
  * Cross-tab auth state propagation (US-6 / FR-046 / 📌 DECISION-9).
@@ -146,6 +146,7 @@ test("cross-tab: OTP signup verify on tab B propagates tab A from /login to /app
     await pageB.getByLabel("Full name").fill("OTP Crosstab");
     await pageB.getByLabel("Email").fill(email);
     await pageB.getByLabel("Password", { exact: true }).fill(DEMO_PASSWORD);
+    await acceptTermsOnSignup(pageB);
     await pageB.getByRole("button", { name: "Create account" }).click();
     await expect(
       pageB.getByRole("heading", { name: "Enter the code instead" }),

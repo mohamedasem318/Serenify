@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { fetchLatestOtp, randomEmail } from "./helpers";
+import { acceptTermsOnSignup, fetchLatestOtp, randomEmail } from "./helpers";
 
 const PASSWORD = "ResetUx123!";
 
@@ -22,6 +22,7 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("Full name").fill("Reset Ux");
   await page.getByLabel("Email").fill(email);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
+  await acceptTermsOnSignup(page);
   await page.getByRole("button", { name: "Create account" }).click();
   await expect(page.getByRole("heading", { name: "Check your email" })).toBeVisible();
 

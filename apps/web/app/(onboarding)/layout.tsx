@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { Wordmark } from "@/components/brand/wordmark";
 import { SignOutButton } from "@/components/sign-out-button";
 import { ThemeToggle } from "@/app/theme-toggle";
 import { createClient } from "@/lib/supabase/server";
@@ -36,9 +37,7 @@ export default async function OnboardingLayout({
     <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col px-4 py-12 sm:px-6 sm:py-16">
       <header className="mb-10 flex items-baseline justify-between sm:mb-12">
         <Link href="/app" className="inline-flex items-baseline gap-2">
-          <span className="font-display text-4xl leading-none tracking-tight text-ink sm:text-5xl">
-            serenify
-          </span>
+          <Wordmark className="text-4xl leading-none sm:text-5xl" />
         </Link>
         <div className="flex items-center gap-1">
           <ThemeToggle />
