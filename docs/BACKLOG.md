@@ -2617,3 +2617,46 @@ convenience and the story advances on its own — but it should not stay closed 
 claims it.
 
 </details>
+
+### `failOpen()` is unobservable on Hobby — A5 has no real-time detector (#192)
+**Status**: tech debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN, DEFERRED BY DECISION.**
+GitHub issue **#192 OPEN.**
+**Category**: feature 013 consent gate / deploy observability
+**Observed**: 2026-07-28, during P8 Stage 3b.
+
+**Description**: `failOpen()` (`apps/web/app/(authed)/layout.tsx:62`) records a fail-open — the
+Terms/Privacy gate silently disabling itself for a request — with `console.error` alone, and
+abort condition **A5** is defined as "a sustained stream" of that line. **On this project that is
+not observable**: the Vercel account is **Hobby**, where Log Drains are Pro+ and retention is
+short, so a sustained stream is something someone would have to happen to be watching. There is
+nothing to alert on.
+
+Distinct from the *method* bug corrected in `deploy-log-stage3b-2026-07-28.md` §5 (the earlier
+positive control returned before the line it was testing). This entry is about the **plan**, which
+is unobservable even with perfectly readable logs.
+
+**Deferred deliberately — ruled by Mohamed, 2026-07-28.** `failOpen()` lives in the file **P5
+shipped alone, specifically to keep `git revert` clean**: Lever 2 of the deploy protocol is a
+`git revert` of the gate commit, and that lever's value depends on the commit staying surgical.
+Reopening that file days before production — for a failure mode that **requires a schema change to
+occur at all** (wrong RLS policy after a migration, dropped grant, renamed column) — trades a real
+and immediate risk for a hypothetical one. Not because it isn't real; because the cure is riskier
+than the disease this week.
+
+**What covers it in the meantime**: `deploy-protocol.md` §6.4 now carries a **lagging** detector
+needing no code change and working on any plan — if the gate works the 20 returning users write
+consent rows, and if it is failing open they reach the app and write nothing. Query (c), signed in
+since the deploy with no consent row, growing while (a) grows, is the alarm. Its limits are
+documented there and are real: it reports only after someone signs in, no single row is conclusive
+(a user sitting on the screen looks identical to one who slipped past), and **zero sign-ins means
+zero information, not good news**.
+
+**Fix scope**: have `failOpen()` also record its own occurrence somewhere queryable — a small
+append-only table or a counter — so "sustained stream" becomes a SQL query that survives retention
+and needs no plan upgrade. **Caveat to design around**: it fires *because* a consent read failed,
+so a total database outage blocks that write too; it is not a universal net. But the three modes the
+docstring names are all specific to the `user_consents` SELECT under RLS, and a separate INSERT
+survives all three — which is the point. Worth pairing with whatever replaces the `console.error`,
+so the file is opened once.
+
+**Address by**: after `013-public-surface-and-legal` merges, as its own change.
