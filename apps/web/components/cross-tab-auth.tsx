@@ -191,9 +191,21 @@ export function CrossTabAuth(): null {
         // logout request and a Set-Cookie clearing response) before
         // we navigate. The IIFE swallows any auth-server error so
         // the navigation still happens — best-effort UX.
+        //
+        // Still required after the 2026-07-28 proxy fix: proxy.ts's
+        // `user && isAuthPage → /app` rule is a GET gate, and a
+        // router.push IS a GET, so a sibling that navigates while the
+        // cookies are still valid is bounced straight back to /app.
+        //
+        // `scope: "local"` — the supabase-js default is "global", which
+        // would revoke this user's refresh token on EVERY device the
+        // instant any tab saw a sign-out broadcast. It does not narrow
+        // the same-browser race (sibling tabs share one cookie jar and
+        // therefore one session), but signing out here must not end the
+        // session on the user's phone. See docs/DECISIONS.md 2026-07-28.
         void (async () => {
           try {
-            await createClient().auth.signOut();
+            await createClient().auth.signOut({ scope: "local" });
           } catch {
             // Auth server unreachable or already-cleared session —
             // navigate anyway so the user isn't stuck on the authed

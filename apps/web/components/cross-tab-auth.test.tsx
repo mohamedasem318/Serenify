@@ -131,6 +131,21 @@ describe("CrossTabAuth — signout broadcast navigation gate (FR-046)", () => {
     },
   );
 
+  it("revokes only this session, never every device", async () => {
+    // The supabase-js default is scope: "global", which would revoke the user's
+    // refresh token on every device the moment ANY tab observed a sign-out
+    // broadcast. This does not narrow the same-browser race — sibling tabs share
+    // one cookie jar and therefore one session — but a sign-out in one browser
+    // must not end the session on the user's phone. See docs/DECISIONS.md
+    // 2026-07-28.
+    pathnameHolder.value = "/app";
+    render(<CrossTabAuth />);
+    fireStorage({ key: AUTH_BROADCAST_KEY, newValue: "signout:321" });
+    await waitFor(() => {
+      expect(signOutMock).toHaveBeenCalledWith({ scope: "local" });
+    });
+  });
+
   it("navigates even if local signOut rejects (auth-server unreachable)", async () => {
     signOutMock.mockRejectedValueOnce(new Error("network down"));
     pathnameHolder.value = "/app";
