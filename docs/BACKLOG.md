@@ -2859,8 +2859,16 @@ covering egress to destinations nobody thought to enumerate.
 
 ## From the production sign-out fix — captured 2026-07-28
 
-### ~~Sign-out on production hangs then shows Next's error screen — `proxy.ts` 307s the Server Action POST into a re-POST~~ — resolved (#200)
-**Status**: bug (`type:bug` / `area:web`) — **RESOLVED** on `fix/signout-race-and-feedback`. GitHub issue **#200**.
+### Sign-out on production hangs then shows Next's error screen — `proxy.ts` 307s the Server Action POST into a re-POST (#200)
+**Status**: bug (`type:bug` / `area:web`) — **fix merged in PR A; entry stays OPEN until PR B lands.**
+GitHub issue **#200 OPEN.**
+
+**Why this is split across two PRs.** `main` is production and squash-merges, so **one PR is one
+deploy**. The auth fix and the region pin are shipped separately so that a regression against the ~20
+live accounts has **one suspect, not two** — and so the region change can actually be measured, which
+it cannot be if the sign-out path moved in the same deploy. **PR A** (C1–C4 + F1) carries the fix and
+all tracking. **PR B** carries `apps/web/vercel.json` alone and merges only after A is verified. The
+two branch independently off `main` and are mergeable in either order.
 **Category**: not a feature — a production defect found by report
 **Observed**: reported against `serenify.tech`, 2026-07-28; reproduced live before the fix
 
@@ -2887,7 +2895,7 @@ nor an `x-action-redirect`, so the identical throw fires with different copy. Th
 protocol requires the action's *own* response — `fetch` follows redirects silently, so a redirect at
 the proxy layer is invisible to the router by construction.
 
-**Resolved**: five independently revertible commits.
+**Fixed in PR A**: five independently revertible commits.
 - **C1** — the fix. `proxy.ts` gates on GET/HEAD only. No authorization is lost: every Server Action
   reachable on a protected path already runs its own `getUser()`, which Next's docs require anyway.
   Also skips the `profiles` lookup on non-navigations (redirect-only gate, so it was pure latency).
@@ -2895,7 +2903,12 @@ the proxy layer is invisible to the router by construction.
   error the action clears the `sb-*` cookies itself and still redirects. See DECISIONS 2026-07-28.
 - **C3** — pending state on all five sign-out call sites.
 - **C4** — an app error boundary (`app/error.tsx`).
-- **C5** — `apps/web/vercel.json` pins functions to `fra1`.
+- **F1** — review follow-up: the sibling tab was discarding its revoke error too.
+
+**Ships separately in PR B, NOT in PR A**: **C5** — `apps/web/vercel.json` pinning Vercel functions
+to `fra1`, co-located with Supabase `eu-central-1`. Expected to reduce sign-out latency; **magnitude
+not measured**, and measuring it is the whole reason it is a second deploy. **This entry stays open
+until PR B merges** — the auth bug itself is fixed by PR A.
 
 **Left open deliberately**: #201 (recent-chats loading state), #202 (stale Edge-runtime claims),
 #203 (`global-error.tsx`).
@@ -2919,8 +2932,8 @@ empty".
 `${clientEnv.apiUrl}/chat` (`lib/api/chat-client.ts:13`, i.e. `NEXT_PUBLIC_API_URL`) → FastAPI →
 Supabase. Two hops sit in front of the database and the first is a container that can be cold, so
 **cold start is the likely dominant cause rather than database latency** — which also fits the flash
-being variable rather than a steady ~200 ms. **Pinning Vercel to `fra1` (#200 C5) will not fix this**;
-the Azure hop is the one that matters.
+being variable rather than a steady ~200 ms. **Pinning Vercel functions to `fra1` will not fix this**
+whenever that lands (#200 PR B); the Azure hop is the one that matters, and it is not Vercel's.
 
 **Fix scope**: small — a third state. Either a `loading` boolean or `ConversationSummary[] | null`
 with `null` meaning unresolved, rendering a skeleton or nothing until the query returns.
