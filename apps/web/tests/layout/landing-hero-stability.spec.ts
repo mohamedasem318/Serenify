@@ -27,7 +27,18 @@ import { expect, test } from "@playwright/test";
  * asserts one line. Recorded in `docs/DECISIONS.md`.
  */
 
-const WIDTHS = [320, 375, 414, 768] as const;
+/*
+ * 1280 IS HERE BECAUSE ITS ABSENCE IS WHAT LET A CLIPPED NARRATION SHIP.
+ *
+ * The four original widths all render the hero in ONE column, where the card is the full
+ * content width — 720 px at 768. The two-column layout only engages at `lg`, and there the
+ * card is a NARROW column. So every width this spec measured was the comfortable case, and
+ * the binding case — the narrowest the card ever gets while the narration row is at its
+ * ONE-line height — was never measured at all. Measured on 2026-07-28 before the fix: at
+ * 1024/1280/1440 the closing beats wrapped to two lines of 51 px inside a 25.5 px row and
+ * were sliced in half, while this spec passed 5/5.
+ */
+const WIDTHS = [320, 375, 414, 768, 1280] as const;
 const BEATS = 17;
 
 interface Sample {
@@ -38,6 +49,7 @@ interface Sample {
   readonly swapScrolls: boolean;
   readonly narrationRowHeight: number;
   readonly narrationLines: number;
+  readonly narrationClipped: boolean;
   readonly documentOverflows: boolean;
   readonly threadClipped: number;
   readonly activePanelClipped: boolean;
@@ -111,6 +123,16 @@ for (const width of WIDTHS) {
               swapEl.scrollWidth > swapEl.clientWidth || swapEl.scrollHeight > swapEl.clientHeight,
             narrationRowHeight: Math.round(rowEl.getBoundingClientRect().height * 10) / 10,
             narrationLines: Math.round(textEl.scrollHeight / lineHeight),
+            /*
+             * The narration's own version of the panel-clipping check above, and it is a
+             * SEPARATE assertion from the line count on purpose. The row is
+             * `overflow-hidden` too, so a string that needs more room than the row has is
+             * silently sliced rather than overflowing — and the fixed-row-height assertion
+             * stays green while it happens, because the row height is exactly what did NOT
+             * change. Line count alone would not catch it either: two lines is legal below
+             * 768 px, so "wrapped" and "clipped" have to be measured independently.
+             */
+            narrationClipped: textEl.scrollHeight > rowEl.clientHeight + 0.5,
             documentOverflows: root.scrollWidth > root.clientWidth,
             threadClipped: bubblesOutside,
             activePanelClipped: activePanel
@@ -166,6 +188,16 @@ for (const width of WIDTHS) {
         `beat ${sample.beat}: the narration row changed height, so its content can move ` +
           `everything below it`,
       ).toBe(first.narrationRowHeight);
+    }
+
+    // ── FR-009: the narration FITS the row it was given, at every beat and width ──
+    for (const sample of samples) {
+      expect(
+        sample.narrationClipped,
+        `beat ${sample.beat}: the narration is taller than its fixed row at ${width}px and is ` +
+          `being cut off mid-glyph by overflow-hidden. The row height is not the bug — the ` +
+          `type size is.`,
+      ).toBe(false);
     }
 
     // ── The line-count rule, per the 2026-07-27 amendment ──

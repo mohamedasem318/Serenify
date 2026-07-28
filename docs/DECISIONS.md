@@ -5346,3 +5346,75 @@ exactly one line. Zero outer-dimension drift remains the bar at all four widths.
 
 **Not done**: `plan.md` is **not** edited and T107's text is unchanged beyond the
 assertion itself. The amendment is noted in the P6 PR body.
+
+---
+
+## 2026-07-28 — The public navbar becomes sticky and gains Sign in / Sign up; the story card's narration returns to `--text-xs` at every width
+
+Three divergences from the spec, recorded here rather than by editing `plan.md`,
+`spec.md` or `research.md` mid-build. All three came out of a fidelity pass against the
+signed-off mock (`docs/mockups/serenify-landing-mock.html`), which is the authority for
+how the page **looks** — never for what it **says**.
+
+### 1. The navbar is sticky and translucent (diverges from FR-018)
+
+**Context**: FR-018 requires the public navbar to be visually identical to the app header,
+and P3 read that as covering behaviour too — so it was neither sticky nor translucent,
+because `components/header/header.tsx` is neither.
+
+**Decision**: on the public shell it is now `sticky top-0 z-50` over
+`color-mix(in srgb, var(--color-bg) 88%, transparent)` with a 12 px backdrop blur, which is
+what the mock's `nav` rule does. The reasoning that produced the original choice inverts on
+a landing page: `/` is a long scrolling narrative whose entire job is to deliver a stranger
+to the two buttons in the bar, and a bar that scrolls away takes them with it. The app
+header sits above short, task-shaped screens where sticky buys nothing. Everything else
+FR-018 names — `h-16`, `border-b border-border`, the wordmark size, the three-slot rhythm,
+the trailing theme toggle — is unchanged.
+
+`html { scroll-padding-top: 4rem }` is added in `globals.css` as a direct consequence: the
+hero's second CTA targets `#how-it-works`, and without it the browser parks that heading
+underneath the now-fixed bar.
+
+### 2. The navbar carries Sign in and Sign up (a functional gap, not a style choice)
+
+**Context**: the trailing slot held the theme toggle alone. A returning visitor landing on
+`/` therefore had **no way into the product from the navigation at all** — the hero's
+"Get started" CTA was the only door on the route, and on a phone it is below the fold.
+
+**Decision**: `Sign in` (outlined) and `Sign up` (solid ink) are added, sourced from a new
+`PUBLIC_AUTH_ACTIONS` in `components/public/destinations.ts`. They are deliberately **not**
+members of `PUBLIC_DESTINATIONS`: that list also drives the footer's site map, where an auth
+action does not belong, and keeping them separate is what lets the shell test go on
+asserting the destination list contains nothing authed. `/login` and `/signup` are
+unauthenticated routes under `app/(auth)/` — not `/app`, not role-gated — so this does not
+put an authed destination on the public surface.
+
+Per the mock, `Sign in` hides below 420 px so the bar still fits at 320 px; **both** appear
+in the mobile sheet, so the narrowest viewport loses nothing (FR-019).
+
+### 3. The narration is `--text-xs` at every width — the `md:` step is removed
+
+**Context**: P6 stepped the story card's narration to `--text-base` (17 px) at `md`. The
+mock's `.vo` is 12.5 px at every width; the step has no counterpart there.
+
+**Measured 2026-07-28, real Chromium**: at 1024, 1280 and 1440 px the closing beats
+(`backToAtEase` and the approved §10.3 Position 3 string) rendered **51 px of text inside
+the 25.5 px one-line row** and were sliced in half by `overflow-hidden`. The cause is the
+two-column hero: at `lg` the card becomes a ~520 px column, and 17 px copy needs more room
+than that. The four widths T107 measured — 320/375/414/768 — are all **single-column**,
+where the card is full width and the string fits, which is why the suite passed 5/5 while
+the page was visibly broken.
+
+**Decision**: the narration returns to `--text-xs` at every width. This is a **reversal of
+a P6 regression, not a new size** — it restores the mock's own value, and it changes no
+copy. The 2026-07-27 amendment above is untouched: the row is still two lines below 768 px
+and one line at and above it.
+
+`tests/layout/landing-hero-stability.spec.ts` gains **1280 px** to its width list and a new
+`narrationClipped` assertion (text `scrollHeight` against row `clientHeight`), because the
+existing checks structurally could not see this: a fixed row height is exactly what does
+*not* change when content is clipped, and "wrapped" and "clipped" are different facts. Both
+additions were confirmed **red** against the old code before the fix.
+
+**Not done**: `plan.md`, `spec.md` and `research.md` are not edited. This entry is the
+record.
