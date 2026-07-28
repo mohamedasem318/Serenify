@@ -15,8 +15,14 @@ import { cn } from "@/lib/utils";
  * none of the behaviour, and passes a shallow a11y check while failing a keyboard user.
  * Pointer and keyboard therefore both activate with no key handling written here at all.
  *
- * ≥44×44 px on touch viewports (FR-053): the visible dot is small, but the button's hit
- * area is padded out to the full target and the focus ring is the app's own (FR-055).
+ * 24×24 px targets — **FR-053's one spent exception, amended 2026-07-28**, and the ONLY
+ * sub-44px targets on the public surface. Six controls in one row meant the 44px floor
+ * fixed the cluster at 264px wide however small the dot was drawn, because the hit area
+ * sets the width; the mock composes ~66px. 24×24 satisfies WCAG 2.5.8 (AA) — a step from
+ * AAA to AA on one control, not a drop below conformance — and the markers are a
+ * convenience rather than a path, since the story auto-advances without them and every
+ * beat is reachable by waiting. The targets sit flush, so a 24px circle centred on one
+ * does not intersect its neighbour. The focus ring is the app's own (FR-055), unchanged.
  * They stay fully functional under reduced motion — that is what makes the reduced-motion
  * branch a readable story rather than a frozen one (T098).
  *
@@ -56,7 +62,7 @@ export function ChapterMarkers({
             aria-current={isActive ? "true" : undefined}
             data-chapter={chapter}
             // The hit area is the button; the dot is only what you see.
-            className="grid size-11 place-items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            className="grid size-6 place-items-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
             <span
               aria-hidden
