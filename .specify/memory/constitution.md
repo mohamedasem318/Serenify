@@ -605,6 +605,55 @@ Cross-references:
 - docs/BACKLOG.md "From constitution Amendment 17" / GitHub issue #155
   (`--color-on-accent` + `--color-scrim` registration gap — CLOSED here)
 - docs/DECISIONS.md 2026-06-17 (filled-accent CTA foreground, feature 007)
+
+Amendment 19: 1.14.0 → 1.15.0 (2026-07-30, MINOR)
+Bump rationale: Widens Amendment 18's second bullet, one day after it landed.
+Recorded plainly rather than folded in silently: Amendment 18 wrote the exception
+at the level of a single CONTROL ("the primary forward action (the composer's
+send control)"), and applying it immediately showed that was the wrong level.
+Recolouring the send control alone left seven other meadow elements on the same
+screen — the sent-message bubbles, the "Say hello" empty-state button, the
+composer focus ring, the "Open full history" link, the "Try again" and end-chat
+links, and the rename input's focus border — each of which then read as the
+defect the exception was written to prevent. The rationale was always cohesion
+across a surface; the wording just failed to say so.
+
+Two changes. (1) The exception is restated at SURFACE level and made a
+consistency requirement, not merely a permission: a surface adopting foggy takes
+it across all its accent-carrying elements. (2) It extends to controls whose sole
+purpose is to open Ren — today the floating chat pill. The pill is Ren-branded,
+and after Amendment 18 a meadow pill opened a foggy panel, which is the same
+incoherence one level out. The extension is written to reach the CONTROL and not
+its host surface: a dashboard carrying a foggy Ren pill keeps meadow for its own
+actions, which is the boundary that keeps this from becoming general licence.
+
+This adds NO new token and changes NO token value; `--color-foggy` serves every
+new site directly. Notably no `--color-foggy-text` is needed — the meadow role
+required a deepened `--color-meadow-text` because raw meadow reads 4.61:1 as
+small text on surface, marginal for AA; raw foggy reads 5.15:1 light and 7.68:1
+dark and needs no sibling. Every ratio in the migration improves on the meadow it
+replaces: focus rings 4.22 → 4.71 light and 7.43 → 8.34 dark, accent text links
+5.76 → 5.15 light (both clear AA) and 7.68 dark, the pill's dark outlined chip
+6.8 → 7.68, filled surfaces 4.78 → 5.33 light and 8.34 dark. No AA regression at
+any site.
+
+MINOR bump: materially expanded guidance on one existing principle (Governance's
+MINOR definition; consistent with Amendments 5/12/13/17/18); no principle is
+added, removed, or restructured. Rewording an exception admitted one amendment
+earlier is not a MAJOR event — the permission's scope grows, its boundary is
+restated more tightly, and no other rule weakens. Hand-edited (not via
+/speckit-constitution) to preserve the curated Sync Impact Report history, per
+the Amendment 10 precedent.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for `foggy`, `meadow`, `accent`, `chat surface`,
+`entry point`, `primary action`, and `Principle V` — zero matches.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-30 (Amendment 19)
+- docs/CHANGELOG.md entry 2026-07-30 (Amendment 19)
+- .specify/memory/constitution.md Amendment 18 (the bullet this replaces)
+- apps/web/components/chat/chat-shell.tsx, apps/web/components/chat-pill.tsx
 -->
 
 # Serenify Constitution
@@ -821,16 +870,25 @@ and every documented pairing meets WCAG AA:
   Filled identity marks take the filled-accent foreground pair above —
   `--color-on-accent` in light, the `bg` token in dark (measured on filled
   foggy: 5.33:1 light, 8.34:1 dark).
-- **Named exception — the primary action inside Ren's chat surface may be
-  foggy.** Within Ren's chat surface ONLY, the primary forward action (the
-  composer's send control) MAY be filled `foggy` rather than `meadow`, because a
-  lone meadow control on a screen whose identity mark is foggy reads as an
-  error rather than as emphasis. THIS IS ONE NAMED EXCEPTION, NOT A LOOSENING.
-  It does not generalize: `meadow` remains the required fill for primary and
-  forward actions on every other surface in the product, and `foggy` remains
-  unavailable for forward actions anywhere outside Ren's chat surface. A future
-  surface wanting the same treatment needs its own amendment, not a reading of
-  this one. Nothing about `meadow`'s calm/affirmative role changes.
+- **Named exception — Ren's chat surface and its entry points may be foggy.**
+  Ren's chat surface, and the controls whose sole purpose is to open it, MAY use
+  filled or text `foggy` in place of `meadow` for accent-carrying elements —
+  primary actions, sent-message bubbles, accent text links, and focus
+  indicators. Where the surface takes this treatment it MUST take it
+  CONSISTENTLY: a surface that leaves some accent controls meadow and turns
+  others foggy is worse than either, because a lone meadow control among foggy
+  ones reads as a defect rather than as emphasis. That cohesion — not a
+  preference for the hue — is the entire justification, and it is why this
+  permission is stated at the level of a surface rather than of a control.
+  THIS IS ONE NAMED SURFACE, NOT A LOOSENING. `meadow` remains the required
+  fill for primary and forward actions everywhere else in the product, and
+  `foggy` remains unavailable for forward actions on any other surface. The
+  entry-point clause reaches only controls that exist to open Ren — today the
+  floating chat pill — and does NOT extend foggy to the surfaces those controls
+  happen to float over: a dashboard hosting a foggy Ren pill keeps meadow for
+  its own actions. A future surface wanting this treatment needs its own
+  amendment, not a reading of this one. Nothing about `meadow`'s
+  calm/affirmative role changes.
 - **Amber stress signal:** the amber role is a soft-tint notice treatment — a
   light amber tint background with deep same-family text (light: tint `#F4E3C6`
   / text `#8A580F`; dark: tint `#3B2F19` / text `#E6C386`), alongside amber as
@@ -1178,4 +1236,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.14.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-29
+**Version**: 1.15.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-30

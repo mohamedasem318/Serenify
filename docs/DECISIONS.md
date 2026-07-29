@@ -6670,3 +6670,56 @@ rows, the pill launcher, recent-chat rows, landing thread bubbles) are likewise 
 `docs/CHANGELOG.md` 2026-07-29; `apps/web/components/chat/ren-avatar.tsx`;
 `docs/DECISIONS.md` 2026-06-17 (filled-accent CTA foreground) and 2026-07-24
 (Amendment 17, which logged the token gap).
+
+---
+
+## 2026-07-30 — Ren's chat surface goes foggy as a whole (constitution Amendment 19)
+
+**Status**: Accepted. Widens the exception recorded one day earlier in the 2026-07-29 entry.
+
+**Decision**: Ren's chat surface takes `foggy` across every accent-carrying element —
+sent-message bubbles, primary actions, accent text links, focus indicators — and the
+treatment is a CONSISTENCY REQUIREMENT rather than a per-control permission. The exception
+also extends to controls whose sole purpose is to open Ren: today the floating chat pill.
+
+**Rationale**: Amendment 18 wrote the exception at the level of a single control ("the
+primary forward action (the composer's send control)"). Shipping it exposed that as the
+wrong level. Recolouring the send control alone left eight other meadow elements on the
+same screen — the message bubbles, the "Say hello" empty-state button, the composer focus
+ring, the "Open full history" link, the "Try again" and end-chat links, the rename input's
+focus border, and the pill panel's two header controls. Each then read as exactly the
+defect the exception was written to prevent. The reasoning was always cohesion across a
+surface; only the wording was pitched at a control.
+
+**Why the pill came too**: it exists only to open Ren, and after Amendment 18 a meadow pill
+opened a foggy panel — the same incoherence one level out. The permission is written to
+reach the CONTROL and not its host: a dashboard carrying a foggy Ren pill keeps meadow for
+its own actions. That boundary is what stops this from becoming general licence, and it is
+stated explicitly in the amendment rather than left to be inferred.
+
+**Why this is a widening and not a correction**: recorded plainly because rewriting an
+exception a day after adding it looks like churn otherwise. Nothing about Amendment 18 was
+wrong on the merits — foggy Ren, foggy send control, non-generalizing scope all stand. What
+changed is the unit the rule is written in. That only became visible by applying it.
+
+**No new token, and notably no `--color-foggy-text`**: the meadow role needed a deepened
+`--color-meadow-text` sibling because raw meadow reads 4.61:1 as small text on surface,
+marginal for AA. Raw foggy reads 5.15:1 light and 7.68:1 dark and needs no such companion,
+so the accent text links consume `--color-foggy` directly. The palette is untouched.
+
+**Contrast — every ratio improved on the meadow it replaced**, measured not assumed:
+focus rings 4.22 → 4.71 light and 7.43 → 8.34 dark (both far past the 3:1 an indicator
+needs); accent text links 5.76 → 5.15 light and 7.68 dark (both clear AA small text); the
+pill's dark outlined chip 6.8 → 7.68; filled surfaces 4.78 → 5.33 light and 8.34 dark. No
+AA regression at any site. The pill's light-fill / dark-outline inversion is unchanged in
+shape — a fill in dark washes the near-white text out regardless of hue, so the outline
+stays.
+
+**Unchanged and deliberately so**: `meadow` remains the required fill for primary and
+forward actions on every other surface, and its calm/affirmative role is untouched. No
+control outside Ren's chat surface and its launcher was recoloured.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 19 (1.14.0 → 1.15.0) and
+Amendment 18 (the bullet it replaces); `docs/CHANGELOG.md` 2026-07-30; `docs/DECISIONS.md`
+2026-07-29 (Amendment 18); `apps/web/components/chat/chat-shell.tsx`;
+`apps/web/components/chat-pill.tsx`.
