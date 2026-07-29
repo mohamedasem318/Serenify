@@ -6850,3 +6850,47 @@ and that `.gitignore` does not broadly ignore `.claude/` — still passes.
 
 **Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md` § Remotion
 skills; `AGENTS.md` § Skills; PR #223.
+
+---
+
+## 2026-07-29 — `remotion-interactivity` installed as a link target; hand-edits cut to one file
+
+**Status**: Accepted. Amends the entry immediately above (same day), which
+recorded `remotion-interactivity` as excluded and six links hand-flattened.
+
+**Decision**: `remotion-interactivity` is installed after all — eight skills, not
+seven — and the four links into it are restored to upstream form. The two links
+into `remotion-maps` stay flattened; `remotion-maps` stays out.
+
+**Rationale, and it generalises**: the skill was excluded on its merits and that
+judgement still holds — Studio drag-to-position editing is not how this video is
+authored. But excluding it cost four hand-edits across three files
+(`remotion-create/SKILL.md`, `remotion-markup/SKILL.md`, `cropping.md`,
+`text-highlights.md`), and every hand-edit is a re-application at every upstream
+sync, forever. At 7.7 KB the skill is cheaper to carry than the divergence it
+avoids. **The operative rule is now: when a link would dangle, install the target
+rather than hand-edit the file** — recorded in `CLAUDE.md`, `AGENTS.md` and
+`video/README.md`.
+
+**Why `remotion-maps` is the one exception**: 569 KB of Cesium/Mapbox/GeoJSON 3D
+flyover assets against two hand-edits in a single file, plus a permanent entry in
+both agents' skill listings for a capability this video will never use. That
+trade goes the other way.
+
+**Restored by re-copying from upstream, not by reverting the sed**, so the four
+files are provably byte-identical to the `4.0.501` tree rather than
+approximately so.
+
+**Result**: exactly two files diverge from upstream —
+`remotion-best-practices/SKILL.md` (nested-to-flat link rewrite plus three
+dropped sections; **unavoidable in a flat layout**, and it would persist even at
+a full eleven-skill install) and `remotion-markup/SKILL.md` (the two maps links,
+and its stripped embedded copy of `remotion-maps`). Every other installed file is
+byte-identical. Verified: zero dangling internal links in either tree, and the
+`.claude` and `.agents` trees are `diff -r` clean against each other.
+
+**No CI or lockfile impact**, unchanged from the entry above: markdown only, both
+lockfiles untouched, `speckit-skills guard` still passes.
+
+**Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md`; `AGENTS.md`;
+PR #223.

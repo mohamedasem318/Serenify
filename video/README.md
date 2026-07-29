@@ -98,9 +98,9 @@ survive a Windows checkout without `core.symlinks`, and the repo's existing
 speckit skills are already dual real copies — this matches that pattern. **Edit
 both or neither.**
 
-Installed (7): `remotion-best-practices` (the router — **enter here**),
+Installed (8): `remotion-best-practices` (the router — **enter here**),
 `remotion-markup`, `remotion-create`, `remotion-render`, `remotion-docs`,
-`remotion-captions`, `remotion-multimedia`.
+`remotion-captions`, `remotion-multimedia`, `remotion-interactivity`.
 
 `remotion-captions` and `remotion-multimedia` are on the list for a specific
 reason: the cut must read silent with on-screen text, and an Egyptian Arabic
@@ -111,35 +111,43 @@ and effects best practices", i.e. `sequencing.md`, `timing.md`, `transitions.md`
 `multi-scene-video.md`, `text-highlights.md`, `voiceover.md`, `google-fonts.md`.
 That is the beat sheet's material almost line for line.
 
+`remotion-interactivity` is installed as a **link target**, not because Studio
+drag-to-position editing is how this video gets authored. Four installed files
+link to it (`remotion-create/SKILL.md`, `remotion-markup/SKILL.md`,
+`cropping.md`, `text-highlights.md`). At 7.7 KB it is cheaper to carry the skill
+than to carry four hand-edits that have to be re-applied at every upstream sync.
+
 ### Not installed, and why
 
-`remotion-maps` (geographic animation), `remotion-saas` (`<Player>`, Lambda,
-render backends), `remotion-upgrade` (premature), `remotion-interactivity`
-(Studio drag-to-position editing, which is not how this video is authored).
-None applies to a hand-authored promotional MP4.
+`remotion-maps` (geographic animation — Cesium, Mapbox, GeoJSON flyovers),
+`remotion-saas` (`<Player>`, Lambda, render backends), `remotion-upgrade`
+(premature). None applies to a hand-authored promotional MP4, and `remotion-maps`
+alone is 569 KB of 3D assets, which is why it is the one exclusion still worth
+two hand-edits.
 
-### Two deliberate divergences from upstream — read before upgrading
+### The only two files that diverge from upstream — read before upgrading
 
-Upstream ships `remotion-best-practices` with a **full copy of every other skill
-nested inside its own directory**, linked as `<name>/REFERENCE.md`. That does not
-fit a flat `skills/` layout, so:
+Every other installed file is **byte-identical to upstream**. Keep it that way:
+when a link would dangle, prefer installing the target over hand-editing the
+file. That principle is why `remotion-interactivity` is here at all.
 
-1. **The router's links were flattened** to `../<name>/SKILL.md`, and the
-   sections for the four uninstalled skills were removed rather than left
-   pointing at nothing. Its section bodies are otherwise upstream's, unedited. A
-   comment at the top of that file says the same thing.
-2. **Links into uninstalled skills were flattened to plain text** marked
-   `(skill not installed in this repo)` — four references to
-   `remotion-interactivity` (in `remotion-create/SKILL.md`,
-   `remotion-markup/SKILL.md`, `cropping.md`, `text-highlights.md`) and two to
-   `remotion-maps` (in `remotion-markup/SKILL.md`). `remotion-markup`'s own
-   embedded 569 KB copy of `remotion-maps` was stripped.
+1. **`remotion-best-practices/SKILL.md`** — upstream ships the router with a full
+   copy of every other skill nested inside its own directory, linked as
+   `<name>/REFERENCE.md`. That cannot work in a flat `skills/` layout, so its
+   links are flattened to `../<name>/SKILL.md` and the three uninstalled skills'
+   sections removed. Section bodies are otherwise upstream's, unedited. A comment
+   at the top of the file says the same thing. **This divergence is unavoidable
+   in a flat layout** — it would persist even at a full eleven-skill install.
+2. **`remotion-markup/SKILL.md`** — its two links to `remotion-maps` are
+   flattened to plain text marked `(skill not installed in this repo)`, and its
+   own embedded 569 KB copy of `remotion-maps` was stripped.
 
 Verified after install: **zero dangling internal links in either tree.**
 
-To upgrade, re-clone upstream and redo both steps — or install the excluded
-skills and restore the links. Do not run upstream's `scripts/sync-agent-skills.ts`:
-it builds symlinks into a `packages/skills/skills` path that does not exist here.
+To upgrade, re-clone upstream and redo those two files — or install
+`remotion-maps` as well, which reduces it to the router alone. Do not run
+upstream's `scripts/sync-agent-skills.ts`: it builds symlinks into a
+`packages/skills/skills` path that does not exist here.
 
 The skills are markdown only. They add nothing to any lockfile and are invisible
 to CI, for the same reasons this whole directory is.

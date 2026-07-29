@@ -167,13 +167,18 @@ project scope so they are committed with the repo. Start at the router; it loads
 - `$remotion-docs` — looking up current Remotion APIs
 - `$remotion-captions` — transcribing, displaying and animating captions
 - `$remotion-multimedia` — Mediabunny: audio/video duration, dimensions, trimming
+- `$remotion-interactivity` — structuring markup so the Studio can edit it; installed mainly
+  as a link target for the four installed files that reference it
 
-**Not installed, deliberately:** `remotion-maps`, `remotion-saas`, `remotion-upgrade`,
-`remotion-interactivity`. None applies to a hand-authored promotional MP4. Where an installed
-file linked to one of them, the link was flattened to plain text marked
-`(skill not installed in this repo)` rather than left dangling — do not "fix" those back into
-links without installing the target. Full rationale and the upgrade procedure:
-`video/README.md`.
+**Not installed, deliberately:** `remotion-maps`, `remotion-saas`, `remotion-upgrade`. None
+applies to a hand-authored promotional MP4.
+
+**Exactly two files diverge from upstream** — `remotion-best-practices/SKILL.md` (links
+flattened from upstream's nested layout to the flat one; unavoidable) and
+`remotion-markup/SKILL.md` (two `remotion-maps` links flattened to plain text marked
+`(skill not installed in this repo)`). Everything else is byte-identical. **Keep it that way:
+when a link would dangle, install the target rather than hand-edit the file.** Full rationale
+and the upgrade procedure: `video/README.md`.
 
 **These are scoped to `video/`.** They carry Remotion's conventions, not this repo's, and have
 nothing to say about `apps/web` or `apps/api`. Do not apply them outside the video project.

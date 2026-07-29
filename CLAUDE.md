@@ -99,12 +99,16 @@ discovers them automatically; invoke with the `Skill` tool.
 Enter through **`remotion-best-practices`** — it is the router and loads the rest. Also installed:
 `remotion-markup` (sequencing, timing, transitions, multi-scene, text highlights, voiceover,
 fonts), `remotion-create`, `remotion-render`, `remotion-docs`, `remotion-captions`,
-`remotion-multimedia`.
+`remotion-multimedia`, `remotion-interactivity`.
 
-**Not installed, deliberately:** `remotion-maps`, `remotion-saas`, `remotion-upgrade`,
-`remotion-interactivity`. Where an installed file linked to one of them the link was flattened to
-plain text marked `(skill not installed in this repo)` — do not turn those back into links without
-installing the target. Rationale and upgrade procedure: `video/README.md`.
+**Not installed, deliberately:** `remotion-maps`, `remotion-saas`, `remotion-upgrade`.
+
+**Exactly two files diverge from upstream** — `remotion-best-practices/SKILL.md` (links flattened
+from upstream's nested layout to the flat one; unavoidable) and `remotion-markup/SKILL.md` (two
+`remotion-maps` links flattened to plain text). Everything else is byte-identical. **Keep it that
+way: when a link would dangle, install the target rather than hand-edit the file** — that is why
+`remotion-interactivity` is installed despite not being needed on its own merits. Rationale and
+upgrade procedure: `video/README.md`.
 
 **These are scoped to `video/`.** They carry Remotion's conventions, not this repo's, and say
 nothing about `apps/web` or `apps/api`. Do not apply them outside the video project. In

@@ -16,7 +16,7 @@ Tailwind animation class will not render correctly, they need to be refactored.
 
 Use `Easing.bezier()` and `Easing.spring()` to customize timing.
 
-Structure your markup according to Remotion Interactivity Best Practices (skill not installed in this repo — see video/README.md)
+Structure your markup according to [Remotion Interactivity Best Practices](../remotion-interactivity/SKILL.md)
 
 ```tsx
 import { useCurrentFrame, Easing, interpolate, Interactive } from "remotion";

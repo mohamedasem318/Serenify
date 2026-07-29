@@ -12,15 +12,19 @@ Upstream (github.com/remotion-dev/skills) ships this router with a full copy of
 every other skill nested INSIDE its own directory, and links to them as
 `<skill-name>/REFERENCE.md`. That layout does not fit `.claude/skills/` and
 `.agents/skills/`, where every skill is a flat sibling directory, so the links
-below point at `../<skill-name>/SKILL.md` instead. The bodies are upstream's,
-unedited.
+below point at `../<skill-name>/SKILL.md` instead. The section bodies are
+upstream's, unedited.
 
-Sections for skills not installed here — remotion-maps, remotion-saas,
-remotion-upgrade, remotion-interactivity — have been removed rather than left
-pointing at nothing. Rationale and the full install list: `video/README.md`.
+Sections for the three skills not installed here — remotion-maps, remotion-saas,
+remotion-upgrade — have been removed rather than left pointing at nothing.
 
-On upgrade: re-flatten the links and re-drop the excluded sections, or install
-the excluded skills and restore them.
+This file and `../remotion-markup/SKILL.md` are the ONLY two files that diverge
+from upstream; every other installed file is byte-identical. Keep it that way —
+when a link would dangle, prefer installing the target over hand-editing the
+file. Rationale and the full install list: `video/README.md`.
+
+On upgrade: re-flatten the links and re-drop the three excluded sections, or
+install the excluded skills and restore them.
 -->
 
 ## New project setup
@@ -38,6 +42,10 @@ If you are writing Remotion React Markup, load [Remotion Markup Best Practices](
 ## Multimedia
 
 For achieving multimedia tasks in the browser, such as trimming, cropping videos, or getting metadata from them, load [Remotion Multimedia](../remotion-multimedia/SKILL.md)
+
+## Improving Interactivity
+
+By structuring the Remotion markup well, we can allow users to interactively change things in the Studio and write back to code. If relevant: [Interactivity Best Practices](../remotion-interactivity/SKILL.md)
 
 ## Rendering
 
