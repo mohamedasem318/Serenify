@@ -1,0 +1,84 @@
+name: Sync hosted email templates
+
+# Makes the repo the thing that governs the hosted Supabase project's
+# transactional email templates — the mechanism half of docs/BACKLOG.md #189.
+#
+# Until this existed, `supabase/templates/*.html` was local-dev config only —
+# nothing transmitted it anywhere — so hosted sat at a stale revision and the
+# only thing that noticed was a human reading the dashboard.
+#
+# WHAT THIS DOES NOT PROVE. The read-back below shows the four fields ARRIVED,
+# not that they are CORRECT. A template that is malformed but still valid HTML
+# applies cleanly, returns 200, matches byte-for-byte, and breaks every signup
+# email. A real email received and read by a human is a REQUIRED step after any
+# run that changes a template — see docs/DECISIONS.md 2026-07-29.
+#
+# NARROW BY CONSTRUCTION. The script sends a PATCH carrying exactly four
+# fields: the two subjects and the two bodies. `site_url` and the redirect
+# allow-list are not in the request, so they cannot be clobbered. That is why
+# this is a template-only PATCH and not `supabase config push`, which would
+# push the whole auth block.
+#
+# ONE ACTION, PINNED. Every action in a workflow that holds a secret can read
+# that secret, and this one holds an account-wide Management API token. So the
+# list is exactly one — actions/checkout — pinned to a full commit SHA rather
+# than a tag, because a tag is mutable and a SHA is not. Everything else is the
+# runner's own Node (>= 18, so `fetch` is built in). Do not add a second action
+# here without re-reading that sentence.
+
+on:
+  # `paths` is deliberately JUST the two files that are the source of truth.
+  #
+  # It does NOT list this workflow or the script, and that omission is load
+  # bearing: adding them would make the merge that introduces or edits the
+  # mechanism auto-fire a production write, instead of leaving the operator a
+  # watched `workflow_dispatch` run. Use the manual trigger to exercise a change
+  # to the mechanism itself.
+  push:
+    branches:
+      - main
+    paths:
+      - supabase/templates/**
+      - supabase/config.toml
+
+  # The first run is meant to be this one — manual, watched.
+  workflow_dispatch:
+
+# NEVER a PR-triggered event. The `…_target` variant in particular runs with
+# the BASE repo's secrets against an untrusted head ref, which would hand this
+# account-wide token to anyone who can open a PR.
+#
+# That rule is enforced by a whole-file substring assertion in
+# apps/web/tests/unit/ops/hosted-email-template-sync.test.ts, not a check of the
+# `on:` block — which is why the two event names are described here rather than
+# written out. A structural check could be walked around by a clever bit of
+# YAML; "the string does not appear in the file" cannot.
+
+# Read-only. The job publishes to Supabase and writes nothing back to GitHub.
+permissions:
+  contents: read
+
+# Serialise: two overlapping runs would race the same auth config, and the
+# loser's read-back would report a mismatch it did not cause. Never cancel a
+# run mid-flight — cancelling between the PATCH and the verification would
+# leave production changed with nothing having checked it.
+concurrency:
+  group: sync-hosted-email-templates
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: publish templates and verify they applied
+    runs-on: ubuntu-latest
+    steps:
+      # Pinned to the commit `v4` / `v4.4.0` resolved to on 2026-07-29.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+
+      # The script builds the payload from supabase/config.toml + the template
+      # files and fails before sending anything if either is missing or
+      # unparseable, then PATCHes, then GETs the config back and compares all
+      # four fields. A silent 200 that did not apply fails the run.
+      - name: Publish templates to hosted Supabase and verify the read-back
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: node scripts/sync-hosted-email-templates.mjs

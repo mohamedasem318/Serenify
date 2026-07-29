@@ -2539,7 +2539,42 @@ than a missed regression, and it never passes when it should fail.
 ## From feature 013 P8 Stage 3 review — captured 2026-07-28
 
 ### Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)
-**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **OPEN.** GitHub issue **#189 OPEN.**
+**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **STILL OPEN.** GitHub issue **#189 OPEN.**
+The mechanism has **landed** but has **never been executed**; it is not resolved until it has run.
+
+**Progress 2026-07-29 — the mechanism landed, unproven (branch `fix/email-template-sync`).** The
+content halves were already closed by hand at P8 (below). What was left was that nothing made the
+repo *govern* hosted, so the next wordmark change would re-open the same drift silently. There is
+now code for that: `.github/workflows/sync-email-templates.yml` fires on a push to `main` touching
+`supabase/templates/**` or `supabase/config.toml` (and on `workflow_dispatch`), and runs
+`scripts/sync-hosted-email-templates.mjs`, which `PATCH`es
+`https://api.supabase.com/v1/projects/excukdzjudslbqmkysrc/config/auth` with **exactly four fields** —
+`mailer_subjects_{confirmation,recovery}` and `mailer_templates_{confirmation,recovery}_content` —
+then `GET`s the config back and **fails the run if any of the four did not apply**. Subjects are read
+out of `supabase/config.toml`, never restated in the workflow. Rationale, the rejected alternative,
+and the account-wide-token risk acceptance: `docs/DECISIONS.md` 2026-07-29.
+
+**Why this entry is not marked resolved on that merge.** The end-to-end push has **never been
+executed** — it targets production and `secrets.SUPABASE_ACCESS_TOKEN` did not exist when the branch
+was written. Everything short of the network is unit-tested (payload shape, subject sourcing, every
+fail-safe path, and the workflow's triggers) in
+`apps/web/tests/unit/ops/hosted-email-template-sync.test.ts`, but a mechanism that has never run is
+not evidence that hosted is governed. Closing on the merge would close the issue on the strength of
+something that has not happened — the same species of claim-without-evidence that produced this
+entry. The PR therefore references #189 **without** a closing keyword.
+
+**What closes this entry** — all three, in order, and not before:
+1. `SUPABASE_ACCESS_TOKEN` created and set as a repository secret (operator).
+2. A **manual `workflow_dispatch`** of *Sync hosted email templates* on `main` that goes green,
+   including the read-back. Expected to be a successful no-op, since hosted already carries the
+   pasted bodies and the verified subject — which is the ideal first run: it proves the pipe without
+   changing anything user-facing. A failure here indicts the pipe, not the content.
+3. **A real signup email received and read by a human** (see `docs/DECISIONS.md` 2026-07-29). A
+   template that is malformed but still valid HTML applies cleanly and passes the read-back; nothing
+   automated can catch it.
+
+Only then: mark this entry resolved and close #189, in the same change, per Principle VIII.
+
 **Category**: constitution Principle V (Amendment 17) / FR-029 / ops
 **Observed**: 2026-07-28, reading the Supabase dashboard for `excukdzjudslbqmkysrc` directly.
 
@@ -2560,9 +2595,10 @@ this entry is making production match the repo; opening a new divergence while c
 defeat it.
 
 **Root cause — two layers.** `supabase/config.toml` wires both templates via `content_path`, but
-that is **local-dev config**. Nothing in the repo and nothing in CI ever transmits
-`supabase/templates/*.html` to a hosted project: no workflow references Supabase at all, and there
-is no `supabase config push` anywhere. Hosted templates are dashboard-only.
+that is **local-dev config**. At the time of this observation nothing in the repo and nothing in CI
+ever transmitted `supabase/templates/*.html` to a hosted project: no workflow referenced Supabase at
+all, and there was no `supabase config push` anywhere. Hosted templates were dashboard-only.
+(**No longer true as of 2026-07-29** — see the progress note at the top of this entry.)
 
 Beneath that, `apps/web/tests/unit/brand/wordmark-sync.test.ts` — the mechanism Principle V relies
 on to stop exactly this drift — reads `supabase/templates/*.html` **off disk**. It can only ever
@@ -2587,14 +2623,18 @@ confirmation email sent from production (`serenify.tech`, `124192a`) arrived wit
 **`Confirm your Serenify email`** — the repo wording, matching the ruling above that the repo
 version wins. Verified on a **delivered email**, not by reading the dashboard field (reading the
 field would have needed the Supabase Management API token out of Windows Credential Manager, which
-was blocked; the delivered mail is the stronger evidence anyway). **The issue stays OPEN for the
-mechanism half** — nothing in the repo or CI transmits `supabase/templates/*.html` to a hosted
-project, and `wordmark-sync.test.ts` reads them off disk, so it can only prove the repo agrees with
-itself. The next wordmark change re-opens the same drift with nothing to catch it.
+was blocked; the delivered mail is the stronger evidence anyway). **The issue stayed OPEN for the
+mechanism half** — at that point nothing in the repo or CI transmitted `supabase/templates/*.html`
+to a hosted project, and `wordmark-sync.test.ts` read them off disk, so it could only prove the repo
+agreed with itself. The next wordmark change would have re-opened the same drift with nothing to
+catch it.
 
 **Address by**: (1) ~~subject field, before Stage 4 ships anything that sends mail~~ — **DONE
-2026-07-28**. (2) the mechanism
-gap — the same pass that does #190, so the email surfaces are touched once.
+2026-07-28**. (2) the mechanism gap — ~~the same pass that does #190, so the email surfaces are
+touched once~~; **built 2026-07-29** on its own branch rather than paired with #190, and **awaiting
+its first dispatch**. The pairing was dropped for the same reason #190 dropped it: #190 is a
+client-side motion fix and this is a CI + Management-API change, and the two share no file. See the
+progress note at the top of this entry for what remains.
 
 ### ~~The OTP verification tick vanishes immediately — it should linger~~ (#190)
 **Status**: **RESOLVED 2026-07-29 — branch `fix/otp-success-hold`.** GitHub issue **#190 CLOSED** by that merge (Principle VIII: entry and issue in the same change).

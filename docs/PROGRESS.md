@@ -203,12 +203,16 @@ marker), **#193** (the TTFB follow-up logged, not built).
 - **#176 updated, not closed** — the 18 `next` alerts clear on this merge; `postcss` × 2 and
   `sharp` × 1 remain and this bump does not touch them.
 - Also open: **#86, #155, #174, #178, #179, #185, #187, #190, #192, #193**.
-- **#189** — the hosted email templates. **Both content halves are now closed**: the template
-  bodies were pasted and verified live, and the *Confirm sign up* **subject** was verified on a
-  **delivered** production email as `Confirm your Serenify email`. It stays open for the
-  **mechanism** half — nothing in the repo or CI transmits `supabase/templates/*.html` to a hosted
-  project, and `wordmark-sync.test.ts` reads them off disk, so it can only prove the repo agrees
-  with itself.
+- **#189** — the hosted email templates. **Both content halves closed at P8**: the template bodies
+  were pasted and verified live, and the *Confirm sign up* **subject** was verified on a
+  **delivered** production email as `Confirm your Serenify email`. The **mechanism** half was open
+  at P8 sign-off — at that point nothing in the repo or CI transmitted `supabase/templates/*.html`
+  to a hosted project, so `wordmark-sync.test.ts` reading them off disk could only prove the repo
+  agreed with itself. **Mechanism built 2026-07-29** (`fix/email-template-sync`): a push to `main`
+  touching `supabase/templates/**` or `supabase/config.toml` PATCHes them onto the hosted project
+  and verifies the read-back. **#189 stays OPEN** — the mechanism has never been executed, and a
+  mechanism that has never run is not evidence that hosted is governed. It closes after a green
+  manual dispatch *and* a real signup email read by a human. See `docs/DECISIONS.md` 2026-07-29.
 
 ### Opened during P8's close-out and production verification
 

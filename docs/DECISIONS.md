@@ -6328,3 +6328,114 @@ Two genuine follow-ups were found while verifying it, and both are logged with i
 - **#214** — `lib/consent/copy.ts:23-28` justifies omitting manager-visibility copy from the
   camera gate on the grounds that "this surface links to it [the Privacy Policy]", and the shipped
   `camera-consent-gate.tsx` renders no links at all. Pre-existing, shipped in 013.
+
+---
+
+## 2026-07-29 — Hosted email templates sync from the repo, via a template-only Management API PATCH
+
+**Status**: Accepted. Addresses #189's mechanism half; **#189 stays open until the mechanism has
+actually run** (see the required steps at the end of this entry). Branch `fix/email-template-sync`.
+
+**Decision**: `supabase/templates/{confirmation,recovery}.html` and their subjects are published to
+the hosted Supabase project by CI. `.github/workflows/sync-email-templates.yml` fires on a push to
+`main` touching `supabase/templates/**` or `supabase/config.toml`, plus `workflow_dispatch`, and runs
+`scripts/sync-hosted-email-templates.mjs`. That script sends **one PATCH** to
+`https://api.supabase.com/v1/projects/excukdzjudslbqmkysrc/config/auth` carrying **exactly four
+fields**:
+
+| field | source |
+| --- | --- |
+| `mailer_subjects_confirmation` | `supabase/config.toml` `[auth.email.template.confirmation].subject` |
+| `mailer_subjects_recovery` | `supabase/config.toml` `[auth.email.template.recovery].subject` |
+| `mailer_templates_confirmation_content` | the file named by that table's `content_path` |
+| `mailer_templates_recovery_content` | ditto, recovery |
+
+It then `GET`s the config back and **fails the run** if any of the four did not apply.
+
+**Why a template-only PATCH, and why `supabase config push` was rejected.** `config push` sends the
+whole `[auth]` block — including `site_url` and `additional_redirect_urls`, which in this repo point
+at `localhost:3000` for local development. Pushing that to production would break every emailed
+confirmation and recovery link in the product. The PATCH is strictly narrower: the request body has
+**no required fields** (verified on `UpdateAuthConfigBody` in the published OpenAPI spec at
+`api.supabase.com/api/v1-json`, which is also where the four field names above come from — they were
+read, not guessed), so a field that is not in the body is a field that cannot be touched. There was
+nothing to gain from testing `config push` once the narrower mechanism was verified to exist.
+
+**Read-back verification is the point, not a nicety.** #189 was not "the templates were wrong", it
+was "the templates were wrong and nothing noticed for weeks". A 200 from the PATCH is not treated as
+evidence; the script re-reads all four fields and reports the first differing offset with context
+from both sides. Up to three read-backs, three seconds apart, cover propagation lag only — the last
+one still fails the run.
+
+**This is what makes `wordmark-sync.test.ts` mean something.** That test reads
+`supabase/templates/*.html` off disk. Before this change it could only prove the repo agreed with
+itself, which is precisely how the two-colour wordmark passed CI for weeks while production rendered
+one colour. Now that the repo is the thing that pushes, the disk state it asserts on *is* the hosted
+state. The test did not change; what changed is that it became enforcement rather than a tautology.
+That is the substance of this decision, not a side effect of it.
+
+**Accepted risk: the token is account-wide.** Supabase issues **no project-scoped Management API
+tokens** — a personal access token can reach every project on the account. That is a real widening
+of blast radius and it is accepted knowingly, not overlooked. The controls:
+
+- **One action, pinned to a commit SHA.** Every action in a job can read that job's secrets, so the
+  list is exactly one — `actions/checkout` at `11d5960a…` rather than a mutable `@v4` tag.
+  Everything else is the runner's own Node. A second action here re-opens the question.
+- **No PR-triggered event, enforced by test.** The `…_target` variant runs with the base repo's
+  secrets against an untrusted head ref, which would hand the token to anyone who can open a PR.
+  `apps/web/tests/unit/ops/hosted-email-template-sync.test.ts` asserts the substring appears
+  **nowhere in the workflow file** — a whole-file check rather than a structural one, because YAML
+  structure can be walked around and a substring cannot.
+- **The project ref is a hardcoded constant, not a parameter**, pinned by that same test. Given an
+  account-wide token, a caller-supplied ref is a wrong-project write waiting to happen.
+- **`permissions: contents: read`.** The job writes nothing back to GitHub.
+- **Fail-before-send.** The payload is built — config parsed, both templates read — before the token
+  is even looked at. A missing or unparseable input aborts with nothing sent, because a PATCH
+  carrying one of two templates is a silent, successful, half-applied deploy.
+
+**Rotation expectation**: the PAT is created with a **90-day expiry** and rotated at expiry, or
+immediately on any suspicion of exposure. Rotation is a two-step operator action — mint a new token
+in the Supabase dashboard, update the `SUPABASE_ACCESS_TOKEN` repository secret, revoke the old one —
+and needs no code change. When the workflow starts failing with a 401, an expired token is the first
+thing to check.
+
+**The TOML reader is 20 lines and deliberately narrow.** The subjects stay in `supabase/config.toml`
+and are read from it; restating them in the workflow would recreate, one layer up, the exact drift
+#189 is about. No TOML dependency was added: the reader accepts only a plain double-quoted scalar on
+its own line inside the named table, and **throws** on anything else rather than mis-parsing a value
+into a subject line that then reaches production. It also refuses a `content_path` outside
+`./supabase/templates/*.html`. In a workflow holding an account-wide token, a reader that refuses
+what it does not understand beats a dependency that accepts everything.
+
+**Unverified on merge, stated plainly.** The end-to-end push has never been executed — it targets
+production and the secret did not exist when this was written. Everything short of the network is
+unit-tested; the first real run is a manual `workflow_dispatch`. The merge does not fire it: the path
+filter covers only `supabase/templates/**` and `supabase/config.toml`, and this change touches
+neither. The workflow file and the script are **deliberately absent** from that filter for the same
+reason — listing them would make the merge that introduces or edits the mechanism auto-fire a
+production write instead of leaving a watched manual run.
+
+**The PR references #189 without a closing keyword, deliberately.** Merging would otherwise close the
+issue on the strength of something that has not happened — which is the same species of
+claim-without-evidence that produced #189 in the first place. #189 and its BACKLOG entry are closed
+together, by hand, after the steps below.
+
+**What this mechanism CANNOT catch, and the required human step.** The read-back proves the four
+fields *arrived*. It says nothing about whether they are *correct*. A template that is malformed but
+still valid HTML — a broken `{{ .ConfirmationURL }}` interpolation, a table that collapses in
+Outlook, a dark-block rule that no longer reaches the wordmark — applies cleanly, returns 200,
+matches byte-for-byte on the read-back, and breaks every signup email in production. Byte equality
+between repo and hosted is the *only* claim this mechanism makes; "the email is good" is a strictly
+larger claim and no automated check in this repo establishes it.
+
+**Therefore: a real signup email, received and read by a human, is a required step after any run
+that changes a template — not an optional sanity check.** It is the only thing standing between a
+green workflow and a broken production email, and it is written down here precisely so it does not
+survive only as something someone remembers to do. The first such check follows the first dispatch;
+#189 does not close before it.
+
+**Line endings, noted because it surprises.** The repo has no `.gitattributes` and the authors work
+on Windows with `core.autocrlf=true`, so the templates are CRLF in a Windows working tree and LF in
+git (4966 vs 4895 bytes for `confirmation.html`). The Linux runner checks out LF, so what lands on
+hosted is byte-identical to the git blob. Running the script from a Windows shell would publish the
+CRLF form — harmless for HTML, but it is why CI is the intended caller.
