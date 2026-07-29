@@ -6723,3 +6723,174 @@ control outside Ren's chat surface and its launcher was recoloured.
 Amendment 18 (the bullet it replaces); `docs/CHANGELOG.md` 2026-07-30; `docs/DECISIONS.md`
 2026-07-29 (Amendment 18); `apps/web/components/chat/chat-shell.tsx`;
 `apps/web/components/chat-pill.tsx`.
+
+---
+
+## 2026-07-29 — Launch video: Remotion, at `video/`, outside the npm workspaces
+
+**Status**: Accepted.
+
+**Decision**: The ~60s LinkedIn launch video is built with Remotion (React → MP4).
+The project lives at `video/` in the repo root, **outside** the root
+`workspaces: ["apps/*", "packages/*"]` globs, with its own `package-lock.json`
+and its own `node_modules`. No CI change accompanies it. The beat sheet — the
+source of truth for the video — is `docs/video/serenify-launch-video-beat-sheet.md`.
+
+**Rationale for Remotion**: the video's product screens are the *real*
+`apps/web` components, animated, rather than hand-redrawn mockups. That is the
+entire reason to accept a React video toolchain over an editor. A screen that
+drifts from the app is a screen that has to be re-drawn every time the app
+changes; a screen that imports the component cannot drift.
+
+**Rationale for the location**: putting it under `apps/` or `packages/` would
+fold ~270 Remotion packages into the root lockfile, so every `npm ci` — including
+CI's, before it lints `apps/web` — would install a video toolchain to run unit
+tests, and `node_modules` would re-hoist for everyone working on `apps/web` or
+`apps/api`. Outside the globs, the root lockfile is byte-unchanged and the cost
+is one extra `npm install` for whoever actually works on the video.
+
+**Why no CI change was needed**: all three jobs in `.github/workflows/ci.yml` are
+already scoped — `speckit-skills guard` reads `.claude/` and `.gitignore`, `web`
+runs everything through `-w apps/web`, `python` runs inside `apps/api` and
+`packages/ml-video`. None globs the repo root. Root `tsconfig.json` includes only
+`scripts/**/*.ts`; root `vitest.config.mts` only `scripts/__tests__/**`. The
+directory is invisible to every existing task, which was verified by running
+them rather than assumed.
+
+**The load-bearing check, and it passed**: a real `apps/web` component
+(`components/brand/wordmark.tsx`) renders inside a Remotion composition with its
+real Tailwind v4 `@theme` tokens — `#EAEBEC` background, `text-ink` on `seren`,
+`text-meadow-text` on `ify`, `lowercase` enforced, Outfit typeface. If this had
+failed the tool choice would have been void, so it was verified on a rendered
+frame and not on a clean exit code. `<Wordmark />` was chosen as the probe
+because it fails visibly rather than subtly.
+
+**Three pieces make that work** (`video/remotion.config.ts`,
+`video/src/tailwind.css`): the app's own `@` → `apps/web` alias, which webpack
+otherwise knows nothing about; `react`/`react-dom` pinned to `video/`'s copies,
+because a file under `apps/web` would otherwise resolve React by walking up to
+the root hoisted copy and put two instances in one bundle; and Tailwind through
+`@remotion/tailwind-v4` with a CSS entry that imports `apps/web/app/globals.css`
+verbatim. No palette is re-declared for the video — the tokens are the shipped
+app's, so the video follows the app rather than drifting from it.
+
+**Known limits, recorded now so they are not rediscovered**: components importing
+`server-only` or reading Supabase / `next/headers` at module scope will not
+bundle; `next/font` does not exist under Remotion, so font tokens need
+`@remotion/google-fonts` (see `video/src/WebComponentProbe.tsx`); `next/image`
+and `next/link` will need shimming when a component reaches for them.
+
+**Licensing**: Remotion's free tier covers this use — individuals and non-profit;
+no company exists here. Decided by Mohamed, 2026-07-29.
+
+**Cross-references**: `video/README.md`;
+`docs/video/serenify-launch-video-beat-sheet.md`; `.github/workflows/ci.yml`.
+
+---
+
+## 2026-07-29 — Remotion agent skills installed at project scope, in both agent trees
+
+**Status**: Accepted. Extends the same-day Remotion entry above.
+
+**Decision**: Seven of Remotion's eleven upstream agent skills
+([remotion-dev/skills](https://github.com/remotion-dev/skills), `4.0.501` tree)
+are installed at **project scope** — committed to the repo — as byte-identical
+real directories under **both** `.claude/skills/` (Claude Code) and
+`.agents/skills/` (Codex, per `AGENTS.md` § Skills).
+
+Installed: `remotion-best-practices` (the router), `remotion-markup`,
+`remotion-create`, `remotion-render`, `remotion-docs`, `remotion-captions`,
+`remotion-multimedia`. Excluded: `remotion-maps`, `remotion-saas`,
+`remotion-upgrade`, `remotion-interactivity`.
+
+**Why project scope and not global**: a global install is invisible to the repo
+and to everyone else working in it, and would silently disappear on a fresh
+clone or a different machine. Committed skills travel with the branch.
+
+**Why real copies rather than symlinks**: upstream's own
+`scripts/sync-agent-skills.ts` symlinks `.agents/skills/<name>` into
+`packages/skills/skills/<name>` and then symlinks `.claude/skills` at
+`.agents/skills` wholesale. Neither survives a Windows checkout without
+`core.symlinks`, and this repo's existing speckit skills are already dual real
+copies in the two trees. Matching the existing pattern beats importing a
+layout built for Remotion's own monorepo. The cost is that the two trees must be
+edited together, which `video/README.md` and both instruction files say
+explicitly.
+
+**`remotion-markup` was initially excluded and that was reversed before merge**,
+recorded because the reasoning generalises: it was filtered out on its NAME,
+which reads as HTML/markup-language. Its actual description is "content,
+animation and effects best practices" and it ships `sequencing.md`, `timing.md`,
+`transitions.md`, `multi-scene-video.md`, `text-highlights.md`, `voiceover.md`
+and `google-fonts.md` — the beat sheet's material almost line for line. Two
+skills that WERE selected (`remotion-create` and the router) link into it, so
+excluding it would also have broken links from the chosen entry points. Upstream
+skill names are not reliable descriptions of contents; read the directory.
+
+**Two deliberate divergences from upstream, both reversible and both recorded**:
+upstream ships the router with a full nested copy of every other skill, linked as
+`<name>/REFERENCE.md`, which does not fit a flat `skills/` layout. So (1) the
+router's links were flattened to `../<name>/SKILL.md` and the four uninstalled
+skills' sections were deleted rather than left dangling — section bodies are
+otherwise upstream's, unedited; and (2) six links from installed files into
+uninstalled skills (four to `remotion-interactivity`, two to `remotion-maps`)
+were flattened to plain text marked `(skill not installed in this repo)`, and
+`remotion-markup`'s embedded 569 KB copy of `remotion-maps` was stripped.
+Verified after install: zero dangling internal links in either tree.
+
+**Scope discipline**: these skills carry Remotion's conventions and are scoped to
+`video/`. They say nothing about `apps/web` or `apps/api`, and in particular must
+not override the `hallmark` routing rule for UI work. Stated in both `CLAUDE.md`
+and `AGENTS.md`.
+
+**No CI or lockfile impact**: the skills are markdown only. Root
+`package-lock.json` and `video/package-lock.json` are both unmodified, and the
+`speckit-skills guard` job — which asserts the fifteen `speckit-*` skills exist
+and that `.gitignore` does not broadly ignore `.claude/` — still passes.
+
+**Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md` § Remotion
+skills; `AGENTS.md` § Skills; PR #223.
+
+---
+
+## 2026-07-29 — `remotion-interactivity` installed as a link target; hand-edits cut to one file
+
+**Status**: Accepted. Amends the entry immediately above (same day), which
+recorded `remotion-interactivity` as excluded and six links hand-flattened.
+
+**Decision**: `remotion-interactivity` is installed after all — eight skills, not
+seven — and the four links into it are restored to upstream form. The two links
+into `remotion-maps` stay flattened; `remotion-maps` stays out.
+
+**Rationale, and it generalises**: the skill was excluded on its merits and that
+judgement still holds — Studio drag-to-position editing is not how this video is
+authored. But excluding it cost four hand-edits across three files
+(`remotion-create/SKILL.md`, `remotion-markup/SKILL.md`, `cropping.md`,
+`text-highlights.md`), and every hand-edit is a re-application at every upstream
+sync, forever. At 7.7 KB the skill is cheaper to carry than the divergence it
+avoids. **The operative rule is now: when a link would dangle, install the target
+rather than hand-edit the file** — recorded in `CLAUDE.md`, `AGENTS.md` and
+`video/README.md`.
+
+**Why `remotion-maps` is the one exception**: 569 KB of Cesium/Mapbox/GeoJSON 3D
+flyover assets against two hand-edits in a single file, plus a permanent entry in
+both agents' skill listings for a capability this video will never use. That
+trade goes the other way.
+
+**Restored by re-copying from upstream, not by reverting the sed**, so the four
+files are provably byte-identical to the `4.0.501` tree rather than
+approximately so.
+
+**Result**: exactly two files diverge from upstream —
+`remotion-best-practices/SKILL.md` (nested-to-flat link rewrite plus three
+dropped sections; **unavoidable in a flat layout**, and it would persist even at
+a full eleven-skill install) and `remotion-markup/SKILL.md` (the two maps links,
+and its stripped embedded copy of `remotion-maps`). Every other installed file is
+byte-identical. Verified: zero dangling internal links in either tree, and the
+`.claude` and `.agents` trees are `diff -r` clean against each other.
+
+**No CI or lockfile impact**, unchanged from the entry above: markdown only, both
+lockfiles untouched, `speckit-skills guard` still passes.
+
+**Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md`; `AGENTS.md`;
+PR #223.

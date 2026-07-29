@@ -1,0 +1,29 @@
+{
+  "name": "serenify-video",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Remotion project for the Serenify launch video. Deliberately OUTSIDE the root npm workspaces (apps/*, packages/*) so it never touches the root lockfile or CI.",
+  "scripts": {
+    "studio": "remotion studio",
+    "render": "remotion render",
+    "render:hello": "remotion render HelloWorld out/hello-world.mp4",
+    "render:probe": "remotion render WebComponentProbe out/web-component-probe.mp4",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.501",
+    "@remotion/google-fonts": "4.0.501",
+    "@remotion/tailwind-v4": "4.0.501",
+    "clsx": "^2.1.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.501",
+    "tailwind-merge": "^3.6.0",
+    "tailwindcss": "^4"
+  },
+  "devDependencies": {
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "typescript": "^5"
+  }
+}

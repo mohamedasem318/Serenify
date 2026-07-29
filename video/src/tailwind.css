@@ -1,0 +1,20 @@
+/*
+ * The video's Tailwind entry.
+ *
+ * It does NOT re-declare a palette. It imports `apps/web/app/globals.css`
+ * verbatim, so every `@theme` token the real components render against —
+ * `--color-ink`, `--color-meadow-text`, `--font-display`, the radii, the
+ * amber sub-tokens — is the one the shipped app uses. If the app's palette
+ * changes, the video changes with it; there is no second copy to drift.
+ *
+ * `@source` is required because Tailwind v4's automatic source detection
+ * scans from the CSS file's own directory downward, which would find only
+ * `video/src` and would therefore emit none of the utilities that live in
+ * `apps/web` component files. Both trees are declared explicitly.
+ */
+@import "../../apps/web/app/globals.css";
+
+@source "../src";
+@source "../../apps/web/components";
+@source "../../apps/web/app";
+@source "../../apps/web/lib";
