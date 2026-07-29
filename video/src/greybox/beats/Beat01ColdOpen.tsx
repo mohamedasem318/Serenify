@@ -4,67 +4,69 @@ import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 import { Camera, frameRect, rect, shot } from "../Camera";
 import { Desktop, OMNIBOX, PublicNav } from "../chrome";
 import { LANDING } from "../copy";
-import { COL_W, COL_X, GREY, H, VIEWPORT_Y, W } from "../theme";
+import { Lift, useLift } from "../lift";
+import { COL_W, COL_X, FONT, GREY, H, MONO, W } from "../theme";
 import { Box, Button, Cursor, Text, TextBlock } from "../ui";
 
 /**
- * Beat 1 · Cold open — `serenify.tech` · 0:00–0:05 · 150 frames
+ * Beat 1 · Cold open — `serenify.tech` · 0:00–0:06 · 180 frames
  *
- * The beat now shows someone *arriving* at the site rather than already being
- * on it: a blank new tab, the URL typed into the address bar, the page loading.
- * "A website exists" and "someone goes to it" are different statements, and
- * only the second is worth the time.
+ * **The lift is the opening shot, and this beat is the model for the other two.**
+ * The address bar starts alone at centre frame, large — 440 wide instead of the
+ * 1080 it really is, which is what lets the camera frame it at 500 and put its
+ * real 14px URL at ~12px on a phone. `serenify.tech` is typed into it. Then it
+ * travels up and settles into its real position in the browser chrome as the page
+ * loads, and the camera pulls out with it.
  *
- * It also ends on a click of the landing page's own **Get started** CTA, which
- * is what carries us into beat 2. No cut — the one-continuous-recording
- * continuity holds, and the primary CTA gets on screen for free.
+ * The video's first action is a person deciding to go somewhere.
  *
- * COST: +1s over the sheet's 4s. Typing a URL, loading, reading the hero and
- * clicking through is four actions; the original beat had one.
+ * Then a push toward the hero, and the beat ends on a click of the landing page's
+ * own **Get started** CTA, which carries us into beat 2. No cut.
+ *
+ * COST: 5s → 6s. The lift buys legibility the camera could not, but it is a
+ * staged move with a settle at the end of it, and that takes about a second.
  */
 
 const URL = "serenify.tech";
 
+/** Staged: narrow enough that the camera can frame it and the 14px URL reads. */
+const OMNIBOX_LIFTED = rect(380, 288, 440, 52);
 /** The hero block — headline, lede, data line, CTAs — framed whole. */
 const HERO = rect(280, 176, 640, 258);
 
 export const Beat01ColdOpen: React.FC = () => {
   const frame = useCurrentFrame();
 
+  // Seated by f74. The page paints at f62, mid-travel, so the two read as one
+  // event: he commits to the address, and the site arrives.
+  const lift = useLift(-1, 1, 48, 26);
   const typedChars = Math.round(
-    interpolate(frame, [14, 44], [0, URL.length], {
+    interpolate(frame, [8, 40], [0, URL.length], {
       extrapolateLeft: "clamp",
       extrapolateRight: "clamp",
     }),
   );
-  const loaded = frame >= 54;
+  const loaded = frame >= 62;
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: shot(W / 2, H / 2, W) },
-          { frame: 12, shot: shot(W / 2, H / 2, W) },
-          // The omnibox, framed whole. It is full-bleed furniture, so its own
-          // width sets the framing — 1112 wide, i.e. barely a push. `cy` is
-          // pinned to half the frame height rather than to the omnibox's centre,
-          // because centring on a strip 28px from the top of the world would put
-          // most of the frame above the screen.
-          { frame: 30, shot: shot(W / 2, 313, 1112) },
-          { frame: 52, shot: shot(W / 2, 313, 1112) },
-          { frame: 64, shot: shot(W / 2, H / 2, W) },
-          // Lands below the public nav rather than through it — 340 is the
-          // lowest `cy` that keeps the whole hero block in frame, and it puts
-          // the nav's bottom edge exactly at the frame's top.
-          { frame: 100, shot: shot(W / 2, 340, frameRect(HERO, 24).w) },
-          { frame: 150, shot: shot(W / 2, 340, frameRect(HERO, 24).w) },
+          { frame: 0, shot: frameRect(OMNIBOX_LIFTED, 30) },
+          { frame: 46, shot: frameRect(OMNIBOX_LIFTED, 30) },
+          { frame: 74, shot: shot(W / 2, H / 2, W) },
+          { frame: 90, shot: shot(W / 2, H / 2, W) },
+          // Lands below the public nav rather than through it.
+          { frame: 124, shot: shot(W / 2, 340, frameRect(HERO, 24).w) },
+          { frame: 180, shot: shot(W / 2, 340, frameRect(HERO, 24).w) },
         ]}
       >
+        {/* The real omnibox stays empty: the lifted one is what is being typed
+            into, and it settles back into this slot. */}
         <Desktop
           clock="10:20 AM"
-          url={URL.slice(0, typedChars)}
-          newTab={!loaded}
-          caret={!loaded}
+          url=""
+          tabs={[{ label: loaded ? "Serenify" : "New tab" }]}
           fill={GREY.page}
         >
           {loaded ? (
@@ -97,23 +99,34 @@ export const Beat01ColdOpen: React.FC = () => {
               <TextBlock x={COL_X + 40} y={590} w={380} lines={3} />
 
               {/* Into beat 2 through the product's own CTA, not through a cut. */}
-              <Cursor x={556} y={410} clickAt={128} />
+              <Cursor x={556} y={410} clickAt={158} />
             </>
-          ) : (
-            <>
-              {/* A blank new tab. He has not gone anywhere yet. */}
-              <Box
-                x={W / 2 - 130}
-                y={VIEWPORT_Y + 150}
-                w={260}
-                h={28}
-                fill={GREY.panelAlt}
-                border={GREY.panelAlt}
-                radius={14}
-              />
-              <Cursor x={OMNIBOX.x + 110} y={OMNIBOX.y + 4} clickAt={6} />
-            </>
-          )}
+          ) : null}
+
+          {/* The lifted address bar. Sits above the page either way. */}
+          <Lift home={OMNIBOX} lifted={OMNIBOX_LIFTED} t={lift}>
+            <div
+              style={{
+                position: "absolute",
+                inset: 0,
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: 14 + 4 * lift,
+                fontFamily: MONO,
+                fontSize: 14,
+                color: GREY.body,
+                backgroundColor: GREY.surface,
+                border: `1px solid ${GREY.border}`,
+                borderRadius: 14 + 12 * lift,
+                boxSizing: "border-box",
+              }}
+            >
+              {URL.slice(0, typedChars)}
+              {typedChars < URL.length || !loaded ? (
+                <span style={{ color: GREY.ink, fontFamily: FONT }}>|</span>
+              ) : null}
+            </div>
+          </Lift>
         </Desktop>
       </Camera>
     </AbsoluteFill>

@@ -54,7 +54,7 @@ Next dev server instead of its own.
 
 ```bash
 cd video
-npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 69.0s, ~15 MB)
+npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 77.0s, ~17 MB)
 npm run render:hello    # -> out/hello-world.mp4
 npm run render:probe    # -> out/web-component-probe.mp4
 
@@ -71,7 +71,7 @@ a real browser); later renders reuse it.
 ## The greybox — `src/greybox/`
 
 `Greybox` is the cut: all twelve beats at the durations the beat sheet gives
-them, 2070 frames = **69.0s** at 30fps.
+them, 2310 frames = **77.0s** at 30fps.
 
 **The world is 1200×675, not 1920×1080.** The product renders at a 1200px-wide
 viewport and the whole desktop is scaled 1.6× to fill the output — a screen
@@ -94,6 +94,7 @@ Everything here gets thrown away. Do not refine it.
 |---|---|
 | Beat durations, to the frame | Every screen, panel, card and window |
 | Every push-in, at its sheet framing | The character (a box with a `FACE: <state>` label) |
+| Every performed action — tabs, clicks, scrolls | Ren's face (a circle with a `REN: <state>` label) |
 | The 2f OTP choreography, at recon timings | The mail client, the music player, the toast |
 | The 1.3s eased band drift (the only colour) | The wordmark, all icons, all art |
 | App copy, verbatim, at app sizes | Typeface, palette, tokens, polish |
@@ -119,6 +120,18 @@ left and right — is documented there too.
 
 `PHONE_PX(size, framedWidth)` in `theme.ts` is the legibility check: ~10px is the
 floor at which a line is read rather than recognised on a phone.
+
+**No cuts inside a beat.** Each beat is one `<Camera>` and one continuous scene
+driven by frame number — the camera moves, holds and moves again, and screen
+changes are animated or performed rather than cut to. Beats 2 and 5 used to be six
+and five sub-sequences with a camera each, which was eleven cuts inside two beats.
+
+`src/greybox/lift.tsx` is the other piece worth reading. Some elements cannot be
+made legible by any camera move — a 1152×86 banner in a 1200px viewport cannot be
+held whole *and* magnified at 16:9 — so the **lift** stages the element instead of
+the shot: it detaches, reflows to a narrower shape at centre frame, is read at its
+real type size, and settles back. Used in exactly three places (beats 1, 3, 7).
+A fourth would make it a gimmick.
 
 ## The two pipeline checks
 

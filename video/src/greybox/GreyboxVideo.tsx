@@ -25,39 +25,44 @@ import { FONT, GREY } from "./theme";
  * being tested are the durations and the camera moves, and both are real here.
  * Everything else gets thrown away.
  *
+ * **No cuts inside a beat.** Each beat is one `<Camera>` and one continuous scene;
+ * the camera moves, holds and moves again. Beats 2 and 5 used to be six and five
+ * sub-sequences with a camera each, which was eleven cuts inside two beats.
+ *
  * Durations are inlined rather than derived from a table so they can be dragged
  * in Studio and read straight off the sheet.
  *
- *   1 cold open     150 (+30)    7 at ease        120
- *   2 signup        390 (+30)    8 the email      180
- *   3 dashboard     120          9 questionnaire   90 (−30)
- *   4 camera gate   120         10 Ren            210
- *   5 calibration   300         11 return to ease 180
+ *   1 cold open     180 (+30)    7 at ease        120
+ *   2 signup        480 (+90)    8 the email      180
+ *   3 dashboard     150 (+30)    9 questionnaire   90
+ *   4 camera gate   150 (+30)   10 Ren            210
+ *   5 calibration   360 (+60)   11 return to ease 180
  *   6 later          60         12 end card       150
- *                                       total   2070 = 69.0s @ 30fps
+ *                                       total   2310 = 77.0s @ 30fps
  *
- * Net +1s on revision 1's 68s. Beat 1 gained a second for arriving at the site
- * and clicking through; 2e gained one for the email's three landings; beat 9 gave
- * one back by not sitting on a finished read.
+ * +8s on revision 2's 69s, and essentially all of it is the no-cut invariant:
+ * performed tab operations, an on-camera form→confirmation transition, a scrolled
+ * consent gate, the calibration upload/success/click chain, and two lift settles.
+ * Beat 7's lift cost nothing — it needs no camera travel.
  */
-export const GREYBOX_DURATION = 2070;
+export const GREYBOX_DURATION = 2310;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
     <Series>
-      <Series.Sequence durationInFrames={150} name="1 · cold open">
+      <Series.Sequence durationInFrames={180} name="1 · cold open">
         <Beat01ColdOpen />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={390} name="2 · signup">
+      <Series.Sequence durationInFrames={480} name="2 · signup">
         <Beat02Signup />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={120} name="3 · dashboard">
+      <Series.Sequence durationInFrames={150} name="3 · dashboard">
         <Beat03Dashboard />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={120} name="4 · camera gate">
+      <Series.Sequence durationInFrames={150} name="4 · camera gate">
         <Beat04CameraGate />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={300} name="5 · calibration">
+      <Series.Sequence durationInFrames={360} name="5 · calibration">
         <Beat05Calibration />
       </Series.Sequence>
       <Series.Sequence durationInFrames={60} name="6 · later">

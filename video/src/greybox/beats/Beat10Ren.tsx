@@ -9,47 +9,46 @@ import { GREY } from "../theme";
 import { Box, Text } from "../ui";
 
 /**
- * Beat 10 · Ren · 0:51–0:58 · 210 frames
+ * Beat 10 · Ren · 0:56–1:03 · 210 frames
  *
- * A real three-turn exchange, each message legible, appearing one at a time with
- * a real beat between them — not all at once.
+ * A real three-turn exchange, each message legible, appearing one at a time with a
+ * real beat between them.
  *
- * THREE THINGS ARE NEW IN THIS REVISION:
+ * **THE AVATAR IS A CHAT AVATAR NOW.** Revision 2 parked one ~300px circle between
+ * the two bubbles, belonging to neither, so nothing on screen said which side of
+ * the conversation was Ren — the one thing this beat cannot afford to be unclear
+ * about. It is now attached to each of Ren's own bubbles, and the app's real
+ * conventions do the work they are there to do
+ * (`components/chat/chat-shell.tsx` `MessageBubble`):
  *
- * 1. **Ren's avatar is in frame for the entire exchange.** Revision 1 let the
- *    camera follow the messages, so the avatar left frame after turn 1 — which
- *    is a poor use of a character drawn specifically for this. Every landing here
- *    is a union of the avatar and the message being read, so the avatar never
- *    leaves. The avatar is parked at the vertical middle of the thread so all
- *    three unions stay tight.
+ *   Ren  → `self-start`, bordered `bg-surface`, `rounded-bl-sm` (left)
+ *   him  → `self-end`, filled `bg-foggy`, `rounded-br-sm` (right)
  *
- * 2. **The avatar is drawn far larger than the app draws it** — 110px against
- *    `RenAvatar`'s 34px default and its 38/54px call sites — under a declared
- *    liberty, for the same reason the viewfinder is enlarged. This is the only
- *    place in the video where Ren's face is on screen long enough to be read.
+ * Both at `text-[15px]`, `max-w-[74%]`. The squared bottom-left corner on Ren's
+ * bubbles is exactly where the avatar sits, so the pairing reads without help.
  *
- * 3. **All four avatar states are timed:** `idle` before the exchange opens,
- *    `attentive` while he types his complaint, `thinking` while Ren composes the
- *    suggestion, `warm` from turn 3 onward (and held through beat 11).
+ * The enlargement liberty (L8) stands: 96px against `RenAvatar`'s 34px default and
+ * its 38/54px call sites. The app draws no avatar beside messages at all, so
+ * attaching one is part of the same liberty.
  *
- * The `thinking` state is accompanied by a typing indicator, which **the app
- * does not have**. That is a declared liberty, not an oversight: the video shows
- * a feature that will be built later.
+ * All four states are timed: `idle` before the exchange opens, `attentive` while he
+ * types his complaint, `thinking` while Ren composes the suggestion (with the
+ * typing indicator the app does not have — L9), `warm` from turn 3 into beat 11.
  *
  * The copy is placeholder — `014-recommendations` does not exist, and length is
- * what this beat tests. Turn 3 has to read as personal knowledge rather than a
- * canned tip; if the audience reads it as generic, the beat is dead, and that is
- * a copy problem to catch here rather than after art.
+ * what this beat tests. Turn 3 must read as personal knowledge, not a canned tip.
  */
 
 const PANEL = rect(280, 130, 640, 520);
-const AVATAR = rect(306, 250, 110, 110);
-const T1 = rect(436, 186, 400, 54);
-const T2 = rect(516, 262, 380, 72);
-const T3 = rect(436, 366, 440, 96);
+
+/** Ren's bubbles carry an avatar; his own do not. Sides are the app's. */
+const A1 = rect(300, 168, 96, 96);
+const B1 = rect(408, 190, 400, 52);
+const B2 = rect(452, 286, 420, 74);
+const A3 = rect(300, 384, 96, 96);
+const B3 = rect(408, 376, 440, 112);
 
 const APPEAR_AT = [20, 92, 138];
-/** idle → attentive (he types) → thinking (Ren composes) → warm (held on). */
 const renState = (frame: number): RenState =>
   frame >= 138 ? "warm" : frame >= 96 ? "thinking" : frame >= 44 ? "attentive" : "idle";
 
@@ -58,7 +57,7 @@ const TypingDots: React.FC<{ x: number; y: number; on: boolean }> = ({ x, y, on 
   if (!on) return null;
   return (
     <>
-      <Box x={x} y={y} w={72} h={38} radius={11} fill={GREY.panelAlt} border={GREY.border} />
+      <Box x={x} y={y} w={72} h={38} radius={12} fill={GREY.surface} border={GREY.border} />
       {[0, 1, 2].map((i) => (
         <div
           key={i}
@@ -78,75 +77,85 @@ const TypingDots: React.FC<{ x: number; y: number; on: boolean }> = ({ x, y, on 
   );
 };
 
+/** `rounded-2xl` with the corner nearest the speaker squared off. */
+const Bubble: React.FC<{ r: typeof B1; mine: boolean; text: string; opacity: number }> = ({
+  r,
+  mine,
+  text,
+  opacity,
+}) => (
+  <div style={{ opacity }}>
+    <div
+      style={{
+        position: "absolute",
+        left: r.x,
+        top: r.y,
+        width: r.w,
+        height: r.h,
+        boxSizing: "border-box",
+        backgroundColor: mine ? GREY.graphite : GREY.surface,
+        border: `1px solid ${mine ? GREY.graphite : GREY.border}`,
+        borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+      }}
+    />
+    <Text x={r.x + 14} y={r.y + 14} w={r.w - 28} size={15} lineHeight={1.5} color={mine ? GREY.white : GREY.ink}>
+      {text}
+    </Text>
+  </div>
+);
+
 export const Beat10Ren: React.FC = () => {
   const frame = useCurrentFrame();
   const state = renState(frame);
+  const appear = (i: number) =>
+    interpolate(frame, [APPEAR_AT[i], APPEAR_AT[i] + 9], [0, 1], {
+      extrapolateLeft: "clamp",
+      extrapolateRight: "clamp",
+      easing: Easing.out(Easing.cubic),
+    });
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: frameRect(union(AVATAR, T1), 24) },
-          { frame: 40, shot: frameRect(union(AVATAR, T1), 24) },
-          { frame: 58, shot: frameRect(union(AVATAR, T2), 24) },
-          { frame: 104, shot: frameRect(union(AVATAR, T2), 24) },
-          { frame: 124, shot: frameRect(union(AVATAR, T3), 24) },
-          { frame: 210, shot: frameRect(union(AVATAR, T3), 24) },
+          // Each landing holds a Ren avatar and the message being read, so Ren is
+          // never off screen and never ambiguous.
+          { frame: 0, shot: frameRect(union(A1, B1), 26) },
+          { frame: 40, shot: frameRect(union(A1, B1), 26) },
+          { frame: 58, shot: frameRect(union(A1, B2), 26) },
+          { frame: 124, shot: frameRect(union(A1, B2), 26) },
+          { frame: 146, shot: frameRect(union(A3, B3), 26) },
+          { frame: 210, shot: frameRect(union(A3, B3), 26) },
         ]}
       >
         <Desktop clock="11:31 AM" url="serenify.tech/app/chat">
           <AppHeader />
 
-          <Box x={PANEL.x} y={PANEL.y} w={PANEL.w} h={PANEL.h} fill={GREY.surface} border={GREY.border} radius={12} />
-          <Text x={PANEL.x + 24} y={PANEL.y + 20} size={18} weight={700}>
+          <Box x={PANEL.x} y={PANEL.y} w={PANEL.w} h={PANEL.h} fill={GREY.page} border={GREY.border} radius={12} />
+          <Text x={PANEL.x + 24} y={PANEL.y + 12} size={18} weight={700}>
             Ren
           </Text>
 
-          {/* Parked, enlarged, and never out of frame. */}
-          <RenAvatar x={AVATAR.x} y={AVATAR.y} size={AVATAR.w} state={state} />
+          {/* Turn 1 — Ren. Avatar attached. */}
+          <div style={{ opacity: appear(0) }}>
+            <RenAvatar x={A1.x} y={A1.y} size={A1.w} state={state} />
+          </div>
+          <Bubble r={B1} mine={false} text={REN.turns[0].text} opacity={appear(0)} />
 
-          {[T1, T2, T3].map((b, i) => {
-            const turn = REN.turns[i];
-            const appear = interpolate(frame, [APPEAR_AT[i], APPEAR_AT[i] + 9], [0, 1], {
-              extrapolateLeft: "clamp",
-              extrapolateRight: "clamp",
-              easing: Easing.out(Easing.cubic),
-            });
-            const mine = turn.who === "him";
+          {/* Turn 2 — him. Right side, filled, no avatar. */}
+          <Bubble r={B2} mine text={REN.turns[1].text} opacity={appear(1)} />
 
-            return (
-              <div key={i} style={{ opacity: appear, translate: `0px ${(1 - appear) * 12}px` }}>
-                <Box
-                  x={b.x}
-                  y={b.y}
-                  w={b.w}
-                  h={b.h}
-                  radius={12}
-                  fill={mine ? GREY.graphite : GREY.panelAlt}
-                  border={mine ? GREY.graphite : GREY.border}
-                />
-                <Text
-                  x={b.x + 18}
-                  y={b.y + 15}
-                  w={b.w - 36}
-                  size={16}
-                  lineHeight={1.5}
-                  color={mine ? GREY.white : GREY.ink}
-                >
-                  {turn.text}
-                </Text>
-              </div>
-            );
-          })}
+          {/* Turn 3 — Ren. Avatar attached. */}
+          <div style={{ opacity: appear(2) }}>
+            <RenAvatar x={A3.x} y={A3.y} size={A3.w} state={state} />
+          </div>
+          <Bubble r={B3} mine={false} text={REN.turns[2].text} opacity={appear(2)} />
 
-          {/*
-           * Ren composing. The app has NO typing indicator — showing one is the
-           * declared liberty that makes the `thinking` state legible at all.
-           */}
-          <TypingDots x={T1.x} y={T1.y + 8} on={frame >= 6 && frame < APPEAR_AT[0]} />
-          <TypingDots x={T3.x} y={T3.y + 20} on={state === "thinking"} />
+          {/* Ren composing, before each of its turns (L9). */}
+          <TypingDots x={B1.x} y={B1.y + 6} on={frame >= 6 && frame < APPEAR_AT[0]} />
+          <TypingDots x={B3.x} y={B3.y + 24} on={state === "thinking"} />
 
-          <Box x={AVATAR.x} y={580} w={590} h={40} label="message Ren" labelSize={10} fill={GREY.field} radius={10} />
+          <Box x={PANEL.x + 20} y={566} w={590} h={40} label="message Ren" labelSize={10} fill={GREY.field} radius={12} />
         </Desktop>
       </Camera>
     </AbsoluteFill>
