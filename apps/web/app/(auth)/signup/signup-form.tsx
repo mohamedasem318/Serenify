@@ -122,6 +122,7 @@ export function SignupForm({
             email={submittedEmail}
             action={verifySignupOtp}
             successHref="/app"
+            successNote="Taking you in…"
             helperText="The email also includes a 6-digit code. Enter it here if the link doesn't work."
           />
         )}

@@ -25,14 +25,23 @@ import { cn } from "@/lib/utils";
  *  - playSuccess() — a meadow halo sweeps box 1→6, then the boxes slide
  *    edge-to-edge while their separators (borders + gaps) melt and they fill
  *    meadow with rounded ends, so the row *becomes* one "Verified" pill, which
- *    then lifts toward the next step. Calm ~3s, weighted so the merge reads.
+ *    then HOLDS, fully opaque, until the panel navigates. Calm ~3s, weighted so
+ *    the merge reads.
  *  - playError() — a gentle low-amplitude **foggy** sway (~0.9s, ease-in-out;
  *    never a sharp red shake). The panel shows the foggy notice, then clears
  *    the digits and refocuses box 1.
  *
+ * 📌 #190 (2026-07-29): the pill used to dissolve to opacity 0 over the last
+ * 700ms, so the verification tick was gone before the handoff — the user's
+ * confirmation vanished on them. The 700ms of wall time is KEPT (navigation
+ * still fires at ~2940ms, so time-to-/app is unchanged) but it is now a plain
+ * hold: the tick is visible for ~1260ms instead of dissolving through half of
+ * it. There is no `faded` visual state any more, and the wrapper carries no
+ * opacity transition — if either reappears, the tick is vanishing again.
+ *
  * Reduced motion is decided by the PANEL (the repo's `useMediaQuery`, not
  * framer's `useReducedMotion`) and passed in as `reducedMotion`: on success the
- * sweep/merge/lift are skipped and the verified pill is shown directly before
+ * sweep/merge are skipped and the verified pill is shown directly before
  * navigating; on a wrong code the sway is skipped but the notice + clear still
  * happen. Never red in either path.
  */
@@ -54,11 +63,34 @@ type Props = {
 const COUNT = 6;
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+/**
+ * The success timeline, named rather than inlined so the panel can derive the
+ * moment its muted note enters without hard-coding a number that silently
+ * drifts the next time a step is retuned.
+ */
+const STEP = {
+  sweep: 130, // per box, ×6 = 780
+  beforeMerge: 360,
+  merge: 540,
+  pillHold: 560,
+  tailHold: 700, // #190: a HOLD, not a fade. Keeps the handoff at ~2940ms.
+  reduced: 650, // reduced motion, whole sequence
+} as const;
+
+/** playSuccess() start → the merge settles and the pill is legible (~1680ms). */
+const MERGE_SETTLES_MS = STEP.sweep * COUNT + STEP.beforeMerge + STEP.merge;
+
+/**
+ * playSuccess() start → the panel's muted success note enters (~2080ms), i.e.
+ * 400ms after the merge settles, leaving it ~860ms on screen before the handoff.
+ * Subordinate to the pill by design: it must not compete with the tick.
+ */
+export const SUCCESS_NOTE_DELAY_MS = MERGE_SETTLES_MS + 400;
+
 type Visual = {
   lit: number; // boxes lit during the halo sweep (0..6)
   merged: boolean; // separators melt, boxes fill meadow + round into one bar
-  pill: boolean; // the "Verified" label resolves on the bar
-  faded: boolean; // the pill fades out before the handoff (no vertical movement)
+  pill: boolean; // the "Verified" label resolves on the bar — and stays
   sway: boolean; // gentle foggy sway on a wrong code
   instant: boolean; // reduced motion → state applied directly, no transitions
 };
@@ -67,7 +99,6 @@ const IDLE: Visual = {
   lit: 0,
   merged: false,
   pill: false,
-  faded: false,
   sway: false,
   instant: false,
 };
@@ -142,26 +173,28 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
     async playSuccess() {
       if (reducedRef.current) {
         meltTogether();
-        setVisual({ lit: COUNT, merged: true, pill: true, faded: false, sway: false, instant: true });
-        await wait(650);
+        setVisual({ lit: COUNT, merged: true, pill: true, sway: false, instant: true });
+        await wait(STEP.reduced);
         return;
       }
       // 1 · meadow halo sweeps box 1 → 6
       for (let i = 1; i <= COUNT; i++) {
         setVisual((v) => ({ ...v, lit: i }));
-        await wait(130);
+        await wait(STEP.sweep);
       }
-      await wait(360);
+      await wait(STEP.beforeMerge);
       // 2 · boxes slide together, separators melt, fill meadow, round into a bar
       meltTogether();
       setVisual((v) => ({ ...v, merged: true }));
-      await wait(540);
+      await wait(STEP.merge);
       // 3 · the bar resolves into the "Verified" pill
       setVisual((v) => ({ ...v, pill: true }));
-      await wait(560);
-      // 4 · the pill fades out (no vertical lift — avoids overlapping the next view)
-      setVisual((v) => ({ ...v, faded: true }));
-      await wait(700);
+      await wait(STEP.pillHold);
+      // 4 · the pill HOLDS, fully opaque, while the panel's note reads and the
+      //     handoff lands (#190). No state change here on purpose: this step is
+      //     wall time only. It used to fade the pill to nothing, which is the
+      //     bug — do not reintroduce an opacity change here.
+      await wait(STEP.tailHold);
     },
   }));
 
@@ -203,13 +236,9 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
   }
 
   return (
-    <div
-      className={cn(
-        "relative flex min-h-[56px] justify-center",
-        !visual.instant && "transition-opacity duration-700 ease-out",
-        visual.faded && "opacity-0",
-      )}
-    >
+    // No opacity transition and no faded state: the verified pill stays put
+    // until the panel navigates away from it (#190).
+    <div className="relative flex min-h-[56px] justify-center">
       <motion.div
         ref={rowRef}
         className="flex w-full flex-nowrap justify-center gap-1.5 sm:gap-2"

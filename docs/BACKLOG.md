@@ -2596,8 +2596,16 @@ itself. The next wordmark change re-opens the same drift with nothing to catch i
 2026-07-28**. (2) the mechanism
 gap — the same pass that does #190, so the email surfaces are touched once.
 
-### The OTP verification tick vanishes immediately — it should linger (#190)
-**Status**: polish (`type:polish` / `area:web`) — **OPEN.** GitHub issue **#190 OPEN.**
+### ~~The OTP verification tick vanishes immediately — it should linger~~ (#190)
+**Status**: **RESOLVED 2026-07-29 — branch `fix/otp-success-hold`.** GitHub issue **#190 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
+**Resolution**: **the diagnosis in the original report was wrong about the cause, and the fix is not the fix it proposed.** The tick did not vanish because the hold was too short — step 4 of the choreography *deliberately dissolved it*, fading the pill to `opacity: 0` over its last 700 ms. So a longer hold would have bought a longer fade, not a legible acknowledgement.
+
+What shipped instead: the 700 ms of wall time is **kept**, so `router.replace` still fires at ~2940 ms and time-to-`/app` is unchanged, but the step is now a plain hold. The pill is fully opaque for ~1260 ms instead of dissolving through half of it. The `faded` visual state and the wrapper's opacity transition are deleted rather than left unreferenced, and a unit test scans the source to keep them gone.
+
+Two things the report did not ask for, both judged part of the same moment: a **muted note** beneath the pill (`successNote`, a new required `OtpPanel` prop — "Taking you in…" on signup, "One moment…" on recovery) entering at ~2080 ms; and a **"Continue" escape hatch** replacing that note 4 s after navigation was attempted, for the case where the handoff silently doesn't happen. It is a real `<a href>`, not a button re-calling the router, precisely because the router is the thing suspected of being wedged. A "redirecting in 3, 2, 1" countdown was **considered and rejected** — perky against a calm brand, and it adds real waiting to fix a perceived problem.
+
+The report's "**No copy change implied**" is therefore superseded: two strings were added. Measured on real Chrome, both flows, light + dark: pill opacity **1.0 at the handoff frame** (was 0), note **6.10:1 / 6.06:1**, Continue **5.76:1 / 6.85:1**, hit target **85×44**, and **zero layout shift at the note's entrance** (panel 254 px through the whole sequence; the +36 px reflow lands at t≈150 ms under the halo sweep).
+**Original status**: polish (`type:polish` / `area:web`)
 **Category**: auth surfaces / motion
 **Observed**: 2026-07-28, entering the emailed code on the preview's own form
 (`deploy-log-stage3-2026-07-28.md` §3).
@@ -2612,6 +2620,11 @@ copy change implied.
 **Address by**: the design pass over the transactional email and OTP surfaces after
 `013-public-surface-and-legal` ships. **Deliberately not built now**, and deliberately paired with
 #189 so those surfaces are opened once rather than twice.
+
+**Note on the pairing**: #190 was taken **on its own**, ahead of #189, not as the paired pass this
+entry planned. It is a self-contained client-side change to two components; #189's template work
+was blocked on an unresolved question about Management-API token blast radius, and holding a
+one-file motion fix behind that would have been the wrong trade. #189 stays open.
 
 ### ~~Landing chapter-marker dots are 24×24 px tap targets, not 44×44~~ — WITHDRAWN, not a defect (#191)
 **Status**: **WITHDRAWN 2026-07-28 — not a defect.** GitHub issue **#191 CLOSED as superseded.**

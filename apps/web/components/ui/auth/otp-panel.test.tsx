@@ -68,6 +68,7 @@ describe("OtpPanel — reduced motion (FR-026)", () => {
         email="new@example.com"
         action={action}
         successHref="/app"
+        successNote="Taking you in…"
         helperText="x"
       />,
     );
@@ -93,6 +94,7 @@ describe("OtpPanel — success navigation + cross-tab broadcast gate (📌 OTP f
         email="new@example.com"
         action={action}
         successHref="/app"
+        successNote="Taking you in…"
         helperText="x"
       />,
     );
@@ -120,6 +122,7 @@ describe("OtpPanel — success navigation + cross-tab broadcast gate (📌 OTP f
         email="reset@example.com"
         action={action}
         successHref="/reset-password"
+        successNote="One moment…"
         helperText="x"
       />,
     );
@@ -147,6 +150,7 @@ describe("OtpPanel — wrong code (FR-015, FR-025)", () => {
         email="new@example.com"
         action={action}
         successHref="/app"
+        successNote="Taking you in…"
         helperText="x"
       />,
     );
@@ -179,6 +183,7 @@ describe("OtpPanel — input behaviour", () => {
         email="new@example.com"
         action={action}
         successHref="/app"
+        successNote="Taking you in…"
         helperText="x"
       />,
     );
@@ -204,6 +209,7 @@ describe("OtpPanel — input behaviour", () => {
         email="new@example.com"
         action={action}
         successHref="/app"
+        successNote="Taking you in…"
         helperText="x"
       />,
     );
