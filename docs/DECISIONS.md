@@ -6605,3 +6605,68 @@ second-pass entry above. It loaded on every session start, so each session began
 opposed instructions on the same subject. Deleted from disk and from the memory index. It is
 local-only and outside the repository, so this change leaves no trace in the diff; it is
 recorded here because the contradiction is the reason the mirroring contract was worth writing.
+
+---
+
+## 2026-07-29 — Foggy is Ren's identity colour (constitution Amendment 18)
+
+**Status**: Accepted. Ratifies practice that already shipped.
+
+**Decision**: Ren's mark is filled `foggy` in both modes at every site that renders it,
+and `RenAvatar`'s `color` prop — the mechanism that let a call site decide otherwise — is
+removed. More generally, a mark identifying a persistent non-human entity MUST NOT use an
+accent that carries band or outcome meaning (`meadow`, `amber`, `crimson`). Separately and
+narrowly, the primary forward action inside Ren's chat surface may be filled `foggy`
+rather than `meadow`.
+
+**Rationale**: `meadow`, `amber` and `crimson` are the stress-band and outcome accents. A
+mark wearing one of them encodes a reading it does not have — a meadow Ren sitting beside
+a stress readout looks like it is asserting that readout is calm, which is precisely the
+kind of accidental claim Principle I's honesty rule exists to prevent. `foggy` is the only
+accent outside the band scale, so Ren can appear next to any reading without being read as
+a state.
+
+This was already the landing page's behaviour. Feature 013 shipped a foggy Ren through the
+`color` prop as an approved liberty under FR-022, and flagged it for review in ST-4
+specifically because foggy's registered role is attention. The flag is now resolved in the
+direction the practice already went, rather than being reverted.
+
+**Why the prop had to go rather than just be re-pointed**: one component was already the
+single *definition* of the mark, but it was not a single *appearance* — the chat surface
+passed nothing and got meadow, the landing page passed foggy. That is the drift the
+extraction was supposed to prevent, arriving through the escape hatch the extraction left
+open. A rule that says "always foggy" alongside a prop that says "unless you'd rather not"
+is not a rule. Foggy is now structural.
+
+**The chat-surface exception, and its limits**: with a foggy Ren in the header, a lone
+meadow send button reads as a mistake rather than as emphasis — the same cohesion problem
+that drove the calibration flow rework. Amendment 18 permits foggy for the primary action
+**inside Ren's chat surface only**, as one named exception. It does not generalize:
+`meadow` remains the required fill for primary and forward actions on every other surface,
+and a future surface wanting this treatment needs its own amendment, not a reading of this
+one. No other control anywhere in the product was recoloured.
+
+**Contrast**: measured, not assumed. Filled foggy with `--color-on-accent` is **5.33:1** in
+light and **8.34:1** in dark — both clear AA, and both better than the meadow the send
+control replaced (4.78:1). No regression.
+
+**Registered along the way**: `--color-on-accent` and `--color-scrim` are now named in
+Principle V's palette for the first time. Both shipped in feature 007 and have been in use
+since, but the palette is declared "locked, no additions without amendment" and never
+admitted they exist. Amendment 17 identified the gap and deferred it to "whichever
+amendment next touches Principle V"; this is that amendment, and the identity-mark rule
+cites `--color-on-accent` directly, so leaving it unregistered would have the constitution
+name a token its own palette denies. Documentation only — neither value changed. Closes
+GitHub issue #155.
+
+**Not done here, deliberately**: Ren has no typing indicator today (`isSending` in
+`chat-shell.tsx` only disables the composer; the assistant message appears atomically), so
+the new `thinking` state has nothing to drive yet. Wiring it would mean adding a
+placeholder row to the message list — a new element, not a reskin — and is left as
+follow-up. Four surfaces where Ren arguably belongs but does not appear (assistant message
+rows, the pill launcher, recent-chat rows, landing thread bubbles) are likewise left alone.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 18 (1.13.0 → 1.14.0);
+`docs/CHANGELOG.md` 2026-07-29; `apps/web/components/chat/ren-avatar.tsx`;
+`docs/DECISIONS.md` 2026-06-17 (filled-accent CTA foreground) and 2026-07-24
+(Amendment 17, which logged the token gap).

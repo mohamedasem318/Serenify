@@ -546,6 +546,65 @@ Cross-references:
 - docs/mockups/serenify-landing-mock.html:92,422 (source of the `seren`/`ify` split;
   untracked — see docs/mockups/README.md)
 - docs/DECISIONS.md 2026-06-18 (`--color-meadow-text` origin, feature 007)
+
+Amendment 18: 1.13.0 → 1.14.0 (2026-07-29, MINOR)
+Bump rationale: One change on one existing principle (V), landed on the feature
+that gives Ren a drawn avatar. Two permissions are written as two separate
+bullets rather than one, because they have different scopes and must not be read
+as a single rule — the first is product-wide for a class of mark, the second is
+a single named surface. Collapsing them would let a later reader take the narrow
+one as licence for the broad one.
+
+Principle V's Palette block gains two bullets. (1) An identity mark MUST NOT use
+a band- or outcome-carrying accent (meadow, amber, crimson), and Ren's mark
+specifically MUST be foggy. This RATIFIES PRACTICE THAT ALREADY SHIPS:
+apps/web/components/landing/panels/ren-panel.tsx has rendered a foggy Ren in
+production since feature 013, passed through `RenAvatar`'s `color` prop, and was
+flagged at the time (that file's docstring, ST-4) precisely because foggy's
+registered role is attention. The amendment resolves that open flag by making
+the practice a rule instead of a liberty. The same feature removes the `color`
+prop that made the divergence possible, so the mark is foggy by construction and
+not by call-site choice. The rule on the CLASS is the prohibition, not a
+foggy-forever requirement — foggy is merely the only accent outside the band
+scale today. (2) Within Ren's chat surface only, the primary action MAY be
+foggy. Scoped to one surface and stated as a non-generalizing exception.
+
+This adds NO new token and changes NO token value; both bullets are application
+rules for existing tokens. It DOES register two shipped-but-unregistered tokens
+in Principle V's palette block for the first time: `--color-on-accent` (light
+`#F8F9FA`; dark uses the `bg` token — it does not swap) and `--color-scrim`
+(`rgba(28, 32, 35, 0.60)`, fixed in both modes). Both shipped in feature 007 and
+have been in use since, but the palette is declared "locked, no additions
+without amendment" and never named them. Amendment 17 identified the gap,
+closed it for a third 007 token (`--color-meadow-text`) because the new Wordmark
+rule depended on that token, and deferred these two to "whichever amendment next
+touches Principle V" as a ride-along — this IS that amendment, and the
+dependency is the same shape: the identity-mark bullet above cites
+`--color-on-accent` as the light-mode foreground, so leaving it unregistered
+would have this amendment name a token the palette does not admit exists.
+Documentation only — NEITHER VALUE IS CHANGED. Closes the gap logged at
+docs/BACKLOG.md "From constitution Amendment 17" and GitHub issue #155.
+
+MINOR bump: materially expanded guidance on one existing principle (Governance's
+MINOR definition; consistent with Amendments 5/12/13/17); no principle is added,
+removed, or restructured, and no numbered section changes. Registering two
+tokens does not raise the bump — Amendment 17 registered `--color-meadow-text`
+under a MINOR for the same reason. Hand-edited (not via /speckit-constitution)
+to preserve the curated Sync Impact Report history, per the Amendment 10
+precedent.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for `foggy`, `meadow`, `accent`, `identity mark`,
+`avatar`, `Ren`, `chat surface`, `primary action`, and `Principle V` — zero
+matches, substantive or coincidental.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-07-29 (Amendment 18)
+- docs/CHANGELOG.md entry 2026-07-29 (Amendment 18)
+- apps/web/components/chat/ren-avatar.tsx (the single shared mark)
+- docs/BACKLOG.md "From constitution Amendment 17" / GitHub issue #155
+  (`--color-on-accent` + `--color-scrim` registration gap — CLOSED here)
+- docs/DECISIONS.md 2026-06-17 (filled-accent CTA foreground, feature 007)
 -->
 
 # Serenify Constitution
@@ -738,6 +797,40 @@ and every documented pairing meets WCAG AA:
   mode and the `bg` token in dark mode. The deepened accents fail AA with ink
   foreground; this replaces the prior ink-on-accent treatment. Soft accent
   tints (e.g. a `foggy/10` attention banner) keep ink-token text.
+- **Supporting tokens (registered here, values unchanged from feature 007):**
+  `--color-on-accent` (the near-white filled-accent foreground above; light
+  `#F8F9FA`, and in dark mode the `bg` token is used instead — this token does
+  NOT swap) and `--color-scrim` (`rgba(28, 32, 35, 0.60)` — Graphite ink at 60%,
+  fixed in both modes). Both shipped in feature 007 and have been in use since;
+  they are named here for the first time to close the registration gap that
+  Amendment 17 identified and deferred. Documentation only — neither value
+  changes.
+- **Identity marks and the band scale.** A mark that identifies a persistent
+  non-human entity in the product MUST NOT use an accent that carries band or
+  outcome meaning — currently `meadow`, `amber`, or `crimson`. A meadow Ren
+  sitting beside a stress reading looks like it is asserting that reading is
+  calm; the mark would encode a state it does not have. **Ren's mark MUST be
+  `foggy`**, in both modes, at every site that renders it. This RATIFIES
+  EXISTING PRACTICE: a foggy Ren already ships in production on the landing
+  page's companion panel. `foggy` is today the only accent outside the band
+  scale, which is why it is the one Ren wears — but the rule on the class is
+  the prohibition above, not a requirement that every future identity mark be
+  foggy specifically. This permission is scoped to identity marks: it does NOT
+  make `foggy` available as a decorative or brand fill for ordinary surfaces,
+  and `foggy`'s attention/error role in Principle V is otherwise unchanged.
+  Filled identity marks take the filled-accent foreground pair above —
+  `--color-on-accent` in light, the `bg` token in dark (measured on filled
+  foggy: 5.33:1 light, 8.34:1 dark).
+- **Named exception — the primary action inside Ren's chat surface may be
+  foggy.** Within Ren's chat surface ONLY, the primary forward action (the
+  composer's send control) MAY be filled `foggy` rather than `meadow`, because a
+  lone meadow control on a screen whose identity mark is foggy reads as an
+  error rather than as emphasis. THIS IS ONE NAMED EXCEPTION, NOT A LOOSENING.
+  It does not generalize: `meadow` remains the required fill for primary and
+  forward actions on every other surface in the product, and `foggy` remains
+  unavailable for forward actions anywhere outside Ren's chat surface. A future
+  surface wanting the same treatment needs its own amendment, not a reading of
+  this one. Nothing about `meadow`'s calm/affirmative role changes.
 - **Amber stress signal:** the amber role is a soft-tint notice treatment — a
   light amber tint background with deep same-family text (light: tint `#F4E3C6`
   / text `#8A580F`; dark: tint `#3B2F19` / text `#E6C386`), alongside amber as
@@ -1085,4 +1178,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.13.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-24
+**Version**: 1.14.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-29

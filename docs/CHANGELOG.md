@@ -2869,3 +2869,40 @@ invalid-code probe instead. Evidence: `deploy-log-production-2026-07-28.md`, rec
 Cross-references: `docs/DECISIONS.md` 2026-07-28 (third pass); `docs/PROGRESS.md` "Feature 013";
 `specs/013-public-surface-and-legal/` (`plan.md`, `deploy-protocol.md`, `smoke-tests.md`, and the
 four deploy logs — Stage 2, Stage 3, Stage 3b and production).
+
+## 2026-07-29 — constitution Amendment 18 (1.13.0 → 1.14.0, MINOR) + Ren's drawn mark
+
+Ren gets a real avatar. The framed "R" that stood in for it since feature 011 is replaced
+by the signed-off drawn mark — one shared SVG component, four states (`idle`, `attentive`,
+`thinking`, `warm`), and a slow blink that is silent under `prefers-reduced-motion`.
+
+Principle V gains two bullets, deliberately written as two rather than one because their
+scopes differ and must not be read together:
+
+1. **Identity marks and the band scale.** A mark identifying a persistent non-human entity
+   MUST NOT use a band- or outcome-carrying accent (`meadow`, `amber`, `crimson`). Ren's
+   mark specifically MUST be `foggy`. This ratifies what already shipped — the landing
+   page's Ren has been foggy since feature 013, as an approved FR-022 liberty flagged for
+   review in ST-4. The flag is resolved by making the practice a rule.
+2. **One named exception.** Inside Ren's chat surface only, the primary forward action may
+   be filled `foggy` rather than `meadow`. Scoped narrowly and stated as non-generalizing:
+   `meadow` remains required for primary actions everywhere else, and nothing about its
+   calm/affirmative role changes.
+
+Also registered in Principle V's palette for the first time: `--color-on-accent`
+(`#F8F9FA` light; dark uses the `bg` token) and `--color-scrim`
+(`rgba(28, 32, 35, 0.60)`, fixed in both modes). Both shipped in feature 007 and were
+logged by Amendment 17 as a ride-along for the next Principle V amendment — this is it.
+**Neither value changed**; this is documentation closing a gap in a palette declared
+"locked, no additions without amendment". Closes GitHub issue #155.
+
+The `color` prop is removed from `RenAvatar`. It was how one component came to render two
+different colours — meadow in the app, foggy on the landing page — so the fix is
+structural rather than a corrected default. The chat send control moves meadow → foggy
+under the exception above; **no other control anywhere in the product was recoloured.**
+
+Contrast measured, not assumed: filled foggy with `--color-on-accent` is 5.33:1 light and
+8.34:1 dark, both AA and both better than the meadow the send control replaced (4.78:1).
+
+Cross-references: `.specify/memory/constitution.md` Amendment 18; `docs/DECISIONS.md`
+2026-07-29; `docs/BACKLOG.md` "From constitution Amendment 17" (#155, resolved).

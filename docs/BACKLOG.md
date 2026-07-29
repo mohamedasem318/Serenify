@@ -1914,7 +1914,14 @@ Amendment 16 and `docs/DECISIONS.md` 2026-07-24.
 ## From constitution Amendment 17 (wordmark canonization + manager-visibility copy discipline) — 2026-07-24
 
 ### `--color-on-accent` and `--color-scrim` are shipped Graphite tokens never registered in Principle V (#155)
-**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#155 OPEN**.
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **RESOLVED 2026-07-29** (constitution
+Amendment 18, v1.14.0). GitHub issue **#155 CLOSED**. Both tokens are now registered in
+Principle V's palette block with their values and their 007 origin, exactly as the fix scope
+below specifies, and **neither value changed**. It landed as the ride-along it was logged as:
+Amendment 18 is the next amendment to touch Principle V, and its new identity-mark rule cites
+`--color-on-accent` directly — leaving it unregistered would have had the constitution name a
+token its own palette denied existed, which is the same dependency that made Amendment 17
+register `--color-meadow-text`.
 **Observed**: 2026-07-24, during the constitution Amendment 17 template/token audit.
 **Description**: Principle V's palette block is declared **"locked, no additions without amendment"**, but
 two tokens shipped in feature 007 have never been named there: `--color-on-accent`
