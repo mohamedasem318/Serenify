@@ -166,7 +166,7 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
             }}
             onBlur={handleEmailBlur}
             placeholder="you@example.com"
-            className="h-12 w-full rounded-control border border-border bg-bg px-3 text-base text-ink outline-none placeholder:text-muted focus:border-meadow"
+            className="h-12 w-full rounded-control border border-border bg-bg px-3 text-base text-ink outline-none placeholder:text-muted focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
           />
         </div>
       )}

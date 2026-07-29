@@ -3142,8 +3142,27 @@ that seeders and test setup should stop using service-role DML and go through th
 RPC/trigger paths production uses. That is a design call, not a mechanical one.
 **Address by**: before the next feature that needs a green e2e run as evidence.
 
-### `--color-border` self-references inside `@theme inline` — every light-mode border falls back to ink (#209)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#209 OPEN.**
+### `--color-border` self-reference, and the control-boundary contrast it was masking (#209)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN. BLOCKED on #211 merging first.**
+GitHub issue **#209 OPEN.**
+
+> **SCOPE CORRECTED 2026-07-29.** This entry was written as a one-line deletion. It is not.
+> Deleting the self-reference is necessary and correct, but it *lands* `#D7D9DC` on control
+> boundaries at **1.18:1 / 1.30:1**, and two of those controls fail WCAG 1.4.11: the consent
+> checkbox and the OTP digit boxes are empty, so the border is 100 % of the affordance. The
+> resolution is a **two-token split** — `--color-border` keeps its value for decorative seams,
+> a new control-boundary token clears 3:1 — not a bare deletion. Dark mode fails the same way
+> today at 1.15–1.25:1, independently of this bug, and is fixed by the same split.
+>
+> **Blocked on #211 (focus-indicator consistency) merging first**, and the
+> order is not arbitrary. Six of the controls that would receive the new token signal focus by
+> **border colour alone**. The proposed control value sits at meadow's luminance, so the
+> resting→focused delta collapses to **1.27:1 light / 1.98:1 dark** — worse than either the bug
+> or the naive fix. Landing the token split first would knowingly regress focus on six controls;
+> landing #211 first makes the split a pure improvement with no window. The dependency runs one
+> way only, so the two cannot be reordered or combined.
+>
+> Everything below this box is the original, still-accurate diagnosis of the token defect.
 **Category**: design tokens / Tailwind v4 `@theme inline`
 **Observed**: 2026-07-29, while verifying `fix/navbar-chrome-and-active-state` in a real
 browser. Pre-existing; that branch neither caused it nor touches the token.
@@ -3210,3 +3229,70 @@ surface.
 those surfaces before merging — 81 borders change colour at once. The direction is correct
 and matches the design, but it is a visible change everywhere and should be seen rather than
 assumed. **Address by**: before the next visual-fidelity pass or design review.
+*(Superseded in part by the scope box at the top of this entry: the deletion alone is not the
+fix. Values settled at review: seams stay `#D7D9DC` / `#23272B`; control boundaries become
+`#7D8083` / `#6C7074`, clearing 3.33–3.76:1 against both adjacent surfaces.)*
+
+### Focus indicator missing or colour-only on nine text-entry controls (#211)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#211 OPEN.**
+**Category**: accessibility — WCAG 2.4.7 Focus Visible (AA), 1.4.1 Use of Color (A)
+**Observed**: 2026-07-29, while working out whether #209's token split would regress focus.
+Pre-existing on `main`; #209 did not cause it.
+
+**This is a live AA failure on `main`, not polish.** Two inline rename inputs —
+`chat/chat-shell.tsx:508` and `home/recent-chats-card.tsx:152` — set `outline-none` and supply
+**no replacement whatsoever**. Both are keyboard-reachable, and once focused they look exactly
+as they did unfocused. That is **SC 2.4.7 Focus Visible (Level AA) failing outright**, today,
+in production.
+
+**Four inconsistent patterns across the text-entry controls**:
+
+| Pattern | Where | Focus signal |
+| --- | --- | --- |
+| A — border colour alone | `field.tsx:49`, `password-input.tsx:36`, `forgot-form.tsx:126`, `onboarding-form.tsx:120`, `otp-panel.tsx:169`, `device-picker.tsx:92` | `focus:border-meadow`, no ring |
+| B — border + ring | `otp-boxes.tsx:249` | ring at `meadow/30` |
+| C — ring only | `terms-acknowledgement-field.tsx:102`, `chat-shell.tsx:362`, `session-end-feedback-card.tsx:290` | `focus-visible:ring-2` |
+| D — nothing | `chat-shell.tsx:508`, `recent-chats-card.tsx:152` | **none** |
+
+Pattern A is also **1.4.1 Use of Color**: grey→meadow is a hue shift whose luminance delta is
+**1.27:1** against the incoming control token, invisible to a red-green colourblind reader.
+Pattern B's ring composites to **1.45:1** against the page — present but not visible.
+
+**Note on which criterion governs.** SC 1.4.11 does *not* constrain the resting→focused
+delta; it says so directly ("does not directly compare the focused and unfocused states").
+The criterion that does is **SC 2.4.13 Focus Appearance (Level AAA)** — ≥3:1 between the same
+pixels in the two states, over an area ≥ a 2 px perimeter. AAA is above this project's target,
+but it is the correct measuring stick, and it is why the indicator must be **added geometry**
+rather than a colour swap. It is also why 2 px is the floor: a 1 px ring is half the required
+area, and the border pixel cannot be counted toward it because grey→meadow is only 1.27:1.
+
+**Rejected alternatives, with numbers.** A focus *background tint* was tested as a calmer
+option: subtle (10 %) gives **1.13:1 light / 1.17:1 dark** — worse than the border it replaces;
+the first strength clearing 3:1 is **80 % light / 56 % dark**, which is a filled green field,
+and at that strength placeholder text drops to **1.90:1 / 1.98:1** and dark body ink to
+**4.47:1**, failing **SC 1.4.3 Contrast (Minimum), AA**. A tint would trade an AAA nicety for an
+AA failure. `ring-offset-2` was also rejected: it paints page background between border and
+ring, so the two read as separate outlines rather than one emphasised edge.
+
+**Fix**: one idiom — a flush 2 px meadow outline, no offset, plus a matching border so the
+whole 3 px edge is one colour and one event:
+`focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2
+focus-visible:outline-offset-0 focus-visible:outline-meadow`. Measured **4.22:1 light /
+7.43:1 dark** on the changed pixels. `outline` rather than `ring` deliberately: box-shadow
+rings are clipped by `overflow-hidden` ancestors, and both rename inputs sit inside one.
+
+**Two Tailwind v4 traps worth recording.** `outline-none` sets `--tw-outline-style: none`, so
+`focus-visible:outline-2` alone sets a width on an outline whose style is still `none` —
+computed `outlineStyle` stays `"none"` and **nothing paints**. `focus-visible:outline-solid` is
+required. And v4's `transition-colors` **includes `outline-color`**, which animates the ring in
+and violates "focus rings appear instantly"; the affected controls now scope the transition to
+`transition-[color,background-color,border-color]`.
+
+**`:focus-visible` vs `:focus` — verified, not assumed.** Moving Pattern A from `focus:` to
+`focus-visible:` is behaviour-preserving: measured in real Chromium, a text input matches
+`:focus-visible` under **mouse click** as well as keyboard, per the spec's text-entry heuristic.
+
+**Known gap, deliberately not closed here**: ~20 other `focus-visible:ring-*` sites across
+landing/public/nav keep the offset ring, so the codebase now carries **two** focus idioms
+rather than one. Converging them is a follow-up, not this change — it would touch surfaces
+this PR has no reason to open. **Address by**: fold into the next a11y sweep.

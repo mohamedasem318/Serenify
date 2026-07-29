@@ -6126,3 +6126,71 @@ CI re-run, and no check will fail for the absence of trailers going forward.
 Descriptive mentions in `docs/PROGRESS.md`, `docs/CHANGELOG.md`, `RECON_2026-07-21.md` and
 `specs/013/smoke-tests.md` are left alone: they are records of what past commits carried,
 not instructions, and editing them would falsify the record.
+
+---
+
+## 2026-07-29 (third pass) — the focus outline sits flush (`outline-offset-0`), against Hallmark's default
+
+**Decision**: the shared focus indicator on text-entry controls is a **2 px meadow outline with
+`outline-offset-0`** — flush against the border, no gap. This **deviates from the Hallmark skill**,
+which prescribes an offset, and the deviation is deliberate. Do not "correct" it back.
+
+### What Hallmark says
+
+`~/.claude/skills/hallmark/references/interaction-and-states.md`, verbatim:
+
+> ```css
+> :focus-visible {
+>   outline: 2px solid var(--color-focus);
+>   outline-offset: 2px;
+> ```
+> - 2px offset from the element.
+
+and in its state-by-state input recipe:
+
+> | **Focus** | `outline: 2px solid var(--color-focus)` · `outline-offset: 1px` … |
+
+So the skill asks for 1–2 px of offset. This repo uses 0.
+
+### Why we deviate
+
+An offset paints **page background between the border and the outline**. The control then reads as
+*two* concentric strokes with a channel between them, rather than one emphasised edge. That was
+rejected on sight during review of #211, and the fix for it is exactly the offset: remove it and the
+two strokes merge into a single 3 px edge (1 px border + 2 px outline, both meadow), so **one** thing
+changes on focus rather than three (border colour + a new ring + a new gap).
+
+This matters more here than it would elsewhere because the brand is deliberately calm. A gapped
+double ring on every field in the auth flow is visual noise the rest of the surface does not have.
+
+### What we did NOT compromise to get it
+
+The offset is a *visual* property; every accessibility property Hallmark cares about is preserved or
+exceeded:
+
+- **2 px width is kept, and is a floor rather than a preference.** SC 2.4.13 Focus Appearance
+  requires an indicator area at least as large as a 2 px perimeter. A 1 px outline is half that, and
+  the border pixel cannot be counted toward it because grey→meadow is only 1.27:1.
+- **Contrast is measured, not assumed**: the outline paints over pixels that were page background,
+  giving **4.22:1 light / 7.43:1 dark**, well past the 3:1 the same criterion asks for.
+- **The ring is instant.** Tailwind v4's `transition-colors` silently includes `outline-color`, which
+  animated the outline in and would have violated Hallmark's "focus rings appear instantly. Always."
+  The affected controls scope their transition to `transition-[color,background-color,border-color]`.
+- **`:focus-visible`, not `:focus`**, exactly as the skill asks — and verified in a real browser to
+  still match under mouse click, so no mouse user loses the indicator.
+
+### `outline` rather than `ring`, also deliberate
+
+Tailwind's `ring-*` is a `box-shadow`, and **box-shadow is clipped by `overflow-hidden` ancestors**.
+Both inline rename inputs (`chat-shell.tsx`, `recent-chats-card.tsx`) sit inside one. `outline` is
+never clipped. This happens to agree with Hallmark, which also prescribes `outline`; the rest of the
+codebase's ~20 `ring-*` focus sites do not, which is the known two-idiom gap recorded on #211.
+
+### The trap that makes this non-obvious
+
+`outline-none` sets `--tw-outline-style: none`. Adding only `focus-visible:outline-2` therefore sets
+a **width on an outline whose style is still `none`** — computed `outlineStyle` stays `"none"` and
+**nothing paints at all**. `focus-visible:outline-solid` is required alongside the width. This was
+caught only by reading computed style in a real engine; a DOM-shim unit test sees the class, finds it
+present, and passes. Anyone editing this triad should re-run
+`apps/web/tests/layout/focus-indicator.spec.ts` rather than trusting the class list.

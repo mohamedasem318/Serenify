@@ -149,7 +149,7 @@ export function RecentChatsCard() {
                       if (e.key === "Escape") setRenamingId(null);
                     }}
                     onBlur={() => void submitRename(c.id)}
-                    className="w-full rounded-md border border-border bg-surface px-1.5 py-0.5 text-[15px] text-ink outline-none"
+                    className="w-full rounded-md border border-border bg-surface px-1.5 py-0.5 text-[15px] text-ink outline-none focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
                     aria-label="Rename conversation"
                   />
                 ) : (
