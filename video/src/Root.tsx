@@ -44,13 +44,13 @@ export function RemotionRoot() {
       />
 
       <Folder name="Greybox-Beats">
-        <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={150} fps={30} width={1920} height={1080} />
-        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={390} fps={30} width={1920} height={1080} />
-        <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={120} fps={30} width={1920} height={1080} />
-        <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={120} fps={30} width={1920} height={1080} />
-        <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={300} fps={30} width={1920} height={1080} />
-        {/* The text/no-text variants are gone: the time-jump line stays, and is
-            now set loud enough to register. */}
+        <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={180} fps={30} width={1920} height={1080} />
+        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={480} fps={30} width={1920} height={1080} />
+        <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={150} fps={30} width={1920} height={1080} />
+        <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={150} fps={30} width={1920} height={1080} />
+        <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={360} fps={30} width={1920} height={1080} />
+        {/* The time-jump line is gone entirely — only beat 7's session timer marks
+            the jump now. See the flag in Beat06Later.tsx. */}
         <Composition id="Beat06-Later" component={Beat06Later} durationInFrames={60} fps={30} width={1920} height={1080} />
         <Composition id="Beat07-AtEase" component={Beat07AtEase} durationInFrames={120} fps={30} width={1920} height={1080} />
         <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={180} fps={30} width={1920} height={1080} />

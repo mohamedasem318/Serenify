@@ -21,9 +21,7 @@ import { Box, Text } from "./ui";
  * §Continuity) — so this wraps every beat and its state carries the continuity.
  */
 
-export type TabId = "serenify" | "mail";
-
-/** The omnibox pill, as a rect, so beat 1 can frame it. */
+/** The omnibox pill, as a rect, so beat 1 can lift it. */
 export const OMNIBOX = { x: 60, y: CHROME_Y + 34, w: W - 120, h: 28 } as const;
 
 /**
@@ -67,72 +65,97 @@ export const MenuBar: React.FC<{ clock: string }> = ({ clock }) => (
   </>
 );
 
+/** One tab in the strip. `mail` draws the established <MailMark>. */
+export interface TabSpec {
+  label: string;
+  mail?: boolean;
+}
+
+const TAB_W = 190;
+const TAB_GAP = 4;
+export const tabRect = (i: number) => ({ x: 60 + i * (TAB_W + TAB_GAP), y: CHROME_Y + 4, w: TAB_W, h: 26 });
+/** The new-tab button, so beat 2 can put a cursor on it and click it. */
+export const newTabRect = (tabCount: number) => ({
+  x: 60 + tabCount * (TAB_W + TAB_GAP) + 4,
+  y: CHROME_Y + 6,
+  w: 22,
+  h: 22,
+});
+
 export const BrowserChrome: React.FC<{
-  tab: TabId;
+  tabs: TabSpec[];
+  active: number;
   url: string;
-  /** Beat 1 opens on a blank new tab; the second tab does not exist yet. */
-  newTab?: boolean;
-  /** Beat 1's caret, while the URL is being typed. */
+  /** While the URL is being typed. */
   caret?: boolean;
-}> = ({ tab, url, newTab = false, caret = false }) => {
-  const serenifyActive = tab === "serenify";
+}> = ({ tabs, active, url, caret = false }) => (
+  <>
+    <Box x={0} y={CHROME_Y} w={W} h={CHROME_H} fill={GREY.panel} border={GREY.panel} radius={0} />
 
-  return (
-    <>
-      <Box x={0} y={CHROME_Y} w={W} h={CHROME_H} fill={GREY.panel} border={GREY.panel} radius={0} />
-
-      {/* Tab strip. Two tabs for the whole video: the app, and his mail. */}
-      <Box
-        x={60}
-        y={CHROME_Y + 4}
-        w={190}
-        h={26}
-        fill={serenifyActive ? GREY.surface : GREY.panelAlt}
-        border={GREY.border}
-        radius={6}
-      />
-      <Text x={72} y={CHROME_Y + 11} size={11} weight={serenifyActive ? 700 : 400} color={GREY.body}>
-        {newTab ? "New tab" : "Serenify"}
-      </Text>
-      {newTab ? null : (
-        <>
+    {/* Tab strip. Tabs are OPENED on camera in beat 2, not cut to, so the strip
+        is driven by a list rather than by a two-state flag. */}
+    {tabs.map((tab, i) => {
+      const r = tabRect(i);
+      const isActive = i === active;
+      return (
+        <React.Fragment key={i}>
           <Box
-            x={254}
-            y={CHROME_Y + 4}
-            w={190}
-            h={26}
-            fill={serenifyActive ? GREY.panelAlt : GREY.surface}
+            x={r.x}
+            y={r.y}
+            w={r.w}
+            h={r.h}
+            fill={isActive ? GREY.surface : GREY.panelAlt}
             border={GREY.border}
             radius={6}
           />
-          <div style={{ position: "absolute", left: 264, top: CHROME_Y + 11 }}>
-            <MailMark size={13} />
-          </div>
-          <Text x={283} y={CHROME_Y + 11} size={11} weight={serenifyActive ? 400 : 700} color={GREY.body}>
-            Mail
+          {tab.mail ? (
+            <div style={{ position: "absolute", left: r.x + 10, top: r.y + 7 }}>
+              <MailMark size={13} />
+            </div>
+          ) : null}
+          <Text
+            x={r.x + (tab.mail ? 29 : 12)}
+            y={r.y + 7}
+            size={11}
+            weight={isActive ? 700 : 400}
+            color={GREY.body}
+          >
+            {tab.label}
+          </Text>
+        </React.Fragment>
+      );
+    })}
+
+    {/* The new-tab button. Beat 2e clicks this. */}
+    {(() => {
+      const r = newTabRect(tabs.length);
+      return (
+        <>
+          <Box x={r.x} y={r.y} w={r.w} h={r.h} fill={GREY.panel} border={GREY.panel} radius={11} />
+          <Text x={r.x} y={r.y + 3} w={r.w} size={15} weight={700} align="center" color={GREY.body}>
+            +
           </Text>
         </>
-      )}
+      );
+    })()}
 
-      {/* Omnibox. Beat 1's only job is *this is deployed*, so this is where that
-          beat opens — the URL is typed here rather than already being there. */}
-      <Box
-        x={OMNIBOX.x}
-        y={OMNIBOX.y}
-        w={OMNIBOX.w}
-        h={OMNIBOX.h}
-        fill={GREY.surface}
-        border={caret ? GREY.graphite : GREY.border}
-        borderWidth={caret ? 2 : 1}
-        radius={14}
-      />
-      <Text x={OMNIBOX.x + 16} y={OMNIBOX.y + 7} size={14} color={GREY.body} mono>
-        {url}
-        {caret ? <span style={{ color: GREY.ink }}>|</span> : null}
-      </Text>
-    </>
-  );
-};
+    {/* Omnibox. Beat 1 opens on a lifted copy of this, which settles into it. */}
+    <Box
+      x={OMNIBOX.x}
+      y={OMNIBOX.y}
+      w={OMNIBOX.w}
+      h={OMNIBOX.h}
+      fill={GREY.surface}
+      border={caret ? GREY.graphite : GREY.border}
+      borderWidth={caret ? 2 : 1}
+      radius={14}
+    />
+    <Text x={OMNIBOX.x + 16} y={OMNIBOX.y + 7} size={14} color={GREY.body} mono>
+      {url}
+      {caret ? <span style={{ color: GREY.ink }}>|</span> : null}
+    </Text>
+  </>
+);
 
 /** Everything below the chrome. Beats draw into this. */
 export const Viewport: React.FC<{ children?: React.ReactNode; fill?: string }> = ({
@@ -151,16 +174,25 @@ export const Viewport: React.FC<{ children?: React.ReactNode; fill?: string }> =
  */
 export const Desktop: React.FC<{
   clock: string;
-  tab?: TabId;
+  /** Defaults to the single Serenify tab. Beat 2 drives this explicitly. */
+  tabs?: TabSpec[];
+  active?: number;
   url?: string;
   fill?: string;
-  newTab?: boolean;
   caret?: boolean;
   children?: React.ReactNode;
-}> = ({ clock, tab = "serenify", url = "serenify.tech", fill, newTab, caret, children }) => (
+}> = ({
+  clock,
+  tabs = [{ label: "Serenify" }],
+  active = 0,
+  url = "serenify.tech",
+  fill,
+  caret,
+  children,
+}) => (
   <>
     <MenuBar clock={clock} />
-    <BrowserChrome tab={tab} url={url} newTab={newTab} caret={caret} />
+    <BrowserChrome tabs={tabs} active={active} url={url} caret={caret} />
     <Viewport fill={fill}>{children}</Viewport>
   </>
 );

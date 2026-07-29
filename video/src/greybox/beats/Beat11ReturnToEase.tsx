@@ -93,8 +93,11 @@ export const Beat11ReturnToEase: React.FC = () => {
           { frame: 0, shot: { cx: W / 2, cy: H / 2, w: W } },
           { frame: 22, shot: frameRect(WIN, 24) },
           { frame: 64, shot: frameRect(WIN, 24) },
-          { frame: 96, shot: frameRect(VIEWFINDER, 24) },
-          { frame: 128, shot: frameRect(VIEWFINDER, 24) },
+          // Wide on the viewfinder, not tight on it: the headphones, the drifting
+          // notes and his head nod all need room, and cropping to the face loses
+          // the thing that makes the beat work. Margin 100, not 24.
+          { frame: 96, shot: frameRect(VIEWFINDER, 100) },
+          { frame: 128, shot: frameRect(VIEWFINDER, 100) },
           { frame: 180, shot: frameRect(union(CARD, VIEWFINDER), 20) },
         ]}
       >

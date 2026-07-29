@@ -93,7 +93,17 @@ export const CALIBRATION = {
   ready: "You’re all set — start when you’re ready.",
   breatheIn: "Breathe in",
   breatheOut: "Breathe out",
+  /**
+   * VERBATIM — `components/anchor/anchor-recorder.tsx` `COPY.uploading`. The
+   * capture stage is replaced by this line before the success state; revision 2
+   * skipped it and cut straight from the recording to the result.
+   */
+  uploading: "Setting your baseline — one calm moment…",
+  /** VERBATIM — `components/anchor/success-state.tsx`, `mode: "first-time"`. */
   done: "Your baseline is set",
+  doneBody:
+    "We’ve learned what calm looks like for you. You can update it anytime from your account.",
+  doneCta: "Back to home",
 } as const;
 
 // ── Beat 6 · the time jump (SHEET) ──────────────────────────────────────────
