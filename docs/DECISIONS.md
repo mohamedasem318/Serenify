@@ -6723,3 +6723,65 @@ control outside Ren's chat surface and its launcher was recoloured.
 Amendment 18 (the bullet it replaces); `docs/CHANGELOG.md` 2026-07-30; `docs/DECISIONS.md`
 2026-07-29 (Amendment 18); `apps/web/components/chat/chat-shell.tsx`;
 `apps/web/components/chat-pill.tsx`.
+
+---
+
+## 2026-07-29 — Launch video: Remotion, at `video/`, outside the npm workspaces
+
+**Status**: Accepted.
+
+**Decision**: The ~60s LinkedIn launch video is built with Remotion (React → MP4).
+The project lives at `video/` in the repo root, **outside** the root
+`workspaces: ["apps/*", "packages/*"]` globs, with its own `package-lock.json`
+and its own `node_modules`. No CI change accompanies it. The beat sheet — the
+source of truth for the video — is `docs/video/serenify-launch-video-beat-sheet.md`.
+
+**Rationale for Remotion**: the video's product screens are the *real*
+`apps/web` components, animated, rather than hand-redrawn mockups. That is the
+entire reason to accept a React video toolchain over an editor. A screen that
+drifts from the app is a screen that has to be re-drawn every time the app
+changes; a screen that imports the component cannot drift.
+
+**Rationale for the location**: putting it under `apps/` or `packages/` would
+fold ~270 Remotion packages into the root lockfile, so every `npm ci` — including
+CI's, before it lints `apps/web` — would install a video toolchain to run unit
+tests, and `node_modules` would re-hoist for everyone working on `apps/web` or
+`apps/api`. Outside the globs, the root lockfile is byte-unchanged and the cost
+is one extra `npm install` for whoever actually works on the video.
+
+**Why no CI change was needed**: all three jobs in `.github/workflows/ci.yml` are
+already scoped — `speckit-skills guard` reads `.claude/` and `.gitignore`, `web`
+runs everything through `-w apps/web`, `python` runs inside `apps/api` and
+`packages/ml-video`. None globs the repo root. Root `tsconfig.json` includes only
+`scripts/**/*.ts`; root `vitest.config.mts` only `scripts/__tests__/**`. The
+directory is invisible to every existing task, which was verified by running
+them rather than assumed.
+
+**The load-bearing check, and it passed**: a real `apps/web` component
+(`components/brand/wordmark.tsx`) renders inside a Remotion composition with its
+real Tailwind v4 `@theme` tokens — `#EAEBEC` background, `text-ink` on `seren`,
+`text-meadow-text` on `ify`, `lowercase` enforced, Outfit typeface. If this had
+failed the tool choice would have been void, so it was verified on a rendered
+frame and not on a clean exit code. `<Wordmark />` was chosen as the probe
+because it fails visibly rather than subtly.
+
+**Three pieces make that work** (`video/remotion.config.ts`,
+`video/src/tailwind.css`): the app's own `@` → `apps/web` alias, which webpack
+otherwise knows nothing about; `react`/`react-dom` pinned to `video/`'s copies,
+because a file under `apps/web` would otherwise resolve React by walking up to
+the root hoisted copy and put two instances in one bundle; and Tailwind through
+`@remotion/tailwind-v4` with a CSS entry that imports `apps/web/app/globals.css`
+verbatim. No palette is re-declared for the video — the tokens are the shipped
+app's, so the video follows the app rather than drifting from it.
+
+**Known limits, recorded now so they are not rediscovered**: components importing
+`server-only` or reading Supabase / `next/headers` at module scope will not
+bundle; `next/font` does not exist under Remotion, so font tokens need
+`@remotion/google-fonts` (see `video/src/WebComponentProbe.tsx`); `next/image`
+and `next/link` will need shimming when a component reaches for them.
+
+**Licensing**: Remotion's free tier covers this use — individuals and non-profit;
+no company exists here. Decided by Mohamed, 2026-07-29.
+
+**Cross-references**: `video/README.md`;
+`docs/video/serenify-launch-video-beat-sheet.md`; `.github/workflows/ci.yml`.

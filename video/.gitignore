@@ -1,0 +1,5 @@
+# Rendered output — regenerable, and MP4s do not belong in git history.
+out/
+
+# Remotion's bundler scratch space.
+.remotion/
