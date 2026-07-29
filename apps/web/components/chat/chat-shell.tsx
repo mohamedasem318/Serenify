@@ -66,7 +66,11 @@ function MessageBubble({ message }: { message: ChatMessage }) {
       className={cn(
         "max-w-[74%] rounded-2xl px-3.5 py-2.5 text-[15px] leading-relaxed",
         isUser
-          ? "self-end rounded-br-sm bg-meadow text-on-accent dark:text-bg"
+          // Foggy, like every other accent element on this surface — constitution
+          // Amendment 19 makes the chat surface's accent treatment a consistency
+          // requirement rather than a per-control choice. The foreground pair is
+          // unchanged and still clears AA (5.33:1 light, 8.34:1 dark).
+          ? "self-end rounded-br-sm bg-foggy text-on-accent dark:text-bg"
           : "self-start rounded-bl-sm border border-border bg-surface text-ink",
       )}
     >
@@ -329,7 +333,8 @@ export function ChatShell({
         A calm place to think out loud whenever work feels like a lot. No pressure —
         start whenever you like.
       </p>
-      <Button variant="meadow" className="mt-2" onClick={() => composerRef.current?.focus()}>
+      {/* The `foggy` variant already existed in button.tsx — no new variant is added. */}
+      <Button variant="foggy" className="mt-2" onClick={() => composerRef.current?.focus()}>
         Say hello
       </Button>
     </div>
@@ -359,19 +364,25 @@ export function ChatShell({
           aria-label={`Message ${BOT_NAME}`}
           placeholder={`Tell ${BOT_NAME} what's on your mind…`}
           data-testid="chat-composer-input"
-          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-border bg-bg px-3.5 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-meadow disabled:opacity-60"
+          // Focus ring foggy per Amendment 19. It reads BETTER than the meadow it
+          // replaces against the composer's `bg` backdrop — 4.71:1 light and 8.34:1
+          // dark, against meadow's 4.22:1 and 7.43:1 — and both clear the 3:1 a focus
+          // indicator needs.
+          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-border bg-bg px-3.5 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-foggy disabled:opacity-60"
         />
         <button
           type="submit"
           disabled={isSending || !input.trim()}
           aria-label="Send message"
           data-testid="chat-send"
-          // FOGGY, NOT MEADOW, AND ONLY HERE. Ren's mark is foggy (constitution
-          // Amendment 18), and a lone meadow control on a screen whose identity mark is
-          // foggy reads as a mistake rather than as emphasis — the same problem that drove
-          // the calibration flow rework. Amendment 18 names this ONE surface as an
-          // exception; meadow remains the required fill for primary actions everywhere
-          // else in the product. Do not take this as licence to recolour another control.
+          // FOGGY, NOT MEADOW. Ren's mark is foggy (Amendment 18), and a lone meadow
+          // control on a screen whose identity mark is foggy reads as a mistake rather
+          // than as emphasis — the same problem that drove the calibration flow rework.
+          // Amendment 19 widened that from this one control to the whole surface, and
+          // made it a CONSISTENCY REQUIREMENT: every accent element here is foggy, so
+          // reverting any single one of them re-creates the defect. Still ONE named
+          // surface — meadow remains required for primary actions everywhere else in the
+          // product, and this is not licence to recolour a control on another screen.
           // The foreground pair is unchanged and still clears AA on foggy (5.33:1 light,
           // 8.34:1 dark — better than the meadow it replaces at 4.78:1).
           className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-foggy text-on-accent transition-opacity disabled:opacity-50 dark:text-bg"
@@ -388,7 +399,7 @@ export function ChatShell({
       {error === "trouble" && (
         <p role="status" className="mt-2 flex items-center justify-center gap-2 text-[12.5px] text-muted">
           {BOT_NAME} had trouble replying.
-          <button onClick={() => void handleRetry()} className="font-semibold text-meadow-text underline">
+          <button onClick={() => void handleRetry()} className="font-semibold text-foggy underline">
             Try again
           </button>
         </p>
@@ -396,7 +407,7 @@ export function ChatShell({
       {error === "end_retry" && (
         <p role="status" className="mt-2 flex items-center justify-center gap-2 text-[12.5px] text-muted">
           Couldn&apos;t wrap up just now.
-          <button onClick={() => void handleEnd()} className="font-semibold text-meadow-text underline">
+          <button onClick={() => void handleEnd()} className="font-semibold text-foggy underline">
             Try again
           </button>
         </p>
@@ -471,7 +482,7 @@ export function ChatShell({
           >
             <Plus aria-hidden className="h-4 w-4" /> New chat
           </button>
-          <Link href="/app/chat" className="text-[12.5px] font-semibold text-meadow-text">
+          <Link href="/app/chat" className="text-[12.5px] font-semibold text-foggy">
             Open full history →
           </Link>
         </div>
@@ -513,7 +524,7 @@ export function ChatShell({
                       if (e.key === "Escape") setRenamingId(null);
                     }}
                     onBlur={() => void submitRename(c.id)}
-                    className="w-full rounded-md border border-border bg-surface px-1.5 py-0.5 text-sm text-ink outline-none focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
+                    className="w-full rounded-md border border-border bg-surface px-1.5 py-0.5 text-sm text-ink outline-none focus-visible:border-foggy focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-foggy"
                     aria-label="Rename conversation"
                   />
                 ) : (

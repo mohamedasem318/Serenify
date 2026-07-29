@@ -153,7 +153,7 @@ export function ChatPill() {
               aria-label="Minimize"
               data-testid="pill-minimize"
               onClick={handleMinimize}
-              className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+              className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foggy"
             >
               <ChevronDown aria-hidden className="h-[18px] w-[18px]" />
             </button>
@@ -162,7 +162,7 @@ export function ChatPill() {
               aria-label="End chat"
               data-testid="pill-end"
               onClick={handleEndRequest}
-              className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow"
+              className="grid h-11 w-11 place-items-center rounded-md text-muted hover:bg-bg hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foggy"
             >
               <X aria-hidden className="h-[18px] w-[18px]" />
             </button>
@@ -208,13 +208,21 @@ export function ChatPill() {
       aria-label={`Talk to ${BOT_NAME}`}
       data-testid="chat-pill"
       onClick={() => void handleOpen()}
-      // Mode-inverted so the pill stays legible on both surfaces:
-      //  • LIGHT — filled meadow with near-white text (text-on-accent = 4.7:1 AA; plain
-      //    text-bg fell to 4.2:1 on the darker light-mode meadow and failed AA).
-      //  • DARK — an OUTLINED chip, not a fill: surface background + meadow border + meadow
-      //    icon/text (6.8:1 AA). A meadow fill in dark washes the near-white text out
-      //    (~1.9:1); the outline reads clearly and tappably against the near-black page.
-      className="fixed bottom-4 right-4 z-40 inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-full bg-meadow px-5 font-display text-sm font-semibold text-on-accent shadow-soft transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow focus-visible:ring-offset-2 cursor-pointer dark:border dark:border-meadow dark:bg-surface dark:text-meadow"
+      // FOGGY AS REN'S ENTRY POINT (constitution Amendment 19). This control exists only
+      // to open Ren, and after Amendment 18 a meadow pill opened a foggy panel — the same
+      // incoherence the chat-surface exception exists to prevent, one level out. The
+      // permission reaches THIS CONTROL, not the page it floats over: a dashboard hosting
+      // this pill keeps meadow for its own actions.
+      //
+      // The mode-inversion below is UNCHANGED IN SHAPE — only the hue moved, and every
+      // ratio improved:
+      //  • LIGHT — filled foggy with near-white text (text-on-accent = 5.3:1, up from
+      //    meadow's 4.7:1).
+      //  • DARK — an OUTLINED chip, not a fill: surface background + foggy border + foggy
+      //    icon/text (7.7:1, up from meadow's 6.8:1). A FILL in dark washes the near-white
+      //    text out (~1.9:1 on meadow) regardless of hue; the outline reads clearly and
+      //    tappably against the near-black page, so the inversion stays.
+      className="fixed bottom-4 right-4 z-40 inline-flex h-12 min-w-12 items-center justify-center gap-2 rounded-full bg-foggy px-5 font-display text-sm font-semibold text-on-accent shadow-soft transition-colors hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foggy focus-visible:ring-offset-2 cursor-pointer dark:border dark:border-foggy dark:bg-surface dark:text-foggy"
     >
       <Sparkles aria-hidden className="h-5 w-5 shrink-0" />
       <span className="sr-only md:not-sr-only">Talk to {BOT_NAME}</span>
