@@ -41,7 +41,10 @@ Never remap a Graphite token name to a different source value inside `@theme inl
 - `get_my_anchor()` is the self-scoped `SECURITY DEFINER` function for scoping queries to the current user; use it for any per-user data access
 
 ### Inference server
-- Must launch **without `--reload`** — worker restarts drop the in-memory per-session smoothing buffer (`_SessionBuffers`); lost buffers silently corrupt readings
+- **Never bare `--reload`.** Any worker restart drops the in-memory per-session smoothing buffer (`_SessionBuffers`), and the smoothed band only latches after ~4 scored windows (~90 s), so the live monitor re-warms from scratch.
+- Normal dev: `--reload --reload-dir app` — scoping the watcher to source means cache writes, test-file saves and branch checkouts can't restart the worker.
+- Live-monitor test pass: no `--reload` at all is cleanest, `--reload --reload-dir app` is acceptable; either way don't edit `app/` source mid-session.
+- `apps/api/README.md` is authoritative here. Do not "correct" it to match a shorter rule.
 
 ### SVG rendering
 - Fixed-pixel SVG: 1 unit = 1px; `SVG width = nLanes × laneWidth` with a matching `viewBox`
@@ -63,8 +66,18 @@ the constitution (§Development Workflow, gate 7) permits it to push to feature 
 been opening PRs for a long time. Neither agent owns git exclusively; assume the other may have
 touched the branch.
 
-**Mohamed reviews and clicks squash-merge.** `main` is protected: PR required, linear history, so
-merge commits are rejected and per-file commits collapse under squash by design.
+`main` is protected: PR required, linear history, so merge commits are rejected and per-file commits
+collapse under squash by design.
+
+### The sequence
+
+1. Agent works on a branch, commits, pushes, opens the PR.
+2. **Mohamed squash-merges in the GitHub UI. No agent ever merges** — and never asks him to run git
+   commands, only to click.
+3. He tells the agent it is merged.
+4. Agent prunes the branch **locally and on the remote**, then confirms `main` is clean and current.
+
+While a PR is still open, fold small things that surface into it rather than opening a second one.
 
 Commit messages must be semantic and scoped — examples:
 ```
@@ -156,7 +169,7 @@ current SpecKit-managed plan context when running them.
 
 - Do **not** add service-role key usage under any circumstance
 - Do **not** remap Graphite design token names inside `@theme inline`
-- Do **not** run the inference server with `--reload`
+- Do **not** run the inference server under **bare** `--reload` (see Inference server above)
 - Do **not** stretch SVG viewBox — always use fixed-pixel 1:1 rendering
 
 ## Testing

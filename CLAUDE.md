@@ -76,6 +76,19 @@ Two regimes, selected by the prefix:
 The SpecKit validator only encodes the first half and only fires when a `/speckit.git.*` command
 runs. It is not a repo-wide rule and must not be "fixed" to cover the second half.
 
+### PR workflow
+
+`main` is protected: PR required, linear history, so merge commits are rejected and per-file commits
+collapse under squash by design.
+
+1. Agent works on a branch, commits, pushes, opens the PR.
+2. **Mohamed squash-merges in the GitHub UI. No agent ever merges** — and never asks him to run git
+   commands, only to click.
+3. He tells the agent it is merged.
+4. Agent prunes the branch **locally and on the remote**, then confirms `main` is clean and current.
+
+While a PR is still open, fold small things that surface into it rather than opening a second one.
+
 ## Instruction files: `CLAUDE.md` ↔ `AGENTS.md`
 
 This file (Claude Code) and `AGENTS.md` (Codex) both bind agents working in this repository. A change
