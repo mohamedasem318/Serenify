@@ -2,8 +2,9 @@
 
 React-as-video. The source of truth for what gets built is
 [`docs/video/serenify-launch-video-beat-sheet.md`](../docs/video/serenify-launch-video-beat-sheet.md).
-**Nothing from that beat sheet is built yet** — this directory is the pipeline
-only, plus the two checks that prove the pipeline is worth having.
+All twelve beats of that sheet exist here as a **greybox** — grey rectangles at
+real durations with real camera moves — plus the two checks that prove the
+pipeline is worth having. Nothing is built to final quality yet.
 
 ## Why it is here and not in `apps/`
 
@@ -53,20 +54,73 @@ Next dev server instead of its own.
 
 ```bash
 cd video
-npm run render:hello   # -> out/hello-world.mp4
-npm run render:probe   # -> out/web-component-probe.mp4
+npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 69.0s, ~15 MB)
+npm run render:hello    # -> out/hello-world.mp4
+npm run render:probe    # -> out/web-component-probe.mp4
 
 # or, generally:
 npx remotion render <CompositionId> out/<name>.mp4 --port 3411
 ```
 
-Both compositions are 1920x1080, h264, 30fps. `out/` is gitignored — renders are
+Every composition is 1920x1080, h264, 30fps. `out/` is gitignored — renders are
 regenerable and MP4s do not belong in git history.
 
 The first render downloads a Chrome Headless Shell (Remotion rasterises frames in
 a real browser); later renders reuse it.
 
-## The two compositions
+## The greybox — `src/greybox/`
+
+`Greybox` is the cut: all twelve beats at the durations the beat sheet gives
+them, 2070 frames = **69.0s** at 30fps.
+
+**The world is 1200×675, not 1920×1080.** The product renders at a 1200px-wide
+viewport and the whole desktop is scaled 1.6× to fill the output — a screen
+recording of a 1200×675 screen, blown up, not a 1920 screen with 384px of dead
+gutter each side. 1200 is the smallest viewport at which the app's `max-w-6xl`
+(1152px) column is at full designed width, and `apps/web` has no `xl:`/`2xl:`
+utilities at all, so nothing reflows between there and 1920. Details and the
+arithmetic are in `src/greybox/theme.ts`.
+
+It exists to answer **one** question — *does the pacing work* — because pacing is
+the failure mode that kills a video like this and it is invisible on paper. So
+it is deliberately ugly: grey rectangles stand in for every screen, panel and
+person. What it does have is **real durations and real camera moves**, plus real
+copy at real sizes, because those are the things being tested. Watch it at
+phone size; that is the whole point.
+
+Everything here gets thrown away. Do not refine it.
+
+| What is real | What is a rectangle |
+|---|---|
+| Beat durations, to the frame | Every screen, panel, card and window |
+| Every push-in, at its sheet framing | The character (a box with a `FACE: <state>` label) |
+| The 2f OTP choreography, at recon timings | The mail client, the music player, the toast |
+| The 1.3s eased band drift (the only colour) | The wordmark, all icons, all art |
+| App copy, verbatim, at app sizes | Typeface, palette, tokens, polish |
+
+Layout is authored at **real app pixel sizes** inside the world — a 448px signup
+column really is 448px wide, `text-sm` really is 14px, the stateline really is
+30px — and legibility comes from the camera pushing in, exactly as it will in the
+finished video. Sizing text up to be readable in a wide shot would test the wrong
+thing.
+
+Every beat is also registered on its own under the **`Greybox-Beats`** folder in
+Studio, so one beat can be scrubbed and re-timed without playing the minute in
+front of it. Double-clicking a sequence in `Greybox` jumps to it.
+
+`src/greybox/Camera.tsx` is the piece to read first. A `Shot` is three numbers —
+which rectangle of the world fills the frame — and every beat's camera plan is a
+short keyframe list of them. `frameRect(rect, margin)` in the same file is the
+**framing rule as arithmetic**: a push-in lands on a *whole* element with all four
+edges inside the frame and margin around it. Every landing goes through it rather
+than through hand arithmetic, which is how the first pass ended up with copy
+hanging off the frame edges. The one exception — full-bleed furniture may run off
+left and right — is documented there too.
+
+`PHONE_PX(size, framedWidth)` in `theme.ts` is the legibility check: ~10px is the
+floor at which a line is read rather than recognised on a phone.
+
+## The two pipeline checks
 
 Neither is a beat. They exist to keep the pipeline honest.
 

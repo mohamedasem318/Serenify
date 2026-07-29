@@ -6,6 +6,7 @@
   "scripts": {
     "studio": "remotion studio",
     "render": "remotion render",
+    "render:greybox": "remotion render Greybox out/greybox.mp4 --port 3411",
     "render:hello": "remotion render HelloWorld out/hello-world.mp4",
     "render:probe": "remotion render WebComponentProbe out/web-component-probe.mp4",
     "typecheck": "tsc --noEmit"
