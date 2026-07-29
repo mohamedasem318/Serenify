@@ -6785,3 +6785,68 @@ no company exists here. Decided by Mohamed, 2026-07-29.
 
 **Cross-references**: `video/README.md`;
 `docs/video/serenify-launch-video-beat-sheet.md`; `.github/workflows/ci.yml`.
+
+---
+
+## 2026-07-29 — Remotion agent skills installed at project scope, in both agent trees
+
+**Status**: Accepted. Extends the same-day Remotion entry above.
+
+**Decision**: Seven of Remotion's eleven upstream agent skills
+([remotion-dev/skills](https://github.com/remotion-dev/skills), `4.0.501` tree)
+are installed at **project scope** — committed to the repo — as byte-identical
+real directories under **both** `.claude/skills/` (Claude Code) and
+`.agents/skills/` (Codex, per `AGENTS.md` § Skills).
+
+Installed: `remotion-best-practices` (the router), `remotion-markup`,
+`remotion-create`, `remotion-render`, `remotion-docs`, `remotion-captions`,
+`remotion-multimedia`. Excluded: `remotion-maps`, `remotion-saas`,
+`remotion-upgrade`, `remotion-interactivity`.
+
+**Why project scope and not global**: a global install is invisible to the repo
+and to everyone else working in it, and would silently disappear on a fresh
+clone or a different machine. Committed skills travel with the branch.
+
+**Why real copies rather than symlinks**: upstream's own
+`scripts/sync-agent-skills.ts` symlinks `.agents/skills/<name>` into
+`packages/skills/skills/<name>` and then symlinks `.claude/skills` at
+`.agents/skills` wholesale. Neither survives a Windows checkout without
+`core.symlinks`, and this repo's existing speckit skills are already dual real
+copies in the two trees. Matching the existing pattern beats importing a
+layout built for Remotion's own monorepo. The cost is that the two trees must be
+edited together, which `video/README.md` and both instruction files say
+explicitly.
+
+**`remotion-markup` was initially excluded and that was reversed before merge**,
+recorded because the reasoning generalises: it was filtered out on its NAME,
+which reads as HTML/markup-language. Its actual description is "content,
+animation and effects best practices" and it ships `sequencing.md`, `timing.md`,
+`transitions.md`, `multi-scene-video.md`, `text-highlights.md`, `voiceover.md`
+and `google-fonts.md` — the beat sheet's material almost line for line. Two
+skills that WERE selected (`remotion-create` and the router) link into it, so
+excluding it would also have broken links from the chosen entry points. Upstream
+skill names are not reliable descriptions of contents; read the directory.
+
+**Two deliberate divergences from upstream, both reversible and both recorded**:
+upstream ships the router with a full nested copy of every other skill, linked as
+`<name>/REFERENCE.md`, which does not fit a flat `skills/` layout. So (1) the
+router's links were flattened to `../<name>/SKILL.md` and the four uninstalled
+skills' sections were deleted rather than left dangling — section bodies are
+otherwise upstream's, unedited; and (2) six links from installed files into
+uninstalled skills (four to `remotion-interactivity`, two to `remotion-maps`)
+were flattened to plain text marked `(skill not installed in this repo)`, and
+`remotion-markup`'s embedded 569 KB copy of `remotion-maps` was stripped.
+Verified after install: zero dangling internal links in either tree.
+
+**Scope discipline**: these skills carry Remotion's conventions and are scoped to
+`video/`. They say nothing about `apps/web` or `apps/api`, and in particular must
+not override the `hallmark` routing rule for UI work. Stated in both `CLAUDE.md`
+and `AGENTS.md`.
+
+**No CI or lockfile impact**: the skills are markdown only. Root
+`package-lock.json` and `video/package-lock.json` are both unmodified, and the
+`speckit-skills guard` job — which asserts the fifteen `speckit-*` skills exist
+and that `.gitignore` does not broadly ignore `.claude/` — still passes.
+
+**Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md` § Remotion
+skills; `AGENTS.md` § Skills; PR #223.

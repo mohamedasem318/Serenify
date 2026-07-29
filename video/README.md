@@ -83,6 +83,67 @@ colour in the wrong typeface — obvious in a frame grab.
 Verified 2026-07-29: it renders with `#EAEBEC` (`--color-bg`), the correct
 two-tone split, and Outfit.
 
+## Agent skills
+
+Remotion's own agent skills ([remotion-dev/skills](https://github.com/remotion-dev/skills),
+taken from the `4.0.501` tree) are installed at **project scope** — committed with
+the repo, not depending on anyone's global install — in **both** locations this
+repo already uses:
+
+- `.claude/skills/<name>/SKILL.md` — Claude Code, auto-discovered
+- `.agents/skills/<name>/SKILL.md` — Codex, per `AGENTS.md` § Skills
+
+The two trees are byte-identical real directories, not symlinks. Symlinks do not
+survive a Windows checkout without `core.symlinks`, and the repo's existing
+speckit skills are already dual real copies — this matches that pattern. **Edit
+both or neither.**
+
+Installed (7): `remotion-best-practices` (the router — **enter here**),
+`remotion-markup`, `remotion-create`, `remotion-render`, `remotion-docs`,
+`remotion-captions`, `remotion-multimedia`.
+
+`remotion-captions` and `remotion-multimedia` are on the list for a specific
+reason: the cut must read silent with on-screen text, and an Egyptian Arabic
+voice-over is laid over a locked cut later.
+
+`remotion-markup` is the one whose name undersells it — it is "content, animation
+and effects best practices", i.e. `sequencing.md`, `timing.md`, `transitions.md`,
+`multi-scene-video.md`, `text-highlights.md`, `voiceover.md`, `google-fonts.md`.
+That is the beat sheet's material almost line for line.
+
+### Not installed, and why
+
+`remotion-maps` (geographic animation), `remotion-saas` (`<Player>`, Lambda,
+render backends), `remotion-upgrade` (premature), `remotion-interactivity`
+(Studio drag-to-position editing, which is not how this video is authored).
+None applies to a hand-authored promotional MP4.
+
+### Two deliberate divergences from upstream — read before upgrading
+
+Upstream ships `remotion-best-practices` with a **full copy of every other skill
+nested inside its own directory**, linked as `<name>/REFERENCE.md`. That does not
+fit a flat `skills/` layout, so:
+
+1. **The router's links were flattened** to `../<name>/SKILL.md`, and the
+   sections for the four uninstalled skills were removed rather than left
+   pointing at nothing. Its section bodies are otherwise upstream's, unedited. A
+   comment at the top of that file says the same thing.
+2. **Links into uninstalled skills were flattened to plain text** marked
+   `(skill not installed in this repo)` — four references to
+   `remotion-interactivity` (in `remotion-create/SKILL.md`,
+   `remotion-markup/SKILL.md`, `cropping.md`, `text-highlights.md`) and two to
+   `remotion-maps` (in `remotion-markup/SKILL.md`). `remotion-markup`'s own
+   embedded 569 KB copy of `remotion-maps` was stripped.
+
+Verified after install: **zero dangling internal links in either tree.**
+
+To upgrade, re-clone upstream and redo both steps — or install the excluded
+skills and restore the links. Do not run upstream's `scripts/sync-agent-skills.ts`:
+it builds symlinks into a `packages/skills/skills` path that does not exist here.
+
+The skills are markdown only. They add nothing to any lockfile and are invisible
+to CI, for the same reasons this whole directory is.
+
 ## How `apps/web` components are made to work
 
 Three pieces, in `remotion.config.ts` and `src/tailwind.css`:

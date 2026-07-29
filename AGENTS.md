@@ -154,6 +154,30 @@ Skills are in `.agents/skills/<skill-name>/SKILL.md`. Invoke by name with `$skil
 - `$responsive-design` — use when a surface needs to work across viewports
 - `$supabase` — use for any Supabase / Postgres / RLS / auth work
 
+### Remotion skills — for the launch video in `video/` only
+
+Upstream skills from [remotion-dev/skills](https://github.com/remotion-dev/skills), installed at
+project scope so they are committed with the repo. Start at the router; it loads the rest.
+
+- `$remotion-best-practices` — **the router. Enter here** for any work in `video/`
+- `$remotion-markup` — content, animation and effects: sequencing, timing, transitions,
+  multi-scene structure, text highlights, voiceover, fonts
+- `$remotion-create` — scaffolding a composition
+- `$remotion-render` — exporting, beyond a plain `npx remotion render`
+- `$remotion-docs` — looking up current Remotion APIs
+- `$remotion-captions` — transcribing, displaying and animating captions
+- `$remotion-multimedia` — Mediabunny: audio/video duration, dimensions, trimming
+
+**Not installed, deliberately:** `remotion-maps`, `remotion-saas`, `remotion-upgrade`,
+`remotion-interactivity`. None applies to a hand-authored promotional MP4. Where an installed
+file linked to one of them, the link was flattened to plain text marked
+`(skill not installed in this repo)` rather than left dangling — do not "fix" those back into
+links without installing the target. Full rationale and the upgrade procedure:
+`video/README.md`.
+
+**These are scoped to `video/`.** They carry Remotion's conventions, not this repo's, and have
+nothing to say about `apps/web` or `apps/api`. Do not apply them outside the video project.
+
 **The design-skill split is deliberate, not drift.** Claude Code's user-level instructions route all
 UI work through `hallmark` and explicitly forbid stacking `frontend-design` or `responsive-design` on
 top of it. **Hallmark is not installed for Codex**, so Codex uses the three skills above instead. Do
