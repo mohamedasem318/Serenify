@@ -1,23 +1,37 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 
-import { Camera, shot } from "../Camera";
+import { Camera, frameRect, rect, shot, union } from "../Camera";
 import { AppHeader, Desktop } from "../chrome";
 import { DASHBOARD } from "../copy";
-import { COL_W, COL_X, GREY } from "../theme";
+import { COL_W, COL_X, GREY, H, W } from "../theme";
 import { Box, Button, Cursor, Text, TextBlock, useFade } from "../ui";
 
 /**
- * Beat 3 · Dashboard, first arrival · 0:16–0:20 · 120 frames
+ * Beat 3 · Dashboard, first arrival · 0:18–0:22 · 120 frames
  *
- * Brief wide to establish the shell — sticky header, wordmark, the 1152px
- * column floating in wide gutters — then push in on the two banners.
+ * Brief wide to establish the shell — sticky header, wordmark, the 1152px column
+ * now nearly filling the frame — then settle on the two banners.
+ *
+ * LEFT ALIGNMENT IS RESTORED. Revision 1 centred the banner copy because at a
+ * 1920 viewport nothing left-aligned in a 1152px banner survived a readable
+ * framing. At 1200 the copy sits where the app puts it.
+ *
+ * BUT: this beat no longer has a push-in, and cannot have one. Both banners are
+ * full-bleed — 1152 wide inside a 1200 viewport — so the tightest framing that
+ * holds either of them whole IS the full frame. There is nowhere to push to. The
+ * camera does what is left: a small vertical reposition to centre both banners.
+ * Their copy is `text-sm` (14px, the app's own size), which at a full-frame
+ * framing lands at about 5px on a phone.
  *
  * The calibration banner really does pop in post-hydration with no transition,
- * which the sheet flags as possibly reading like a glitch on video. It is faded
- * here over 6 frames: at 30fps an instant appearance genuinely does read as a
- * dropped frame rather than as an interface.
+ * which the sheet flags as possibly reading like a glitch. It is faded here over
+ * 6 frames: at 30fps an instant appearance genuinely reads as a dropped frame.
  */
+
+const WELCOME = rect(COL_X, 166, COL_W, 66);
+const CALIB = rect(COL_X, 248, COL_W, 80);
+
 export const Beat03Dashboard: React.FC = () => {
   const banner = useFade(14, 6);
 
@@ -25,56 +39,44 @@ export const Beat03Dashboard: React.FC = () => {
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: shot(960, 560, 1880) },
-          { frame: 26, shot: shot(960, 560, 1880) },
-          { frame: 96, shot: shot(960, 322, 800) },
+          { frame: 0, shot: shot(W / 2, H / 2, W) },
+          { frame: 26, shot: shot(W / 2, H / 2, W) },
+          { frame: 96, shot: frameRect(union(WELCOME, CALIB), 24) },
+          { frame: 120, shot: frameRect(union(WELCOME, CALIB), 24) },
         ]}
       >
         <Desktop clock="10:23 AM" url="serenify.tech/app">
           <AppHeader />
 
-          {/*
-           * Banner CONTENTS are centred, where the real banners are left-aligned
-           * against the 1152px column. A greybox change, made for a reason worth
-           * carrying into the real cut: at a framing tight enough to read a
-           * 20px line on a phone, the camera sees ~800px of world, and copy
-           * pinned to the left edge of a 1152px banner falls outside it. Either
-           * the copy moves inward or the beat is unreadable.
-           */}
-          <Box x={COL_X} y={200} w={COL_W} h={80} fill={GREY.surface} border={GREY.border} radius={12} />
-          <Text x={560} y={216} w={800} size={26} weight={700} align="center">
+          {/* Welcome banner — left-aligned, as the app has it. */}
+          <Box x={WELCOME.x} y={WELCOME.y} w={WELCOME.w} h={WELCOME.h} fill={GREY.surface} border={GREY.border} radius={10} />
+          <Text x={WELCOME.x + 24} y={WELCOME.y + 12} size={24} weight={700}>
             {DASHBOARD.welcomeTitle}
           </Text>
-          <Text x={560} y={252} w={800} size={17} align="center" color={GREY.body}>
+          <Text x={WELCOME.x + 24} y={WELCOME.y + 44} size={14} color={GREY.body}>
             {DASHBOARD.welcomeBody}
           </Text>
 
-          {/* Calibration banner — foggy-tinted in the app; a flatter grey here. */}
+          {/* Calibration banner — `p-5`, `text-sm`, `h-11` button. Foggy-tinted
+              in the app; a flatter grey here. */}
           <div style={{ opacity: banner }}>
-            <Box
-              x={COL_X}
-              y={296}
-              w={COL_W}
-              h={148}
-              fill={GREY.panelAlt}
-              border={GREY.graphite}
-              radius={12}
-            />
-            <Text x={610} y={316} w={700} size={20} align="center" color={GREY.ink} lineHeight={1.4}>
+            <Box x={CALIB.x} y={CALIB.y} w={CALIB.w} h={CALIB.h} fill={GREY.panelAlt} border={GREY.graphite} radius={10} />
+            <Text x={CALIB.x + 20} y={CALIB.y + 20} w={700} size={14} color={GREY.ink} lineHeight={1.6}>
               {DASHBOARD.calibrationBanner}
             </Text>
-            <Button x={860} y={382} w={200} h={44} size={16}>
+            <Button x={CALIB.x + CALIB.w - 182} y={CALIB.y + 18} w={162} h={44} size={14}>
               {DASHBOARD.setBaseline}
             </Button>
           </div>
 
-          {/* The rest of the dashboard exists and is never read. */}
-          <Box x={COL_X} y={476} w={560} h={280} label="today" fill={GREY.surface} />
-          <TextBlock x={COL_X + 28} y={534} w={430} lines={4} />
-          <Box x={COL_X + 592} y={476} w={560} h={280} label="trend" fill={GREY.surface} />
-          <TextBlock x={COL_X + 620} y={534} w={430} lines={4} />
+          {/* The rest of the dashboard exists and is never read. Two columns
+              above the `min-[880px]` breakpoint, which 1200 clears comfortably. */}
+          <Box x={COL_X} y={352} w={564} h={208} label="today" fill={GREY.surface} />
+          <TextBlock x={COL_X + 24} y={396} w={430} lines={4} />
+          <Box x={COL_X + 588} y={352} w={564} h={208} label="trend" fill={GREY.surface} />
+          <TextBlock x={COL_X + 612} y={396} w={430} lines={4} />
 
-          <Cursor x={1022} y={398} clickAt={106} opacity={banner} />
+          <Cursor x={CALIB.x + CALIB.w - 90} y={CALIB.y + 30} clickAt={106} opacity={banner} />
         </Desktop>
       </Camera>
     </AbsoluteFill>

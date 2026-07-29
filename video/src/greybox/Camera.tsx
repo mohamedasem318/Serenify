@@ -7,15 +7,15 @@ import { GREY, H, W } from "./theme";
  * The camera rig.
  *
  * The beat sheet's governing rule is that **every readable moment is a
- * push-in** — at 1920×1080 in a phone-sized feed a wide shot is illegible, so
- * the camera work is not decoration, it is the thing that makes the video
+ * push-in** — the camera work is not decoration, it is what makes the video
  * readable at all. That makes it the one part of a greybox that must NOT be
  * approximated: with the moves missing, the pass tests nothing.
  *
- * A `Shot` frames a rectangle of the 1920×1080 world: `cx`/`cy` is its centre,
- * `w` is how wide a slice of world fills the frame. `w: 1920` is the full
- * screen; `w: 560` is a 3.4× push-in. Height follows from 16:9, so a shot is
- * three numbers and the maths stays checkable by eye.
+ * A `Shot` frames a rectangle of the 1200×675 world: `cx`/`cy` is its centre,
+ * `w` is how wide a slice of world fills the frame. `w: 1200` is the whole
+ * screen (and already 1.6×, since the output is 1920 wide); `w: 500` is a 3.8×
+ * push-in. Height follows from 16:9, so a shot is three numbers and the maths
+ * stays checkable by eye.
  *
  * Keyframes rather than a from/to pair because beat 8 needs a single
  * *continuous* move — in on the toast and his face, then back out to catch the
@@ -28,6 +28,50 @@ export interface Shot {
 }
 
 export const shot = (cx: number, cy: number, w: number): Shot => ({ cx, cy, w });
+
+export interface Rect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+export const rect = (x: number, y: number, w: number, h: number): Rect => ({ x, y, w, h });
+
+/**
+ * **The framing rule, as arithmetic.**
+ *
+ * A push-in must land on a *whole* element — a card, a panel, a message — with
+ * all four of its edges inside the frame and margin around it. Landing
+ * mid-layout, so the shot holds its target plus fragments of the elements above
+ * and below, reads as a crop of something bigger rather than as a composed shot.
+ *
+ * `frameRect` returns the tightest shot that contains a rect with at least
+ * `margin` world-pixels of clearance on every side, widening past the rect's own
+ * width when the rect is tall enough that 16:9 demands it. Every landing in this
+ * pass goes through here rather than through hand arithmetic — hand arithmetic
+ * is exactly how revision 1 ended up with copy hanging off the frame edges.
+ *
+ * ONE DELIBERATE EXCEPTION, worth stating because it comes up constantly:
+ * **full-bleed furniture may run off the left and right edges.** The public nav,
+ * the app header, the omnibox, the calibration banner and the page background
+ * all span the viewport by design, and 16:9 cannot hold a 1152×86 banner whole
+ * and also magnify it — the geometry forbids it. Those read as background, not
+ * as cropped objects. What must never bleed is a *content* element: a card, a
+ * bubble, a prompt, a button, a field.
+ */
+export const frameRect = (r: Rect, margin = 24): Shot => ({
+  cx: r.x + r.w / 2,
+  cy: r.y + r.h / 2,
+  w: Math.max(r.w + margin * 2, ((r.h + margin * 2) * 16) / 9),
+});
+
+/** Union of two rects — the "frame both entirely" case. */
+export const union = (a: Rect, b: Rect): Rect => {
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  return { x, y, w: Math.max(a.x + a.w, b.x + b.w) - x, h: Math.max(a.y + a.h, b.y + b.h) - y };
+};
 
 export interface CameraKey {
   frame: number;
@@ -60,10 +104,15 @@ export const Camera: React.FC<{
   const cy = locked ? keys[0].shot.cy : interpolate(frame, at, keys.map((k) => k.shot.cy), opts);
   const w = locked ? keys[0].shot.w : interpolate(frame, at, keys.map((k) => k.shot.w), opts);
 
-  const zoom = W / w;
+  // The output is 1920 wide, so a full-world shot is already 1.6×.
+  const zoom = 1920 / w;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: GREY.black, overflow: "hidden" }}>
+    // The backdrop is the page grey, not black. Elements pinned to the right of
+    // the viewport — the toast, the viewfinder — cannot be framed tightly AND
+    // centred without the frame reaching past the world's edge, and a black
+    // sliver there would be far more visible than a few pixels of page colour.
+    <AbsoluteFill style={{ backgroundColor: GREY.page, overflow: "hidden" }}>
       <div
         style={{
           position: "absolute",
@@ -75,7 +124,7 @@ export const Camera: React.FC<{
           // With origin 0 0 the individual `translate`/`scale` properties compose
           // as translate ∘ scale, i.e. screen = translate + zoom · world. So
           // mapping world (cx, cy) to frame centre (960, 540) is this directly.
-          translate: `${W / 2 - zoom * cx}px ${H / 2 - zoom * cy}px`,
+          translate: `${960 - zoom * cx}px ${540 - zoom * cy}px`,
           scale: zoom,
         }}
       >

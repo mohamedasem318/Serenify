@@ -5,8 +5,8 @@ import { BAND, FONT, GREY, MONO } from "./theme";
 import { Box } from "./ui";
 
 /**
- * The three things in this video that are not rectangles standing still: his
- * face, the bloom, and the trend line.
+ * The four things in this video that are not rectangles standing still: his
+ * face, Ren's face, the bloom, and the trend line.
  */
 
 // ── The character ───────────────────────────────────────────────────────────
@@ -32,10 +32,10 @@ export const FaceBox: React.FC<{
   headphones?: boolean;
   /** Small idle sway, plus the head nod beat 11 asks for. */
   nod?: boolean;
-}> = ({ x, y, w, h, state, labelSize = 30, headphones = false, nod = false }) => {
+}> = ({ x, y, w, h, state, labelSize = 20, headphones = false, nod = false }) => {
   const frame = useCurrentFrame();
-  const sway = Math.sin(frame / 22) * 3;
-  const bob = nod ? Math.sin(frame / 5) * 7 : 0;
+  const sway = Math.sin(frame / 22) * 2;
+  const bob = nod ? Math.sin(frame / 5) * 4 : 0;
   const headW = w * 0.42;
   const headH = h * 0.42;
 
@@ -76,7 +76,7 @@ export const FaceBox: React.FC<{
             width: headW + w * 0.1,
             height: headH * 0.66,
             borderRadius: `${headW * 0.5}px ${headW * 0.5}px 0 0`,
-            border: `${Math.max(4, w * 0.028)}px solid ${GREY.graphite}`,
+            border: `${Math.max(3, w * 0.028)}px solid ${GREY.graphite}`,
             borderBottom: "none",
             boxSizing: "border-box",
             translate: `${sway}px ${bob}px`,
@@ -94,12 +94,65 @@ export const FaceBox: React.FC<{
           fontFamily: MONO,
           fontSize: labelSize,
           fontWeight: 700,
-          letterSpacing: 1,
+          letterSpacing: 0.5,
           color: GREY.ink,
           whiteSpace: "nowrap",
         }}
       >
         {`FACE: ${state}`}
+      </div>
+    </div>
+  );
+};
+
+// ── Ren ─────────────────────────────────────────────────────────────────────
+
+/**
+ * Ren's four avatar states, as labelled grey placeholders. The drawn face is
+ * PR #221's and comes later; what this pass tests is *when* each state is on
+ * screen and for how long.
+ *
+ * Drawn much larger than the app does — `RenAvatar` defaults to 34px and its
+ * call sites use 38 and 54 — under a declared liberty, for the same reason the
+ * viewfinder is enlarged: at true size it is a smudge on a phone, and beat 10
+ * is the only place in the video where Ren's face is on screen long enough to
+ * be read at all.
+ */
+export type RenState = "idle" | "attentive" | "thinking" | "warm";
+
+export const RenAvatar: React.FC<{ x: number; y: number; size: number; state: RenState }> = ({
+  x,
+  y,
+  size,
+  state,
+}) => {
+  const frame = useCurrentFrame();
+  // The states differ by eye shape in the real component; here they differ by a
+  // label, plus a breath so the avatar is not a dead sticker on screen.
+  const breath = 1 + Math.sin(frame / 30) * 0.012;
+
+  return (
+    <div style={{ position: "absolute", left: x, top: y, scale: breath, transformOrigin: "50% 50%" }}>
+      <Box x={0} y={0} w={size} h={size} radius={size / 2} fill={GREY.panel} border={GREY.graphite} borderWidth={2} />
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          width: size,
+          height: size,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: size * 0.04,
+          fontFamily: MONO,
+          fontWeight: 700,
+          color: GREY.label,
+        }}
+      >
+        <span style={{ fontSize: size * 0.16 }}>REN</span>
+        <span style={{ fontSize: size * 0.155, color: GREY.ink }}>{state}</span>
       </div>
     </div>
   );
@@ -136,7 +189,7 @@ export const MusicNotes: React.FC<{ x: number; y: number; w: number; h: number; 
               left: w * (0.14 + i * 0.18) + drift,
               top: rise,
               fontFamily: FONT,
-              fontSize: h * 0.11,
+              fontSize: h * 0.13,
               color: GREY.graphite,
               opacity: fade,
             }}
@@ -163,13 +216,13 @@ export const Viewfinder: React.FC<{
   nod?: boolean;
   notesFrom?: number;
   faceLabelSize?: number;
-}> = ({ x, y, w, h, state, headphones, nod, notesFrom, faceLabelSize = 26 }) => (
+}> = ({ x, y, w, h, state, headphones, nod, notesFrom, faceLabelSize = 20 }) => (
   <>
-    <Box x={x} y={y} w={w} h={h} fill={GREY.panelAlt} border={GREY.graphite} radius={10} label="viewfinder" labelSize={14} />
+    <Box x={x} y={y} w={w} h={h} fill={GREY.panelAlt} border={GREY.graphite} radius={8} label="viewfinder" labelSize={10} />
     <FaceBox
-      x={x + w * 0.28}
+      x={x + w * 0.26}
       y={y + h * 0.1}
-      w={w * 0.44}
+      w={w * 0.48}
       h={h * 0.85}
       state={state}
       labelSize={faceLabelSize}
@@ -200,7 +253,6 @@ export const Bloom: React.FC<{ cx: number; cy: number; size: number; tension: nu
   // Breathing. Faster and shallower as tension rises — free, and it reads.
   const period = interpolate(tension, [0, 1], [58, 34]);
   const pulse = Math.sin((frame / period) * Math.PI * 2);
-  const scale = 1 + pulse * 0.045;
 
   return (
     <div
@@ -213,7 +265,7 @@ export const Bloom: React.FC<{ cx: number; cy: number; size: number; tension: nu
         borderRadius: size / 2,
         backgroundColor: colour,
         opacity: 0.9,
-        scale,
+        scale: 1 + pulse * 0.045,
         boxShadow: `0 0 ${size * 0.34}px ${size * 0.1}px ${colour}55`,
       }}
     />
@@ -254,7 +306,7 @@ export const Trend: React.FC<{
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} style={{ position: "absolute", left: x, top: y }}>
-      <polyline points={pts.join(" ")} fill="none" stroke={colour} strokeWidth={5} strokeLinejoin="round" />
+      <polyline points={pts.join(" ")} fill="none" stroke={colour} strokeWidth={3} strokeLinejoin="round" />
     </svg>
   );
 };

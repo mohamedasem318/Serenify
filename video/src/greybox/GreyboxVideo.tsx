@@ -20,31 +20,35 @@ import { FONT, GREY } from "./theme";
  * `docs/video/serenify-launch-video-beat-sheet.md`, each at the duration the
  * sheet gives it.
  *
- * This pass answers one question: does the pacing work. It is deliberately
- * ugly — grey rectangles for every screen, panel and person — because the two
- * things being tested are the durations and the camera moves, and both of them
- * are real here. Everything else gets thrown away.
+ * This pass answers one question: does the pacing work. It is deliberately ugly
+ * — grey rectangles for every screen, panel and person — because the two things
+ * being tested are the durations and the camera moves, and both are real here.
+ * Everything else gets thrown away.
  *
  * Durations are inlined rather than derived from a table so they can be dragged
  * in Studio and read straight off the sheet.
  *
- *   1 cold open     120     7 at ease        120
- *   2 signup        360     8 the email      180
- *   3 dashboard     120     9 questionnaire  120
- *   4 camera gate   120    10 Ren            210
- *   5 calibration   300    11 return to ease 180
- *   6 later          60    12 end card       150
- *                                    total  2040 = 68.0s @ 30fps
+ *   1 cold open     150 (+30)    7 at ease        120
+ *   2 signup        390 (+30)    8 the email      180
+ *   3 dashboard     120          9 questionnaire   90 (−30)
+ *   4 camera gate   120         10 Ren            210
+ *   5 calibration   300         11 return to ease 180
+ *   6 later          60         12 end card       150
+ *                                       total   2070 = 69.0s @ 30fps
+ *
+ * Net +1s on revision 1's 68s. Beat 1 gained a second for arriving at the site
+ * and clicking through; 2e gained one for the email's three landings; beat 9 gave
+ * one back by not sitting on a finished read.
  */
-export const GREYBOX_DURATION = 2040;
+export const GREYBOX_DURATION = 2070;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
     <Series>
-      <Series.Sequence durationInFrames={120} name="1 · cold open">
+      <Series.Sequence durationInFrames={150} name="1 · cold open">
         <Beat01ColdOpen />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={360} name="2 · signup">
+      <Series.Sequence durationInFrames={390} name="2 · signup">
         <Beat02Signup />
       </Series.Sequence>
       <Series.Sequence durationInFrames={120} name="3 · dashboard">
@@ -65,7 +69,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={180} name="8 · the email">
         <Beat08Email />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={120} name="9 · questionnaire">
+      <Series.Sequence durationInFrames={90} name="9 · questionnaire">
         <Beat09Questionnaire />
       </Series.Sequence>
       <Series.Sequence durationInFrames={210} name="10 · Ren">

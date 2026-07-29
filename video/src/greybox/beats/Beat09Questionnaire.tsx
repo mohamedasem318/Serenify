@@ -1,41 +1,41 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
-import { Camera, shot } from "../Camera";
+import { Camera, frameRect, union } from "../Camera";
 import { QUESTIONNAIRE } from "../copy";
+import { CARD, MonitorSurface, PROMPT, SESSION_BASE, VIEWFINDER } from "../surfaces";
 import { GREY } from "../theme";
-import { MonitorSurface, RAIL_X, SESSION_BASE } from "../surfaces";
 import { Box, Cursor, Text, useFade } from "../ui";
 
 /**
- * Beat 9 · Confirmatory questionnaire · 0:46–0:50 · 120 frames
+ * Beat 9 · Confirmatory questionnaire · 0:48–0:51 · 90 frames
  *
  * He answers, and confirms the stress is real — the TRUE-POSITIVE branch. The
- * landing hero deliberately shows the false alarm; that inversion is
- * intentional and is not reconciled anywhere.
+ * landing hero deliberately shows the false alarm; that inversion is intentional
+ * and is not reconciled anywhere.
  *
- * The sheet says this copy was never recon'd and to greybox it with
- * placeholder. It turns out the surface already exists and is signed off, so
- * the strings here are verbatim from
- * `apps/web/components/questionnaire/confirmatory-prompt.tsx` — one fewer thing
- * to write before the real render.
+ * TIGHTENED: revision 1 held the prompt for 120 frames and did not click until
+ * f90, so the beat sat on a read the audience had finished two seconds earlier.
+ * The read is quick, so the click follows quickly — the prompt lands at f6, the
+ * click is at f40, and the beat is now 90 frames. −1s.
+ *
+ * The copy is verbatim from `components/questionnaire/confirmatory-prompt.tsx`.
+ * The sheet says this was never recon'd; the surface turned out to exist and be
+ * signed off.
  */
-
-const CARD = { x: RAIL_X, y: 556, w: 480, h: 400 } as const;
-
 export const Beat09Questionnaire: React.FC = () => {
   const frame = useCurrentFrame();
-  const appear = useFade(8, 10);
-  const answered = frame >= 92;
+  const appear = useFade(6, 8);
+  const answered = frame >= 44;
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
-          // Picks up beat 8's closing framing, then goes to the prompt.
-          { frame: 0, shot: shot(1030, 462, 1490) },
-          { frame: 38, shot: shot(1400, 756, 700) },
-          { frame: 120, shot: shot(1400, 756, 700) },
+          // Picks up beat 8's closing framing, then lands on the prompt whole.
+          { frame: 0, shot: frameRect(union(CARD, VIEWFINDER), 14) },
+          { frame: 30, shot: frameRect(PROMPT, 24) },
+          { frame: 90, shot: frameRect(PROMPT, 24) },
         ]}
       >
         <MonitorSurface
@@ -48,20 +48,20 @@ export const Beat09Questionnaire: React.FC = () => {
         >
           <div style={{ opacity: appear }}>
             <Box
-              x={CARD.x}
-              y={CARD.y}
-              w={CARD.w}
-              h={CARD.h}
+              x={PROMPT.x}
+              y={PROMPT.y}
+              w={PROMPT.w}
+              h={PROMPT.h}
               fill={GREY.surface}
               border={GREY.graphite}
               borderWidth={2}
-              radius={14}
+              radius={10}
             />
-            <Box x={CARD.x + 20} y={CARD.y + 22} w={22} h={22} radius={5} fill={GREY.panel} />
-            <Text x={CARD.x + 52} y={CARD.y + 20} size={23} weight={700}>
+            <Box x={PROMPT.x + 16} y={PROMPT.y + 16} w={18} h={18} radius={4} fill={GREY.panel} />
+            <Text x={PROMPT.x + 42} y={PROMPT.y + 15} size={16} weight={700}>
               {QUESTIONNAIRE.title}
             </Text>
-            <Text x={CARD.x + 20} y={CARD.y + 62} w={CARD.w - 40} size={20} color={GREY.body} lineHeight={1.5}>
+            <Text x={PROMPT.x + 16} y={PROMPT.y + 46} w={PROMPT.w - 32} size={14} color={GREY.body} lineHeight={1.5}>
               {QUESTIONNAIRE.body}
             </Text>
 
@@ -70,19 +70,19 @@ export const Beat09Questionnaire: React.FC = () => {
               return (
                 <React.Fragment key={option}>
                   <Box
-                    x={CARD.x + 20}
-                    y={CARD.y + 176 + i * 64}
-                    w={CARD.w - 40}
-                    h={52}
-                    radius={10}
+                    x={PROMPT.x + 16}
+                    y={PROMPT.y + 116 + i * 42}
+                    w={PROMPT.w - 32}
+                    h={34}
+                    radius={8}
                     fill={chosen ? GREY.graphite : GREY.page}
                     border={chosen ? GREY.graphite : GREY.border}
                   />
-                  <Box x={CARD.x + 36} y={CARD.y + 191 + i * 64} w={22} h={22} radius={5} fill={GREY.panel} />
+                  <Box x={PROMPT.x + 28} y={PROMPT.y + 124 + i * 42} w={16} h={16} radius={4} fill={GREY.panel} />
                   <Text
-                    x={CARD.x + 70}
-                    y={CARD.y + 190 + i * 64}
-                    size={19}
+                    x={PROMPT.x + 54}
+                    y={PROMPT.y + 124 + i * 42}
+                    size={13}
                     weight={chosen ? 700 : 400}
                     color={chosen ? GREY.white : GREY.ink}
                   >
@@ -92,7 +92,7 @@ export const Beat09Questionnaire: React.FC = () => {
               );
             })}
 
-            <Cursor x={CARD.x + 372} y={CARD.y + 198} clickAt={90} />
+            <Cursor x={PROMPT.x + 232} y={PROMPT.y + 126} clickAt={42} />
           </div>
         </MonitorSurface>
       </Camera>

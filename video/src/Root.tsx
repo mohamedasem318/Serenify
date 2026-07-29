@@ -44,29 +44,17 @@ export function RemotionRoot() {
       />
 
       <Folder name="Greybox-Beats">
-        <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={120} fps={30} width={1920} height={1080} />
-        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={360} fps={30} width={1920} height={1080} />
+        <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={150} fps={30} width={1920} height={1080} />
+        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={390} fps={30} width={1920} height={1080} />
         <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={120} fps={30} width={1920} height={1080} />
         <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={120} fps={30} width={1920} height={1080} />
         <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={300} fps={30} width={1920} height={1080} />
+        {/* The text/no-text variants are gone: the time-jump line stays, and is
+            now set loud enough to register. */}
         <Composition id="Beat06-Later" component={Beat06Later} durationInFrames={60} fps={30} width={1920} height={1080} />
-        {/*
-         * The sheet's own open question, made scrubbable rather than argued
-         * about: does "later that morning" earn its place, or does beat 7's
-         * 47:12 timer communicate the jump on its own? Same beat, text off.
-         */}
-        <Composition
-          id="Beat06-Later-NoText"
-          component={Beat06Later}
-          durationInFrames={60}
-          fps={30}
-          width={1920}
-          height={1080}
-          defaultProps={{ showLaterText: false }}
-        />
         <Composition id="Beat07-AtEase" component={Beat07AtEase} durationInFrames={120} fps={30} width={1920} height={1080} />
         <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={180} fps={30} width={1920} height={1080} />
-        <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={120} fps={30} width={1920} height={1080} />
+        <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={90} fps={30} width={1920} height={1080} />
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={210} fps={30} width={1920} height={1080} />
         <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={180} fps={30} width={1920} height={1080} />
         <Composition id="Beat12-EndCard" component={Beat12EndCard} durationInFrames={150} fps={30} width={1920} height={1080} />

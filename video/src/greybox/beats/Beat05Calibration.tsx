@@ -2,14 +2,14 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, Series, useCurrentFrame } from "remotion";
 
 import { FaceBox } from "../actors";
-import { Camera, shot } from "../Camera";
+import { Camera, frameRect, rect, union } from "../Camera";
 import { AppHeader, Desktop } from "../chrome";
 import { CALIBRATION } from "../copy";
 import { GREY, MONO } from "../theme";
 import { Box, Button, Cursor, Text, useFade } from "../ui";
 
 /**
- * Beat 5 · Calibration · 0:24–0:34 · 300 frames
+ * Beat 5 · Calibration · 0:26–0:36 · 300 frames
  *
  * Where the character first appears — here in the green room, not beat 7,
  * because that is where you genuinely first see yourself.
@@ -18,27 +18,21 @@ import { Box, Button, Cursor, Text, useFade } from "../ui";
  * · 5e success (60).
  */
 
-/**
- * The 3:4 portrait framing target.
- *
- * Sized 480×640 rather than 540×720 for a camera reason, not a design one: the
- * beat has to hold the whole preview AND the status line beneath it, and at
- * 720px tall that composite forces the camera out past the point where his face
- * and the status line stay readable on a phone. Same ratio, same framing target,
- * ~90px less vertical extent to cover.
- */
-const PREVIEW = { x: 720, y: 200, w: 480, h: 640 } as const;
-/** Head-and-shoulders, inside the framing target. */
-const FACE = { x: PREVIEW.x + 95, y: PREVIEW.y + 100, w: 290, h: 420 } as const;
-const STATUS_Y = 858;
+/** The 3:4 portrait framing target. */
+const PREVIEW = rect(480, 160, 240, 320);
+/** Head and shoulders, inside the framing target. */
+const FACE = rect(522, 224, 156, 216);
+const STATUS = rect(380, 498, 440, 24);
+/** Preview + status line, framed together — both complete, both readable. */
+const GREEN_ROOM = union(PREVIEW, STATUS);
 
 const Brackets: React.FC<{ cleared: number }> = ({ cleared }) => {
   // Graphite until the gate clears; the sheet has them turn meadow, kept grey
   // here because only band colour is built in this pass.
   const colour = cleared > 0.5 ? GREY.ink : GREY.graphite;
-  const len = 56;
-  const inset = 22;
-  const t = 5;
+  const len = 38;
+  const inset = 16;
+  const t = 4;
   const corners = [
     { x: PREVIEW.x + inset, y: PREVIEW.y + inset, sx: 1, sy: 1 },
     { x: PREVIEW.x + PREVIEW.w - inset, y: PREVIEW.y + inset, sx: -1, sy: 1 },
@@ -80,8 +74,8 @@ const Brackets: React.FC<{ cleared: number }> = ({ cleared }) => {
           top: PREVIEW.y,
           width: PREVIEW.w,
           height: PREVIEW.h,
-          borderRadius: 14,
-          boxShadow: `0 0 ${70 * cleared}px ${22 * cleared}px ${GREY.white}`,
+          borderRadius: 12,
+          boxShadow: `0 0 ${48 * cleared}px ${15 * cleared}px ${GREY.white}`,
           opacity: cleared,
         }}
       />
@@ -98,9 +92,9 @@ const Preview: React.FC<{ blur?: number; children?: React.ReactNode }> = ({ blur
       h={PREVIEW.h}
       fill={GREY.panelAlt}
       border={GREY.border}
-      radius={14}
+      radius={12}
       label="camera preview · 3:4"
-      labelSize={15}
+      labelSize={10}
     />
     <div style={{ filter: blur > 0 ? `blur(${blur}px)` : undefined }}>{children}</div>
   </>
@@ -108,44 +102,55 @@ const Preview: React.FC<{ blur?: number; children?: React.ReactNode }> = ({ blur
 
 // ── 5a · intro ──────────────────────────────────────────────────────────────
 
+const INTRO_CARD = rect(340, 160, 520, 380);
+const TURN_ON = rect(450, 440, 300, 44);
+
 const SubA: React.FC = () => (
   <Camera
     keys={[
-      { frame: 0, shot: shot(960, 540, 1420) },
-      { frame: 60, shot: shot(960, 706, 760) },
+      { frame: 0, shot: frameRect(INTRO_CARD, 24) },
+      { frame: 60, shot: frameRect(TURN_ON, 60) },
     ]}
   >
     <Desktop clock="10:25 AM" url="serenify.tech/app/calibrate">
       <AppHeader />
-      <Box x={560} y={200} w={800} h={700} fill={GREY.surface} border={GREY.border} radius={16} />
-      <Text x={600} y={244} w={720} size={30} weight={700} align="center">
+      <Box
+        x={INTRO_CARD.x}
+        y={INTRO_CARD.y}
+        w={INTRO_CARD.w}
+        h={INTRO_CARD.h}
+        fill={GREY.surface}
+        border={GREY.border}
+        radius={12}
+      />
+      <Text x={INTRO_CARD.x + 20} y={INTRO_CARD.y + 22} w={480} size={24} weight={700} align="center">
         {CALIBRATION.heading}
       </Text>
+      {/* Texture, not information — the camera pushes past these fast. */}
       {CALIBRATION.rows.map((row, i) => (
         <React.Fragment key={row}>
-          <Box x={640} y={336 + i * 76} w={44} h={44} radius={10} fill={GREY.panel} />
-          <Text x={704} y={348 + i * 76} size={19} color={GREY.body}>
+          <Box x={410} y={232 + i * 40} w={30} h={30} radius={8} fill={GREY.panel} />
+          <Text x={454} y={239 + i * 40} size={15} color={GREY.body}>
             {row}
           </Text>
         </React.Fragment>
       ))}
-      <Button x={810} y={682} w={300} h={50} size={18}>
+      <Button x={TURN_ON.x} y={TURN_ON.y} w={TURN_ON.w} h={TURN_ON.h} size={15}>
         {CALIBRATION.turnOnCamera}
       </Button>
-      <Cursor x={1058} y={702} clickAt={54} />
+      <Cursor x={660} y={454} clickAt={54} />
     </Desktop>
   </Camera>
 );
 
 // ── 5b · green room, first sight of him ─────────────────────────────────────
 /**
- * The audience's first look at the protagonist. Everything in beats 7–11
- * depends on them having learned this face while it was calm, so it gets a real
- * hold and the slowest push in the video.
+ * The audience's first look at the protagonist. Everything in beats 7–11 depends
+ * on them having learned this face while it was calm, so it gets a real hold and
+ * the slowest push in the video.
  */
 const SubB: React.FC = () => {
   const frame = useCurrentFrame();
-  // He settles into the framing target.
   const settle = interpolate(frame, [0, 34], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
@@ -160,8 +165,8 @@ const SubB: React.FC = () => {
   return (
     <Camera
       keys={[
-        { frame: 0, shot: shot(960, 545, 1420) },
-        { frame: 90, shot: shot(960, 545, 1300) },
+        { frame: 0, shot: frameRect(GREEN_ROOM, 40) },
+        { frame: 90, shot: frameRect(GREEN_ROOM, 20) },
       ]}
     >
       <Desktop clock="10:25 AM" url="serenify.tech/app/calibrate">
@@ -169,30 +174,22 @@ const SubB: React.FC = () => {
         <Preview>
           <div
             style={{
-              translate: `${(1 - settle) * 74}px ${(1 - settle) * 46}px`,
+              translate: `${(1 - settle) * 38}px ${(1 - settle) * 24}px`,
               scale: 0.86 + settle * 0.14,
               transformOrigin: "50% 50%",
             }}
           >
-            <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={34} />
+            <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={24} />
           </div>
         </Preview>
         <Brackets cleared={cleared} />
 
         {/* Small check, top-centre. */}
-        <Text
-          x={PREVIEW.x}
-          y={PREVIEW.y + 36}
-          w={PREVIEW.w}
-          size={38}
-          weight={700}
-          align="center"
-          opacity={check}
-        >
+        <Text x={PREVIEW.x} y={PREVIEW.y + 28} w={PREVIEW.w} size={26} weight={700} align="center" opacity={check}>
           ✓
         </Text>
 
-        <Text x={560} y={STATUS_Y} w={800} size={26} align="center" color={GREY.body} opacity={cleared}>
+        <Text x={STATUS.x} y={STATUS.y} w={STATUS.w} size={18} align="center" color={GREY.body} opacity={cleared}>
           {CALIBRATION.ready}
         </Text>
       </Desktop>
@@ -209,25 +206,25 @@ const SubC: React.FC = () => {
   const beat = frame % 10;
 
   return (
-    <Camera keys={[{ frame: 0, shot: shot(960, 545, 1300) }]}>
+    <Camera keys={[{ frame: 0, shot: frameRect(GREEN_ROOM, 20) }]}>
       <Desktop clock="10:26 AM" url="serenify.tech/app/calibrate">
         <AppHeader />
-        <Preview blur={8}>
-          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={34} />
+        <Preview blur={6}>
+          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={24} />
         </Preview>
         <div
           style={{
             position: "absolute",
             left: PREVIEW.x,
-            top: PREVIEW.y + 210,
+            top: PREVIEW.y + 108,
             width: PREVIEW.w,
             textAlign: "center",
             fontFamily: MONO,
-            fontSize: 170,
+            fontSize: 110,
             fontWeight: 700,
             color: GREY.white,
             opacity: interpolate(beat, [0, 2, 8, 10], [0, 1, 1, 0.2], { extrapolateRight: "clamp" }),
-            textShadow: "0 0 40px rgba(0,0,0,0.35)",
+            textShadow: "0 0 24px rgba(0,0,0,0.35)",
           }}
         >
           {n}
@@ -242,58 +239,45 @@ const SubC: React.FC = () => {
  * ~2s of a 60s process — the most aggressive compression in the video, and the
  * sheet is right that the orb's rhythm sells the idea instantly. The timer and
  * the 6px progress bar are ramped together so they stay consistent with each
- * other even though neither is running at wall-clock speed.
+ * other even though neither runs at wall-clock speed.
  */
 const SubD: React.FC = () => {
   const frame = useCurrentFrame();
   const progress = interpolate(frame, [0, 60], [0.08, 0.88], { extrapolateRight: "clamp" });
   const remaining = Math.round(60 * (1 - progress));
   const breathIn = Math.floor(frame / 20) % 2 === 0;
-  const orb = 210 * (1 + Math.sin((frame / 40) * Math.PI * 2) * 0.09);
+  const orb = 128 * (1 + Math.sin((frame / 40) * Math.PI * 2) * 0.09);
 
   return (
-    <Camera
-      keys={[
-        { frame: 0, shot: shot(960, 566, 1360) },
-        { frame: 60, shot: shot(960, 560, 1300) },
-      ]}
-    >
+    <Camera keys={[{ frame: 0, shot: frameRect(GREEN_ROOM, 20) }]}>
       <Desktop clock="10:26 AM" url="serenify.tech/app/calibrate">
         <AppHeader />
-        <Preview blur={6}>
-          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={34} />
+        <Preview blur={5}>
+          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={24} />
         </Preview>
 
         {/* The breathing orb. */}
         <div
           style={{
             position: "absolute",
-            left: 960 - orb / 2,
-            top: 450 - orb / 2,
+            left: 600 - orb / 2,
+            top: 276 - orb / 2,
             width: orb,
             height: orb,
             borderRadius: orb / 2,
             backgroundColor: GREY.white,
             opacity: 0.82,
-            boxShadow: `0 0 60px 16px ${GREY.white}`,
+            boxShadow: `0 0 40px 10px ${GREY.white}`,
           }}
         />
-        <Text x={690} y={606} w={540} size={30} weight={700} align="center" color={GREY.ink}>
+        <Text x={PREVIEW.x} y={370} w={PREVIEW.w} size={18} weight={700} align="center" color={GREY.ink}>
           {breathIn ? CALIBRATION.breatheIn : CALIBRATION.breatheOut}
         </Text>
 
         {/* 6px progress bar. */}
-        <Box x={PREVIEW.x} y={862} w={PREVIEW.w} h={6} radius={3} fill={GREY.ghost} border={GREY.ghost} />
-        <Box
-          x={PREVIEW.x}
-          y={862}
-          w={PREVIEW.w * progress}
-          h={6}
-          radius={3}
-          fill={GREY.ink}
-          border={GREY.ink}
-        />
-        <Text x={PREVIEW.x} y={884} w={PREVIEW.w} size={26} align="center" color={GREY.body} mono>
+        <Box x={PREVIEW.x} y={494} w={PREVIEW.w} h={6} radius={3} fill={GREY.ghost} border={GREY.ghost} />
+        <Box x={PREVIEW.x} y={494} w={PREVIEW.w * progress} h={6} radius={3} fill={GREY.ink} border={GREY.ink} />
+        <Text x={STATUS.x} y={STATUS.y + 12} w={STATUS.w} size={16} align="center" color={GREY.body} mono>
           {`0:${String(remaining).padStart(2, "0")}`}
         </Text>
       </Desktop>
@@ -311,25 +295,21 @@ const SubE: React.FC = () => {
       extrapolateRight: "clamp",
       easing: Easing.out(Easing.cubic),
     });
-    return { size: 120 + t * 520, opacity: (1 - t) * 0.5 };
+    return { size: 70 + t * 300, opacity: (1 - t) * 0.5 };
   };
   const draw = interpolate(frame, [10, 30], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
+  const done = useFade(24, 10);
 
   return (
-    <Camera
-      keys={[
-        { frame: 0, shot: shot(960, 540, 1260) },
-        { frame: 60, shot: shot(960, 548, 1160) },
-      ]}
-    >
+    <Camera keys={[{ frame: 0, shot: frameRect(GREEN_ROOM, 20) }]}>
       <Desktop clock="10:27 AM" url="serenify.tech/app/calibrate">
         <AppHeader />
         <Preview blur={4}>
-          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={34} />
+          <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={24} />
         </Preview>
 
         {[0, 9, 18].map((d) => {
@@ -339,14 +319,14 @@ const SubE: React.FC = () => {
               key={d}
               style={{
                 position: "absolute",
-                left: 960 - r.size / 2,
-                top: 440 - r.size / 2,
+                left: 600 - r.size / 2,
+                top: 272 - r.size / 2,
                 width: r.size,
                 height: r.size,
                 borderRadius: r.size / 2,
                 // Graphite, not white: white rings on a light-grey page were
                 // invisible in the render even though they were animating.
-                border: `5px solid ${GREY.graphite}`,
+                border: `3px solid ${GREY.graphite}`,
                 opacity: r.opacity,
               }}
             />
@@ -354,20 +334,20 @@ const SubE: React.FC = () => {
         })}
 
         {/* The check draws itself. */}
-        <svg width={160} height={160} style={{ position: "absolute", left: 880, top: 360 }}>
+        <svg width={100} height={100} style={{ position: "absolute", left: 550, top: 222 }}>
           <path
-            d="M32 84 L66 116 L128 44"
+            d="M20 52 L41 72 L80 27"
             fill="none"
             stroke={GREY.white}
-            strokeWidth={13}
+            strokeWidth={9}
             strokeLinecap="round"
             strokeLinejoin="round"
-            strokeDasharray={190}
-            strokeDashoffset={190 * (1 - draw)}
+            strokeDasharray={120}
+            strokeDashoffset={120 * (1 - draw)}
           />
         </svg>
 
-        <Text x={660} y={606} w={600} size={36} weight={700} align="center" opacity={useFade(24, 10)}>
+        <Text x={STATUS.x} y={STATUS.y - 4} w={STATUS.w} size={22} weight={700} align="center" opacity={done}>
           {CALIBRATION.done}
         </Text>
       </Desktop>

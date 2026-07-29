@@ -1,31 +1,35 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, Series, useCurrentFrame } from "remotion";
 
-import { Camera, shot } from "../Camera";
+import { Camera, frameRect, rect, shot } from "../Camera";
 import { Desktop, MailMark, PublicNav } from "../chrome";
 import { EMAIL, OTP, SIGNUP } from "../copy";
-import { FORM_W, FORM_X, GREY, MONO, VIEWPORT_Y } from "../theme";
+import { FORM_W, FORM_X, GREY, H, MONO, VIEWPORT_Y, W } from "../theme";
 import { Box, Button, Cursor, Text, TextBlock, useFade } from "../ui";
 
 /**
- * Beat 2 · Signup · 0:04–0:16 · 360 frames
+ * Beat 2 · Signup · 0:05–0:18 · 390 frames
  *
  * The credibility spend, chosen deliberately over a 4s montage. Six sub-beats,
- * each its own shot: 2a form (120), 2b consent (30), 2c submit (30), 2d check
- * your email (30), 2e his mail (60), 2f the OTP choreography (90).
+ * each landing on a complete element: 2a form (120), 2b consent (30), 2c submit
+ * (30), 2d check your email (30), 2e his mail (90), 2f the OTP choreography (90).
+ *
+ * COST: 2e went 60 → 90 frames (+1s). Under the framing rule the email needs
+ * three landings — the unread list row, the whole rendered email, then the code
+ * — and 2s could not hold them.
  */
 
 // ── Shared signup layout ────────────────────────────────────────────────────
-// Real sizes: a 448px form column, which is what makes the push-in ratio honest.
+// Real sizes: a 448px form column inside a 1200px viewport.
 
-const CARD_X = FORM_X - 32;
-const CARD_W = FORM_W + 64;
-const CARD_Y = 236;
+const CARD = rect(344, 166, 512, 470);
+/** Labels + the three fields + the live checklist, as one complete element. */
+const FIELD_GROUP = rect(376, 228, 448, 266);
+const CONSENT_ROW = rect(376, 510, 448, 44);
+const SUBMIT_ROW = rect(376, 570, 448, 42);
 
-const FIELD_Y = { name: 334, email: 412, password: 490 } as const;
-const CHECKLIST_Y = 548;
-const CONSENT_Y = 654;
-const SUBMIT_Y = 716;
+const FIELD_Y = { name: 246, email: 316, password: 386 } as const;
+const CHECKLIST_Y = 440;
 
 /** Reveals a string left-to-right, so a field looks typed rather than pasted. */
 const typed = (value: string, frame: number, from: number, over: number) => {
@@ -45,20 +49,20 @@ const Field: React.FC<{ y: number; label: string; value: string; focused?: boole
   focused,
 }) => (
   <>
-    <Text x={FORM_X} y={y - 18} size={11} weight={700} color={GREY.label} mono style={{ letterSpacing: 1 }}>
+    <Text x={FORM_X} y={y - 15} size={10} weight={700} color={GREY.label} mono style={{ letterSpacing: 1 }}>
       {label}
     </Text>
     <Box
       x={FORM_X}
       y={y}
       w={FORM_W}
-      h={44}
+      h={40}
       fill={GREY.field}
       border={focused ? GREY.graphite : GREY.border}
       borderWidth={focused ? 2 : 1}
       radius={8}
     />
-    <Text x={FORM_X + 14} y={y + 13} size={15} color={GREY.ink}>
+    <Text x={FORM_X + 12} y={y + 12} size={15} color={GREY.ink}>
       {value}
     </Text>
   </>
@@ -76,8 +80,11 @@ const SignupCard: React.FC<{
   focused?: "name" | "email" | "password";
 }> = ({ nameValue, emailValue, passwordValue, checklistLit, collapsed, consentTicked, submitLabel, focused }) => (
   <>
-    <Box x={CARD_X} y={CARD_Y} w={CARD_W} h={564} fill={GREY.surface} border={GREY.border} radius={14} />
-    <Text x={FORM_X} y={CARD_Y + 32} size={27} weight={700}>
+    <Box x={CARD.x} y={CARD.y} w={CARD.w} h={CARD.h} fill={GREY.surface} border={GREY.border} radius={12} />
+    {/* 12px of card padding rather than 20: the 2a field-group landing tops out
+        at y 212, and at 20 the heading's descenders were sliced by the frame
+        edge — a text fragment, which is the one thing the framing rule forbids. */}
+    <Text x={FORM_X} y={CARD.y + 12} size={24} weight={700}>
       {SIGNUP.heading}
     </Text>
 
@@ -88,7 +95,7 @@ const SignupCard: React.FC<{
     {/* The live checklist. Rows light one at a time, then the whole thing
         collapses to a single line — a real beat with a real duration. */}
     {collapsed ? (
-      <Text x={FORM_X} y={CHECKLIST_Y} size={14} weight={700} color={GREY.body}>
+      <Text x={FORM_X} y={CHECKLIST_Y} size={13} weight={700} color={GREY.body}>
         ✓&nbsp;&nbsp;{SIGNUP.checklistCollapsed}
       </Text>
     ) : (
@@ -96,8 +103,8 @@ const SignupCard: React.FC<{
         <Text
           key={row}
           x={FORM_X}
-          y={CHECKLIST_Y + i * 24}
-          size={14}
+          y={CHECKLIST_Y + i * 20}
+          size={13}
           color={i < checklistLit ? GREY.body : GREY.strong}
           weight={i < checklistLit ? 700 : 400}
         >
@@ -106,32 +113,32 @@ const SignupCard: React.FC<{
       ))
     )}
 
-    {/* Consent. Beat 2b pushes tight enough to read this whole line. */}
+    {/* Consent. Beat 2b lands on this row so the whole line reads. */}
     <Box
       x={FORM_X}
-      y={CONSENT_Y}
-      w={20}
-      h={20}
-      radius={5}
+      y={514}
+      w={18}
+      h={18}
+      radius={4}
       fill={consentTicked ? GREY.graphite : GREY.field}
       border={consentTicked ? GREY.graphite : GREY.border}
     />
     {consentTicked ? (
-      <Text x={FORM_X + 4} y={CONSENT_Y + 1} size={15} weight={700} color={GREY.white}>
+      <Text x={FORM_X + 3} y={514} size={13} weight={700} color={GREY.white}>
         ✓
       </Text>
     ) : null}
-    <Text x={FORM_X + 32} y={CONSENT_Y - 1} w={FORM_W - 32} size={13.5} color={GREY.body} lineHeight={1.5}>
+    <Text x={FORM_X + 26} y={512} w={FORM_W - 26} size={12.5} color={GREY.body} lineHeight={1.5}>
       {SIGNUP.consent}
     </Text>
 
-    <Button x={FORM_X} y={SUBMIT_Y} w={FORM_W}>
+    <Button x={SUBMIT_ROW.x} y={SUBMIT_ROW.y} w={SUBMIT_ROW.w} h={SUBMIT_ROW.h} size={15}>
       {submitLabel}
     </Button>
   </>
 );
 
-// ── 2a · 0:04–0:08 · 120f — the form fills ──────────────────────────────────
+// ── 2a · 120f — the form fills ──────────────────────────────────────────────
 
 const SubA: React.FC = () => {
   const frame = useCurrentFrame();
@@ -140,9 +147,11 @@ const SubA: React.FC = () => {
   return (
     <Camera
       keys={[
-        { frame: 0, shot: shot(960, 530, 1200) },
-        { frame: 58, shot: shot(960, 428, 580) },
-        { frame: 120, shot: shot(960, 556, 580) },
+        // The whole card, then the field group. Both complete elements.
+        { frame: 0, shot: frameRect(CARD, 24) },
+        { frame: 14, shot: frameRect(CARD, 24) },
+        { frame: 62, shot: frameRect(FIELD_GROUP, 16) },
+        { frame: 120, shot: frameRect(FIELD_GROUP, 16) },
       ]}
     >
       <Desktop clock="10:20 AM" url="serenify.tech/signup">
@@ -162,13 +171,13 @@ const SubA: React.FC = () => {
   );
 };
 
-// ── 2b · 0:08–0:09 · 30f — the consent checkbox ticks ───────────────────────
+// ── 2b · 30f — the consent checkbox ticks ───────────────────────────────────
 
 const SubB: React.FC = () => {
   const frame = useCurrentFrame();
 
   return (
-    <Camera keys={[{ frame: 0, shot: shot(960, 676, 470) }]}>
+    <Camera keys={[{ frame: 0, shot: frameRect(CONSENT_ROW, 40) }]}>
       <Desktop clock="10:20 AM" url="serenify.tech/signup">
         <PublicNav />
         <SignupCard
@@ -180,19 +189,19 @@ const SubB: React.FC = () => {
           consentTicked={frame >= 9}
           submitLabel={SIGNUP.submit}
         />
-        <Cursor x={FORM_X + 12} y={CONSENT_Y + 12} clickAt={8} />
+        <Cursor x={FORM_X + 10} y={524} clickAt={8} />
       </Desktop>
     </Camera>
   );
 };
 
-// ── 2c · 0:09–0:10 · 30f — "Create account" → "Creating account…" ───────────
+// ── 2c · 30f — "Create account" → "Creating account…" ───────────────────────
 
 const SubC: React.FC = () => {
   const frame = useCurrentFrame();
 
   return (
-    <Camera keys={[{ frame: 0, shot: shot(960, 740, 520) }]}>
+    <Camera keys={[{ frame: 0, shot: frameRect(SUBMIT_ROW, 48) }]}>
       <Desktop clock="10:20 AM" url="serenify.tech/signup">
         <PublicNav />
         <SignupCard
@@ -204,122 +213,167 @@ const SubC: React.FC = () => {
           consentTicked
           submitLabel={frame >= 11 ? SIGNUP.submitting : SIGNUP.submit}
         />
-        <Cursor x={1096} y={SUBMIT_Y + 18} clickAt={10} />
+        <Cursor x={720} y={584} clickAt={10} />
       </Desktop>
     </Camera>
   );
 };
 
-// ── 2d · 0:10–0:11 · 30f — "Check your email" ───────────────────────────────
+// ── 2d · 30f — "Check your email" ───────────────────────────────────────────
 // Register the heading; the sheet says explicitly not to attempt the body.
 
+const CHECK_CARD = rect(344, 200, 512, 250);
+
 const SubD: React.FC = () => (
-  <Camera keys={[{ frame: 0, shot: shot(960, 424, 800) }]}>
+  <Camera keys={[{ frame: 0, shot: frameRect(CHECK_CARD, 24) }]}>
     <Desktop clock="10:20 AM" url="serenify.tech/signup">
       <PublicNav />
-      <Box x={CARD_X} y={300} w={CARD_W} h={340} fill={GREY.surface} border={GREY.border} radius={14} />
-      <Box x={FORM_X} y={336} w={56} h={56} radius={28} fill={GREY.panel} />
-      <Text x={FORM_X} y={418} size={30} weight={700}>
+      <Box
+        x={CHECK_CARD.x}
+        y={CHECK_CARD.y}
+        w={CHECK_CARD.w}
+        h={CHECK_CARD.h}
+        fill={GREY.surface}
+        border={GREY.border}
+        radius={12}
+      />
+      <Box x={FORM_X} y={228} w={44} h={44} radius={22} fill={GREY.panel} />
+      <Text x={FORM_X} y={292} size={26} weight={700}>
         {SIGNUP.checkEmail}
       </Text>
-      <Text x={FORM_X} y={466} w={FORM_W} size={15} color={GREY.body}>
+      <Text x={FORM_X} y={332} w={FORM_W} size={13} color={GREY.body}>
         {SIGNUP.checkEmailBody}
       </Text>
-      <TextBlock x={FORM_X} y={540} w={FORM_W} lines={3} />
+      <TextBlock x={FORM_X} y={392} w={FORM_W} lines={2} />
     </Desktop>
   </Camera>
 );
 
-// ── 2e · 0:11–0:13 · 60f — his mail ─────────────────────────────────────────
+// ── 2e · 90f — his mail ─────────────────────────────────────────────────────
 /**
- * Same window, new tab. The email is real — the shipped Supabase template — and
- * the push-in lands on the 6-digit code.
+ * Same window, new tab. The email is the shipped Supabase template
+ * (`supabase/templates/confirmation.html`) at that template's own type sizes —
+ * 30px headline, 16px body, 25px code with 4px tracking — so this is a real
+ * email with a sender, a subject, a timestamp, a body and a code, not a
+ * placeholder in an envelope shape. Generic in *branding* (L2b), not in content.
  *
- * This sub-beat also has a job 25 seconds downstream: it must establish the
- * mail app's visual signature, because beat 8's toast is only unambiguous if
- * the audience recognises the icon. `<MailMark>` is that signature, used here
- * at size and again in the toast.
+ * Two landings, each a complete element: the unread row in the list, then the
+ * whole rendered email, which is held with a slow push that ends tighter.
+ *
+ * A third landing on the code block was built and then removed: at any framing
+ * tight enough to enlarge the code, the frame edge cut through the body line
+ * above it. The whole-card landing already renders the code legibly, so the push
+ * stays inside the card instead — the sheet's "the push-in lands on the code" is
+ * honoured by where the move *ends*, not by cropping to it.
+ *
+ * This sub-beat also has a job 25 seconds downstream: it must establish the mail
+ * app's visual signature, because beat 8's toast is only unambiguous if the
+ * audience recognises the icon. `<MailMark>` is that signature, used here at
+ * size and again in the toast.
  */
+const LIST_ROW = rect(180, 104, 310, 62);
+const EMAIL_CARD = rect(560, 190, 520, 400);
+
 const SubE: React.FC = () => {
   const frame = useCurrentFrame();
-  const opened = frame >= 18;
+  const opened = frame >= 34;
 
   return (
     <Camera
       keys={[
-        { frame: 0, shot: shot(960, 520, 1700) },
-        { frame: 24, shot: shot(1160, 470, 1020) },
-        { frame: 58, shot: shot(1160, 584, 600) },
+        { frame: 0, shot: shot(W / 2, H / 2, W) },
+        { frame: 18, shot: frameRect(LIST_ROW, 24) },
+        { frame: 38, shot: frameRect(LIST_ROW, 24) },
+        { frame: 58, shot: frameRect(EMAIL_CARD, 44) },
+        { frame: 90, shot: frameRect(EMAIL_CARD, 6) },
       ]}
     >
-      <Desktop clock="10:21 AM" tab="mail" url="mail.example.com" fill={GREY.page}>
+      <Desktop clock="10:21 AM" tab="mail" url="mail.example.com">
         {/* Sidebar + list + message pane */}
-        <Box x={0} y={VIEWPORT_Y} w={260} h={976} fill={GREY.panelAlt} border={GREY.panelAlt} radius={0} />
-        <div style={{ position: "absolute", left: 28, top: VIEWPORT_Y + 26 }}>
-          <MailMark size={34} />
+        <Box x={0} y={VIEWPORT_Y} w={170} h={H - VIEWPORT_Y} fill={GREY.panelAlt} border={GREY.panelAlt} radius={0} />
+        <div style={{ position: "absolute", left: 20, top: VIEWPORT_Y + 18 }}>
+          <MailMark size={24} />
         </div>
-        <Text x={72} y={VIEWPORT_Y + 32} size={20} weight={700} color={GREY.body}>
+        <Text x={52} y={VIEWPORT_Y + 22} size={15} weight={700} color={GREY.body}>
           Mail
         </Text>
-        <TextBlock x={28} y={VIEWPORT_Y + 110} w={200} lines={6} gap={26} size={11} />
+        <TextBlock x={20} y={VIEWPORT_Y + 70} w={130} lines={6} gap={18} size={8} />
 
-        <Box x={260} y={VIEWPORT_Y} w={560} h={976} fill={GREY.surface} border={GREY.border} radius={0} />
-        {/* The Serenify email — unread, at the top. */}
-        <Box x={272} y={VIEWPORT_Y + 16} w={536} h={84} fill={GREY.panelAlt} border={GREY.graphite} radius={8} />
-        <Text x={290} y={VIEWPORT_Y + 30} size={16} weight={700}>
+        <Box x={170} y={VIEWPORT_Y} w={330} h={H - VIEWPORT_Y} fill={GREY.surface} border={GREY.border} radius={0} />
+        {/* The Serenify email — unread, at the top of the list. */}
+        <Box
+          x={LIST_ROW.x}
+          y={LIST_ROW.y}
+          w={LIST_ROW.w}
+          h={LIST_ROW.h}
+          fill={GREY.panelAlt}
+          border={GREY.graphite}
+          radius={7}
+        />
+        <Text x={LIST_ROW.x + 14} y={LIST_ROW.y + 11} size={14} weight={700}>
           {EMAIL.from}
         </Text>
-        <Text x={290} y={VIEWPORT_Y + 56} w={420} size={14} color={GREY.body}>
-          {EMAIL.subject}
-        </Text>
-        <Text x={700} y={VIEWPORT_Y + 30} w={92} size={13} color={GREY.label} align="right">
+        <Text x={LIST_ROW.x + 200} y={LIST_ROW.y + 12} w={96} size={11} color={GREY.label} align="right">
           {EMAIL.time}
         </Text>
-        <TextBlock x={290} y={VIEWPORT_Y + 128} w={500} lines={7} gap={34} size={12} />
+        <Text x={LIST_ROW.x + 14} y={LIST_ROW.y + 33} w={282} size={12} color={GREY.body}>
+          {EMAIL.subject}
+        </Text>
+        <TextBlock x={LIST_ROW.x + 14} y={LIST_ROW.y + 84} w={282} lines={6} gap={26} size={8} />
+        <Cursor x={LIST_ROW.x + 240} y={LIST_ROW.y + 34} clickAt={30} />
 
-        {/* The message pane — a greybox of the shipped template. */}
-        <div style={{ opacity: opened ? 1 : 0.18 }}>
-          <Text x={880} y={190} w={900} size={26} weight={700}>
+        {/* The message pane — a greybox of the shipped template, at its sizes. */}
+        <div style={{ opacity: opened ? 1 : 0.16 }}>
+          <Text x={530} y={116} w={560} size={20} weight={700}>
             {EMAIL.subject}
           </Text>
-          <div style={{ position: "absolute", left: 880, top: 240 }}>
-            <MailMark size={30} />
+          <div style={{ position: "absolute", left: 530, top: 150 }}>
+            <MailMark size={22} />
           </div>
-          <Text x={922} y={244} size={17} weight={700}>
+          <Text x={562} y={152} size={14} weight={700}>
             {EMAIL.from}
           </Text>
-          <Text x={1520} y={246} w={240} size={15} color={GREY.label} align="right">
+          <Text x={960} y={153} w={130} size={12} color={GREY.label} align="right">
             {EMAIL.time}
           </Text>
 
-          <Box x={900} y={300} w={520} h={470} fill={GREY.surface} border={GREY.border} radius={12} />
-          <Box x={928} y={326} w={90} h={22} label="wordmark" labelSize={10} fill={GREY.panelAlt} />
-          <Text x={928} y={372} size={26} weight={700}>
+          <Box
+            x={EMAIL_CARD.x}
+            y={EMAIL_CARD.y}
+            w={EMAIL_CARD.w}
+            h={EMAIL_CARD.h}
+            fill={GREY.surface}
+            border={GREY.border}
+            radius={12}
+          />
+          <Box x={588} y={212} w={78} h={22} label="wordmark" labelSize={9} fill={GREY.panelAlt} />
+          <Text x={588} y={250} size={30} weight={700}>
             {EMAIL.headline}
           </Text>
-          <Text x={928} y={412} w={464} size={15} color={GREY.body}>
+          <Text x={588} y={296} w={464} size={16} color={GREY.body} lineHeight={1.6}>
             {EMAIL.body}
           </Text>
-          <Button x={1058} y={452} w={160} h={42} size={14}>
+          <Button x={738} y={352} w={164} h={40} size={15}>
             {EMAIL.button}
           </Button>
-          <Text x={928} y={520} size={12} weight={700} color={GREY.body}>
+          <Text x={588} y={422} size={13} weight={500} color={GREY.body}>
             {EMAIL.codeLabel}
           </Text>
-          <Box x={928} y={542} w={464} h={54} fill={GREY.field} border={GREY.border} radius={8} />
+          <Box x={588} y={444} w={464} h={48} fill={GREY.field} border={GREY.border} radius={8} />
           <Text
-            x={928}
-            y={556}
+            x={588}
+            y={456}
             w={464}
-            size={26}
+            size={25}
             weight={700}
             align="center"
             mono
-            style={{ letterSpacing: 6 }}
+            style={{ letterSpacing: 4 }}
           >
             {EMAIL.code}
           </Text>
-          <Text x={928} y={628} w={464} size={12} color={GREY.label}>
+          <Box x={588} y={514} w={464} h={1} fill={GREY.border} border={GREY.border} radius={0} />
+          <Text x={588} y={528} w={464} size={13} color={GREY.label} lineHeight={1.6}>
             {EMAIL.footer}
           </Text>
         </div>
@@ -328,29 +382,35 @@ const SubE: React.FC = () => {
   );
 };
 
-// ── 2f · 0:13–0:16 · 90f — the OTP choreography ─────────────────────────────
+// ── 2f · 90f — the OTP choreography ─────────────────────────────────────────
 /**
- * The hero moment of the signup section, played close to real time. Timings
- * straight from the recon, converted at 30fps:
+ * The hero moment of the signup section, played close to real time. Timings from
+ * `components/ui/auth/otp-boxes.tsx`, converted at 30fps:
  *
  *   halo sweep 1→6, 130ms each  →  0 – 23.4f
  *   hold 360ms                  → 23.4 – 34.2f
  *   merge 540ms                 → 34.2 – 50.4f
  *   check + "Verified" 560ms    → 50.4 – 67.2f
- *   pill holds 700ms            → 67.2 – 88.2f
+ *   pill HOLDS 700ms (#190)     → 67.2 – 88.2f
  *   "Taking you in…" at 2080ms  → from 62.4f
  *
- * NOTE, and it is a real finding: the sheet gives 2f three seconds and the
- * choreography alone is 2.94s, which leaves no room for the digits to be
- * entered first. They are landed *on* the halo sweep instead — which is what
- * the product does anyway, since the halo is what tracks each arriving digit.
+ * The sheet gives 2f three seconds and the choreography alone is 2.94s, so there
+ * is no room for the digits to be entered first. They are landed *on* the halo
+ * sweep instead — which is what the product does anyway, since the halo is what
+ * tracks each arriving digit.
+ *
+ * DIGITS CLEAR ON THE MERGE, not after it. Revision 1 held them until "Verified"
+ * faded in, which looked broken. The real component applies `text-transparent`
+ * on the *same* state flip that fills the boxes, with a 500ms colour transition
+ * — so the digits fade out across the merge and there is never a moment where
+ * they sit inside a filled pill. There is no gap in the shipped component.
  *
  * Locked-off. No camera move; the animation carries it.
  */
-const BOX_W = 56;
-const BOX_H = 64;
-const GAP = 12;
-const ROW_Y = 400;
+const BOX_W = 52;
+const BOX_H = 52;
+const GAP = 8;
+const OTP_ROW = rect(424, 300, 6 * BOX_W + 5 * GAP, BOX_H);
 
 const SubF: React.FC = () => {
   const frame = useCurrentFrame();
@@ -368,13 +428,13 @@ const SubF: React.FC = () => {
 
   const gap = GAP * (1 - merge);
   const rowW = 6 * BOX_W + 5 * gap;
-  const rowX = 960 - rowW / 2;
+  const rowX = W / 2 - rowW / 2;
 
   return (
-    <Camera keys={[{ frame: 0, shot: shot(960, 424, 560) }]}>
+    <Camera keys={[{ frame: 0, shot: frameRect(OTP_ROW, 40) }]}>
       <Desktop clock="10:22 AM" url="serenify.tech/verify">
         <PublicNav />
-        <Text x={660} y={324} w={600} size={27} weight={700} align="center">
+        <Text x={400} y={246} w={400} size={24} weight={700} align="center">
           {OTP.heading}
         </Text>
 
@@ -385,6 +445,7 @@ const SubF: React.FC = () => {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           });
+          // Outer corners round to 28px; inner corners melt to 0.
           const outerL = i === 0 ? 8 + 20 * merge : 8 * (1 - merge);
           const outerR = i === 5 ? 8 + 20 * merge : 8 * (1 - merge);
 
@@ -394,14 +455,14 @@ const SubF: React.FC = () => {
                 style={{
                   position: "absolute",
                   left: rowX + i * (BOX_W + gap),
-                  top: ROW_Y,
+                  top: OTP_ROW.y,
                   width: BOX_W,
                   height: BOX_H,
                   boxSizing: "border-box",
-                  // Borders melt as the row becomes one pill. Dropped outright
-                  // at the end rather than left at a fraction of a pixel —
-                  // Chrome still paints a sub-pixel border as a hairline, which
-                  // showed up as six visible seams down the finished pill.
+                  // Borders melt as the row becomes one pill. Dropped outright at
+                  // the end rather than left at a fraction of a pixel — Chrome
+                  // paints a sub-pixel border as a hairline, which showed up as
+                  // six visible seams down the finished pill.
                   border: merge > 0.98 ? "none" : `${1 - merge}px solid ${GREY.border}`,
                   borderRadius: `${outerL}px ${outerR}px ${outerR}px ${outerL}px`,
                   backgroundColor: merge > 0 ? GREY.graphite : GREY.field,
@@ -411,11 +472,11 @@ const SubF: React.FC = () => {
                 <div
                   style={{
                     position: "absolute",
-                    left: rowX + i * (BOX_W + gap) - 4,
-                    top: ROW_Y - 4,
-                    width: BOX_W + 8,
-                    height: BOX_H + 8,
-                    borderRadius: 12,
+                    left: rowX + i * (BOX_W + gap) - 3,
+                    top: OTP_ROW.y - 3,
+                    width: BOX_W + 6,
+                    height: BOX_H + 6,
+                    borderRadius: 11,
                     border: `3px solid ${GREY.graphite}`,
                     opacity: halo,
                   }}
@@ -425,14 +486,15 @@ const SubF: React.FC = () => {
                 style={{
                   position: "absolute",
                   left: rowX + i * (BOX_W + gap),
-                  top: ROW_Y + 16,
+                  top: OTP_ROW.y + 12,
                   width: BOX_W,
                   textAlign: "center",
                   fontFamily: MONO,
-                  fontSize: 30,
-                  fontWeight: 700,
-                  color: merge > 0.5 ? GREY.white : GREY.ink,
-                  opacity: (landed ? 1 : 0) * (1 - verified),
+                  fontSize: 26,
+                  fontWeight: 500,
+                  color: GREY.ink,
+                  // Cleared BY the merge, exactly as the real component does it.
+                  opacity: (landed ? 1 : 0) * (1 - merge),
                 }}
               >
                 {digit}
@@ -441,12 +503,12 @@ const SubF: React.FC = () => {
           );
         })}
 
-        {/* Check + "Verified" cross-fade into the finished pill. */}
+        {/* Check + "Verified" (text-lg) cross-fade onto the finished pill. */}
         <Text
           x={rowX}
-          y={ROW_Y + 18}
+          y={OTP_ROW.y + 16}
           w={rowW}
-          size={26}
+          size={18}
           weight={700}
           align="center"
           color={GREY.white}
@@ -455,7 +517,7 @@ const SubF: React.FC = () => {
           ✓&nbsp;&nbsp;{OTP.verified}
         </Text>
 
-        <Text x={660} y={498} w={600} size={16} align="center" color={GREY.label} opacity={takingYouIn}>
+        <Text x={400} y={378} w={400} size={14} align="center" color={GREY.label} opacity={takingYouIn}>
           {OTP.takingYouIn}
         </Text>
       </Desktop>
@@ -478,7 +540,7 @@ export const Beat02Signup: React.FC = () => (
       <Series.Sequence durationInFrames={30} name="2d check your email">
         <SubD />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={60} name="2e his mail">
+      <Series.Sequence durationInFrames={90} name="2e his mail">
         <SubE />
       </Series.Sequence>
       <Series.Sequence durationInFrames={90} name="2f OTP choreography">
