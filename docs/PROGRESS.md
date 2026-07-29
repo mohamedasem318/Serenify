@@ -4,6 +4,79 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Fix — Navbar chrome: solid, sticky, and an exact active-state mirror
+
+**Branch**: `fix/navbar-chrome-and-active-state`
+**Status**: open — not yet merged.
+**Date**: 2026-07-29
+**Issues opened**: **#208**, **#209** (both pre-existing defects found while verifying; neither fixed here).
+
+**What it does.** Four things, all chrome, none of them auth-aware:
+
+1. **The public navbar becomes solid.** The inline
+   `style={{ background: "color-mix(in srgb, var(--color-bg) 88%, transparent)" }}` and
+   `backdrop-blur-md` are both removed in favour of the opaque `bg-bg` token the app header
+   already used. Stickiness, `h-16` and `border-b border-border` are kept. This **reverses
+   part of the 2026-07-28 decision** that introduced the translucency from the landing mock.
+2. **The app header becomes sticky** — `sticky top-0 z-50` on `components/header/header.tsx`,
+   matching the public navbar in both directions. It was already `bg-bg` and `h-16`;
+   `app/(authed)/layout.tsx` is untouched.
+3. **The two destination rows become one treatment.** `public-desktop-nav.tsx` and
+   `center-nav.tsx` now carry a **character-identical** 124-byte class string. The public
+   row loses its underline, `text-muted` resting colour, `rounded-control` and custom focus
+   ring; `CenterNav` is **raised from `h-9` to `h-11`** so both satisfy FR-053's 44 px floor.
+4. **The legal contents rail stops sliding under the bar.** `lg:top-8` → `lg:top-20`
+   (at 32 px it parked under the 64 px navbar with "Contents" entirely hidden), and its
+   `lg:max-h` reserve tracks the new offset. The sections' `scroll-mt-8` is **unchanged** —
+   raising it to `scroll-mt-20` was tried and reverted after measuring: it pushed the
+   anchored heading from 71.6 px to 119.6 px below the bar. `scroll-padding-top` clears the
+   bar, `scroll-mt-*` is breathing room, and `globals.css` now says so at the declaration.
+
+**The direction of the mirror was the real decision.** Making the two rows identical could
+have gone either way. FR-053 requires 44 px on the public surface and its one exception is
+explicitly spent, so lowering the public row to `h-9` would have needed a fresh spec
+amendment *to make a tap target smaller* — on a row that is live from 768 px up, which
+includes touch tablets. Raising `CenterNav` costs nothing. **No spec is amended, so
+`docs/CHANGELOG.md` gets no entry.**
+
+**The underline is a knowing trade, not an oversight.** `bg-surface` on `bg-bg` measures
+1.094:1 in light and 1.085:1 in dark against WCAG 1.4.11's 3:1 for a non-text indicator,
+and `hover:bg-surface` renders identically to the active fill. All of that was already true
+of `CenterNav`; the ruling was that the two bars share one known-weak indicator rather than
+one file fixing it unilaterally. `aria-current="page"` is untouched. Recorded in
+`docs/DECISIONS.md` and pinned by tests in both components.
+
+**The mock is now spent for one property.** `docs/mockups/serenify-landing-mock.html` is
+gitignored and cannot be corrected by a PR, so DECISIONS records that it is **no longer the
+authority for the public navbar's background treatment specifically** — otherwise the next
+fidelity pass reads its `nav` rule and puts the translucency back. It remains authoritative
+everywhere else.
+
+**Verified — and what the verification does NOT cover:**
+
+- **Vitest**: 1460 tests / 133 files green. Seven new assertions confirmed **red against
+  `main`** before the fix.
+- **Layout Playwright** (`playwright.layout.config.ts`): new `tests/layout/public-chrome.spec.ts`,
+  5 tests, **3 confirmed red against `main`**; the other 2 are guards and say so.
+- **The app header's stickiness is class-list assertions ONLY.** `/app` is authed and the
+  layout config has no `globalSetup` (which is what frees it from Supabase), so it cannot
+  reach that route. The rendered thresholds — the `<h1>` goes under the bar below 624 px,
+  the chat card below 576 px, nothing scrolls above 656 px, and the open `ChatPill` panel
+  paints *on top of* the header below 444 px — were measured by hand in real Chromium and
+  recorded in DECISIONS, not asserted.
+- **The layout specs are not a gate.** CI does not invoke that config; a human must run
+  `npm run -w apps/web test:layout`.
+- **No e2e evidence.** Per **#208** the suite cannot start in any environment. It has also
+  never run in CI by design (`ci.yml:4`). The four files touched have no e2e coverage
+  regardless.
+
+**Out of scope, deliberately**: the public navbar does not become auth-aware — signed-in
+visitors still see "Sign in / Sign up" on `/`. That change adds a `profiles` read to public
+routes and is kept to its own deploy. `public-mobile-nav.tsx`'s weaker exact-only active
+rule is also left alone pending a separate decision.
+
+---
+
 ## Fix — Production sign-out: proxy re-POSTed Server Actions (merged to main)
 
 **Branches**: `fix/signout-race-and-feedback`, `chore/vercel-region-fra1`

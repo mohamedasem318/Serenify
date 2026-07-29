@@ -25,9 +25,21 @@ import {
  *  - **Every section is a real `<section>` with a real `<h2>`.** The anchors are not
  *    decorative: they are what lets a screen-reader user jump by heading and what makes
  *    `/privacy#what-a-manager-can-see` a citable link. Nothing here is a styled `<div>`.
- *  - **`scroll-mt-8`** on each section, so an anchor jump leaves the heading clear of the
- *    viewport edge. The public navbar is not sticky — it matches the app header, which is
- *    not either — so this is breathing room rather than clearance for a fixed bar.
+ *  - **`scroll-mt-8`** on each section — breathing room, NOT bar clearance. Clearing the
+ *    64 px bar is `html { scroll-padding-top: 4rem }`'s job (`globals.css`), and the two
+ *    ADD rather than max: an anchor jump lands the section 64 + 32 = 96 px down, so the
+ *    heading sits about 72 px below the bar. Measured on /terms, 2026-07-29.
+ *
+ *    RAISING THIS TO `scroll-mt-20` WAS TRIED ON 2026-07-29 AND REVERTED. The idea was
+ *    self-sufficiency — a section that clears the bar without depending on a global
+ *    declared in another file for another surface. It works, but it costs 48 px of dead
+ *    space on every jump: the heading landed 119.6 px below the bar instead of 71.6, about
+ *    15 % of an 800 px viewport spent on nothing. Speculative robustness is not worth a
+ *    visible regression on the common path. The division of labour stays: one global that
+ *    tracks the bar's height, plus per-section breathing room here.
+ *
+ *    So `scroll-padding-top` IS load-bearing for this file, and `globals.css` now says so
+ *    at its declaration rather than leaving the coupling implicit.
  *
  * The version identifier and publication date are READ FROM THE REGISTRY, never
  * hard-coded — `currentRevision("terms_privacy")` is the same source the consent gate
@@ -119,9 +131,24 @@ export function LegalDocument({ title, lede, sections }: LegalDocumentProps) {
          * Sticky only at `lg`, where there is room beside the prose; below that it is an
          * ordinary block above the document.
          */}
+        {/*
+         * `lg:top-20` (80 px), NOT `lg:top-8`. The rail is sticky against a sticky navbar,
+         * so its offset has to clear the bar, not the viewport: at `top-8` the rail parked
+         * at y=32 and the top 32 px of it — the entire "Contents" heading — sat UNDER the
+         * 64 px bar, with the first link's top edge at y=63.19, 0.8 px from being clipped
+         * too. Measured at `lg` on /terms at two scroll positions on 2026-07-29.
+         * 80 px = the bar's 64 px plus a 16 px gap.
+         *
+         * `lg:max-h-[calc(100dvh-6rem)]` tracks that offset. The reserve has to be the
+         * offset plus a matching bottom gap (80 + 16 = 96 px = 6rem), or the rail is
+         * allowed to grow past the bottom of the viewport by exactly the amount the offset
+         * grew. Measured height of the rail is 571 px against 704 px available at an
+         * 800 px viewport, so it still fits without scrolling; taller documents get the
+         * `overflow-y-auto` they already had.
+         */}
         <nav
           aria-labelledby="legal-contents"
-          className="mb-10 lg:sticky lg:top-8 lg:mb-0 lg:max-h-[calc(100dvh-4rem)] lg:overflow-y-auto"
+          className="mb-10 lg:sticky lg:top-20 lg:mb-0 lg:max-h-[calc(100dvh-6rem)] lg:overflow-y-auto"
         >
           <h2
             id="legal-contents"

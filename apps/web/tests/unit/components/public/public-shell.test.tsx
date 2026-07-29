@@ -145,13 +145,28 @@ describe("PublicNavbar", () => {
   });
 
   /**
-   * The desktop destination row marks the page you are on — and marks it with something
-   * other than colour (WCAG 1.4.1). `bg-surface` alone would fail twice over: it is a
-   * colour-only cue, and in dark mode it is a ~4 % lightness difference that is barely
-   * visible to anyone. The underline is the cue that survives both.
+   * The desktop destination row marks the page you are on.
+   *
+   * `aria-current="page"` is the machine-readable half and is asserted first because it is
+   * the half that is not optional. The visible half is a `bg-surface` pill and nothing
+   * else — the underline that PR #188 added was removed on 2026-07-29 so this row renders
+   * identically to `CenterNav`. That trade (a weak, colour-only indicator, shared with the
+   * app bar rather than fixed in one place) was ruled on explicitly; see
+   * `public-desktop-nav.tsx`'s comment and docs/DECISIONS.md.
+   *
+   * ASSERTED AS CONCRETE PROPERTIES, not by string-comparing this component against
+   * `CenterNav`. A comparison would pass whenever both drift together, which is the likely
+   * failure mode given they are meant to move as a pair. `components/header/center-nav.test.tsx`
+   * asserts the same three facts about the other component independently.
    */
   describe("the desktop nav marks the current page", () => {
     // The module-level mock puts the pathname at /terms.
+    function publicPills(container: HTMLElement): HTMLElement[] {
+      return Array.from(
+        container.querySelectorAll<HTMLElement>("nav[aria-label='Public pages'] a"),
+      );
+    }
+
     it("sets aria-current='page' on exactly the current destination", () => {
       const { container } = render(<PublicNavbar />);
       const current = container.querySelectorAll("a[aria-current='page']");
@@ -160,11 +175,55 @@ describe("PublicNavbar", () => {
       expect(current[0]).toHaveAttribute("href", "/terms");
     });
 
-    it("marks it with a non-colour cue, not a background tint alone", () => {
+    it("marks it with bg-surface", () => {
       const { container } = render(<PublicNavbar />);
       const current = container.querySelector<HTMLElement>("a[aria-current='page']");
 
-      expect(current?.className).toMatch(/\bunderline\b/);
+      expect(current?.className).toMatch(/\bbg-surface\b/);
+    });
+
+    it("leaves the inactive destinations without the active fill", () => {
+      const { container } = render(<PublicNavbar />);
+      const inactive = publicPills(container).filter(
+        (a) => a.getAttribute("aria-current") === null,
+      );
+
+      expect(inactive.length).toBeGreaterThan(0);
+      for (const link of inactive) {
+        // `hover:bg-surface` is on every pill; match the bare utility, not a substring.
+        expect(link.className.split(/\s+/)).not.toContain("bg-surface");
+      }
+    });
+
+    it("carries no underline on any destination, current or not", () => {
+      // Dropped 2026-07-29 to mirror CenterNav exactly. Asserted in both directions so a
+      // future edit cannot quietly restore the divergence from either side.
+      const { container } = render(<PublicNavbar />);
+      const pills = publicPills(container);
+
+      expect(pills.length).toBeGreaterThan(0);
+      for (const link of pills) {
+        expect(link.className).not.toMatch(/\bunderline\b/);
+      }
+    });
+
+    it("gives every destination a 44 px tap target (FR-053)", () => {
+      // The one property that did NOT move to match CenterNav's original: FR-053 requires
+      // 44 px here and its single exception is spent (spec.md, amended 2026-07-28), so
+      // CenterNav was raised to h-11 instead of this row being lowered to h-9.
+      const { container } = render(<PublicNavbar />);
+      for (const link of publicPills(container)) {
+        expect(link.className).toMatch(/\bh-11\b/);
+        expect(link.className).not.toMatch(/\bh-9\b/);
+      }
+    });
+
+    it("uses rounded-md and the ink resting colour", () => {
+      const { container } = render(<PublicNavbar />);
+      for (const link of publicPills(container)) {
+        expect(link.className).toMatch(/\brounded-md\b/);
+        expect(link.className).toMatch(/\btext-ink\b/);
+      }
     });
 
     it("does not mark Home on a descendant route", () => {
@@ -175,17 +234,51 @@ describe("PublicNavbar", () => {
 
       expect(home?.getAttribute("aria-current")).toBeNull();
     });
+  });
 
-    it("leaves the inactive destinations with no underline, so hover cannot mimic it", () => {
-      const { container } = render(<PublicNavbar />);
-      const inactive = Array.from(
-        container.querySelectorAll<HTMLElement>("nav[aria-label='Public pages'] a"),
-      ).filter((a) => a.getAttribute("aria-current") === null);
+  /**
+   * The bar itself is SOLID and STICKY (2026-07-29).
+   *
+   * The translucency — an inline `color-mix` over 88 % `--color-bg` plus `backdrop-blur-md`,
+   * both copied from the landing mock — was removed. The inline `style` was a colour
+   * declaration bypassing the token utilities, which is what FR-057 exists to prevent, and
+   * an 88 % veil over scrolling body copy bought nothing. The mock is spent as the authority
+   * for this element's background specifically; see docs/DECISIONS.md 2026-07-29.
+   *
+   * The blur and the alpha are asserted separately because they are two independent
+   * mechanisms and removing one while leaving the other would still be translucent.
+   */
+  describe("the bar's chrome", () => {
+    function banner(): HTMLElement {
+      render(<PublicNavbar />);
+      return screen.getByRole("banner");
+    }
 
-      expect(inactive.length).toBeGreaterThan(0);
-      for (const link of inactive) {
-        expect(link.className).not.toMatch(/\bunderline\b/);
-      }
+    it("carries NO backdrop blur", () => {
+      expect(banner().className).not.toMatch(/backdrop-blur/);
+    });
+
+    /*
+     * THE INLINE `color-mix` STYLE IS NOT ASSERTED HERE, DELIBERATELY. The obvious test —
+     * `expect(banner().getAttribute("style")).toBe("")` — was written, run against `main`,
+     * and PASSED there, which makes it worthless: happy-dom's CSS parser rejects
+     * `color-mix(in srgb, …)` as an unknown value and drops it, so the attribute is empty
+     * whether or not the component sets it. A test that cannot go red is not a test.
+     * Real Chromium keeps the declaration, so the assertion lives in
+     * `tests/layout/public-chrome.spec.ts` instead, where it means something.
+     */
+    it("uses the opaque bg-bg token, the same one the app header uses", () => {
+      const cls = banner().className;
+      expect(cls).toMatch(/\bbg-bg\b/);
+      expect(cls).not.toMatch(/\/\d{1,2}\b/); // no `bg-bg/88`-style alpha suffix
+    });
+
+    it("stays sticky at the top, at z-50, at 64 px", () => {
+      const cls = banner().className;
+      expect(cls).toMatch(/\bsticky\b/);
+      expect(cls).toMatch(/\btop-0\b/);
+      expect(cls).toMatch(/\bz-50\b/);
+      expect(cls).toMatch(/\bh-16\b/);
     });
   });
 });

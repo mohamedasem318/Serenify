@@ -53,8 +53,15 @@ updated in the same PR.
   messages too: strip any such trailer before merging, since squash concatenates the branch's commit
   messages by default. (Two such trailers already exist on `main` in older feature commits, `#23`
   and `#118`; history is not rewritten for them — the rule is forward-looking.)
-- Co-author trailers: add all three teammates (`Fatma-Alzahraaa`, `gehaddmohamedd`, `hebatullah003`)
-  as `Co-authored-by:` trailers on every commit.
+- **Do NOT add `Co-authored-by:` trailers.** Rescinded 2026-07-29 by Mohamed, reversing the
+  earlier blanket rule that put all three teammates on every commit. Two reasons: the
+  teammates are direct contributors to this repository now, so the trailers are redundant;
+  and GitHub attributes co-authors by **email**, so a guessed address credits nobody — the
+  trailers on the 2026-07-29 navbar-chrome commit used three invented `@users.noreply`
+  addresses that appear nowhere in `main`'s history. Redundant at best, misattributing at
+  worst. See `docs/DECISIONS.md` 2026-07-29.
+  **Commits already merged into `main` keep their trailers** — published history is not
+  rewritten for this. The rule is forward-looking only.
 
 ## graphify
 

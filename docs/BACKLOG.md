@@ -3042,3 +3042,171 @@ action, not with another proxy redirect. If either is picked up, look at both.
 
 **Fix scope**: small. **Address by**: no deadline; filed so the consequence cannot later read as an
 oversight.
+
+---
+
+## From the navbar chrome fix — captured 2026-07-29
+
+### `service_role` has no DML on any `public` table — the e2e suite cannot start and both seeders are dead (#208)
+**Status**: tech-debt (`type:tooling` / `area:db`) — **OPEN.** GitHub issue **#208 OPEN.**
+**Category**: dev-tooling / local-stack grants
+**Observed**: 2026-07-29, while running a throwaway Playwright probe on
+`fix/navbar-chrome-and-active-state`. Not caused by that branch — the branch touches
+four component files and one stylesheet.
+
+**Symptom**: any service-role write to `public.profiles` fails with
+`42501 permission denied for table profiles`. Playwright's `globalSetup` dies on it, so
+**zero e2e specs run**:
+
+```
+$ npx playwright test tests/e2e/employee-signup.spec.ts --project=chromium
+{ code: '42501', hint: 'Grant the required privileges to the current role with:
+  GRANT SELECT, UPDATE ON public.profiles TO service_role;',
+  message: 'permission denied for table profiles' }
+```
+
+**It is not a `profiles` problem, and nothing revoked it.** `service_role` holds
+`REFERENCES, TRIGGER, TRUNCATE` and nothing else on **every** table in `public` —
+`profiles`, `chat_conversations`, `chat_messages`, `monitoring_sessions`,
+`window_readings`, `user_consents`, all three questionnaire tables. The cause is the
+project's default privileges for relations created **by `postgres`**, which is the role
+migrations run as:
+
+```
+pg_default_acl → postgres | public | r |
+  {postgres=arwdDxtm/postgres, anon=Dxtm/postgres,
+   authenticated=Dxtm/postgres, service_role=Dxtm/postgres}
+```
+
+`Dxtm` = TRUNCATE, REFERENCES, TRIGGER, MAINTAIN. **No `arwd`** — no SELECT/INSERT/
+UPDATE/DELETE. (The `supabase_admin` default ACL for the same schema *is* full
+`arwdDxtm` for all three roles; objects created by migrations do not land under it.)
+Local stack: Supabase CLI 2.110.0, PostgreSQL 17.6.
+
+**The grant is absent from all 16 migrations.** No `GRANT … TO service_role` on any
+table exists in `supabase/migrations/`. The only statement naming the role is
+`20260525000000_security_hardening_slice_1.sql:187-188`, which *revokes* EXECUTE on a
+function. So the role was never granted DML — it was not taken away.
+
+**Two comments in the tree are misleading given the above, and are deliberately NOT
+fixed here** (they are accurate-sounding prose whose premise is false; fixing them
+belongs with whatever fixes the grant, so the two stay together):
+- `supabase/migrations/20260527000000_anchor_columns.sql:35` — "service_role (seed,
+  future 005 server-side read) is untouched." True, but *untouched* means never
+  granted, not retains a working grant. Reads as reassurance; is not.
+- `scripts/seed-demo.ts:117` — "service_role bypasses RLS + the authenticated column
+  whitelist, so it can write the anchor." Bypassing RLS does not help when there is no
+  table privilege to bypass to.
+
+**Three consumers, all dev tooling, all broken on a freshly reset local stack**:
+- `apps/web/tests/e2e/setup/global-setup.ts:74-77` — promotes the seeded test admin.
+  Throws, so the whole e2e run aborts before a single spec.
+- `scripts/seed-demo.ts:133` — writes the demo cohort's profiles.
+- `scripts/seed/seed-accounts.ts:231` — upserts profile rows.
+
+**Production is NOT affected, and this is the reason it is `tech-debt` and not
+`priority:blocker`.** No runtime path uses the service-role key at all. A sweep of every
+`.ts/.tsx/.mts/.js/.mjs/.py` in the repo finds it only in `scripts/` and in test
+harnesses, and two suites actively assert it can never appear in runtime code —
+`apps/web/tests/unit/runtime-secret-posture.test.ts:14-15`, plus
+`apps/api/tests/test_consent_privacy.py:562`, `test_chat_storage_rls.py:142` and
+`test_questionnaire_privacy.py:542`. Whatever the hosted project's grants are, no
+serving code path exercises them.
+
+**Whether hosted differs is UNKNOWN and was not determined.** Migration history cannot
+answer it: with no GRANT and no REVOKE in the repo, hosted holds whatever the platform's
+`ALTER DEFAULT PRIVILEGES` gave at table-creation time, which is outside version
+control. Determining it requires querying hosted, which was deliberately not done. **The
+decisive test**: if either seeder has ever succeeded against the hosted project, hosted
+must have the grant and the repo never issued it — meaning something granted it outside
+version control, which is worth recording explicitly if confirmed.
+
+**THE SUITE IS UNRUNNABLE IN EVERY ENVIRONMENT.** Not in CI — and never has been, by
+design: `.github/workflows/ci.yml:4` reads "No secrets, no Supabase, no Playwright, no
+`next build`", and the last eight runs on `main` (all `success`) show only
+`speckit-skills guard`, `web (lint · typecheck · vitest)` and `python (ruff · pytest)`.
+A green checkmark on `main` has never included a single Playwright spec. And not locally
+— `globalSetup` aborts at `42501` before any spec executes. **Right now no environment
+can execute it.** The two halves are separable and both open: the grant is what makes it
+impossible today, the CI gap is what leaves it unenforced regardless. `tests/layout/` is
+unaffected — `playwright.layout.config.ts:5` has no `globalSetup` and needs no Supabase —
+though it too is not invoked by CI.
+
+**Adjacent to #179** (`SUPABASE_SERVICE_ROLE_KEY` is undocumented) — same key, different
+problem: #179 is about where the value is written down, this is about what the role can
+do once it authenticates. Fixing #179 does not fix this.
+
+**Fix scope**: small if the answer is a migration (`GRANT SELECT, UPDATE ON
+public.profiles TO service_role`, or a broader per-table sweep); larger if the answer is
+that seeders and test setup should stop using service-role DML and go through the same
+RPC/trigger paths production uses. That is a design call, not a mechanical one.
+**Address by**: before the next feature that needs a green e2e run as evidence.
+
+### `--color-border` self-references inside `@theme inline` — every light-mode border falls back to ink (#209)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#209 OPEN.**
+**Category**: design tokens / Tailwind v4 `@theme inline`
+**Observed**: 2026-07-29, while verifying `fix/navbar-chrome-and-active-state` in a real
+browser. Pre-existing; that branch neither caused it nor touches the token.
+
+**Description**: `apps/web/app/globals.css:124` declares the token in terms of itself —
+
+```css
+@theme inline {
+  --color-border:             var(--color-border);   /* ← cycles on itself */
+  --color-input:              var(--color-border);
+}
+```
+
+A cyclic custom property computes to the guaranteed-invalid value, so `var(--color-border)`
+falls back to the property's initial value. For `border-color` that is **`currentColor`** —
+which on every surface in this app is ink.
+
+**Measured, real Chromium, `/terms`**:
+
+```
+LIGHT  tok_border: ""         renders_border_border: rgb(28, 32, 35)   ← ink, not #D7D9DC
+       tok_input:  ""         renders_border_input:  rgb(28, 32, 35)
+DARK   tok_border: "#23272b"  renders_border_border: rgb(35, 39, 43)   ← correct
+                              renders_border_input:  rgb(35, 39, 43)   ← correct
+```
+
+Control in the same probe: `border-surface` (not a real utility) renders `currentColor` in
+both modes, matching light-mode `border-border` exactly.
+
+**LIGHT MODE ONLY, and that is the trap.** `:root.dark` (`globals.css:154`) re-declares
+`--color-border: #23272B` as a plain literal in `@layer base`, which breaks the cycle at
+runtime. Light mode has no such re-declaration, so the cyclic entry is the last word. The
+bug is invisible to anyone checking in dark mode, and it is the DEFAULT mode that is wrong.
+
+**The intended source token already exists — the fix must NOT hardcode a hex.**
+`globals.css:36` (first `@theme`, the Graphite palette) already carries
+`--color-border: #D7D9DC;`, with `#23272B` for dark at `:root.dark`. **The fix is to delete
+the `--color-border: var(--color-border);` line from `@theme inline`** and let the Graphite
+declaration stand — exactly how `--color-bg` and `--color-surface` already work (declared
+once, overridden in `:root.dark`, correct in both modes). `--color-input:
+var(--color-border)` can stay: `@theme inline` inlines the reference into the utility, which
+is why `border-input` already renders correctly in dark.
+
+**Self-reference sweep of the whole `@theme inline` block (requested explicitly)**: swept all
+18 colour entries and the 8-entry radius ladder at `globals.css:108-141`. **`--color-border`
+is the ONLY self-reference.** Every other entry points at a distinct Graphite token
+(`--color-background: var(--color-bg)`, `--color-primary: var(--color-meadow)`,
+`--color-destructive: var(--color-crimson)`, …) or a distinct radius
+(`--radius-md: var(--radius-control)`). So this is a single-line defect rather than a
+systemic pattern, which is what makes the fix a one-line deletion instead of a rework of the
+shadcn mapping.
+
+**Blast radius — 81 `border-border` occurrences across 47 component files** (plus 1
+`border-input`). Every hairline in the product, in light mode: both headers and the public
+footer; the whole landing page (`never-cards`, `team-cards`, `story-card`, `ren-thread`,
+`how-it-works`, `status-statement`, `team-photo`); `legal-document.tsx`'s contents-rail
+dividers; all three consent surfaces; chat (`chat-shell`, `chat-pill`, `crisis-panel`);
+monitoring (`viewfinder`, `camera-pill`, `session-trend`); account, onboarding and anchor
+capture. A near-black 1 px rule wherever a `#D7D9DC` one was designed — subtle enough to have
+shipped unnoticed, wrong enough that it undercuts Principle V's palette on every light-mode
+surface.
+
+**Fix scope**: trivial to apply (one deleted line), but wants a light-mode visual pass across
+those surfaces before merging — 81 borders change colour at once. The direction is correct
+and matches the design, but it is a visible change everywhere and should be seen rather than
+assumed. **Address by**: before the next visual-fidelity pass or design review.
