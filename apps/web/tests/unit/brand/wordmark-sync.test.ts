@@ -19,6 +19,17 @@ import { describe, expect, it } from "vitest";
  * either side of the boundary — the component, a token VALUE, or an
  * exception file — fails CI.
  *
+ * One thing this file does NOT do on its own: reach production. It reads
+ * supabase/templates/*.html off DISK, so on its own it can only prove the
+ * repo agrees with itself — which is exactly how the two-colour wordmark
+ * passed here for weeks while hosted rendered one colour (BACKLOG #189).
+ * What answers that is not a change to this file but
+ * .github/workflows/sync-email-templates.yml, which publishes those same
+ * files to the hosted project on every push to main that touches them.
+ * Once that workflow has run, the disk state asserted on below IS the
+ * hosted state; delete it and this test quietly reverts to a tautology.
+ * #189 stays open until it has actually run — see docs/BACKLOG.md.
+ *
  * The token values are READ from app/globals.css, never hard-coded
  * here. That is the load-bearing choice: if someone deepens
  * `--color-meadow-text` and does not touch the social card, this test
