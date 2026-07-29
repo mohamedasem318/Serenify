@@ -2538,9 +2538,12 @@ than a missed regression, and it never passes when it should fail.
 
 ## From feature 013 P8 Stage 3 review — captured 2026-07-28
 
-### Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)
-**Status**: bug (`type:bug` / `area:db` / `area:docs`) — **STILL OPEN.** GitHub issue **#189 OPEN.**
-The mechanism has **landed** but has **never been executed**; it is not resolved until it has run.
+### ~~Hosted Supabase email templates render a single-colour wordmark — the hand-sync exception is unenforced on the hosted side (#189)~~
+**Status**: **RESOLVED 2026-07-29 — the mechanism has now run.** GitHub issue **#189 CLOSED**
+2026-07-29 (Principle VIII: entry and issue in the same change). All three close conditions below
+were met, in order: the secret was created, a manual `workflow_dispatch` on `main` went green
+including the read-back, and a human received and read a real signup email **and** a real reset
+email. The mechanism is no longer merely landed — it is proven end to end against production.
 
 **Progress 2026-07-29 — the mechanism landed, unproven (branch `fix/email-template-sync`).** The
 content halves were already closed by hand at P8 (below). What was left was that nothing made the
@@ -2574,6 +2577,15 @@ entry. The PR therefore references #189 **without** a closing keyword.
    automated can catch it.
 
 Only then: mark this entry resolved and close #189, in the same change, per Principle VIII.
+
+**All three happened, 2026-07-29.** The secret was created; the manual dispatch ran green on `main`
+with the read-back passing; and both a real signup email and a real reset email were received and
+read. The third step is the one no automated check can stand in for, and it is the reason this entry
+stayed open through the merge of the mechanism itself rather than closing on it — see
+`docs/DECISIONS.md` 2026-07-29. One observation from that human read is recorded separately: the
+confirmation email renders light in a Gmail client set to dark mode. That is a Gmail limitation, not
+template drift, and is deliberately **not** being fixed — the evidence and the decision are in
+`docs/DECISIONS.md` 2026-07-29 so it does not get reopened.
 
 **Category**: constitution Principle V (Amendment 17) / FR-029 / ops
 **Observed**: 2026-07-28, reading the Supabase dashboard for `excukdzjudslbqmkysrc` directly.
@@ -3432,3 +3444,45 @@ navigation?** — and it should be recorded in `docs/DECISIONS.md` before any co
 
 Interacts with #213 (a link added here is dead for exactly those users) but neither blocks
 the other: the camera gate is only reachable after `full_name` is set.
+
+---
+
+## From the reset-copy and checkout-pin fix — captured 2026-07-29
+
+### Windows: `hosted-email-template-sync.test.ts` fails to load with a SyntaxError — CI unaffected (#218)
+**Status**: tooling (`type:tooling` / `area:web`) — **OPEN.** GitHub issue **#218 OPEN.**
+Filed, not fixed — parked. Local-developer-experience only; nothing user-facing and nothing in CI.
+
+**Category**: dev tooling / test harness
+**Observed**: 2026-07-29, running the full `apps/web` unit suite on Windows while bumping the
+`actions/checkout` pin.
+
+**Description**: On a Windows working tree the suite reports `SyntaxError: Invalid or unexpected
+token` at module load — `(0 test)`, before anything runs. The rest of the suite is green
+(`1 failed | 137 passed (138)`, `1509 passed`).
+
+**It is Windows-only and CI is green.** The required `web (lint · typecheck · vitest)` check passes
+on `main` (commit `fb622c8`, the #217 merge). It also reproduces on a **stashed clean `main`**, so it
+is not caused by any in-flight branch — a red local suite here is not your diff.
+
+**Diagnosis.** The file is valid: `npx esbuild` parses it, `node --check` passes on
+`scripts/sync-hosted-email-templates.mjs`, and plain `node -e "import(...)"` imports that module and
+lists its exports. No BOM; UTF-8 with CRLF like its neighbours. The read is that **Vitest cannot
+resolve the outside-root import** at `hosted-email-template-sync.test.ts:13` —
+`"../../../../../scripts/sync-hosted-email-templates.mjs"` escapes the `apps/web` Vitest root into
+repo-level `scripts/`, and the repository path contains a space (`D:\Graduation Project\Serenify`).
+**A read, not a proven root cause — nobody has bisected it.**
+
+**Why it is worth fixing eventually.** This suite is the guard on the hosted-template sync contract
+(#189): it pins the payload to exactly four fields, pins the project ref, and asserts the workflow's
+single action is a full-SHA pin rather than a mutable tag. A Windows developer cannot run it, so it
+reads as "my diff broke it" every run, and a genuine regression in it is invisible locally.
+
+**Hand-validated in the meantime**, since the `checkout` pin is what it guards — one action,
+`actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1`, matching
+`/^actions\/checkout@[0-9a-f]{40}$/`, with the forbidden trigger substrings absent. The assertion is
+SHA-*shape*, not SHA-*value*, so it stays green across a pin bump by design.
+
+**Workaround**: scope the local run (e.g. `--exclude "**/ops/**"`) and rely on CI for this suite.
+Distinct from the known Windows `forks`-pool startup crash (`Error: kill EPERM`) that makes
+`--pool=threads` necessary locally — that workaround is already in effect and does not resolve this.
