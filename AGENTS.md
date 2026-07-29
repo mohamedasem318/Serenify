@@ -41,7 +41,10 @@ Never remap a Graphite token name to a different source value inside `@theme inl
 - `get_my_anchor()` is the self-scoped `SECURITY DEFINER` function for scoping queries to the current user; use it for any per-user data access
 
 ### Inference server
-- Must launch **without `--reload`** — worker restarts drop the in-memory per-session smoothing buffer (`_SessionBuffers`); lost buffers silently corrupt readings
+- **Never bare `--reload`.** Any worker restart drops the in-memory per-session smoothing buffer (`_SessionBuffers`), and the smoothed band only latches after ~4 scored windows (~90 s), so the live monitor re-warms from scratch.
+- Normal dev: `--reload --reload-dir app` — scoping the watcher to source means cache writes, test-file saves and branch checkouts can't restart the worker.
+- Live-monitor test pass: no `--reload` at all is cleanest, `--reload --reload-dir app` is acceptable; either way don't edit `app/` source mid-session.
+- `apps/api/README.md` is authoritative here. Do not "correct" it to match a shorter rule.
 
 ### SVG rendering
 - Fixed-pixel SVG: 1 unit = 1px; `SVG width = nLanes × laneWidth` with a matching `viewBox`
@@ -58,13 +61,43 @@ Never remap a Graphite token name to a different source value inside `@theme inl
 
 ## Git Workflow
 
-Codex handles **all** git operations:
-- Per-file commits (semantic, scoped: `feat/fix/chore/docs/refactor(scope): message`)
-- Branch creation and cleanup
-- Pushing to remote
-- Opening PRs
+Codex commits, creates and cleans up branches, pushes, and opens PRs. **Claude Code does the same** —
+the constitution (§Development Workflow, gate 7) permits it to push to feature branches, and it has
+been opening PRs for a long time. Neither agent owns git exclusively; assume the other may have
+touched the branch.
 
-**Mohamed's only git step: click squash-merge on the PR.**
+`main` is protected: PR required, linear history, so merge commits are rejected and per-file commits
+collapse under squash by design.
+
+### The sequence
+
+1. Agent works on a branch, commits, pushes, opens the PR.
+2. **Mohamed squash-merges in the GitHub UI. No agent ever merges** — and never asks him to run git
+   commands, only to click.
+3. He tells the agent it is merged.
+4. Agent prunes the branch **locally and on the remote**, then confirms `main` is clean and current.
+
+While a PR is still open, fold small things that surface into it rather than opening a second one.
+
+Commit messages must be semantic and scoped — examples:
+```
+feat(monitor): add stress trend SVG component
+fix(auth): use RLS-as-user posture in session query
+chore(deps): update supabase-js to 2.x
+```
+
+### Branch naming
+
+Two regimes, selected by the prefix:
+
+- **SpecKit feature branches** — `NNN-feature-slug` (e.g. `013-public-surface-and-legal`). Cut by
+  `/speckit.specify`; `.specify/extensions/git/` validates this prefix and rejects anything else.
+- **Everything else** — fixes, chores, docs, spikes — **MUST NOT** match `[0-9][0-9][0-9]-*`. Use a
+  typed prefix: `fix/…`, `chore/…`, `docs/…`. A `NNN-` prefix on a non-SpecKit branch makes CI run a
+  doubled check list on a PR into `main`.
+
+The SpecKit validator only encodes the first half and only fires when a `/speckit.git.*` command
+runs. It is not a repo-wide rule and must not be "fixed" to cover the second half.
 
 ### Workspace safety — non-negotiable
 
@@ -80,12 +113,33 @@ Codex handles **all** git operations:
   task branch; user-owned untracked files must remain visible exactly where
   they were.
 
-Commit messages must be semantic and scoped — examples:
-```
-feat(monitor): add stress trend SVG component
-fix(auth): use RLS-as-user posture in session query
-chore(deps): update supabase-js to 2.x
-```
+## Commit & PR conventions
+
+- **Do NOT add `Co-authored-by:` trailers.** Rescinded 2026-07-29, reversing an earlier blanket rule
+  that put all three teammates on every commit. The teammates are direct contributors to this
+  repository now, so the trailers are redundant; and GitHub attributes co-authors by **email**, so a
+  guessed address credits nobody. Commits already merged into `main` keep their trailers — published
+  history is not rewritten. See `docs/DECISIONS.md` 2026-07-29.
+- **Never write a `Claude-Session:` trailer or any `claude.ai` URL** into a commit message, PR
+  description, or issue comment. This repository is **public**, and those URLs link to private agent
+  sessions — publishing one exposes a private session to anyone. This includes squash-merge messages,
+  which concatenate the branch's commit messages by default: strip any such trailer before merging.
+
+## Privacy Policy & Terms of Service
+
+Any PR that changes what data is collected, where it goes, who can see it, or how long it is
+retained MUST review and update the Privacy Policy and Terms of Service in the same PR.
+
+## Instruction files: `CLAUDE.md` ↔ `AGENTS.md`
+
+`CLAUDE.md` (Claude Code) and this file (Codex) both bind agents working in this repository. A change
+to a **shared** rule in one MUST land the matching change in the other, in the same PR.
+
+Shared — keep in sync: commit and PR conventions, git workflow, branch naming, security and privacy
+invariants, the backlog ↔ issues contract.
+
+Agent-specific — free to differ: harness and tool config, skill names and invocation syntax, which
+SpecKit surface the agent drives, and the design-skill split recorded under **Skills**.
 
 ## Skills
 
@@ -100,6 +154,12 @@ Skills are in `.agents/skills/<skill-name>/SKILL.md`. Invoke by name with `$skil
 - `$responsive-design` — use when a surface needs to work across viewports
 - `$supabase` — use for any Supabase / Postgres / RLS / auth work
 
+**The design-skill split is deliberate, not drift.** Claude Code's user-level instructions route all
+UI work through `hallmark` and explicitly forbid stacking `frontend-design` or `responsive-design` on
+top of it. **Hallmark is not installed for Codex**, so Codex uses the three skills above instead. Do
+not "reconcile" this. If Hallmark is ever installed for Codex, this note is the trigger to revisit
+the split.
+
 ## SpecKit
 
 SpecKit commands (`/speckit-*`) may be used by both Codex and Claude Code. Follow the
@@ -109,7 +169,7 @@ current SpecKit-managed plan context when running them.
 
 - Do **not** add service-role key usage under any circumstance
 - Do **not** remap Graphite design token names inside `@theme inline`
-- Do **not** run the inference server with `--reload`
+- Do **not** run the inference server under **bare** `--reload` (see Inference server above)
 - Do **not** stretch SVG viewBox — always use fixed-pixel 1:1 rendering
 
 ## Testing
@@ -120,18 +180,21 @@ current SpecKit-managed plan context when running them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/012-questionnaire-feedback/plan.md
+at `specs/013-public-surface-and-legal/plan.md`. That feature — the landing
+page, `/terms`, `/privacy`, the public navbar/footer, and the two consent
+gates — is merged and live; treat its plan as shipped context, not as work
+in progress. `CLAUDE.md` carries the detailed version of this block.
 <!-- SPECKIT END -->
 
 ## graphify
 
-This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and cross-file relationships.
+
+`graphify-out/` is **gitignored and local-only** — regenerable build output, never a committed artifact, and it never appears in `git status`. A fresh clone has no graph until someone runs `graphify update .`; treat its absence as "not built yet", never as "this project has no graph".
 
 When the user types `/graphify`, use the installed graphify skill or instructions before doing anything else.
 
 Rules:
-- For codebase questions, first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
-- Dirty graphify-out/ files are expected after hooks or incremental updates; dirty graph files are not a reason to skip graphify. Only skip graphify if the task is about stale or incorrect graph output, or the user explicitly says not to use it.
-- If graphify-out/wiki/index.md exists, use it for broad navigation instead of raw source browsing.
-- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- For codebase questions, first run `graphify query "<question>"` when `graphify-out/graph.json` exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output.
+- Read `graphify-out/GRAPH_REPORT.md` only for broad architecture review or when query/path/explain do not surface enough context. It is the broad-navigation entry point — there is no `wiki/index.md`, and no graphify command generates one.
 - After modifying code, run `graphify update .` to keep the graph current (AST-only, no API cost).

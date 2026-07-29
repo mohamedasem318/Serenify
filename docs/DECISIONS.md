@@ -6536,3 +6536,72 @@ They do pay off on Apple Mail, iOS Mail, Outlook 2019+, Samsung Mail and Thunder
 blocks and their tests stay. Every available workaround (bulletproof table layering, transparent-PNG
 logos, inversion-tuned colours) fixes one Gmail client while risking the others and cannot be verified
 without a real-device matrix. A legible email with a mild aesthetic mismatch does not justify that.
+
+---
+
+## 2026-07-29 (fifth pass) — `CLAUDE.md` and `AGENTS.md` get a mirroring contract, and one divergence is marked deliberate
+
+**Status**: Accepted.
+
+Two agents read this repository — Claude Code via `CLAUDE.md`, Codex via `AGENTS.md` — and
+the files had drifted apart with nothing holding them together. `AGENTS.md` still pointed at
+feature 012, still told Codex to navigate via a `graphify-out/wiki/index.md` that has never
+existed, still described `graphify-out/` as expected-dirty working files when it is gitignored,
+and still claimed Codex handled **all** git operations with Mohamed's only step being the
+squash-merge click — which had not been true for a long time. Meanwhile the three rules with
+the sharpest teeth lived only on the Claude side, so a Codex session was bound by none of them.
+
+### The mirroring contract
+
+Both files now carry the same clause: **a change to a shared rule in one requires the same
+change in the other, in the same PR.**
+
+Shared, and therefore synchronised: commit and PR conventions, git workflow, branch naming,
+security and privacy invariants, the backlog ↔ issues contract.
+
+Agent-specific, and free to differ: harness and tool config, skill names and invocation
+syntax, which SpecKit surface the agent drives, and the design-skill split below.
+
+The alternative — one shared file with a thin per-agent shim — was not taken. Each harness
+discovers its own filename by convention, the agent-specific halves are substantial rather
+than incidental, and a symlink or include is not portable across both. A stated contract that
+a human reviewer can check in a diff is the cheaper instrument, and the drift being fixed here
+was never caused by the two files being separate — it was caused by nothing saying they had
+to agree.
+
+### The design-skill divergence is deliberate
+
+`CLAUDE.md`'s user-level counterpart routes all UI work through `hallmark` and **forbids**
+stacking `frontend-design` or `responsive-design` on top of it, because Hallmark encodes the
+same source material with stricter responsive gates and the token systems contradict each
+other. `AGENTS.md` tells Codex to use `frontend-design`, `ui-ux-pro-max`, and
+`responsive-design`.
+
+**This stays. Hallmark is not installed for Codex**, so the Claude-side prohibition has no
+Codex-side equivalent to attach to — removing Codex's three skills would leave it with no
+design guidance at all. It is now marked as such in `AGENTS.md` §Skills, so a future audit
+reads it as a decision rather than as drift and does not "reconcile" it. **If Hallmark is ever
+installed for Codex, that note is the trigger to revisit the split.**
+
+### Branch naming is written down for the first time
+
+The only branch-naming rule the repo had was the SpecKit validator at
+`.specify/extensions/git/`, which *requires* a `NNN-` or timestamp prefix — and the last
+several branches (`fix/otp-success-hold`, `fix/navbar-chrome-and-active-state`,
+`chore/smoke-test-scripts`) all violate it. They were right and the written rule was wrong,
+because it only ever described SpecKit feature branches.
+
+Both halves are now stated in both files: SpecKit features are `NNN-feature-slug`; everything
+else **must not** match `[0-9][0-9][0-9]-*`, because that prefix makes CI run a doubled check
+list on a PR into `main`. **The validator itself is untouched** — it fires only when a
+`/speckit.git.*` command runs, which is exactly the case where the first half applies. Widening
+it to know about typed prefixes would mean teaching it a rule it has no occasion to enforce.
+
+### Also: the stale local memory that contradicted all of this
+
+Claude Code's project memory still carried `serenify-commit-coauthors.md`, instructing every
+session to append `Co-authored-by:` trailers to every commit — the exact rule rescinded in the
+second-pass entry above. It loaded on every session start, so each session began holding two
+opposed instructions on the same subject. Deleted from disk and from the memory index. It is
+local-only and outside the repository, so this change leaves no trace in the diff; it is
+recorded here because the contradiction is the reason the mirroring contract was worth writing.

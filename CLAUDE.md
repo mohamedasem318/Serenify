@@ -63,6 +63,45 @@ updated in the same PR.
   **Commits already merged into `main` keep their trailers** — published history is not
   rewritten for this. The rule is forward-looking only.
 
+### Branch naming
+
+Two regimes, selected by the prefix:
+
+- **SpecKit feature branches** — `NNN-feature-slug` (e.g. `013-public-surface-and-legal`). Cut by
+  `/speckit.specify`; `.specify/extensions/git/` validates this prefix and rejects anything else.
+- **Everything else** — fixes, chores, docs, spikes — **MUST NOT** match `[0-9][0-9][0-9]-*`. Use a
+  typed prefix: `fix/…`, `chore/…`, `docs/…`. A `NNN-` prefix on a non-SpecKit branch makes CI run a
+  doubled check list on a PR into `main`.
+
+The SpecKit validator only encodes the first half and only fires when a `/speckit.git.*` command
+runs. It is not a repo-wide rule and must not be "fixed" to cover the second half.
+
+### PR workflow
+
+`main` is protected: PR required, linear history, so merge commits are rejected and per-file commits
+collapse under squash by design.
+
+1. Agent works on a branch, commits, pushes, opens the PR.
+2. **Mohamed squash-merges in the GitHub UI. No agent ever merges** — and never asks him to run git
+   commands, only to click.
+3. He tells the agent it is merged.
+4. Agent prunes the branch **locally and on the remote**, then confirms `main` is clean and current.
+
+While a PR is still open, fold small things that surface into it rather than opening a second one.
+
+## Instruction files: `CLAUDE.md` ↔ `AGENTS.md`
+
+This file (Claude Code) and `AGENTS.md` (Codex) both bind agents working in this repository. A change
+to a **shared** rule in one MUST land the matching change in the other, in the same PR.
+
+Shared — keep in sync: commit and PR conventions, git workflow, branch naming, security and privacy
+invariants, the backlog ↔ issues contract.
+
+Agent-specific — free to differ: harness and tool config, skill names and invocation syntax, which
+SpecKit surface the agent drives, and the design-skill split (Claude routes UI work through
+`hallmark`; Codex uses `frontend-design` / `ui-ux-pro-max` / `responsive-design` because Hallmark is
+not installed for it — recorded in `AGENTS.md` §Skills).
+
 ## graphify
 
 This project has a knowledge graph at `graphify-out/` with god nodes, community structure, and
