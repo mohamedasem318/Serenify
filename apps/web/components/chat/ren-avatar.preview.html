@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ren avatar — four states + blink</title>
+<!--
+  DISPOSABLE DESIGN HARNESS. Not imported by anything, not part of the build, not
+  covered by tests. It exists so the locked mark can be eyeballed at every size and in
+  both modes without booting Next and signing in to reach the chat surface. Delete it
+  once the mark is signed off.
+
+  The path data and the token values below are COPIES, and copies drift. The real
+  definitions are components/chat/ren-avatar.tsx and app/globals.css — if this file
+  ever disagrees with those, this file is the one that is wrong.
+-->
+<style>
+  :root {
+    --color-bg: #EAEBEC;
+    --color-surface: #F4F5F6;
+    --color-ink: #1C2023;
+    --color-muted: #585D61;
+    --color-foggy: #356E88;
+    --color-on-accent: #F8F9FA;
+    --color-border: #D7D9DC;
+    --eye: var(--color-on-accent);
+  }
+  .dark {
+    --color-bg: #101214;
+    --color-surface: #181B1E;
+    --color-ink: #E2E5E8;
+    --color-muted: #939A9F;
+    --color-foggy: #74B6CE;
+    --color-border: #23272B;
+    --eye: var(--color-bg);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font: 15px/1.5 system-ui, sans-serif;
+    background: var(--color-bg);
+    color: var(--color-ink);
+  }
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .mode { background: var(--color-bg); padding: 32px 28px 40px; min-width: 0; }
+  h1 { font-size: 15px; letter-spacing: .06em; text-transform: uppercase; color: var(--color-muted); margin: 0 0 24px; }
+  h2 { font-size: 13px; color: var(--color-muted); font-weight: 500; margin: 28px 0 10px; }
+  .row { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .cell span { font-size: 11px; color: var(--color-muted); }
+  .card {
+    background: var(--color-surface); border: 1px solid var(--color-border);
+    border-radius: 12px; padding: 16px; margin-top: 8px;
+  }
+  svg { display: block; flex-shrink: 0; }
+  .body-fill { fill: var(--color-foggy); }
+  .eyes { fill: var(--eye); }
+  @keyframes ren-blink {
+    0%, 94% { opacity: 1; } 95%, 97% { opacity: 0; } 98%, 100% { opacity: 1; }
+  }
+  @keyframes ren-blink-closed {
+    0%, 94% { opacity: 0; } 95%, 97% { opacity: 1; } 98%, 100% { opacity: 0; }
+  }
+  .ren-eyes-open { animation: ren-blink 7s ease-in-out infinite; }
+  .ren-eyes-closed { animation: ren-blink-closed 7s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) {
+    .ren-eyes-open { animation: none; opacity: 1; }
+    .ren-eyes-closed { animation: none; opacity: 0; }
+  }
+  .note { color: var(--color-muted); font-size: 12px; margin: 24px 0 0; max-width: 46ch; }
+</style>
+</head>
+<body>
+<div class="modes">
+  <div class="mode" id="light"></div>
+  <div class="mode dark" id="dark"></div>
+</div>
+
+<script>
+const BODY = "M 54.78 3.41 c -3.74 0.77 -8.14 2.79 -11.31 5.19 -1.61 1.23 -1.58 1.23 -3.42 -0.46 -3.88 -3.55 -6.8 -4.73 -11.78 -4.73 -2.81 -0 -3.74 0.11 -5.25 0.6 -5.41 1.83 -9.32 5.82 -11.2 11.42 -0.63 1.91 -0.63 1.91 -0.63 34.43 0 26.26 0.08 32.74 0.36 33.61 1.64 4.92 3.44 7.71 6.48 9.97 9.51 7.08 22.52 3.91 27.35 -6.67 1.45 -3.14 1.58 -4.15 1.64 -11.86 0.03 -3.96 0.14 -7.62 0.25 -8.17 0.41 -2.19 2.08 -4.37 4.18 -5.49 1.64 -0.87 1.64 -0.87 5.96 -0.87 7.24 -0.03 11.48 -0.87 16.37 -3.33 6.45 -3.2 11.89 -9.73 13.99 -16.75 1.75 -5.79 1.72 -12.52 -0.08 -17.82 -2.79 -8.2 -10.17 -15.66 -17.98 -18.14 -4.34 -1.39 -10.63 -1.78 -14.92 -0.93z";
+const OPEN_L = "M 48.06 22.46 c -1.09 0.74 -1.53 1.28 -2.4 3.09 -1.09 2.19 -1.09 2.19 -1.09 5.6 -0.03 4.67 0.87 7.1 3.28 8.94 0.9 0.66 1.26 0.77 2.87 0.77 2.35 -0 3.52 -0.82 4.84 -3.47 4.04 -7.98 -1.45 -18.94 -7.49 -14.92z";
+const OPEN_R = "M 69.43 21.96 c -2.79 1.23 -4.54 4.97 -4.54 9.7 0 7.54 5.52 12 9.7 7.82 3.74 -3.74 3.85 -11.72 0.22 -15.96 -1.58 -1.89 -3.44 -2.4 -5.38 -1.56z";
+const CLOSED_L = "M 24.4 29.74 c -1.25 1.57 -0.27 5.04 2.14 7.72 4.93 5.5 13.84 4.28 17.15 -2.38 1.84 -3.68 1.38 -6.04 -1.16 -6.07 -1.33 -0 -2.11 0.68 -2.44 2.17 -0.16 0.68 -0.57 1.73 -0.95 2.38 -2.55 4.33 -9.62 3.03 -10.56 -1.95 -0.43 -2.44 -2.87 -3.49 -4.17 -1.87z";
+const CLOSED_R = "M 54.74 29.74 c -1.52 1.92 0.76 7.12 4.06 9.43 3.12 2.14 7.59 2.33 11.27 0.46 2.44 -1.25 4.98 -5.04 5.2 -7.75 0.3 -3.52 -4.06 -4.04 -4.71 -0.54 -0.51 2.87 -2.76 4.71 -5.77 4.71 -3.14 -0 -5.31 -1.73 -5.82 -4.71 -0.41 -2.25 -2.95 -3.2 -4.23 -1.6z";
+const CL_T = "translate(27.85,7.93) scale(0.667)";
+const CR_T = "translate(27.98,8.03) scale(0.667)";
+const OPEN_T = {
+  idle: [null, null],
+  attentive: ["translate(-11.17,-6.87) scale(1.22)", "translate(-15.66,-6.89) scale(1.22)"],
+  thinking: ["translate(19.29,11.87) scale(0.62)", "translate(27.05,11.91) scale(0.62)"],
+};
+
+function ren(state, size) {
+  const s = Math.max(24, size);
+  const warm = state === "warm";
+  const t = warm ? null : OPEN_T[state];
+  const attr = (v) => (v ? ` transform="${v}"` : "");
+  const open = warm ? "" :
+    `<g class="ren-eyes-open eyes"><path d="${OPEN_L}"${attr(t[0])}/><path d="${OPEN_R}"${attr(t[1])}/></g>`;
+  const closed =
+    `<g class="eyes ${warm ? "" : "ren-eyes-closed"}"><path d="${CLOSED_L}" transform="${CL_T}"/><path d="${CLOSED_R}" transform="${CR_T}"/></g>`;
+  return `<svg viewBox="0 0 100 100" width="${s}" height="${s}" aria-hidden="true"><path class="body-fill" d="${BODY}"/>${open}${closed}</svg>`;
+}
+
+const STATES = ["idle", "attentive", "thinking", "warm"];
+// The sizes Ren actually renders at today, plus the 24px floor and a below-floor probe
+// that must clamp UP to 24 rather than rendering small.
+const SIZES = [16, 24, 28, 34, 38, 54, 96];
+
+for (const id of ["light", "dark"]) {
+  const el = document.getElementById(id);
+  let html = `<h1>${id} mode</h1><h2>Four states — 54px</h2><div class="row card">`;
+  for (const s of STATES) html += `<div class="cell">${ren(s, 54)}<span>${s}</span></div>`;
+  html += `</div>`;
+  for (const s of STATES) {
+    html += `<h2>${s} — across every size it renders at</h2><div class="row card">`;
+    for (const px of SIZES) {
+      const clamped = Math.max(24, px);
+      html += `<div class="cell">${ren(s, px)}<span>${px}${clamped !== px ? " → 24" : ""}</span></div>`;
+    }
+    html += `</div>`;
+  }
+  html += `<p class="note">Live call sites: 28 (landing Ren panel), 34 (chat header), 38 (pill empty state), 54 (page empty state). The 16px column is a probe — it must render identically to 24, proving the clamp. Blink runs on a 7s cycle; set your OS to reduce motion and reload to confirm it goes silent.</p>`;
+  el.innerHTML = html;
+}
+</script>
+</body>
+</html>

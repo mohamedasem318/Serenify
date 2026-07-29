@@ -366,7 +366,15 @@ export function ChatShell({
           disabled={isSending || !input.trim()}
           aria-label="Send message"
           data-testid="chat-send"
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-meadow text-on-accent transition-opacity disabled:opacity-50 dark:text-bg"
+          // FOGGY, NOT MEADOW, AND ONLY HERE. Ren's mark is foggy (constitution
+          // Amendment 18), and a lone meadow control on a screen whose identity mark is
+          // foggy reads as a mistake rather than as emphasis — the same problem that drove
+          // the calibration flow rework. Amendment 18 names this ONE surface as an
+          // exception; meadow remains the required fill for primary actions everywhere
+          // else in the product. Do not take this as licence to recolour another control.
+          // The foreground pair is unchanged and still clears AA on foggy (5.33:1 light,
+          // 8.34:1 dark — better than the meadow it replaces at 4.78:1).
+          className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-foggy text-on-accent transition-opacity disabled:opacity-50 dark:text-bg"
         >
           <SendHorizontal aria-hidden className="h-5 w-5" />
         </button>

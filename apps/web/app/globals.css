@@ -288,3 +288,39 @@
 /* The weekly stepper progress fill animates its width; the component drops this class under
  * reduced motion so the width snaps to its final value without a transition. */
 .qprogress-fill { transition: width 0.35s ease; }
+
+/* ── Ren's blink — COMPONENT-LOCAL to components/chat/ren-avatar.tsx ─────────────────────
+ * A slow, occasional blink: the open eye pair fades out and the closed pair fades in for
+ * ~200ms once every 7s. The two keyframes are EXACT INVERSES of each other and share one
+ * duration, so the pairs cross over rather than both being visible or both being absent —
+ * a drift between them shows up immediately as a flicker or a doubled eye.
+ *
+ * CSS rather than JS because the blink is decoration with no state: nothing reads it,
+ * nothing depends on its phase, and driving it from React would put a timer in every
+ * surface that renders Ren (the chat header, two empty states, the landing panel) for no
+ * behaviour. It also means the animation is already running before hydration.
+ *
+ * SILENT UNDER REDUCED MOTION, twice over. The explicit rule below is the belt; the global
+ * prefers-reduced-motion rule further up is the suspenders — that one pins
+ * iteration-count to 1, which on its own would land these at their final keyframe (open
+ * visible, closed hidden), i.e. the resting face. The explicit `animation: none` states it
+ * outright rather than leaving it to be derived, and the resting opacities are declared so
+ * the pairs cannot both linger at a mid-crossfade value. A `warm` Ren carries neither
+ * class — it is closed permanently and has nothing to animate. */
+@keyframes ren-blink {
+  0%, 94%   { opacity: 1; }
+  95%, 97%  { opacity: 0; }
+  98%, 100% { opacity: 1; }
+}
+@keyframes ren-blink-closed {
+  0%, 94%   { opacity: 0; }
+  95%, 97%  { opacity: 1; }
+  98%, 100% { opacity: 0; }
+}
+.ren-eyes-open   { animation: ren-blink 7s ease-in-out infinite; }
+.ren-eyes-closed { animation: ren-blink-closed 7s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ren-eyes-open   { animation: none; opacity: 1; }
+  .ren-eyes-closed { animation: none; opacity: 0; }
+}
