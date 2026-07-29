@@ -6194,3 +6194,137 @@ a **width on an outline whose style is still `none`** — computed `outlineStyle
 caught only by reading computed style in a real engine; a DOM-shim unit test sees the class, finds it
 present, and passes. Anyone editing this triad should re-run
 `apps/web/tests/layout/focus-indicator.spec.ts` rather than trusting the class list.
+
+---
+
+## 2026-07-29 (fourth pass) — the public navbar becomes auth-aware, and FR-018 is superseded for the signed-in case only
+
+**Decision**: `/terms` and `/privacy` now render a **signed-in** navbar when the visitor has a
+session — **"Go to app" · theme toggle · profile dropdown**, replacing "Sign in / Sign up". The
+signed-out navbar is byte-for-byte unchanged. `spec.md` is **not** edited.
+
+### The defect
+
+The public navbar rendered "Sign in / Sign up" to everybody. The path that matters is not
+cosmetic: a pre-013 user meets the Terms/Privacy re-consent gate, opens one of the two documents
+from it — in a new tab, by design (`components/consent/terms-reconsent-screen.tsx:104`) — and the
+site greets them as a stranger. There are ~20 production accounts and **every pre-013 one meets
+that gate**.
+
+`/` was never affected: `app/(public)/page.tsx:65-70` already redirects a signed-in visitor to
+`/app`. The one caveat is that the redirect is gated on `getUser()` returning a user, so a failed
+auth read renders `/` signed-out — the same fail-open direction chosen below, and pre-existing.
+
+### FR-018 is superseded for one case, and the case it was written for is untouched
+
+`specs/013-public-surface-and-legal/spec.md:379-381`, verbatim:
+
+> **FR-018**: The public navbar MUST **visually match** the real app navbar but be a **separate
+> component** with its own nav items and **no dashboard or authed links**. It MUST NOT be
+> translucent.
+
+Restated in `contracts/public-surface.md:71` and `plan.md:111`.
+
+FR-018 was guarding a **different failure** from the one fixed here, and its own test says so:
+
+> "the failure mode is somebody 'de-duplicating' the two into one component that takes an optional
+> session — at which point an authed destination reaches a **signed-out** page"
+
+That guarantee is **absolute and unchanged**. What FR-018 should never have bound is the signed-in
+case, which did not exist when it was written — the public surface had no way to resolve a session
+at all, so there was no third state to legislate for.
+
+**Superseded, not amended.** Feature 013 has shipped (PR #194) and was production-verified (#199);
+its spec is a point-in-time record. The constitution states the convention directly:
+
+> "forward-looking feature-number references in shipped `specs/*/` are NOT retro-edited … those
+> spec docs are point-in-time records"
+
+And the precedent is exact: **PR #210 changed this very component's chrome and rewrote
+`public-shell.test.tsx`, touching no file under `specs/013/`**; PR #212 likewise. Both recorded the
+change here. So `spec.md`, `contracts/public-surface.md` and `plan.md` are left alone, and no
+`CHANGELOG.md` entry is written — per `CLAUDE.md`, that is for when a spec **is** amended.
+
+### The guard test is split, not relaxed
+
+`tests/unit/components/public/public-shell.test.tsx`:
+
+- **signed out** — the original assertion at its original strictness, unconditional: no `/app`,
+  `/onboarding` or `/auth` href; no `dashboard|sign out|my account|profile` in the rendered text;
+  and, new, **no avatar trigger at all** (the dropdown's contents live in a Radix portal that only
+  mounts on open, so the two text/href assertions cannot see them while it is closed — asserting
+  the trigger's absence is what actually covers `/app/account` and "Sign out").
+- Run across **all three ways of expressing "no viewer"** — prop omitted, `undefined`, `null` — so
+  a future merged component that defaults its session parameter, or branches on a truthiness test
+  a null profile object would pass, fails on at least one. The de-duplication risk went **up** with
+  this change, not down, because the component now has a signed-in branch to get wrong.
+- **signed in** — asserts the authed destinations ARE present, and that neither "Sign in" nor
+  "Sign up" survives.
+- The sheet gets the same pair, because otherwise the defect just moves into it.
+
+### It fails open, and it fails silent
+
+`lib/public-viewer.ts` cannot throw and cannot reject: auth failure, profiles failure and
+client-construction failure all return `null`, log `[public-viewer] FAIL-OPEN`, and render the
+signed-out navbar. Pinned by `tests/unit/lib/public-viewer.test.ts`.
+
+The asymmetry is the point. `/terms` and `/privacy` are **legally load-bearing** — FR-043d entitles
+a blocked user to read both in full, and the re-consent screen links into them as the gate's only
+exit. A wrong navbar is a nuisance, and it is the navbar those routes shipped with anyway; a legal
+page that 500s because an auth call timed out takes the gate's exit with it. Same direction as the
+consent gate in `app/(authed)/layout.tsx`, same loud-and-greppable log convention.
+
+**Not a client fetch.** Resolving auth after mount would flash "Sign in / Sign up" on every load,
+which is worse than the bug. `getUser()`, never `getSession()`.
+
+### Accepted cost: the `profiles` row is read twice per signed-in load
+
+`proxy.ts:243-247` already selects `full_name` on every GET, including these routes. The proxy is a
+**separate Node function invocation that completes before the render begins**, so React's
+per-request memoisation cannot span the two — this is not a `cache()` problem, it is two processes.
+
+The alternatives are worse: forwarding profile data on a request header across every route in the
+app to save one query on two of them, or dropping the name and rendering email-derived initials for
+every user. It is one indexed primary-key lookup of one column, and a **signed-out visitor pays
+none of it** — `readPublicViewer` returns before touching `profiles` when there is no user.
+Accepted, not engineered around.
+
+**There is a clean way out, and it belongs to a different change.** #213 (filed from this branch)
+proposes exempting `/terms` and `/privacy` from the proxy's onboarding gate — which is where the
+proxy's `profiles` select lives. Landing that removes the proxy's read on exactly these two routes
+and leaves `readPublicViewer`'s as the only one. It is not folded in here because `proxy.ts` is the
+highest-blast-radius file in the repo and wants its own PR with dedicated gate coverage. **When #213
+lands, this paragraph is superseded** — the duplicate read is gone rather than accepted.
+
+### Two things checked and deliberately left alone
+
+- **`public-footer.tsx` needs no change.** It renders no auth actions at all — wordmark,
+  `PUBLIC_DESTINATIONS`, and the `© 2026 Serenify` line. The bug cannot move into it.
+- **No sign-out control in the mobile sheet.** The profile dropdown is visible in the bar at every
+  width, exactly as in the app header, so sign-out is already one click. The app's own
+  `MobileMenu` carries none either.
+
+### No rendering behaviour changes
+
+`/terms` and `/privacy` were already `ƒ (Dynamic)` before this — the root layout awaits `headers()`
+for the CSP nonce (`app/layout.tsx:45`), so nothing in this application prerenders. Confirmed
+against a real `next build` on `main` **before** the change, not assumed, and re-confirmed after.
+
+### Two follow-ups routed to BACKLOG, and why the fix itself needs no entry
+
+Principle VIII governs **follow-ups deferred out of a change**. The navbar fix itself is not one —
+it is planned work shipping complete in its own PR, with no deferred remainder.
+
+Two genuine follow-ups were found while verifying it, and both are logged with issues:
+
+- **#213** — a signed-in user with `full_name IS NULL` cannot open `/terms` or `/privacy` at all;
+  `proxy.ts`'s onboarding gate exempts only `/api/*`. Measured, not reasoned: direct navigation,
+  a new tab (the `target="_blank"` path every legal anchor uses), and `/signup` all 302 to
+  `/onboarding`, while a signed-out control reaches both. **Latent, not a consent-integrity
+  break** — no user is ever asked to accept a document they cannot read. The 013 legal anchor is
+  on the *signup* form, where the user is signed out; the onboarding surface has none; and the
+  camera gate cannot appear before the block lifts, because `onboarding-form.tsx:55-67` writes
+  `full_name` and only then calls `setStep("anchor")`.
+- **#214** — `lib/consent/copy.ts:23-28` justifies omitting manager-visibility copy from the
+  camera gate on the grounds that "this surface links to it [the Privacy Policy]", and the shipped
+  `camera-consent-gate.tsx` renders no links at all. Pre-existing, shipped in 013.
