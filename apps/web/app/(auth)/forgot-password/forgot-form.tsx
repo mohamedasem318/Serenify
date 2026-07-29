@@ -77,9 +77,27 @@ export function ForgotForm({
             action={verifyResetOtp}
             successHref="/reset-password"
             successNote="One moment…"
-            helperText="The email also includes a 6-digit code. Enter it here if the link doesn't work."
+            helperText="If it arrives, it also includes a 6-digit code. Enter it here if the link doesn't work."
           />
         )}
+
+        {/* The exit. Without it, an address with no account can enter codes
+            forever: every attempt returns "that code didn't match. Try again,
+            or request a fresh email", which loops back to a mailbox nothing
+            was ever sent to. Phrased as a condition, not a verdict — it reads
+            the same to someone who does have an account, so it resolves the
+            dead end without resolving which case the reader is in. */}
+        <p className="text-sm leading-relaxed text-muted">
+          No email will arrive if that address doesn&apos;t have an account
+          yet — you can{" "}
+          <Link
+            href="/signup"
+            className="text-meadow-text underline-offset-4 hover:underline"
+          >
+            create one
+          </Link>
+          .
+        </p>
 
         <p className="pt-2 text-sm text-muted">
           <Link

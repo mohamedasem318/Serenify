@@ -6439,3 +6439,100 @@ on Windows with `core.autocrlf=true`, so the templates are CRLF in a Windows wor
 git (4966 vs 4895 bytes for `confirmation.html`). The Linux runner checks out LF, so what lands on
 hosted is byte-identical to the git blob. Running the script from a Windows shell would publish the
 CRLF form — harmless for HTML, but it is why CI is the intended caller.
+
+---
+
+## 2026-07-29 — The recovery hedge stays, the checkout pin moves to v7, and Gmail dark mode is left alone
+
+Three unrelated decisions that shipped on one branch (`fix/reset-copy-and-ci-pin`). Recorded
+separately below.
+
+### The `/forgot-password` hedge is security theatre, and it stays anyway
+
+**Do not "simplify" the sent-state copy to "We've sent you an email."** The conditional phrasing —
+*"If &lt;email&gt; is registered, we've sent a link to reset your password"* — looks like redundant
+hedging and it is not.
+
+**It is theatre, and that is stated plainly here so nobody has to rediscover it.** As an
+anti-enumeration control the hedge protects nothing. `signup-form.tsx` answers the same question
+outright — *"This email already has an account. Sign in, or reset your password."* — unauthenticated,
+with no password required. Anyone who wants to test an address against the user list uses signup, not
+recovery. `docs/security/02-auth-cookies-broadcast.md` records that disclosure as
+**intentional and not flagged**: the standard signup-form trade-off, since the visitor supplied the
+address and needs actionable guidance.
+
+**So the reason to keep it is no longer secrecy. It is accuracy.** `requestPasswordReset` always
+returns `{status:"ok"}` and swallows every Supabase error (FR-007), so the application genuinely does
+not know whether an email went out. An unconditional *"We've sent you an email"* would therefore be a
+claim the server cannot support — false for exactly the case that prompted this change, an address
+whose account had been deleted. The hedge is the honest sentence, independent of what it hides.
+
+Three further reasons it is not worth "cleaning up":
+
+- **It is already correct if the signup posture ever tightens.** Open-signup posture is tracked as a
+  separate axis. If disclosure at signup is ever closed, recovery is already right; removing the
+  hedge now creates work then.
+- **Changing one surface silently de-syncs three.** Signup discloses, login does not, recovery does
+  not. That split is deliberate and documented. Editing recovery alone leaves a posture nobody chose.
+- **The cost of keeping it is one subordinate clause.**
+
+**What was actually wrong, and was fixed.** Not the hedge — two honesty defects sitting next to it:
+
+1. The OTP helper asserted *"The email also includes a 6-digit code"*, a definite claim contradicting
+   the hedge nine lines above it on the same screen. Now *"If it arrives, it also includes…"*.
+2. A dead end. An address with no account could enter codes indefinitely; every attempt returned
+   *"That code didn't match. Try again, or request a fresh email"*, looping back to a mailbox nothing
+   was sent to. The sent state now carries an exit to `/signup`, phrased as a condition rather than a
+   verdict, so it reads identically to someone who does have an account.
+
+Both are pinned by `apps/web/tests/unit/forgot-password-copy.test.tsx`, which also guards the two
+properties that must not regress: the hedge stays, and nothing on the surface resolves which case the
+reader is in. The e2e specs that touch this copy cannot run (#208), which is why the coverage is a
+unit test.
+
+### `actions/checkout` moves from v4.4.0 to v7.0.1
+
+`11d5960a…` (`v4` / `v4.4.0`) declares `runs.using: node20`, which GitHub now forces onto Node 24 with
+a deprecation warning. The pin is now `3d3c42e5aac5ba805825da76410c181273ba90b1` (`v7` / `v7.0.1`,
+`runs.using: node24`).
+
+**v7 rather than v5, to avoid bumping this again.** Every breaking change between v5 and v7 is scoped
+to fork-PR checkout under `pull_request_target` / `workflow_run` — the `allow-unsafe-pr-checkout`
+default flip backported into v5.1.0 and v6.1.0, and the fork-PR block in v7.0.0 — or to a runner
+minimum (v5 → 2.327.1; v6 → 2.329.0, and only for Docker container actions). This workflow triggers on
+`push` to `main` and `workflow_dispatch`, performs a bare checkout with **no inputs**, and forbids
+`pull_request_target` outright, enforced by a whole-file substring assertion in
+`apps/web/tests/unit/ops/hosted-email-template-sync.test.ts`. None of the breaking changes can reach
+it. The runner is GitHub-hosted `ubuntu-latest`, far past both minimums.
+
+**Verified against the tag list and the action manifest, not the version string.** Both SHAs were
+resolved through `git/matching-refs/tags` and their `action.yml` `runs.using` values read at that
+exact ref. That test asserts `/^actions\/checkout@[0-9a-f]{40}$/` — SHA *shape*, not SHA *value* — so
+it stays green across this bump by design, and no test goes red on it. The empirical `node20 → node24`
+check is the evidence.
+
+**The 2026-07-29 entry above still reads `11d5960a…` / `@v4`. That is intentional.** This log is
+append-only; that entry records what was true when it was written, and this one supersedes it.
+
+### Gmail dark mode: not fixable, not a defect, left alone
+
+**Do not add Gmail-specific dark-mode hacks to `supabase/templates/*.html`.** A confirmation email
+renders light in a Gmail client set to dark mode. This is a client limitation, not template drift —
+the workflow's read-back proves hosted is byte-identical to the repo, and the
+`@media (prefers-color-scheme: dark)` overrides `wordmark-sync.test.ts` asserts are present in what
+Gmail received.
+
+Google's own [CSS support reference](https://developers.google.com/workspace/gmail/design/css)
+enumerates the supported media queries — `min-width`, `max-width`, `min-device-width`,
+`max-device-width`, `orientation`, `min-resolution`, `max-resolution` — and `prefers-color-scheme` is
+absent, as is any mention of dark mode. That is an absence from an enumerated list rather than an
+explicit denial, and it is the strongest vendor signal available. caniemail marks it supported across
+all four Gmail clients, but that is a community-maintained database whose Gmail entry was last tested
+2023-03-08, and it is contradicted by both the vendor list and direct observation. Gmail web darkens
+its own chrome and leaves the message body light; Android partially darkens; iOS often full-inverts.
+
+**The overrides are not losing to Gmail — they never reach it, and Gmail exposes no targetable hook.**
+They do pay off on Apple Mail, iOS Mail, Outlook 2019+, Samsung Mail and Thunderbird, so the dark
+blocks and their tests stay. Every available workaround (bulletproof table layering, transparent-PNG
+logos, inversion-tuned colours) fixes one Gmail client while risking the others and cannot be verified
+without a real-device matrix. A legible email with a mild aesthetic mismatch does not justify that.

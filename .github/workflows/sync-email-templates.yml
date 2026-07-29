@@ -71,8 +71,8 @@ jobs:
     name: publish templates and verify they applied
     runs-on: ubuntu-latest
     steps:
-      # Pinned to the commit `v4` / `v4.4.0` resolved to on 2026-07-29.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      # Pinned to the commit `v7` / `v7.0.1` resolved to on 2026-07-29.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       # The script builds the payload from supabase/config.toml + the template
       # files and fails before sending anything if either is missing or
