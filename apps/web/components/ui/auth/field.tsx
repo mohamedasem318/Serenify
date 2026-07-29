@@ -46,7 +46,7 @@ export const Field = (props: FieldProps) => {
           aria-invalid={error ? true : undefined}
           aria-describedby={errorId}
           {...inputProps}
-          className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-meadow"
+          className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-[color,background-color,border-color] placeholder:text-muted focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
         />
       )}
       {error && (

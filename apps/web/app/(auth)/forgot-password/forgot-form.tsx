@@ -123,7 +123,7 @@ export function ForgotForm({
             inputMode="email"
             aria-invalid={errors.email ? true : undefined}
             {...register("email")}
-            className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors placeholder:text-muted focus:border-meadow"
+            className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-[color,background-color,border-color] placeholder:text-muted focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
           />
           {errors.email?.message && (
             <p className="text-xs text-ink">{errors.email.message}</p>

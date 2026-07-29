@@ -89,7 +89,7 @@ export function DevicePicker({
         value={selected}
         onChange={handleChange}
         disabled={disabled}
-        className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-colors focus:border-meadow disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-12 w-full rounded-control border border-border bg-surface px-3 text-base text-ink outline-none transition-[color,background-color,border-color] focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow disabled:cursor-not-allowed disabled:opacity-60"
       >
         {hasLabels ? (
           devices.map((device, index) => (
