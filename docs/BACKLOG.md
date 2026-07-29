@@ -3296,3 +3296,86 @@ and violates "focus rings appear instantly"; the affected controls now scope the
 landing/public/nav keep the offset ring, so the codebase now carries **two** focus idioms
 rather than one. Converging them is a follow-up, not this change — it would touch surfaces
 this PR has no reason to open. **Address by**: fold into the next a11y sweep.
+
+## From the auth-aware public navbar fix — captured 2026-07-29
+
+### Signed-in users mid-onboarding cannot open `/terms` or `/privacy` — the proxy onboarding gate swallows both legal routes (#213)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#213 OPEN.**
+**Category**: routing / consent access — FR-043d adjacent
+**Observed**: 2026-07-29, while checking whether the auth-aware navbar's `profiles` read
+had a reachable null-`full_name` branch. Pre-existing on `main`; the navbar branch touches
+no routing.
+
+**Measured**, on a production build against local Supabase with `full_name` nulled for a
+real signed-in account:
+
+| attempt | landed on |
+| --- | --- |
+| direct GET `/terms` | `/onboarding` |
+| direct GET `/privacy` | `/onboarding` |
+| **new tab** → `/terms` (the `target="_blank"` path every legal anchor uses) | `/onboarding` |
+| GET `/signup` | `/onboarding` |
+| control: signed-**out** GET of both | reached both |
+
+**Cause**: `proxy.ts` steps 4 & 5 exempt only `/api/*`, so the onboarding gate swallows the
+two legal routes as well.
+
+**Why this is LATENT and not a live consent-integrity break.** No user is ever asked to
+accept a document while unable to read it — every ask lands in a state where the documents
+are reachable:
+
+| moment | `full_name` | consent asked | documents reachable |
+| --- | --- | --- | --- |
+| signup form | signed out | Terms + Privacy | yes |
+| onboarding, name step | `NULL` | none | **no** |
+| onboarding, anchor step (camera gate) | set | camera + inference | yes |
+| re-consent gate | set | Terms + Privacy | yes |
+
+The legal anchor 013 shipped is on the **signup** form
+(`components/consent/terms-acknowledgement-field.tsx:115,125`), where the user is signed
+out. There is no legal anchor anywhere on the onboarding surface. The camera gate cannot
+appear before the block lifts: `onboarding-form.tsx:55-67` writes `full_name` and only then
+calls `setStep("anchor")`. Abandonment was checked too — sign up, abandon, Terms revised,
+return — and the user is bounced to the name step, not shown the re-consent gate, finishes
+the name, and meets the gate normally with the documents reachable.
+
+What is actually wrong: a user mid-onboarding cannot **re-read** what they accepted minutes
+earlier at signup without signing out first.
+
+**Fix**: exempt the two routes the way `/api/*` is exempt —
+`const PUBLIC_LEGAL = new Set(["/terms", "/privacy"])`, added to the step-4 condition. It
+also removes the proxy's `profiles` select on those routes, which **eliminates the
+duplicate read** recorded in `docs/DECISIONS.md` 2026-07-29 (fourth pass).
+
+**Its own PR, not a ride-along.** `proxy.ts` is the highest-blast-radius file in the repo
+and wants dedicated `tests/unit/proxy-*.test.ts` coverage.
+
+### The camera consent gate links to nothing, but `lib/consent/copy.ts` says it links to the Privacy Policy — and omits manager-visibility copy on that basis (#214)
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#214 OPEN.**
+**Category**: consent surface / documented-intent vs shipped code
+**Observed**: 2026-07-29, while establishing whether onboarding asks for a consent whose
+governing document was unreachable (#213). Pre-existing on `main`, shipped in 013 (#194).
+
+`lib/consent/copy.ts:23-28` records why the camera gate deliberately says nothing about
+manager visibility, and rests that decision on a link: *"The Privacy Policy states
+visibility plainly and in full; **this surface links to it** rather than paraphrasing it."*
+
+`components/consent/camera-consent-gate.tsx` renders **no links at all** — `grep` for
+`<a`/`<Link`/`href` returns nothing, and no link constant for one exists in
+`lib/consent/copy.ts`. So the gate asks for camera-and-biometric-inference permission and
+points nowhere for the visibility answer it declines to give.
+
+Both sibling consent surfaces do link out: `terms-acknowledgement-field.tsx:115,125` and
+`terms-reconsent-screen.tsx:163`, both `target="_blank"` with accessible names naming the
+destination and the new tab. The camera gate is the only one of the three without.
+
+**The fix is not a copy tweak, and that is the difficulty.** `lib/consent/copy.ts:9-14`
+sets the publishing rule: the camera wording and `camera_inference@2026-07-26.1` landed in
+the same PR, so editing rendered wording requires appending a NEW registry revision with an
+explicit materiality judgment in that same PR, and
+`tests/unit/lib/consent/published-revisions.snapshot.json` makes that non-optional. A
+judgment is needed first — **does adding a link change the consent's wording, or only its
+navigation?** — and it should be recorded in `docs/DECISIONS.md` before any code is written.
+
+Interacts with #213 (a link added here is dead for exactly those users) but neither blocks
+the other: the camera gate is only reachable after `full_name` is set.

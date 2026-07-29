@@ -1,5 +1,6 @@
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicNavbar } from "@/components/public/public-navbar";
+import { readPublicViewer } from "@/lib/public-viewer";
 
 /**
  * Feature 013 — the public route group's shell (T028).
@@ -29,21 +30,41 @@ import { PublicNavbar } from "@/components/public/public-navbar";
  * resolves to either. P3 deliberately adds no `(public)/page.tsx`, which is the one file
  * that WOULD collide with `app/page.tsx` over `/`. The root-route takeover is P6.
  *
- * NO AUTHENTICATION CALL. This layout creates no Supabase client and reads no session, so
- * `/terms` and `/privacy` render for a signed-out visitor with no round trip and nothing
- * to fail (FR-016). The consent gate that will block the rest of the application must
- * never block these two routes — FR-043d requires a blocked user to still read both
- * documents in full — and the cheapest way to guarantee that is a shell that has no
- * session to check.
+ * ── IT READS THE SESSION NOW, AND THAT REVERSES A LINE THIS FILE USED TO CARRY ─────────
+ *
+ * Until 2026-07-29 this comment said "NO AUTHENTICATION CALL … the cheapest way to
+ * guarantee that is a shell that has no session to check". That was true, and it was
+ * also why `/terms` and `/privacy` rendered "Sign in / Sign up" to signed-in users — the
+ * shell could not tell the difference. A pre-013 user meets the re-consent gate, opens
+ * one of these documents from it, and is greeted as a stranger.
+ *
+ * WHAT THAT SENTENCE WAS PROTECTING IS UNCHANGED, and it was never the absence of the
+ * call. FR-043d requires a blocked user to still read both documents in full, and the
+ * guarantee is STRUCTURAL: these routes live outside `(authed)`, so the consent gate in
+ * `app/(authed)/layout.tsx` cannot run for them at all. Reading a session here does not
+ * reach that gate, and cannot re-introduce it.
+ *
+ * The cost the old sentence was buying — "nothing to fail" — is bought differently now:
+ * `readPublicViewer()` cannot throw and cannot reject. Every failure returns null, which
+ * renders exactly the navbar this route shipped with. See `lib/public-viewer.ts` for why
+ * the asymmetry runs that way. A signed-out visitor still pays one short-circuited
+ * `getUser()` and no profiles round trip.
+ *
+ * NO RENDERING BEHAVIOUR CHANGES. `/terms` and `/privacy` were already `ƒ (Dynamic)` in
+ * the build route table before this — the root layout awaits `headers()` for the CSP
+ * nonce (`app/layout.tsx:45`), so nothing in this application prerenders. Verified
+ * against a real `next build` on `main` rather than assumed.
  *
  * The column mirrors `app/(authed)/layout.tsx`: `min-h-dvh` flex column so a short
  * document still pins the footer to the bottom of the viewport rather than floating it
  * mid-screen.
  */
-export default function PublicLayout({ children }: { children: React.ReactNode }) {
+export default async function PublicLayout({ children }: { children: React.ReactNode }) {
+  const viewer = await readPublicViewer();
+
   return (
     <div className="flex min-h-dvh flex-col bg-bg">
-      <PublicNavbar />
+      <PublicNavbar viewer={viewer} />
       <main className="flex-1">{children}</main>
       <PublicFooter />
     </div>

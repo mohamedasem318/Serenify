@@ -61,3 +61,26 @@ export const PUBLIC_AUTH_ACTIONS = {
   signIn: { href: "/login", label: "Sign in" },
   signUp: { href: "/signup", label: "Sign up" },
 } as const satisfies Record<string, PublicDestination>;
+
+/**
+ * The way BACK, for a visitor who already has a session (2026-07-29).
+ *
+ * DELIBERATELY NOT IN `PUBLIC_DESTINATIONS`, and the reason is the same one that keeps
+ * the two auth actions out of it. That list is the *pages* — it drives the navbar's
+ * centre row, the sheet's page list AND the footer's link column — and this is not a
+ * page of the public site; it is the door out of it. Keeping it separate is also what
+ * lets `tests/unit/components/public/public-shell.test.tsx` go on asserting, without
+ * conditions, that the destination list contains nothing authed.
+ *
+ * THIS IS AN AUTHED DESTINATION AND IT IS RENDERED ONLY TO A RESOLVED SESSION. FR-018
+ * ("no dashboard or authed links") is superseded for the signed-in case only; the
+ * signed-out guarantee it was actually written to protect is unchanged and is asserted
+ * unconditionally. See docs/DECISIONS.md 2026-07-29.
+ *
+ * "Go to app" is three short words on purpose: it sits in a 44 px target at 320 px and
+ * must not wrap to a second line (FR-053).
+ */
+export const PUBLIC_RETURN_ACTION = {
+  href: "/app",
+  label: "Go to app",
+} as const satisfies PublicDestination;

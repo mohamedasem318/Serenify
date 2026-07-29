@@ -15,6 +15,11 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/terms",
 }));
 
+// The sign-out server action, stubbed the same way `header/profile-dropdown.test.tsx`
+// stubs it — importing the real module pulls `next/headers` into a happy-dom process
+// that has no request to read cookies from.
+vi.mock("@/app/(authed)/actions", () => ({ signOut: vi.fn() }));
+
 import { PUBLIC_DESTINATIONS } from "@/components/public/destinations";
 import { PublicFooter } from "@/components/public/public-footer";
 import { PublicMobileNav } from "@/components/public/public-mobile-nav";
@@ -79,22 +84,135 @@ describe("PublicNavbar", () => {
     }
   });
 
-  it("exposes NO dashboard or authed link anywhere (FR-018)", () => {
-    // The single assertion this component exists to satisfy. The public navbar looks
-    // identical to the app header, and the failure mode is somebody "de-duplicating" the
-    // two into one component that takes an optional session — at which point an authed
-    // destination reaches a signed-out page. This is what would catch that.
-    const { container } = render(<PublicNavbar />);
-    const hrefs = Array.from(container.querySelectorAll("a[href]")).map(
-      (a) => a.getAttribute("href") ?? "",
-    );
+  /**
+   * FR-018's leak protection, kept at exactly its original strictness.
+   *
+   * FR-018 (spec.md:379) says the public navbar carries "no dashboard or authed links".
+   * As of 2026-07-29 that is **superseded for the signed-in case only** — a signed-in
+   * viewer now gets "Go to app" and the profile dropdown (docs/DECISIONS.md). What FR-018
+   * was actually guarding is untouched and asserted below without conditions: an authed
+   * destination must never reach a visitor who has no session.
+   *
+   * THE ORIGINAL COMMENT NAMED THE FAILURE AND IT IS STILL LIVE: somebody
+   * "de-duplicating" this component and the app header into one that takes an optional
+   * session, at which point an authed destination reaches a signed-out page. That risk
+   * went UP with this change, not down, because the component now has a signed-in branch
+   * to get wrong. So the signed-out case is asserted across all three ways of expressing
+   * "no viewer" — omitted, `undefined`, and `null` — because a merged component that
+   * defaults its session parameter, or that branches on a truthiness test that a null
+   * profile object would pass, fails on at least one of them.
+   */
+  describe("signed out — exposes NO dashboard or authed link anywhere (FR-018)", () => {
+    const noViewer = [
+      ["prop omitted", <PublicNavbar key="omitted" />],
+      ["viewer={undefined}", <PublicNavbar key="undef" viewer={undefined} />],
+      ["viewer={null}", <PublicNavbar key="null" viewer={null} />],
+    ] as const;
 
-    for (const href of hrefs) {
-      expect(href, `authed destination on the public navbar: ${href}`).not.toMatch(
-        /^\/app(\/|$)|^\/onboarding(\/|$)|^\/auth(\/|$)/,
+    it.each(noViewer)("%s → no authed href", (_label, element) => {
+      const { container } = render(element);
+      const hrefs = Array.from(container.querySelectorAll("a[href]")).map(
+        (a) => a.getAttribute("href") ?? "",
       );
-    }
-    expect(container.textContent).not.toMatch(/\b(dashboard|sign out|my account|profile)\b/i);
+
+      expect(hrefs.length).toBeGreaterThan(0);
+      for (const href of hrefs) {
+        expect(href, `authed destination on the public navbar: ${href}`).not.toMatch(
+          /^\/app(\/|$)|^\/onboarding(\/|$)|^\/auth(\/|$)/,
+        );
+      }
+    });
+
+    it.each(noViewer)("%s → no authed vocabulary in the rendered text", (_label, element) => {
+      const { container } = render(element);
+      expect(container.textContent).not.toMatch(
+        /\b(dashboard|sign out|my account|profile)\b/i,
+      );
+    });
+
+    it.each(noViewer)("%s → no avatar trigger at all", (_label, element) => {
+      // The dropdown's trigger is the thing that HOLDS the authed destinations, and it
+      // is rendered by a Radix portal that only mounts its content on open — so the two
+      // assertions above cannot see /app/account or "Sign out" while the menu is closed.
+      // Asserting the trigger's absence is what actually covers them here.
+      render(element);
+      expect(screen.queryByLabelText("Open profile menu")).toBeNull();
+    });
+
+    it("still offers the two doors IN, which is the signed-out surface's whole job", () => {
+      render(<PublicNavbar />);
+      expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+      expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/signup");
+    });
+  });
+
+  /**
+   * Signed in — the bug this change fixes.
+   *
+   * A pre-013 user meets the re-consent gate, opens /terms from it (in a new tab, by
+   * design — `terms-reconsent-screen.tsx:104`), and the site greets them as a stranger.
+   * There are ~20 production accounts and every pre-013 one meets that gate.
+   */
+  describe("signed in", () => {
+    const viewer = { fullName: "Amira Hassan", email: "amira@example.com" } as const;
+
+    it("offers a direct way back into the application", () => {
+      render(<PublicNavbar viewer={viewer} />);
+      expect(screen.getByRole("link", { name: "Go to app" })).toHaveAttribute("href", "/app");
+    });
+
+    it("shows the profile dropdown, with the viewer's initials", () => {
+      render(<PublicNavbar viewer={viewer} />);
+      expect(screen.getByLabelText("Open profile menu")).toHaveTextContent("AH");
+    });
+
+    it("carries Account and Sign out inside the dropdown", async () => {
+      render(<PublicNavbar viewer={viewer} />);
+      await userEvent.click(screen.getByLabelText("Open profile menu"));
+
+      expect(screen.getByTestId("profile-dropdown-account")).toHaveAttribute(
+        "href",
+        "/app/account",
+      );
+      expect(screen.getByTestId("profile-dropdown-signout")).toBeInTheDocument();
+    });
+
+    it("shows NEITHER Sign in NOR Sign up", () => {
+      // The actual reported defect. Both must be gone, not merely de-emphasised.
+      render(<PublicNavbar viewer={viewer} />);
+      expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Sign up" })).toBeNull();
+    });
+
+    it("keeps the theme toggle and the public destinations", () => {
+      // The signed-in branch replaces the auth pair and nothing else.
+      const { container } = render(<PublicNavbar viewer={viewer} />);
+      expect(screen.getByTestId("theme-toggle")).toBeInTheDocument();
+
+      const hrefs = Array.from(container.querySelectorAll("a[href]")).map((a) =>
+        a.getAttribute("href"),
+      );
+      for (const { href } of PUBLIC_DESTINATIONS) {
+        expect(hrefs).toContain(href);
+      }
+    });
+
+    it("gives 'Go to app' a 44 px target whose label cannot wrap (FR-053)", () => {
+      render(<PublicNavbar viewer={viewer} />);
+      const cls = screen.getByRole("link", { name: "Go to app" }).className;
+      expect(cls).toMatch(/\bh-11\b/);
+      expect(cls).toMatch(/whitespace-nowrap/);
+    });
+
+    it("hides 'Go to app' below 420 px, where the bar has no room for it", () => {
+      // Same budget the signed-out bar spends on Sign up: at 320 px the row already
+      // carries a hamburger, a wordmark, a theme toggle and now a 44 px avatar. The
+      // sheet carries it at every width instead (asserted in the PublicMobileNav block).
+      render(<PublicNavbar viewer={viewer} />);
+      const cls = screen.getByRole("link", { name: "Go to app" }).className;
+      expect(cls).toMatch(/\bhidden\b/);
+      expect(cls).toMatch(/min-\[420px\]:inline-flex/);
+    });
   });
 
   it("renders the theme toggle, matching the app header's placement", () => {
@@ -303,6 +421,56 @@ describe("PublicMobileNav", () => {
   it("carries a visible focus indicator (FR-055)", () => {
     render(<PublicMobileNav />);
     expect(screen.getByLabelText("Open menu").className).toMatch(/focus-visible:ring-2/);
+  });
+
+  /**
+   * The sheet is a SECOND surface, and the bug moves into it if it is left alone.
+   *
+   * Below 420 px the bar drops its one wide control — Sign up when signed out, "Go to
+   * app" when signed in — so at the narrowest widths this panel is the only place that
+   * control exists. It therefore has to know about the session too.
+   */
+  describe("signed in", () => {
+    const viewer = { fullName: "Amira Hassan", email: "amira@example.com" } as const;
+
+    it("offers 'Go to app' instead of the two doors in", async () => {
+      render(<PublicMobileNav viewer={viewer} />);
+      await userEvent.click(screen.getByLabelText("Open menu"));
+
+      expect(screen.getByRole("link", { name: "Go to app" })).toHaveAttribute("href", "/app");
+      expect(screen.queryByRole("link", { name: "Sign in" })).toBeNull();
+      expect(screen.queryByRole("link", { name: "Sign up" })).toBeNull();
+    });
+
+    it("keeps every public destination in the page list", async () => {
+      render(<PublicMobileNav viewer={viewer} />);
+      await userEvent.click(screen.getByLabelText("Open menu"));
+
+      for (const { label } of PUBLIC_DESTINATIONS) {
+        expect(screen.getByRole("link", { name: label })).toBeInTheDocument();
+      }
+    });
+  });
+
+  describe("signed out — the sheet leaks nothing either (FR-018)", () => {
+    it.each([
+      ["prop omitted", <PublicMobileNav key="omitted" />],
+      ["viewer={null}", <PublicMobileNav key="null" viewer={null} />],
+    ])("%s → no authed href in the open sheet", async (_label, element) => {
+      const { baseElement } = render(element);
+      await userEvent.click(screen.getByLabelText("Open menu"));
+
+      // `baseElement`, not `container`: Radix portals the panel to document.body.
+      const hrefs = Array.from(baseElement.querySelectorAll("a[href]")).map(
+        (a) => a.getAttribute("href") ?? "",
+      );
+      expect(hrefs.length).toBeGreaterThan(0);
+      for (const href of hrefs) {
+        expect(href, `authed destination in the public sheet: ${href}`).not.toMatch(
+          /^\/app(\/|$)|^\/onboarding(\/|$)|^\/auth(\/|$)/,
+        );
+      }
+    });
   });
 });
 
