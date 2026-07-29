@@ -1,15 +1,20 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   broadcastSignIn,
   destinationBroadcastsSignIn,
 } from "@/lib/auth-broadcast";
 import { useMediaQuery } from "@/hooks/use-media-query";
+import { cn } from "@/lib/utils";
 
-import { OtpBoxes, type OtpBoxesHandle } from "./otp-boxes";
+import {
+  OtpBoxes,
+  SUCCESS_NOTE_DELAY_MS,
+  type OtpBoxesHandle,
+} from "./otp-boxes";
 import { OtpNotice } from "./otp-notice";
 
 // Shared shape of the verify Server Action result — matches both
@@ -31,9 +36,31 @@ type Props = {
   action: VerifyOtpAction;
   successHref: string;
   helperText: string;
+  /**
+   * The quiet line that reads beneath the verified pill while the handoff
+   * lands — the caller's words, because only the caller knows where the user
+   * is going. Required: a success handoff with nothing under the tick is what
+   * #190 was about.
+   */
+  successNote: string;
 };
 
 const EMPTY: string[] = ["", "", "", "", "", ""];
+
+/**
+ * router.replace() → the "Continue" escape hatch appears.
+ *
+ * This should never be reached. It exists for the case where navigation
+ * silently doesn't happen: without it the user is left looking at a verified
+ * tick on a page that never moves, with nothing to press. Deliberately NOT a
+ * countdown — a "redirecting in 3, 2, 1" reads perky against a calm brand,
+ * adds real waiting to fix a perceived problem, and implies the user could
+ * stop it.
+ */
+const HANDOFF_STALL_MS = 4000;
+
+/** What sits in the reserved slot beneath the boxes during a success handoff. */
+type Handoff = "none" | "note" | "stalled";
 
 /**
  * 6-digit OTP fallback. Inline beside the "check your email" (signup) and
@@ -51,7 +78,13 @@ const EMPTY: string[] = ["", "", "", "", "", ""];
  * themselves resolve into the verified pill, so there is no separate submit
  * button (the prior amber-error single-input form is retired per FR-002).
  */
-export function OtpPanel({ email, action, successHref, helperText }: Props) {
+export function OtpPanel({
+  email,
+  action,
+  successHref,
+  helperText,
+  successNote,
+}: Props) {
   const router = useRouter();
   const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
   const boxesRef = useRef<OtpBoxesHandle>(null);
@@ -62,6 +95,22 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
     "input",
   );
   const [error, setError] = useState<string | null>(null);
+  const [handoff, setHandoff] = useState<Handoff>("none");
+
+  // Both handoff timers outlive the awaits in verify(), so they have to be
+  // cancellable from unmount — otherwise the 4s stall timer fires into a
+  // component that navigated away and sets state on nothing.
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  useEffect(
+    () => () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    },
+    [],
+  );
+  const later = (fn: () => void, ms: number) => {
+    timers.current.push(setTimeout(fn, ms));
+  };
 
   async function verify(code: string) {
     setError(null);
@@ -94,9 +143,21 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
       // motion shows the pill directly, then navigates). Behaviour is
       // unchanged: the same router.replace(successHref) + refresh as before.
       setStatus("success");
+      // The note's slot is reserved from here, so the reflow lands on the same
+      // frame the halo sweep starts — a moment that already carries a strong
+      // visual event — and the note's own entrance 2s later is a pure
+      // crossfade with no layout shift under it.
+      if (reducedMotion) {
+        // Batched with setStatus above, so the note mounts already opaque:
+        // reduced-motion users asked for less motion, not a slower fade.
+        setHandoff("note");
+      } else {
+        later(() => setHandoff("note"), SUCCESS_NOTE_DELAY_MS);
+      }
       await boxesRef.current?.playSuccess();
       router.replace(successHref);
       router.refresh();
+      later(() => setHandoff("stalled"), HANDOFF_STALL_MS);
       return;
     }
     setError(result.message);
@@ -179,6 +240,40 @@ export function OtpPanel({ email, action, successHref, helperText }: Props) {
         reducedMotion={reducedMotion}
         invalid={status === "error"}
       />
+
+      {/* Mounted for the whole success sequence so the note's entrance costs no
+          layout shift. aria-live announces the note after the pill's own
+          "Verified", then announces "Continue" if the handoff stalls — which is
+          the one case where a screen-reader user most needs to hear it. */}
+      {status === "success" && (
+        <div
+          aria-live="polite"
+          className="flex min-h-5 items-center justify-center"
+        >
+          {handoff === "stalled" ? (
+            // A real anchor, not a button re-calling the router: this only
+            // appears BECAUSE router.replace silently didn't happen, and a
+            // button would re-enter the same wedged path. A full document
+            // navigation is the actual escape.
+            <a
+              href={successHref}
+              className="inline-flex min-h-11 items-center justify-center rounded-control px-3 text-sm font-medium text-meadow-text underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Continue
+            </a>
+          ) : (
+            <p
+              className={cn(
+                "text-xs text-muted",
+                !reducedMotion && "transition-opacity duration-300 ease-out",
+                handoff === "note" ? "opacity-100" : "opacity-0",
+              )}
+            >
+              {successNote}
+            </p>
+          )}
+        </div>
+      )}
 
       {error && <OtpNotice>{error}</OtpNotice>}
     </section>

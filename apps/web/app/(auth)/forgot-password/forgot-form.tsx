@@ -76,6 +76,7 @@ export function ForgotForm({
             email={submittedEmail}
             action={verifyResetOtp}
             successHref="/reset-password"
+            successNote="One moment…"
             helperText="The email also includes a 6-digit code. Enter it here if the link doesn't work."
           />
         )}
