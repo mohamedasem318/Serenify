@@ -2,14 +2,13 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { BEAT11_WIDE, COMPOSITE } from "../../app/framing";
-import { OS_FONT, STANDIN } from "../../app/furniture";
 import { SCROLL, VIEWFINDER, emphasisCapFor, scrolled } from "../../app/geometry";
+import { useHover } from "../../app/hover";
 import { MonitorPage } from "../../app/monitor";
 import { useDrift, useEmphasis } from "../../app/motion";
+import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN } from "../../app/player";
 import { Pointer } from "../../app/pointer";
-import { StandIn } from "../../app/shell";
-import { Camera, frameRect, rect } from "../Camera";
-import { PLAYER } from "../copy";
+import { Camera, frameRect } from "../Camera";
 import { useExpression } from "../rig";
 import { H, W } from "../theme";
 
@@ -56,137 +55,31 @@ import { H, W } from "../theme";
  *   f214  everything has stopped travelling
  *   f214–234  the linger. Nothing moves but his breath and the nod.
  *
- * The music player stays a STAND-IN this pass — register item 7, deliberately.
- */
-
-const WIN = rect(300, 220, 600, 280);
-
-/** The transport's play button — `WIN.x + 254`, `WIN.y + 177`, 44 × 44. Its centre. */
-const PLAY = { x: WIN.x + 276, y: WIN.y + 199 } as const;
-
-/**
- * The music player — a STAND-IN, in dark.
+ * ══ THE MUSIC PLAYER IS DRAWN NOW ═══════════════════════════════════════════════════
  *
- * Register item 7 keeps it a stand-in this pass. What it owed was to stop reading as a
- * light-mode rectangle sitting in a dark film, which it now does via the `STANDIN` ramp — a
- * genuine dark ramp rather than the old light values inverted, because perceptual lightness is
- * not symmetric about the midpoint and inverting a light ramp yields muddy mid-greys with the
- * wrong spacing.
+ * It was a STAND-IN through the component pass — deferred-register item 7, deliberately — and it
+ * is not one any more. `app/player.tsx` draws the window this beat always described: a real
+ * transport with prev / play-pause / next glyphs, a scrubber carrying elapsed and total time,
+ * original album art from `app/albumart.tsx`, and the track and artist named on screen. The
+ * geometry it exports (`PLAYER_WIN`, `PLAY_CENTRE`) is what this file frames and aims the pointer
+ * at, so the camera and the hand read the component's own numbers instead of a copy of them.
  *
- * **The track is named on screen and the naming is the point** — it is the evidence Ren knew
- * him. Under liberty L2b the player is generic while Billie Jean and Michael Jackson are named.
- * The album art stays a labelled block: when it is drawn it must be ORIGINAL, never a
- * reproduction of a real sleeve, and authoring it belongs to the assets pass.
+ * **It is generic, and that is decided (liberty L2b).** Not Spotify, not Apple Music, not a clone
+ * of either — a desktop player window of a kind that has existed since Winamp. The naming is the
+ * load-bearing part: Billie Jean and Michael Jackson on screen are the evidence Ren knew his
+ * taste, and none of that needs a branded interface underneath it.
+ *
+ * **The artwork is ORIGINAL, and that is a requirement rather than a preference.** No real sleeve
+ * is reproduced, approximated or referenced, for three reasons that stack: the film is
+ * **promotional**, which is the fair-use factor that cuts hardest and cuts against us; the sleeve
+ * is a **copyright separate from the recording**, so not playing the song does nothing for it; and
+ * the sleeve in question is a **photograph of a person**, so likeness rights put a second
+ * rightsholder on top of the first. The full reasoning lives next to the art, in `albumart.tsx`.
+ *
+ * The window's `z-index: 80` — the fix for the viewfinder punching a webcam feed through the
+ * corner of a window he had just opened — moved into `player.tsx` with the component, and the bug
+ * it closes is recorded there. It is not re-derived here.
  */
-const MusicPlayer: React.FC<{ open: number; playing: boolean; progress: number }> = ({
-  open,
-  playing,
-  progress,
-}) => (
-  <div
-    style={{
-      opacity: open,
-      scale: 0.94 + open * 0.06,
-      transformOrigin: "50% 50%",
-      fontFamily: OS_FONT,
-      /*
-       * ── IT IS AN APPLICATION WINDOW, SO IT SITS ABOVE EVERYTHING ──
-       *
-       * The player was layered between the page and the viewfinder: the browser page painted
-       * under it and the viewfinder painted OVER it, so a window he had just opened had a webcam
-       * feed punched through its corner. It reads as a rendering fault rather than as depth,
-       * because nothing in an operating system behaves that way — a foreground window occludes
-       * the browser and everything inside it.
-       *
-       * The cause was ordering rather than intent. `<Viewfinder/>` is `z-10` inside the
-       * monitoring stage and the overlay layer carries no stacking of its own, so the two
-       * competed on DOM order in a shared context. 80 clears the viewfinder and the app header's
-       * `z-50` alike, and sits below the pointer's 90 — a cursor is above every window.
-       */
-      position: "relative",
-      zIndex: 80,
-    }}
-  >
-    <StandIn x={WIN.x} y={WIN.y} w={WIN.w} h={WIN.h} radius={12} fill={STANDIN.surface} />
-    <StandIn x={WIN.x} y={WIN.y} w={WIN.w} h={32} radius={0} fill={STANDIN.panel} />
-    <div
-      style={{
-        position: "absolute",
-        left: WIN.x + 14,
-        top: WIN.y + 9,
-        fontSize: 14,
-        fontWeight: 700,
-        color: STANDIN.body,
-      }}
-    >
-      {PLAYER.app}
-    </div>
-
-    <StandIn
-      x={WIN.x + 24}
-      y={WIN.y + 52}
-      w={160}
-      h={160}
-      radius={8}
-      fill={STANDIN.panelAlt}
-      label="album art"
-    />
-
-    <div
-      style={{
-        position: "absolute",
-        left: WIN.x + 208,
-        top: WIN.y + 62,
-        width: 360,
-        fontSize: 26,
-        fontWeight: 700,
-        color: STANDIN.ink,
-      }}
-    >
-      {PLAYER.track}
-    </div>
-    <div
-      style={{
-        position: "absolute",
-        left: WIN.x + 208,
-        top: WIN.y + 102,
-        width: 360,
-        fontSize: 17,
-        color: STANDIN.body,
-      }}
-    >
-      {PLAYER.artist}
-    </div>
-
-    <StandIn x={WIN.x + 208} y={WIN.y + 152} w={360} h={5} radius={3} fill={STANDIN.ghost} border={STANDIN.ghost} />
-    <StandIn
-      x={WIN.x + 208}
-      y={WIN.y + 152}
-      w={360 * progress}
-      h={5}
-      radius={3}
-      fill={STANDIN.line}
-      border={STANDIN.line}
-    />
-
-    <StandIn x={WIN.x + 208} y={WIN.y + 182} w={34} h={34} radius={17} fill={STANDIN.panelAlt} />
-    <StandIn x={WIN.x + 254} y={WIN.y + 177} w={44} h={44} radius={22} fill={STANDIN.fill} border={STANDIN.line} />
-    <div
-      style={{
-        position: "absolute",
-        left: WIN.x + 254,
-        top: WIN.y + 188,
-        width: 44,
-        textAlign: "center",
-        fontSize: 17,
-        color: STANDIN.ink,
-      }}
-    >
-      {playing ? "❚❚" : "▶"}
-    </div>
-    <StandIn x={WIN.x + 310} y={WIN.y + 182} w={34} h={34} radius={17} fill={STANDIN.panelAlt} />
-  </div>
-);
 
 export const Beat11ReturnToEase: React.FC = () => {
   const frame = useCurrentFrame();
@@ -200,6 +93,31 @@ export const Beat11ReturnToEase: React.FC = () => {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
+
+  /**
+   * ── THE PLAY BUTTON LIGHTS BEFORE HE PRESSES IT (§2) ────────────────────────────────
+   *
+   * §2's finding, in this beat exactly: *the cursor arrives at a control and the control does
+   * nothing until the click.* The pointer lands on the transport at f20 and clicks at f24, and
+   * across those four frames the button used to sit inert — so the press read as an effect that
+   * happened near the cursor rather than as the cursor doing something to a button that had
+   * already acknowledged it.
+   *
+   * The window opens at **f18**, two frames before the arrow settles, because a real pointer
+   * crosses a control's edge before it stops moving and a light that arrives *with* the stop reads
+   * as triggered by the stop. It closes at **f52**, the waypoint that carries the pointer off the
+   * window — the click sits inside the window rather than at its end, since a hand is still over a
+   * button while it presses it.
+   *
+   * **This uses `useHover`, not `<Hover/>`, and the distinction is the point.** The player is an
+   * AUTHORED surface — the video owns its markup — so there is no shipped `apps/web` rule to
+   * reproduce and no shipped element for a scoped stylesheet to address by selector. The treatment
+   * applied at the far end (`player.tsx`'s `TransportButton`) is therefore the house
+   * `hover:opacity-90` idiom every filled `<Button/>` variant in the product carries, on the same
+   * 150ms ramp — so the drawn control and the shipped ones light at the same rate, and nobody
+   * later reads this as evidence that a transport button ships a hover.
+   */
+  const playHover = useHover(18, 52);
 
   // amber → meadow, on the component's own 1.3s ease. It drifts where it can be SEEN — while
   // the bloom is still framed, before the camera and the page start travelling.
@@ -263,8 +181,8 @@ export const Beat11ReturnToEase: React.FC = () => {
       <Camera
         keys={[
           { frame: 0, shot: { cx: W / 2, cy: H / 2, w: W } },
-          { frame: 20, shot: frameRect(WIN, 24) },
-          { frame: 52, shot: frameRect(WIN, 24) },
+          { frame: 20, shot: frameRect(PLAYER_WIN, 24) },
+          { frame: 52, shot: frameRect(PLAYER_WIN, 24) },
           // Wide on the viewfinder, not tight: the headphones, the drifting notes and the head
           // nod all need room, and cropping to the face loses what makes the beat work.
           { frame: 84, shot: frameRect(scrolled(VIEWFINDER, SCROLL.monitor), 100) },
@@ -294,7 +212,12 @@ export const Beat11ReturnToEase: React.FC = () => {
           sessionFrom={47 * 60 + 33}
           overlay={
             <>
-              <MusicPlayer open={open} playing={frame >= 24} progress={trackProgress} />
+              <MusicPlayer
+                open={open}
+                playing={frame >= 24}
+                progress={trackProgress}
+                playHover={playHover}
+              />
               {/*
                * He presses play. Beat 11 opens on an interface appearing and a track starting,
                * and without a hand on it the sequence reads as the app doing it to him — which
@@ -303,9 +226,9 @@ export const Beat11ReturnToEase: React.FC = () => {
                */}
               <Pointer
                 path={[
-                  { frame: 6, x: PLAY.x - 170, y: PLAY.y + 120 },
-                  { frame: 20, x: PLAY.x, y: PLAY.y },
-                  { frame: 52, x: PLAY.x + 260, y: PLAY.y + 210 },
+                  { frame: 6, x: PLAY_CENTRE.x - 170, y: PLAY_CENTRE.y + 120 },
+                  { frame: 20, x: PLAY_CENTRE.x, y: PLAY_CENTRE.y },
+                  { frame: 52, x: PLAY_CENTRE.x + 260, y: PLAY_CENTRE.y + 210 },
                 ]}
                 clicks={[24]}
                 visible={{ from: 4, to: 62 }}

@@ -6,14 +6,21 @@ import { FramingOverlay } from "@/components/anchor/framing-overlay";
 import { GetReadyCountdown } from "@/components/anchor/get-ready-countdown";
 import { GreenRoom } from "@/components/anchor/green-room";
 import { Intro } from "@/components/anchor/intro";
-import { CaptureProgressBar } from "@/components/anchor/recording-timer";
+import { CaptureProgressBar, RecordingTimer } from "@/components/anchor/recording-timer";
 import { RecordingStage } from "@/components/anchor/recording-stage";
 import { SuccessState } from "@/components/anchor/success-state";
 import { Header } from "@/components/header/header";
 
 import { PROTAGONIST } from "../greybox/copy";
 import { CharacterRig, type Pose } from "../greybox/rig";
-import { BreathPacer, CheckDraw, ORB_CYCLE_REAL, Ripple } from "./motion";
+import {
+  BreathPacer,
+  CheckDraw,
+  IntroPrivacyEmphasis,
+  ORB_CYCLE_REAL,
+  Ripple,
+  useCountdown,
+} from "./motion";
 import { AppShell, CALIBRATE_COL, CALIBRATE_PREVIEW } from "./shell";
 
 /**
@@ -48,6 +55,33 @@ export type CalibPhase =
   | "success";
 
 /**
+ * The 3 → 2 → 1, actually counting.
+ *
+ * `<GetReadyCountdown/>` decrements through `setTimeout`, which never fires in a frame-addressed
+ * render — so it rendered **"3" for the whole beat** and the shot cut to the recording from a
+ * static numeral. That is what read as "too fast": there was no count, only a jump.
+ *
+ * `from` seeds the component's state once, so a changing prop cannot move it; the `key` is what
+ * makes each number a fresh mount. Everything visible — the face, the size, the tabular figures,
+ * the drop shadow, the 300ms zoom-and-fade — stays the component's. See `useCountdown`.
+ */
+const Countdown: React.FC<{ from: number }> = ({ from }) => {
+  const { value, enter } = useCountdown(from);
+  return (
+    <div
+      style={{
+        opacity: enter,
+        // `animate-in … zoom-in-75` — the component's own entrance, which its reduced-motion
+        // branch strips. 0.75 → 1 over 300ms.
+        scale: 0.75 + 0.25 * enter,
+      }}
+    >
+      <GetReadyCountdown key={value} from={value} onComplete={() => {}} />
+    </div>
+  );
+};
+
+/**
  * The preview box. The character fills it, and the rig sizes itself off the box's ASPECT rather
  * than its pixels — so the same component that fills the 16:9 monitoring viewfinder fills this
  * 16:9 one with no second set of numbers. Under the old 3:4 greybox box it was re-framing to a
@@ -62,7 +96,7 @@ const Preview: React.FC<{
   recordingFrom: number;
   /** How long one inhale+exhale runs in this beat. See `useOrbBreath`. */
   breathCycle: number;
-}> = ({ phase, pose, gateReady, recordingFrom, breathCycle }) => (
+}> = ({ phase, pose, gateReady, countdownFrom, recordingFrom, breathCycle }) => (
   <div className={CALIBRATE_PREVIEW}>
     {/* `anchor-recorder.tsx:580` — the feed is eased to softened for get-ready and recording
         (FR-013), sharp in the green room. The blur is the component's own `blur-[2px]`. */}
@@ -82,7 +116,7 @@ const Preview: React.FC<{
       <>
         <FramingOverlay showNudge={false} />
         <div className="absolute inset-0 grid place-items-center bg-ink/10">
-          <GetReadyCountdown onComplete={() => {}} />
+          <Countdown from={countdownFrom} />
         </div>
       </>
     )}
@@ -115,8 +149,16 @@ export const CalibratePage: React.FC<{
   phase: CalibPhase;
   pose: Pose;
   gateReady?: boolean;
-  /** Seconds left on the 60s capture. Drives the real `<RecordingStage/>`. */
+  /** Seconds left on the 60s capture, continuous. Drives the bar and `<RecordingStage/>`. */
   remaining?: number;
+  /**
+   * The same value, **held** for four frames at a time, for the numerals. See `useCaptureMinute`:
+   * at 30× compression a per-frame readout is thirty values a second, which is a texture rather
+   * than a number. The bar stays continuous; only the digits are paced.
+   */
+  shownRemaining?: number;
+  /** 0–1, the in-place emphasis on beat 5a's privacy line (§7 / L12). */
+  privacyEmphasis?: number;
   /** Frame the success state landed on — the ripple and the check draw from it. */
   successFrom?: number;
   countdownFrom?: number;
@@ -133,6 +175,8 @@ export const CalibratePage: React.FC<{
   pose,
   gateReady = false,
   remaining = 38,
+  shownRemaining = remaining,
+  privacyEmphasis = 0,
   successFrom = 0,
   countdownFrom = 0,
   recordingFrom = 0,
@@ -150,7 +194,14 @@ export const CalibratePage: React.FC<{
       }
     >
       <section className="space-y-6">
-        {phase === "intro" && <Intro onTurnOnCamera={() => {}} />}
+        {phase === "intro" && (
+          // `data-intro` is the handle the emphasis and the hover both address. The component is
+          // untouched; a wrapper is the only seam the video has into a shipped surface.
+          <div data-probe="intro" data-intro>
+            <Intro onTurnOnCamera={() => {}} />
+            <IntroPrivacyEmphasis t={privacyEmphasis} />
+          </div>
+        )}
 
         {(phase === "green-room" || phase === "get-ready" || phase === "recording") && (
           <div className={CALIBRATE_COL}>
@@ -186,21 +237,54 @@ export const CalibratePage: React.FC<{
              * fill advances every frame instead of once a second. That is smoother than the
              * product and is the compression the sheet already declares (~2s of a 60s process).
              */}
+            {/*
+             * ── AND THE NUMBERS ARE IN FRAME (§4.2) ──
+             *
+             * The bar came back last pass and the readout did not, so the compressed minute had
+             * a filling bar and nothing that said what it was filling. The point of the sped-up
+             * minute is that **a minute is legibly passing**, and a bar alone cannot say "a
+             * minute" — it says "some proportion of something".
+             *
+             * `<RecordingTimer/>` is the real readout and it already renders, in the controls
+             * card BELOW the preview (FR-031 keeps status *words* off the raw video). That card
+             * starts at world y 492 and 5d's framing ends at 504, so the mm:ss sits **8px under
+             * the frame's bottom edge** — visible in the product, out of shot in the beat. Since
+             * framing is Pass B's and out of scope here, the readout comes to the shot instead:
+             * the same component, on the bar's own row, inside the framing that already exists.
+             *
+             * FR-031 is honoured rather than worked around. The rule keeps status *words* off the
+             * video, and this is neither words nor on the video — it is a numeral beside the bar,
+             * below the preview, which is exactly where the bar already lives. The product's own
+             * reading of its rule is `<GetReadyCountdown/>`, which puts numerals *over* the feed
+             * on the grounds that they are "numbers only".
+             *
+             * The row is height-capped at 16px so the 20px line box centres inside it: the row
+             * then runs y 484–500 and finishes **4px clear** of the frame's 504, where an
+             * uncapped row would have landed flush against it. Digits carry no descenders, but a
+             * line box kissing the frame edge is the kind of thing that reads as a crop.
+             */}
             {phase === "recording" && (
-              <div className="mt-2">
-                <CaptureProgressBar remaining={remaining} total={60} />
+              <div className="mt-2 flex items-center gap-3">
+                <div className="flex-1">
+                  <CaptureProgressBar remaining={remaining} total={60} />
+                </div>
+                <div className="flex h-4 shrink-0 items-center">
+                  <RecordingTimer remaining={shownRemaining} total={60} />
+                </div>
               </div>
             )}
 
             <div className="mt-4">
               {phase === "green-room" && (
-                <GreenRoom
-                  guide="active"
-                  gate={gateReady ? "ready" : "off-centre"}
-                  ready={gateReady}
-                  onReady={() => {}}
-                  onNotNow={() => {}}
-                />
+                <div data-probe="greenroom">
+                  <GreenRoom
+                    guide="active"
+                    gate={gateReady ? "ready" : "off-centre"}
+                    ready={gateReady}
+                    onReady={() => {}}
+                    onNotNow={() => {}}
+                  />
+                </div>
               )}
               {phase === "get-ready" && (
                 <div className="flex flex-col items-center gap-3 text-center">

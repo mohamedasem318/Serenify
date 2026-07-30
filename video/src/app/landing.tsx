@@ -60,7 +60,9 @@ export const LandingPage: React.FC<{
   <Desktop clock={clock} url={url} tabs={tabs} caret={caret} overlay={overlay}>
     <div className={PUBLIC_SHELL} style={{ marginTop: -scroll }}>
       <PublicNavbar />
-      <main className="flex-1">
+      {/* `data-public` is the handle beat 1's hover addresses. The components are untouched — a
+          wrapper is the only seam the video has into a shipped surface. */}
+      <main className="flex-1" data-public>
         <Hero />
       </main>
     </div>

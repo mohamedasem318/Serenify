@@ -1,6 +1,6 @@
 import React from "react";
 
-import { OS, OS_FONT, OS_MONO, STANDIN } from "./furniture";
+import { OS, OS_FONT, OS_TABULAR, STANDIN } from "./furniture";
 
 /**
  * ── THE WORLD, AND THE REAL APP SHELL INSIDE IT ─────────────────────────────────────
@@ -252,12 +252,28 @@ export const BrowserChrome: React.FC<{
       border={caret ? OS.lift : OS.seam}
       borderWidth={caret ? 2 : 1}
     />
+    {/*
+     * ── THE OMNIBOX AND THE CLOCK ARE SYSTEM UI SANS, NOT MONO (§6.1) ──
+     *
+     * Both were Geist Mono, on the reasoning that an address bar and a ticking clock want stable
+     * digit widths. The premise is right and the conclusion was not: **no mainstream browser sets
+     * its omnibox in a monospace face.** Chrome, Safari and Firefox all use the system UI font,
+     * and a monospaced address bar is one of the clearest tells of a browser that was *drawn* —
+     * which is the one thing this chrome cannot afford to be, since its whole job is to be
+     * unremarkable enough to read as the audience's own machine.
+     *
+     * The digit-width argument survives and is met properly: `OS_TABULAR` turns on Inter's own
+     * tabular figures, so the clock's minutes tick without the row reflowing and the omnibox keeps
+     * proportional letters. That is what a browser does, and it costs a font-feature declaration
+     * rather than a second family. Full argument in `furniture.ts` § OS_FONT.
+     */}
     <div
       style={{
         position: "absolute",
         left: OMNIBOX.x + 16,
-        top: OMNIBOX.y + 7,
-        fontFamily: OS_MONO,
+        top: OMNIBOX.y + 6,
+        fontFamily: OS_FONT,
+        fontFeatureSettings: OS_TABULAR,
         fontSize: 14,
         color: OS.label,
         whiteSpace: "nowrap",
@@ -273,9 +289,16 @@ export const BrowserChrome: React.FC<{
         left: CLOCK.x,
         top: CLOCK.y,
         width: CLOCK.w,
-        fontFamily: OS_MONO,
+        fontFamily: OS_FONT,
+        fontFeatureSettings: OS_TABULAR,
         fontSize: 28,
         fontWeight: 700,
+        // Inter is a little wider than Geist Mono at this size and the clock is a fixed-width
+        // right-aligned box, so the tracking comes in slightly to keep "11:30 AM" off the
+        // omnibox's right edge. Nothing else about it moves — it stays plain, un-tinted and
+        // un-animated (L11), because emphasis here would turn beat 8's discovery into an
+        // instruction.
+        letterSpacing: -0.4,
         lineHeight: 1.05,
         color: OS.clock,
         textAlign: "right",

@@ -3,6 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { ConsentGatePage } from "../../app/consent";
 import { GATE, centre } from "../../app/geometry";
+import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
 import { Camera, frameRect, rect, union } from "../Camera";
 
@@ -97,14 +98,26 @@ export const Beat04CameraGate: React.FC = () => {
           clock="10:24 AM"
           scroll={scroll}
           overlay={
-            <Pointer
-              path={[
-                { frame: 150, x: ALLOW.x + 230, y: ALLOW.y + 120 },
-                { frame: 168, x: ALLOW.x, y: ALLOW.y },
-              ]}
-              clicks={[172]}
-              visible={{ from: 148 }}
-            />
+            <>
+              {/* §2 — "Allow camera and inference" is `variant="meadow"`
+                  (`camera-consent-gate.tsx:121`), so `hover:opacity-90`, snapped: the shipped
+                  `transition-colors` does not cover opacity. The window opens as the pointer
+                  lands and stays open across the click. */}
+              <Hover
+                selector="[data-probe='gate'] button"
+                treatment="meadow"
+                from={168}
+                to={180}
+              />
+              <Pointer
+                path={[
+                  { frame: 150, x: ALLOW.x + 230, y: ALLOW.y + 120 },
+                  { frame: 168, x: ALLOW.x, y: ALLOW.y },
+                ]}
+                clicks={[172]}
+                visible={{ from: 148 }}
+              />
+            </>
           }
         />
       </Camera>

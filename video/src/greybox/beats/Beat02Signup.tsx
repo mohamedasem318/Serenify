@@ -2,15 +2,16 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { AuthPage, CheckEmailSurface, SignupSurface } from "../../app/auth";
-import { OS_FONT, STANDIN } from "../../app/furniture";
+import { STANDIN } from "../../app/furniture";
 import { SIGNUP as G, VERIFY, centre } from "../../app/geometry";
+import { Hover, useHover } from "../../app/hover";
+import { MAIL_MESSAGE, MAIL_ROW, MailClient } from "../../app/mail";
 import { OTP_TIMELINE } from "../../app/otp";
 import { Pointer } from "../../app/pointer";
-import { Desktop, MailMark, StandIn, newTabRect, tabRect } from "../../app/shell";
-import { Camera, frameRect, rect, shot, union } from "../Camera";
-import { EMAIL, PROTAGONIST, SIGNUP } from "../copy";
+import { Desktop, StandIn, newTabRect, tabRect } from "../../app/shell";
+import { Camera, frameRect, rect, shot } from "../Camera";
+import { PROTAGONIST, SIGNUP } from "../copy";
 import { H, VIEWPORT_Y, W } from "../theme";
-import { Box, Text, TextBlock } from "../ui";
 
 /**
  * Beat 2 · Signup · 0:06–0:21.6 · 468 frames
@@ -34,9 +35,19 @@ import { Box, Text, TextBlock } from "../ui";
  *    79.5px below the fold. That is the product's behaviour at this world, and the beat scrolls
  *    to it rather than pretending the form fits.
  *
- * The mail client is the one surface here that is still drawn, deliberately: it is a non-Serenify
- * stand-in and the assets pass owns it. Deferred register item 1 (the reading pane must be empty
- * until the message is clicked) is still its requirement and is still not patched here.
+ * ══ AND THE MAIL CLIENT IS DRAWN — REGISTER ITEM 1, CLOSED ══════════════════════════
+ *
+ * It was four labelled rectangles with the email's text over them, and the whole rendered message
+ * was drawn at `opacity: 0.16` before the click — a **ghost**. That is what the register flagged:
+ * the beat is "he opens the email and finds the code", and a click that uncovers something the
+ * audience has been looking at for two seconds reveals nothing.
+ *
+ * `<MailClient/>` (`src/app/mail.tsx`) is the asset the register said the fix belonged to, and it
+ * has **two genuinely different states** rather than one at two opacities — the empty-selection
+ * state every mail client ships, then the message. Nothing of the email is in the DOM before the
+ * click. It stays generic in branding (L2b) and specific in content: a real sidebar, a real list
+ * with five plausible neighbours around the unread one, and the shipped confirmation template's
+ * own copy and type scale.
  *
  * ══ 2f — THE OTP MERGE, AND IT IS FRAME-ADDRESSED ═══════════════════════════════════
  *
@@ -50,10 +61,19 @@ import { Box, Text, TextBlock } from "../ui";
  * The timeline below is `STEP`'s, converted at 30fps, and it plays at real speed.
  */
 
-// ── The mail client — still a stand-in, and still not patched (register item 1) ──────
+// ── The mail client's two landings ──────────────────────────────────────────────────
+//
+// Both come from `mail.tsx`'s own exported geometry rather than from numbers restated here, so a
+// change to the client cannot silently leave the camera framing where the client used to be.
+// They are offset by `VIEWPORT_Y` because the client is drawn inside the page, below the chrome.
 
-const LIST_ROW = rect(180, 104, 310, 62);
-const EMAIL_CARD = rect(560, 190, 520, 400);
+const LIST_ROW = rect(MAIL_ROW.x, MAIL_ROW.y + VIEWPORT_Y, MAIL_ROW.w, MAIL_ROW.h);
+const EMAIL_CARD = rect(
+  MAIL_MESSAGE.x,
+  MAIL_MESSAGE.y + VIEWPORT_Y,
+  MAIL_MESSAGE.w,
+  MAIL_MESSAGE.h,
+);
 
 // ── Phase clock ─────────────────────────────────────────────────────────────────────
 
@@ -104,120 +124,6 @@ const typed = (value: string, frame: number, from: number, over: number) => {
 const SIGNUP_SCROLL = 145;
 
 const scrolledRect = (r: ReturnType<typeof rect>, s: number) => rect(r.x, r.y - s, r.w, r.h);
-
-// ── His mail ────────────────────────────────────────────────────────────────────────
-
-const MailScreen: React.FC<{ frame: number }> = ({ frame }) => {
-  const opened = frame >= T.openEmail;
-
-  return (
-    <>
-      <StandIn x={0} y={VIEWPORT_Y} w={170} h={H - VIEWPORT_Y} radius={0} fill={STANDIN.panelAlt} />
-      <div style={{ position: "absolute", left: 20, top: VIEWPORT_Y + 18 }}>
-        <MailMark size={24} />
-      </div>
-      <Text x={52} y={VIEWPORT_Y + 22} size={15} weight={700} color={STANDIN.body}>
-        Mail
-      </Text>
-      <TextBlock x={20} y={VIEWPORT_Y + 70} w={130} lines={6} gap={18} size={8} />
-
-      <StandIn x={170} y={VIEWPORT_Y} w={330} h={H - VIEWPORT_Y} radius={0} fill={STANDIN.surface} />
-      {/* The Serenify email — unread, at the top of the list. */}
-      <StandIn
-        x={LIST_ROW.x}
-        y={LIST_ROW.y}
-        w={LIST_ROW.w}
-        h={LIST_ROW.h}
-        radius={7}
-        fill={STANDIN.panelAlt}
-        border={STANDIN.line}
-      />
-      <Text x={LIST_ROW.x + 14} y={LIST_ROW.y + 11} size={14} weight={700} color={STANDIN.ink}>
-        {EMAIL.from}
-      </Text>
-      <Text x={LIST_ROW.x + 200} y={LIST_ROW.y + 12} w={96} size={11} color={STANDIN.label} align="right">
-        {EMAIL.time}
-      </Text>
-      <Text x={LIST_ROW.x + 14} y={LIST_ROW.y + 33} w={282} size={12} color={STANDIN.body}>
-        {EMAIL.subject}
-      </Text>
-      <TextBlock x={LIST_ROW.x + 14} y={LIST_ROW.y + 84} w={282} lines={6} gap={26} size={8} />
-
-      <div style={{ opacity: opened ? 1 : 0.16 }}>
-        <Text x={530} y={116} w={560} size={20} weight={700} color={STANDIN.ink}>
-          {EMAIL.subject}
-        </Text>
-        <div style={{ position: "absolute", left: 530, top: 150 }}>
-          <MailMark size={22} />
-        </div>
-        <Text x={562} y={152} size={14} weight={700} color={STANDIN.ink}>
-          {EMAIL.from}
-        </Text>
-        <Text x={960} y={153} w={130} size={12} color={STANDIN.label} align="right">
-          {EMAIL.time}
-        </Text>
-
-        <StandIn
-          x={EMAIL_CARD.x}
-          y={EMAIL_CARD.y}
-          w={EMAIL_CARD.w}
-          h={EMAIL_CARD.h}
-          radius={12}
-          fill={STANDIN.surface}
-        />
-        <Box x={588} y={212} w={78} h={22} label="wordmark" labelSize={9} fill={STANDIN.panelAlt} />
-        <Text x={588} y={250} size={30} weight={700} color={STANDIN.ink}>
-          {EMAIL.headline}
-        </Text>
-        <Text x={588} y={296} w={464} size={16} color={STANDIN.body} lineHeight={1.6}>
-          {EMAIL.body}
-        </Text>
-        <div
-          style={{
-            position: "absolute",
-            left: 738,
-            top: 352,
-            width: 164,
-            height: 40,
-            borderRadius: 8,
-            backgroundColor: STANDIN.fill,
-            border: `1px solid ${STANDIN.line}`,
-            color: STANDIN.ink,
-            fontFamily: OS_FONT,
-            fontSize: 15,
-            fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          {EMAIL.button}
-        </div>
-        <Text x={588} y={422} size={13} weight={500} color={STANDIN.body}>
-          {EMAIL.codeLabel}
-        </Text>
-        <StandIn x={588} y={444} w={464} h={48} radius={8} fill={STANDIN.field} />
-        <Text
-          x={588}
-          y={456}
-          w={464}
-          size={25}
-          weight={700}
-          align="center"
-          mono
-          color={STANDIN.ink}
-          style={{ letterSpacing: 4 }}
-        >
-          {EMAIL.code}
-        </Text>
-        <StandIn x={588} y={514} w={464} h={1} radius={0} fill={STANDIN.border} border={STANDIN.border} />
-        <Text x={588} y={528} w={464} size={13} color={STANDIN.label} lineHeight={1.6}>
-          {EMAIL.footer}
-        </Text>
-      </div>
-    </>
-  );
-};
 
 // ── The take ────────────────────────────────────────────────────────────────────────
 
@@ -289,6 +195,9 @@ export const Beat02Signup: React.FC = () => {
   const consentAt = centre(scrolledRect(G.consentBox, SIGNUP_SCROLL));
   const submitAt = centre(scrolledRect(G.submit, SIGNUP_SCROLL));
 
+  /** The list row lights as the pointer reaches it, six frames before the click (§2). */
+  const rowHover = useHover(T.openEmail - 6, T.openEmail + 20);
+
   return (
     <AbsoluteFill>
       <Camera
@@ -333,8 +242,18 @@ export const Beat02Signup: React.FC = () => {
               <Pointer
                 path={[
                   { frame: T.openEmail - 30, x: LIST_ROW.x + 250, y: LIST_ROW.y + 120 },
-                  { frame: T.openEmail - 6, x: LIST_ROW.x + 150, y: LIST_ROW.y + 34 },
-                  { frame: T.serenifyTabClick - 16, x: tabRect(0).x + 80, y: tabRect(0).y + 12 },
+                  // The row's measured centre, not a point near it.
+                  {
+                    frame: T.openEmail - 6,
+                    x: LIST_ROW.x + LIST_ROW.w / 2,
+                    y: LIST_ROW.y + LIST_ROW.h / 2,
+                  },
+                  // …and the tab's, likewise. It was landing 15px left of centre.
+                  {
+                    frame: T.serenifyTabClick - 16,
+                    x: tabRect(0).x + tabRect(0).w / 2,
+                    y: tabRect(0).y + tabRect(0).h / 2,
+                  },
                 ]}
                 clicks={[T.openEmail, T.serenifyTabClick]}
                 visible={{ from: T.mailLoaded }}
@@ -342,9 +261,10 @@ export const Beat02Signup: React.FC = () => {
             }
           >
             {mailLoaded ? (
-              <div style={{ position: "absolute", left: 0, top: -VIEWPORT_Y, width: W, height: H }}>
-                <MailScreen frame={frame} />
-              </div>
+              // The client fills the page below the chrome. `opened` is the click and nothing of
+              // the message exists before it — register item 1. `rowHover` is the pointer
+              // arriving on the row six frames earlier (§2).
+              <MailClient opened={frame >= T.openEmail} rowHover={rowHover} />
             ) : (
               // A blank new tab, being navigated. The action is the payload.
               <StandIn
@@ -366,6 +286,28 @@ export const Beat02Signup: React.FC = () => {
             active={active}
             overlay={
               <>
+                {/*
+                 * ── §2 · WHAT LIGHTS HERE, AND WHAT HONESTLY CANNOT ──
+                 *
+                 * "Create account" is the `(auth)` submit — `signup-form.tsx:255`'s
+                 * `hover:opacity-90` over its own `transition-opacity`, which makes it the ONE
+                 * hover in the film the product actually eases. (Everywhere else the same
+                 * declaration snaps, because the `<Button/>` base transitions colours only.)
+                 *
+                 * **The consent checkbox ships no hover at all**, and that is a finding rather
+                 * than an omission here. `terms-acknowledgement-field.tsx:93` gives the input
+                 * `cursor-pointer`, a `focus-visible` ring and nothing else; its 44px `<label>`
+                 * wrapper carries no treatment either. A native checkbox's hover is the browser's
+                 * own rendering, which is not something the product declares and not something
+                 * this film can reproduce without inventing it. So the tick has a cursor, a
+                 * press and a ring, and no hover — which is what the product does.
+                 */}
+                <Hover
+                  selector="[data-signup] > div > button[type='button']"
+                  treatment="submitAuth"
+                  from={T.submitPress - 8}
+                  to={T.checkEmail}
+                />
                 {/* The consent tick and the submit press — one shot, two clicks, with the hand
                     travelling between them. */}
                 <Pointer
@@ -377,11 +319,17 @@ export const Beat02Signup: React.FC = () => {
                   clicks={[T.consentTick, T.submitPress]}
                   visible={{ from: T.consentTick - 30, to: T.checkEmail + 6 }}
                 />
-                {/* The new-tab button, clicked. */}
+                {/* The new-tab button, clicked — at its CENTRE. It was landing on (x+6, y+4) of
+                    a 22 × 22 target, which is inside the box but visibly in its top-left corner
+                    rather than on the `+`. */}
                 <Pointer
                   path={[
                     { frame: T.newTabClick - 22, x: newTabRect(1).x + 90, y: newTabRect(1).y + 70 },
-                    { frame: T.newTabClick - 6, x: newTabRect(1).x + 6, y: newTabRect(1).y + 4 },
+                    {
+                      frame: T.newTabClick - 6,
+                      x: newTabRect(1).x + newTabRect(1).w / 2,
+                      y: newTabRect(1).y + newTabRect(1).h / 2,
+                    },
                   ]}
                   clicks={[T.newTabClick]}
                   visible={{ from: T.newTabClick - 26, to: T.newTabClick + 12 }}

@@ -154,7 +154,11 @@ export const SignupSurface: React.FC<{
       {/* `signup-form.tsx:252-258` */}
       <button
         type="button"
-        className="inline-flex h-12 w-full items-center justify-center rounded-control bg-ink px-4 text-sm font-medium text-bg transition-opacity disabled:cursor-not-allowed disabled:opacity-60"
+        // `hover:opacity-90` was dropped when this class list was transcribed. It is restored
+        // rather than added: the shipped control has it, and it is the treatment §2's hover
+        // reproduces. Unlike the `<Button/>` variants this one carries `transition-opacity`, so
+        // the product genuinely eases it — see `HOVER.submitAuth`.
+        className="inline-flex h-12 w-full items-center justify-center rounded-control bg-ink px-4 text-sm font-medium text-bg transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
         disabled={submitting}
       >
         {submitting ? "Creating account…" : "Create account"}

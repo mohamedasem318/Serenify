@@ -2,6 +2,8 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { ChatPage, msg } from "../../app/chat";
+import { CHAT, centre } from "../../app/geometry";
+import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
 import { Camera, rect, shot } from "../Camera";
 import { REN } from "../copy";
@@ -55,8 +57,21 @@ import { H, W } from "../theme";
  * after turn 1, and ownership is stated in words instead of inferred from a circle.
  */
 
-/** The composer sits at the bottom of the panel — where the cursor goes and the typing happens. */
-const COMPOSER = rect(300, 520, 600, 64);
+/**
+ * The composer sits at the bottom of the panel — where the cursor goes and the typing happens.
+ *
+ * ── AND THIS BEAT'S CURSOR WAS THE ONE IN THE FILM THAT MISSED ──────────────────────
+ *
+ * Both waypoints were hand-typed rather than measured: the caret at (460, 552) and **send at
+ * (872, 552)**. The send button is 44px wide starting at x 879, so the pointer was pressing
+ * **seven pixels outside the left edge of the control it was pressing** — every other click site
+ * in the film is a measured centre, and this was the exception. It is now `CHAT.send`'s centre,
+ * probed against the real `<ChatShell/>` at this beat's own panel measure (`geometry.ts` § CHAT).
+ */
+const COMPOSER = rect(CHAT.textarea.x, CHAT.textarea.y, CHAT.textarea.w, CHAT.textarea.h);
+const SEND_AT = centre(CHAT.send);
+/** A caret lands where a caret lands — near the start of the field, on its vertical centre. */
+const CARET_AT = { x: CHAT.textarea.x + 62, y: CHAT.textarea.y + CHAT.textarea.h / 2 };
 
 /**
  * ── THE TYPING WINDOW OPENED FOUR FRAMES, AND THAT IS THE WHOLE COST ────────────────
@@ -124,21 +139,41 @@ export const Beat10Ren: React.FC = () => {
           draft={frame >= T.typeFrom && frame < T.send ? typed : ""}
           thinking={frame >= T.thinking && frame < T.reply}
           overlay={
-            /*
-             * The pointer TRAVELS to the composer, and then to send. It used to switch between
-             * three positions on frame thresholds, so it was present at each of them and never
-             * seen going anywhere — which is the difference between a person using software and
-             * a diagram of one. Both clicks share a shot with what they cause: the caret lands
-             * in the textarea and the typing starts; send is pressed and the bubble appears.
-             */
-            <Pointer
-              path={[
-                { frame: 0, x: 700, y: 300 },
-                { frame: T.cursorToComposer, x: 460, y: 552 },
-                { frame: T.send - 8, x: 872, y: 552 },
-              ]}
-              clicks={[T.cursorToComposer + 4, T.send]}
-            />
+            <>
+              {/*
+               * §2 — the send button lights as the pointer reaches it. **It is the one control in
+               * the film with no shipped hover**: `chat-shell.tsx:388` is
+               * `bg-foggy text-on-accent transition-opacity disabled:opacity-50`, which is a
+               * disabled state and an opacity transition with nothing to trigger it. So this
+               * treatment is authored — as the house idiom (`hover:opacity-90`, which every
+               * filled `<Button/>` variant ships) rather than as an invention, on an element that
+               * already carries the transition to run it. Declared as authored in `hover.tsx`.
+               */}
+              <Hover
+                selector="[data-testid='chat-send']"
+                treatment="sendAuthored"
+                from={T.send - 8}
+                to={T.send + 10}
+              />
+              {/*
+               * The pointer TRAVELS to the composer, and then to send. It used to switch between
+               * three positions on frame thresholds, so it was present at each of them and never
+               * seen going anywhere — which is the difference between a person using software and
+               * a diagram of one. Both clicks share a shot with what they cause: the caret lands
+               * in the textarea and the typing starts; send is pressed and the bubble appears.
+               *
+               * Both targets are measured now. See the note on `COMPOSER` — the send waypoint
+               * used to sit outside the button.
+               */}
+              <Pointer
+                path={[
+                  { frame: 0, x: 700, y: 300 },
+                  { frame: T.cursorToComposer, x: CARET_AT.x, y: CARET_AT.y },
+                  { frame: T.send - 8, x: SEND_AT.x, y: SEND_AT.y },
+                ]}
+                clicks={[T.cursorToComposer + 4, T.send]}
+              />
+            </>
           }
         />
       </Camera>

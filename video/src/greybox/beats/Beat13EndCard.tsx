@@ -3,7 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { Wordmark } from "@/components/brand/wordmark";
 
-import { CARD, OS_MONO, SANS_STACK } from "../../app/furniture";
+import { CARD, CARD_DISPLAY, SANS_STACK } from "../../app/furniture";
 import { useDarkRoot } from "../../app/shell";
 import { Camera, shot } from "../Camera";
 import { END_CARD } from "../copy";
@@ -218,12 +218,30 @@ export const Beat13EndCard: React.FC = () => {
              * being ASSEMBLED out of the brand rather than as two things that happened to line
              * up, which is the entire claim the move exists to make.
              */}
+            {/*
+             * ── `.tech` IS IN THE BRAND FACE (§6.2) ──
+             *
+             * It was Geist Mono, which broke the one claim the whole move exists to make: the
+             * domain **derives from the wordmark**, and a domain that switches typeface halfway
+             * through has not derived from anything — it has had a suffix stuck onto it. The
+             * mark is Outfit, so the suffix is Outfit, and `serenify.tech` reads as one word set
+             * once.
+             *
+             * It also loses the two-point size drop. That existed to compensate for Geist Mono's
+             * larger apparent size beside Outfit; with both in Outfit there is nothing to
+             * compensate for, and `inherit` is what makes the row genuinely one line of type
+             * rather than two sizes that happen to sit together. The colour stays `CARD.domain`
+             * — a shade under the mark's ink, so the suffix is subordinate to the brand without
+             * being a different material.
+             */}
             <span style={{ display: "inline-flex", alignItems: "baseline" }}>
               <Wordmark className="leading-none" />
               <span
                 style={{
-                  fontFamily: OS_MONO,
-                  fontSize: DERIVED.size - 2,
+                  fontFamily: CARD_DISPLAY,
+                  fontSize: "inherit",
+                  fontWeight: 600,
+                  letterSpacing: "-0.01em",
                   color: CARD.domain,
                   lineHeight: 1,
                 }}
@@ -267,8 +285,12 @@ export const Beat13EndCard: React.FC = () => {
               top: ROW_Y + 1,
               width: W,
               textAlign: "center",
-              fontFamily: OS_MONO,
-              fontSize: DERIVED.size - 2,
+              // The fallback path takes the brand face too — see §6.2 above. A `DERIVE = false`
+              // revert must not quietly reintroduce the mono.
+              fontFamily: CARD_DISPLAY,
+              fontSize: DERIVED.size,
+              fontWeight: 600,
+              letterSpacing: "-0.01em",
               color: CARD.domain,
             }}
           >

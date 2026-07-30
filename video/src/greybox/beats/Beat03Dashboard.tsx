@@ -5,6 +5,7 @@ import { CalibrationBanner } from "@/components/anchor/calibration-banner";
 
 import { HOME, centre } from "../../app/geometry";
 import { HomePage } from "../../app/home";
+import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
 import { Camera, frameRect, rect, shot } from "../Camera";
 import { Lift, useLift } from "../lift";
@@ -131,7 +132,13 @@ export const Beat03Dashboard: React.FC = () => {
                 </Lift>
               ) : null}
 
-              {/* Then the click on "Set baseline", which is what carries us into beat 4. */}
+              {/*
+               * Then the click on "Set baseline", which is what carries us into beat 4 — and the
+               * button lights under the pointer before it lands (§2). `variant="foggy"`
+               * (`calibration-banner.tsx:93`), so the treatment is `hover:opacity-90`, which the
+               * product snaps: `transition-colors` does not cover opacity.
+               */}
+              <Hover selector="[data-probe='calib'] a" treatment="foggy" from={108} to={120} />
               <Pointer
                 path={[
                   { frame: 90, x: SET_BASELINE.x - 190, y: SET_BASELINE.y + 120 },
