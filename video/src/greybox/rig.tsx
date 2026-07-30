@@ -3,7 +3,7 @@ import { Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { OfficeBackdrop } from "./character/backdrop";
 import { CharacterBase, SHIRT } from "./character/base";
-import { FACE, Features, Hands, Headphones, MusicNote } from "./character/features";
+import { FACE, Features, Headphones, MusicNote } from "./character/features";
 
 /**
  * ── THE CHARACTER RIG ───────────────────────────────────────────────────────
@@ -53,8 +53,10 @@ import { FACE, Features, Hands, Headphones, MusicNote } from "./character/featur
  *   4 · pupils      gaze offset
  *   5 · mouth       one curvature scalar (+smile / −frown), width, openness, skew
  *   6 · shoulders   slump, and the typing motion
- *   7 · hands       two shapes at the frame edge, alternating — "still working"
- *   8 · headphones  an overlay on the ears, beat 11 only
+ *   7 · headphones  an overlay on the ears, beat 11 only
+ *
+ * There was an eighth — two hands at the bottom edge, alternating — and it is cut. See
+ * the note where it used to live in `character/features.tsx`.
  *
  * The hair, the ears and the neck are not animated. They come from the base, and the
  * ears are where the headphones attach — at the **measured** ear centres (71, 117) and
@@ -100,7 +102,8 @@ export interface Pose {
  *   5b  calm      first sight of him, settled — the audience learns this face here
  *   7   content   working, lightly smiling
  *   8   dismayed  THE FALL lands here. Not a state the beat sits in for long
- *   8   tense     and then it settles into this
+ *   8   tense     and then it settles into this — the SAME shape, deeper. See the note
+ *                 on the pose itself; two intensities of one emotion, not two emotions
  *   11  easing    quieter, relieved, a bit amused at itself
  *
  * `falling` and `curious` from the placeholder are gone on purpose: falling was never
@@ -156,19 +159,32 @@ export const POSE = {
     breathRate: 0.8,
   },
   tense: {
-    // Brows down and drawn together, eyes narrowed, lips pressed. Held, not falling.
-    browY: -0.75,
-    browInner: -0.55,
-    eyeOpen: 0.88,
-    lidDrop: 0.2,
-    gazeY: 0.15,
-    mouthCurve: -0.3,
-    mouthWidth: 0.84,
-    mouthOpen: 0,
+    // **DEEPER DISMAY, NOT A DIFFERENT EMOTION**, and the difference is one number.
+    //
+    // This used to be browY −0.75 with browInner −0.55: brows down and drawn *together*,
+    // lips pressed. That is the anger configuration, and it read as anger. The direction
+    // of the inner brow is the whole of it — inner ends raised is sadness and worry,
+    // inner ends pulled down is anger — so `browInner` stays positive here and goes
+    // slightly past `dismayed`, and everything else escalates around it: corners further
+    // down, the jaw closing as the shock turns into a held state, eyes a little wider
+    // still, head lower, shoulders sinking twice as far.
+    //
+    // The pair is what beat 8 needs. Its stateline steps twice — "a little tense", then
+    // "tense" — and the face now steps with it instead of leaving the escalation to the
+    // copy. Two intensities of one emotion, and because they differ only in degree the
+    // travel between them is a settle rather than a second fall.
+    browY: -0.35,
+    browInner: 1.2,
+    eyeOpen: 1.22,
+    lidDrop: 0.05,
+    gazeY: -0.1,
+    mouthCurve: -1,
+    mouthWidth: 0.86,
+    mouthOpen: 0.1,
     mouthSkew: 0,
-    headTilt: -0.5,
-    headY: 1.8,
-    shoulderY: 3.2,
+    headTilt: 0.8,
+    headY: 3.8,
+    shoulderY: 4.5,
     breathRate: 0.66,
   },
   easing: {
@@ -279,99 +295,100 @@ const useBlink = (): number => {
  * browser do the fitting. Change the box to any size or aspect and the character re-frames
  * itself: the window keeps its top and bottom, and only its width follows the box.
  *
- *   top 22      two units into the hair, which is what a laptop webcam does to a person
- *               sitting close. The chin lands at y 181 and the head fills ~68% of frame
- *               height.
+ *   top 10      clear of the hair's crown at y ≈ 21, which is what buys the headphone
+ *               band somewhere to cross. It was 22 — two units *into* the hair — and at
+ *               that value any band arcing over the crown was sliced by the frame, so the
+ *               band had to sit low on the fringe and read as resting on his forehead.
+ *               Twelve units of headroom is the whole cost, and the head still fills
+ *               ~66% of frame height.
  *   bottom 262  far enough below the collar (y 222) that a band of shirt is in frame at
  *               the sides. Above ~240 the shoulders leave the frame entirely and he reads
  *               as a floating head.
  *
- * At 16:9 that gives a 427-wide window against artwork only 264 wide — which is the whole
- * reason the shoulder extension below exists.
+ * At 16:9 that gives a 448-wide window against artwork only 264 wide — which is the whole
+ * reason the shoulders below are authored rather than inherited.
  */
-const WINDOW = { top: 22, bottom: 262 } as const;
+const WINDOW = { top: 10, bottom: 262 } as const;
 const WINDOW_H = WINDOW.bottom - WINDOW.top;
 
 /** The head clip line, at the neck. The two halves overlap by 2 to absorb head motion. */
 const NECK_SPLIT = 187;
 
 /**
- * **The shoulder extension**, and it is not the scale transform the handover suggested.
+ * **The shoulders are authored**, and they are not the scale transform the handover
+ * suggested. The base's crew neck is part of the same path as the shirt body, so scaling
+ * the shirt 2× scales the collar 2× and he ends up in a boat neck.
  *
- * The base's shoulders span x 32–232 inside a 264-wide box — about 12% padding a side —
- * against a framing spec that wants them running off both edges. A plain x-scale would
- * fix that and wreck the crew neck with it: the neck opening is part of the same path, so
- * scaling the shirt 2× scales the collar 2× and he ends up in a boat neck.
+ * So this draws a torso behind the base instead, in the shirt's exact `#25557C`, and the
+ * base's own shoulders sit entirely inside it and contribute nothing to the outline.
  *
- * So this draws a quadratic behind the base instead, in the shirt's exact `#25557C`.
+ * ── PROPORTION, WHICH IS THE WHOLE OF THIS SHAPE ────────────────────────────
  *
- * ── WHY IT TAKES OVER AT THE COLLAR AND NOT FURTHER OUT ─────────────────────
+ * Revision 6 spanned the full framing window at every aspect and pinned a nearly flat
+ * apex. That is a distant horizon, not a pair of shoulders, and it was the first thing
+ * anyone saw. Two numbers fix it, and both are anthropometric rather than compositional:
  *
- * The first version pinned the apex at y 228, safely below the collar notch, and it left a
- * **visible step**: the base's own shoulder arc drops steeply — from (99, 199) to (32,
- * 271), where it is already vertical — so a curve flat enough to reach the frame edges
- * crossed it around x 45, at which point the two silhouettes met at about a 35° angle. He
- * looked like he was wearing shoulder pads over a second shirt.
+ *   **span**   biacromial breadth is ~2.7 head widths on a real adult. The skull here is
+ *              112 wide (x 76–188), so the shoulders span 300 — x −18 to 282 — and they
+ *              stop *inside* the 16:9 window rather than running off it. That is correct
+ *              and not a regression: at a framing where the head fills two thirds of the
+ *              height, real shoulders occupy about 70% of the width and a band of room
+ *              shows at each bottom corner. The old shape reached the edges by being
+ *              five head-widths across.
  *
- * The fix is to stop having two silhouettes. The apex sits at **y 199, level with the
- * shirt's own shoulder tops**, so the extension emerges from behind the base right at the
- * collar and every visible pixel of shoulder outboard of that is the extension's. The base
- * shirt is then entirely *inside* it and contributes nothing to the outline — which is why
- * there is no longer a crossing to hide.
+ *   **slope**  49 units of drop from the collar corners to the acromion, over 116 of
+ *              run — roughly 23°, which is what a shoulder does at webcam distance. The
+ *              old arc dropped 37 over 213 and read as a horizon.
  *
- * That apex would fill the crew neck, so the extension is clipped out of a box around it
- * (x 96–170, above y 226). All three of that box's edges are behind solid shirt: at x 96
- * and x 170 the shirt is solid from y ≈ 200 down — the neck opening only spans x 99–166 —
- * and the notch bottoms out at y 222, above the box's floor.
+ * Below the acromion the outline turns down into the upper arm and leaves the frame.
  *
- * `edgeY` is then solved rather than chosen, from the requirement that the curve passes
- * through the shirt's shoulder top at x 96. At 16:9 the curve is so flat there that the
- * solution barely constrains it — thirteen units of `edgeY` move it four tenths of one —
- * so it is clamped to keep a proper band of shirt in the bottom corners. At the 3:4
- * portrait preview the half-width is small, the constraint bites, and the clamp does not
- * apply: he simply shows more torso, which is what a portrait framing should do.
+ * ── WHY IT TRACES THE SHIRT'S OWN NECKLINE ──────────────────────────────────
+ *
+ * A shoulder line that *slopes* is below the base shirt's flat-then-plunge arc near the
+ * neck, so the extension has to take over at the collar itself — which would fill the crew
+ * neck. Revision 6 clipped a box out of it and left a 1.5-unit step at the box's edge.
+ * Instead the neckline is now part of this outline, copied from `SHIRT_D` control point
+ * for control point, so the two blues meet along the shirt's own curve and there is no
+ * seam to hide. Everything outboard of the collar corners is this shape's; everything
+ * inboard is the base's.
+ *
+ * Nothing here depends on the framing window, which is the point — shoulder proportion is
+ * a fact about the character, not about the box he is being drawn into. At the 3:4
+ * calibration preview the window is narrower than his shoulders and they simply run off
+ * both edges, which is what a portrait crop should do.
  */
-const SHOULDER_APEX = 199;
-/** The base shirt's own top edge at x 96, which is where the extension has to meet it. */
-const SHOULDER_MEET = 200.5;
+const SHOULDER = {
+  /** Half of the 300-unit span. The skull is 112 wide, so this is ~2.7 head widths. */
+  halfSpan: 150,
+  /** The acromion, 49 below the collar corners at y 199. */
+  tipY: 248,
+  /** The upper arm flares a little below the shoulder point, as an arm does. */
+  armFlare: 9,
+} as const;
 
-const ShoulderExtension: React.FC<{ winX: number; winW: number; uid: string }> = ({
-  winX,
-  winW,
-  uid,
-}) => {
-  const a = winW / 2;
-  // Solving y(96) = SHOULDER_MEET for a symmetric quadratic gives exactly this. The
-  // clamp keeps at least 26 units of shirt in the bottom corners at wide aspects.
-  const edgeY = Math.min(
-    SHOULDER_APEX + (a * a * (SHOULDER_MEET - SHOULDER_APEX)) / 1296,
-    WINDOW.bottom - 26,
-  );
-  const x0 = winX - 2;
-  const x1 = winX + winW + 2;
-  // A quadratic sits at half its control's offset at the midpoint, so this puts the apex
-  // exactly on SHOULDER_APEX whatever the ends are doing.
-  const ctrlY = 2 * SHOULDER_APEX - edgeY;
-  const floor = WINDOW.bottom + 60;
+const TORSO_FLOOR = WINDOW.bottom + 60;
+const TIP_L = FACE.cx - SHOULDER.halfSpan;
+const TIP_R = FACE.cx + SHOULDER.halfSpan;
+const ARM_L = TIP_L - SHOULDER.armFlare;
+const ARM_R = TIP_R + SHOULDER.armFlare;
 
-  return (
-    <>
-      <defs>
-        {/* Everything except the collar box, as the union of three rectangles. */}
-        <clipPath id={`${uid}-shoulder`}>
-          <rect x={x0 - 40} y={0} width={96 - x0 + 40} height={floor} />
-          <rect x={170} y={0} width={x1 - 170 + 40} height={floor} />
-          <rect x={x0 - 40} y={226} width={winW + 160} height={floor} />
-        </clipPath>
-      </defs>
-      <path
-        d={`M ${x0} ${edgeY} Q ${FACE.cx} ${ctrlY} ${x1} ${edgeY} L ${x1} ${floor} L ${x0} ${floor} Z`}
-        fill={SHIRT}
-        clipPath={`url(#${uid}-shoulder)`}
-      />
-    </>
-  );
-};
+/**
+ * Up the left arm, over the left shoulder, **around the shirt's own neckline**, over the
+ * right shoulder and down the right arm. The six middle segments are `SHIRT_D`'s collar,
+ * verbatim and in its own coordinates.
+ */
+const TORSO_D =
+  `M ${ARM_L} ${TORSO_FLOOR} ` +
+  `C ${ARM_L} ${SHOULDER.tipY + 12} ${TIP_L - 3} ${SHOULDER.tipY + 3} ${TIP_L} ${SHOULDER.tipY} ` +
+  `C ${FACE.cx - 138} ${SHOULDER.tipY - 16} ${FACE.cx - 78} 200 99.0454063 199.2195264 ` +
+  `C 99.0152598 199.5931145 99 199.9692272 99 200.3476251 ` +
+  `C 99 212.2107177 113.998461 221.8276544 132.5 221.8276544 ` +
+  `C 151.001539 221.8276544 166 212.2107177 166 200.3476251 ` +
+  `C 166 199.9946691 165.986723 199.6437014 165.960472 199.2949161 ` +
+  `C ${FACE.cx + 78} 200 ${FACE.cx + 138} ${SHOULDER.tipY - 16} ${TIP_R} ${SHOULDER.tipY} ` +
+  `C ${TIP_R + 3} ${SHOULDER.tipY + 3} ${ARM_R} ${SHOULDER.tipY + 12} ${ARM_R} ${TORSO_FLOOR} Z`;
+
+const Torso: React.FC = () => <path d={TORSO_D} fill={SHIRT} />;
 
 // ── The drawing ─────────────────────────────────────────────────────────────
 
@@ -430,9 +447,9 @@ export const CharacterRig: React.FC<{
   h: number;
   pose: Pose;
   /**
-   * He is at his keyboard and his hands are going. Beats 7, 8 and 11 — and beat 11
-   * especially, where the whole point is that the reading comes down **over** the
-   * work rather than instead of it.
+   * He is at his keyboard and typing. Beats 7, 8 and 11 — and beat 11 especially, where
+   * the whole point is that the reading comes down **over** the work rather than instead
+   * of it. Since the hands were cut this drives the shoulders alone.
    */
   working?: boolean;
   headphones?: boolean;
@@ -494,8 +511,8 @@ export const CharacterRig: React.FC<{
           </clipPath>
         </defs>
 
-        <OfficeBackdrop x={winX} y={WINDOW.top} w={winW} h={WINDOW_H} />
-        <ShoulderExtension winX={winX} winW={winW} uid={uid} />
+        <OfficeBackdrop x={winX} y={WINDOW.top} w={winW} h={WINDOW_H} uid={uid} />
+        <Torso />
 
         {/* Shoulders and clothing. */}
         <g transform={`translate(${bodyDx} ${bodyDy})`} clipPath={`url(#${uid}-body)`}>
@@ -511,7 +528,6 @@ export const CharacterRig: React.FC<{
           {headphones ? <Headphones /> : null}
         </g>
 
-        {working ? <Hands bottom={WINDOW.bottom} typing={typing} /> : null}
         {notesFrom === undefined ? null : <Notes startFrame={notesFrom} winX={winX} winW={winW} />}
       </svg>
     </div>

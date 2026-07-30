@@ -14,9 +14,10 @@ person. See "The character rig" below. Cross-expression consistency is the thing
 the wordmark across four attempts, and the rig removes the need for it.
 
 **The character's art has landed** (2026-07-30): a stripped Avataaars base, MIT, with the
-rig's authored primitives drawn over it and an office backdrop behind it. Everything else
-inside the viewfinder — headphones, hands, drifting notes — is authored. The page around it
-is still greybox on purpose; real `apps/web` components are a separate pass.
+rig's authored primitives drawn over it, an authored torso under it and an office backdrop
+behind it. Everything else inside the viewfinder — headphones, drifting notes — is authored
+too. The page around it is still greybox on purpose; real `apps/web` components are a separate
+pass, and what that pass owes is listed in **the deferred register** at the end of this file.
 
 **Governing rule:** at 1920×1080 in a phone-sized feed, wide shots are illegible. **Every readable moment is a push-in.** Full-desktop wide shots exist only as brief establishing or transition frames.
 
@@ -63,7 +64,7 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
 | L12 | **The in-place emphasis** — the stateline block grows 1.65× where it stands, is read, and settles. Nothing travels, the camera does not move | Holding bloom + stateline + viewfinder together means framing ~1096px of world, at which the app's `text-base` (16px) sub is ~6px on a phone. A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. |
-| L13 | **The character's face and hands are AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
+| L13 | **The character's face is AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head, with an authored torso behind it | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
 ---
 
@@ -99,8 +100,10 @@ These are deliberate. Do not "fix" them toward fidelity.
   produces neither — on a face it reads as a jump cut. An expression is a vector of numbers,
   and every transition is an interpolation between two points in that space. Same model as
   Ren's avatar. See "The character rig".
-- **HE NEVER STOPS WORKING.** In beats 7, 8 and 11 his hands are at the keyboard. He stops
-  once, to read the email, and resumes in beat 11 *while* the reading comes down. This is not
+- **HE NEVER STOPS WORKING.** In beats 7, 8 and 11 he is typing. He stops
+  once, to read the email, and resumes in beat 11 *while* the reading comes down. Carried by
+  the shoulders' typing motion, the nod, the drifting notes and the trend's descent — the two
+  drawn hands that used to say it are cut; see "The character rig". This is not
   a flourish: without it beat 11 reads as the stress app telling an employee to listen to
   music instead of doing an urgent report, which is the worst available misreading and the
   audience is managers.
@@ -148,9 +151,21 @@ set of numbers — and will re-fit whatever inner box the real component turns o
 Two corrections to the handover notes, both load-bearing: **the ears exist** (baked into the
 skin path, centres at (71, 117) and (193, 117), five pixels *below* the eye line — headphones
 hung on the eye line ride visibly high), and **the shoulders needed authoring rather than a
-scale transform**, since scaling the shirt scales its crew neck with it. A quadratic in the
-shirt's own colour, with its apex pinned level with the shirt's shoulder tops, now carries the
-silhouette off both frame edges.
+scale transform**, since scaling the shirt scales its crew neck with it and gives him a boat
+neck.
+
+**The shoulders are anthropometric, not compositional**, and that is the fix for a pair that
+spanned the whole framing window on a nearly flat arc — a distant horizon rather than a pair of
+shoulders. Two numbers, both taken from a body rather than from the frame: a **span of 2.7 head
+widths** (the skull is 112 units wide, so the shoulders are 300 across) and **49 units of drop**
+from the collar corners to the acromion over 116 of run, about 23°. Below that the outline turns
+down into the upper arm and leaves frame. The consequence is deliberate and is not a regression:
+at a framing where
+the head fills two thirds of the height, real shoulders occupy about 70% of the width and a
+band of room shows at each bottom corner. They run off both edges only where the crop is
+narrower than they are — beat 5's 3:4 preview, which is what a portrait crop should do. The
+outline traces the shirt's **own neckline**, control point for control point, so the authored
+torso and the base meet along the crew neck with no seam to hide.
 
 **An expression is a vector, not a picture.** Thirteen numbers — brow height, brow inner-end
 angle, eye aperture, lid drop, gaze, mouth curvature, mouth width, mouth openness, mouth skew,
@@ -166,17 +181,28 @@ Expressions are keyframed exactly as camera shots are.
 | pupils | gaze — down at the keyboard when he is working |
 | mouth | one curvature scalar, plus width, openness and skew |
 | shoulders | slump, and the typing motion |
-| hands | two shapes at the desk edge, alternating — "still working" |
 | headphones | an overlay on the ears, beat 11 only |
 
 The hair, the ears and the neck are **not** animated. They come from the base, and the ears are
-where the headphones attach.
+where the headphones attach — the cups sit on the measured centres, and the **band crosses the
+crown**, above the hairline. It used to cross the fringe most of a forehead lower, which from
+the front reads as a band across his face; the framing window gained twelve units of headroom
+to buy the room. They are also **muted grey, not near-black**: at black they were the highest
+contrast object in the frame, on the one beat where the relief is supposed to land on his face.
+
+**The hands are cut.** There were two, at the bottom edge, alternating. Widely separated blobs
+read as detached objects rather than as forearms; they are below legibility at the wide
+composites where beat 11 actually resolves; and narrowing the shoulders did not rescue them, it
+moved them onto his chest. **"He never stops working" is unaffected as an invariant** — it is
+carried by the shoulders' typing motion, the head nod, the drifting notes and the trend walking
+back down while the music plays. It also removes a smaller wrong thing: hands at a keyboard
+during a *calibration*, where the instruction is to sit still for a baseline.
 
 **What the head must provide** — the art brief, and the delivered base meets every line of it:
 
 - **One drawing. Neutral expression, mouth closed, eyes open, front on**, at the framing a
-  webcam gives: head and shoulders, head filling ~55% of frame height, shoulders running off
-  both sides. Nothing below the chest.
+  webcam gives: head and shoulders, head filling ~66% of frame height, shoulders at human
+  proportion across ~70% of the width. Nothing below the chest.
 - **Separable layers, and this is the load-bearing requirement.** The face's *features* are not
   drawn: the delivered art supplies **skull, hair, ears, neck, shoulders/clothing** as separate
   regions, and the rig draws brows, eyes, pupils and mouth over them. A head delivered with its
@@ -185,13 +211,24 @@ where the headphones attach.
   middle third of the head's height) and the mouth band (lower third), free of texture, shading
   gradients or drawn detail in those two zones. Shading elsewhere is fine.
 - **Transparent background.** The office backdrop composites behind it and is **authored in
-  code, not sourced** — a wall, a horizon, one framed rectangle and a door edge. In the wide
-  composites the whole viewfinder is about 123 × 69px on a phone, so it has to read as "an
-  office" at very low fidelity, where any real detail becomes noise behind the character. It is
-  **static** and it never animates. Muted warm neutrals at 7–12% saturation, sitting back from
-  the `#25557C` shirt: **no red, no saturated green, no amber**, because those three carry
-  band meaning in this product and a backdrop wearing one looks like it is asserting a reading.
-  unDraw was the fallback and was not needed, so no third-party licence entry was incurred.
+  code, not sourced** — unDraw was the fallback and was not needed, so no third-party licence
+  entry was incurred. In the wide composites the whole viewfinder is about 123 × 69px on a
+  phone, so it has to read as "an office" at very low fidelity, where any real detail becomes
+  noise behind the character. It is **static** and it never animates. Two requirements on it,
+  both of which the first version failed:
+  - **Office-coded, not room-coded.** A wall, a mid-height band, a large field below it and a
+    framed picture reads as **headboard and mattress** — every element was generic-room, and
+    generic-room defaults to bedroom. It is now three things that only exist in a workplace: a
+    **window with venetian blinds** running off the top edge, the **back of a monitor** on its
+    stand running off the right, and a **desk line** low in the frame. A picture frame does no
+    work here; it hangs in any room ever built.
+  - **It has to recede**, because at the tight framing it was competing with the face and the
+    face has to win. Muted warm neutrals at 6–11% saturation, the whole palette inside ten
+    points of lightness so no edge in it is stronger than the hair's or the shirt's — and
+    everything except the wall is **blurred**, which is what a webcam does to a background two
+    metres back. Depth of field, not a softening effect. **No red, no saturated green, no
+    amber**, because those three carry band meaning in this product and a backdrop wearing one
+    looks like it is asserting a reading.
 - Landmarks the rig needs to line up against: **eye-line height, inter-pupil distance, mouth
   centre, chin, ear centres** (the headphones attach there). Any consistent proportion works;
   the rig scales to it.
@@ -204,7 +241,25 @@ separable are the parts the rig draws.
 
 **Two adjustments the base needed**, both flagged in the handover and both applied: the nose's
 `fill-opacity` was raised from **0.16 to 0.27** (against the mouth's 0.7 it was four times
-fainter and did not read), and the shoulders were extended to run off both frame edges.
+fainter and did not read), and the shoulders were replaced by the authored torso above.
+
+**One facial-coding error, found and fixed.** `tense` used to be brows *down and drawn
+together* over a flat pressed mouth — which is the **anger** configuration, and it read as
+anger. The direction of the inner brow is the whole difference: inner ends raised is sadness
+and worry, inner ends pulled down is anger. `tense` is now the **same shape as `dismayed`, one
+degree deeper** — inner ends still raised and slightly higher, corners further down, the jaw
+closing as the shock settles into a held state, eyes a fraction wider, head lower, shoulders
+sinking twice as far. That gives beat 8 two readable intensities of one emotion under its two
+stateline steps, so the face escalates alongside the UI instead of leaving it to the copy, and
+the travel between them is a settle rather than a second fall. **`tense` must never use lowered
+inner brows.**
+
+**Face size, measured rather than estimated.** At beat 8's tight framing (615px of world, the
+composition's tightest) his head is **~80px crown-to-chin on a 422px phone**. Head size is set
+by the framing window's height against the viewfinder's, not by the shoulders, so narrowing
+them cost nothing; the twelve units of headroom the headphone band needed cost about 2%. The
+lever if it ever has to be bought back is **L1's viewfinder size**, and only against a measured
+figure.
 
 ---
 
@@ -266,7 +321,8 @@ email and finds the code", and a click that reveals something already on screen 
 nothing. The greybox currently shows a ghost of the message body before the click. **This is a
 requirement on the drawn mail client, which does not exist yet — it is recorded here and the
 greybox ghost is deliberately not fixed**, since the asset that fixes it is a page-level drawn
-asset and goes with the components pass. Applies here and again at beat 8.
+asset and goes with the components pass. Applies here and again at beat 8. Deferred register,
+item 1.
 
 **⚠️ This beat has a job in beat 8.** The mail client needs one distinct, memorable visual signature — an app icon with a specific shape and colour, used consistently. Establish it clearly here. Beat 8's notification depends on the audience recognising that icon; see the note there.
 | 2f | 0:19–0:22 | **Back on Serenify.** A **wide hold** on the verify screen first, so the audience sees which screen it is on, then in on the OTP row. Six boxes fill, then the verification choreography, at or near real speed. |
@@ -398,9 +454,14 @@ hold the whole state → it is read → he clicks. The +0.4s is reading time for
 **Shot note for 5b:** this is the audience's first look at your protagonist's face. Give it a real hold. Everything in beats 7–11 depends on the audience having learned this face while it was calm.
 
 **Framing note:** the preview and the status line beneath it are framed **together**, both
-complete. That caps the preview at a **240×320** portrait target (same 3:4 ratio) — at 320×426
-the composite forces the camera out far enough that the face and the status line both stop
-being readable. Ratio and framing target are unchanged; only the on-screen size is smaller.
+complete. That caps the preview at **240** wide — at 320 the composite forces the camera out far
+enough that the face and the status line both stop being readable.
+
+**The greybox draws the preview 3:4, and that is a liberty being retired.** The real component
+is a full-width **`aspect-video`** box (`components/anchor/anchor-recorder.tsx`) with a **3:4
+bracket guide floating inside it** (`components/anchor/framing-overlay.tsx`, `aspect-[3/4]
+h-[78%]`). The *bracket target* is genuinely 3:4 and 5b is faithful; the *box* is not. The
+decision is to go faithful at the component pass — see the deferred register, item 5.
 
 ---
 
@@ -429,9 +490,9 @@ The monitoring session, live and settled.
 - Stateline: **"You're at ease right now"** · "Steady and settled — nothing to do."
 - The session trend below, a steady meadow step-line
 - Corner readout: **`Session · 47:12`**, ticking. Animate the seconds — it's a small liveness cue that costs nothing.
-- The viewfinder (L1, enlarged), showing him **content and lightly smiling**, working — hands
-  at the keyboard, gaze down at it. This is the face beat 8 has to fall *from*, so it is held
-  rather than played.
+- The viewfinder (L1, enlarged), showing him **content and lightly smiling**, working — gaze
+  down at the keyboard, shoulders carrying the typing. This is the face beat 8 has to fall
+  *from*, so it is held rather than played.
 
 Wide enough to hold bloom, stateline and viewfinder together. This is the "before" — the audience needs it registered so the fall lands.
 
@@ -587,7 +648,7 @@ change to the shot plan, not to the beat.
 
 ---
 
-### 11 · Return to ease · 1:05.7 – 1:12.7 (7s)
+### 11 · Return to ease · 1:05.7 – 1:13.5 (7.8s)
 
 He acts on it. In order:
 
@@ -598,10 +659,10 @@ He acts on it. In order:
 **HE EASES *OVER* THE WORK, NOT INSTEAD OF IT.** The beat used to end with him relaxed and the
 deadline untouched, and there is a reading available — particularly for the managers this post is
 aimed at — where the stress app told an employee to listen to music instead of doing the urgent
-report. The clock says 11:30 and the deadline is 12. So **he never leaves the keyboard**: his hands
-are going from the moment the player closes, all the way through the nod, the drift and the
+report. The clock says 11:30 and the deadline is 12. So **he never leaves the keyboard**: he is
+typing again from the moment the player closes, all the way through the nod, the drift and the
 recovery. The nod and the notes stay — they are the point of the beat. What changed is that he
-does not stop. Staging only; the beat's length is unchanged.
+does not stop.
 
 **No audio plays.** This is animation only; the VO track is Arabic narration and the cut must work silent regardless.
 
@@ -628,12 +689,18 @@ starts at f108, after the relief has landed. The staging is correct as built and
 drifting notes and his head nod all need room; cropping to the face loses the thing that makes the
 beat work.
 
-**Cost: 6s → 7s.** The music player gives back ~0.4s — the track name reads in well under two
-seconds at that framing — and the payoff takes 1.4s.
+**AND IT LINGERS ON THE FINAL READING.** The last thing on the page that travels is the emphasis
+settling at f214, which leaves twenty frames — two thirds of a second — where nothing is moving
+but his breath and the nod. Beat 12 is the film's thesis and it lands better arriving out of a
+settled frame than out of a settling one. **This is the only timing change in the viewfinder
+pass.**
+
+**Cost: 6s → 7.8s.** The music player gives back ~0.4s — the track name reads in well under two
+seconds at that framing — the payoff takes 1.4s and the linger 0.8s.
 
 ---
 
-### 12 · The closing subtitle card · 1:12.7 – 1:15.7 (3s)
+### 12 · The closing subtitle card · 1:13.5 – 1:16.5 (3s)
 
 A short card between the demo resolving and the wordmark reveal.
 
@@ -670,7 +737,7 @@ is a tic. Framed at 760, the same as the end card, so the two read as one closin
 
 ---
 
-### 13 · End card · 1:15.7 – 1:20.2 (4.5s)
+### 13 · End card · 1:16.5 – 1:21.0 (4.5s)
 
 **A sequence, not a static frame.** Three timed events:
 
@@ -716,30 +783,32 @@ and it is not what feels slow.
 
 ---
 
-## Running total: ~80.2s
+## Running total: ~81.0s
 
-Still well over the 40–60s target, and it now moves in the right direction for the first time.
-**Do not trim on paper — trim in greybox**, where you can actually feel what's slow.
+Still well over the 40–60s target. **Do not trim on paper — trim in greybox**, where you can
+actually feel what's slow.
 
-**−0.8s across this revision**, itemised:
+**+0.8s across this revision**, and it is one line:
 
 | Beat | Was | Now | What changed |
 |---|---|---|---|
-| 8 · the email | 6s | **6.7s** | +0.7s. The tight framing HOLDS through the fall. The rig found this |
-| 13 · end card | 6s | **4.5s** | −1.5s, all of it typing speed. The hold is untouched |
+| 11 · return to ease | 7s | **7.8s** | +0.8s. It lingers on the returned reading, so beat 12 arrives out of a settled frame |
 
-Everything else is unchanged. The character rig itself, the restaged beat 11 — he never leaves the
-keyboard now — and the decided closing line all cost **nothing**.
+Everything else in the viewfinder-polish pass is drawing, not timing, and cost **nothing**: the
+shoulders' proportion, the cut hands, the office-coded backdrop, the headphones and the corrected
+`tense` pose are all free.
 
 **Trim candidates, in order:**
 
 1. Beat 2, 15.6s → 12s. The performed mail sequence is where the fat is; the OTP choreography is not.
 2. Beat 5, 12.4s → 10.5s. 5d recording can lose a second and 5f's hold can lose half of one.
-3. Beat 11, 7s → 6.5s. The music-player sub-beat, not the easing and not the pull-out.
-4. Beat 4, 5s → 4s. The scroll can move faster than it does.
+3. Beat 4, 5s → 4s. The scroll can move faster than it does.
+
+Beat 11 has come **off** this list. The music-player sub-beat is still the only fat in it, but the
+beat now ends on a deliberate linger and trimming there would take the linger with it.
 
 **Protect at all costs:** beat 8 (6.7s, and specifically its tight hold), beat 10's turn 3, the 5b
-first-sight-of-face hold, and beat 11's wide hold. Those four are the video.
+first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those four are the video.
 
 ---
 
@@ -774,21 +843,78 @@ first-sight-of-face hold, and beat 11's wide hold. Those four are the video.
   already has its closer moment: the relief lands and holds at the tight headphones framing
   (~120px of head) for 26 frames before the pull-out begins. Checked, not assumed.
 
+- ~~Was the shoulder proportion right?~~ **No, and it is fixed.** They spanned about five head
+  widths on a flat arc and read as a distant horizon. Now 2.7 head widths with a real slope. See
+  "The character rig".
+- ~~Do the hands earn their place?~~ **No. Cut.** See "The character rig".
+- ~~Does the office backdrop read as an office?~~ **It did not — it read as a bedroom**, and it
+  competed with the face. Rebuilt around a blinded window, a monitor back and a desk line, and
+  blurred. See the art brief.
+- ~~Does `tense` read as the emotion it is meant to be?~~ **No. It read as anger**, and that was a
+  facial-coding error rather than a matter of taste. It is now escalated dismay. See "The
+  character rig".
+
 **Still open:**
 
 - **Does the closing card land or stall the ending?** Three seconds of held text between the demo
   resolving and the wordmark is either the last idea or a speed bump. Judge it in this pass.
-- **Is 80.2s acceptable, and if not, what goes?** See the trim list above.
-- **The face is smaller at beat 8's tight framing than the crude rig made it — ~78px on a phone
-  against ~101px.** That is the cost of real proportions: the crude rig put an 82%-of-frame head
-  on a body that barely existed, and honest webcam framing spends some of that height on
-  shoulders. The fall still reads clearly at 78px, so nothing was done about it — but if it ever
-  needs buying back, the lever is L1's viewfinder size (320×180 today), not the framing window.
+- **Is 81.0s acceptable, and if not, what goes?** See the trim list above.
+- **Does the face need to be bigger?** It is **~80px crown-to-chin on a phone** at beat 8's tight
+  framing — measured off a render, not estimated. The fall reads clearly there, so nothing was
+  done about it. Head size is set by the framing window against the viewfinder's height, so the
+  narrower shoulders cost nothing and the headphone band's headroom cost about 2%. The lever if it
+  ever needs buying back is L1's viewfinder size (320×180 today), not the framing window — and it
+  should be re-checked against the real component before it is pulled (deferred register, item 6).
 - **Does beat 13's duplicate-and-derive move sell on screen?** See beat 13; `DERIVE` reverts it.
 - Do the real full-page reloads (`<a href>` / `window.location.replace`) read as broken on video, or as honest? They're real; showing them is more faithful, but a hard white flash mid-video may just look like a mistake.
 - Beat 10's three-turn exchange is written for the video; `014-recommendations` doesn't exist. Keep the UI plausible against what 014 will actually ship.
 - Beat 10 turn 3 must read as *personal knowledge*, not a canned tip. If greybox shows it reading generic, that's a copy problem to fix before art.
 - Does the mail app icon established in 2e survive the ~25 seconds to beat 8 as a recognisable signature? Greybox will show it.
+
+---
+
+## The deferred register
+
+**What is deliberately unfinished, so that nothing depends on being remembered.** Each entry is a
+requirement plus the reason it is not built yet. Recording these *is* the work; none of them is to
+be started from this list.
+
+**Deferred to the component pass** — when the greybox page is replaced by real `apps/web`
+components:
+
+1. **The mail client's reading pane must be empty until the message is clicked.** A ghost of the
+   body is visible beforehand, which leaves the click nothing to reveal. Applies at **beat 2 and
+   beat 8**. The mail client is a drawn asset that does not exist yet, so this is a requirement on
+   that asset — do not patch the greybox.
+2. **Un-pad the dashboard layout.** The greybox widened the gap between the orb/stateline and the
+   trend line so the emphasis would not overlap the bloom. That solved a video problem by changing
+   the product's layout. Real components render their real spacing, and **the emphasis is what
+   must yield** — not the layout.
+3. **The stateline emphasis must not overlap the bloom** once real spacing is in. Same invariant as
+   today (L12), re-solved against real geometry rather than against the padded greybox.
+4. **Frame the calibration success state against real geometry, ripple extent included.** It has
+   read as punched-in across three revisions because it has been fitted to a greybox
+   approximation. Measure the real component's bounding box before framing it.
+5. **The calibration viewfinder becomes 16:9.** The greybox's 3:4 box was a liberty; the real
+   component is `aspect-video` with a 3:4 bracket guide floating inside it. The decision is to go
+   faithful. That take needs reframing, and the change should also make the centering nudge land
+   harder. There was **no row in the liberties table to delete** — the liberty lived in beat 5's
+   framing note, which now records the decision instead.
+6. **Re-check beat 8's face size after the swap.** It is ~80px on a phone today. The lever if it is
+   too small is L1's viewfinder size, and only against a measured figure.
+7. **Beat 11's page half is unfinished** — the music player and the trend descent are still grey.
+   Expected, not a defect: the viewfinder pass finished the viewfinder.
+
+**Open and unanswered, older than this pass:**
+
+8. **On-screen text has no treatment.** Deferred every pass so far, deliberately, because designing
+   it before the framing settled would have been wasted work. It still needs doing. *(A reference
+   video existed for this, was misread, and Mohamed asked to scratch it. Do not resurface it.)*
+9. **Should Ren stop blinking while a reading is Tense?** Raised three sessions ago, never
+   answered.
+10. **Do Ren's `attentive` and `thinking` states need properly drawn eyes?** They are `idle`'s eyes
+    scaled. At the enlarged avatar size (L8), held for seconds, that may become visible in a way it
+    is not in the app.
 
 ---
 
