@@ -98,13 +98,35 @@ export const Beat01ColdOpen: React.FC = () => {
               <Box x={COL_X} y={545} w={COL_W} h={200} label="hero product shot" fill={GREY.panelAlt} />
               <TextBlock x={COL_X + 40} y={590} w={380} lines={3} />
 
-              {/* Into beat 2 through the product's own CTA, not through a cut. */}
-              <Cursor x={556} y={410} clickAt={158} />
+              {/* Into beat 2 through the product's own CTA, not through a cut. The
+                  click moved later (f158 → f168): the page was lingering ~0.7s after
+                  it, which is dead time in the opening beat. Free — no duration
+                  changed. */}
+              <Cursor x={556} y={410} clickAt={168} />
             </>
           ) : null}
 
-          {/* The lifted address bar. Sits above the page either way. */}
-          <Lift home={OMNIBOX} lifted={OMNIBOX_LIFTED} t={lift}>
+          {/*
+           * The lifted address bar. Sits above the page either way.
+           *
+           * ONE SHAPE, ONE RADIUS. This used to be two nested shapes — the lift's
+           * own panel at a fixed radius 10, and the pill inside it at 14→26 — so
+           * the container's corners sat visibly outside the input at both ends.
+           * The pill IS the panel now: `panelStyle` carries the fill, the border and
+           * the growing radius, and the child draws only the text. The shadow that
+           * says "detached" still comes from the panel.
+           */}
+          <Lift
+            home={OMNIBOX}
+            lifted={OMNIBOX_LIFTED}
+            t={lift}
+            panelStyle={{
+              backgroundColor: GREY.surface,
+              border: `1px solid ${GREY.border}`,
+              borderRadius: 14 + 12 * lift,
+              opacity: 1,
+            }}
+          >
             <div
               style={{
                 position: "absolute",
@@ -115,9 +137,6 @@ export const Beat01ColdOpen: React.FC = () => {
                 fontFamily: MONO,
                 fontSize: 14,
                 color: GREY.body,
-                backgroundColor: GREY.surface,
-                border: `1px solid ${GREY.border}`,
-                borderRadius: 14 + 12 * lift,
                 boxSizing: "border-box",
               }}
             >

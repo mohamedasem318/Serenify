@@ -1,9 +1,9 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
-import { Camera, frameRect, union } from "../Camera";
+import { Camera, frameRect } from "../Camera";
 import { QUESTIONNAIRE } from "../copy";
-import { CARD, MonitorSurface, PROMPT, SESSION_BASE, VIEWFINDER } from "../surfaces";
+import { monitorWide, MonitorSurface, PROMPT, SESSION_BASE } from "../surfaces";
 import { GREY } from "../theme";
 import { Box, Cursor, Text, useFade } from "../ui";
 
@@ -33,7 +33,7 @@ export const Beat09Questionnaire: React.FC = () => {
       <Camera
         keys={[
           // Picks up beat 8's closing framing, then lands on the prompt whole.
-          { frame: 0, shot: frameRect(union(CARD, VIEWFINDER), 14) },
+          { frame: 0, shot: monitorWide(14) },
           { frame: 30, shot: frameRect(PROMPT, 24) },
           { frame: 90, shot: frameRect(PROMPT, 24) },
         ]}

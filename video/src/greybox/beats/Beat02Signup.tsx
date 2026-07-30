@@ -8,7 +8,7 @@ import { FORM_W, FORM_X, GREY, H, MONO, VIEWPORT_Y, W } from "../theme";
 import { Box, Button, Cursor, Text, TextBlock } from "../ui";
 
 /**
- * Beat 2 · Signup · 0:06–0:22 · 480 frames
+ * Beat 2 · Signup · 0:06–0:21.6 · 468 frames
  *
  * **ONE TAKE.** This beat used to be six `Series.Sequence`s, each with its own
  * camera — which meant five cuts inside a single beat. It is now one continuous
@@ -26,9 +26,10 @@ import { Box, Button, Cursor, Text, TextBlock } from "../ui";
  * · A **wide hold** on the verify screen before pushing in on the OTP row, so the
  *   audience sees which screen it is on.
  *
- * COST: 13s → 16s. Every second of it is a performed action that used to be a
- * cut — opening a tab, typing a URL, waiting for a page, clicking a message open.
- * This is the expensive beat the no-cut invariant was always going to produce.
+ * COST: 13s → 16s → **15.6s**. Every second of it is a performed action that used to
+ * be a cut — opening a tab, typing a URL, waiting for a page, clicking a message open.
+ * This is the expensive beat the no-cut invariant was always going to produce. The 12
+ * frames back come out of the wide hold on the verify screen, not out of any action.
  */
 
 // ── Layout ──────────────────────────────────────────────────────────────────
@@ -70,8 +71,14 @@ const T = {
    * it any earlier put the halo sweep on screen at full frame, where six 52px
    * boxes are too small to see it happen, which wasted the best motion in the
    * product on a wide shot.
+   *
+   * Pulled 388 → 380 with the wide hold, which is shortened by 10 frames. The greybox
+   * verify screen is sparse and stays sparse — the real page brings the heading, the
+   * body copy, the halo sweep and the meadow fills, and dressing the greybox to fill
+   * the wait would test furniture that is not shipping. So the wait got shorter
+   * instead of fuller.
    */
-  otp: 388,
+  otp: 380,
 } as const;
 
 /** Reveals a string left-to-right, so a field looks typed rather than pasted. */
@@ -498,11 +505,12 @@ export const Beat02Signup: React.FC = () => {
           { frame: 340, shot: frameRect(EMAIL_CARD, 6) },
           // F · performed tab switch back — the pull-out and the tab click coincide
           { frame: 360, shot: shot(W / 2, H / 2, W) },
-          // G · the wide hold, so the audience sees the screen it is on
-          { frame: 380, shot: shot(W / 2, H / 2, W) },
+          // G · the wide hold, so the audience sees the screen it is on. Shortened
+          // by 10 frames against a screen this sparse — see T.otp.
+          { frame: 370, shot: shot(W / 2, H / 2, W) },
           // H · in on the OTP row, arriving as the first digits land
-          { frame: 396, shot: frameRect(OTP_ROW, 40) },
-          { frame: 480, shot: frameRect(OTP_ROW, 40) },
+          { frame: 388, shot: frameRect(OTP_ROW, 40) },
+          { frame: 468, shot: frameRect(OTP_ROW, 40) },
         ]}
       >
         <Desktop clock={frame >= T.mailLoaded ? "10:21 AM" : "10:20 AM"} tabs={tabs} active={active} url={url}>

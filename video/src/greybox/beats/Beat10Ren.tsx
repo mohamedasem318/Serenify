@@ -128,7 +128,9 @@ export const Beat10Ren: React.FC = () => {
           { frame: 210, shot: frameRect(union(A3, B3), 26) },
         ]}
       >
-        <Desktop clock="11:31 AM" url="serenify.tech/app/chat">
+        {/* 11:30, not 11:31. Beats 7–11 are ~26s of screen time and ~26s of story
+            time, all inside the same minute — see the internal clock in the sheet. */}
+        <Desktop clock="11:30 AM" url="serenify.tech/app/chat">
           <AppHeader />
 
           <Box x={PANEL.x} y={PANEL.y} w={PANEL.w} h={PANEL.h} fill={GREY.page} border={GREY.border} radius={12} />

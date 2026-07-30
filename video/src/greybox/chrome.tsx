@@ -21,8 +21,45 @@ import { Box, Text } from "./ui";
  * §Continuity) — so this wraps every beat and its state carries the continuity.
  */
 
-/** The omnibox pill, as a rect, so beat 1 can lift it. */
-export const OMNIBOX = { x: 60, y: CHROME_Y + 34, w: W - 120, h: 28 } as const;
+/**
+ * The omnibox pill, as a rect, so beat 1 can lift it. Shortened from `W - 120` to
+ * make room for the clock at the right end of the same row.
+ */
+export const OMNIBOX = { x: 60, y: CHROME_Y + 34, w: 960, h: 28 } as const;
+
+/**
+ * **The clock (liberty L11), and why it lives in the browser toolbar.**
+ *
+ * Beat 8's payoff is arithmetic the audience does unaided: the clock says 11:30,
+ * the boss says "need the report by 12", and nobody is told it is thirty minutes.
+ * With no clock legible on screen there is no arithmetic and no payoff, so the
+ * clock is load-bearing furniture and it exists **from beat 1** — one continuous
+ * screen recording cannot grow new chrome halfway through.
+ *
+ * The requirements fight each other. It must read in wide shots (~10px on a phone
+ * at a full-frame framing, so ~28 world px), it must be inside beat 8's push-in on
+ * the toast, and it must not cost page height — the composition is exactly full at
+ * 1200×675 and dropping below 1.6× gives back the magnification L7 exists for.
+ *
+ * Three forms were considered:
+ *
+ *  · **macOS menu bar** (the honest place). A 24px bar holds at most ~16px of type,
+ *    ~6px on a phone in a wide shot, so the bar would have to grow — page height —
+ *    and beat 8's push-in would have to reach world y 0, widening it from 590 to
+ *    ~711 and dropping the toast's subject line to ~8.3px. Two costs, both real.
+ *  · **App header.** Does not exist in beat 1, where the public nav is up.
+ *  · **Browser toolbar, right end of the omnibox row.** The chrome is already 68px
+ *    of furniture above the page, so a clock in it costs **zero page height**, and
+ *    at y 58–88 it sits directly above the toast — beat 8's push-in widens only
+ *    590 → 615, about 7%.
+ *
+ * The toolbar wins on the number that matters most, and its whole cost is that no
+ * real browser draws a clock there, plus its 28px against the URL's 14px. Declared.
+ *
+ * Its right edge is 1176 — the same as the toast's and the viewfinder's, so beat 8
+ * frames a vertical stack rather than three unrelated things.
+ */
+export const CLOCK = { x: 1036, y: 58, w: 140, h: 30 } as const;
 
 /**
  * The mail app's visual signature. Beat 8's entire meaning hangs on the
@@ -53,16 +90,40 @@ export const MailMark: React.FC<{ size: number }> = ({ size }) => (
   </div>
 );
 
-export const MenuBar: React.FC<{ clock: string }> = ({ clock }) => (
+/**
+ * The menu bar. It used to carry the clock at 12px, which is ~4px on a phone in a
+ * wide shot and out of frame entirely in beat 8's push-in — see `CLOCK` above for
+ * where the clock went and why. There is exactly one clock in this video.
+ */
+export const MenuBar: React.FC = () => (
   <>
     <Box x={0} y={0} w={W} h={MENUBAR_H} fill={GREY.strong} border={GREY.strong} radius={0} />
     <Text x={16} y={6} size={11} weight={700} color={GREY.white} mono>
       MENU BAR
     </Text>
-    <Text x={W - 150} y={6} w={134} size={12} weight={700} color={GREY.white} align="right" mono>
-      {clock}
-    </Text>
   </>
+);
+
+/**
+ * The clock itself. **Plain, and it must stay plain** — it does not pulse, flash,
+ * tint or animate beyond the time changing. Beat 8 works because nobody is told it
+ * is bad news; emphasis here would convert a discovery into an instruction. There
+ * is no colour available for it either: amber and meadow both carry band meaning.
+ */
+export const ChromeClock: React.FC<{ clock: string }> = ({ clock }) => (
+  <Text
+    x={CLOCK.x}
+    y={CLOCK.y}
+    w={CLOCK.w}
+    size={28}
+    weight={700}
+    color={GREY.body}
+    align="right"
+    lineHeight={1.05}
+    mono
+  >
+    {clock}
+  </Text>
 );
 
 /** One tab in the strip. `mail` draws the established <MailMark>. */
@@ -86,9 +147,10 @@ export const BrowserChrome: React.FC<{
   tabs: TabSpec[];
   active: number;
   url: string;
+  clock: string;
   /** While the URL is being typed. */
   caret?: boolean;
-}> = ({ tabs, active, url, caret = false }) => (
+}> = ({ tabs, active, url, clock, caret = false }) => (
   <>
     <Box x={0} y={CHROME_Y} w={W} h={CHROME_H} fill={GREY.panel} border={GREY.panel} radius={0} />
 
@@ -154,6 +216,8 @@ export const BrowserChrome: React.FC<{
       {url}
       {caret ? <span style={{ color: GREY.ink }}>|</span> : null}
     </Text>
+
+    <ChromeClock clock={clock} />
   </>
 );
 
@@ -191,8 +255,8 @@ export const Desktop: React.FC<{
   children,
 }) => (
   <>
-    <MenuBar clock={clock} />
-    <BrowserChrome tabs={tabs} active={active} url={url} caret={caret} />
+    <MenuBar />
+    <BrowserChrome tabs={tabs} active={active} url={url} clock={clock} caret={caret} />
     <Viewport fill={fill}>{children}</Viewport>
   </>
 );

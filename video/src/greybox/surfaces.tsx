@@ -2,11 +2,11 @@ import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 
 import { Bloom, FaceState, Trend, Viewfinder } from "./actors";
-import { Rect, rect } from "./Camera";
-import { AppHeader, Desktop, SessionReadout } from "./chrome";
+import { frameRect, Rect, rect, Shot, union } from "./Camera";
+import { AppHeader, CLOCK, Desktop, SessionReadout } from "./chrome";
 import { STATELINE } from "./copy";
-import { grow, Lift } from "./lift";
-import { FONT, FPS, GREY } from "./theme";
+import { Lift } from "./lift";
+import { FONT, FPS, GREY, VIEWPORT_Y } from "./theme";
 import { Box } from "./ui";
 
 /**
@@ -31,26 +31,75 @@ import { Box } from "./ui";
  */
 
 /** Every rect a beat might want to frame. Beats pass these to `frameRect`. */
-export const CARD: Rect = rect(120, 164, 700, 436);
+export const CARD: Rect = rect(120, 164, 700, 476);
 export const VIEWFINDER: Rect = rect(856, 200, 320, 180);
 export const TOAST_BOX: Rect = rect(856, 96, 320, 92);
 export const PROMPT: Rect = rect(856, 412, 320, 240);
-/** The stateline head + sub. Beat 7 lifts this. */
-export const STATELINE_BLOCK: Rect = rect(270, 336, 400, 118);
+/** The stateline head + sub. This is what the in-place emphasis raises. */
+export const STATELINE_BLOCK: Rect = rect(270, 334, 400, 118);
+export const TREND: Rect = rect(160, 548, 620, 84);
 
-export const BLOOM = { cx: 470, cy: 262, size: 148 } as const;
+export const BLOOM = { cx: 470, cy: 252, size: 148 } as const;
 export const READOUT = { x: 856, y: 390 } as const;
 
 /** 47:12 — liberty L4. He has been heads-down a while. */
 export const SESSION_BASE = 47 * 60 + 12;
 
 /**
- * Beat 7's lift: the block grows about its own centre by this much and the camera
- * does not move. 1.8 is the largest factor whose lifted panel still sits inside
- * the composite framing — at 1.9 its left edge lands at world x 90 and the frame
- * starts at 100, so the panel was clipped.
+ * **THE EMPHASIS GROWS DOWNWARD, AND THE CARD WAS RELAID OUT SO IT CAN.**
+ *
+ * Revision 3 grew the block 1.8× about its own centre, which sent its top edge up
+ * to y 289 and covered roughly the lower third of the bloom. That was a nitpick
+ * when the emphasis fired once; now that it fires on every stateline change it is a
+ * pattern, and beat 7's entire job is to plant bloom, stateline and viewfinder
+ * together as the "before".
+ *
+ * So the emphasis is anchored at the block's **top** edge (y 334, eight pixels
+ * below the bloom's bottom at 326) and grows down. That needs 195px of clear room
+ * below, which the old layout did not have — the trend sat at y 472. The card is
+ * 40px taller (436 → 476) and the trend moved down to 548, which buys the room
+ * without touching the bloom, the viewfinder, the toast or the prompt.
+ *
+ *   bloom            y 178 – 326
+ *   stateline        y 334 – 452   ← seated
+ *   stateline raised y 334 – 529   ← 8px clear of the bloom, 19px clear of the trend
+ *   trend            y 548 – 632
+ *
+ * The factor is 1.65, not 1.8: that is what makes the app's 16px sub land at ~10px
+ * on a phone at the composite framing (~1096 world px), which is the floor and the
+ * only thing the emphasis is for. Anything larger buys nothing and costs clearance.
  */
-export const STATELINE_LIFT_FACTOR = 1.8;
+export const STATELINE_EMPH: Rect = rect(140, STATELINE_BLOCK.y, 660, 195);
+export const STATELINE_EMPH_FACTOR = STATELINE_EMPH.w / STATELINE_BLOCK.w;
+
+/**
+ * The monitoring composite — card + viewfinder — framed so **the clock is in it**.
+ *
+ * `frameRect` centres on the composite, which put the frame's top edge inside the
+ * browser chrome and sliced the clock horizontally. A sliced clock is the one thing
+ * this video cannot have, since beat 8's payoff is reading it.
+ *
+ * The fix is not to push the frame down off the chrome but to pull it UP until the
+ * clock is whole: the composite needs 1056 world px of width, which at 16:9 buys 594
+ * of height against the 582 it takes to span the clock's top (58) to the card's
+ * bottom (640). The room is there — `frameRect` was simply spending it below. So the
+ * shot top-aligns two pixels above the clock and spills below the world instead,
+ * which is free: backdrop and page are the same grey, so the world's bottom edge is
+ * literally invisible. The tab strip ends at 54 and stays out of frame.
+ *
+ * Result: the clock reads in every monitoring beat, not only in beat 8's push-in.
+ */
+export const monitorWide = (margin: number): Shot => {
+  const base = frameRect(union(CARD, VIEWFINDER), margin);
+  const halfHeight = (base.w * 9) / 32;
+  const cardBottom = CARD.y + CARD.h;
+  return {
+    cx: base.cx,
+    // Top-align on the clock, unless that would clip the card's own bottom edge.
+    cy: Math.max(CLOCK.y - 2 + halfHeight, cardBottom + 12 - halfHeight),
+    w: base.w,
+  };
+};
 
 export type StatelineKey = keyof typeof STATELINE;
 
@@ -63,8 +112,11 @@ export const MonitorSurface: React.FC<{
   headphones?: boolean;
   nod?: boolean;
   notesFrom?: number;
-  /** 0 = seated, 1 = lifted. Beat 7 only. */
-  statelineLift?: number;
+  /**
+   * 0 = seated, 1 = raised. Driven by `useEmphasis` and fired on EVERY stateline
+   * copy change — beats 7, 8 and 11. Not a budget; a rule.
+   */
+  emphasis?: number;
   /** Seconds already elapsed when this beat starts; the readout ticks on. */
   sessionFrom?: number;
   children?: React.ReactNode;
@@ -77,15 +129,15 @@ export const MonitorSurface: React.FC<{
   headphones,
   nod,
   notesFrom,
-  statelineLift = 0,
+  emphasis = 0,
   sessionFrom = SESSION_BASE,
   children,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const state = STATELINE[stateline];
-  const t = statelineLift;
-  const k = 1 + (STATELINE_LIFT_FACTOR - 1) * t;
+  const t = emphasis;
+  const k = 1 + (STATELINE_EMPH_FACTOR - 1) * t;
 
   return (
     <Desktop clock={clock} url="serenify.tech/app/monitor">
@@ -96,10 +148,10 @@ export const MonitorSurface: React.FC<{
 
       {/*
        * text-3xl / text-base, exactly as the app sets them — and both scaled by
-       * the lift factor when beat 7 lifts the block, which is what finally makes
-       * the 16px sub readable at a framing wide enough to hold the viewfinder.
+       * the emphasis factor while the block is raised, which is what makes the
+       * 16px sub readable at a framing wide enough to hold the viewfinder.
        */}
-      <Lift home={STATELINE_BLOCK} lifted={grow(STATELINE_BLOCK, STATELINE_LIFT_FACTOR)} t={t} panel>
+      <Lift home={STATELINE_BLOCK} lifted={STATELINE_EMPH} t={t} panel>
         <div
           style={{
             position: "absolute",
@@ -121,7 +173,7 @@ export const MonitorSurface: React.FC<{
         </div>
       </Lift>
 
-      <Trend x={160} y={472} w={620} h={90} climb={climb} tension={tension} />
+      <Trend x={TREND.x} y={TREND.y} w={TREND.w} h={TREND.h} climb={climb} tension={tension} />
 
       <Viewfinder
         x={VIEWFINDER.x}

@@ -11,14 +11,15 @@ import { Beat08Email } from "./greybox/beats/Beat08Email";
 import { Beat09Questionnaire } from "./greybox/beats/Beat09Questionnaire";
 import { Beat10Ren } from "./greybox/beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
-import { Beat12EndCard } from "./greybox/beats/Beat12EndCard";
+import { Beat12Closing } from "./greybox/beats/Beat12Closing";
+import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
 import { GREYBOX_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
 import { HelloWorld } from "./HelloWorld";
 import { WebComponentProbe } from "./WebComponentProbe";
 import "./tailwind.css";
 
 /**
- * `Greybox` is the cut: all twelve beats of
+ * `Greybox` is the cut: all thirteen beats of
  * `docs/video/serenify-launch-video-beat-sheet.md` at their sheet durations, in
  * grey rectangles, with real camera moves.
  *
@@ -45,10 +46,10 @@ export function RemotionRoot() {
 
       <Folder name="Greybox-Beats">
         <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={180} fps={30} width={1920} height={1080} />
-        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={480} fps={30} width={1920} height={1080} />
-        <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={150} fps={30} width={1920} height={1080} />
+        <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={468} fps={30} width={1920} height={1080} />
+        <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={120} fps={30} width={1920} height={1080} />
         <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={150} fps={30} width={1920} height={1080} />
-        <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={360} fps={30} width={1920} height={1080} />
+        <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={372} fps={30} width={1920} height={1080} />
         {/* The time-jump line is gone entirely — only beat 7's session timer marks
             the jump now. See the flag in Beat06Later.tsx. */}
         <Composition id="Beat06-Later" component={Beat06Later} durationInFrames={60} fps={30} width={1920} height={1080} />
@@ -56,8 +57,12 @@ export function RemotionRoot() {
         <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={180} fps={30} width={1920} height={1080} />
         <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={90} fps={30} width={1920} height={1080} />
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={210} fps={30} width={1920} height={1080} />
-        <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={180} fps={30} width={1920} height={1080} />
-        <Composition id="Beat12-EndCard" component={Beat12EndCard} durationInFrames={150} fps={30} width={1920} height={1080} />
+        <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={210} fps={30} width={1920} height={1080} />
+        {/* NEW: the closing subtitle card, between the demo and the wordmark. Its
+            copy is a placeholder at the right length — the candidate lines are in the
+            revision-4 report and Mohamed picks one. */}
+        <Composition id="Beat12-Closing" component={Beat12Closing} durationInFrames={90} fps={30} width={1920} height={1080} />
+        <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={180} fps={30} width={1920} height={1080} />
       </Folder>
 
       <Folder name="Pipeline-Checks">

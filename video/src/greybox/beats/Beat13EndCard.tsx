@@ -7,7 +7,9 @@ import { GREY, H, MONO, W } from "../theme";
 import { Box, Text } from "../ui";
 
 /**
- * Beat 12 · End card · 1:09–1:14 · 150 frames
+ * Beat 13 · End card · 1:16 – 1:22 · 180 frames
+ *
+ * Was beat 12 — the closing subtitle card is beat 12 now and this moved down one.
  *
  * **A sequence, not a static frame.** Three timed events:
  *
@@ -20,9 +22,11 @@ import { Box, Text } from "../ui";
  * of the three events, not the reveal itself.
  *
  * Typing on rather than fading in, because it puts a readable pace on the two lines
- * and gives the VO something to land against. The hold at the end is deliberately
- * long: it is where the last narration line goes, so it is room in the cut rather
- * than dead air.
+ * and gives the VO something to land against.
+ *
+ * **+1s on the hold after "serenify.tech" types on**, as asked: 150 → 180 frames.
+ * The hold runs f146–f180, 1.1s, and it is where the last narration line goes — room
+ * in the cut rather than dead air.
  */
 
 const REVEAL_FROM = 0;
@@ -44,7 +48,7 @@ const typeOn = (value: string, frame: number, from: number, to: number) =>
     ),
   );
 
-export const Beat12EndCard: React.FC = () => {
+export const Beat13EndCard: React.FC = () => {
   const frame = useCurrentFrame();
 
   const wipe = interpolate(frame, [REVEAL_FROM, REVEAL_TO], [0, 1], {

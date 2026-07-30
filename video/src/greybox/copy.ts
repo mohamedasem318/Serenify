@@ -167,7 +167,28 @@ export const PLAYER = {
   artist: "Michael Jackson",
 } as const;
 
-// ── Beat 12 · end card (SHEET) ──────────────────────────────────────────────
+// ── Beat 12 · the closing subtitle card (PLACEHOLDER — awaiting Mohamed) ────
+/**
+ * PLACEHOLDER, and deliberately so. The line names the thesis of the whole project
+ * — the model does not decide alone; the reading came back down because he was asked
+ * and he answered — which the video demonstrates and never states.
+ *
+ * Two constraints on whatever replaces this:
+ *
+ *  1. **The video shows only the true-positive path.** The landing page shows both
+ *     branches; this card cannot lean on the landing page's framing without implying
+ *     a branch the video never showed. So no "sometimes the answer is no", and
+ *     nothing that turns on the false alarm.
+ *  2. It is **one line**, its own beat, not a fourth event inside the end card.
+ *
+ * The string below is a length-and-pacing stand-in in the landing page's voice
+ * (`lib/landing/copy.ts`: "asks before it decides", "Nothing moves until you
+ * answer", "Asking is not a courtesy; it is the correction"). Candidates are in the
+ * revision report; Mohamed picks one and it lands next revision.
+ */
+export const CLOSING_LINE = "Nothing moved until he answered.";
+
+// ── Beat 13 · end card (SHEET) ──────────────────────────────────────────────
 export const END_CARD = {
   line: "take care of yourself",
   domain: "serenify.tech",

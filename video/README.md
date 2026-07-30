@@ -2,7 +2,7 @@
 
 React-as-video. The source of truth for what gets built is
 [`docs/video/serenify-launch-video-beat-sheet.md`](../docs/video/serenify-launch-video-beat-sheet.md).
-All twelve beats of that sheet exist here as a **greybox** — grey rectangles at
+All thirteen beats of that sheet exist here as a **greybox** — grey rectangles at
 real durations with real camera moves — plus the two checks that prove the
 pipeline is worth having. Nothing is built to final quality yet.
 
@@ -54,7 +54,7 @@ Next dev server instead of its own.
 
 ```bash
 cd video
-npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 77.0s, ~17 MB)
+npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 81.0s, ~18 MB)
 npm run render:hello    # -> out/hello-world.mp4
 npm run render:probe    # -> out/web-component-probe.mp4
 
@@ -70,8 +70,8 @@ a real browser); later renders reuse it.
 
 ## The greybox — `src/greybox/`
 
-`Greybox` is the cut: all twelve beats at the durations the beat sheet gives
-them, 2310 frames = **77.0s** at 30fps.
+`Greybox` is the cut: all thirteen beats at the durations the beat sheet gives
+them, 2430 frames = **81.0s** at 30fps.
 
 **The world is 1200×675, not 1920×1080.** The product renders at a 1200px-wide
 viewport and the whole desktop is scaled 1.6× to fill the output — a screen
@@ -93,6 +93,7 @@ Everything here gets thrown away. Do not refine it.
 | What is real | What is a rectangle |
 |---|---|
 | Beat durations, to the frame | Every screen, panel, card and window |
+| The toolbar clock, and the internal clock it sits on | The clock's chrome (no browser draws one there) |
 | Every push-in, at its sheet framing | The character (a box with a `FACE: <state>` label) |
 | Every performed action — tabs, clicks, scrolls | Ren's face (a circle with a `REN: <state>` label) |
 | The 2f OTP choreography, at recon timings | The mail client, the music player, the toast |
@@ -126,12 +127,24 @@ driven by frame number — the camera moves, holds and moves again, and screen
 changes are animated or performed rather than cut to. Beats 2 and 5 used to be six
 and five sub-sequences with a camera each, which was eleven cuts inside two beats.
 
-`src/greybox/lift.tsx` is the other piece worth reading. Some elements cannot be
-made legible by any camera move — a 1152×86 banner in a 1200px viewport cannot be
-held whole *and* magnified at 16:9 — so the **lift** stages the element instead of
-the shot: it detaches, reflows to a narrower shape at centre frame, is read at its
-real type size, and settles back. Used in exactly three places (beats 1, 3, 7).
-A fourth would make it a gimmick.
+`src/greybox/lift.tsx` is the other piece worth reading, and it holds **two
+devices** that revision 3 confused for one:
+
+- **The travelling lift** (beats 1 and 3). Some elements cannot be made legible by
+  any camera move — a 1152×86 banner in a 1200px viewport cannot be held whole *and*
+  magnified at 16:9 — so this stages the element instead of the shot: it detaches,
+  travels to a narrower measure at centre frame, is read at its real type size, and
+  settles back. **Capped at two uses**; a third would make it a template.
+- **The in-place emphasis** (beats 7, 8, 11). The stateline block grows 1.65× where it
+  stands and the camera does not move, which is why it is free. It is a **rule, not a
+  budget**: it fires on every stateline copy change, so the audience learns that when
+  the block moves, the reading changed. One hard constraint — **no yo-yo**: beat 8's
+  two copy changes land seconds apart and are covered by a single raise.
+
+The emphasis is also why `surfaces.tsx` relaid out the reading card. Growing about the
+block's centre sent its top edge into the bloom, and beat 7 exists to plant bloom,
+stateline and viewfinder together — so it grows *downward* from its own top edge, and
+the card is 40px taller with the trend 76px lower to make the room.
 
 ## The two pipeline checks
 
