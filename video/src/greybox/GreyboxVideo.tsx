@@ -34,21 +34,26 @@ import { FONT, GREY } from "./theme";
  * in Studio and read straight off the sheet.
  *
  *   1 cold open     180          7 at ease        120
- *   2 signup        468          8 the email      200 (+20)
+ *   2 signup        468          8 the email      200
  *   3 dashboard     120          9 questionnaire   90
- *   4 camera gate   150         10 Ren            210
- *   5 calibration   372         11 return to ease 234 (+24)
+ *   4 camera gate   180 (+30)   10 Ren            210
+ *   5 calibration   372         11 return to ease 234
  *   6 later          60         12 closing card   90
  *                               13 end card      136
- *                                       total   2430 = 81.0s @ 30fps
+ *                                       total   2460 = 82.0s @ 30fps
  *
- * +0.8s: **beat 11 lingers on the returned reading** before the cut to the closing card.
- * Everything on the page has stopped travelling by f214 — the only motion left in the
- * last twenty frames is his breath and the nod — so the card that follows, which is the
- * film's thesis, arrives out of a settled frame instead of out of a settling one. It is
- * the only timing change in the viewfinder pass.
+ * **+1.0s, and it is beat 4's second landing.** The privacy pitch the beat exists to
+ * deliver turns out to be the third bullet of the FIRST consent card, not the last one —
+ * the sheet's staging ("one landing holds the key line's card AND the button") rested on
+ * an assumption the shipped copy does not meet. Key-line top to CTA bottom is 594.8px
+ * against a 583px viewport, so the two miss sharing a frame by 11.8px and the beat needs
+ * two landings inside its one continuous move. The extra second is the second landing.
+ *
+ * Everything else in this pass is ±0: the font, the component swaps, the cursor, the
+ * emphasis retiming and the two closing cards all changed what is on screen without
+ * changing how long anything is on screen for.
  */
-export const GREYBOX_DURATION = 2430;
+export const GREYBOX_DURATION = 2460;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -62,7 +67,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={120} name="3 · dashboard">
         <Beat03Dashboard />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={150} name="4 · camera gate">
+      <Series.Sequence durationInFrames={180} name="4 · camera gate">
         <Beat04CameraGate />
       </Series.Sequence>
       <Series.Sequence durationInFrames={372} name="5 · calibration">

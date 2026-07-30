@@ -1,5 +1,11 @@
 import { Composition, Folder } from "remotion";
 
+// FIRST, and before any beat. `fonts.ts` registers Inter, Outfit and Geist Mono under the exact
+// family names `apps/web/app/globals.css` asks for, each behind its own `delayRender` handle —
+// so no frame can be screenshotted before the real faces are in. Without it every real component
+// silently falls back to `system-ui`, which is most of why the film read as greybox even where it
+// wasn't. See the header in `fonts.ts`.
+import "./fonts";
 import { Beat01ColdOpen } from "./greybox/beats/Beat01ColdOpen";
 import { Beat02Signup } from "./greybox/beats/Beat02Signup";
 import { Beat03Dashboard } from "./greybox/beats/Beat03Dashboard";
@@ -50,7 +56,9 @@ export function RemotionRoot() {
         <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={180} fps={30} width={1920} height={1080} />
         <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={468} fps={30} width={1920} height={1080} />
         <Composition id="Beat03-Dashboard" component={Beat03Dashboard} durationInFrames={120} fps={30} width={1920} height={1080} />
-        <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={150} fps={30} width={1920} height={1080} />
+        {/* 150 → 180: the privacy pitch turns out to be in the FIRST card, 550px from the CTA,
+            and the two miss sharing a frame by 11.8px — so the beat takes two landings. */}
+        <Composition id="Beat04-CameraGate" component={Beat04CameraGate} durationInFrames={180} fps={30} width={1920} height={1080} />
         <Composition id="Beat05-Calibration" component={Beat05Calibration} durationInFrames={372} fps={30} width={1920} height={1080} />
         {/* The time-jump line is gone entirely — only beat 7's session timer marks
             the jump now. See the flag in Beat06Later.tsx. */}

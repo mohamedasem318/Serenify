@@ -30,6 +30,8 @@
  * Only the frame changed.
  */
 
+import { DISPLAY, MONO_FAMILY, SANS } from "../fonts";
+
 export const FPS = 30;
 /** World width = the rendered viewport width. Scaled 1.6× to a 1920 output. */
 export const W = 1200;
@@ -86,8 +88,19 @@ export const BAND = {
   amber: "#C98637",
 } as const;
 
-export const FONT = "Arial, Helvetica, sans-serif";
-export const MONO = 'Consolas, "Courier New", monospace';
+/**
+ * The greybox's own type, and it is no longer a fallback stack.
+ *
+ * These were `Arial` and `Consolas` — a placeholder from the pass where every screen was a grey
+ * rectangle and the typeface was beside the point. It stopped being beside the point the moment
+ * real components appeared next to them: an Arial label against an Inter component is the loudest
+ * thing in the frame. They now point at the same loaded faces as everything else (`src/fonts.ts`),
+ * so whatever is still greybox at least sets in the film's typeface.
+ */
+export const FONT = `${SANS}, system-ui, sans-serif`;
+export const MONO = `${MONO_FAMILY}, ui-monospace, monospace`;
+/** The app's display face, for anything greybox that stands in for a heading or the wordmark. */
+export const DISPLAY_FONT = `${DISPLAY}, sans-serif`;
 
 // ── Window furniture ────────────────────────────────────────────────────────
 // One browser window for the whole video — tabs switch, the frame never cuts to

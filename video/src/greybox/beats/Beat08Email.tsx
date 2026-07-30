@@ -1,7 +1,8 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { BEAT8_CLOCK, BEAT8_FACE, BEAT8_WIDE, COMPOSITE, PHONE } from "../../app/framing";
+import { emphasisCapFor } from "../../app/geometry";
 import { MonitorPage } from "../../app/monitor";
 import { useDrift, useEmphasis } from "../../app/motion";
 import { MailToast } from "../../app/toast";
@@ -17,8 +18,8 @@ import { useExpression } from "../rig";
  *
  *   the toast lands and is read   f6 – f70    (at the CLOCK framing)
  *   HIS FACE FALLS                f70 – f86   (at the FACE framing)
- *   the bloom drifts              f104 + 39   (1.3s ease — it drifts, it does not snap)
- *   the stateline steps twice     f130, f156  (both under ONE raise)
+ *   the bloom drifts              f116 + 39   (1.3s ease — it drifts, it does not snap)
+ *   the stateline steps twice     f138, f164  (the raise fires on the first, settles on the second)
  *   the trend climbs and recolours
  *
  * The toast stays up throughout.
@@ -56,17 +57,39 @@ import { useExpression } from "../rig";
  * not readable. That is the right thing to lose — it was read seconds earlier at 4.2×, and
  * after that its only job is to still be up while the reading falls.
  *
- * **The emphasis raises ONCE**, at f142 as the camera lands wide, and that one raise carries
- * both copy changes (f150, f176) before settling at f194. No yo-yo — the hard constraint.
+ * **The emphasis raises ON the first copy change and settles as the second lands.** It never
+ * grows twice, which is the hard constraint — see the note beside `emphasisFactor` for why the
+ * settle is what makes the second change readable, and why the two-line `tense` copy cannot be
+ * held raised at this layout.
+ */
+/**
+ * ── THE ESCALATION IS TIGHTER, AND THE DRIFT IS NOW SEEN ────────────────────────────
+ *
+ * Two things were wrong with the old clock and they were the same thing twice: **the reading
+ * changed while nobody could see it.**
+ *
+ * · The bloom's 1.3s drift ran f104–f143, and the bloom does not enter the frame until the
+ *   camera has widened to about f128 — so the audience met an already-amber bloom and the
+ *   sheet's "let it drift, don't snap" was spent off screen. It starts at f116 now and its last
+ *   two thirds play in frame.
+ * · The stateline changed at f150 and f176 while the beat header, and the sheet, both said f130
+ *   and f156. The code had drifted twenty frames later than the plan and nobody had noticed,
+ *   which put a dead second between the fall settling and anything else moving.
+ *
+ * f138 is the earliest the stateline is genuinely INSIDE the frame — checked against the camera
+ * rather than assumed. The move to `BEAT8_WIDE` runs f118–f150 on an in-out cubic, and the
+ * stateline block (y 581–648.5 at this scroll) first clears the frame's bottom edge at about
+ * f135. So the changes land at **f138 and f164**, twelve frames earlier each, with the drift
+ * beginning at f116.
  */
 export const Beat08Email: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // 1.3s, the component's own `transition: background 1.3s ease`. It starts as the camera
-  // begins pulling out, so the drift is seen rather than spent behind a tight shot — the bloom
-  // is not in either of the first two framings at all.
-  const tension = useDrift(0, 1, 104);
-  const climb = useDrift(0, 1, 116);
+  // 1.3s, the component's own `transition: background 1.3s ease`. It begins as the camera starts
+  // widening, so the last two thirds of the drift play with the bloom in frame — which is the
+  // whole point of the sheet keeping the drift rather than snapping the band.
+  const tension = useDrift(0, 1, 116);
+  const climb = useDrift(0, 1, 126);
 
   /**
    * **THE FALL, as a keyframed transition rather than a state flip.** `falling` used to be a
@@ -82,20 +105,50 @@ export const Beat08Email: React.FC = () => {
     { frame: 0, state: "content" },
     { frame: 70, state: "content" },
     { frame: 86, state: "dismayed" },
-    { frame: 110, state: "dismayed" },
-    { frame: 148, state: "tense" },
+    { frame: 104, state: "dismayed" },
+    { frame: 140, state: "tense" },
   ]);
 
   // The real component's own bands and copy — `BAND_DISPLAY` in `use-monitoring-session.ts`.
-  const band = frame >= 176 ? "tense" : frame >= 150 ? "a_little_tense" : "at_ease";
+  const band = frame >= 164 ? "tense" : frame >= 138 ? "a_little_tense" : "at_ease";
 
+  /**
+   * ── THE EMPHASIS FIRES ON EACH CHANGE, AND IT IS THE TIMING THAT REGRESSED ─────────
+   *
+   * The device's whole claim is that when the block moves, the reading changed — so the movement
+   * has to be CAUSED by the change, not merely near it. The previous cut raised the block at
+   * f142, eight frames before the first copy change and while the camera was still arriving, and
+   * then never settled: one movement, attached to nothing, and the second change at f176 carried
+   * no movement at all. That is what "it only fires on the first" was describing.
+   *
+   * The raise now begins **on** the first change, at f138.
+   */
   const emphasis = useEmphasis([
     { frame: 0, up: 0 },
-    { frame: 142, up: 0 },
-    { frame: 158, up: 1 },
-    { frame: 194, up: 1 },
+    { frame: 138, up: 0 },
+    { frame: 154, up: 1 },
     { frame: 200, up: 1 },
   ]);
+
+  /**
+   * ── AND THE SECOND CHANGE CARRIES MOVEMENT BECAUSE THE FACTOR YIELDS ──────────────
+   *
+   * `tense`'s sub wraps to two lines, and a two-line block cannot be raised at this layout
+   * without either leaving the viewport or landing on the Pause/End controls — the arithmetic is
+   * scroll-invariant and is in `emphasisCapFor`. Rather than slicing a line or abandoning the
+   * device, the factor is what yields: the cap for a one-line sub is L12's 1.25×, the cap for a
+   * two-line one is 1.01×, and the block SETTLES into the tense reading as it lands.
+   *
+   * That is not the device failing quietly. Both copy changes now carry movement — a rise on the
+   * first, a settle on the second — and it is not a yo-yo, because it never grows again. The
+   * cost is that `tense` is read at its natural size, which is the honest consequence of the
+   * layout and is the measured case for §7's Pass-B rearrangement.
+   */
+  const emphasisFactor = interpolate(frame, [164, 180], [emphasisCapFor(1), emphasisCapFor(2)], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
+  });
 
   return (
     <AbsoluteFill>
@@ -121,6 +174,7 @@ export const Beat08Email: React.FC = () => {
           pose={pose}
           working={frame < 70}
           emphasis={emphasis}
+          emphasisFactor={emphasisFactor}
           sessionFrom={47 * 60 + 16}
           // WORLD coordinates — an OS notification floats over the chrome and the page alike,
           // and the framing in `framing.ts` is derived from its world rect.

@@ -1,4 +1,8 @@
-import { loadFont } from "@remotion/google-fonts/Outfit";
+// NOT `loadFont()` from the font package directly. Unqualified it fetches EVERY weight of every
+// subset — nine weights × two subsets for Outfit alone — which is thirty-odd network round trips
+// on every render of every composition, because this module's top level runs whenever `Root.tsx`
+// is loaded. The shared module in `src/fonts.ts` names the weights the film actually uses.
+import { DISPLAY } from "./fonts";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 
 // The real component, imported straight out of apps/web through the `@/` alias
@@ -9,9 +13,9 @@ import { Wordmark } from "@/components/brand/wordmark";
 
 // `apps/web/app/globals.css` sets `--font-display: "Outfit", sans-serif`, and in
 // the app next/font supplies the actual file. Remotion is not Next, so the font
-// is loaded here instead; without it `font-display` would silently fall back to
-// a generic sans and the wordmark would render in the wrong typeface.
-const { fontFamily } = loadFont();
+// is loaded in `src/fonts.ts` instead; without it `font-display` would silently
+// fall back to a generic sans and the wordmark would render in the wrong typeface.
+const fontFamily = DISPLAY;
 
 /**
  * Check (2): a real `apps/web` component rendered inside a Remotion

@@ -92,30 +92,142 @@ export const useDrift = (from: number, to: number, startFrame: number): number =
  *   core — scale [0.94, 1.03, 0.94]
  *
  * Under forced reduced motion the component renders the two layers static (`bloom.tsx:87-91`),
- * which is the correct base to animate over. The breathing is re-applied here as a transform on
- * the component's WRAPPER rather than on its two inner layers, because the wrapper is what the
- * video can reach without touching `apps/web`.
+ * which is the correct base to animate over — and **nothing was putting the loop back**. That is
+ * this pass's finding rather than a declared liberty: the film's central graphic, which the
+ * sheet describes in beat 7 as "the bloom **pulsing** meadow", was a still circle for its entire
+ * time on screen. The greybox's stand-in pulsed; the real component replaced it with a
+ * photograph of itself. `useBreath` existed, was written against the right numbers, and was
+ * wired to the CALIBRATION preview instead, where it scaled the whole webcam box at the wrong
+ * period (see `useOrbBreath` above — two components' motions had been crossed).
  *
- * That is a small, declared divergence and it is worth naming: the real component breathes its
- * halo and core on slightly different amplitudes (1.06 vs 1.03), and a single wrapper transform
- * cannot. The visible difference at the framings the bloom appears at — 148px of world inside a
- * ~1050px frame — is well under a pixel of edge travel, and the alternative is a second copy of
- * the gradient stack in the video, which would be a real fidelity risk rather than a
- * sub-pixel one. The halo's opacity breath IS reproducible on the wrapper and is kept.
+ * It is reproduced on the two layers SEPARATELY rather than on the wrapper. They are separately
+ * addressable — `bloom.tsx:65-76` renders them as the wrapper's two child `span`s, halo first —
+ * and the component genuinely breathes them at different amplitudes (1.06 against 1.03) with an
+ * opacity breath on the halo alone. A wrapper transform cannot express that and there is no
+ * reason to settle for one.
  */
-export const useBreath = (): { scale: number; opacity: number } => {
-  const frame = useCurrentFrame();
-  const cycle = sec(6.5);
-  // A full period as a 0→1→0 triangle, then eased — which is what a three-keyframe
-  // framer `animate` array with `easeInOut` produces.
-  const phase = (frame % cycle) / cycle;
+const BREATH_CYCLE = sec(6.5);
+
+/** A three-keyframe framer `animate` array with `easeInOut` is a 0→1→0 triangle, eased. */
+const breathPhase = (frame: number): number => {
+  const phase = (frame % BREATH_CYCLE) / BREATH_CYCLE;
   const tri = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
-  const t = EASE_IN_OUT(tri);
+  return EASE_IN_OUT(tri);
+};
+
+export const useBloomBreath = (): { halo: { scale: number; opacity: number }; core: number } => {
+  const t = breathPhase(useCurrentFrame());
   return {
-    // The mean of the component's two amplitudes, since one wrapper carries both layers.
-    scale: interpolate(t, [0, 1], [0.92, 1.045]),
-    opacity: interpolate(t, [0, 1], [0.86, 1]),
+    halo: {
+      scale: interpolate(t, [0, 1], [0.9, 1.06]),
+      opacity: interpolate(t, [0, 1], [0.72, 1]),
+    },
+    core: interpolate(t, [0, 1], [0.94, 1.03]),
   };
+};
+
+/**
+ * ── THE CALIBRATION BREATHING ORB, AND THE COPY THAT WAS WRONG ──────────────────────
+ *
+ * Source: `components/anchor/breathing-guide.tsx`.
+ *
+ * **The film was showing the reduced-motion variant and calling it the product.** The orb has
+ * two behaviours, and the shim that forces `prefers-reduced-motion` picks the wrong one:
+ *
+ *   full motion   discs `scale: [0.84, 1.12, 0.84]` on an 8s `easeInOut` loop (`:93-95`), and
+ *                 the pacer label ALTERNATES "Breathe in" / "Breathe out" on a 4s interval
+ *                 (`:31`, `:55-61`) — a 4s inhale and a 4s exhale, which is the 8s cycle
+ *   reduced       the discs hold still and the label is a single static **"Breathe gently"**
+ *                 (`STATIC_LABEL`, `:32`), which is FR-032's accessibility behaviour
+ *
+ * "Breathe gently" is not invented copy — it is real, shipped, and it is the wrong one. It is
+ * what a user who has asked their OS for less motion sees, and the film is not that user. The
+ * beat sheet asked for the alternation all along (5d: 'label alternating "Breathe in" /
+ * "Breathe out"'), and the greybox was faithful to it; the component swap silently replaced it.
+ *
+ * Both halves are put back here from the frame, on the component's own declared numbers.
+ *
+ * ── AND THE BREATH WAS ON THE WRONG ELEMENT ─────────────────────────────────────────
+ *
+ * The previous pass drove the calibration preview with `useBreath()`, which is the MONITORING
+ * bloom's loop (`bloom.tsx`: 6.5s, 0.92→1.045) applied to the whole 512×288 preview box — so the
+ * entire webcam feed, the character and the framing brackets pulsed together, at the wrong
+ * period, while the orb that is supposed to be breathing sat still. Two different components'
+ * motions had been crossed. `useOrbBreath` is the orb's own, and it is applied to the orb's own
+ * discs layer.
+ */
+/** `breathing-guide.tsx:95` — `duration: 8`, one inhale + one exhale. */
+export const ORB_CYCLE_REAL = sec(8);
+/** `breathing-guide.tsx:93` — `animate={{ scale: [0.84, 1.12, 0.84] }}`. */
+const ORB_SCALE = { min: 0.84, max: 1.12 } as const;
+
+/**
+ * ── THE ONE COMPRESSION IN THIS, AND WHY IT IS NOT A THIRTIETH ──────────────────────
+ *
+ * Beat 5d shows ~2 seconds of a 60-second capture, which the sheet calls the most aggressive
+ * compression in the video. The timer and the progress bar take that 30× directly — they are
+ * counters, and a counter running fast reads as a counter running fast.
+ *
+ * **The breath cannot.** At 30× the discs would flutter four times a second and the pacer would
+ * strobe, which reads as a glitch rather than as breathing and would be the one thing on screen
+ * contradicting the word "calm". At the real 8s cycle the opposite happens: a 2s window shows a
+ * quarter of one breath, the discs barely move, and the label never changes — so the pacer's
+ * whole nature, that it alternates, is invisible.
+ *
+ * So the cycle is a parameter, and beat 5d passes the length of its own window: **one complete
+ * breath, in and out, inside the compressed minute.** The audience sees the orb fill and empty
+ * once and reads "this is a breathing exercise", which is what the beat is for. The shape,
+ * amplitude, easing and copy are all the component's; only the period is staged.
+ */
+export const useOrbBreath = (from = 0, cycleFrames = ORB_CYCLE_REAL): number => {
+  const frame = useCurrentFrame();
+  const phase = (((frame - from) % cycleFrames) + cycleFrames) % cycleFrames / cycleFrames;
+  const tri = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+  return interpolate(EASE_IN_OUT(tri), [0, 1], [ORB_SCALE.min, ORB_SCALE.max]);
+};
+
+/**
+ * The pacer label, put back.
+ *
+ * The component holds its label in React state, so it cannot be driven from outside — the only
+ * reachable seam is the DOM. So the component's own static label is hidden and the alternating
+ * one is drawn over it **with that element's className quoted character-for-character**
+ * (`breathing-guide.tsx:106`), which makes the result identical in every respect except the two
+ * words that were wrong. The `scale` goes on the component's own static-bloom layer by its
+ * `data-testid`, so the discs, their gradients and their opacities stay the component's.
+ *
+ * `visibility: hidden` rather than `display: none`: the label is `relative z-10` inside a grid
+ * that centres it, and removing it from layout would move the box it is centred in.
+ *
+ * The label follows the same clock as the discs — half a cycle each, inhale first — which is
+ * what `breathing-guide.tsx` does with a `setInterval` at half its `duration`. Tying them to one
+ * parameter also makes it impossible for the words and the motion to drift apart, which they
+ * would if the label kept a hard-coded 4s while the cycle was staged.
+ */
+export const BreathPacer: React.FC<{
+  scopeAttr: string;
+  /** The frame the capture starts on, so the first half-cycle is an inhale. */
+  from?: number;
+  cycleFrames?: number;
+}> = ({ scopeAttr, from = 0, cycleFrames = ORB_CYCLE_REAL }) => {
+  const frame = useCurrentFrame();
+  const scale = useOrbBreath(from, cycleFrames);
+  const half = cycleFrames / 2;
+  const label = Math.floor(Math.max(0, frame - from) / half) % 2 === 0 ? "Breathe in" : "Breathe out";
+  return (
+    <>
+      <style>{`
+        [data-${scopeAttr}] [data-testid="breath-bloom-static"] { scale: ${scale}; }
+        [data-${scopeAttr}] p[aria-live="polite"] { visibility: hidden; }
+      `}</style>
+      <p
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-20 grid place-items-center text-center text-sm font-medium tracking-wide text-white [text-shadow:0_1px_3px_rgba(0,0,0,0.45)]"
+      >
+        {label}
+      </p>
+    </>
+  );
 };
 
 /**

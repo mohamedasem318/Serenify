@@ -4,6 +4,7 @@ import { ChatShell } from "@/components/chat/chat-shell";
 import { Header } from "@/components/header/header";
 import type { ChatMessage, ConversationDetail } from "@/lib/api/chat-client";
 
+import { PROTAGONIST } from "../greybox/copy";
 import { AppShell } from "./shell";
 
 /**
@@ -68,7 +69,9 @@ export const ChatPage: React.FC<{
   draft?: string;
   /** L9 — the typing indicator the app does not have. The video depicts a later feature. */
   thinking?: boolean;
-}> = ({ clock, messages, draft = "", thinking = false }) => {
+  /** World-coordinate layer — the drawn cursor. */
+  overlay?: React.ReactNode;
+}> = ({ clock, messages, draft = "", thinking = false, overlay }) => {
   const detail: ConversationDetail = {
     conversation: { ...conversation, messageCount: messages.length },
     messages,
@@ -78,7 +81,10 @@ export const ChatPage: React.FC<{
     <AppShell
       clock={clock}
       url="serenify.tech/app/chat"
-      header={<Header fullName="Mohamed Asem" email="mohamed@serenify.tech" role="employee" />}
+      overlay={overlay}
+      header={
+        <Header fullName={PROTAGONIST.fullName} email={PROTAGONIST.email} role="employee" />
+      }
     >
       <div className="mx-auto h-[460px] w-full max-w-2xl overflow-hidden rounded-2xl border border-border">
         <ChatShell

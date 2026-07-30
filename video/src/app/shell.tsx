@@ -309,8 +309,14 @@ export const BrowserChrome: React.FC<{
  *
  * `useLayoutEffect` rather than `useEffect` so the class is on the element BEFORE the first
  * paint of frame 0 — an effect would let one frame through light.
+ *
+ * **Exported because two beats need it without a `Desktop`.** Beats 12 and 13 leave the browser
+ * entirely, so they render no shell — and the end card renders the real `<Wordmark/>`, whose
+ * `text-ink` resolved to the LIGHT `#1C2023` on a near-black card. The mark was there, correct
+ * and effectively invisible. Any beat that renders an `apps/web` component outside `Desktop` has
+ * to call this.
  */
-const useDarkRoot = () => {
+export const useDarkRoot = () => {
   React.useLayoutEffect(() => {
     document.documentElement.classList.add("dark");
     return () => document.documentElement.classList.remove("dark");
