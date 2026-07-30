@@ -6894,3 +6894,57 @@ lockfiles untouched, `speckit-skills guard` still passes.
 
 **Cross-references**: `video/README.md` § Agent skills; `CLAUDE.md`; `AGENTS.md`;
 PR #223.
+
+---
+
+## 2026-07-30 — Launch video: the character base is Avataaars, and the licence is MIT
+
+**Status**: Accepted.
+
+**Decision**: the launch video's character (`video/src/greybox/character/`) is
+built on a stripped [getavataaars.com](https://getavataaars.com) export —
+Avataaars, by Pablo Stanley — shipped in this public repository and used in a
+promotional video. The full notice, the measured landmark table and the two
+deltas applied to the export live in `video/src/greybox/character/NOTICE.md`.
+
+**Why this needed a decision at all**: the getavataaars.com site describes its
+terms in plain English — free for personal and commercial use, no attribution
+required — which is a *grant*, not a licence text. This repository is public, so
+that is not a formality: a plain-English grant is not something to ship a derived
+asset on.
+
+**What was actually read**: the `LICENSE` file inside the
+[`avataaars`](https://www.npmjs.com/package/avataaars) npm package (`2.0.0`),
+which is the React implementation the web exporter is built on. It is **MIT**,
+`Copyright (c) 2017 Pablo Stanley, Fang-Pen Lin`. MIT grants use, modification,
+distribution, sublicensing and commercial use without restriction; its only
+condition is that the copyright and permission notice travel with copies or
+substantial portions.
+
+**The export was tied to that package rather than only to the website.** Every
+path in the shipped asset was checked byte-for-byte against `avataaars@2.0.0`:
+the body/skin path (`avatar/index.tsx` + `Skin.tsx`), the shirt and its collar
+shadow (`clothes/ShirtCrewNeck.tsx`), the hair (`top/ShortHairShortFlat.tsx`) and
+the nose (`face/nose/Default.tsx`). All four match. So the asset is not merely
+"from a site with friendly terms" — it is a derivative of MIT-licensed source,
+which is a licence this repository can rely on.
+
+**Compliance**: the notice is reproduced verbatim in
+`video/src/greybox/character/NOTICE.md`, alongside the pristine `av2-base.svg`
+and the `base.tsx` that inlines it. Nothing further is required — MIT asks for
+no attribution in the video itself.
+
+**Two deltas from the export**, both documented in `NOTICE.md`: the nose's
+`fill-opacity` raised 0.16 → 0.27, and an authored shoulder extension (the
+export's shoulders stop ~12% short of its own frame; scaling the shirt to fix
+that would scale its crew neck with it).
+
+**The office backdrop is authored in code, not sourced**, so **no unDraw licence
+entry is incurred**. unDraw was the declared fallback if a code attempt did not
+come together; it did. Recording the road not taken because unDraw's terms
+reportedly forbid use as AI/ML training data — irrelevant to decorative video
+use, but Serenify is an ML product in a public repo, so if it is ever adopted it
+gets its own entry here.
+
+**Cross-references**: `video/src/greybox/character/NOTICE.md`;
+`docs/video/serenify-launch-video-beat-sheet.md` § The character rig.

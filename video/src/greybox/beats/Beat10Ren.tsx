@@ -37,6 +37,22 @@ import { Box, Text } from "../ui";
  *
  * The copy is placeholder — `014-recommendations` does not exist, and length is
  * what this beat tests. Turn 3 must read as personal knowledge, not a canned tip.
+ *
+ * ── HIS MESSAGE TYPES ON. REN'S DOES NOT. ───────────────────────────────────
+ *
+ * Turn 2 is the one moment in the whole video where he acts through **language**
+ * rather than through a click, and it should show that — so it is typed, character
+ * by character, into a bubble that grows as a real composer does. Turn 3 keeps the
+ * typing-indicator-then-message treatment it already had. The human types; the AI
+ * thinks, then speaks, and the asymmetry is the point.
+ *
+ * The copy was shortened to pay for it — 63 characters to 35 — rather than the
+ * typing being sped up to fit. See the note in `copy.ts`. At ~20 c/s the line takes
+ * 52 frames, which pushed Ren's `thinking` window and turn 3's arrival later by
+ * about 12 frames each. **Turn 3's hold got longer, not shorter** (58 frames against
+ * 64 before the shift, and the beat now spends less of that hold on a message the
+ * audience finished reading) — it is the thing the sheet says to protect at all
+ * costs, so it was never the place to find the frames.
  */
 
 const PANEL = rect(280, 130, 640, 520);
@@ -44,13 +60,22 @@ const PANEL = rect(280, 130, 640, 520);
 /** Ren's bubbles carry an avatar; his own do not. Sides are the app's. */
 const A1 = rect(300, 168, 96, 96);
 const B1 = rect(408, 190, 400, 52);
-const B2 = rect(452, 286, 420, 74);
+/**
+ * Turn 2's FINAL size. The drawn bubble grows with the typed text, but the camera
+ * frames this — a rect that changes every frame would make the shot crawl.
+ * `self-end`, so it grows leftward from a fixed right edge at x 872.
+ */
+const B2 = rect(582, 286, 290, 50);
 const A3 = rect(300, 384, 96, 96);
 const B3 = rect(408, 376, 440, 112);
 
-const APPEAR_AT = [20, 92, 138];
+/** Turn 1 lands, turn 2 STARTS TYPING, turn 3 lands. */
+const APPEAR_AT = [20, 56, 150];
+const TYPE_FROM = 56;
+const TYPE_TO = 108;
+
 const renState = (frame: number): RenState =>
-  frame >= 138 ? "warm" : frame >= 96 ? "thinking" : frame >= 44 ? "attentive" : "idle";
+  frame >= 150 ? "warm" : frame >= 116 ? "thinking" : frame >= 44 ? "attentive" : "idle";
 
 const TypingDots: React.FC<{ x: number; y: number; on: boolean }> = ({ x, y, on }) => {
   const frame = useCurrentFrame();
@@ -78,31 +103,39 @@ const TypingDots: React.FC<{ x: number; y: number; on: boolean }> = ({ x, y, on 
 };
 
 /** `rounded-2xl` with the corner nearest the speaker squared off. */
-const Bubble: React.FC<{ r: typeof B1; mine: boolean; text: string; opacity: number }> = ({
-  r,
-  mine,
-  text,
-  opacity,
-}) => (
-  <div style={{ opacity }}>
-    <div
-      style={{
-        position: "absolute",
-        left: r.x,
-        top: r.y,
-        width: r.w,
-        height: r.h,
-        boxSizing: "border-box",
-        backgroundColor: mine ? GREY.graphite : GREY.surface,
-        border: `1px solid ${mine ? GREY.graphite : GREY.border}`,
-        borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-      }}
-    />
-    <Text x={r.x + 14} y={r.y + 14} w={r.w - 28} size={15} lineHeight={1.5} color={mine ? GREY.white : GREY.ink}>
-      {text}
-    </Text>
-  </div>
-);
+const Bubble: React.FC<{
+  r: typeof B1;
+  mine: boolean;
+  text: string;
+  opacity: number;
+  /** Typed bubbles grow leftward from their right edge, as `self-end` implies. */
+  width?: number;
+  caret?: boolean;
+}> = ({ r, mine, text, opacity, width, caret = false }) => {
+  const w = width ?? r.w;
+  const x = mine ? r.x + r.w - w : r.x;
+  return (
+    <div style={{ opacity }}>
+      <div
+        style={{
+          position: "absolute",
+          left: x,
+          top: r.y,
+          width: w,
+          height: r.h,
+          boxSizing: "border-box",
+          backgroundColor: mine ? GREY.graphite : GREY.surface,
+          border: `1px solid ${mine ? GREY.graphite : GREY.border}`,
+          borderRadius: mine ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
+        }}
+      />
+      <Text x={x + 14} y={r.y + 14} w={w - 28} size={15} lineHeight={1.5} color={mine ? GREY.white : GREY.ink}>
+        {text}
+        {caret ? <span style={{ opacity: 0.7 }}>|</span> : null}
+      </Text>
+    </div>
+  );
+};
 
 export const Beat10Ren: React.FC = () => {
   const frame = useCurrentFrame();
@@ -114,6 +147,19 @@ export const Beat10Ren: React.FC = () => {
       easing: Easing.out(Easing.cubic),
     });
 
+  /** Turn 2, typed. ~20 characters a second — a person hammering, not a blur. */
+  const typed = REN.turns[1].text.slice(
+    0,
+    Math.round(
+      interpolate(frame, [TYPE_FROM, TYPE_TO], [0, REN.turns[1].text.length], {
+        extrapolateLeft: "clamp",
+        extrapolateRight: "clamp",
+      }),
+    ),
+  );
+  // The bubble hugs the text as it arrives, from a minimum that fits the caret alone.
+  const typedW = Math.max(56, Math.min(B2.w, 32 + typed.length * 7.4));
+
   return (
     <AbsoluteFill>
       <Camera
@@ -123,8 +169,10 @@ export const Beat10Ren: React.FC = () => {
           { frame: 0, shot: frameRect(union(A1, B1), 26) },
           { frame: 40, shot: frameRect(union(A1, B1), 26) },
           { frame: 58, shot: frameRect(union(A1, B2), 26) },
-          { frame: 124, shot: frameRect(union(A1, B2), 26) },
-          { frame: 146, shot: frameRect(union(A3, B3), 26) },
+          { frame: 130, shot: frameRect(union(A1, B2), 26) },
+          // Lands on the empty spot while Ren is still composing, so the reply
+          // arrives into a settled frame rather than chasing it.
+          { frame: 152, shot: frameRect(union(A3, B3), 26) },
           { frame: 210, shot: frameRect(union(A3, B3), 26) },
         ]}
       >
@@ -144,8 +192,15 @@ export const Beat10Ren: React.FC = () => {
           </div>
           <Bubble r={B1} mine={false} text={REN.turns[0].text} opacity={appear(0)} />
 
-          {/* Turn 2 — him. Right side, filled, no avatar. */}
-          <Bubble r={B2} mine text={REN.turns[1].text} opacity={appear(1)} />
+          {/* Turn 2 — him. Right side, filled, no avatar, and it TYPES. */}
+          <Bubble
+            r={B2}
+            mine
+            text={typed}
+            opacity={appear(1)}
+            width={typedW}
+            caret={frame >= TYPE_FROM && frame < TYPE_TO + 12}
+          />
 
           {/* Turn 3 — Ren. Avatar attached. */}
           <div style={{ opacity: appear(2) }}>

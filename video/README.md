@@ -95,12 +95,12 @@ Everything here gets thrown away. Do not refine it.
 |---|---|
 | Beat durations, to the frame | Every screen, panel, card and window |
 | The toolbar clock, and the internal clock it sits on | The clock's chrome (no browser draws one there) |
-| **The character's motion** — every expression, the fall, the nod, the blink, the typing | The character's *art* — he is arcs, dots and one quadratic |
+| **The character** — his art, his motion, and everything else inside the viewfinder | The viewfinder's own chrome (the real component is `apps/web`'s) |
 | Every push-in, at its sheet framing | The mail client, the music player, the toast |
 | Every performed action — tabs, clicks, scrolls | Ren's face (a circle with a `REN: <state>` label) |
-| The 2f OTP choreography, at recon timings | The office backdrop (a flat rectangle) |
-| The 1.3s eased band drift (the only colour) | The wordmark, all icons, all art |
-| App copy, verbatim, at app sizes | Typeface, palette, tokens, polish |
+| The 2f OTP choreography, at recon timings | The wordmark, all page-level icons and art |
+| The 1.3s eased band drift, and the shirt | Typeface, palette, tokens, polish |
+| App copy, verbatim, at app sizes | |
 
 Layout is authored at **real app pixel sizes** inside the world — a 448px signup
 column really is 448px wide, `text-sm` really is 14px, the stateline really is
@@ -148,12 +148,32 @@ block's centre sent its top edge into the bloom, and beat 7 exists to plant bloo
 stateline and viewfinder together — so it grows *downward* from its own top edge, and
 the card is 40px taller with the trend 76px lower to make the room.
 
-## The character rig — `src/greybox/rig.tsx`
+## The character rig — `src/greybox/rig.tsx` and `src/greybox/character/`
 
-**A spike, and it answers one question:** can a face made of primitives *fall* convincingly? Two
-risks were travelling under one name — whether a rig can produce the motion the beats need, and
-whether we can get good consistent art — and the second was making the first look frightening. The
-first is settled with no art at all.
+**It started as a spike answering one question:** can a face made of primitives *fall*
+convincingly? Two risks were travelling under one name — whether a rig can produce the motion the
+beats need, and whether we can get good consistent art — and the second was making the first look
+frightening. The first was settled with no art at all, and then **the art landed onto the
+unchanged rig**: the pose vector, the named expressions and the interpolations are exactly as the
+spike built them; only the drawing underneath changed.
+
+`src/greybox/character/` holds the art. Read **`NOTICE.md` first** — it carries the MIT licence the
+base ships under, the provenance trail tying every path back to `avataaars@2.0.0`, and the measured
+landmark table the rig registers against. `base.tsx` is the export inlined and flattened,
+`features.tsx` is everything the rig draws over it, `backdrop.tsx` is the office.
+
+**The one constraint worth knowing before you touch `features.tsx`: Avataaars has no sclera.**
+Every facial feature in that system is `#000000` at a fill opacity — `Eyes/Default` is two filled
+r-6 circles and nothing else. The crude rig drew white eyeballs with dark pupils, and porting that
+design onto the new base would have produced the same cartoon on better art. So brows are filled
+leaves rather than stroked lines, the mouth is a filled crescent, and an eye is a dark iris clipped
+by its lids. `expression-reference.json` is **shape reference only** — those presets are discrete
+drawings and cross-fading them is the jump cut the rig exists to prevent.
+
+**The character sizes himself off the viewfinder's aspect, never its pixels.** He picks a framing
+window in the base's own `0 0 264 280` coordinates and hands it to an SVG viewBox, so the same
+component fills the 16:9 viewfinder and beat 5's 3:4 portrait preview — and will re-fit whatever
+inner box `apps/web`'s real viewfinder turns out to have.
 
 **An expression is a vector, not a picture.** Thirteen numbers (`Pose`), and each named expression
 — `calm`, `content`, `dismayed`, `tense`, `easing` — is a point in that space. Every transition is
@@ -172,14 +192,16 @@ const pose = useExpression([
 ```
 
 Parts: head (nod, sink, tilt), brows (the fall, more than anything else), eyes (aperture + blink),
-pupils (gaze), mouth (one curvature scalar), shoulders (slump + typing), hands, headphones. The hair
-cap, ears and neck are **not** animated — they exist to mark where the generated drawing's seams
-land, and to prove the rig has somewhere to attach them.
+pupils (gaze), mouth (one curvature scalar), shoulders (slump + typing), hands, headphones. The
+hair, ears and neck are **not** animated — they come from the base, and the ears are where the
+headphones attach, at the measured centres (71, 117) and (193, 117). Those sit **five pixels below
+the eye line**; cups hung on the eye line ride visibly high.
 
 **Studio composition `CharacterRig`, under `Spikes`**, is the bench: the five poses static, plus
-beat 8's fall at its real timings both large and at the viewfinder's real on-screen size. Use it
-rather than the cut — a rig that fails only at small sizes is invisible in the cut, and a rig that
-fails everywhere is a finding worth surfacing before art exists.
+beat 8's fall at its real timings both large and at the viewfinder's real on-screen size, and beat
+11's headphones-nod-and-notes. Use it rather than the cut — a rig that fails only at small sizes is
+invisible in the cut. Render single frames with
+`npx remotion still CharacterRig out/rig.png --frame=N --port 3411`.
 
 It also found a real defect in the cut. Beat 8's camera used to arrive tight and start pulling out
 immediately, so the fall played at ~930px of framing where the head is ~45px on a phone. Invisible
