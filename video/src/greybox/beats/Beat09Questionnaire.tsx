@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { Camera, frameRect } from "../Camera";
 import { QUESTIONNAIRE } from "../copy";
+import { useExpression } from "../rig";
 import { monitorWide, MonitorSurface, PROMPT, SESSION_BASE } from "../surfaces";
 import { GREY } from "../theme";
 import { Box, Cursor, Text, useFade } from "../ui";
@@ -27,6 +28,9 @@ export const Beat09Questionnaire: React.FC = () => {
   const frame = useCurrentFrame();
   const appear = useFade(6, 8);
   const answered = frame >= 44;
+  // Still tense, picking up exactly where beat 8 left the pose. Not working — he has
+  // stopped to answer, which is the beat.
+  const pose = useExpression([{ frame: 0, state: "tense" }]);
 
   return (
     <AbsoluteFill>
@@ -43,8 +47,8 @@ export const Beat09Questionnaire: React.FC = () => {
           tension={1}
           stateline="tense"
           climb={1}
-          face="tense"
-          sessionFrom={SESSION_BASE + 10}
+          pose={pose}
+          sessionFrom={SESSION_BASE + 11}
         >
           <div style={{ opacity: appear }}>
             <Box
