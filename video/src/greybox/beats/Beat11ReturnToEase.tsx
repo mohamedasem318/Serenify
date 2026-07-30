@@ -44,10 +44,16 @@ import { Box, Text } from "../ui";
  *   f144  the bloom drifts amber → meadow (1.3s ease — let it drift)
  *   f146  the trend's tail walks back down (55f)
  *   f150  the stateline emphasis rises; f158 the copy returns to "at ease"
- *   f160–210  held wide. 1.7s of the reading actually coming down.
+ *   f160–234  held wide. 2.5s of the reading actually coming down.
  *
- * COST: 6s → 7s. The music player gives back ~0.4s (the track name reads in well
- * under two seconds at that framing) and the payoff takes 1.4s.
+ * **AND IT LINGERS.** 210 → 234 frames. The last thing that moves is the emphasis
+ * settling at f214, which leaves twenty frames — two thirds of a second — where nothing
+ * on the page is travelling and the only motion left is his breath and the nod. The card
+ * that follows is the film's thesis, and it arrives out of a settled frame rather than
+ * out of a moving one. Cheap, and the only timing change in this pass.
+ *
+ * COST: 6s → 7.8s. The music player gives back ~0.4s (the track name reads in well
+ * under two seconds at that framing), the payoff takes 1.4s and the linger 0.8s.
  *
  * His face is NOT the beat 7 expression — quieter, a bit amused at itself, which the
  * state label calls `easing`.
@@ -115,7 +121,7 @@ export const Beat11ReturnToEase: React.FC = () => {
   const climb = 1 - useDrift(146, 55);
   // The third firing of the emphasis rule. Rises as the camera lands, holds while the
   // returned reading is read, settles into the closing beat.
-  const emphasis = useEmphasis(150, 18, 196, 14);
+  const emphasis = useEmphasis(150, 18, 200, 14);
   // tense → easing over 30 frames, starting as the headphones go on. Slower than the
   // fall on purpose: coming back takes longer than going down.
   const pose = useExpression([
@@ -138,7 +144,7 @@ export const Beat11ReturnToEase: React.FC = () => {
           { frame: 130, shot: frameRect(VIEWFINDER, 100) },
           // …and OUT, landing with 50 frames still to run. This is the payoff.
           { frame: 160, shot: monitorWide(20) },
-          { frame: 210, shot: monitorWide(20) },
+          { frame: 234, shot: monitorWide(20) },
         ]}
       >
         <MonitorSurface

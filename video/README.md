@@ -54,7 +54,7 @@ Next dev server instead of its own.
 
 ```bash
 cd video
-npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 80.2s, ~18 MB)
+npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 81.0s, ~18 MB)
 npm run render:rig      # -> out/rig-spike.mp4  (the character rig's bench, 6s)
 npm run render:hello    # -> out/hello-world.mp4
 npm run render:probe    # -> out/web-component-probe.mp4
@@ -72,7 +72,7 @@ a real browser); later renders reuse it.
 ## The greybox — `src/greybox/`
 
 `Greybox` is the cut: all thirteen beats at the durations the beat sheet gives
-them, 2406 frames = **80.2s** at 30fps.
+them, 2430 frames = **81.0s** at 30fps.
 
 **The world is 1200×675, not 1920×1080.** The product renders at a 1200px-wide
 viewport and the whole desktop is scaled 1.6× to fill the output — a screen
@@ -160,7 +160,10 @@ spike built them; only the drawing underneath changed.
 `src/greybox/character/` holds the art. Read **`NOTICE.md` first** — it carries the MIT licence the
 base ships under, the provenance trail tying every path back to `avataaars@2.0.0`, and the measured
 landmark table the rig registers against. `base.tsx` is the export inlined and flattened,
-`features.tsx` is everything the rig draws over it, `backdrop.tsx` is the office.
+`features.tsx` is everything the rig draws over it, `backdrop.tsx` is the office — a blinded window,
+the back of a monitor and a desk line, blurred, in warm neutrals inside ten points of lightness so
+it recedes behind the face. It is **office-coded on purpose**: the first version was a wall, a band
+and a picture frame, which reads as a bedroom.
 
 **The one constraint worth knowing before you touch `features.tsx`: Avataaars has no sclera.**
 Every facial feature in that system is `#000000` at a fill opacity — `Eyes/Default` is two filled
@@ -192,10 +195,23 @@ const pose = useExpression([
 ```
 
 Parts: head (nod, sink, tilt), brows (the fall, more than anything else), eyes (aperture + blink),
-pupils (gaze), mouth (one curvature scalar), shoulders (slump + typing), hands, headphones. The
-hair, ears and neck are **not** animated — they come from the base, and the ears are where the
-headphones attach, at the measured centres (71, 117) and (193, 117). Those sit **five pixels below
-the eye line**; cups hung on the eye line ride visibly high.
+pupils (gaze), mouth (one curvature scalar), shoulders (slump + typing), headphones. The hair, ears
+and neck are **not** animated — they come from the base, and the ears are where the headphones
+attach, at the measured centres (71, 117) and (193, 117). Those sit **five pixels below the eye
+line**; cups hung on the eye line ride visibly high, and the band crosses the **crown**, not the
+fringe. There was an eighth part — two hands at the bottom edge — and it is cut; the note where it
+lived in `features.tsx` says why.
+
+**`tense` must never use lowered inner brows.** It did, with a flat pressed mouth, and that is the
+anger configuration — it read as anger. Inner ends raised is worry; inner ends down is anger. It is
+now `dismayed` one degree deeper, which also gives beat 8's two stateline steps two matching facial
+intensities. The note on the pose itself has the full reasoning.
+
+**The shoulders are authored and anthropometric.** 2.7 head widths across with ~23° of slope, not
+the framing window's full width on a flat arc — that read as a distant horizon. The outline traces
+the base shirt's own neckline control point for control point, so the authored torso and the base
+meet along the crew neck with no seam. Nothing about it depends on the framing window: shoulder
+proportion is a fact about the character, not about the box.
 
 **Studio composition `CharacterRig`, under `Spikes`**, is the bench: the five poses static, plus
 beat 8's fall at its real timings both large and at the viewfinder's real on-screen size, and beat

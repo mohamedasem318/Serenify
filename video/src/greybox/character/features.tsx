@@ -1,7 +1,6 @@
 import React from "react";
 
 import type { Pose } from "../rig";
-import { SKIN } from "./base";
 
 /**
  * ── THE AUTHORED PRIMITIVES ─────────────────────────────────────────────────
@@ -216,12 +215,26 @@ export const Features: React.FC<{ pose: Pose; blink: number; uid: string }> = ({
  * into the skin path, and `NOTICE.md` has the derivation. The ear centre is five pixels
  * *below* the eye line, and cups hung on the eye line ride visibly high.
  *
- * Flat fills in the base's language, no gradients and no strokes on the cups. The band
- * **rests on the hair rather than arcing over it**: an arc that clears the hair puts its
- * apex above the framing window's top edge at y 22, and a band sliced off by the top of
- * the viewfinder reads as a mistake rather than as a crop. Its apex is at y ≈ 34, eight
- * units clear of the frame, and real over-ear bands press into hair anyway.
+ * Flat fills in the base's language, no gradients and no strokes on the cups.
+ *
+ * ── THE BAND CROSSES THE CROWN ──────────────────────────────────────────────
+ *
+ * Its apex is at y ≈ 21, which puts it on the hair's own crown (y ≈ 21 at centre) and
+ * reads as a band resting on the top of his head. It used to sit at y 34.5, most of a
+ * fringe lower, and from the front that reads as a band across his **forehead** — the
+ * cups were right and the arc was wrong. The framing window's top edge moved from 22 to
+ * 10 to buy the room; see `WINDOW` in `rig.tsx`.
+ *
+ * ── AND THEY ARE GREY, NOT BLACK ────────────────────────────────────────────
+ *
+ * At `#2E3338` they were the highest-contrast object in the frame, on the one beat where
+ * the relief is supposed to land on his face. `#7E8489` sits between the hair and the
+ * wall and reads as an object without out-shouting the features, which are ink at 0.6–0.7
+ * over skin.
  */
+const SHELL = "#7E8489";
+const PAD = "#9AA0A4";
+
 export const Headphones: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => {
   const cupW = 26;
   const cupH = 44;
@@ -229,9 +242,9 @@ export const Headphones: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => {
     <g opacity={opacity}>
       {/* The band, tucked under the cups at both ends. */}
       <path
-        d={`M ${FACE.cx - FACE.earDx} 102 C ${FACE.cx - FACE.earDx} 12 ${FACE.cx + FACE.earDx} 12 ${FACE.cx + FACE.earDx} 102`}
+        d={`M ${FACE.cx - FACE.earDx} 102 C ${FACE.cx - FACE.earDx} -6 ${FACE.cx + FACE.earDx} -6 ${FACE.cx + FACE.earDx} 102`}
         fill="none"
-        stroke="#2E3338"
+        stroke={SHELL}
         strokeWidth={8}
         strokeLinecap="round"
       />
@@ -245,10 +258,10 @@ export const Headphones: React.FC<{ opacity?: number }> = ({ opacity = 1 }) => {
               width={cupW}
               height={cupH}
               rx={11}
-              fill="#2E3338"
+              fill={SHELL}
             />
             {/* The pad. A lighter neutral, flat — it is what stops the cup reading as a hole. */}
-            <ellipse cx={cx} cy={FACE.earY} rx={7.5} ry={14} fill="#525A62" />
+            <ellipse cx={cx} cy={FACE.earY} rx={7.5} ry={14} fill={PAD} />
           </React.Fragment>
         );
       })}
@@ -288,31 +301,22 @@ export const MusicNote: React.FC<{ x: number; y: number; scale: number; opacity:
 );
 
 /**
- * Hands at the desk edge, rising into the bottom of the frame and alternating.
+ * ── THE HANDS ARE CUT ───────────────────────────────────────────────────────
  *
- * Crude on purpose, and the read comes from the alternation rather than the shape — but
- * it is the only unambiguous way to say "he never stopped working", which beat 11 needs
- * it to say. Skin, not panel grey: at panel grey they matched the backdrop and read as
- * two notches cut out of his shoulders.
+ * There were two — wide, shallow, skin-coloured, rising into the bottom of the frame and
+ * alternating — and they are gone. They never survived a proper look. Widely separated
+ * blobs on a flat chest read as detached objects rather than as forearms, they are far
+ * below legibility at the wide composites where beat 11 actually resolves, and narrowing
+ * the shoulders to human proportion did not rescue them: it moved them onto the chest,
+ * where they read as two mitts pinned to his shirt.
  *
- * **They sit at the very bottom edge and inboard of the shoulder line**, and both of those
- * are corrections. Sized like the crude rig's — square-ish, half a head wide — and placed
- * at the shoulders' own height, they landed exactly on the shoulder curve and read as
- * epaulettes. Wide, shallow and in front of the chest, they read as forearms at a
- * keyboard, which is the only thing they have to say.
+ * What they were for — "he never stopped working", which beat 11 needs so that easing
+ * over the work does not become easing *instead of* it — is carried by the head nod, the
+ * drifting notes and the trend walking back down while the music plays. `working` still
+ * feeds the shoulders' typing motion, so the beat keeps a physical tell; it just no
+ * longer keeps two orange rectangles.
+ *
+ * It also fixes a smaller wrong thing: they were drawn at any beat passing `working`, and
+ * hands resting at a keyboard during a **calibration** — where the whole instruction is
+ * to sit still for a baseline — was off-story.
  */
-export const Hands: React.FC<{ bottom: number; typing: number }> = ({ bottom, typing }) => (
-  <>
-    {([-1, 1] as const).map((side) => (
-      <rect
-        key={side}
-        x={FACE.cx + side * 74 - 29}
-        y={bottom - 18 - Math.max(0, typing * side) * 4}
-        width={58}
-        height={44}
-        rx={15}
-        fill={SKIN}
-      />
-    ))}
-  </>
-);

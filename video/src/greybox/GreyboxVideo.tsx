@@ -37,18 +37,18 @@ import { FONT, GREY } from "./theme";
  *   2 signup        468          8 the email      200 (+20)
  *   3 dashboard     120          9 questionnaire   90
  *   4 camera gate   150         10 Ren            210
- *   5 calibration   372         11 return to ease 210
+ *   5 calibration   372         11 return to ease 234 (+24)
  *   6 later          60         12 closing card   90
- *                               13 end card      136 (−44)
- *                                       total   2406 = 80.2s @ 30fps
+ *                               13 end card      136
+ *                                       total   2430 = 81.0s @ 30fps
  *
- * −0.8s on revision 4's 81s: the end card's typing gives back 1.5s (it ran at ~13
- * characters a second, which is a stall; the hold is untouched) and beat 8 spends 0.67s
- * holding its tight framing through the fall. The character rig surfaced that one —
- * before it, the fifteen most important frames in the video were playing at the width
- * where a face reads least.
+ * +0.8s: **beat 11 lingers on the returned reading** before the cut to the closing card.
+ * Everything on the page has stopped travelling by f214 — the only motion left in the
+ * last twenty frames is his breath and the nod — so the card that follows, which is the
+ * film's thesis, arrives out of a settled frame instead of out of a settling one. It is
+ * the only timing change in the viewfinder pass.
  */
-export const GREYBOX_DURATION = 2406;
+export const GREYBOX_DURATION = 2430;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -83,7 +83,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={210} name="10 · Ren">
         <Beat10Ren />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={210} name="11 · return to ease">
+      <Series.Sequence durationInFrames={234} name="11 · return to ease">
         <Beat11ReturnToEase />
       </Series.Sequence>
       <Series.Sequence durationInFrames={90} name="12 · closing card">
