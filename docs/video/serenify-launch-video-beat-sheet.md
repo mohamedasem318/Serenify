@@ -16,8 +16,25 @@ the wordmark across four attempts, and the rig removes the need for it.
 **The character's art has landed** (2026-07-30): a stripped Avataaars base, MIT, with the
 rig's authored primitives drawn over it, an authored torso under it and an office backdrop
 behind it. Everything else inside the viewfinder — headphones, drifting notes — is authored
-too. The page around it is still greybox on purpose; real `apps/web` components are a separate
-pass, and what that pass owes is listed in **the deferred register** at the end of this file.
+too.
+
+**THE FILM IS DARK, AND THE PRODUCT SURFACES ARE REAL COMPONENTS.** `apps/web` has had a
+designed dark mode from the start — a full token swap under `:root.dark` — so this is the app's
+own theme rather than an approximation, and **no Serenify surface in any beat lacks a genuine
+dark variant.** The monitoring page, the calibration flow, the confirmatory prompt and Ren's
+chat are now the real components, in dark, framed against measured geometry. The non-Serenify
+furniture — browser chrome, the mail notification, the two closing cards — has no dark version
+to inherit and was authored; it carries **its own token block, deliberately decoupled from the
+app's palette**, because a browser is not part of Serenify and must not move when the product's
+palette does.
+
+**Framing is now measured, not fitted.** `video/src/SwapProbe.tsx` renders the real components
+at the real 1200px world and prints their bounding boxes; `video/src/app/geometry.ts` holds
+those numbers and `framing.ts` derives every shot from them. Three consecutive revisions logged
+crop complaints and all three traced to framing tuned against greybox rectangles. That is what
+this pass ends.
+
+What remains unfinished is listed in **the deferred register** at the end of this file.
 
 **Governing rule:** at 1920×1080 in a phone-sized feed, wide shots are illegible. **Every readable moment is a push-in.** Full-desktop wide shots exist only as brief establishing or transition frames.
 
@@ -51,7 +68,7 @@ These are deliberate. Do not "fix" them toward fidelity.
 
 | # | Liberty | Why |
 |---|---|---|
-| L1 | **Viewfinder is scaled up** from the app's 224×126px | At true size his face is a smudge on a phone. The emotional core of beat 8 requires a readable face. |
+| L1 | **Viewfinder is scaled up** from the app's 224×126px to 320×181 | At true size his face is a smudge on a phone. The emotional core of beat 8 requires a readable face. **Measured against the real component (2026-07-30): it grows from its TOP-LEFT.** The real viewfinder is an `absolute … z-10` overlay inside the stage card and its left edge sits at world x 743 against the bloom's right at 744; the bloom's gradient is fully opaque out to x 669, so growing from the top-right — its anchor in the app — covers the bloom's solid core, and beat 7's whole job is to plant bloom, stateline and viewfinder together. Growing from the top-left spends the enlargement on the empty page beside the card instead. It also has to be parented one level out of the card, which carries `overflow-hidden`. |
 | L2 | **The deadline notification sits top-right**, adjacent to the viewfinder | Keeps notification and face in one push-in, so you watch his face fall *while the toast is up*. Correct for macOS anyway. |
 | L2b | **The mail client and music player are generic, not Gmail and Spotify.** Billie Jean is named. | Mohamed's call. No audio, no lyrics, so naming the track carries effectively no risk, while drawn third-party UIs carry needless brand clutter. |
 | L3 | **Time is compressed throughout.** The real flow is 10–15 minutes | 60s video. Non-negotiable. |
@@ -63,7 +80,7 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L9 | **Ren gets a typing indicator, which the app does not have** | Needed to make the `thinking` state legible as a state rather than as dead air. The video depicts a feature that will be built later. **Decided — this is not a fidelity defect and must not be "fixed".** |
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
-| L12 | **The in-place emphasis** — the stateline block grows 1.65× where it stands, is read, and settles. Nothing travels, the camera does not move | Holding bloom + stateline + viewfinder together means framing ~1096px of world, at which the app's `text-base` (16px) sub is ~6px on a phone. A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. |
+| L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px, where the sub lands at 6.5px on a phone. The real composite is **760** — the real viewfinder sits inside the stage card rather than 300px to its right, so the union is far tighter — and at 760 the sub already lands at 9.4px. The factor needed for legibility alone is 1.064×, which is not a device. 1.25× is set by two measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and finishes 11.1px clear of the real Pause/End controls, with the sub at 11.8px. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. |
 | L13 | **The character's face is AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head, with an authored torso behind it | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
 ---
@@ -451,17 +468,30 @@ pull-out began, so its own payoff played cropped for about a second and the clic
 after the camera finally landed. The order is now: the line resolves → the camera pulls out to
 hold the whole state → it is read → he clicks. The +0.4s is reading time for 16 words at 16px.
 
+**AND THE PUNCHED-IN READ IS EXPLAINED — register item 4, done.** It is one number. The
+component measures **448 × 346.9**, and its ripple (`components/anchor/success-state.tsx:30-36`)
+scales a `size-24` badge to **2.1**, reaching (96 × 2.1 − 96) / 2 = **52.8px past the badge on
+every side**. The badge sits only 24px below the component's own top edge, so **the ripple
+crosses that edge by 28.8px**. Every previous framing measured the component and cropped the
+ripple, so the payoff played with its own bloom clipped by the frame — which looks exactly like a
+shot that is too tight, because it is one. The shot now frames the component grown by the
+ripple's real overshoot on all four sides.
+
 **Shot note for 5b:** this is the audience's first look at your protagonist's face. Give it a real hold. Everything in beats 7–11 depends on the audience having learned this face while it was calm.
 
-**Framing note:** the preview and the status line beneath it are framed **together**, both
-complete. That caps the preview at **240** wide — at 320 the composite forces the camera out far
-enough that the face and the status line both stop being readable.
+**THE PREVIEW IS 16:9, AND THE LIBERTY IS RETIRED.** Register item 5, done. The real component
+is a full-width **`aspect-video`** box — **512 × 288** in its `max-w-lg` column
+(`components/anchor/anchor-recorder.tsx:570,578`) — with a **3:4 bracket guide floating inside
+it** at **168.5 × 224.6** (`components/anchor/framing-overlay.tsx:82`, `aspect-[3/4] h-[78%]`).
+The *bracket target* was always genuinely 3:4, so 5b was faithful to it; the *box* never was.
 
-**The greybox draws the preview 3:4, and that is a liberty being retired.** The real component
-is a full-width **`aspect-video`** box (`components/anchor/anchor-recorder.tsx`) with a **3:4
-bracket guide floating inside it** (`components/anchor/framing-overlay.tsx`, `aspect-[3/4]
-h-[78%]`). The *bracket target* is genuinely 3:4 and 5b is faithful; the *box* is not. The
-decision is to go faithful at the component pass — see the deferred register, item 5.
+**The old framing note is gone with it.** It capped the preview at 240 wide so the preview and
+the status line could be held together; at the real 512 that cap is meaningless, and the
+composite is governed by the real green-room card below the box instead.
+
+**And the change lands the centering nudge harder, for a measurable reason.** The bracket target
+is only **33% of the box's width**, so where he sits in frame is now a visible fact about the
+shot rather than an inset inside a portrait box his face already filled.
 
 ---
 
@@ -496,12 +526,30 @@ The monitoring session, live and settled.
 
 Wide enough to hold bloom, stateline and viewfinder together. This is the "before" — the audience needs it registered so the fall lands.
 
-**The first firing of the in-place emphasis (L12), and it costs nothing.** Holding bloom +
-stateline + viewfinder together means framing ~1096px of world, at which the app's `text-base`
-(16px) sub is ~6px on a phone. The alternative — its own landing on the block — was priced at
-~1.5s. The emphasis is free because it needs **no camera travel**: the block grows **1.65×**
-where it stands while the camera holds the composite, putting the 30px head at ~19px and the
-16px sub at ~10px. The rise and the settle both fit inside the 4s the beat already had.
+**The first firing of the in-place emphasis (L12), and it costs nothing.** The emphasis is free
+because it needs **no camera travel**: the block grows where it stands while the camera holds
+the composite. The rise and the settle both fit inside the 4s the beat already had.
+
+**THE REAL COMPONENTS MADE THIS SHOT TIGHTER, AND EVERYTHING FOLLOWS FROM THAT.** The greybox
+framed ~1096 world px because it drew the viewfinder as a separate 320-wide panel 300px to the
+right of a 700-wide card. The real viewfinder is an overlay INSIDE the stage card, so the union
+of bloom + stateline + viewfinder is far tighter and the composite is **760** — a 1.58× push-in
+rather than a 1.09× one. Measured consequences, all improvements:
+
+- the 17px sub lands at **9.4px** on a phone instead of 6.5px, and **11.8px** raised
+- **the emphasis therefore yields, 1.65× → 1.25×** (register item 3; see L12 for the arithmetic)
+- his head is **~66px** on a phone here, against the ~50px this sheet recorded
+- **the layout is the product's own** — register item 2. Nothing is padded: the card is
+  `min-h-[480px] … px-10 pb-10 pt-16`, the bloom is `sm:size-72` (288, where the greybox drew
+  148), and the real `mt-6` puts 24px between the bloom's bottom and the stateline's top. The
+  emphasis grows downward from that top edge, so it cannot reach the bloom by construction
+  rather than by arrangement.
+
+**The page sits scrolled 32px, and that is the page's behaviour rather than a device.** The real
+monitoring page is ~973px tall below the chrome against a 583px viewport, so it scrolls in the
+product too. 32 is the intersection of two measured constraints: below it the stateline's sub is
+clipped by the viewport bottom, above it the sticky header swallows the `Session · 47:12`
+readout.
 
 **It settles HERE rather than handing the raised block to beat 8.** The intent was to carry it
 across the join, but beat 8's push-in frames from world x 708 and the raised block's right edge
@@ -536,17 +584,36 @@ The push-in must make that readable. **The clock reads `11:30 AM` and is IN THE 
 
 **The three-way framing question, and what it cost.** The push-in must hold the notification and
 his face (L2) and the emphasis rule wants the stateline in frame when its copy changes. **No
-single framing does both**, and the reason is geometry rather than craft: the block sits at world
-x 270–670 and the clock/toast/viewfinder stack at x 856–1176, so a shot holding all three spans
-906px — 2.0× against the wide shot's 1.75×, barely a push-in, with the toast's subject line at
-~6px on a phone. The beat's own key text would become unreadable to keep a device on screen.
+single framing does both**, and the reason is geometry rather than craft. So it is split across
+the one continuous move the beat already had. What is given up: at the wide framing the toast is
+present but not readable. That is the right thing to lose — it was read seconds earlier at 4.2×,
+and after that its only job is to still be up while the reading falls.
 
-So it is split across the one continuous move the beat already had: **tight** holds clock + toast
-+ face and is where the toast is *read*; **wide** holds the whole card, the viewfinder and the
-toast still up, and is where the stateline changes twice under one raise. What was given up: at
-the wide framing the toast is present but not readable. That is the right thing to lose — it was
-read seconds earlier at 3.1×, and after that its only job is to still be up while the reading
-falls.
+**AND THE SPLIT GAINED A THIRD POSITION AT THE COMPONENT SWAP.** Measured, and it is the one
+framing the real geometry forced. A single tight shot holding clock + toast + face is **794.7**
+world px wide, at which his head lands at **63px** on a phone — against the ~80px the register
+accepted and the ~100px this sheet quotes for the fall. The cause is pure geometry:
+
+    the clock is browser chrome at            y  58
+    the real viewfinder is a card overlay at  y 277   (the greybox drew it at y 200)
+
+Any shot holding both spans 399px of height and 16:9 charges ~795px of width for it. Those 77px
+are the whole difference, and they exist because the real page has a 64px app header, a 32px main
+pad, a 44px readout row and the card's own 64px `pt-16` above the viewfinder.
+
+**So the beat takes three landings instead of two — still one continuous move, still no cut**,
+which is this sheet's own remedy for this class of problem applied once more:
+
+| | frames | width | what it holds | what reads |
+|---|---|---|---|---|
+| **clock** | f30–f68 | 460 | clock + toast | clock at **25.7px**, subject at **12.8px** |
+| **face** | f80–f118 | 565 | toast still up + his face | **THE FALL**, head at **88.7px** |
+| **wide** | f150 on | — | the whole card, viewfinder, toast | both stateline changes, one raise |
+
+It is strictly better than the greybox on both numbers the beat cares about: **the clock reads at
+25.7px instead of ~19, and the face falls at 88.7px instead of ~80.** The clock, the toast and
+the viewfinder still share a right edge — **1063** rather than 1176, because the real viewfinder
+cannot reach 1176 without covering the bloom, so the stack moved rather than the viewfinder.
 
 Sequencing matters here: let the **toast land and be read first**, then his face reacts, then the bloom moves. The order is what makes it cause-and-effect rather than three things happening at once.
 
@@ -598,13 +665,19 @@ landing is a union of the avatar and the message being read, so the avatar never
 character drawn specifically for this; letting the camera follow the messages and drop it after
 turn 1 wastes it.
 
-**It is a CHAT AVATAR, attached to Ren's own bubbles.** A single enlarged circle floating between
-the two bubbles belongs to neither, and leaves it unclear which side of the conversation is Ren —
-the one thing this beat cannot afford. Anchored to each Ren bubble, the app's real conventions do
-their normal job (`components/chat/chat-shell.tsx`): Ren is `self-start`, bordered `bg-surface`,
-`rounded-bl-sm`; he is `self-end`, filled `bg-foggy`, `rounded-br-sm`; both `text-[15px]`,
-`max-w-[74%]`. The squared bottom-left corner on Ren's bubbles is exactly where the avatar sits,
-so the pairing reads without help. Ownership must be unambiguous at a glance.
+**THE AVATAR IS IN THE CONVERSATION HEADER, NOT ON THE BUBBLES — corrected against the real
+component.** This sheet asked for it anchored to each Ren bubble, reasoning that the squared
+`rounded-bl-sm` corner is where it would sit. **The real surface does not work that way**:
+`<RenAvatar/>` lives in the conversation header beside the name and "here to listen"
+(`components/chat/chat-shell.tsx:385`), and the bubbles carry no avatar at all.
+
+That is better for this beat, not worse. The header is on screen for the **entire** exchange by
+construction, so L8's enlargement is never lost after turn 1 — which is the requirement the
+bubble-anchoring was trying to meet. And ownership stops depending on a pairing the audience has
+to infer: the header states "Ren" in words, and the bubbles keep the app's own conventions —
+Ren `self-start`, bordered `bg-surface`, `rounded-bl-sm`; he `self-end`, filled `bg-foggy`,
+`rounded-br-sm`; both `text-[15px]`, `max-w-[74%]`. Ownership is unambiguous at a glance because
+it is written down, not drawn.
 
 **All four states are timed** (labelled grey placeholders in greybox; the art comes later):
 
@@ -625,10 +698,30 @@ The exchange, in shape (exact wording to be written, not lifted — this surface
 
 **Turn 3 is the beat that sells the product** and it needs to land as *personal*, not generic. The whole difference between Serenify and a wellness app that says "try deep breathing" is that Ren knows this specific person. If the audience reads turn 3 as a canned suggestion, the beat is dead. Whatever the final wording, it must make clear that Ren knew this about him already.
 
-**HIS MESSAGE TYPES ON. REN'S DOES NOT.** Turn 2 is the one moment in the video where he acts
-through *language* rather than through a click, and it should show that — so it types,
-character by character, into a bubble that grows as a composer does. Ren keeps the
-typing-indicator-then-message treatment (L9). The human types; the AI thinks, then speaks.
+**HIS MESSAGE IS PERFORMED IN THE COMPOSER — RESTRUCTURED.** It used to type directly into a
+bubble that did not exist yet, and the text bled out of it. The bleed was a symptom; the real
+problem was that **the beat showed the result of an action instead of the action**, which is the
+one thing the one-take invariant exists to prevent and the same note this sheet already applies
+to tabs, clicks and scrolls everywhere else. So the beat does what a person does:
+
+    f36   the cursor moves to the composer at the bottom
+    f48   he types THERE, into the real textarea — 35 characters at ~20 c/s
+    f100  he hits send
+    f104  the bubble appears, sized by the real component to its own content
+    f116  Ren shows the typing indicator (L9)
+    f150  Ren replies
+
+Two defects resolve as side effects, both because a real bubble sizes to its content: **the bleed
+is gone**, and so is **the over-tall reply bubble**. Neither was ever a text-fitting problem;
+both were drawn boxes with guessed widths.
+
+And it earns something the old staging could not: this is the one moment in the film where he
+acts through *language* rather than through a click, and the beat now **shows** that instead of
+asserting it. Ren keeps the typing-indicator-then-message treatment (L9). The human types; the AI
+thinks, then speaks.
+
+**His message stays short — that constraint is unchanged and load-bearing.** 35 characters, ~1.7s
+at ~20 c/s. Never speed the typing to fit; shorten the line.
 
 **Turn 2's copy was shortened to pay for it, and that is the right lever.** At 63 characters
 the old line needed either 3.2 seconds the beat does not have or ~50 characters a second, which
@@ -669,8 +762,28 @@ does not stop.
 Then, **after the head nod, THE CAMERA PULLS OUT AND HOLDS.** That pull-out is the beat's payoff
 and it was missing: the move used to begin two-thirds of the way in and arrive on the very last
 frame, so it never landed and never held, and everything that resolves resolved off screen. It now
-lands with 50 frames still to run, and all three of these happen in that wide shot, in causal
-order:
+lands with 54 frames still to run.
+
+**THE THREE THINGS CANNOT SHARE ONE STATIC FRAME, AND THAT WAS MEASURED.** At the real geometry:
+
+    bloom top → trend bottom            664.2 px
+    viewport below the sticky header    519.0 px
+                                        ─────────
+                                        145 px short, at every scroll and every framing
+
+No camera move buys page height, and padding the layout until it fits is exactly what register
+item 2 exists to undo — the greybox only ever fitted because it drew a 476-tall card where the
+product has a 607.7-tall one. (A further 32px separates the stateline from the trend's plot, so
+even those two cannot be held together; the header is `sticky top-0` and cannot be scrolled away.)
+
+**So the causal ORDER survives and the single static shot does not.** The bloom drifts and the
+stateline returns while both are framed; then the camera pulls out AND the page scrolls, in one
+continuous move, landing on the trend card whole for the descent. That is this sheet's own order
+with the camera following the story instead of waiting for it, and **the closing linger lands on
+the trend**, which is the thing the beat exists to show. The returned stateline is read at
+18.6px on a phone in the shot before the move. No cut.
+
+In causal order:
 
 - The bloom drifts amber → meadow (1.3s ease — let it drift, don't snap)
 - Stateline returns to **"You're at ease right now"** · "Steady and settled — nothing to do."
@@ -788,15 +901,19 @@ and it is not what feels slow.
 Still well over the 40–60s target. **Do not trim on paper — trim in greybox**, where you can
 actually feel what's slow.
 
-**+0.8s across this revision**, and it is one line:
+**±0.0s across the component pass.** Every change in it is geometry, colour or staging, and none
+of it moved a duration:
 
-| Beat | Was | Now | What changed |
-|---|---|---|---|
-| 11 · return to ease | 7s | **7.8s** | +0.8s. It lingers on the returned reading, so beat 12 arrives out of a settled frame |
+| What changed | Cost |
+|---|---|
+| Dark mode, everywhere | nothing |
+| The component swap (beats 5, 7, 8, 9, 10, 11) | nothing |
+| Beat 8 gaining a third landing inside its existing move | nothing — the move was already there |
+| Beat 11's pull-out becoming a pull-out-and-scroll | nothing — same move, same frames |
+| Beat 10's restructure into the composer | nothing — the typing was already 52 frames |
+| The emphasis yielding 1.65× → 1.25× | nothing |
 
-Everything else in the viewfinder-polish pass is drawing, not timing, and cost **nothing**: the
-shoulders' proportion, the cut hands, the office-coded backdrop, the headphones and the corrected
-`tense` pose are all free.
+The previous revision's +0.8s (beat 11's closing linger) stands and is unchanged.
 
 **Trim candidates, in order:**
 
@@ -853,6 +970,27 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
 - ~~Does `tense` read as the emotion it is meant to be?~~ **No. It read as anger**, and that was a
   facial-coding error rather than a matter of taste. It is now escalated dismay. See "The
   character rig".
+- ~~Does any Serenify surface lack a genuine dark variant?~~ **No — not one.** `apps/web`'s dark
+  mode is a full token swap under `:root.dark` and every component the film uses reads its
+  colour from tokens; there is no hardcoded light value in any of them. One latent oddity was
+  found and is NOT a video problem: the monitor viewfinder's placeholder is `bg-ink/80`
+  (`components/monitor/viewfinder.tsx:55`), and `--color-ink` swaps to near-WHITE in dark, so the
+  letterbox behind the feed is a light panel rather than a dark one. It is invisible in the film
+  (the character fills the box) and invisible in the product whenever the feed covers it. Logged
+  for the backlog, not fixed here — the video does not modify `apps/web`.
+- ~~Does the viewfinder become a bright rectangle in a dark page, and is that wrong?~~ **It does,
+  and it is right — but the backdrop needed re-tinting.** A bright feed in a dark page is exactly
+  what a webcam looks like. What did not survive the swap is the relationship *inside* the
+  viewfinder: the office backdrop's wall was tuned at **L 78 and the skin sits at L 78**, so
+  against dark chrome the whole rectangle read as one bright slab with the face fighting its own
+  background. The ramp dropped ~15 points (wall to **L 61**) and saturation came down from ~8% to
+  ~6% — at the old chroma it read distinctly tan against cool dark chrome. The face is the
+  brightest thing in frame again, which is the brief that backdrop has always had.
+- ~~Do the headphones still read now that the face is the brightest thing in frame?~~ **Yes**, and
+  the re-tint is what protects it. They were brought down to muted grey to stop competing with
+  the face; with the backdrop now 17 points below the skin, the cups sit between the two rather
+  than against the top of the range. The contrast relationship inverted, and the fix was the
+  backdrop rather than the headphones — moving them back up would have undone the previous pass.
 
 **Still open:**
 
@@ -886,24 +1024,54 @@ components:
    body is visible beforehand, which leaves the click nothing to reveal. Applies at **beat 2 and
    beat 8**. The mail client is a drawn asset that does not exist yet, so this is a requirement on
    that asset — do not patch the greybox.
-2. **Un-pad the dashboard layout.** The greybox widened the gap between the orb/stateline and the
-   trend line so the emphasis would not overlap the bloom. That solved a video problem by changing
-   the product's layout. Real components render their real spacing, and **the emphasis is what
-   must yield** — not the layout.
-3. **The stateline emphasis must not overlap the bloom** once real spacing is in. Same invariant as
-   today (L12), re-solved against real geometry rather than against the padded greybox.
-4. **Frame the calibration success state against real geometry, ripple extent included.** It has
-   read as punched-in across three revisions because it has been fitted to a greybox
-   approximation. Measure the real component's bounding box before framing it.
-5. **The calibration viewfinder becomes 16:9.** The greybox's 3:4 box was a liberty; the real
-   component is `aspect-video` with a 3:4 bracket guide floating inside it. The decision is to go
-   faithful. That take needs reframing, and the change should also make the centering nudge land
-   harder. There was **no row in the liberties table to delete** — the liberty lived in beat 5's
-   framing note, which now records the decision instead.
-6. **Re-check beat 8's face size after the swap.** It is ~80px on a phone today. The lever if it is
-   too small is L1's viewfinder size, and only against a measured figure.
-7. **Beat 11's page half is unfinished** — the music player and the trend descent are still grey.
-   Expected, not a defect: the viewfinder pass finished the viewfinder.
+2. ~~**Un-pad the dashboard layout.**~~ **DONE (component pass).** The monitoring surface renders
+   the product's own spacing — `max-w-3xl` (768, not 700), `min-h-[480px] … px-10 pb-10 pt-16`,
+   `sm:size-72` bloom (288, not 148), the readout as a row above the card rather than a corner
+   overlay, and the viewfinder as an overlay inside the card rather than a panel to its right.
+   Nothing is padded, and **the emphasis is what yielded** — see item 3.
+3. ~~**The stateline emphasis must not overlap the bloom.**~~ **DONE.** It cannot, by
+   construction rather than by arrangement: it grows downward from the block's own top edge, so
+   its top never moves and the real `mt-6` between the bloom and the stateline is untouchable.
+   The emphasis yielded from **1.65× to 1.25×**, set by two measured clearances (11.1px above the
+   real Pause/End controls, and inside the frame's bottom edge). See L12 for the arithmetic. The
+   layout did not move.
+4. ~~**Frame the calibration success state against real geometry, ripple extent included.**~~
+   **DONE, and the cause was one number.** The ripple scales a 96px badge to 2.1 — 52.8px past
+   the badge on every side — and the badge sits 24px below the component's top edge, so the
+   ripple crosses it by **28.8px**. Every previous framing measured the component and cropped the
+   ripple. See beat 5.
+5. ~~**The calibration viewfinder becomes 16:9.**~~ **DONE.** The box is 512 × 288 `aspect-video`;
+   the 3:4 bracket guide floats inside it at 168.5 × 224.6. The take is reframed, and the
+   centring nudge lands harder for a measurable reason — the bracket target is only 33% of the
+   box's width. The stale liberty lived in beat 5's framing note and **that note is deleted**;
+   there was no row in the liberties table to remove.
+6. ~~**Re-check beat 8's face size after the swap.**~~ **CLOSED — re-checked and better.** The
+   fall now plays at **88.7px** on a phone, against the ~80px that was accepted. L1 is unchanged
+   at 320×181; only the direction it grows from moved (see L1).
+7. **Beat 11's page half — the trend descent is DONE, the music player stays a stand-in.** The
+   trend is the real `<SessionTrend/>`: the tail walks back down in meadow while the climbed
+   history stays put, which is the thing the beat exists to show. The player remains a stand-in
+   by design, now in dark-mode grey rather than light-mode grey sitting in a dark film.
+
+**Still to swap — the beats this pass did not reach:**
+
+7b. **Beats 1, 2, 3, 4, 6, 12 and 13 are still greybox**, now in dark-mode grey so the film reads
+   as one piece rather than a mix of modes. What each owes is a real component that already
+   exists and is already proven to render: the landing `<Hero/>` and `<PublicNavbar/>` (beat 1),
+   the signup `<Field/>` / `<PasswordRequirements/>` / `<OtpPanel/>` (beat 2), `<WelcomeBanner/>`
+   and `<CalibrationBanner/>` (beats 3 and 6), and `<CameraConsentGate/>` (beat 4) — all four
+   measured and recorded in `video/src/app/geometry.ts` by the same harness, so the framing work
+   is already done. Beats 12 and 13 are authored cards and are dark; only their type treatment is
+   outstanding, which is item 8.
+
+   **One of these carries a known blocker.** Beat 2f's OTP choreography is a `setTimeout` state
+   machine inside `otp-boxes.tsx` — a 780ms sweep, a 540ms merge that writes inline transforms
+   from layout, then a hold. A Remotion render is frame-addressed and does not advance the wall
+   clock, so the choreography cannot play as written; the component's static (reduced-motion)
+   variant jumps straight to the merged pill and loses the 2.94s the sheet calls the best motion
+   in the product. Every other component in the film was absorbed by taking its static variant and
+   re-authoring its declared motion per frame; this one needs the merge's inline transforms
+   interpolated as well, which is the piece not yet built.
 
 **Open and unanswered, older than this pass:**
 
@@ -915,6 +1083,32 @@ components:
 10. **Do Ren's `attentive` and `thinking` states need properly drawn eyes?** They are `idle`'s eyes
     scaled. At the enlarged avatar size (L8), held for seconds, that may become visible in a way it
     is not in the app.
+
+---
+
+---
+
+## The assets pass — recorded now, not built
+
+The next pass draws the mail client, the music player, the notification and album art. Two things
+are written down here so they are not built wrong later. **Neither is to be started from this
+list.**
+
+**ALBUM ART MUST BE ORIGINAL.** Song titles and an artist's name on screen are decided and stay
+(L2b) — the naming is the evidence Ren knew him, and with no audio and no lyrics it carries
+effectively no risk. **An actual album cover does not.** It is a copyrighted image, and
+reproducing one in a promotional video on a public post is a materially different exposure from
+naming a track. Authored abstract cover art costs nothing, removes the question entirely, and can
+be matched to the film's palette. **No reproduction or near-reproduction of a real album sleeve** —
+not redrawn, not "inspired by", not recoloured.
+
+**THESE ASSETS NEED PERSONALITY, NOT WIREFRAMES.** They are the film's only non-Serenify surfaces,
+and a labelled grey rectangle beside a real product component reads as unfinished in a way it
+never did when everything was grey. They should feel like real software someone actually uses —
+in dark, sitting inside the film's palette, with the specificity that implies: a mail client with a
+sender list and a real reading pane, a player with a transport that looks like it works. They take
+their values from the furniture token block, which is deliberately decoupled from the app's palette
+(a browser and a mail client are not part of Serenify and must not move when its tokens do).
 
 ---
 

@@ -57,17 +57,42 @@ import React from "react";
  * coordinates to keep in sync.
  */
 
+/**
+ * ── RE-TINTED FOR DARK MODE, AND IT NEEDED IT ───────────────────────────────────────
+ *
+ * These values were tuned against LIGHT app chrome, where a wall at L 78 sat comfortably below
+ * a page at L 90. In a dark page (`--color-bg` dark is `#101214`, L 7) the viewfinder becomes
+ * the brightest object on screen by a wide margin — which is exactly what a real webcam feed
+ * looks like, and on its own that is an improvement rather than a problem.
+ *
+ * What did not survive the swap is the relationship INSIDE the viewfinder. The old wall sat at
+ * **L 78 and the skin sits at L 78**, so against light chrome they read as a lit room with a
+ * face in it, and against dark chrome the whole rectangle reads as one bright slab with the
+ * face fighting its own background for attention. The brief for this backdrop has always been
+ * "it has to recede, because the face has to win"; at equal lightness it stops receding.
+ *
+ * So the whole ramp drops ~15 points of lightness — the wall to **L 61** — which puts the skin
+ * a clear 17 points above everything behind it and makes the face the brightest thing in the
+ * frame again. Saturation also comes down from ~8% to ~6%: at the old chroma the panel read
+ * distinctly tan against cool dark chrome, which is the "warm neutrals against a cool dark UI
+ * can look wrong" failure. It is still warm — a cool-grey office would look like a morgue —
+ * just no longer yellow.
+ *
+ * Both original constraints are unchanged and still hold: **no red, no saturated green, no
+ * amber** (all three carry band meaning), and the whole palette stays inside a ~13-point
+ * lightness band so no edge back here is stronger than the hair's or the shirt's.
+ */
 export const BACKDROP = {
-  wall: "#C9C2B8",
-  /** Daylight, barely. A window that is much brighter than the wall pulls the eye. */
-  glass: "#D6D0C7",
-  slat: "#C1B9AE",
-  sash: "#BCB4A8",
+  wall: "#A49D95",
+  /** Daylight, barely. A window much brighter than the wall pulls the eye. */
+  glass: "#AFA8A0",
+  slat: "#9C958D",
+  sash: "#979089",
   /** The monitor's back shell, a shade under the wall so it sits behind him. */
-  shell: "#BAB2A7",
-  stand: "#B3AB9F",
-  deskTop: "#C4BCB1",
-  deskFront: "#B8B0A5",
+  shell: "#958E87",
+  stand: "#8D8780",
+  deskTop: "#9F988F",
+  deskFront: "#948D86",
 } as const;
 
 export const OfficeBackdrop: React.FC<{
