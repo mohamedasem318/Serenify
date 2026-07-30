@@ -2,10 +2,10 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { ChatPage, msg } from "../../app/chat";
+import { Pointer } from "../../app/pointer";
 import { Camera, rect, shot } from "../Camera";
 import { REN } from "../copy";
 import { H, W } from "../theme";
-import { Cursor } from "../ui";
 
 /**
  * Beat 10 · Ren · 210 frames
@@ -58,10 +58,26 @@ import { Cursor } from "../ui";
 /** The composer sits at the bottom of the panel — where the cursor goes and the typing happens. */
 const COMPOSER = rect(300, 520, 600, 64);
 
+/**
+ * ── THE TYPING WINDOW OPENED FOUR FRAMES, AND THAT IS THE WHOLE COST ────────────────
+ *
+ * Turn 2 was 35 characters of pure callback — "boss moved it to 12. thirty minutes" — in which
+ * *it* has no antecedent on screen. The line now names the report and states the consequence,
+ * at 49 characters, so the audience gets the stakes from this message rather than from a
+ * notification forty seconds earlier. See `REN` in `copy.ts`.
+ *
+ * It types f40–f98: 58 frames, about 25 characters a second. Faster than the ~20 c/s the sheet
+ * quotes, and deliberately — he is hurried, and this is the one moment in the film where the
+ * hurry is his own behaviour rather than something the UI is telling us. Every character still
+ * gets more than two frames, so it is typing rather than a blur.
+ *
+ * The send stays at f100 and turn 3's hold is untouched at 60 frames. The sheet's rule is not to
+ * speed the typing to fit a line the beat cannot afford; this one it can.
+ */
 const T = {
-  cursorToComposer: 36,
-  typeFrom: 48,
-  typeTo: 100,
+  cursorToComposer: 30,
+  typeFrom: 40,
+  typeTo: 98,
   send: 100,
   bubble: 104,
   thinking: 116,
@@ -107,13 +123,23 @@ export const Beat10Ren: React.FC = () => {
           messages={messages}
           draft={frame >= T.typeFrom && frame < T.send ? typed : ""}
           thinking={frame >= T.thinking && frame < T.reply}
-        />
-        {/* The cursor moves to the composer, then to send. The click and its consequence share
-            a shot, which is the invariant. */}
-        <Cursor
-          x={frame >= T.send ? 872 : frame >= T.cursorToComposer ? 420 : 700}
-          y={frame >= T.cursorToComposer ? 552 : 300}
-          clickAt={T.send}
+          overlay={
+            /*
+             * The pointer TRAVELS to the composer, and then to send. It used to switch between
+             * three positions on frame thresholds, so it was present at each of them and never
+             * seen going anywhere — which is the difference between a person using software and
+             * a diagram of one. Both clicks share a shot with what they cause: the caret lands
+             * in the textarea and the typing starts; send is pressed and the bubble appears.
+             */
+            <Pointer
+              path={[
+                { frame: 0, x: 700, y: 300 },
+                { frame: T.cursorToComposer, x: 460, y: 552 },
+                { frame: T.send - 8, x: 872, y: 552 },
+              ]}
+              clicks={[T.cursorToComposer + 4, T.send]}
+            />
+          }
         />
       </Camera>
     </AbsoluteFill>

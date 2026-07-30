@@ -106,7 +106,81 @@ export const RAW = {
  * f146, framed) and lands on the trend card whole. Both are read, neither is cropped, and the
  * causal order is the sheet's own.
  */
-export const SCROLL = { monitor: 32, trend: 634 } as const;
+export const SCROLL = { monitor: 40, trend: 634 } as const;
+
+/**
+ * ── THE SUB IS NOT ALWAYS ONE LINE, AND THAT IS WHY `monitor` MOVED 32 → 40 ─────────
+ *
+ * `RAW.statelineSub` was measured at **25.5 tall — one line** — against the `at_ease` copy, which
+ * is what the probe happened to render. Two of the three copies the film shows are one line:
+ *
+ *   at_ease         "Steady and settled — nothing to do."                        1 line
+ *   a_little_tense  "A bit of an edge lately. Maybe a slow breath."              1 line
+ *   tense           "This has held a while. Serenify can check in when you're    2 lines
+ *                    ready."
+ *
+ * The sub is `max-w-[42ch]` (~393px at 17px Inter), and the `tense` copy is 62 characters, so it
+ * wraps. At the old scroll of 32 its second line ran to raw y 714 against a viewport bottom of
+ * 707, and **the descenders of the film's most important reading were sliced** — at rest, before
+ * any emphasis, and the sheet's own rule is that a sliced line of text is always a failure. It
+ * was invisible in review because every still anyone framed was an `at_ease` one.
+ *
+ * 40 is again the intersection of measured constraints, now three:
+ *
+ *   s > 39      the two-line `tense` sub clears the viewport bottom (714 − s ≤ 675)
+ *   s ≤ 41.5    the Pause/End controls stay BELOW the fold (716.5 − s ≥ 675). Past this they
+ *               appear, and the raised stateline lands on top of them.
+ *   s as small  the `Session · 47:12` readout sits in the row at y 188–232 under a sticky header
+ *   as possible ending at 156. At 40 the row's top 8px is covered and its centred text clears by
+ *               ~14px; past ~48 the text itself goes under.
+ *
+ * The window is (39, 41.5]. There is no taste in it.
+ */
+
+/**
+ * ── AND THE EMPHASIS CANNOT SPEND ROOM THAT IS NOT THERE ────────────────────────────
+ *
+ * L12's 1.25× was derived against a one-line block. Measured against the two-line `tense` copy
+ * it does not fit, and no scroll rescues it — the arithmetic is scroll-invariant:
+ *
+ *   raised two-line bottom   737.25 − s
+ *   Pause/End controls top   716.5  − s
+ *
+ * The first is 20.75px below the second at EVERY scroll, so a 1.25× raise on the `tense` copy
+ * either runs off the viewport or runs through the controls. There is no third option at this
+ * layout. **This is the measured case for §7's Pass-B rearrangement** — moving the bloom,
+ * stateline and trend into their own column is what buys the block the room it needs.
+ *
+ * So the factor is capped by the room actually available, per copy, and the cap is what makes
+ * the device safe rather than a rule anyone has to remember:
+ *
+ *   room = viewportBottom(raw) − block top = (675 + 40) − 621 = 94
+ *   one line   block 621 → 688.5  = 67.5 tall → cap 1.39 → L12's 1.25 applies
+ *   two lines  block 621 → 714    = 93   tall → cap 1.01 → the raise is unavailable
+ *
+ * That is not the device failing quietly. **The collapse IS the firing**: beat 8 raises on its
+ * first copy change and the block settles as the second lands, so both changes carry movement
+ * and nothing yo-yos — see `Beat08Email.tsx`.
+ */
+const STATELINE_LINE_H = 25.5;
+const VIEWPORT_BOTTOM_RAW = 675 + SCROLL.monitor;
+
+/** The natural (unraised) height of the stateline block, for a sub of `lines` lines. */
+export const statelineBlockHeight = (lines: number): number =>
+  RAW.statelineSub.y + STATELINE_LINE_H * lines - RAW.statelineHead.y;
+
+/**
+ * The largest factor the block can grow to without a line leaving the page's own viewport.
+ * Never above L12's 1.25×, and never below 1 — a block that would already be clipped at rest is
+ * a defect to fix at the scroll, not something to shrink out of.
+ */
+export const emphasisCapFor = (lines: number): number => {
+  const room = VIEWPORT_BOTTOM_RAW - RAW.statelineHead.y;
+  return Math.max(1, Math.min(EMPHASIS_FACTOR, room / statelineBlockHeight(lines)));
+};
+
+/** How many lines each band's sub wraps to at `max-w-[42ch]`. Measured, not guessed. */
+export const SUB_LINES = { at_ease: 1, a_little_tense: 1, tense: 2 } as const;
 
 /** A raw rect shifted by a scroll offset. The sticky header never moves. */
 export const scrolled = (r: Rect, s: number): Rect => rect(r.x, r.y - s, r.w, r.h);
@@ -179,6 +253,10 @@ export const TOAST: Rect = rect(743, 187, 320, 104);
  * At 1.65× the block would reach 700.4 — through the controls and out of frame. The device
  * survives as grammar (it still fires on every copy change, which is what makes it grammar);
  * only its amplitude yields, and legibility is better than it was because the shot is tighter.
+ *
+ * **This is the CEILING, not the applied factor.** The arithmetic above is a one-line block's;
+ * `emphasisCapFor()` above re-derives it per copy against the real number of lines, and the
+ * two-line `tense` sub does not fit at any scroll. See that function's header.
  */
 export const EMPHASIS_FACTOR = 1.25;
 
@@ -247,6 +325,177 @@ export const SUCCESS_FRAMED: Rect = rect(
  * and the copy is saying "this is long because it matters".
  */
 export const CONSENT_GATE: Rect = rect(312, 0, 576, 1169.9);
+
+// ── Beats 1, 2, 3 and 6, measured ───────────────────────────────────────────────────
+//
+// All in WORLD coordinates as the beats render them — the probe's own page offsets are already
+// subtracted. Re-run `SwapProbe` after any `apps/web` layout change.
+
+/**
+ * **The landing page, and it is not what the greybox drew.**
+ *
+ * The greybox had a centred 640-wide block: headline, lede, data line, two buttons. Three
+ * measured facts about the real hero contradict it, and all three change the shot:
+ *
+ *  · **Two columns.** `hero.tsx:48` is `flex-col lg:flex-row`, and 1200 is well past `lg`, so
+ *    the copy column and `<StoryCard/>` sit side by side. The stacked version exists only below
+ *    1024 and the film never renders there.
+ *  · **The headline is 67.2px**, not 40 — `clamp(2.125rem, 5.6vw, 3.5rem)` resolves against the
+ *    viewport, and at 1200 that is the 3.5rem cap.
+ *  · **The copy column is 510 wide**, and the story card is another 510 beside it. The hero is
+ *    1120 across, not 640.
+ *
+ * The copy column is vertically CENTRED against the story card (`lg:items-center`), which is why
+ * it starts 62.9px below the section's own top padding rather than at it.
+ */
+export const LANDING = {
+  navbar: rect(0, 92, 1200, 64),
+  /** The `<section>`'s top edge — immediately under the sticky navbar. */
+  heroTop: 156,
+  /** Headline + lede + CTAs + data line, as one column. */
+  heroCopy: rect(64, 274.9, 510, 369.3),
+  heroHeadline: rect(64, 274.9, 510, 178.1),
+  /** "Get started" — beat 1 ends on a click of it. */
+  ctaGetStarted: rect(64, 556.2, 138.7, 44),
+  storyCard: rect(626, 212, 510, 495.2),
+} as const;
+
+/**
+ * **Signup, and there is no card.**
+ *
+ * `app/(auth)/layout.tsx` states it outright — "no card chrome — the page IS the surface" — and
+ * there is no public navbar either: the `(auth)` group has its own shell, a `max-w-md` (448)
+ * column with the wordmark at `text-4xl sm:text-5xl` and the theme toggle. The greybox drew a
+ * 512px bordered card under the public nav, which is two elements that do not exist on `/signup`.
+ *
+ * **And the column is 818.5 tall in a 583px viewport**, so the page scrolls — the submit button
+ * sits 79.5px below the fold at scroll 0. That is the product's own behaviour at this world, not
+ * a video device, and it is the same class of finding as the monitoring page's scroll.
+ */
+export const SIGNUP = {
+  /** The content column's own bounds. `max-w-md` (448) less `px-4 sm:px-6`. */
+  col: rect(400, 92, 400, 818.5),
+  wordmark: rect(400, 156, 400, 56),
+  section: rect(400, 260, 400, 586.5),
+  heading: rect(400, 260, 400, 47.5),
+  /** Label + input, as `<Field/>` renders them. The input alone is 48 tall, 22 below the label. */
+  fieldName: rect(400, 370.2, 400, 72.2),
+  fieldEmail: rect(400, 466.4, 400, 72.2),
+  /** The password `<Field/>` plus `<PasswordRequirements/>` under it, as one `space-y-2` group. */
+  fieldPassword: rect(400, 562.6, 400, 106.4),
+  passwordRules: rect(400, 642.8, 400, 26),
+  /** The acknowledgement's 20px checkbox — where the tick click lands. */
+  consentBox: rect(400, 685, 20, 20),
+  consentRow: rect(400, 685, 400, 48),
+  submit: rect(400, 754.5, 400, 48),
+  /** The whole labelled field group, for the 2a push-in. */
+  fieldGroup: rect(400, 370.2, 400, 298.8),
+  /** Consent + submit together, for the 2b–2c pan. */
+  consentAndSubmit: rect(400, 685, 400, 117.5),
+} as const;
+
+/** The "Check your email" state and the OTP panel inside it. Same shell, same column. */
+export const VERIFY = {
+  section: rect(400, 260, 400, 442.1),
+  heading: rect(400, 260, 400, 36),
+  panel: rect(400, 396.2, 400, 253.9),
+  /** The six boxes: 52 wide on an 8px gap, centred on the world. Confirmed by measurement —
+   *  box 0 at x 424 and box 5 at x 724 give a 60px step, which is 52 + `gap-2`. */
+  otpRow: rect(424, 537.1, 352, 52),
+} as const;
+
+/**
+ * The dashboard, at `max-w-6xl` (1152) inside the authed layout's `sm:px-6`.
+ *
+ * `space-y-10` (40) separates the banner from the greeting, so beat 6's layout is not beat 3's
+ * with a hole in it — everything below the missing banner moves up by 126, which is exactly the
+ * "its absence is the beat's visible content" the sheet asks for.
+ */
+export const HOME = {
+  calibrationBanner: rect(24, 124, 1152, 86),
+  /** "Set baseline". Beat 3 ends on a click of it. */
+  setBaseline: rect(948.8, 145, 114, 44),
+  /** With the banner above it (beat 3). */
+  welcomeWithBanner: rect(24, 250, 1152, 83.1),
+  /** Without it (beat 6). */
+  welcome: rect(24, 124, 1152, 83.1),
+} as const;
+
+/**
+ * Beat 4's gate, broken into the blocks the beat actually frames.
+ *
+ * 1169.9px of page in a 583px viewport — very nearly exactly two screens, which is why the beat
+ * scrolls and why the scroll is honest rather than a device.
+ */
+export const GATE = {
+  section: rect(312, 124, 576, 1169.9),
+  header: rect(316, 148, 568, 200.4),
+  /** "What happens" — the first bordered card. */
+  facts1: rect(316, 372.4, 568, 416.3),
+  /** "What declining changes" — the second bordered card. */
+  facts2: rect(316, 812.6, 568, 325.3),
+  buttons: rect(316, 1161.9, 568, 108),
+  /** "Allow camera and inference". The beat ends on it. */
+  allow: rect(316, 1161.9, 568, 48),
+  /**
+   * ── THE PRIVACY PITCH IS IN THE FIRST CARD, NOT THE LAST ──────────────────────────
+   *
+   * "Nothing is kept. There is no bucket, no table, and no file path where a clip lands." —
+   * `CAMERA_GATE_WHAT_HAPPENS[2]`, the **third bullet of the first** `<Facts/>` block. The beat
+   * sheet's staging assumed it was in the card nearest the button ("one landing holds the key
+   * line's card AND the button"), and the greybox drew it that way; the shipped copy puts it in
+   * "What happens to the video", 550px further up the page. The first landing after the swap
+   * was on "What declining changes" — a real card, correctly rendered, and the wrong one.
+   *
+   * **And the two cannot share a frame, by 11.8px.** Key-line top to Allow's bottom is 594.8;
+   * the viewport is 583. It is the closest near-miss in the film and it is still a miss, so the
+   * beat takes two landings inside one continuous move — the sheet's own remedy for exactly
+   * this, applied once more.
+   */
+  keyLine: rect(341, 615.1, 518, 91),
+} as const;
+
+/**
+ * ── THE CONFIRMATORY PROMPT LIVES IN SCREEN SPACE, NOT IN THE WORLD ─────────────────
+ *
+ * `<Notification/>` portals to `document.body` and is `fixed right-4 w-80 bottom-[…]`
+ * (`notification.tsx:186`), so it resolves against the 1920×1080 OUTPUT frame and is outside the
+ * camera's transform entirely. A wrapper around `<ConfirmatoryPrompt/>` cannot move it — the
+ * portal escapes the wrapper — which is why beat 9's prompt sits bottom-right of the frame
+ * regardless of where the camera is looking. **That is the known framing complaint and Pass B
+ * owns it**; what is recorded here is only where the control is, so the cursor can reach it.
+ *
+ * Measured in OUTPUT pixels, not world pixels. Anything drawn against these must sit outside
+ * `<Camera>`.
+ */
+export const PROMPT_SCREEN = {
+  panel: rect(1584, 758, 320, 290),
+  /** "Yes, that's me" — the true-positive branch. */
+  yes: rect(1609, 875, 270, 44),
+} as const;
+
+/**
+ * ── THE CONTROLS, RELATIVE TO THEIR OWN COMPONENT ───────────────────────────────────
+ *
+ * A drawn pointer that lands NEAR a button reads as a miss, so every click site is measured off
+ * the control rather than eyeballed. These are offsets from each component's own top-left, and
+ * the beat adds the page position it gave that component — which is what keeps them correct if
+ * a beat ever restages.
+ */
+export const CONTROL = {
+  /** `<Intro/>` (448 × 514.6) — "Turn on camera". */
+  turnOnCamera: rect(8, 422.6, 432, 48),
+  /** `<GreenRoom/>` (512 × 204.2) — the ready button. */
+  imReady: rect(21, 83.2, 470, 48),
+  /** `<SuccessState/>` (448 × 346.9) — "Back to home". */
+  backToHome: rect(64, 274.9, 320, 48),
+} as const;
+
+/** The centre of a rect — where a pointer's tip should land. */
+export const centre = (r: Rect): { x: number; y: number } => ({
+  x: r.x + r.w / 2,
+  y: r.y + r.h / 2,
+});
 
 /**
  * Phone-legibility floor, as arithmetic rather than folklore. A 1920-wide frame viewed at 422px

@@ -1,63 +1,79 @@
 import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
+import { CalibrationBanner } from "@/components/anchor/calibration-banner";
+
+import { HOME, centre } from "../../app/geometry";
+import { HomePage } from "../../app/home";
+import { Pointer } from "../../app/pointer";
 import { Camera, frameRect, rect, shot } from "../Camera";
-import { AppHeader, Desktop } from "../chrome";
-import { DASHBOARD } from "../copy";
 import { Lift, useLift } from "../lift";
-import { COL_W, COL_X, FONT, GREY, H, W } from "../theme";
-import { Box, Cursor, Text, TextBlock, useFade } from "../ui";
+import { H, W } from "../theme";
+import { useFade } from "../ui";
 
 /**
- * Beat 3 · Dashboard, first arrival · 0:22–0:26 · 120 frames
+ * Beat 3 · Dashboard, first arrival · 0:21.6–0:25.6 · 120 frames
  *
- * **Arrives by pulling out, not by cutting.** After "Taking you in…" the camera
- * pulls back from the OTP row and the dashboard is simply what is there when it
- * gets wide. Revision 2 panned across the banners on arrival, which was awkward;
- * a pull-out is the natural continuation of a page navigating under a held camera.
+ * **Arrives by pulling out, not by cutting.** After "Taking you in…" the camera pulls back from
+ * the OTP row and the dashboard is simply what is there when it gets wide.
  *
- * **Then the travelling lift (L10).** This beat has no push-in available: both
- * banners are 1152 wide inside a 1200 viewport, so the tightest framing that holds
- * either whole is the full frame, and the calibration banner's `text-sm` copy lands
- * at ~5px on a phone. The lift solves it without a type-scale liberty — the banner
- * detaches, travels to a 520px measure at centre frame where the camera *can* frame
- * it tightly, is read at its real 14px, and settles back. Then the click on
- * "Set baseline".
+ * ══ THE BANNERS ARE THE REAL COMPONENTS ═════════════════════════════════════════════
  *
- * **THE BANNER IS A ROW, SEATED AND LIFTED.** It used to be a column, so at its
- * seated 80px height its own contents — the sentence and the button — overflowed top
- * and bottom and crossed the banner's edge in the wide shot. The real banner is a row
- * with the button inside it, and a row is what both states are now: text left, button
- * right, both inside the bounds. The lift narrows the measure; it does not reflow the
- * layout, which also means there is no reflow flicker mid-travel.
+ * `<WelcomeBanner/>` and `<CalibrationBanner/>`, which is exactly what the deferred register
+ * lists this beat as owing. Two things the swap settled:
  *
- * COST: 5s → 4s. It works and it stays, but it was spending about a second more than
- * the beat can afford, and the 20-word sentence was never going to be fully read
- * whatever the hold — the lift buys legibility, not reading time. The travel and the
- * hold are both tighter, and the beat reads as "calibration is required, he clicks".
+ *  · **The greeting is generated, not written.** `WelcomeBanner` derives "Good morning" from the
+ *    hour and the first name from `fullName`, so the film passes a fixed `now` of 10:23 and the
+ *    banner produces "Good morning, Youssef" itself. The internal clock and the greeting can no
+ *    longer disagree, because only one of them is a string.
+ *  · **The calibration banner is 86 tall at 1152 wide**, and its "Set baseline" CTA is a foggy
+ *    `<Button/>` at the row's right end — 114 × 44 at x 948.8. The greybox drew a 44px-tall
+ *    graphite button 162 wide, in the wrong place.
+ *
+ * The pop-in is real: the component gates on `useSyncExternalStore` with a server snapshot of
+ * "dismissed", so it renders nothing until the client reads `sessionStorage`. At 30fps an
+ * instant appearance reads as a dropped frame, so it is faded over six frames on a wrapper. The
+ * component is not touched.
+ *
+ * ══ THE TRAVELLING LIFT (L10) ═══════════════════════════════════════════════════════
+ *
+ * This beat has no push-in available: the banner is 1152 wide inside a 1200 viewport, so the
+ * tightest framing that holds it whole is the full frame, and at the full frame its `text-sm`
+ * copy lands at about 5px on a phone. The lift solves it without a type-scale liberty — the
+ * banner detaches, travels to a 520px measure at centre frame where the camera *can* frame it
+ * tightly, is read at its real 14px, and settles back.
+ *
+ * **The lifted copy is a re-measure of the real banner, not a redraw of it.** The component is
+ * rendered inside the lift at a 520px width; flex reflows the sentence from one line to three
+ * and the button stays at the right end, because that is what the component's own
+ * `sm:flex-row sm:justify-between` does at a narrower measure. Nothing about it is restated.
+ *
+ * COST: 5s → 4s. The 20-word sentence was never going to be fully read whatever the hold — the
+ * lift buys legibility, not reading time.
  */
 
-const CALIB_HOME = rect(COL_X, 248, COL_W, 80);
+/** Where the banner lives in the layout, measured. */
+const CALIB_HOME = HOME.calibrationBanner;
 /**
  * Staged: a 520px measure, which is what makes 14px readable at framing 580.
  *
- * `y` is 341 rather than the banner's own 248 for a framing reason: at 258 the shot
- * on the lifted card reached up to world y 157 and caught the welcome banner's
- * "Good morning, Youssef" — the page scrim reduced it to a ghost but a *sliced word*
- * in shot is what the framing rule exists to forbid, and revision 3 shipped it as a
- * known residual. At 341 the frame starts at 240, below that text entirely, and
- * everything it does catch is grey bars and card edges behind a 0.9 scrim.
+ * `y` is 341 rather than the banner's own 124 for a framing reason: higher up, the shot on the
+ * lifted card reaches into the welcome banner and catches a sliced word, which is what the
+ * framing rule exists to forbid. At 341 everything the frame catches above it is card edges
+ * behind a 0.9 scrim.
  */
-const CALIB_LIFTED = rect(340, 341, 520, 124);
+const CALIB_LIFTED = rect(340, 341, 520, 148);
 /** Beat 2's closing framing, so this beat opens exactly where that one ended. */
-const OTP_SHOT = shot(600, 326, 432);
+const OTP_SHOT = shot(600, 563.1, 432);
+
+const SET_BASELINE = centre(HOME.setBaseline);
 
 export const Beat03Dashboard: React.FC = () => {
   const frame = useCurrentFrame();
   const lift = useLift(28, 16, 78, 16);
   const banner = useFade(14, 6);
-  // The navigation lands during the pull-out, which is what makes it read as one
-  // continuous move rather than as two shots.
+  // The navigation lands during the pull-out, which is what makes it read as one continuous move
+  // rather than as two shots.
   const onDashboard = frame >= 8;
 
   return (
@@ -73,107 +89,68 @@ export const Beat03Dashboard: React.FC = () => {
           { frame: 120, shot: shot(W / 2, H / 2, W) },
         ]}
       >
-        <Desktop clock="10:23 AM" url={onDashboard ? "serenify.tech/app" : "serenify.tech/verify"}>
-          {onDashboard ? (
+        <HomePage
+          clock="10:23 AM"
+          calibrationBanner={onDashboard}
+          bannerOpacity={lift > 0.02 ? 0 : banner}
+          overlay={
             <>
-              <AppHeader />
-
-              {/* Welcome banner — left-aligned, as the app has it. */}
-              <Box x={COL_X} y={166} w={COL_W} h={66} fill={GREY.surface} border={GREY.border} radius={10} />
-              <Text x={COL_X + 24} y={178} size={24} weight={700}>
-                {DASHBOARD.welcomeTitle}
-              </Text>
-              <Text x={COL_X + 24} y={210} size={14} color={GREY.body}>
-                {DASHBOARD.welcomeBody}
-              </Text>
-
-              {/* The rest of the dashboard. Two columns, well above `min-[880px]`. */}
-              <Box x={COL_X} y={352} w={564} h={208} label="today" fill={GREY.surface} />
-              <TextBlock x={COL_X + 24} y={396} w={430} lines={4} />
-              <Box x={COL_X + 588} y={352} w={564} h={208} label="trend" fill={GREY.surface} />
-              <TextBlock x={COL_X + 612} y={396} w={430} lines={4} />
-
               {/*
-               * The calibration banner. It really does pop in post-hydration with
-               * no transition, which at 30fps reads as a dropped frame — faded
-               * over 6 frames. Then it lifts, is read, and settles.
+               * A scrim under the lifted banner. Without it the framing on the lifted card
+               * catches the welcome banner's edge, and a sliced word in shot is exactly what
+               * the framing rule forbids. Washing the page back is also what makes the element
+               * read as lifted *off* the page rather than resized on it.
                */}
-              {/*
-               * A scrim under the lifted banner. Without it the framing on the
-               * lifted card catches the welcome banner's bottom edge, and a sliced
-               * word ("…ssef") in shot is exactly what the framing rule forbids.
-               * Washing the page back is also what makes the element read as
-               * lifted *off* the page rather than resized on it.
-               */}
-              <Box
-                x={0}
-                y={0}
-                w={W}
-                h={H}
-                fill={GREY.page}
-                border={GREY.page}
-                radius={0}
-                /* 0.9, not 0.7: at 0.7 the welcome banner's ink still showed
-                   through as a legible fragment. */
-                opacity={0.9 * lift}
+              <div
+                style={{
+                  position: "absolute",
+                  inset: 0,
+                  width: W,
+                  height: H,
+                  backgroundColor: "var(--color-bg)",
+                  /*
+                   * 0.97, not 0.9. At 0.9 the welcome banner's `text-4xl` greeting still came
+                   * through the wash as a legible fragment — "…oussef" hanging in the top-left
+                   * of the shot — and a sliced word in frame is exactly what the scrim exists
+                   * to prevent. The greybox got away with 0.9 because its greeting was a small
+                   * grey run of text; the real `<WelcomeBanner/>` is 38px of Outfit at full ink.
+                   */
+                  opacity: 0.97 * lift,
+                }}
               />
 
-              <div style={{ opacity: banner }}>
-                <Lift home={CALIB_HOME} lifted={CALIB_LIFTED} t={lift} seatedPanel>
-                  {/*
-                   * A ROW, in both states — text left, button right, everything
-                   * inside the bounds. Flex does the reflow: at 1152 the sentence is
-                   * one line, at 520 it is three, and the button never moves relative
-                   * to the right edge.
-                   */}
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 20,
-                      padding: "0 20px",
-                      fontFamily: FONT,
-                      boxSizing: "border-box",
-                    }}
-                  >
-                    <div style={{ flex: 1, fontSize: 14, color: GREY.ink, lineHeight: 1.55 }}>
-                      {DASHBOARD.calibrationBanner}
-                    </div>
-                    <div
-                      style={{
-                        flexShrink: 0,
-                        width: 162,
-                        height: 44,
-                        borderRadius: 8,
-                        backgroundColor: GREY.graphite,
-                        color: GREY.white,
-                        fontSize: 14,
-                        fontWeight: 700,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                      }}
-                    >
-                      {DASHBOARD.setBaseline}
-                    </div>
+              {/*
+               * The banner itself, travelling. It is the REAL component at both measures — the
+               * lift moves and resizes its box, and the component reflows inside it.
+               */}
+              {lift > 0.02 ? (
+                <Lift home={CALIB_HOME} lifted={CALIB_LIFTED} t={lift} panel={false}>
+                  <div style={{ position: "absolute", inset: 0 }}>
+                    <LiftedBanner />
                   </div>
                 </Lift>
-              </div>
+              ) : null}
 
-              <Cursor x={COL_X + COL_W - 90} y={296} clickAt={106} opacity={lift < 0.05 ? banner : 0} />
+              {/* Then the click on "Set baseline", which is what carries us into beat 4. */}
+              <Pointer
+                path={[
+                  { frame: 90, x: SET_BASELINE.x - 190, y: SET_BASELINE.y + 120 },
+                  { frame: 108, x: SET_BASELINE.x, y: SET_BASELINE.y },
+                ]}
+                clicks={[112]}
+                visible={{ from: 88 }}
+              />
             </>
-          ) : (
-            // Still the verify screen for the first third of a second, which is
-            // what makes the arrival a move rather than a cut.
-            <Text x={400} y={378} w={400} size={14} align="center" color={GREY.label}>
-              Taking you in…
-            </Text>
-          )}
-        </Desktop>
+          }
+        />
       </Camera>
     </AbsoluteFill>
   );
 };
+
+/**
+ * The banner at its lifted measure. It is the same component the page renders, so the lifted
+ * copy cannot drift from the seated one — which is the failure a hand-drawn "lifted version"
+ * guarantees eventually.
+ */
+const LiftedBanner: React.FC = () => <CalibrationBanner />;

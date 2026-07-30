@@ -10,12 +10,17 @@ import { SuccessState } from "@/components/anchor/success-state";
 import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import { Header } from "@/components/header/header";
 import { WelcomeBanner } from "@/components/home/welcome-banner";
+import { Hero } from "@/components/landing/hero";
 import { OpSurfaces } from "@/components/monitor/op-surfaces";
 import { SessionTrend } from "@/components/monitor/session-trend";
 import { Viewfinder } from "@/components/monitor/viewfinder";
+import { PublicNavbar } from "@/components/public/public-navbar";
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 
+import { AuthShell, CheckEmailSurface, SignupSurface } from "./app/auth";
+import { HOME_COL } from "./app/home";
 import { trendPoints } from "./app/monitor";
+import { fontsReady } from "./fonts";
 
 import {
   AppShell,
@@ -73,18 +78,80 @@ const TARGETS: [string, string][] = [
   ["green-room", "[data-probe='greenroom'] > div"],
   ["recording-stage", "[data-probe='recstage'] > div"],
   ["consent-gate", "[data-probe='gate'] > *"],
+  ["gate-header", "[data-probe='gate'] header"],
+  ["gate-facts-1", "[data-probe='gate'] section > div:nth-of-type(1)"],
+  ["gate-facts-2", "[data-probe='gate'] section > div:nth-of-type(2)"],
+  ["gate-buttons", "[data-probe='gate'] section > div:last-child"],
+  // The privacy pitch — "Nothing is kept. There is no bucket, no table, and no file path where a
+  // clip lands." It is the THIRD bullet of the FIRST card (`CAMERA_GATE_WHAT_HAPPENS[2]`), not
+  // anything in the second one. The beat had been landing on "What declining changes".
+  ["gate-key-line", "[data-probe='gate'] section > div:nth-of-type(1) li:nth-child(3)"],
+
+  // ── The controls the cursor has to travel to (§4) ──────────────────────────────────
+  //
+  // A drawn pointer that lands NEAR a button is worse than none — it reads as a miss. So every
+  // click site in the film is measured off the control it lands on, exactly as every framing
+  // number is, and the beats add the component's own page offset.
+  ["btn-turn-on-camera", "[data-probe='intro'] button"],
+  ["btn-im-ready", "[data-probe='greenroom'] button"],
+  ["btn-back-to-home", "[data-probe='success'] button"],
+  ["btn-allow-camera", "[data-probe='gate'] button"],
+  ["btn-set-baseline", "[data-probe='calib'] a"],
+  // `<Notification/>` portals to the document body, so it is NOT under `[data-probe='confirm']`
+  // — the first attempt at this measured nothing and reported "NOT FOUND", which is exactly what
+  // a portal looks like from a scoped selector. Its own testid is the honest handle.
+  ["confirmatory", "[data-testid='notification']"],
+  ["btn-yes-thats-me", "[data-testid='notification'] button"],
+
+  // ── Beats 1, 2, 3 and 6's surfaces ────────────────────────────────────────────────
+  ["public-navbar", "[data-probe='public'] header"],
+  ["hero", "[data-probe='public'] main > section"],
+  ["hero-copy", "[data-probe='public'] main > section > div > div:first-child"],
+  ["hero-headline", "[data-probe='public'] h1"],
+  ["hero-cta", "[data-probe='public'] main a[href='/signup']"],
+  ["story-card", "[data-probe='public'] main > section > div > div:last-child"],
+
+  ["auth-col", "[data-probe='signup'] > div"],
+  ["auth-wordmark", "[data-probe='signup'] header"],
+  ["signup-form", "[data-probe='signup'] section"],
+  ["signup-heading", "[data-probe='signup'] h1"],
+  ["signup-fields", "[data-probe='signup'] section > div:last-child"],
+  ["field-name", "[data-probe='signup'] #full_name"],
+  ["field-email", "[data-probe='signup'] #email"],
+  ["field-password", "[data-probe='signup'] #password"],
+  ["password-rules", "[data-probe='signup'] #password-requirements"],
+  ["consent-row", "[data-probe='signup'] #accept_terms"],
+  ["btn-create-account", "[data-probe='signup'] section > div > button[type='button']"],
+  ["signup-consent-block", "[data-probe='signup'] section > div > div:nth-of-type(2)"],
+
+  ["check-email", "[data-probe='verify'] section"],
+  ["check-email-heading", "[data-probe='verify'] h1"],
+  ["otp-panel", "[data-probe='verify'] section > section"],
+  ["otp-row", "[data-probe='verify'] [data-otp] > div"],
+  ["otp-box-0", "[data-probe='verify'] [data-otp] input:nth-child(1)"],
+  ["otp-box-5", "[data-probe='verify'] [data-otp] input:nth-child(6)"],
+
+  ["home-col", "[data-probe='home'] > div"],
+  ["home-welcome", "[data-probe='home'] [data-probe='welcome'] header"],
+  ["home-calib", "[data-probe='home'] [role='region']"],
+  ["home-calib-cta", "[data-probe='home'] [role='region'] a"],
 ];
 
 const Measure: React.FC = () => {
   React.useEffect(() => {
-    const handle = delayRender("measure");
+    const handle = delayRender("measure", { timeoutInMilliseconds: 60000 });
     let tries = 0;
     const run = () => {
       if (!document.querySelector("[data-testid='session-trend-svg']") && tries++ < 30) {
         requestAnimationFrame(run);
         return;
       }
-      go();
+      // **Measure in the real typeface or do not measure.** Every rect below is a text box or
+      // contains one, and Inter and Outfit have different metrics from `system-ui` — a rect
+      // taken against a fallback face is wrong by a line height and would then look like a
+      // layout bug for the rest of the project's life. `loadFont()` already gates the render,
+      // but a probe that reads the DOM in an effect can outrun it.
+      void fontsReady().then(() => document.fonts.ready).then(go);
     };
     const go = () => {
       const root = document.getElementById("probe-world")!.getBoundingClientRect();
@@ -201,6 +268,42 @@ export const SwapProbe: React.FC = () => (
         </div>
         <div data-probe="confirm">
           <ConfirmatoryPrompt open onConfirm={() => {}} onFalseAlarm={() => {}} onOpenChat={() => {}} />
+        </div>
+
+        {/* ── Beats 1, 2, 3 and 6 ───────────────────────────────────────────────────
+            Measured inside the same `#probe-world`, so their numbers are in the same
+            coordinate space as everything above. Each is offset by whatever page
+            position its beat gives it; what is measured here is the component's own
+            size and its internal geometry, which is what the framing needs. */}
+        <div data-probe="public" className="mt-8">
+          <PublicNavbar />
+          <main>
+            <Hero />
+          </main>
+        </div>
+
+        <div data-probe="signup" className="mt-8">
+          <AuthShell>
+            <SignupSurface
+              fullName="Youssef Kamal"
+              email="youssef.kamal@example.com"
+              password="quietmornings7"
+              consent
+            />
+          </AuthShell>
+        </div>
+
+        <div data-probe="verify" className="mt-8">
+          <AuthShell>
+            <CheckEmailSurface otpFrom={0} />
+          </AuthShell>
+        </div>
+
+        <div data-probe="home" className="mt-8">
+          <div className={HOME_COL}>
+            <CalibrationBanner />
+            <WelcomeBanner fullName="Youssef Kamal" now={new Date(2026, 6, 30, 10, 23)} />
+          </div>
         </div>
       </AppShell>
     </div>

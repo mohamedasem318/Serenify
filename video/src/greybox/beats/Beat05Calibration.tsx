@@ -7,8 +7,11 @@ import {
   BEAT5_INTRO,
   BEAT5_PREVIEW,
   BEAT5_SUCCESS,
+  CALIB_TOP,
   PHONE,
 } from "../../app/framing";
+import { CALIB, CONTROL, SUCCESS } from "../../app/geometry";
+import { Pointer } from "../../app/pointer";
 import { Camera, shot } from "../Camera";
 import { useExpression } from "../rig";
 import { H, W } from "../theme";
@@ -57,6 +60,8 @@ const T = {
   turnOnCamera: 48,
   greenRoom: 60,
   gateClear: 108,
+  /** The "I'm ready" click. The gate cleared at f108; he acts on it. */
+  imReady: 146,
   countdown: 150,
   recording: 180,
   uploading: 240,
@@ -64,6 +69,22 @@ const T = {
   doneClick: 344,
   dashboard: 354,
 } as const;
+
+/**
+ * ── THE THREE CLICKS, IN WORLD COORDINATES ──────────────────────────────────────────
+ *
+ * Each is the measured centre of the real control, offset by the page position this beat gives
+ * its component. `CONTROL.*` are offsets inside the component; `CALIB_TOP` is where the
+ * calibration column starts. A pointer that lands NEAR a button reads as a miss, which is why
+ * none of these is eyeballed.
+ */
+const at = (component: { x: number; y: number }, control: { x: number; y: number; w: number; h: number }) => ({
+  x: component.x + control.x + control.w / 2,
+  y: CALIB_TOP + component.y + control.y + control.h / 2,
+});
+const TURN_ON = at(CALIB.intro, CONTROL.turnOnCamera);
+const IM_READY = at(CALIB.greenRoom, CONTROL.imReady);
+const BACK_HOME = at(SUCCESS, CONTROL.backToHome);
 
 export const Beat05Calibration: React.FC = () => {
   const frame = useCurrentFrame();
@@ -123,6 +144,41 @@ export const Beat05Calibration: React.FC = () => {
           remaining={Math.max(0, remaining)}
           successFrom={T.success}
           countdownFrom={T.countdown}
+          recordingFrom={T.recording}
+          // One complete breath inside the compressed minute. See `useOrbBreath` for why the
+          // orb's period is staged where the timer's is taken at 30× directly.
+          breathCycle={T.uploading - T.recording}
+          overlay={
+            <>
+              {/* 5a ends on the click of "Turn on camera". */}
+              <Pointer
+                path={[
+                  { frame: 14, x: TURN_ON.x - 200, y: TURN_ON.y + 130 },
+                  { frame: 40, x: TURN_ON.x, y: TURN_ON.y },
+                ]}
+                clicks={[T.turnOnCamera]}
+                visible={{ from: 10, to: T.greenRoom }}
+              />
+              {/* 5b ends on "I'm ready" — the gate cleared at f108 and he acts on it. */}
+              <Pointer
+                path={[
+                  { frame: T.gateClear + 4, x: IM_READY.x - 180, y: IM_READY.y + 120 },
+                  { frame: T.imReady - 8, x: IM_READY.x, y: IM_READY.y },
+                ]}
+                clicks={[T.imReady]}
+                visible={{ from: T.gateClear, to: T.countdown }}
+              />
+              {/* 5f — the state is read whole, THEN he clicks "Back to home". */}
+              <Pointer
+                path={[
+                  { frame: T.success + 26, x: BACK_HOME.x - 190, y: BACK_HOME.y + 120 },
+                  { frame: T.doneClick - 12, x: BACK_HOME.x, y: BACK_HOME.y },
+                ]}
+                clicks={[T.doneClick]}
+                visible={{ from: T.success + 22 }}
+              />
+            </>
+          }
         />
       </Camera>
     </AbsoluteFill>

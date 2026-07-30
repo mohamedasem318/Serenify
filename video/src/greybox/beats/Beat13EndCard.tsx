@@ -1,62 +1,75 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
+import { Wordmark } from "@/components/brand/wordmark";
+
+import { CARD, OS_MONO, SANS_STACK } from "../../app/furniture";
+import { useDarkRoot } from "../../app/shell";
 import { Camera, shot } from "../Camera";
 import { END_CARD } from "../copy";
-import { GREY, H, MONO, W } from "../theme";
-import { Box, Text } from "../ui";
+import { H, W } from "../theme";
+
+/*
+ * Hallmark · component: end-card · genre: editorial · theme: film-furniture (locked)
+ * states: n/a — a non-interactive film frame
+ * contrast: pass — CARD.ink #e8ebee and CARD.muted #a6acb2 on CARD.field #0b0c0e ≈ 17:1 / 9:1
+ * pre-emit critique: P5 H5 E4 S5 R5 V4
+ */
 
 /**
- * Beat 13 · End card · 1:14.6 – 1:19.1 · 136 frames
- *
- * Was beat 12 — the closing subtitle card is beat 12 now and this moved down one.
+ * Beat 13 · End card · 1:16.5 – 1:21.0 · 136 frames
  *
  * **A sequence, not a static frame.** Three timed events:
  *
- *   1. the wordmark reveals            f0–30
- *   2. "take care of yourself" appears f38–56
+ *   1. the wordmark reveals             f0–30
+ *   2. "take care of yourself" appears  f38–56
  *   3. the wordmark DUPLICATES and the copy travels down to the domain line f66–88,
- *      then ".tech" types onto the end of it   f90–102
+ *      then `.tech` types onto the end of it f90–102
  *
- * The wordmark's real animation gets designed later. It is a placeholder here — a
- * left-to-right wipe with a small settle — and what this pass tests is the *rhythm*
- * of the three events, not the reveal itself.
+ * ══ THE WORDMARK IS THE WORDMARK NOW ════════════════════════════════════════════════
  *
- * ── WHY THE TYPEWRITER IS NOW USED ONCE, AND ON A URL ───────────────────────
+ * It was a grey rectangle labelled "wordmark reveal", and that is the one placeholder in this
+ * film that could not be allowed to ship: **`components/brand/wordmark.tsx` is the single
+ * definition of the mark inside the React tree, and re-typing its markup at a new site is a
+ * constitutional violation** (Principle V, Amendment 17). A drawn box is not a violation, but it
+ * is worse in the way that matters here — the last frame of a launch film is the one frame that
+ * is *about* the brand, and it was showing a placeholder.
  *
- * All three elements used to type on, which made typing the card's house style rather
- * than a gesture. It is now the opposite: the only thing that types in this beat is a
- * **domain**, and beat 1 opens the film by typing a domain into an omnibox. The film is
- * bookended by the same action, and the typewriter comes to mean *the things a person
- * types* rather than "here is some text".
+ * So the mark is `<Wordmark/>`, with its two-colour `seren` / `ify` split coming from
+ * `--color-ink` and `--color-meadow-text` rather than from anything restated here. Three
+ * consequences, all of them the point:
  *
- * That is also why **"take care of yourself" no longer types.** It is the sentimental
- * line and it should not be competing with a mechanical effect — so it simply appears,
- * on a fade and a short rise. A wipe was the alternative and was rejected for being the
- * same kind of effect: the point is to isolate the typewriter, and a wipe would have left
- * three mechanical reveals in eight seconds.
+ *  · The reveal is a **clip**, not a fill. A left-to-right `inset()` wipe uncovers the real
+ *    glyphs, so what is revealed is the mark itself rather than a rectangle standing in for it.
+ *  · **The two-colour split can finally be judged at domain size** — the open question the sheet
+ *    records against `DERIVE`. The derived copy is the same component at 22px, so the answer is
+ *    now visible in the render instead of deferred to "when the real wordmark lands".
+ *  · The duplicate that travels is a **second `<Wordmark/>`**, not a box that stands for one. It
+ *    can shrink and move because it is type, and type scales.
  *
- * And **`serenify.tech` derives from the wordmark** rather than being typed whole: the
- * wordmark duplicates on screen, the copy shrinks and travels to the domain line, and
- * only `.tech` types after it. The domain is then visibly *made of* the brand instead of
- * being a caption underneath it.
+ * ── WHY THE TYPEWRITER IS USED ONCE, AND ON A URL ───────────────────────────────────
  *
- * **This move is on probation, and the fallback is one flag away.** It is charming
- * described and it is the last thing the audience sees, so if it reads fussy in the
- * render, set `DERIVE` to false: the domain then types whole from f78, which is exactly
- * the previous treatment. Two things to watch — whether the travel reads as *derivation*
- * or as a stray box moving, and whether the two-colour seren/ify split survives at domain
- * size, which cannot be judged until the real wordmark replaces this placeholder.
+ * All three elements used to type on, which made typing the card's house style rather than a
+ * gesture. It is now the opposite: the only thing that types is a **domain**, and beat 1 opens
+ * the film by typing a domain into an omnibox. The film is bookended by the same action, and the
+ * typewriter comes to mean *the things a person types* rather than "here is some text".
  *
- * **THE TYPING IS FASTER, THE HOLD IS NOT.** The typing was what felt slow, not the
- * hold: the reveal took 1.53s, and the two lines typed at ~13 and ~12 characters a
- * second, which is a deliberate pace at best and a stall at worst. The hold after the
- * domain lands is unchanged at 34 frames (~1.13s) — including the second added in
- * revision 4 — because that is where the VO lands its last line and it is room in the cut
- * rather than dead air.
+ * That is also why **"take care of yourself" no longer types.** It is the sentimental line and
+ * it should not be competing with a mechanical effect, so it fades up with a short rise. It is
+ * also **Inter, not Outfit, and not bold** — it is subordinate to the mark above it by design,
+ * and setting it in the display face at 700 made it argue with the wordmark for the frame. A
+ * wipe was the alternative reveal and was rejected for being the same *kind* of effect: the
+ * point is to isolate the typewriter.
  *
- * The beat is 180 → 136 frames and stays there; this revision moved events inside it
- * without changing its length.
+ * **The card sits on `CARD.field`**, three points below the app's own page, which is the whole
+ * of how the film says "we have stepped outside the product" — no transition, no rule, no label.
+ * Both closing cards were drawing on the app's background instead, so the signal was designed
+ * and never spent.
+ *
+ * **Permission to fall back is one flag.** `DERIVE = false` reverts to typing `serenify.tech`
+ * whole, which is exactly the previous treatment. Two things to watch: whether the travel reads
+ * as *derivation* or as a stray word moving, and whether the seren/ify split survives at domain
+ * size — the second is now judgeable.
  */
 
 /** Set false to fall back to typing `serenify.tech` whole. See the header. */
@@ -76,14 +89,16 @@ const TECH_TO = 102;
 const DOMAIN_FROM = 78;
 const DOMAIN_TO = 102;
 
-/** The wordmark placeholder, and where its duplicate lands. */
-const MARK = { x: 490, y: 216, w: 220, h: 56 } as const;
-const DERIVED = { w: 86, h: 22 } as const;
+/**
+ * The mark's own box. 72px of Outfit at `text-7xl`, centred — measured rather than guessed so the
+ * duplicate's travel lands where the domain row actually is.
+ */
+const MARK = { size: 72, y: 218 } as const;
+/** The derived copy's size on the domain row. Small enough to read as a URL, large enough that
+ *  the seren/ify split is judgeable — which is the open question this move exists to answer. */
+const DERIVED = { size: 22 } as const;
 const TECH = ".tech";
-/** `serenify` + `.tech` as one centred unit: 86px of derived mark plus five mono chars. */
-const ROW_W = DERIVED.w + 55;
-const ROW_X = W / 2 - ROW_W / 2;
-const ROW_Y = 380;
+const ROW_Y = 384;
 
 /** Reveals a string left-to-right, one character at a time. */
 const typeOn = (value: string, frame: number, from: number, to: number) =>
@@ -99,13 +114,17 @@ const typeOn = (value: string, frame: number, from: number, to: number) =>
 
 export const Beat13EndCard: React.FC = () => {
   const frame = useCurrentFrame();
+  // This beat renders no `Desktop`, so nothing else puts `.dark` on the document element — and
+  // `<Wordmark/>`'s `text-ink` then resolves to the LIGHT #1C2023 on a near-black card. The mark
+  // was present, correct, and invisible.
+  useDarkRoot();
 
   const wipe = interpolate(frame, [REVEAL_FROM, REVEAL_TO], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
-  const settle = interpolate(frame, [REVEAL_TO - 8, REVEAL_TO + 6], [1.05, 1], {
+  const settle = interpolate(frame, [REVEAL_TO - 8, REVEAL_TO + 6], [1.04, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
@@ -118,15 +137,13 @@ export const Beat13EndCard: React.FC = () => {
     easing: Easing.out(Easing.cubic),
   });
 
-  /** 3 · the duplicate's travel, as one eased parameter driving all four edges. */
+  /** 3 · the duplicate's travel, as one eased parameter driving size and position together. */
   const travel = interpolate(frame, [DUP_FROM, DUP_TO], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
-  const dupW = MARK.w + (DERIVED.w - MARK.w) * travel;
-  const dupH = MARK.h + (DERIVED.h - MARK.h) * travel;
-  const dupX = MARK.x + (ROW_X - MARK.x) * travel;
+  const dupSize = MARK.size + (DERIVED.size - MARK.size) * travel;
   const dupY = MARK.y + (ROW_Y - MARK.y) * travel;
 
   const tech = typeOn(TECH, frame, TECH_FROM, TECH_TO);
@@ -137,95 +154,126 @@ export const Beat13EndCard: React.FC = () => {
 
   return (
     <AbsoluteFill>
-      <Camera keys={[{ frame: 0, shot: shot(W / 2, 310, 760) }]}>
-        <Box x={0} y={0} w={W} h={H} fill={GREY.page} border={GREY.page} radius={0} />
+      <Camera keys={[{ frame: 0, shot: shot(W / 2, 312, 760) }]}>
+        <div
+          style={{ position: "absolute", inset: 0, width: W, height: H, backgroundColor: CARD.field }}
+        />
 
-        {/* 1 · the wordmark reveal — placeholder, timed. */}
+        {/*
+         * 1 · the wordmark reveal.
+         *
+         * A left-to-right `inset()` clip, not a fill: the wipe uncovers the REAL glyphs, so what
+         * arrives is the mark rather than a rectangle that stands for it. The settle is a 4%
+         * scale rather than the old 5% — at 72px of Outfit a 5% overshoot is 3.6px of travel on
+         * a letterform, which reads as a wobble rather than as weight arriving.
+         */}
         <div
           style={{
             position: "absolute",
-            left: MARK.x,
+            left: 0,
             top: MARK.y,
-            width: MARK.w,
-            height: MARK.h,
-            overflow: "hidden",
+            width: W,
+            textAlign: "center",
             scale: settle,
             transformOrigin: "50% 50%",
+            clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)`,
           }}
         >
-          <div style={{ position: "absolute", left: 0, top: 0, width: MARK.w * wipe, height: MARK.h, overflow: "hidden" }}>
-            <Box x={0} y={0} w={MARK.w} h={MARK.h} label="wordmark reveal" labelSize={11} fill={GREY.panelAlt} radius={8} />
-          </div>
+          <Wordmark className="text-7xl leading-none" />
         </div>
 
         {/*
-         * 3a · the duplicate, and it is drawn BEFORE the line so it passes **behind** it.
+         * 3a · the duplicate, drawn BEFORE the line so it passes **behind** it.
          *
-         * The travel from the wordmark to the domain row is almost vertical and the line
-         * sits across the middle of it, so on its first pass an opaque box slid straight
-         * through "take care of yourself" and blanked half of it for most of the move.
-         * Behind the text and dipped to under half opacity while it is in transit, the
-         * line stays readable throughout and the mark reads as settling rather than as a
-         * rectangle barrelling past.
+         * The travel from the wordmark to the domain row is almost vertical and the line sits
+         * across the middle of it; in front and fully opaque it blanked half of "take care of
+         * yourself" for most of the move. Behind the text and dipped to under half opacity in
+         * transit, the line stays readable and the mark reads as settling rather than as
+         * something barrelling past.
          */}
         {DERIVE && frame >= DUP_FROM ? (
-          <Box
-            x={dupX}
-            y={dupY}
-            w={dupW}
-            h={dupH}
-            fill={GREY.panelAlt}
-            radius={8 * (dupH / MARK.h)}
-            opacity={interpolate(travel, [0, 0.18, 0.82, 1], [1, 0.45, 0.45, 1])}
-          />
-        ) : null}
-
-        {/* 2 · then this appears. No typing, no wipe — see the header. */}
-        <Text
-          x={300}
-          y={322}
-          w={600}
-          size={34}
-          weight={700}
-          align="center"
-          opacity={lineIn}
-          style={{ translate: `0px ${(1 - lineIn) * 8}px` }}
-        >
-          {END_CARD.line}
-        </Text>
-
-        {/* 3b · …and `.tech` types onto the end of it. The only typing in the beat. */}
-        {DERIVE ? (
-          <>
-            <div
-              style={{
-                position: "absolute",
-                left: ROW_X + DERIVED.w + 2,
-                top: ROW_Y - 3,
-                fontFamily: MONO,
-                fontSize: 20,
-                color: GREY.body,
-              }}
-            >
-              {tech}
-              {techCaret ? <span style={{ color: GREY.graphite }}>|</span> : null}
-            </div>
-          </>
-        ) : (
           <div
             style={{
               position: "absolute",
-              left: 300,
-              top: ROW_Y - 3,
-              width: 600,
+              left: 0,
+              top: dupY,
+              width: W,
               textAlign: "center",
-              fontFamily: MONO,
-              fontSize: 20,
-              color: GREY.body,
+              fontSize: dupSize,
+              lineHeight: 1,
+              opacity: interpolate(travel, [0, 0.18, 0.82, 1], [1, 0.45, 0.45, 1]),
+            }}
+          >
+            {/*
+             * ── THE SUFFIX IS IN THE SAME ROW, NOT BESIDE IT ──
+             *
+             * `.tech` was drawn as its own absolutely-positioned block at a guessed offset from
+             * centre, so it landed ON TOP of the derived mark rather than after it — the two
+             * were centred independently and both wanted the middle of the frame. They are one
+             * inline row now, centred as a unit, so the suffix cannot help but sit where the
+             * mark ends however wide the mark measures.
+             *
+             * The row re-centres as the five characters land, which drifts the mark ~15px left
+             * over 0.4s. That is not a defect to design out: it is what makes the domain read as
+             * being ASSEMBLED out of the brand rather than as two things that happened to line
+             * up, which is the entire claim the move exists to make.
+             */}
+            <span style={{ display: "inline-flex", alignItems: "baseline" }}>
+              <Wordmark className="leading-none" />
+              <span
+                style={{
+                  fontFamily: OS_MONO,
+                  fontSize: DERIVED.size - 2,
+                  color: CARD.domain,
+                  lineHeight: 1,
+                }}
+              >
+                {DERIVE ? tech : domain}
+                {(DERIVE ? techCaret : domainCaret) ? (
+                  <span style={{ color: CARD.muted }}>|</span>
+                ) : null}
+              </span>
+            </span>
+          </div>
+        ) : null}
+
+        {/* 2 · then this appears. No typing, no wipe — see the header. */}
+        <div
+          style={{
+            position: "absolute",
+            left: 220,
+            top: 322,
+            width: 760,
+            textAlign: "center",
+            fontFamily: SANS_STACK,
+            fontSize: 26,
+            fontWeight: 400,
+            lineHeight: 1.4,
+            color: CARD.muted,
+            opacity: lineIn,
+            translate: `0px ${(1 - lineIn) * 8}px`,
+          }}
+        >
+          {END_CARD.line}
+        </div>
+
+        {/* 3b · the whole-domain fallback, for when `DERIVE` is off. With `DERIVE` on, the
+            suffix is part of the derived row above so it cannot land anywhere but after it. */}
+        {DERIVE ? null : (
+          <div
+            style={{
+              position: "absolute",
+              left: 0,
+              top: ROW_Y + 1,
+              width: W,
+              textAlign: "center",
+              fontFamily: OS_MONO,
+              fontSize: DERIVED.size - 2,
+              color: CARD.domain,
             }}
           >
             {domain}
-            {domainCaret ? <span style={{ color: GREY.graphite }}>|</span> : null}
+            {domainCaret ? <span style={{ color: CARD.muted }}>|</span> : null}
           </div>
         )}
       </Camera>

@@ -1,3 +1,5 @@
+import { DISPLAY, MONO_FAMILY, SANS } from "../fonts";
+
 /*
  * Hallmark · component: os-furniture + closing-cards · genre: modern-minimal (chrome) + editorial (cards)
  * theme: dedicated non-Serenify dark block · anchor hue: steel-indigo 250°
@@ -180,6 +182,24 @@ export const BAND_MEANING = {
   foggy: "attention, and it is SERENIFY'S. Never on the mail app — see MAIL above.",
 } as const;
 
-/** Furniture type. The film's OS is not Serenify, so it does not use Outfit. */
-export const OS_FONT = '-apple-system, "Segoe UI", Inter, Arial, sans-serif';
-export const OS_MONO = 'ui-monospace, Consolas, "Courier New", monospace';
+/**
+ * Furniture type. **The film's OS is not Serenify, so it does not use Outfit** — that rule is
+ * unchanged and is the reason these are two constants rather than one.
+ *
+ * What changed is that both are now REAL, LOADED faces rather than CSS system stacks. A system
+ * stack resolves against whatever the render box happens to have installed, which is the same
+ * failure mode as a component falling back to `system-ui` — the film's set was in a fallback
+ * typeface, and a stand-in in a fallback face reads as unfinished beside a real component.
+ *
+ * `OS_FONT` is **Inter**, which is a neutral UI grotesque of exactly the kind every desktop OS
+ * ships and is therefore right on its own merits, not merely already loaded. `OS_MONO` is
+ * **Geist Mono**, the one face in the film with no counterpart in the product: `apps/web` has no
+ * mono token, and the omnibox URL and the toolbar clock both want stable digit widths. See
+ * `src/fonts.ts`.
+ */
+export const OS_FONT = `${SANS}, system-ui, sans-serif`;
+export const OS_MONO = `${MONO_FAMILY}, ui-monospace, monospace`;
+/** The two closing cards' display line and the wordmark. The app's own display face. */
+export const CARD_DISPLAY = `${DISPLAY}, sans-serif`;
+/** Body type on the closing cards — subordinate to the mark above it, so never the display face. */
+export const SANS_STACK = `${SANS}, system-ui, sans-serif`;

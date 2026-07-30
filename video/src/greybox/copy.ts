@@ -13,6 +13,24 @@
  *   PLACEHOLDER — written for this pass because the surface does not exist yet
  */
 
+/**
+ * ── THE PROTAGONIST, IN ONE PLACE ───────────────────────────────────────────
+ *
+ * He is **Youssef Kamal**, and he always was — beat 2 types that name into the signup form and
+ * beat 3's welcome banner greets "Youssef". What had leaked in was the repo owner's identity:
+ * every `<Header/>` in the film was mounted with `fullName="Mohamed Asem"`, so the avatar in the
+ * app header read **MA** for the whole second half of the video while the man on screen was
+ * someone else. `deriveInitials` (`lib/initials.ts`) takes them straight off `fullName`, so
+ * naming him correctly is the entire fix — there is no initials string to keep in sync.
+ *
+ * Every render site that needs a name reads it from here rather than inlining one, which is what
+ * stops the same leak happening again on the next surface someone mounts.
+ */
+export const PROTAGONIST = {
+  fullName: "Youssef Kamal",
+  email: "youssef.kamal@example.com",
+} as const;
+
 // ── Beat 1 · landing (VERBATIM — apps/web/lib/landing/copy.ts) ───────────────
 export const LANDING = {
   headlineLead: "Stress detection that",
@@ -29,7 +47,20 @@ export const SIGNUP = {
   fields: [
     { label: "FULL NAME", value: "Youssef Kamal" },
     { label: "EMAIL", value: "youssef.kamal@example.com" },
-    { label: "PASSWORD", value: "••••••••••••" },
+    /**
+     * **A REAL password, not a row of bullets.** The greybox typed "••••••••••••" because it
+     * drew its own checklist and only needed something to look like typing. `<PasswordInput/>`
+     * masks the field itself, and `<PasswordRequirements/>` tests the VALUE — twelve bullet
+     * characters satisfy "at least 8" and fail both "contains a letter" and "contains a
+     * number", so the real checklist sat permanently two-thirds unlit and 48px taller than its
+     * collapsed state. That extra height pushed the submit button through the page's viewport
+     * and the beat's pan landed on a sliced control.
+     *
+     * The order the rules light is a property of the string, so the string is chosen for it:
+     * the letter at character 1, the length at 8, and the number at 14 — so the list collapses
+     * to "Password looks good." on the last keystroke rather than halfway through.
+     */
+    { label: "PASSWORD", value: "quietmornings7" },
   ],
   checklist: ["At least 8 characters", "Contains a letter", "Contains a number"],
   checklistCollapsed: "Password looks good.",
@@ -149,18 +180,25 @@ export const QUESTIONNAIRE = {
  * Turn 3 has to read as *personal knowledge*, not a canned tip; that is the
  * whole difference between Serenify and an app that says "try deep breathing".
  *
- * **Turn 2 was shortened because it now TYPES ON.** It is the one moment he acts
- * through language rather than a click and the beat should show that — but a long
- * sentence typing out kills it. At 63 characters the old line needed either 3.2
- * seconds the beat does not have or ~50 characters a second, which is a blur and
- * not typing. It is 35 characters now and types in 1.7s at ~20 c/s, which reads as
- * a person hammering something out. Shortening the copy is the correct lever here;
- * speeding the typing is not.
+ * **Turn 2 CARRIES THE SITUATION, and the previous cut of it did not.** It read
+ * "boss moved it to 12. thirty minutes", which is 35 characters of pure callback:
+ * *it* has no antecedent on screen, so the line only parses for someone who is
+ * still holding the toast in their head from forty seconds earlier. In a feed, at
+ * phone size, they are not. The beat's job is that the audience understands the
+ * stakes from THIS message — the report, the new deadline, and how little time is
+ * left — without going back to the notification.
  *
- * Nothing was lost with the words. The audience watched the toast say "need the
- * report by 12" and the clock say 11:30 forty seconds ago, so "boss moved it to
- * 12" is a callback rather than an exposition, and turn 3 needs "thirty minutes"
- * on the record because it answers it.
+ * So it names the report and states the consequence: 49 characters, still lower
+ * case, still no punctuation he would not type in a hurry. It runs f40–f98 — 58
+ * frames, ~25 characters a second — which is faster than the ~20 c/s the sheet
+ * quotes and is deliberate rather than a fitting compromise: **he is hurried**,
+ * and this is the one moment in the film where that is his own behaviour rather
+ * than something the UI is telling us. It is still typing and not a blur; every
+ * character gets more than two frames.
+ *
+ * The lever the sheet forbids is speeding the typing *to fit a line the beat
+ * cannot afford*. This line is affordable — the typing window opened four frames
+ * earlier and the send moved two, and turn 3's hold is untouched at 60 frames.
  *
  * **Ren's reply does NOT type** — it keeps the typing-indicator-then-message
  * treatment. The human types; the AI thinks, then speaks.
@@ -168,7 +206,7 @@ export const QUESTIONNAIRE = {
 export const REN = {
   turns: [
     { who: "ren" as const, text: "Something shifted just now. What happened?" },
-    { who: "him" as const, text: "boss moved it to 12. thirty minutes" },
+    { who: "him" as const, text: "boss moved the report to 12. i have thirty minutes" },
     {
       who: "ren" as const,
       text: "Thirty minutes is enough — just not like this. Put Billie Jean on first. You always settle faster with MJ playing.",

@@ -18,6 +18,14 @@ rig's authored primitives drawn over it, an authored torso under it and an offic
 behind it. Everything else inside the viewfinder — headphones, drifting notes — is authored
 too.
 
+**EVERY PRODUCT SURFACE IN THE FILM IS A SHIPPED COMPONENT.** The landing hero and public
+navbar, the signup fields and their live password checklist, the consent acknowledgement, the
+OTP boxes and their whole 2.94s merge, the dashboard's two banners, the camera gate, the
+calibration flow, the monitoring stage, the confirmatory prompt, Ren's chat, and the wordmark on
+the end card. What is still drawn is the film's **non-Serenify furniture** — the browser chrome,
+the mail client, the music player, the notification — and that is deliberate; the assets pass
+owns it.
+
 **THE FILM IS DARK, AND THE PRODUCT SURFACES ARE REAL COMPONENTS.** `apps/web` has had a
 designed dark mode from the start — a full token swap under `:root.dark` — so this is the app's
 own theme rather than an approximation, and **no Serenify surface in any beat lacks a genuine
@@ -33,6 +41,23 @@ at the real 1200px world and prints their bounding boxes; `video/src/app/geometr
 those numbers and `framing.ts` derives every shot from them. Three consecutive revisions logged
 crop complaints and all three traced to framing tuned against greybox rectangles. That is what
 this pass ends.
+
+**AND THE FILM SETS IN THE APP'S OWN TYPEFACE.** `apps/web` gets Inter and Outfit from
+`next/font/google`, which is a build-time mechanism with no counterpart in a Remotion bundle —
+so `--font-sans` and `--font-display` resolved to nothing and **every real component silently
+fell back to `system-ui`**. That single fact is most of why the film read as greybox even on the
+beats that were already using real components: the components were real and the letters were
+not. `video/src/fonts.ts` registers both families under exactly the names `globals.css` asks
+for, each behind its own `delayRender` handle, so a frame cannot be screenshotted before the
+bytes are in. Nothing overrides a token; the app's typography becomes correct by the families
+existing. The authored furniture takes **Inter** (a browser is not Serenify, so it does not wear
+Outfit — that rule is intact) and **Geist Mono** for the omnibox and the clock.
+
+**Every interaction has a visible cause.** A cursor travels to each control and clicks it, with
+the component's response following the click — `video/src/app/pointer.tsx`. The component pass
+had lost it, and the film read as a sequence of screenshots of software rather than as someone
+using it; the confirmatory prompt was the clearest case, where a focus ring arrived on "Yes,
+that's me" with nothing touching it.
 
 What remains unfinished is listed in **the deferred register** at the end of this file.
 
@@ -81,6 +106,7 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
 | L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px, where the sub lands at 6.5px on a phone. The real composite is **760** — the real viewfinder sits inside the stage card rather than 300px to its right, so the union is far tighter — and at 760 the sub already lands at 9.4px. The factor needed for legibility alone is 1.064×, which is not a device. 1.25× is set by two measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and finishes 11.1px clear of the real Pause/End controls, with the sub at 11.8px. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. |
+| L14 | **The monitoring surface is REARRANGED for the film** — viewfinder to the right, the bloom with its stateline and the trend to the left, as the greybox had it. **Pass B builds this; nothing in Pass A implements it.** | The real dashboard puts the top of the bloom and the bottom of the trend **664.2px apart in a 519px viewport**, so they cannot share a frame at any scroll and at any framing — 145px short. The component pass resolved it with a travelling camera at the moment beat 11 should be settling, which is the one place in the film a camera move is most expensive. Rearranging the columns is a knowing departure from the app's real layout, taken because the alternative is a camera move where the beat wants stillness. **It also buys back the two things Pass A had to concede.** Beat 8's `tense` stateline wraps to two lines, and a two-line block cannot take L12's 1.25× raise at this layout without either leaving the viewport or landing on the Pause/End controls — the arithmetic is scroll-invariant, so the emphasis yields to ~1.01× on that one copy. And beat 4's privacy line and its CTA miss sharing a frame by 11.8px. Both are the same shortage of vertical room, and a column layout is what has it. |
 | L13 | **The character's face is AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head, with an authored torso behind it | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
 ---
@@ -105,9 +131,24 @@ These are deliberate. Do not "fix" them toward fidelity.
   ease right now"), beat 8 (→ "a little tense" → "feeling tense"), beat 11 (back to "at
   ease"). The audience should learn that when the block moves, the reading changed;
   repetition is what turns the device from a flourish into grammar.
+  - **The movement must be CAUSED by the change, not merely near it.** This is what regressed:
+    beat 8 raised at f142, eight frames *before* its first copy change and while the camera was
+    still arriving, then never settled — one movement, attached to nothing, and the second
+    change carried none at all. Beat 11 did the same eight frames early. Each raise now begins
+    **on** its copy change. A raise that precedes the change teaches the audience the opposite
+    of the rule.
   - **No yo-yo.** Beat 8's two copy changes land seconds apart, so the block goes up
-    **once** and stays up across both, with the copy changing while it is raised. Never
-    grow, settle, and grow again.
+    **once** and settles once. Never grow, settle, and grow again.
+  - **AND THE AMPLITUDE IS CAPPED BY THE ROOM THAT EXISTS.** L12's 1.25× was derived against a
+    ONE-LINE sub. `tense`'s sub is 62 characters at `max-w-[42ch]` and wraps to **two**, and a
+    two-line block cannot be raised here without either leaving the viewport or landing on the
+    Pause/End controls — the raised bottom is 20.75px below the controls' top at *every* scroll,
+    so no scroll fixes it. `emphasisCapFor()` re-derives the factor per copy: 1.25× for one
+    line, ~1.01× for two. **The collapse IS the second firing** — beat 8 raises on its first
+    change and the block settles as the second lands, so both carry movement and nothing
+    yo-yos. It also fixed a defect the emphasis merely made worse: the two-line `tense` sub was
+    being sliced by the page viewport *at rest*, which is why `SCROLL.monitor` moved 32 → 40.
+    **Getting the raise back on `tense` is L14's job.**
   - **It must never cover the bloom.** Beat 7's job is to plant bloom, stateline and
     viewfinder together as the "before". So the block grows *downward* from its own top
     edge rather than about its centre, and the reading card was relaid out to make the room
@@ -301,6 +342,19 @@ the hero block → click through. **No text overlay.**
 **RESOLVED — the ~5px typed domain.** Lifted, the omnibox frames at 500 and its real 14px
 reads at about 12px on a phone. No crop, no type-scale liberty.
 
+**The page is the real landing page**, and the shot follows it: the greybox's centred 640-wide
+block does not exist at any viewport ≥ 1024, so the beat frames the measured **copy column**
+(510 wide at x 64, headline at 67.2px) rather than the gap between two columns. The frame is
+shifted left so `<StoryCard/>` stays out of it — at the centred position it caught 64px of the
+card including a sliced line of its narration, and a sliced line of text is always a failure.
+What it gives up on the left is page background the camera's own backdrop matches exactly.
+
+**And the omnibox reads.** Its text was `OS.label` — recessive by design for a URL nobody reads,
+which is the wrong treatment for the one URL in the film the audience watches being typed. While
+lifted it takes `OS.clock`, the one furniture value allowed to clear the ramp's lightness band,
+in Geist Mono; seated afterwards it drops back to `OS.label`. That is the same treatment a
+browser gives a focused versus an unfocused address bar.
+
 ---
 
 ### 2 · Signup · 0:06 – 0:21.6 (15.6s)
@@ -372,10 +426,18 @@ Total ~2.94s. **Play this close to real time.** It's the single most polished pi
 
 **Shot:** locked-off tight on the OTP row for the full choreography. No camera move — let the animation carry it.
 
-**Do not dress the greybox verify screen.** It reads bland and it should — the real page
-brings the heading, the body copy, the halo sweep and the meadow fills. The wide hold before
-the OTP row was shortened by 10 frames instead (−0.4s on the beat), which is the right lever:
-shorten the wait, never fill it with furniture that is not shipping.
+~~**Do not dress the greybox verify screen.**~~ **There is no greybox verify screen.** It is the
+real "Check your email" state with the real OTP panel inside it — the heading, the helper text,
+the `Code for …` line, the boxes, the pill and the reserved slot the muted note fades into. The
+note about not dressing it was correct while it was drawn and is now moot; the shortened wide
+hold stands.
+
+**THE BEAT SCROLLS, BECAUSE THE FORM DOES.** The `(auth)` column is **818.5 tall in a 583px
+viewport**, so the consent row and the submit button are genuinely below the fold and the 2b–2c
+pan travels to them behind a page scroll of 145. That number is bounded on both sides and
+neither bound is taste: below ~135 the submit's own bottom edge is still under the fold and the
+pan lands on a sliced control; above ~150 the "Already have an account?" footnote rises into the
+viewport and is sliced by it.
 
 ---
 
@@ -387,7 +449,11 @@ He lands on `/app`. Uncalibrated.
 the OTP row and the dashboard is simply what is there when it gets wide. Then the two things
 that matter:
 
-- **Welcome banner:** "Good morning, [name]" · "A space to check in with yourself."
+- **Welcome banner:** "Good morning, [name]" · "A space to check in with yourself." **The
+  greeting is generated, not written** — `<WelcomeBanner/>` derives "Good morning" from the hour
+  and the first name from `fullName`, so the beat passes a fixed `now` of 10:23 and the component
+  produces "Good morning, Youssef" itself. The internal clock and the greeting can no longer
+  disagree, because only one of them is a string.
 - **Calibration banner** (foggy-tinted): **"Stress detection isn’t active yet — it needs about a minute of calibration to know what your calm looks like."** with **"Set baseline"**
 
 Note for greybox: the calibration banner really does *pop in* post-hydration with no transition. That may read as a glitch on video. If it does, fade it in. **Settled: it does — at 30fps an instant appearance reads as a dropped frame. Faded over 6 frames.**
@@ -416,7 +482,7 @@ tighter, and the beat reads as "calibration is required, he clicks" without ling
 
 ---
 
-### 4 · Camera consent gate · 0:25.6 – 0:30.6 (5s)
+### 4 · Camera consent gate · 0:25.6 – 0:31.6 (6s)
 
 ~230 words. Unreadable at any speed. Do not try.
 
@@ -440,6 +506,24 @@ guarantee a cropped element in every shot.
 
 **Ends on:** **"Allow camera and inference"**.
 
+**⚠️ THE FRAMING NOTE ABOVE IS WRONG, AND THE REAL COMPONENT IS WHAT SHOWED IT.** "One landing
+holds the key line's card AND the button" rests on the privacy pitch being in the card nearest
+the CTA. It is not. It is `CAMERA_GATE_WHAT_HAPPENS[2]` — **the third bullet of the FIRST card**,
+"What happens to the video", 550px further up the page. The greybox drew it in the last card
+because that is what this sheet said; the first render after the swap landed squarely on "What
+declining changes", which is a real card, correctly rendered, and the wrong one.
+
+**And the two miss sharing a frame by 11.8px.** Key-line top to Allow's bottom is 594.8 against
+a 583px viewport. It is the closest near-miss in the film and it is still a miss — no scroll
+closes it. So the beat takes **two landings inside its one continuous move**: the key line
+alone at 566 world px, where its 17px copy reads at 12.7px on a phone, then a scroll-and-pull
+onto both controls for the click. That is this sheet's own remedy for this class of problem,
+applied once more.
+
+**Cost: 5s → 6s**, and it is the second landing. The beat had five seconds for four events on
+the assumption the last two shared a frame. **The vertical room L14 buys back is what would
+collapse this to one landing again.**
+
 ---
 
 ### 5 · Calibration · 0:30.6 – 0:43 (12.4s)
@@ -455,7 +539,33 @@ getting simpler; the last 0.4s is reading time for the success copy (see 5f).
 | 5a | 0:32–0:34 | **Intro, and it STAYS WIDE.** "Set your calm baseline" + the three icon rows (armchair / sun / clock). The rows are short and the whole screen reads without magnification, so there is no push-in — the old one onto **"Turn on camera"** was buying nothing. Ends on the click. |
 | 5b | 0:34–0:37 | **Green room — first sight of him.** He settles into the 3:4 portrait framing target. The brackets are graphite. Then the gate clears: **brackets turn meadow, a meadow glow blooms, a small check appears top-centre.** Status line reads **"You’re all set — start when you’re ready."** He looks calm, mildly curious. |
 | 5c | 0:37–0:38 | **Countdown.** 3 → 2 → 1, white numerals over the blurring preview. Compress — one second total, not three. |
-| 5d | 0:38–0:40 | **Recording.** The breathing orb pulsing over his softened preview, label alternating **"Breathe in" / "Breathe out"**. The 6px meadow progress bar advancing beneath. The timer reading down from 1:00. **Show ~2s of a 60s process** — this is the most aggressive compression in the video and it's fine, the orb's rhythm sells the idea instantly. |
+| 5d | 0:38–0:40 | **Recording.** The breathing orb pulsing over his softened preview, label alternating **"Breathe in" / "Breathe out"**. The 6px meadow progress bar advancing beneath. **Show ~2s of a 60s process** — this is the most aggressive compression in the video and it's fine, the orb's rhythm sells the idea instantly. |
+
+**5d WAS SHOWING THE ACCESSIBILITY VARIANT AND CALLING IT THE PRODUCT.** The label read
+**"Breathe gently"**, which is not invented copy — it is `STATIC_LABEL` in
+`components/anchor/breathing-guide.tsx:32`, what a user who has asked their OS for less motion
+sees (FR-032). The reduced-motion shim that lets every component render frame-exact had picked
+it, and with it the discs held perfectly still. The shipped full-motion orb scales its discs
+`[0.84, 1.12, 0.84]` on an 8s loop and **alternates the pacer every four seconds**, which is
+what this row asked for all along and what the greybox showed. Both are re-authored from the
+frame on the component's own numbers.
+
+**Two more things this found in the same place.** The breath was being applied to the WRONG
+element — the monitoring bloom's 6.5s loop was scaling the whole 512×288 preview box, feed,
+character and framing brackets together, while the orb sat still; two components' motions had
+been crossed. And **the capture progress bar was missing entirely**: `anchor-recorder.tsx:628`
+renders `<CaptureProgressBar/>` hugging the preview, this reproduction of the layout had dropped
+it, and the mm:ss readout lives in the controls card *outside* 5d's framing (FR-031 keeps status
+words off the raw video) — so nothing on screen said time was passing and the beat cut to
+"Setting your baseline…" out of nowhere. The bar is back, and it is the real component.
+
+**The orb's PERIOD is the one thing staged.** The timer and the bar take the beat's 30×
+compression directly, because a counter running fast reads as a counter running fast. The breath
+cannot: at 30× the discs flutter four times a second and the pacer strobes, which is the one
+thing on screen that would contradict the word "calm". At the real 8s cycle a 2s window shows a
+quarter of one breath and the label never changes, so the pacer's whole nature is invisible. So
+the cycle is the length of the window — **one complete breath, in and out, inside the compressed
+minute**. Shape, amplitude, easing and copy are all the component's; only the period is staged.
 | 5e | 0:38.6–0:40 | **Uploading.** The capture stage is **replaced** by the line, verbatim from `components/anchor/anchor-recorder.tsx`: **"Setting your baseline — one calm moment…"** |
 | 5f | 0:40–0:43 | **The camera PULLS OUT, then he clicks.** The bloom ripple, the check drawing itself, and the real success state from `components/anchor/success-state.tsx`: **"Your baseline is set"** (`text-3xl sm:text-4xl`) · "We’ve learned what calm looks like for you. You can update it anytime from your account." · the **"Back to home"** button. All three are in frame, all four edges inside it, *before* the click. Then he clicks, and lands on the dashboard. Beat 6 continues from that frame. |
 
@@ -499,6 +609,11 @@ shot rather than an inset inside a portrait box his face already filled.
 
 Continues straight from beat 5, which now lands on the dashboard itself. The calibration banner
 is gone — that absence is the beat's visible content — and he clicks **"Start check-in"**.
+
+**It is the SAME component as beat 3 with one flag off**, which is what makes the absence read:
+the `space-y-10` column closes up and everything below the missing banner moves up by 126,
+exactly as the product does when `has_anchor` flips. A separately-drawn "beat 6 dashboard" could
+not have produced that, and would have drifted from beat 3 the first time either was touched.
 
 **The "later that morning" text is GONE.** No replacement.
 
@@ -625,9 +740,26 @@ Then, in one continuous shot with the toast still up:
 2. The **bloom drifts** meadow → mixed → amber. The real transition is 1.3s ease, so a band change *drifts rather than snaps* — keep that, it's the honest behaviour and it looks better.
 3. The stateline changes: **"You're a little tense"** · "A bit of an edge lately. Maybe a slow breath."
 4. Then further: **"You're feeling tense"** · "This has held a while. Serenify can check in when you're ready."
-   — **both under ONE raise of the emphasis** (L12). It goes up as the camera lands wide, both
-   readings change while it is up, and it settles once. No settle-and-relift between them.
 5. The trend line below climbs and recolours.
+
+**THE ESCALATION WAS TWENTY FRAMES LATE AND THE DRIFT WAS OFF SCREEN.** Both defects were the
+same thing twice — *the reading changed while nobody could see it*:
+
+- The drift ran f104–f143, and the bloom does not enter the frame until the camera has widened
+  to about f128. The audience met an already-amber bloom, and "let it drift, don't snap" was
+  being spent behind a tight shot. It begins at **f116** now and its last two thirds play in
+  frame.
+- The stateline changed at f150 and f176 while this sheet, and the beat's own header, both said
+  f130 and f156. The code had drifted twenty frames later than the plan, which put a dead second
+  between the fall settling and anything else moving. The changes land at **f138 and f164** —
+  f138 being the earliest the stateline is genuinely inside the widening frame, checked against
+  the camera rather than assumed.
+
+**The emphasis fires on the first change and settles as the second lands.** The previous cut
+raised it at f142, before the first change and during the camera's arrival, and never settled —
+so neither change carried movement. It still goes up **once** and never grows twice; what
+changed is that the settle is now doing work rather than being skipped. The `tense` copy's
+two-line sub is why the settle is available at all — see the invariant and L14.
 
 **Do not rush this.** It is the largest single allocation in the video and it's correct — this beat is the entire product thesis in one shot.
 
@@ -645,6 +777,19 @@ change readable rather than paying for the fall out of it.
 The sticky confirmatory prompt appears beside the stage. He answers — **and confirms the stress is real.**
 
 **This is the true-positive branch.** The landing page hero deliberately shows the false-alarm branch. That inversion is intentional and must not be reconciled.
+
+**He clicks it, and the click has a cause now.** A focus ring arriving on "Yes, that's me" with
+nothing touching it reads as a stray keyboard focus rather than as a person deciding, which
+inverts the one beat whose entire subject is *he was asked and he answered*. The pointer travels
+to the option and presses it.
+
+It is drawn in SCREEN space, outside the camera, and that is forced rather than chosen:
+`<Notification/>` portals to `document.body` and is `fixed right-4 … bottom-[…]`
+(`notification.tsx:186`), so it resolves against the 1920×1080 output frame and is outside the
+camera's transform entirely — a wrapper cannot move it, because the portal escapes the wrapper.
+**That is also why the prompt sits bottom-right of the frame regardless of where the camera is
+looking**, which is the known framing complaint; Pass B owns it. What is fixed here is only that
+the click has a cause.
 
 **RESOLVED — the copy exists and is signed off.** `apps/web/components/questionnaire/confirmatory-prompt.tsx`:
 title **"Checking in"**, body **"Your signals have looked tense for a little while. Is that how
@@ -723,12 +868,22 @@ thinks, then speaks.
 **His message stays short — that constraint is unchanged and load-bearing.** 35 characters, ~1.7s
 at ~20 c/s. Never speed the typing to fit; shorten the line.
 
-**Turn 2's copy was shortened to pay for it, and that is the right lever.** At 63 characters
-the old line needed either 3.2 seconds the beat does not have or ~50 characters a second, which
-is a blur rather than typing. It is 35 characters now — **"boss moved it to 12. thirty
-minutes"** — and types in 1.7s at ~20 c/s. Nothing was lost: the audience watched the toast say
-"need the report by 12" and the clock say 11:30 forty seconds earlier, so this is a callback
-rather than exposition. Never speed the typing to fit; shorten the line.
+**TURN 2 HAS TO CARRY THE SITUATION, AND "boss moved it to 12. thirty minutes" DID NOT.** At 35
+characters it was pure callback: *it* has no antecedent on screen, so the line only parses for
+someone still holding the toast in their head from forty seconds earlier. In a feed, at phone
+size, they are not. The beat's job is that the audience understands the stakes from **this**
+message — the report, the new deadline, and how little time is left — without going back to the
+notification.
+
+It is 49 characters: **"boss moved the report to 12. i have thirty minutes"**. Still lower case,
+still no punctuation he would not type in a hurry. It runs f40–f98 — 58 frames, ~25 characters a
+second, which is faster than ~20 c/s **and is the point**: he is hurried, and this is the one
+moment in the film where the hurry is his own behaviour rather than something the UI is telling
+us. Every character still gets more than two frames, so it is typing and not a blur.
+
+The rule this sheet actually carries is *never speed the typing to fit a line the beat cannot
+afford*. This one it can: the typing window opened four frames earlier, the send moved two, and
+**turn 3's hold is untouched at 60 frames.**
 
 **Pacing:** messages appear one at a time with a real beat between them, not all at once. ~2s each. Push in on turn 3 and hold. The typed turn pushed Ren's `thinking` window and turn 3's arrival about twelve frames later each; **turn 3's hold got longer, not shorter**, since the sheet says to protect it at all costs and it was never the place to find frames.
 
@@ -745,7 +900,19 @@ change to the shot plan, not to the beat.
 
 He acts on it. In order:
 
-1. **Opens a music player**, plays the track. Generic app, drawn. **The track is named on screen: Billie Jean, Michael Jackson.** That naming is the point — it's the evidence Ren knew him. Brief; a couple of seconds, no lingering on the interface.
+1. **Opens a music player**, plays the track — and **he presses play**, with a cursor on the
+   transport. Without a hand on it the sequence reads as the app doing it to him, which is the
+   exact inversion this beat is staged to prevent. Generic app, drawn. **The track is named on
+   screen: Billie Jean, Michael Jackson.** That naming is the point — it's the evidence Ren knew
+   him. Brief; a couple of seconds, no lingering on the interface.
+
+   **The player sits ABOVE the viewfinder, and that was a plain z-order bug.** It was layered
+   between the page and the viewfinder, so a window he had just opened had a webcam feed punched
+   through its corner — which reads as a rendering fault rather than as depth, because nothing
+   in an operating system behaves that way. `<Viewfinder/>` is `z-10` inside the stage and the
+   overlay layer carried no stacking of its own, so the two competed on DOM order in a shared
+   context. The player is 80 now: above the viewfinder and the app header alike, below the
+   pointer, because a cursor is above every window.
 2. **Puts headphones on** — and goes straight back to the keyboard.
 3. **Music notes drift around him** in the viewfinder. He starts moving with it — small, a head nod on the beat, a shoulder. Not a dance number.
 
@@ -896,7 +1063,7 @@ and it is not what feels slow.
 
 ---
 
-## Running total: ~81.0s
+## Running total: ~82.0s
 
 Still well over the 40–60s target. **Do not trim on paper — trim in greybox**, where you can
 actually feel what's slow.
@@ -914,6 +1081,21 @@ of it moved a duration:
 | The emphasis yielding 1.65× → 1.25× | nothing |
 
 The previous revision's +0.8s (beat 11's closing linger) stands and is unchanged.
+
+**+1.0s across the completion pass, and all of it is beat 4's second landing.** The privacy
+pitch is in the first consent card rather than the last, and it misses sharing a frame with the
+CTA by 11.8px, so the beat needs two landings inside its one continuous move. Everything else in
+the pass changed what is on screen without changing how long anything is on screen for:
+
+| What changed | Cost |
+|---|---|
+| The real typeface, everywhere | nothing |
+| Beats 1, 2, 3, 6, 12, 13 swapped to real components | nothing |
+| The OTP merge, frame-addressed at real speed | nothing — the 2.94s was already budgeted |
+| The cursor, on every interaction | nothing — the clicks were already timed |
+| The emphasis retimed onto its copy changes | nothing |
+| Beat 8's escalation pulled 12 frames earlier | nothing — it tightened dead time, it did not add any |
+| Beat 4 gaining a second landing | **+1.0s** |
 
 **Trim candidates, in order:**
 
@@ -1004,6 +1186,15 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
   ever needs buying back is L1's viewfinder size (320×180 today), not the framing window — and it
   should be re-checked against the real component before it is pulled (deferred register, item 6).
 - **Does beat 13's duplicate-and-derive move sell on screen?** See beat 13; `DERIVE` reverts it.
+  **Half of this is now answerable and the answer is yes:** the mark is the real `<Wordmark/>`,
+  so the two-colour `seren`/`ify` split is on screen at domain size and it holds. What is still
+  a judgement call is whether the travel reads as *derivation* or as a word moving.
+- **The protagonist is Youssef Kamal, and the film was calling him Mohamed Asem.** Every
+  `<Header/>` in the second half was mounted with the repo owner's name, so the avatar read
+  **MA** for twenty-five seconds while the man in the viewfinder was someone else. `deriveInitials`
+  reads straight off `fullName`, so naming him correctly is the whole fix — there is no initials
+  string to keep in sync. It is one constant now (`PROTAGONIST` in `copy.ts`), which is what stops
+  the same leak reaching the next surface someone mounts.
 - Do the real full-page reloads (`<a href>` / `window.location.replace`) read as broken on video, or as honest? They're real; showing them is more faithful, but a hard white flash mid-video may just look like a mistake.
 - Beat 10's three-turn exchange is written for the video; `014-recommendations` doesn't exist. Keep the UI plausible against what 014 will actually ship.
 - Beat 10 turn 3 must read as *personal knowledge*, not a canned tip. If greybox shows it reading generic, that's a copy problem to fix before art.
@@ -1053,31 +1244,62 @@ components:
    history stays put, which is the thing the beat exists to show. The player remains a stand-in
    by design, now in dark-mode grey rather than light-mode grey sitting in a dark film.
 
-**Still to swap — the beats this pass did not reach:**
+7b. ~~**Beats 1, 2, 3, 4, 6, 12 and 13 are still greybox.**~~ **DONE (completion pass).** Every
+   product surface in the film is now a shipped component. Beat 1 is `<PublicNavbar/>` +
+   `<Hero/>` (which brings `<StoryCard/>` with it); beat 2 is `<Field/>`,
+   `<PasswordRequirements/>`, `<TermsAcknowledgementField/>`, `<Wordmark/>` and `<OtpBoxes/>`;
+   beats 3 and 6 are `<WelcomeBanner/>` + `<CalibrationBanner/>`; beat 4 is
+   `<CameraConsentGate/>`. Beats 12 and 13 are authored and finished — see item 8.
 
-7b. **Beats 1, 2, 3, 4, 6, 12 and 13 are still greybox**, now in dark-mode grey so the film reads
-   as one piece rather than a mix of modes. What each owes is a real component that already
-   exists and is already proven to render: the landing `<Hero/>` and `<PublicNavbar/>` (beat 1),
-   the signup `<Field/>` / `<PasswordRequirements/>` / `<OtpPanel/>` (beat 2), `<WelcomeBanner/>`
-   and `<CalibrationBanner/>` (beats 3 and 6), and `<CameraConsentGate/>` (beat 4) — all four
-   measured and recorded in `video/src/app/geometry.ts` by the same harness, so the framing work
-   is already done. Beats 12 and 13 are authored cards and are dark; only their type treatment is
-   outstanding, which is item 8.
+   **Four things the real components contradicted, all now in `geometry.ts`:**
 
-   **One of these carries a known blocker.** Beat 2f's OTP choreography is a `setTimeout` state
-   machine inside `otp-boxes.tsx` — a 780ms sweep, a 540ms merge that writes inline transforms
-   from layout, then a hold. A Remotion render is frame-addressed and does not advance the wall
-   clock, so the choreography cannot play as written; the component's static (reduced-motion)
-   variant jumps straight to the merged pill and loses the 2.94s the sheet calls the best motion
-   in the product. Every other component in the film was absorbed by taking its static variant and
-   re-authoring its declared motion per frame; this one needs the merge's inline transforms
-   interpolated as well, which is the piece not yet built.
+   - **The landing hero is TWO COLUMNS at this world** (`hero.tsx:48` is `flex-col lg:flex-row`,
+     and 1200 is well past `lg`), its headline is **67.2px** rather than 40, and its copy column
+     is 510 wide beside a 510-wide story card. The greybox's centred 640-wide block exists at no
+     viewport ≥ 1024.
+   - **There is no signup card and no public navbar on `/signup`.** `app/(auth)/layout.tsx` says
+     it outright — "no card chrome — the page IS the surface" — and the `(auth)` shell is a
+     `max-w-md` column with the wordmark and the theme toggle, nothing else. The column is
+     **818.5 tall in a 583px viewport**, so the beat scrolls to its own submit button.
+   - **The greybox's password was twelve bullet characters**, which satisfy "at least 8" and fail
+     both "contains a letter" and "contains a number" — so the real checklist sat permanently
+     two-thirds unlit and 48px taller than its collapsed state, and pushed the submit button
+     through the fold. It is a real password now, chosen so the list collapses on the last
+     keystroke.
+   - **Beat 4's privacy line is in the FIRST card**, not the last. See beat 4.
+
+   ~~**One of these carries a known blocker.**~~ **CLOSED — the OTP merge is frame-addressed.**
+   The obstacle was never the timers; every component in this film had timers. It was that this
+   one expresses state through `useState` and motion through CSS transitions, so there was no
+   prop to drive and no declared value in the markup to interpolate. The answer is the same
+   technique one level deeper: **the static variant has to be asked for.**
+   `playSuccess()`'s reduced-motion branch (`otp-boxes.tsx:174`) is not a degradation but a
+   *synchronous end state* — `meltTogether()`, then `{lit: 6, merged: true, pill: true, instant:
+   true}` in one commit — and `instant` is the flag that strips the component's own
+   `duration-500` classes. It is also the only state in which the pill's contents (the check
+   glyph and the word) exist in the DOM at all. From there every value is re-authored per frame
+   as `color-mix()` of the app's own tokens: the halo sweep, the meadow fills, the corner radii,
+   the digits clearing, the pill's fade.
+
+   **And the 1.5px overlap turned out to be derivable rather than measurable.** `meltTogether()`
+   measures the row and writes an absolute offset per box, which cannot be re-run per frame
+   without a `delayRender` round trip on every frame. It does not need to be: working the
+   arithmetic through, `translateX(i) = (gap + 1.5) · (2.5 − i)` — **the box width cancels
+   completely.** At this world the gap is 8, so the offsets are ±23.75, ±14.25, ±4.75, symmetric
+   about the centre. Confirmed against the probe: box 0 at x 424, box 5 at x 724, a 60px step.
+   The overlap is inside that expression, and it is why the step is 9.5 rather than 8.
 
 **Open and unanswered, older than this pass:**
 
-8. **On-screen text has no treatment.** Deferred every pass so far, deliberately, because designing
-   it before the framing settled would have been wasted work. It still needs doing. *(A reference
-   video existed for this, was misread, and Mohamed asked to scratch it. Do not resurface it.)*
+8. **On-screen text has no treatment** — still open for CAPTIONS and any on-screen text the film
+   might gain. *(A reference video existed for this, was misread, and Mohamed asked to scratch it.
+   Do not resurface it.)* **The two closing cards are no longer part of this item:** they were
+   finished in the completion pass and are the film's only authored type. Beat 12 is Outfit at
+   500 with `-0.01em`, not bold system-sans; beat 13's mark is the **real `<Wordmark/>`**,
+   revealed by a clip rather than a fill, so what arrives is the mark itself and the two-colour
+   `seren`/`ify` split is finally judgeable at domain size. Both now sit on `CARD.field`
+   (#0b0c0e), three points below the app's own page — the signal `furniture.ts` designed to say
+   "we have stepped outside the product" and which the beats had never actually spent.
 9. **Should Ren stop blinking while a reading is Tense?** Raised three sessions ago, never
    answered.
 10. **Do Ren's `attentive` and `thinking` states need properly drawn eyes?** They are `idle`'s eyes

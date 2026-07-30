@@ -10,8 +10,9 @@ import type { SessionTrendPoint } from "@/lib/api/monitoring-reads";
 
 import { CharacterRig } from "../greybox/rig";
 import type { Pose } from "../greybox/rig";
-import { EMPHASIS_FACTOR, RAW, SCROLL, VF_SCALE, VIEWFINDER } from "./geometry";
-import { useBloomColor } from "./motion";
+import { PROTAGONIST } from "../greybox/copy";
+import { RAW, SCROLL, VF_SCALE, VIEWFINDER, emphasisCapFor } from "./geometry";
+import { useBloomBreath, useBloomColor } from "./motion";
 import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y } from "./shell";
 
 /**
@@ -92,9 +93,15 @@ export const trendPoints = (opts: {
  *
  * A transform does not affect layout, so the controls and the footnote below do not move. They
  * do not need to: at 1.25× the block finishes 11.1px clear of the controls (see `geometry.ts`).
+ *
+ * **`factor` is passed in rather than read from `EMPHASIS_FACTOR`, because it is not constant.**
+ * L12's 1.25× was derived against a ONE-LINE sub; the `tense` copy wraps to two and does not fit
+ * at any scroll (`emphasisCapFor()` in `geometry.ts` has the arithmetic). The beat interpolates
+ * between the two caps so the collapse is a settle rather than a snap, and that settle is what
+ * makes the second copy change carry movement — see `Beat08Email.tsx`.
  */
-const Emphasis: React.FC<{ t: number }> = ({ t }) => {
-  const k = 1 + (EMPHASIS_FACTOR - 1) * t;
+const Emphasis: React.FC<{ t: number; factor: number }> = ({ t, factor }) => {
+  const k = 1 + (factor - 1) * t;
   const dySub = RAW.statelineSub.y - RAW.statelineHead.y; // 42px, measured
   return (
     <style>{`
@@ -159,10 +166,30 @@ const TrendSettle: React.FC = () => {
   return null;
 };
 
-/** Drives `--bloom` per frame, overriding the component's inline value. See the header. */
+/**
+ * Drives `--bloom` per frame, overriding the component's inline value (see the header) — and
+ * puts the **breath** back, which nothing was doing.
+ *
+ * The bloom's two framer loops cannot run in a frame-addressed render, so under the forced
+ * reduced-motion shim `<Bloom/>` renders its halo and core static (`bloom.tsx:87-91`). That is
+ * the right base, but the loop was never re-authored over it, so the film's central graphic held
+ * perfectly still through beats 7–11 while the sheet describes it as *pulsing*. The two layers
+ * are the wrapper's two child `span`s in a fixed order (`bloom.tsx:65-76`), so each gets its own
+ * declared amplitude rather than a shared approximation on the wrapper.
+ */
 const BloomDrift: React.FC<{ tension: number }> = ({ tension }) => {
   const color = useBloomColor(tension);
-  return <style>{`[data-bloom] [data-testid="bloom"] { --bloom: ${color} !important; }`}</style>;
+  const breath = useBloomBreath();
+  return (
+    <style>{`
+      [data-bloom] [data-testid="bloom"] { --bloom: ${color} !important; }
+      [data-bloom] [data-testid="bloom"] > span:first-child {
+        scale: ${breath.halo.scale};
+        opacity: ${breath.halo.opacity};
+      }
+      [data-bloom] [data-testid="bloom"] > span:last-child { scale: ${breath.core}; }
+    `}</style>
+  );
 };
 
 export const MonitorPage: React.FC<{
@@ -173,6 +200,12 @@ export const MonitorPage: React.FC<{
   tension: number;
   /** 0 seated, 1 raised. Fires on every stateline copy change (L12). */
   emphasis?: number;
+  /**
+   * The factor a full raise reaches. Defaults to the one-line cap, which is L12's 1.25×. A beat
+   * whose copy changes line count interpolates it (see `emphasisCapFor` in `geometry.ts`) so the
+   * device never slices a line.
+   */
+  emphasisFactor?: number;
   /** Page scroll. `SCROLL.monitor` for beats 7–9; beat 11 travels to `SCROLL.trend`. */
   scroll?: number;
   pose: Pose;
@@ -192,6 +225,7 @@ export const MonitorPage: React.FC<{
   band,
   tension,
   emphasis = 0,
+  emphasisFactor = emphasisCapFor(1),
   scroll = SCROLL.monitor,
   pose,
   working,
@@ -213,11 +247,13 @@ export const MonitorPage: React.FC<{
     <AppShell
       clock={clock}
       url="serenify.tech/app/monitor"
-      header={<Header fullName="Mohamed Asem" email="mohamed@serenify.tech" role="employee" />}
+      header={
+        <Header fullName={PROTAGONIST.fullName} email={PROTAGONIST.email} role="employee" />
+      }
       overlay={overlay}
     >
       <BloomDrift tension={tension} />
-      <Emphasis t={emphasis} />
+      <Emphasis t={emphasis} factor={emphasisFactor} />
       <TrendSettle />
 
       {/* The page scrolls under the sticky header. The real page is ~973px tall below the

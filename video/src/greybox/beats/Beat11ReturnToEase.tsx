@@ -3,9 +3,10 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { BEAT11_WIDE, COMPOSITE } from "../../app/framing";
 import { OS_FONT, STANDIN } from "../../app/furniture";
-import { SCROLL, VIEWFINDER, scrolled } from "../../app/geometry";
+import { SCROLL, VIEWFINDER, emphasisCapFor, scrolled } from "../../app/geometry";
 import { MonitorPage } from "../../app/monitor";
 import { useDrift, useEmphasis } from "../../app/motion";
+import { Pointer } from "../../app/pointer";
 import { StandIn } from "../../app/shell";
 import { Camera, frameRect, rect } from "../Camera";
 import { PLAYER } from "../copy";
@@ -60,6 +61,9 @@ import { H, W } from "../theme";
 
 const WIN = rect(300, 220, 600, 280);
 
+/** The transport's play button — `WIN.x + 254`, `WIN.y + 177`, 44 × 44. Its centre. */
+const PLAY = { x: WIN.x + 276, y: WIN.y + 199 } as const;
+
 /**
  * The music player — a STAND-IN, in dark.
  *
@@ -85,6 +89,22 @@ const MusicPlayer: React.FC<{ open: number; playing: boolean; progress: number }
       scale: 0.94 + open * 0.06,
       transformOrigin: "50% 50%",
       fontFamily: OS_FONT,
+      /*
+       * ── IT IS AN APPLICATION WINDOW, SO IT SITS ABOVE EVERYTHING ──
+       *
+       * The player was layered between the page and the viewfinder: the browser page painted
+       * under it and the viewfinder painted OVER it, so a window he had just opened had a webcam
+       * feed punched through its corner. It reads as a rendering fault rather than as depth,
+       * because nothing in an operating system behaves that way — a foreground window occludes
+       * the browser and everything inside it.
+       *
+       * The cause was ordering rather than intent. `<Viewfinder/>` is `z-10` inside the
+       * monitoring stage and the overlay layer carries no stacking of its own, so the two
+       * competed on DOM order in a shared context. 80 clears the viewfinder and the app header's
+       * `z-50` alike, and sits below the pointer's 90 — a cursor is above every window.
+       */
+      position: "relative",
+      zIndex: 80,
     }}
   >
     <StandIn x={WIN.x} y={WIN.y} w={WIN.w} h={WIN.h} radius={12} fill={STANDIN.surface} />
@@ -195,15 +215,30 @@ export const Beat11ReturnToEase: React.FC = () => {
    */
   const descend = useDrift(0, 1, 182);
 
-  // The third firing of the emphasis rule (L12). The audience has learned by now that when the
-  // block moves the reading changed — repetition is what turns the device into grammar.
+  /**
+   * The third firing of the emphasis rule (L12), and the same retiming beat 8 needed: the raise
+   * begins **on** the copy change at f146, not eight frames before it. The audience has learned
+   * by now that when the block moves the reading changed, and that only holds if the movement is
+   * caused by the change rather than merely near it.
+   */
   const emphasis = useEmphasis([
     { frame: 0, up: 0 },
-    { frame: 138, up: 0 },
-    { frame: 156, up: 1 },
+    { frame: 146, up: 0 },
+    { frame: 162, up: 1 },
     { frame: 200, up: 1 },
     { frame: 214, up: 0 },
   ]);
+
+  /**
+   * The copy returns to the one-line `at_ease` sub, so the full 1.25× is available again — it
+   * comes back as the two-line `tense` copy leaves. The interpolation is what stops the block
+   * jumping size on the frame the band flips.
+   */
+  const emphasisFactor = interpolate(frame, [140, 152], [emphasisCapFor(2), emphasisCapFor(1)], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+    easing: Easing.inOut(Easing.cubic),
+  });
 
   // tense → easing over 30 frames, starting as the headphones go on. Slower than the fall on
   // purpose: coming back takes longer than going down. NOT the beat-7 expression — quieter,
@@ -255,8 +290,28 @@ export const Beat11ReturnToEase: React.FC = () => {
           nod={frame >= 108}
           notesFrom={84}
           emphasis={emphasis}
+          emphasisFactor={emphasisFactor}
           sessionFrom={47 * 60 + 33}
-          overlay={<MusicPlayer open={open} playing={frame >= 24} progress={trackProgress} />}
+          overlay={
+            <>
+              <MusicPlayer open={open} playing={frame >= 24} progress={trackProgress} />
+              {/*
+               * He presses play. Beat 11 opens on an interface appearing and a track starting,
+               * and without a hand on it the sequence reads as the app doing it to him — which
+               * is the exact inversion the whole beat is staged to prevent. The pointer travels
+               * to the transport, presses it, and the progress bar starts on the click.
+               */}
+              <Pointer
+                path={[
+                  { frame: 6, x: PLAY.x - 170, y: PLAY.y + 120 },
+                  { frame: 20, x: PLAY.x, y: PLAY.y },
+                  { frame: 52, x: PLAY.x + 260, y: PLAY.y + 210 },
+                ]}
+                clicks={[24]}
+                visible={{ from: 4, to: 62 }}
+              />
+            </>
+          }
         />
       </Camera>
     </AbsoluteFill>
