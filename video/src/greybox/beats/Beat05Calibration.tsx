@@ -23,8 +23,16 @@ import { Box, Button, Cursor, Text, TextBlock } from "../ui";
  * screen reads without magnification, so the old push-in onto "Turn on camera"
  * was buying nothing.
  *
- * COST: 10s → 12s. The uploading line is 1.3s and the success state plus its
- * click is 2.7s, offset slightly by 5a getting simpler.
+ * **5f: THE CAMERA PULLS OUT BEFORE THE CLICK, NOT AFTER.** The success state used
+ * to appear eight frames *before* the pull-out started, so its own payoff — the
+ * heading, the body copy and the "Back to home" button — played cropped for about a
+ * second, and then the click followed 0.7s after the camera finally landed. The
+ * order is now: the uploading line resolves, the camera pulls out to hold all of
+ * `SUCCESS` with all four edges inside the frame, the state is read, *then* he
+ * clicks. That is the beat's actual payoff and it was the thing being cut off.
+ *
+ * COST: 12s → 12.4s. The pull-out is the same move; the +12 frames are reading time
+ * for the success copy, which is 16 words at 16px and was getting 0.7s.
  */
 
 /** The 3:4 portrait framing target. */
@@ -45,9 +53,10 @@ const T = {
   countdown: 150,
   recording: 180,
   uploading: 240,
-  success: 280,
-  doneClick: 334,
-  dashboard: 344,
+  /** Lands as the camera starts pulling back, so the state arrives already opening out. */
+  success: 282,
+  doneClick: 344,
+  dashboard: 354,
 } as const;
 
 const Brackets: React.FC<{ cleared: number }> = ({ cleared }) => {
@@ -176,12 +185,13 @@ export const Beat05Calibration: React.FC = () => {
           { frame: 240, shot: frameRect(GREEN_ROOM, 40) },
           // 5e · the uploading line replaces the capture stage
           { frame: 268, shot: frameRect(UPLOADING, 40) },
-          { frame: 288, shot: frameRect(UPLOADING, 40) },
-          // 5f · the success state, and the click on its button
-          { frame: 312, shot: frameRect(SUCCESS, 30) },
-          { frame: 344, shot: frameRect(SUCCESS, 30) },
+          { frame: 278, shot: frameRect(UPLOADING, 40) },
+          // 5f · OUT first, so the whole success state is in frame — heading, body
+          // copy and button, all four edges inside — and only then the click.
+          { frame: 306, shot: frameRect(SUCCESS, 40) },
+          { frame: 354, shot: frameRect(SUCCESS, 40) },
           // …which lands on the dashboard.
-          { frame: 360, shot: shot(W / 2, H / 2, W) },
+          { frame: 372, shot: shot(W / 2, H / 2, W) },
         ]}
       >
         <Desktop

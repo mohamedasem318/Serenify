@@ -1,9 +1,9 @@
 import React from "react";
 import { AbsoluteFill } from "remotion";
 
-import { Camera, frameRect, union } from "../Camera";
-import { useLift } from "../lift";
-import { CARD, MonitorSurface, VIEWFINDER } from "../surfaces";
+import { Camera } from "../Camera";
+import { useEmphasis } from "../lift";
+import { monitorWide, MonitorSurface } from "../surfaces";
 
 /**
  * Beat 7 · Working, at ease · 0:46–0:50 · 120 frames
@@ -11,35 +11,42 @@ import { CARD, MonitorSurface, VIEWFINDER } from "../surfaces";
  * The "before". The audience needs the settled state registered or the fall in
  * beat 8 has nothing to fall from.
  *
- * **The sub-line reads now, and the lift is why.** Revision 2 established that
- * holding bloom + stateline + viewfinder together means framing ~1056px of world,
- * at which the app's `text-base` (16px) sub is ~6px on a phone — and that the fix
- * was a separate landing on the stateline block, priced at ~1.5s. The lift is
- * cheaper because it needs no camera travel: the block grows 1.9× where it stands
- * while the camera holds the composite, which puts the 30px head at ~22px and the
- * 16px sub at ~12px. Cost: **zero seconds.** The lift and the settle both fit
- * inside the 4s the beat already had.
+ * **The sub-line reads, and the in-place emphasis (L12) is why.** Holding bloom +
+ * stateline + viewfinder together means framing ~1096px of world, at which the
+ * app's `text-base` (16px) sub is ~6px on a phone. The alternative — a separate
+ * landing on the block — was priced at ~1.5s. The emphasis is free because it needs
+ * **no camera travel**: the block grows 1.65× where it stands while the camera holds
+ * the composite, putting the 30px head at ~19px and the 16px sub at ~10px.
  *
- * This is the scale-in-place shape of the lift — see `lift.tsx`.
+ * **IT SETTLES HERE, AND BEAT 8 RAISES ITS OWN.** The intent was to hand the raised
+ * block across the cut so it never yo-yos — but beat 8's push-in on the toast frames
+ * from world x 708, and the raised block's right edge is at x 800, so a raised block
+ * put 92px of panel and the sliced word "now" inside the beat's single most important
+ * shot. The framing does not allow the join, so the join is not forced: this beat
+ * raises and settles, beat 8 raises once and covers BOTH of its copy changes with
+ * that one raise, which is the constraint that actually matters.
+ *
+ * The clock reads 11:30 (was 11:29). 10:43 + `47:12` is 11:30:12, so 11:29 was the
+ * drift, not the session timer.
  */
 export const Beat07AtEase: React.FC = () => {
-  const lift = useLift(20, 16, 84, 16);
+  const emphasis = useEmphasis(20, 18, 86, 16);
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: frameRect(union(CARD, VIEWFINDER), 70) },
-          { frame: 120, shot: frameRect(union(CARD, VIEWFINDER), 20) },
+          { frame: 0, shot: monitorWide(70) },
+          { frame: 120, shot: monitorWide(20) },
         ]}
       >
         <MonitorSurface
-          clock="11:29 AM"
+          clock="11:30 AM"
           tension={0}
           stateline="ease"
           climb={0}
           face="content"
-          statelineLift={lift}
+          emphasis={emphasis}
         />
       </Camera>
     </AbsoluteFill>

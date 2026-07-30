@@ -9,50 +9,68 @@ import { COL_W, COL_X, FONT, GREY, H, W } from "../theme";
 import { Box, Cursor, Text, TextBlock, useFade } from "../ui";
 
 /**
- * Beat 3 · Dashboard, first arrival · 0:22–0:27 · 150 frames
+ * Beat 3 · Dashboard, first arrival · 0:22–0:26 · 120 frames
  *
  * **Arrives by pulling out, not by cutting.** After "Taking you in…" the camera
  * pulls back from the OTP row and the dashboard is simply what is there when it
  * gets wide. Revision 2 panned across the banners on arrival, which was awkward;
  * a pull-out is the natural continuation of a page navigating under a held camera.
  *
- * **Then the lift.** Revision 2 established that this beat has no push-in
- * available: both banners are 1152 wide inside a 1200 viewport, so the tightest
- * framing that holds either whole is the full frame, and the calibration banner's
- * `text-sm` copy lands at ~5px on a phone. The lift solves it without a
- * type-scale liberty — the banner detaches, reflows to a 520px measure at centre
- * frame where the camera *can* frame it tightly, is read at its real 14px, and
- * settles back. Then the click on "Set baseline".
+ * **Then the travelling lift (L10).** This beat has no push-in available: both
+ * banners are 1152 wide inside a 1200 viewport, so the tightest framing that holds
+ * either whole is the full frame, and the calibration banner's `text-sm` copy lands
+ * at ~5px on a phone. The lift solves it without a type-scale liberty — the banner
+ * detaches, travels to a 520px measure at centre frame where the camera *can* frame
+ * it tightly, is read at its real 14px, and settles back. Then the click on
+ * "Set baseline".
  *
- * COST: 4s → 5s. The lift is a staged move with a settle at the end, and the
- * pull-out from beat 2 eats the first second.
+ * **THE BANNER IS A ROW, SEATED AND LIFTED.** It used to be a column, so at its
+ * seated 80px height its own contents — the sentence and the button — overflowed top
+ * and bottom and crossed the banner's edge in the wide shot. The real banner is a row
+ * with the button inside it, and a row is what both states are now: text left, button
+ * right, both inside the bounds. The lift narrows the measure; it does not reflow the
+ * layout, which also means there is no reflow flicker mid-travel.
+ *
+ * COST: 5s → 4s. It works and it stays, but it was spending about a second more than
+ * the beat can afford, and the 20-word sentence was never going to be fully read
+ * whatever the hold — the lift buys legibility, not reading time. The travel and the
+ * hold are both tighter, and the beat reads as "calibration is required, he clicks".
  */
 
 const CALIB_HOME = rect(COL_X, 248, COL_W, 80);
-/** Staged: a 520px measure, which is what makes 14px readable at framing 580. */
-const CALIB_LIFTED = rect(340, 250, 520, 160);
+/**
+ * Staged: a 520px measure, which is what makes 14px readable at framing 580.
+ *
+ * `y` is 341 rather than the banner's own 248 for a framing reason: at 258 the shot
+ * on the lifted card reached up to world y 157 and caught the welcome banner's
+ * "Good morning, Youssef" — the page scrim reduced it to a ghost but a *sliced word*
+ * in shot is what the framing rule exists to forbid, and revision 3 shipped it as a
+ * known residual. At 341 the frame starts at 240, below that text entirely, and
+ * everything it does catch is grey bars and card edges behind a 0.9 scrim.
+ */
+const CALIB_LIFTED = rect(340, 341, 520, 124);
 /** Beat 2's closing framing, so this beat opens exactly where that one ended. */
 const OTP_SHOT = shot(600, 326, 432);
 
 export const Beat03Dashboard: React.FC = () => {
   const frame = useCurrentFrame();
-  const lift = useLift(46, 20, 106, 20);
-  const banner = useFade(18, 6);
+  const lift = useLift(28, 16, 78, 16);
+  const banner = useFade(14, 6);
   // The navigation lands during the pull-out, which is what makes it read as one
   // continuous move rather than as two shots.
-  const onDashboard = frame >= 10;
+  const onDashboard = frame >= 8;
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
           { frame: 0, shot: OTP_SHOT },
-          { frame: 30, shot: shot(W / 2, H / 2, W) },
-          { frame: 44, shot: shot(W / 2, H / 2, W) },
-          { frame: 66, shot: frameRect(CALIB_LIFTED, 30) },
-          { frame: 106, shot: frameRect(CALIB_LIFTED, 30) },
-          { frame: 128, shot: shot(W / 2, H / 2, W) },
-          { frame: 150, shot: shot(W / 2, H / 2, W) },
+          { frame: 24, shot: shot(W / 2, H / 2, W) },
+          { frame: 34, shot: shot(W / 2, H / 2, W) },
+          { frame: 56, shot: frameRect(CALIB_LIFTED, 30) },
+          { frame: 78, shot: frameRect(CALIB_LIFTED, 30) },
+          { frame: 100, shot: shot(W / 2, H / 2, W) },
+          { frame: 120, shot: shot(W / 2, H / 2, W) },
         ]}
       >
         <Desktop clock="10:23 AM" url={onDashboard ? "serenify.tech/app" : "serenify.tech/verify"}>
@@ -102,25 +120,31 @@ export const Beat03Dashboard: React.FC = () => {
 
               <div style={{ opacity: banner }}>
                 <Lift home={CALIB_HOME} lifted={CALIB_LIFTED} t={lift} seatedPanel>
+                  {/*
+                   * A ROW, in both states — text left, button right, everything
+                   * inside the bounds. Flex does the reflow: at 1152 the sentence is
+                   * one line, at 520 it is three, and the button never moves relative
+                   * to the right edge.
+                   */}
                   <div
                     style={{
                       position: "absolute",
                       inset: 0,
                       display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      gap: 14 + 8 * lift,
-                      padding: `0 ${20 + 8 * lift}px`,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 20,
+                      padding: "0 20px",
                       fontFamily: FONT,
                       boxSizing: "border-box",
                     }}
                   >
-                    <div style={{ fontSize: 14, color: GREY.ink, lineHeight: 1.6, maxWidth: 700 }}>
+                    <div style={{ flex: 1, fontSize: 14, color: GREY.ink, lineHeight: 1.55 }}>
                       {DASHBOARD.calibrationBanner}
                     </div>
                     <div
                       style={{
-                        alignSelf: lift > 0.5 ? "flex-start" : "flex-end",
+                        flexShrink: 0,
                         width: 162,
                         height: 44,
                         borderRadius: 8,
@@ -139,7 +163,7 @@ export const Beat03Dashboard: React.FC = () => {
                 </Lift>
               </div>
 
-              <Cursor x={COL_X + COL_W - 90} y={296} clickAt={138} opacity={lift < 0.05 ? banner : 0} />
+              <Cursor x={COL_X + COL_W - 90} y={296} clickAt={106} opacity={lift < 0.05 ? banner : 0} />
             </>
           ) : (
             // Still the verify screen for the first third of a second, which is
