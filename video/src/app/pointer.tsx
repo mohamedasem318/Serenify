@@ -77,9 +77,35 @@ const positionAt = (path: Waypoint[], frame: number): { x: number; y: number } =
   return { x: last.x, y: last.y };
 };
 
+/**
+ * ── THE GLYPH IS macOS-SIZED, AND IT WAS HALF AGAIN TOO BIG ─────────────────────────
+ *
+ * It was drawn at 26 × 34 world px. A real macOS arrow is **about 12 × 19 points** at its tip-to-
+ * tail extent, and at a 1200px world standing in for a desktop screen that is the size to use —
+ * the film is a screen recording of a 1200px screen (L7), so the cursor should be the size a
+ * cursor is on that screen. At 26 wide it was reading as a prop rather than as a pointer, and it
+ * was worst exactly where it mattered most: in a tight push-in the camera magnifies it with
+ * everything else, so beat 9's 3.4× shot was drawing a 90px arrow over a 320px prompt.
+ *
+ * The shape is macOS's rather than Windows', which is a consistency call the film had already
+ * made elsewhere — the notification is a macOS toast and the browser sits under a macOS menu bar,
+ * so a Windows arrow would be the one object on screen from a different operating system. The
+ * two differ in ways that read at this size: the macOS arrow is **narrower**, its tail is
+ * **straight-cut rather than notched**, and it carries a white outline around a black fill in
+ * light contexts. Inverted here — light fill, dark outline — because every surface it crosses in
+ * this film is dark, which is what macOS itself does under its "invert cursor" behaviour and is
+ * the only way it stays visible over both the near-black page and the bright viewfinder.
+ *
+ * The ring scales with the glyph for the same reason: a 52px ring around a 19px arrow is a
+ * target reticle, not a click.
+ */
+const GLYPH = { w: 13, h: 20 } as const;
+
 /** How long the click ring lives, and how long the press dips the glyph. */
 const RING_FRAMES = 14;
 const PRESS_FRAMES = 5;
+/** The ring's terminal radius. Scaled with the glyph — it used to be 26 against a 26-wide arrow. */
+const RING_R = 13;
 
 export const Pointer: React.FC<{
   /** World-coordinate waypoints, in ascending frame order. The tip lands on `(x, y)`. */
@@ -114,14 +140,14 @@ export const Pointer: React.FC<{
         <div
           style={{
             position: "absolute",
-            left: -26,
-            top: -26,
-            width: 52,
-            height: 52,
-            borderRadius: 26,
+            left: -RING_R,
+            top: -RING_R,
+            width: RING_R * 2,
+            height: RING_R * 2,
+            borderRadius: RING_R,
             // Colourless on purpose. Meadow and amber both carry band meaning in this product,
             // and a click ring wearing one would look like it was asserting a stress reading.
-            border: "3px solid rgba(255, 255, 255, 0.85)",
+            border: "1.5px solid rgba(255, 255, 255, 0.85)",
             opacity: interpolate(since, [0, RING_FRAMES], [0.9, 0], { extrapolateRight: "clamp" }),
             scale: interpolate(since, [0, RING_FRAMES], [0.28, 1], {
               extrapolateRight: "clamp",
@@ -131,23 +157,29 @@ export const Pointer: React.FC<{
         />
       ) : null}
       <svg
-        width={26}
-        height={34}
-        viewBox="0 0 26 34"
+        width={GLYPH.w}
+        height={GLYPH.h}
+        viewBox="0 0 13 20"
         style={{
           display: "block",
           scale: 1 - press * 0.12,
           transformOrigin: "0 0",
           // A macOS pointer has a soft drop shadow, which is also what keeps it legible over
           // both the near-black page and the bright viewfinder.
-          filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.55))",
+          filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55))",
         }}
       >
+        {/*
+         * The macOS arrow: tip at the origin, a straight-cut tail, and a narrow tang. The tip is
+         * at (1,1) rather than (0,0) so the stroke's own half-width does not push the visible
+         * point off the control the pointer is aimed at — the glyph's hotspot IS its tip, and
+         * every waypoint in every beat is a control's measured centre.
+         */}
         <path
-          d="M2 2 L2 26 L8.5 20 L13 31 L18 29 L13.5 18.5 L22 18 Z"
+          d="M1 1 L1 15.2 L4.7 11.7 L7.2 17.6 L9.9 16.5 L7.4 10.7 L12 10.4 Z"
           fill="#f2f4f6"
           stroke="#101214"
-          strokeWidth={1.5}
+          strokeWidth={1}
           strokeLinejoin="round"
         />
       </svg>

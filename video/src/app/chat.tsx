@@ -1,10 +1,12 @@
 import React from "react";
+import { useCurrentFrame } from "remotion";
 
 import { ChatShell } from "@/components/chat/chat-shell";
 import { Header } from "@/components/header/header";
 import type { ChatMessage, ConversationDetail } from "@/lib/api/chat-client";
 
 import { PROTAGONIST } from "../greybox/copy";
+import { sec } from "./motion";
 import { AppShell } from "./shell";
 
 /**
@@ -109,18 +111,52 @@ export const ChatPage: React.FC<{
   );
 };
 
-/** Three dots on the app's own bubble geometry — `self-start`, bordered, `rounded-bl-sm`. */
-const TypingIndicator: React.FC = () => (
-  <div
-    style={{ position: "absolute", left: 320, top: 300, zIndex: 5 }}
-    className="flex w-fit items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border bg-surface px-3.5 py-3"
-  >
-    {[0, 1, 2].map((i) => (
-      <span
-        key={i}
-        className="block size-1.5 rounded-full bg-muted"
-        style={{ opacity: 0.35 + 0.45 * (1 - i / 2) }}
-      />
-    ))}
-  </div>
-);
+/**
+ * Three dots on the app's own bubble geometry — `self-start`, bordered, `rounded-bl-sm`.
+ *
+ * ── AND THE DOTS MOVE, WHICH IS THE ENTIRE POINT OF THE LIBERTY ─────────────────────
+ *
+ * They used to carry a **static** stagger — `opacity: 0.35 + 0.45 · (1 − i/2)`, one fixed value
+ * each — which is a photograph of a typing indicator. Held for 34 frames beside a completely
+ * still frame, a typing indicator that does not animate is not a weaker version of the device: it
+ * is three dots of different greys, and it reads as decoration rather than as a state.
+ *
+ * L9's whole justification is that Ren's `thinking` state is otherwise **dead air** — the liberty
+ * exists to make a state legible AS a state, and only motion does that. So the stagger becomes a
+ * travelling wave: the same three opacities, on a 0.9s loop, each dot a third of a cycle behind
+ * the last. That is the universal form of this indicator, and the frame is what drives it, so it
+ * is deterministic across a Studio scrub and a CLI render like everything else in `motion.tsx`.
+ *
+ * It stays the one authored thing in this beat. Everything else on screen is `<ChatShell/>`.
+ */
+const DOT_CYCLE = sec(0.9);
+
+const TypingIndicator: React.FC = () => {
+  const frame = useCurrentFrame();
+  return (
+    <div
+      style={{ position: "absolute", left: 320, top: 300, zIndex: 5 }}
+      className="flex w-fit items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border bg-surface px-3.5 py-3"
+    >
+      {[0, 1, 2].map((i) => {
+        // Each dot is a third of a cycle behind the one before it. The triangle wave is the same
+        // 0→1→0 shape the bloom's breath uses, so the two pieces of looping motion in the film
+        // share an idiom.
+        const phase = (((frame - (i * DOT_CYCLE) / 3) % DOT_CYCLE) + DOT_CYCLE) / DOT_CYCLE % 1;
+        const tri = phase < 0.5 ? phase * 2 : (1 - phase) * 2;
+        return (
+          <span
+            key={i}
+            className="block size-1.5 rounded-full bg-muted"
+            style={{
+              // The same range the static stagger spanned — 0.35 to 0.8 — now travelled rather
+              // than assigned, so the indicator's resting weight is unchanged.
+              opacity: 0.35 + 0.45 * tri,
+              scale: 0.88 + 0.12 * tri,
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};

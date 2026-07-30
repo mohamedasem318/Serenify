@@ -6,7 +6,7 @@
 desktop is scaled **1.6×** to fill the 1920×1080 output (L7). Not a 1920px browser with
 384px of dead gutter each side.
 
-**Pipeline:** real `apps/web` React components for every product screen. Drawn assets only for: the character, the Gmail tab contents, the macOS notification, and the end card.
+**Pipeline:** real `apps/web` React components for every product screen. Drawn assets only for: the character, the browser chrome, the mail client, the music player and its album art, the macOS notification, and the end card. All of them are built — none is a stand-in.
 
 **The character is a RIG, not a set of drawings** — and the art brief is therefore **one**
 neutral head and shoulders rather than five expressions that all have to read as the same
@@ -20,11 +20,13 @@ too.
 
 **EVERY PRODUCT SURFACE IN THE FILM IS A SHIPPED COMPONENT.** The landing hero and public
 navbar, the signup fields and their live password checklist, the consent acknowledgement, the
-OTP boxes and their whole 2.94s merge, the dashboard's two banners, the camera gate, the
+OTP boxes and their whole 2.94s merge, the dashboard's two banners and its cards, the camera gate, the
 calibration flow, the monitoring stage, the confirmatory prompt, Ren's chat, and the wordmark on
-the end card. What is still drawn is the film's **non-Serenify furniture** — the browser chrome,
-the mail client, the music player, the notification — and that is deliberate; the assets pass
-owns it.
+the end card. What is drawn is the film's **non-Serenify furniture** — the browser chrome, the
+mail client, the music player, the notification — and **that furniture is now built rather than
+stood in for.** A three-pane mail client with somebody's actual inbox in it, a transport with
+real glyphs and a scrubber, original album art, and a macOS Sonoma banner with vibrancy in it.
+Nothing in the film is a labelled grey rectangle any more. See "The assets pass" below.
 
 **THE FILM IS DARK, AND THE PRODUCT SURFACES ARE REAL COMPONENTS.** `apps/web` has had a
 designed dark mode from the start — a full token swap under `:root.dark` — so this is the app's
@@ -51,13 +53,80 @@ not. `video/src/fonts.ts` registers both families under exactly the names `globa
 for, each behind its own `delayRender` handle, so a frame cannot be screenshotted before the
 bytes are in. Nothing overrides a token; the app's typography becomes correct by the families
 existing. The authored furniture takes **Inter** (a browser is not Serenify, so it does not wear
-Outfit — that rule is intact) and **Geist Mono** for the omnibox and the clock.
+Outfit — that rule is intact), and **that includes the omnibox and the clock.**
+
+**THE OMNIBOX AND THE CLOCK WERE GEIST MONO, AND THAT WAS THE RIGHT INSTINCT ANSWERED WRONG.**
+The premise was sound — an address bar and a ticking clock want stable digit widths — but the
+conclusion does not follow from it. **No mainstream browser sets its omnibox in a monospace
+face.** Chrome, Safari and Firefox all use the system UI font, and a monospaced address bar is
+one of the clearest tells of a browser that was *drawn* — which is the one thing this chrome
+cannot afford to be, since its whole job is to be unremarkable enough to read as the audience's
+own machine. The instinct underneath is unaffected and intact: a browser is not Serenify, so it
+must not wear Outfit. The mistake was answering "not the product's face" with a face no browser
+uses instead of the face every browser uses. Both are **Inter** (`OS_FONT`) now with **tabular
+figures** (`OS_TABULAR`) — the digit-width argument met properly, as a numerals problem rather
+than a typeface problem, which is what a browser actually does and costs a font-feature
+declaration rather than a second family. The clock's tracking comes in 0.4 to hold the
+fixed-width right-aligned box; it stays plain, un-tinted and un-animated (L11).
+
+**`OS_MONO` is now used by nothing in the film, and it is kept deliberately** — still loaded for
+the probe compositions — so that nobody has to re-derive "which mono, and why" later.
 
 **Every interaction has a visible cause.** A cursor travels to each control and clicks it, with
 the component's response following the click — `video/src/app/pointer.tsx`. The component pass
 had lost it, and the film read as a sequence of screenshots of software rather than as someone
 using it; the confirmatory prompt was the clearest case, where a focus ring arrived on "Yes,
 that's me" with nothing touching it.
+
+**AND THE CURSOR WAS TWICE THE SIZE OF A CURSOR.** It was 26 × 34 world px. A real macOS arrow
+is about **12 × 19 points**, and at a 1200px world standing in for a desktop screen that is the
+size to use — it is now **13 × 20**, in the macOS shape rather than the Windows one (narrower,
+straight-cut tail), light fill over a dark outline because every surface it crosses in this film
+is dark. The click ring scaled with it, **52px → 26px** in diameter: a 52px ring around a 19px
+arrow is a target reticle, not a click. The worst case before the change was beat 9's 3.4×
+push-in, which drew a **90px arrow over a 320px prompt**.
+
+**THREE CLICK TARGETS WERE WRONG AND ONE OF THEM GENUINELY MISSED.** Beat 10's send is the one
+that missed: both its waypoints were hand-typed, the send button is 44px wide starting at x 879,
+and the pointer was aiming at **x 872 — seven pixels outside the left edge of the control it was
+pressing**. It is measured now (`geometry.ts` § CHAT, probed against the real `<ChatShell/>`).
+Beat 2's new-tab button (which was hitting the top-left corner of a 22 × 22 target), beat 2's
+tab switch and beat 2's mail row are re-centred on the same principle. Beat 6's was a different
+and larger failure — see beat 6.
+
+**`:HOVER` CAN NEVER FIRE IN A REMOTION RENDER, BECAUSE A RENDER HAS NO POINTER.** This is an
+invariant-level fact about the medium rather than a bug in any beat: **every `hover:` utility in
+`apps/web` is dead code inside this film**, and no amount of correct component usage brings it
+back. A cursor that travels to a control and presses it while the control never acknowledges it
+is the same class of defect as a click with no cause. So the rules are re-declared and gated on
+**the frame** instead of on a pointer, using exactly the technique `motion.tsx` uses for
+animation — `video/src/app/hover.tsx`. Every treatment is **transcribed** from `button.tsx`'s
+variant table and cited, never invented, and each is a function of t, so a `bg-meadow/10` wash
+at t is genuinely that wash at 10·t% and the intermediate frames are colours the browser would
+have interpolated.
+
+**And the transition property decides the shape of the move.** `transition-colors`
+(`button.tsx:8`) covers colours and **not** opacity, so `hover:opacity-90` variants **snap** — in
+the product, and therefore in the film — while `hover:bg-*` variants ease over 150ms. Sites
+wired: beat 1's "Get started" (meadow), beat 2's "Create account" and its mail-list row, beat 3's
+"Set baseline" (foggy), beat 4's "Allow camera and inference" (meadow), beat 5's "Turn on
+camera" / "I'm ready" / "Back to home" (all meadow), beat 6's "Start check-in" (meadow), beat 9's
+"Yes, that's me", beat 10's send, and beat 11's play button.
+
+**Two of those sites ship no hover at all, and the film says so rather than inventing one.**
+Beat 10's chat send is `bg-foggy text-on-accent transition-opacity disabled:opacity-50`
+(`chat-shell.tsx:388`) — a disabled state and a transition with nothing to trigger it. Its
+treatment is the **one authored entry** in the whole table, written as the house
+`hover:opacity-90` idiom on an element that already carries the transition to run it, and
+declared as authored in the code. And the signup consent checkbox ships nothing either
+(`terms-acknowledgement-field.tsx:93` — `cursor-pointer`, a focus-visible ring, and that is all):
+a native checkbox's hover is the browser's own rendering, which the product does not declare, so
+the tick gets a cursor, a press and a ring and **no hover**, which is what the product does.
+
+**One hover had been dropped in transcription and is restored.** The `(auth)` submit carries
+`hover:opacity-90` at `signup-form.tsx:255`; the film's copy of it did not. It is also the one
+hover in the film the product genuinely **eases**, because it carries `transition-opacity`
+rather than the `<Button/>` base's `transition-colors`.
 
 What remains unfinished is listed in **the deferred register** at the end of this file.
 
@@ -102,10 +171,10 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L6 | **No `/onboarding` step** | `full_name` is captured at signup, so the bounce never fires in practice. Signup → `/app` directly. |
 | L7 | **The product is rendered at a 1200px viewport, scaled 1.6× to 1920×1080** | `apps/web` uses no `xl:`/`2xl:` utilities at all — its highest breakpoint is `lg:` (1024px), plus one custom `min-[880px]` on the dashboard grid — so every viewport ≥1024px is the identical layout. The content column is `max-w-6xl` (1152) inside `sm:px-6` (24), so it hits its designed cap at exactly 1200. That makes 1200 the *smallest* viewport at which the column is full width: maximum content, zero layout compromise, 1.6× of free magnification. At 1920 the column filled ~60% of frame; at 1200 it fills ~96%. |
 | L8 | **Ren's avatar is drawn much larger than the app draws it** | `RenAvatar` defaults to 34px and its call sites use 38 and 54. Beat 10 is the only place in the video where Ren's face is on screen long enough to be read, and at true size it is a smudge on a phone. Same category as L1. |
-| L9 | **Ren gets a typing indicator, which the app does not have** | Needed to make the `thinking` state legible as a state rather than as dead air. The video depicts a feature that will be built later. **Decided — this is not a fidelity defect and must not be "fixed".** |
+| L9 | **Ren gets a typing indicator, which the app does not have** | Needed to make the `thinking` state legible as a state rather than as dead air. The video depicts a feature that will be built later. **Decided — this is not a fidelity defect and must not be "fixed".** **And only motion satisfies the justification:** the dots must *travel*. A static stagger is a photograph of a typing indicator, which reads as decoration and gives the liberty nothing to have been taken for. See beat 10. |
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
-| L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px, where the sub lands at 6.5px on a phone. The real composite is **760** — the real viewfinder sits inside the stage card rather than 300px to its right, so the union is far tighter — and at 760 the sub already lands at 9.4px. The factor needed for legibility alone is 1.064×, which is not a device. 1.25× is set by two measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and finishes 11.1px clear of the real Pause/End controls, with the sub at 11.8px. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. |
+| L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px, where the sub lands at 6.5px on a phone. The real composite is **760** — the real viewfinder sits inside the stage card rather than 300px to its right, so the union is far tighter — and at 760 the sub already lands at 9.4px. The factor needed for legibility alone is 1.064×, which is not a device. 1.25× is set by two measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and finishes 11.1px clear of the real Pause/End controls, with the sub at 11.8px. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. **A second copy takes the device: beat 5a's privacy line**, at the same 1.25× and at **full amplitude**, because there the room is simply there. It does not count against L10's travelling-lift cap — this is the in-place device, which is a rule rather than a budget, and it needs no camera travel, so it fits inside 5a's existing wide hold without moving a keyframe. See beat 5. |
 | L14 | **The monitoring surface is REARRANGED for the film** — viewfinder to the right, the bloom with its stateline and the trend to the left, as the greybox had it. **Pass B builds this; nothing in Pass A implements it.** | The real dashboard puts the top of the bloom and the bottom of the trend **664.2px apart in a 519px viewport**, so they cannot share a frame at any scroll and at any framing — 145px short. The component pass resolved it with a travelling camera at the moment beat 11 should be settling, which is the one place in the film a camera move is most expensive. Rearranging the columns is a knowing departure from the app's real layout, taken because the alternative is a camera move where the beat wants stillness. **It also buys back the two things Pass A had to concede.** Beat 8's `tense` stateline wraps to two lines, and a two-line block cannot take L12's 1.25× raise at this layout without either leaving the viewport or landing on the Pause/End controls — the arithmetic is scroll-invariant, so the emphasis yields to ~1.01× on that one copy. And beat 4's privacy line and its CTA miss sharing a frame by 11.8px. Both are the same shortage of vertical room, and a column layout is what has it. |
 | L13 | **The character's face is AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head, with an authored torso behind it | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
@@ -153,6 +222,12 @@ These are deliberate. Do not "fix" them toward fidelity.
     viewfinder together as the "before". So the block grows *downward* from its own top
     edge rather than about its centre, and the reading card was relaid out to make the room
     below: the card is 40px taller and the trend sits 76px lower.
+- **HOVER IS A FUNCTION OF THE FRAME, NEVER OF A POINTER.** `:hover` cannot fire in a render —
+  a render has no pointer — so **every `hover:` utility in `apps/web` is dead code inside this
+  film**, and correct component usage does not bring it back. A treatment that is not gated on
+  the frame does not exist on screen. Every treatment is **transcribed** from the product's own
+  variant table and cited; the two controls that ship no hover get none; the single authored
+  entry is declared as authored where it lives. See "Every interaction has a visible cause".
 - **EXPRESSIONS ARE TRANSFORMS ON SEPARABLE PARTS, NEVER DRAWINGS CROSS-FADED.** Beat 8 needs
   the face to *fall* and beat 11 needs a nod; a cross-fade between two finished drawings
   produces neither — on a face it reads as a jump cut. An expression is a vector of numbers,
@@ -351,9 +426,10 @@ What it gives up on the left is page background the camera's own backdrop matche
 
 **And the omnibox reads.** Its text was `OS.label` — recessive by design for a URL nobody reads,
 which is the wrong treatment for the one URL in the film the audience watches being typed. While
-lifted it takes `OS.clock`, the one furniture value allowed to clear the ramp's lightness band,
-in Geist Mono; seated afterwards it drops back to `OS.label`. That is the same treatment a
-browser gives a focused versus an unfocused address bar.
+lifted it takes `OS.clock`, the one furniture value allowed to clear the ramp's lightness band;
+seated afterwards it drops back to `OS.label`. That is the same treatment a browser gives a
+focused versus an unfocused address bar. **The face is Inter with tabular figures, not Geist
+Mono** — see the typeface note above; a monospaced address bar is the tell of a drawn browser.
 
 ---
 
@@ -377,6 +453,14 @@ a real client: sender, subject, timestamp, body, code. The copy AND the type sca
 4px tracking — not from invention. Generic in *branding* (L2b), never in content. Timestamp
 on the email: **10:21 AM** (see internal clock).
 
+**AND THE CLIENT IS BUILT — `video/src/app/mail.tsx`.** A real three-pane dark client: a sidebar
+with six folders and their unread counts, a message list with the Serenify mail unread at the
+top and **five plausible neighbour messages** under it, and a reading pane. The neighbours are
+the whole reason it reads as somebody's inbox rather than as a diagram of one — a list with a
+single row in it is a wireframe with a story attached. The email itself is drawn as a **document
+card inside the pane**, which is what an HTML email looks like in a client; it is not the pane.
+Generic in branding, specific in content, which is the L2b line held in both directions.
+
 **Cost: beat 2 goes 13s → 16s, and it is the invariant's biggest bill.** Opening a tab,
 typing a URL, waiting for a page and clicking a message open used to be five cuts; performed,
 they are about three seconds. A cut back to Serenify after the code was explicitly allowed and
@@ -387,13 +471,18 @@ to enlarge the code, the frame edge cut the body line above it. The whole-card l
 already renders the code legibly, so "the push-in lands on the code" is honoured by where the
 move ends rather than by cropping to it.*
 
-**⚠️ THE READING PANE MUST BE EMPTY UNTIL THE MESSAGE IS CLICKED.** The beat is "he opens the
-email and finds the code", and a click that reveals something already on screen reveals
-nothing. The greybox currently shows a ghost of the message body before the click. **This is a
-requirement on the drawn mail client, which does not exist yet — it is recorded here and the
-greybox ghost is deliberately not fixed**, since the asset that fixes it is a page-level drawn
-asset and goes with the components pass. Applies here and again at beat 8. Deferred register,
-item 1.
+**THE READING PANE IS EMPTY UNTIL THE MESSAGE IS CLICKED — register item 1, closed.** The beat
+is "he opens the email and finds the code", and a click that reveals something already on screen
+reveals nothing. The greybox showed a ghost of the body at `opacity: 0.16` beforehand, which is
+one state at two opacities and not two states. **The pane now has two genuinely different
+states**: before the click, the empty-selection state every mail client ships — a large
+low-contrast envelope and "Select a message to read" — and after it, the message. **Nothing of
+the email is in the DOM before the click.** The ghost is gone.
+
+**The register said this applied "at beat 2 and beat 8"; at beat 8 it is structurally
+inapplicable.** Beat 8 renders **no mail client at all** — it is the monitoring page plus
+`<MailToast/>`, with no cutaway, which is that beat's own invariant. There is no reading pane
+there to be empty. The requirement is met at beat 2 and there is nothing to meet at beat 8.
 
 **⚠️ This beat has a job in beat 8.** The mail client needs one distinct, memorable visual signature — an app icon with a specific shape and colour, used consistently. Establish it clearly here. Beat 8's notification depends on the audience recognising that icon; see the note there.
 | 2f | 0:19–0:22 | **Back on Serenify.** A **wide hold** on the verify screen first, so the audience sees which screen it is on, then in on the OTP row. Six boxes fill, then the verification choreography, at or near real speed. |
@@ -470,6 +559,44 @@ it as a column meant its own contents overflowed the seated 80px banner top and 
 crossed its edge in the wide shot. Row seated, row lifted: text left, button right, both inside
 the bounds. Flex does the reflow, so there is no layout flip mid-travel either.
 
+**THE DASHBOARD'S THREE CARDS WERE A LOADING SKELETON, AND THAT WAS A BUG.** They were dark
+rectangles with an uppercase label and three grey bars each — the shape every product uses to
+say *this is still fetching*. **Loading skeletons that never resolve is not something the product
+does.** Software stuck mid-load is the most legible way a screen has of saying "this is a
+mock-up", and it was saying it for four seconds on the beat whose entire job is *he is in, and it
+is real*.
+
+The reasoning in the code — that the real cards "would render their empty states… on the beat
+that is supposed to say the product is live" — had the trade backwards. **At beat 3 he signed up
+ninety seconds ago.** An empty account is not a compromise there, it is the truth, and the
+product ships *written* empty states precisely because a new account is a normal thing to be. A
+card that says "Nothing to nudge you toward right now" is a product with an opinion about its
+own first-run. Three grey bars are a screenshot of a network request.
+
+The real copy, which is what is on screen now:
+
+- `<ThingsThatMightHelpCard/>` — **"Things that might help"** · "Suggestions land here when
+  they're useful." · "Nothing to nudge you toward right now — Serenify is still learning your
+  patterns."
+- `<RecentChatsCard/>`, empty branch — "You haven't started a chat yet. When you do, threads stay
+  here so you can pick them back up."
+- `<TodaysCheckinCard/>`, static default — **"Today's check-in"** · "A quiet space for a quick
+  read on how today is going." · "Watches for signs of stress while you work and checks in if
+  something comes up." — plus the **"Start check-in"** CTA, which is the control beat 6 clicks.
+
+**Two of the three are the shipped components, mounted so they take their no-data branch with no
+network.** `<ThingsThatMightHelpCard/>` takes no props; `<TodaysCheckinCard/>` with no `userId`
+early-returns in its effect, so nothing is fetched, nothing is awaited and nothing can fail.
+**`<RecentChatsCard/>` cannot be imported** — it calls `loadConversations()` from a `"use server"`
+module that pulls in `next/cache` and `@/lib/supabase/server`, which would drag a server-only
+dependency graph into a Remotion bundle. Its empty branch is reproduced with the class strings
+and the copy quoted character-for-character and line-cited, exactly as `shell.tsx` reproduces the
+`(authed)` layout contract for the same class of reason.
+
+**And all three skeleton heights were wrong.** Measured: **217.5 / 176.3 / 152.5**, against the
+invented **196 / 168 / 168**. The grid row is 176.3 rather than 168 because the two cards are
+deliberately not height-yoked — neither carries `h-full`.
+
 **RESOLVED:** the revision-2 note that this beat had no push-in available and no fix short of a
 type-scale liberty. The lift needs neither.
 
@@ -538,8 +665,8 @@ getting simpler; the last 0.4s is reading time for the success copy (see 5f).
 |---|---|---|
 | 5a | 0:32–0:34 | **Intro, and it STAYS WIDE.** "Set your calm baseline" + the three icon rows (armchair / sun / clock). The rows are short and the whole screen reads without magnification, so there is no push-in — the old one onto **"Turn on camera"** was buying nothing. Ends on the click. |
 | 5b | 0:34–0:37 | **Green room — first sight of him.** He settles into the 3:4 portrait framing target. The brackets are graphite. Then the gate clears: **brackets turn meadow, a meadow glow blooms, a small check appears top-centre.** Status line reads **"You’re all set — start when you’re ready."** He looks calm, mildly curious. |
-| 5c | 0:37–0:38 | **Countdown.** 3 → 2 → 1, white numerals over the blurring preview. Compress — one second total, not three. |
-| 5d | 0:38–0:40 | **Recording.** The breathing orb pulsing over his softened preview, label alternating **"Breathe in" / "Breathe out"**. The 6px meadow progress bar advancing beneath. **Show ~2s of a 60s process** — this is the most aggressive compression in the video and it's fine, the orb's rhythm sells the idea instantly. |
+| 5c | 0:37–0:38.5 | **Countdown.** 3 → 2 → 1, white numerals over the blurring preview. **45 frames — 15 a number, half a second each.** Compressed, but a count rather than a flicker; the fifteen extra frames come out of 5d, not out of the camera. See below. |
+| 5d | 0:38.5–0:40 | **Recording.** The breathing orb pulsing over his softened preview, label alternating **"Breathe in" / "Breathe out"**. The 6px meadow progress bar advancing beneath, with the real mm:ss on its row. **Show ~1.5s of a 60s process** — this is the most aggressive compression in the video and it's fine, the orb's rhythm sells the idea instantly. |
 
 **5d WAS SHOWING THE ACCESSIBILITY VARIANT AND CALLING IT THE PRODUCT.** The label read
 **"Breathe gently"**, which is not invented copy — it is `STATIC_LABEL` in
@@ -557,17 +684,87 @@ been crossed. And **the capture progress bar was missing entirely**: `anchor-rec
 renders `<CaptureProgressBar/>` hugging the preview, this reproduction of the layout had dropped
 it, and the mm:ss readout lives in the controls card *outside* 5d's framing (FR-031 keeps status
 words off the raw video) — so nothing on screen said time was passing and the beat cut to
-"Setting your baseline…" out of nowhere. The bar is back, and it is the real component.
+"Setting your baseline…" out of nowhere. The bar is back, and it is the real component. **The
+readout followed it a pass later, onto the bar's own row — see below.**
 
-**The orb's PERIOD is the one thing staged.** The timer and the bar take the beat's 30×
+**The orb's PERIOD is the one thing staged.** The timer and the bar take the beat's 40×
 compression directly, because a counter running fast reads as a counter running fast. The breath
-cannot: at 30× the discs flutter four times a second and the pacer strobes, which is the one
-thing on screen that would contradict the word "calm". At the real 8s cycle a 2s window shows a
-quarter of one breath and the label never changes, so the pacer's whole nature is invisible. So
-the cycle is the length of the window — **one complete breath, in and out, inside the compressed
-minute**. Shape, amplitude, easing and copy are all the component's; only the period is staged.
-| 5e | 0:38.6–0:40 | **Uploading.** The capture stage is **replaced** by the line, verbatim from `components/anchor/anchor-recorder.tsx`: **"Setting your baseline — one calm moment…"** |
+cannot: at 40× the discs flutter five times a second and the pacer strobes, which is the one
+thing on screen that would contradict the word "calm". At the real 8s cycle a 1.5s window shows
+under a fifth of one breath and the label never changes, so the pacer's whole nature is
+invisible. So the cycle is the length of the window — **one complete breath, in and out, inside
+the compressed minute**. Shape, amplitude, easing and copy are all the component's; only the
+period is staged, and it is parameterised on the window rather than hard-coded, so shortening
+5d still shows exactly one breath.
+
+**5c WAS NOT COUNTING. IT WAS HOLDING A "3".** `<GetReadyCountdown/>` decrements through a
+`setTimeout`, and **no frame-addressed render ever fires a timeout**, so across all thirty of
+its frames the numeral was **"3"** and then the beat cut to the recording. What has been read as
+"too fast, too abrupt" for three revisions was never a fast count — it was a static numeral
+followed by a jump. **There was no count.** It is driven from the frame now, remounted per value
+with a `key` (because `from` only seeds initial state), keeping the component's own face, size,
+tabular figures, drop shadow and its 300ms zoom-and-fade.
+
+**And it gets 45 frames — 15 a number, half a second each.** At the old thirty that would be a
+third of a second per number, which is a flicker rather than a beat settling; the reason the
+old timing was never questioned is that it was never running.
+
+**THE FIFTEEN FRAMES COME OUT OF 5d, NOT OUT OF THE CAMERA, AND THAT CONSTRAINT DECIDED IT.**
+Framing is Pass B's and no keyframe moved. The camera holds BEAT5_GREENROOM to f150 and lands on
+BEAT5_PREVIEW at f172, so a countdown starting before f150 plays its first two numbers at the
+green-room framing — and worse, `<GreenRoom/>` unmounts the moment the phase flips, so those
+frames would hold a **204px hole** where its card had been. So the countdown stays at f150 and
+5d goes **60 frames → 45** (~2s → ~1.5s). **The trim list already priced this** — "Beat 5, 12.4s
+→ 10.5s. 5d recording can lose a second" — so it spends half of a cut already agreed available.
+Beat 5 stays 372 frames and the running total does not move.
+
+**5d's MINUTE NOW HAS NUMERALS, AND THEY ARE PACED.** The bar came back last pass and the
+readout did not. `<RecordingTimer/>` is the real readout and it already renders — in the
+controls card **below** the preview, because FR-031 keeps status *words* off the raw video — but
+that card starts at world y 492 and 5d's framing ends at 504, so the mm:ss sat **8px under the
+frame's bottom edge**: visible in the product, out of shot in the beat. Framing is out of scope,
+so the readout came to the shot instead — the same component, on the bar's own row, inside the
+existing framing. The row is height-capped at 16px so its 20px line box centres and finishes
+**4px clear** of the frame's 504. **FR-031 is honoured rather than worked around:** this is
+neither words nor on the video, and the product's own reading of its rule is
+`<GetReadyCountdown/>`, which puts numerals *over* the feed on the grounds that they are numbers
+only.
+
+**The compression was LINEAR, and linear is what made the minute read as a jump cut.** One story
+second per frame gave the bar no shape at all and gave the readout thirty distinct values a
+second — digits as flickering texture rather than as a time. It is **eased in and out** now
+(starts near real time, races, settles — the shape that reads as elapsed time rather than as a
+skip), with the numeral **held four frames at a time**: about seven readouts a second, 133ms
+each. **The bar stays continuous; only the digits are paced.** The two can disagree by up to four
+story-seconds mid-run, which is 6.7% of the bar's width and not a comparison anyone can make at
+133ms — and stepping the bar to match would turn a smooth fill into fifteen visible jumps.
+| 5e | 0:39.1–0:40 | **Uploading.** The capture stage is **replaced** by the line, verbatim from `components/anchor/anchor-recorder.tsx`: **"Setting your baseline — one calm moment…"** |
 | 5f | 0:40–0:43 | **The camera PULLS OUT, then he clicks.** The bloom ripple, the check drawing itself, and the real success state from `components/anchor/success-state.tsx`: **"Your baseline is set"** (`text-3xl sm:text-4xl`) · "We’ve learned what calm looks like for you. You can update it anytime from your account." · the **"Back to home"** button. All three are in frame, all four edges inside it, *before* the click. Then he clicks, and lands on the dashboard. Beat 6 continues from that frame. |
+
+**5a CARRIES THE FILM'S PRIVACY CLAIM, AND IT TAKES THE IN-PLACE EMPHASIS (L12).** The line is
+**"Your video isn't stored — only the calm reading it produces."**, and it is at
+`components/anchor/intro.tsx:52` — the **calibration intro**, not the beat-4 consent gate, which
+has its own separate pitch. It gets the same grow-and-settle the stateline uses, at the same
+**1.25×**, and unlike the stateline it gets the device at **full amplitude**, because here the
+room is simply there.
+
+Measured, growing downward from the line's own top edge and outward from its horizontal centre:
+the line is **418.4 × 20 at (390.8, 370.6)** inside the intro; raised it is **523.0 × 25** with
+its bottom at 395.6 against the "Turn on camera" block's top at 422.6 — **27px of clearance**.
+Horizontally it runs 37.5px past the invisible `max-w-md` boundary onto empty page background,
+and BEAT5_INTRO gives **249px of clearance each side**. It does not count against L10's
+travelling-lift cap: this is the in-place device, which is a rule rather than a budget, and it
+needs no camera travel, so it fits inside 5a's existing wide hold without moving a keyframe.
+
+**MOTION ONLY. IT IS NOT RECOLOURED, DELIBERATELY.** Everything else this film adapts is
+geometry. Recolouring a privacy claim would be a different kind of change — it would make the
+sentence more prominent in the video than it is in the product, which is a claim *about* the
+product rather than a staging *of* it. The `text-muted` grey and the meadow shield stay exactly
+as `intro.tsx` sets them.
+
+**And the emphasis buys emphasis, not legibility — record that honestly.** 5a is deliberately
+wide, and at 1021.5 world px the line's real 14px lands at **5.8px on a phone**, 7.2px raised. A
+framing that makes this line *readable* is Pass B's to find; see "Still open".
 
 **5e/5f corrected.** The earlier version covered the viewfinder with a success state and then cut
 to the dashboard, skipping the uploading line, the real success copy and the click. All three are
@@ -614,6 +811,16 @@ is gone — that absence is the beat's visible content — and he clicks **"Star
 the `space-y-10` column closes up and everything below the missing banner moves up by 126,
 exactly as the product does when `has_anchor` flips. A separately-drawn "beat 6 dashboard" could
 not have produced that, and would have drifted from beat 3 the first time either was touched.
+
+**AND THE BEAT WAS CLICKING EMPTY PAGE.** It drew its own 152 × 44 "Start check-in" button,
+floated it at **(1000, 300)**, and clicked *that* — because `<TodaysCheckinCard/>` underneath it
+was a grey skeleton with no button in it, so there was nothing real to press and a button was
+invented to press instead. The real CTA is **126.3 × 40 at (49, 399.6)** — the bottom **left** of
+the card, not the middle right of the page. Both the drawn button and the guessed position are
+gone; the pointer travels to the shipped control and presses it, and it has a hover (meadow,
+easing over 150ms) because the shipped control has one. This is the same defect as beat 10's
+seven-pixel miss, one order of magnitude larger: a hand-typed coordinate standing in for a
+measurement.
 
 **The "later that morning" text is GONE.** No replacement.
 
@@ -696,6 +903,24 @@ and the reading card was narrowed to 700 to make room.
 > Deadline moved up — need the report by 12
 
 The push-in must make that readable. **The clock reads `11:30 AM` and is IN THE PUSH-IN** (L11) — so the audience does the arithmetic themselves and lands on *thirty minutes*. Nobody needs to be told it's bad news; the two numbers do it. The clock, the toast and the viewfinder share a right edge at world x 1176, so the push-in frames one vertical stack rather than three unrelated things.
+
+**THE TOAST IS FINISHED, AND IT IS A macOS SONOMA BANNER — `video/src/app/toast.tsx`.** A
+squircle app icon (a clip-path superellipse over the **shared** `MailMark`, not a fork of it, so
+2e's signature and beat 8's icon cannot drift apart), and a **two-stop vibrancy gradient**
+(`panelTop` → `panel`, 2.7 L\*) — because at beat 8's ~4.2× magnification a flat fill is *the*
+tell of drawn chrome, and this is the one surface in the film that has to pass as the audience's
+own operating system. Radius 14 → 18. **Tabular figures on the subject line**, because its "12"
+and the clock's "11:30" are the two numbers the audience subtracts and they share the
+BEAT8_CLOCK frame; two sets of digits doing arithmetic together should not have different
+metrics.
+
+**The "Mail" app-name row is KEPT deliberately**, even though modern macOS banners often omit it.
+It is doing disambiguation work — see the misread risk above — and dropping it to be more
+faithful to Sonoma would cost the beat the one label that says *this is not Serenify talking*.
+
+**The subject wraps to two lines and that is not a regression.** Measured: 289.95px of text in a
+242px column. It is why the rect is **104 tall rather than 82**, which this sheet's geometry
+already recorded as the reason.
 
 **The three-way framing question, and what it cost.** The push-in must hold the notification and
 his face (L2) and the emphasis rule wants the stateline in frame when its copy changes. **No
@@ -865,6 +1090,20 @@ acts through *language* rather than through a click, and the beat now **shows** 
 asserting it. Ren keeps the typing-indicator-then-message treatment (L9). The human types; the AI
 thinks, then speaks.
 
+**THE TYPING INDICATOR EXISTED BUT WAS A PHOTOGRAPH OF ONE.** Its three dots carried a **static**
+stagger — three fixed opacities, held for 34 frames beside an otherwise still frame. A stagger
+that never travels reads as decoration, not as a state, which defeats L9's entire justification:
+the liberty exists because `thinking` is otherwise dead air, and the only thing that makes a
+state legible *as* a state is motion. It is a **travelling wave** now, on a 0.9s loop, each dot a
+third of a cycle behind the last, over the same **0.35–0.8** opacity range so its resting weight
+against the thread is unchanged. The human types; the AI thinks, then speaks — unchanged, and now
+visible.
+
+**And the send button's click was seven pixels wide of it.** Both waypoints were hand-typed
+against a 44px control starting at x 879, aiming at x 872 — outside its left edge. Measured now,
+against the real `<ChatShell/>`; see the pointer note at the top of this file. The button also
+gets the film's one **authored** hover treatment, because the shipped control declares none.
+
 **His message stays short — that constraint is unchanged and load-bearing.** 35 characters, ~1.7s
 at ~20 c/s. Never speed the typing to fit; shorten the line.
 
@@ -913,6 +1152,23 @@ He acts on it. In order:
    overlay layer carried no stacking of its own, so the two competed on DOM order in a shared
    context. The player is 80 now: above the viewfinder and the app header alike, below the
    pointer, because a cursor is above every window.
+
+   **THE PLAYER IS BUILT — `video/src/app/player.tsx` — AND ITS TRANSPORT IS REAL.** Previous,
+   play-pause and next are **SVG glyph paths, not text characters.** The old `▶` and `❚❚` were
+   characters, so their metrics came from whatever face resolved them, which is why the play
+   glyph sat visibly low in its circle — a defect with no fix inside a font. One **filled
+   primary** and two quiet secondaries, because three identical circles say "three equal
+   things" and there is one thing here he is about to do. A scrubber with **elapsed and total**
+   time in tabular figures and a drag handle, and the track length is the real **4:54**. Title
+   and artist are as before (L2b). The play button has a hover, and the pointer presses it.
+
+   **The sleeve is ORIGINAL abstract artwork — `video/src/app/albumart.tsx`.** The rule and its
+   reasoning are in "The assets pass" below; what matters here is the design constraint it was
+   built to. At beat 11's framing it is about **62px square on a phone**, so it is four elements
+   and nothing else: a vertical field, one offset disc, a soft halo, three horizon bands. And it
+   wears the furniture's **cool quadrant** — no meadow, no amber, nothing foggy — because a
+   cover in a band colour, sitting ~200px from a bloom that genuinely is asserting a reading,
+   would look like it was asserting one too.
 2. **Puts headphones on** — and goes straight back to the keyboard.
 3. **Music notes drift around him** in the viewfinder. He starts moving with it — small, a head nod on the beat, a shoulder. Not a dance number.
 
@@ -1044,6 +1300,14 @@ from the wordmark to the domain row is almost vertical and the line sits across 
 it; drawn in front and fully opaque it blanked half of "take care of yourself" for most of the
 move.
 
+**`.tech` WAS GEIST MONO, WHICH BROKE THE ONE CLAIM THE MOVE EXISTS TO MAKE.** The whole point is
+that the domain **derives from the wordmark** — and a domain that switches typeface halfway
+through has not derived from anything, it has had a suffix stuck on it. It is **Outfit** now, at
+`inherit` size: the old two-point drop existed to compensate for Geist Mono's larger apparent
+size beside Outfit, and with both in Outfit there is nothing left to compensate for. So
+`serenify.tech` reads as one word, set once. Colour stays `CARD.domain`. **The `DERIVE = false`
+fallback path took the brand face too**, so a revert cannot quietly reintroduce the mono.
+
 **Permission to fall back, and it is one flag.** The duplicate-and-derive move is charming
 described, it could be fussy on screen, and it is the last thing the audience sees. `DERIVE` in
 `Beat13EndCard.tsx` reverts to typing `serenify.tech` whole, which is exactly the previous
@@ -1097,10 +1361,29 @@ the pass changed what is on screen without changing how long anything is on scre
 | Beat 8's escalation pulled 12 frames earlier | nothing — it tightened dead time, it did not add any |
 | Beat 4 gaining a second landing | **+1.0s** |
 
+**±0.0s across the assets and interaction pass.** Every change in it is an asset, an interaction
+or a pacing correction, and the one change that genuinely needed frames — the countdown, which
+was holding a static "3" — was **paid for out of 5d rather than added to the beat**:
+
+| What changed | Cost |
+|---|---|
+| The mail client, the player, the album art, the toast | nothing |
+| Hover states on every wired control | nothing — they run inside the existing approach |
+| The cursor at real size, and three re-aimed click targets | nothing |
+| Beat 6 clicking the real CTA instead of a drawn one | nothing |
+| The dashboard's real empty states | nothing — same cards, different branch |
+| Both typeface corrections | nothing |
+| Beat 5a's privacy-line emphasis | nothing — in place, no camera travel (L12) |
+| Ren's typing indicator becoming a travelling wave | nothing — same 34 frames |
+| 5c counting for real, 45 frames | **+0.5s, taken out of 5d** — beat 5 stays 372 frames |
+| 5d's paced minute and its numerals | nothing |
+
 **Trim candidates, in order:**
 
 1. Beat 2, 15.6s → 12s. The performed mail sequence is where the fat is; the OTP choreography is not.
 2. Beat 5, 12.4s → 10.5s. 5d recording can lose a second and 5f's hold can lose half of one.
+   **Half of 5d's second is already spent** — it bought the countdown an actual count, internally,
+   without moving the beat. What is left here is about a second, not 1.9s.
 3. Beat 4, 5s → 4s. The scroll can move faster than it does.
 
 Beat 11 has come **off** this list. The music-player sub-beat is still the only fat in it, but the
@@ -1168,6 +1451,11 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
   background. The ramp dropped ~15 points (wall to **L 61**) and saturation came down from ~8% to
   ~6% — at the old chroma it read distinctly tan against cool dark chrome. The face is the
   brightest thing in frame again, which is the brief that backdrop has always had.
+- ~~The protagonist is Youssef Kamal, and the film was calling him Mohamed Asem.~~ **CLOSED, and
+  verified.** `PROTAGONIST.fullName` is "Youssef Kamal", `deriveInitials` reads straight off it,
+  and every `<Header/>` in the film mounts from that one constant — so the avatar reads **YK**
+  and there is no initials string to keep in sync. The only "Mohamed Asem" left anywhere in the
+  video project is in `SwapProbe.tsx`, which is a measurement bench and is never in the cut.
 - ~~Do the headphones still read now that the face is the brightest thing in frame?~~ **Yes**, and
   the re-tint is what protects it. They were brought down to muted grey to stop competing with
   the face; with the backdrop now 17 points below the skin, the cups sit between the two rather
@@ -1189,16 +1477,19 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
   **Half of this is now answerable and the answer is yes:** the mark is the real `<Wordmark/>`,
   so the two-colour `seren`/`ify` split is on screen at domain size and it holds. What is still
   a judgement call is whether the travel reads as *derivation* or as a word moving.
-- **The protagonist is Youssef Kamal, and the film was calling him Mohamed Asem.** Every
-  `<Header/>` in the second half was mounted with the repo owner's name, so the avatar read
-  **MA** for twenty-five seconds while the man in the viewfinder was someone else. `deriveInitials`
-  reads straight off `fullName`, so naming him correctly is the whole fix — there is no initials
-  string to keep in sync. It is one constant now (`PROTAGONIST` in `copy.ts`), which is what stops
-  the same leak reaching the next surface someone mounts.
+- **Does 5a's privacy line read, now that it has the emphasis?** No, and that is recorded rather
+  than hidden. The device buys **emphasis, not legibility**: 5a is deliberately wide, so at
+  1021.5 world px the line's real 14px lands at **5.8px on a phone**, 7.2px raised. A framing
+  that makes "Your video isn't stored — only the calm reading it produces." genuinely readable is
+  **Pass B's to find**, and it is the strongest candidate the beat has for one. See beat 5.
 - Do the real full-page reloads (`<a href>` / `window.location.replace`) read as broken on video, or as honest? They're real; showing them is more faithful, but a hard white flash mid-video may just look like a mistake.
 - Beat 10's three-turn exchange is written for the video; `014-recommendations` doesn't exist. Keep the UI plausible against what 014 will actually ship.
 - Beat 10 turn 3 must read as *personal knowledge*, not a canned tip. If greybox shows it reading generic, that's a copy problem to fix before art.
-- Does the mail app icon established in 2e survive the ~25 seconds to beat 8 as a recognisable signature? Greybox will show it.
+- **Does the mail app icon established in 2e survive the ~25 seconds to beat 8 as a recognisable
+  signature?** This is now a judgement rather than a blocker: both surfaces are built, and the
+  toast's squircle icon is a clip-path over the **same shared `MailMark`** the client uses rather
+  than a second drawing of it, so the two cannot drift apart. What is left to judge is
+  recognition across the gap, which only the render can answer.
 
 ---
 
@@ -1211,10 +1502,15 @@ be started from this list.
 **Deferred to the component pass** — when the greybox page is replaced by real `apps/web`
 components:
 
-1. **The mail client's reading pane must be empty until the message is clicked.** A ghost of the
-   body is visible beforehand, which leaves the click nothing to reveal. Applies at **beat 2 and
-   beat 8**. The mail client is a drawn asset that does not exist yet, so this is a requirement on
-   that asset — do not patch the greybox.
+1. ~~**The mail client's reading pane must be empty until the message is clicked.**~~ **DONE
+   (assets pass).** The pane has **two genuinely different states** rather than one at two
+   opacities: the empty-selection state every mail client ships — a large low-contrast envelope
+   and "Select a message to read" — and, after the click, the message. Nothing of the email is in
+   the DOM beforehand; the greybox's `opacity: 0.16` ghost is gone. **The "and beat 8" half of
+   this entry was structurally inapplicable and is recorded as such**: beat 8 renders no mail
+   client at all — it is the monitoring page plus `<MailToast/>`, no cutaway, which is that beat's
+   own invariant — so there is no reading pane there to be empty. Met at beat 2; nothing to meet
+   at beat 8.
 2. ~~**Un-pad the dashboard layout.**~~ **DONE (component pass).** The monitoring surface renders
    the product's own spacing — `max-w-3xl` (768, not 700), `min-h-[480px] … px-10 pb-10 pt-16`,
    `sm:size-72` bloom (288, not 148), the readout as a row above the card rather than a corner
@@ -1239,10 +1535,13 @@ components:
 6. ~~**Re-check beat 8's face size after the swap.**~~ **CLOSED — re-checked and better.** The
    fall now plays at **88.7px** on a phone, against the ~80px that was accepted. L1 is unchanged
    at 320×181; only the direction it grows from moved (see L1).
-7. **Beat 11's page half — the trend descent is DONE, the music player stays a stand-in.** The
-   trend is the real `<SessionTrend/>`: the tail walks back down in meadow while the climbed
-   history stays put, which is the thing the beat exists to show. The player remains a stand-in
-   by design, now in dark-mode grey rather than light-mode grey sitting in a dark film.
+7. ~~**Beat 11's page half — the trend descent is DONE, the music player stays a stand-in.**~~
+   **CLOSED (assets pass).** The trend was already the real `<SessionTrend/>` — the tail walks
+   back down in meadow while the climbed history stays put, which is the thing the beat exists to
+   show. **The player is no longer a stand-in:** a real transport in SVG glyph paths rather than
+   text characters, one filled primary against two quiet secondaries, a scrubber with elapsed and
+   total time in tabular figures and a drag handle, the real 4:54, and original abstract album
+   art beside it. See beat 11.
 
 7b. ~~**Beats 1, 2, 3, 4, 6, 12 and 13 are still greybox.**~~ **DONE (completion pass).** Every
    product surface in the film is now a shipped component. Beat 1 is `<PublicNavbar/>` +
@@ -1310,27 +1609,56 @@ components:
 
 ---
 
-## The assets pass — recorded now, not built
+## The assets pass — built
 
-The next pass draws the mail client, the music player, the notification and album art. Two things
-are written down here so they are not built wrong later. **Neither is to be started from this
-list.**
+The mail client, the music player, the album art and the notification are drawn. They are the
+film's only non-Serenify surfaces, and they were the last labelled grey rectangles left in it.
 
-**ALBUM ART MUST BE ORIGINAL.** Song titles and an artist's name on screen are decided and stay
-(L2b) — the naming is the evidence Ren knew him, and with no audio and no lyrics it carries
-effectively no risk. **An actual album cover does not.** It is a copyrighted image, and
-reproducing one in a promotional video on a public post is a materially different exposure from
-naming a track. Authored abstract cover art costs nothing, removes the question entirely, and can
-be matched to the film's palette. **No reproduction or near-reproduction of a real album sleeve** —
-not redrawn, not "inspired by", not recoloured.
+**THESE ASSETS NEEDED PERSONALITY, NOT WIREFRAMES**, and that was the brief they were built to. A
+labelled grey rectangle beside a real product component reads as unfinished in a way it never did
+when everything was grey. They feel like real software someone actually uses — in dark, inside the
+film's palette, with the specificity that implies. They take their values from the furniture token
+block, which is deliberately decoupled from the app's palette, because a browser and a mail client
+are not part of Serenify and must not move when its tokens do.
 
-**THESE ASSETS NEED PERSONALITY, NOT WIREFRAMES.** They are the film's only non-Serenify surfaces,
-and a labelled grey rectangle beside a real product component reads as unfinished in a way it
-never did when everything was grey. They should feel like real software someone actually uses —
-in dark, sitting inside the film's palette, with the specificity that implies: a mail client with a
-sender list and a real reading pane, a player with a transport that looks like it works. They take
-their values from the furniture token block, which is deliberately decoupled from the app's palette
-(a browser and a mail client are not part of Serenify and must not move when its tokens do).
+── WHAT WAS BUILT ──
+
+- **`mail.tsx`** — a three-pane client: six folders with unread counts, a message list with the
+  Serenify mail unread at the top and five plausible neighbours under it, and a reading pane with
+  **two states**, empty-selection and message. The email is a document card *inside* the pane,
+  which is what an HTML email looks like in a client. Copy and type scale from
+  `supabase/templates/confirmation.html`. Beat 2e; register item 1.
+- **`player.tsx`** — a transport in SVG glyph paths rather than text characters, one filled
+  primary against two quiet secondaries, a scrubber with elapsed and total time in tabular
+  figures and a drag handle, the real 4:54. Beat 11; register item 7.
+- **`albumart.tsx`** — original abstract artwork, four elements, in the furniture's cool
+  quadrant. See the standing rule below.
+- **`toast.tsx`** — a macOS Sonoma banner: squircle app icon over the shared `MailMark`, a
+  two-stop vibrancy gradient, tabular figures on the subject. Beat 8.
+
+── THE ALBUM-ART RULE, WHICH STANDS ──
+
+**ALBUM ART MUST BE ORIGINAL, AND THIS DOES NOT EXPIRE.** Song titles and an artist's name on
+screen are decided and stay (L2b) — the naming is the evidence Ren knew him, and with no audio and
+no lyrics it carries effectively no risk. **An actual album cover does not.** Three reasons, each
+independent of the others:
+
+- **The film is promotional, not educational** — which is the fair-use factor that cuts hardest
+  against it.
+- **The sleeve is a separate copyrighted work from the recording**, so not playing the song does
+  nothing for it. The two are unrelated licences.
+- **The sleeve in question is a photograph of a person**, so likeness rights sit on top of the
+  copyright.
+
+Original art costs nothing, matches the palette, and cannot get a launch post flagged. **No
+reproduction or near-reproduction of a real album sleeve** — not redrawn, not "inspired by", not
+recoloured. That holds for any future track, not just this one.
+
+The art that exists is built from **four elements only** — a vertical field, one offset disc, a
+soft halo, three horizon bands — because at beat 11's framing it is about **62px square on a
+phone** and anything more becomes noise. It wears the furniture's **cool quadrant**: no meadow, no
+amber, nothing foggy, since a cover in a band colour sitting ~200px from a bloom that genuinely is
+asserting a reading would look like it was asserting one too.
 
 ---
 

@@ -5,6 +5,7 @@ import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prom
 
 import { BEAT8_WIDE, COMPOSITE } from "../../app/framing";
 import { PROMPT_SCREEN, centre, emphasisCapFor } from "../../app/geometry";
+import { Hover } from "../../app/hover";
 import { MonitorPage } from "../../app/monitor";
 import { useToastIn } from "../../app/motion";
 import { Pointer } from "../../app/pointer";
@@ -100,6 +101,21 @@ export const Beat09Questionnaire: React.FC = () => {
           }
         />
       </Camera>
+
+      {/*
+       * §2 — "Yes, that's me" lights before it is pressed. The prompt's options are not
+       * `<Button/>`s: `OPTION` (`confirmatory-prompt.tsx:27`) is its own class list with
+       * `hover:bg-[color-mix(in_srgb,var(--color-foggy)_8%,var(--color-surface))]` over
+       * `transition-colors`, so this one genuinely EASES over 150ms rather than snapping.
+       * `:first-of-type` because the three options share a class list and only the first is
+       * touched — the sheet's true-positive branch.
+       */}
+      <Hover
+        selector="[data-testid='notification'] button:first-of-type"
+        treatment="promptOption"
+        from={56}
+        to={90}
+      />
 
       {/* Screen space, outside the camera — see the header. */}
       <Pointer

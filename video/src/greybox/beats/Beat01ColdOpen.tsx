@@ -2,7 +2,8 @@ import React from "react";
 import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
 
 import { LANDING, centre } from "../../app/geometry";
-import { OS, OS_MONO } from "../../app/furniture";
+import { OS, OS_FONT, OS_TABULAR } from "../../app/furniture";
+import { Hover } from "../../app/hover";
 import { LandingPage } from "../../app/landing";
 import { Pointer } from "../../app/pointer";
 import { OMNIBOX } from "../../app/shell";
@@ -39,12 +40,20 @@ import { H, W } from "../theme";
  *
  * ── THE OMNIBOX READS NOW ───────────────────────────────────────────────────────────
  *
- * Its text was `OS.label` (#8d9398) at 14px in a fallback mono — recessive by design for a URL
- * nobody reads, which is wrong for the one URL in the film that the audience is *watching being
- * typed*. Lifted, it is the subject of the shot. It takes `OS.clock`, the one furniture value
- * allowed to clear the ramp's lightness band, and Geist Mono. Seated afterwards it is chrome
- * again and drops back to `OS.label`, which is the same treatment a browser gives a focused
- * versus an unfocused address bar.
+ * Its text was `OS.label` (#8d9398) — recessive by design for a URL nobody reads, which is wrong
+ * for the one URL in the film that the audience is *watching being typed*. Lifted, it is the
+ * subject of the shot, so it takes `OS.clock`, the one furniture value allowed to clear the
+ * ramp's lightness band. Seated afterwards it is chrome again and drops back to `OS.label` —
+ * the same treatment a browser gives a focused versus an unfocused address bar.
+ *
+ * ── AND IT IS NOT MONOSPACED ANY MORE (§6.1) ────────────────────────────────────────
+ *
+ * It was Geist Mono, on the reasoning that an address bar wants stable digit widths. **No
+ * mainstream browser sets its omnibox in a monospace face** — Chrome, Safari and Firefox all use
+ * the system UI font — and a monospaced address bar is one of the most recognisable tells of a
+ * *drawn* browser, which is the one thing this chrome cannot afford to be. It is `OS_FONT`
+ * (Inter) with tabular figures, which is what a browser actually does. The full argument is in
+ * `furniture.ts` § OS_FONT.
  */
 
 const URL = "serenify.tech";
@@ -103,15 +112,25 @@ export const Beat01ColdOpen: React.FC = () => {
             tabs={[{ label: "Serenify" }]}
             overlay={
               // Into beat 2 through the product's own CTA, not through a cut. The hand travels
-              // in from the right of the hero, arrives on "Get started", and presses it.
-              <Pointer
-                path={[
-                  { frame: 108, x: CTA.x + 240, y: CTA.y + 96 },
-                  { frame: 152, x: CTA.x, y: CTA.y },
-                ]}
-                clicks={[168]}
-                visible={{ from: 104 }}
-              />
+              // in from the right of the hero, arrives on "Get started", and presses it — and
+              // the button lights as it lands (§2). `variant="meadow"` (`hero.tsx:60`), so
+              // `hover:opacity-90`, snapped: `transition-colors` does not cover opacity.
+              <>
+                <Hover
+                  selector="[data-public] a[href='/signup']"
+                  treatment="meadow"
+                  from={152}
+                  to={180}
+                />
+                <Pointer
+                  path={[
+                    { frame: 108, x: CTA.x + 240, y: CTA.y + 96 },
+                    { frame: 152, x: CTA.x, y: CTA.y },
+                  ]}
+                  clicks={[168]}
+                  visible={{ from: 104 }}
+                />
+              </>
             }
           />
         ) : (
@@ -148,7 +167,8 @@ export const Beat01ColdOpen: React.FC = () => {
               display: "flex",
               alignItems: "center",
               paddingLeft: 14 + 4 * lift,
-              fontFamily: OS_MONO,
+              fontFamily: OS_FONT,
+              fontFeatureSettings: OS_TABULAR,
               fontSize: 14,
               // Lifted, this is the subject of the shot and reads at `OS.clock`; seated it is
               // chrome again and drops to `OS.label`. Same treatment a browser gives a focused

@@ -7,8 +7,11 @@ import { GreenRoom } from "@/components/anchor/green-room";
 import { Intro } from "@/components/anchor/intro";
 import { RecordingStage } from "@/components/anchor/recording-stage";
 import { SuccessState } from "@/components/anchor/success-state";
+import { ChatShell } from "@/components/chat/chat-shell";
 import { CameraConsentGate } from "@/components/consent/camera-consent-gate";
 import { Header } from "@/components/header/header";
+import { ThingsThatMightHelpCard } from "@/components/home/things-that-might-help-card";
+import { TodaysCheckinCard } from "@/components/home/todays-checkin-card";
 import { WelcomeBanner } from "@/components/home/welcome-banner";
 import { Hero } from "@/components/landing/hero";
 import { OpSurfaces } from "@/components/monitor/op-surfaces";
@@ -18,9 +21,21 @@ import { PublicNavbar } from "@/components/public/public-navbar";
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 
 import { AuthShell, CheckEmailSurface, SignupSurface } from "./app/auth";
-import { HOME_COL } from "./app/home";
+import { HOME_COL, RecentChatsEmpty as RecentChatsEmptyProbe } from "./app/home";
 import { trendPoints } from "./app/monitor";
 import { fontsReady } from "./fonts";
+
+/** The chat panel needs a conversation to render its composer. Shape only; no messages. */
+const PROBE_CONVERSATION = {
+  id: "probe",
+  title: "Checking in",
+  state: "open" as const,
+  rollupBand: null,
+  messageCount: 0,
+  lastMessageAt: null,
+  createdAt: "2026-07-30T11:30:00.000Z",
+  updatedAt: "2026-07-30T11:30:00.000Z",
+};
 
 import {
   AppShell,
@@ -135,6 +150,32 @@ const TARGETS: [string, string][] = [
   ["home-welcome", "[data-probe='home'] [data-probe='welcome'] header"],
   ["home-calib", "[data-probe='home'] [role='region']"],
   ["home-calib-cta", "[data-probe='home'] [role='region'] a"],
+
+  // ── The assets pass's additions ────────────────────────────────────────────────────
+  //
+  // Beat 10's composer, because its cursor was the one in the film that genuinely MISSED.
+  // The send button's centre was being guessed at (872, 552) against an actual (901, 577) —
+  // 40px away from a 44px control, so the click landed outside the thing it was clicking.
+  // Everything else in the film is measured; this was the exception and it showed.
+  ["chat-panel", "[data-probe='chat'] > div"],
+  ["chat-composer", "[data-probe='chat'] form"],
+  ["chat-textarea", "[data-probe='chat'] textarea"],
+  ["chat-send", "[data-testid='chat-send']"],
+  ["chat-conv-header", "[data-probe='chat'] [data-probe='convhead'], [data-probe='chat'] form"],
+
+  // The dashboard's real empty states (§5). Their heights are what the beat-3 and beat-6
+  // layouts stack on, and the skeleton cards they replace were 196 / 168 by invention.
+  ["card-today", "[data-probe='cards'] [data-probe='today'] > div"],
+  // The "Start check-in" CTA inside it — the control beat 6 ends on. It had been clicking a
+  // grey rectangle, because until this pass the card WAS a grey rectangle.
+  ["btn-start-checkin", "[data-probe='cards'] [data-probe='today'] a"],
+  ["card-help", "[data-probe='cards'] [data-probe='help'] > div"],
+  ["card-chats", "[data-probe='cards'] [data-probe='chats'] > div"],
+
+  // Beat 5a's privacy line — the one §7 raises. It is the only direct `p` child of the
+  // intro's root, which is what makes it addressable without a class the video cannot add.
+  ["intro-privacy", "[data-probe='intro'] > div > p"],
+  ["intro-cta-block", "[data-probe='intro'] > div > div:last-child"],
 ];
 
 const Measure: React.FC = () => {
@@ -303,6 +344,38 @@ export const SwapProbe: React.FC = () => (
           <div className={HOME_COL}>
             <CalibrationBanner />
             <WelcomeBanner fullName="Youssef Kamal" now={new Date(2026, 6, 30, 10, 23)} />
+          </div>
+        </div>
+
+        {/* ── The assets pass ──────────────────────────────────────────────────────
+            Beat 10's composer, at the beat's own panel measure, so the send button's
+            centre is measured rather than guessed. The film wraps `<ChatShell/>` in a
+            `max-w-2xl` panel of a fixed height; anything else would put the composer at a
+            different y and the number would be wrong in a way nobody would notice. */}
+        <div data-probe="chat" className="mt-8">
+          <div className="mx-auto h-[460px] w-full max-w-2xl overflow-hidden rounded-2xl border border-border">
+            <ChatShell
+              variant="panel"
+              initialConversations={[PROBE_CONVERSATION]}
+              initialDetail={{ conversation: PROBE_CONVERSATION, messages: [] }}
+            />
+          </div>
+        </div>
+
+        {/* The dashboard's real empty states (§5), at the real grid. */}
+        <div data-probe="cards" className="mt-8">
+          <div className={HOME_COL}>
+            <div data-probe="today">
+              <TodaysCheckinCard />
+            </div>
+            <div className="grid grid-cols-1 items-start gap-6 min-[880px]:grid-cols-2">
+              <div data-probe="help">
+                <ThingsThatMightHelpCard />
+              </div>
+              <div data-probe="chats">
+                <RecentChatsEmptyProbe />
+              </div>
+            </div>
           </div>
         </div>
       </AppShell>

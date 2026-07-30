@@ -231,6 +231,107 @@ export const BreathPacer: React.FC<{
 };
 
 /**
+ * ── THE GET-READY COUNTDOWN, WHICH WAS NOT COUNTING ─────────────────────────────────
+ *
+ * Source: `components/anchor/get-ready-countdown.tsx`.
+ *
+ * The sheet's note on 5c says the countdown is compressed to "one second total, not three", and
+ * the beat gave it thirty frames — but **it was not counting at all.** `GetReadyCountdown` holds
+ * its number in `useState` and decrements it with a `setTimeout(…, 1000)`, and the reduced-motion
+ * shim plus a frame-addressed renderer mean no timer ever fires: the component mounted at `from`
+ * and rendered **"3" for all thirty frames**, then the beat cut to the recording. What read as
+ * "too fast" was a countdown that never happened followed by a jump.
+ *
+ * So the number is driven from the frame, and the component is remounted per value with a `key` —
+ * `from` only seeds the initial state, so a changing prop cannot move it. That is the same
+ * technique `chat.tsx` uses to type into the real composer, and it keeps the numeral the
+ * component's own: its `font-display text-8xl leading-none tabular-nums text-white` and its drop
+ * shadow, not a redraw.
+ *
+ * **And it is given real time.** Three seconds of story in thirty frames is a third of a second
+ * per number, which is below the threshold at which a digit reads as a beat rather than a flicker
+ * — the sheet's compression was set when nothing in 5c was moving, so nothing was lost by it.
+ * `COUNTDOWN_FRAMES` is 45, so each numeral holds **15 frames, half a second**. That is a 2×
+ * compression of a real countdown rather than the 3× the beat was nominally claiming, and it is
+ * the point at which a digit reads as having landed. Where the fifteen frames come from — 5d, not
+ * the camera — is argued at the top of `Beat05Calibration.tsx`.
+ *
+ * The component's own entrance — `animate-in fade-in zoom-in-75 duration-300`, gated off by the
+ * reduced-motion branch — is re-authored on the same 300ms, so each number arrives the way the
+ * product's does instead of appearing whole.
+ */
+/** 15 frames a number. Long enough to read as a beat settling, still 2× real time. */
+export const COUNTDOWN_FRAMES = 45;
+
+export const useCountdown = (
+  startFrame: number,
+  totalFrames = COUNTDOWN_FRAMES,
+): { value: number; enter: number } => {
+  const frame = useCurrentFrame();
+  const per = totalFrames / 3;
+  const elapsed = Math.max(0, frame - startFrame);
+  const value = Math.max(1, 3 - Math.floor(elapsed / per));
+  // `get-ready-countdown.tsx:44` — `duration-300` on the zoom/fade, keyed per number.
+  const sinceStep = elapsed - Math.floor(elapsed / per) * per;
+  const enter = interpolate(sinceStep, [0, sec(0.3)], [0, 1], { ...clamp, easing: EASE_OUT });
+  return { value, enter };
+};
+
+/**
+ * ── THE COMPRESSED MINUTE, PACED SO IT READS AS TIME PASSING ────────────────────────
+ *
+ * Source: the beat's own 30× compression, plus `recording-timer.tsx`.
+ *
+ * 5d shows ~2 seconds of a 60-second capture, and the timer used to take that compression
+ * **linearly** — `remaining = 60 · (1 − elapsed/60)`, one story-second per frame. Two problems,
+ * and they compound:
+ *
+ *  · At thirty distinct values a second the digits are noise. Nothing is read; the readout is a
+ *    flickering texture, which is worse than no readout because it looks like a fault.
+ *  · A linear ramp between two still moments has no shape, so the minute reads as a **jump cut
+ *    with a bar over it** rather than as time being sped through.
+ *
+ * Both are fixed by pacing rather than by slowing down, which the beat cannot afford:
+ *
+ *  · **The compression is eased in and out.** The minute starts at something close to real time,
+ *    accelerates through the middle, and settles as it lands — the shape of every time-lapse ever
+ *    cut, and the reason one reads as elapsed time rather than as a skip.
+ *  · **The displayed numeral is held.** `HOLD_FRAMES` of 4 gives ~7 readouts a second, each on
+ *    screen for 133ms, so the digits are legibly racing instead of strobing.
+ *
+ * The BAR is not quantised — it takes the eased value continuously, which is what a progress bar
+ * does and is smoother than the product's own once-a-second `transition-[width]`. The bar and the
+ * numeral can therefore disagree by up to four story-seconds mid-run, which is 6.7% of the bar's
+ * width; at 133ms per readout that is not a comparison anybody can make, and the alternative —
+ * stepping the bar too — turns a smooth fill into fifteen visible jumps.
+ */
+const HOLD_FRAMES = 4;
+
+export const useCaptureMinute = (
+  startFrame: number,
+  windowFrames: number,
+  totalSeconds = 60,
+): { remaining: number; shown: number } => {
+  const frame = useCurrentFrame();
+  const eased = interpolate(frame, [startFrame, startFrame + windowFrames], [0, 1], {
+    ...clamp,
+    easing: EASE_IN_OUT,
+  });
+  const remaining = totalSeconds * (1 - eased);
+
+  // The held numeral: sample the same eased curve at the last multiple of HOLD_FRAMES, so the
+  // readout is always a value the bar genuinely passed through rather than a rounding of the
+  // current one.
+  const held = startFrame + Math.floor((frame - startFrame) / HOLD_FRAMES) * HOLD_FRAMES;
+  const easedHeld = interpolate(held, [startFrame, startFrame + windowFrames], [0, 1], {
+    ...clamp,
+    easing: EASE_IN_OUT,
+  });
+
+  return { remaining, shown: Math.round(totalSeconds * (1 - easedHeld)) };
+};
+
+/**
  * ── THE CALIBRATION SUCCESS RIPPLE ──────────────────────────────────────────────────
  *
  * Source: `components/anchor/success-state.tsx:30-36`.
@@ -358,5 +459,52 @@ export const useEmphasis = (keys: { frame: number; up: number }[]): number => {
     keys.map((k) => k.frame),
     keys.map((k) => k.up),
     { ...clamp, easing: EASE_IN_OUT },
+  );
+};
+
+/**
+ * ── THE SAME DEVICE, ON BEAT 5a'S PRIVACY LINE ──────────────────────────────────────
+ *
+ * "Your video isn't stored — only the calm reading it produces." (`intro.tsx:52`). It is the
+ * single most important sentence in the film for a privacy-first product and it was reading as a
+ * small grey line among four other small grey lines.
+ *
+ * It takes **the in-place emphasis, not the travelling lift** — the same grow-and-settle the
+ * stateline uses, at the same 1.25×, on the same easing. That matters for two separate reasons:
+ *
+ *  · The lift (L10) is capped at two uses and both are spent (beat 1's address bar, beat 3's
+ *    calibration banner). The in-place device is **a rule rather than a budget**, so this costs
+ *    nothing against that cap — it is grammar the audience has already been taught by beats 7, 8
+ *    and 11.
+ *  · The lift needs camera travel and a settle; this needs neither, so it fits inside 5a's
+ *    existing wide hold without moving a keyframe. **Beat 5a's framing is untouched.**
+ *
+ * ── MOTION ONLY. IT IS NOT RECOLOURED, AND THAT IS DELIBERATE ───────────────────────
+ *
+ * Everything else this film adapts is geometry — a lifted banner, a raised block, an enlarged
+ * viewfinder. Recolouring a **privacy claim** would be a different kind of change: it would make
+ * the sentence more prominent in the video than it is in the product, which is a claim about the
+ * product rather than a staging of it. The `text-muted` grey and the meadow shield stay exactly
+ * as `intro.tsx` sets them; only the size moves, and the movement carries the emphasis on its own.
+ *
+ * The mechanism is `monitor.tsx`'s `<Emphasis/>` one file over: a scoped stylesheet on the
+ * element, `transform-origin: top center` so it grows downward and outward from where it already
+ * is. The component is not touched and the intro is not re-laid-out — at 1.25× the raised line
+ * finishes 27px clear of the "Turn on camera" block and 249px clear of the frame (`geometry.ts`
+ * § INTRO_PRIVACY has the arithmetic).
+ */
+export const IntroPrivacyEmphasis: React.FC<{ t: number; factor?: number }> = ({
+  t,
+  factor = 1.25,
+}) => {
+  const k = 1 + (factor - 1) * t;
+  if (t <= 0) return null;
+  return (
+    <style>{`
+      [data-intro] > div > p {
+        transform-origin: top center;
+        scale: ${k};
+      }
+    `}</style>
   );
 };

@@ -419,6 +419,87 @@ export const HOME = {
   welcomeWithBanner: rect(24, 250, 1152, 83.1),
   /** Without it (beat 6). */
   welcome: rect(24, 124, 1152, 83.1),
+
+  /**
+   * ── THE THREE CARDS, AS THE REAL EMPTY STATES ─────────────────────────────────────
+   *
+   * The skeleton stand-ins were 196 / 168 / 168 by invention. The real cards, in their
+   * genuine no-data branches, measure **217.5 / 176.3 / 152.5** — so all three were wrong,
+   * and the grid row is 176.3 rather than 168 because the two cards are deliberately not
+   * height-yoked (`recent-chats-card.tsx:91` — neither carries `h-full`).
+   *
+   * Beat 6's card sits at 247.1: the welcome header ends at 207.1 and `space-y-10` adds 40.
+   * Beat 3's sits 126 lower, at 373.1, which is the calibration banner plus its own gap —
+   * the same 126 the sheet already quotes for what moves when `has_anchor` flips.
+   */
+  todayCard: rect(24, 247.1, 1152, 217.5),
+  todayCardWithBanner: rect(24, 373.1, 1152, 217.5),
+  /**
+   * **"Start check-in", and beat 6 had been clicking a rectangle.** The CTA is 126.3 × 40 at
+   * x 49, 152.5 down the card — so in beat 6's column it is at y 399.6. The beat used to draw
+   * its own 152 × 44 button at (1000, 300) and click that, because the card underneath was a
+   * stand-in with no button in it. Both the drawn button and the guessed position are gone.
+   */
+  startCheckIn: rect(49, 399.6, 126.3, 40),
+} as const;
+
+/**
+ * ── BEAT 10'S COMPOSER, MEASURED — THE ONE CURSOR IN THE FILM THAT MISSED ───────────
+ *
+ * Every other click site in this film is the measured centre of a real control. Beat 10's two
+ * were hand-typed: the caret at (460, 552) and **send at (872, 552)**. The send button is 44px
+ * wide and starts at x 879, so the cursor was pressing **seven pixels outside the left edge of
+ * the control it was pressing** — which is exactly the "it clicks near a button rather than on
+ * it" complaint, and it is the only genuine instance of it in the cut.
+ *
+ * The panel is `mx-auto max-w-2xl` at a fixed `h-[460px]`, so it lands at x 264–936 and, under
+ * the authed layout's header and `pt-8`, at y 188. `<ChatShell/>`'s composer sits 346.1 down
+ * from the panel's top — a `border-t p-3` form of `min-h-[44px]`, above a `px-3 py-2` footer bar.
+ *
+ * The caret position was fine by luck (460, 552) is inside the textarea; it is measured now
+ * anyway, because "inside by luck" is not a property that survives the next layout change.
+ */
+export const CHAT = {
+  panel: rect(264, 188, 672, 460),
+  composer: rect(277, 534.1, 646, 44.5),
+  textarea: rect(277, 534.1, 592, 44.5),
+  /** The send button. Beat 10 ends its typing on a click of this. */
+  send: rect(879, 534.1, 44, 44),
+} as const;
+
+/**
+ * ── BEAT 5a'S PRIVACY LINE, AND THE ROOM THE EMPHASIS HAS ───────────────────────────
+ *
+ * "Your video isn't stored — only the calm reading it produces." — `intro.tsx:52`, the single
+ * most important sentence in the film for a privacy-first product, and until this pass it passed
+ * as a small grey line. It takes the **in-place emphasis (L12)**, the same grow-and-settle device
+ * the stateline uses, and unlike the stateline it gets the device at **full amplitude**.
+ *
+ * Both clearances measured, growing downward from the line's own top edge and outward from its
+ * horizontal centre, at L12's 1.25×:
+ *
+ *   line               418.4 × 20 at (390.8, 370.6) inside the intro
+ *   raised             523.0 × 25 — bottom at 395.6
+ *   the CTA block      top at 422.6                 → **27px of clearance**
+ *   the intro column   376 – 824                    → 37.5px past it, onto empty page
+ *   the frame          89.3 – 1110.8 (BEAT5_INTRO)  → **249px of clearance each side**
+ *
+ * So nothing caps it: the stateline yielded to 1.25× because two measured clearances forced it,
+ * and this one arrives at 1.25× because the room is simply there. The 37.5px of overhang past the
+ * `max-w-md` boundary costs nothing — that boundary is invisible, with no border, no background
+ * and nothing beside it to collide with.
+ *
+ * **What the emphasis does NOT buy here is legibility, and that is worth stating rather than
+ * discovering later.** Beat 5a is deliberately wide (the sheet: "it STAYS WIDE"), so at 1021.5
+ * world px the line's real 14px lands at **5.8px on a phone**, and 7.2px raised. The device is
+ * carrying emphasis, not size — which is what §7 asked for, and it is why the instruction was
+ * *motion only, do not recolour*. A framing that makes this line readable is Pass B's to find.
+ */
+export const INTRO_PRIVACY = {
+  /** Relative to the intro component's own top-left. */
+  line: rect(14.8, 370.6, 418.4, 20),
+  /** Where the "Turn on camera" block starts — what caps the downward growth. */
+  ctaBlockTop: 422.6,
 } as const;
 
 /**
