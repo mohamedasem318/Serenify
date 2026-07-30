@@ -148,11 +148,27 @@ export const QUESTIONNAIRE = {
  *
  * Turn 3 has to read as *personal knowledge*, not a canned tip; that is the
  * whole difference between Serenify and an app that says "try deep breathing".
+ *
+ * **Turn 2 was shortened because it now TYPES ON.** It is the one moment he acts
+ * through language rather than a click and the beat should show that — but a long
+ * sentence typing out kills it. At 63 characters the old line needed either 3.2
+ * seconds the beat does not have or ~50 characters a second, which is a blur and
+ * not typing. It is 35 characters now and types in 1.7s at ~20 c/s, which reads as
+ * a person hammering something out. Shortening the copy is the correct lever here;
+ * speeding the typing is not.
+ *
+ * Nothing was lost with the words. The audience watched the toast say "need the
+ * report by 12" and the clock say 11:30 forty seconds ago, so "boss moved it to
+ * 12" is a callback rather than an exposition, and turn 3 needs "thirty minutes"
+ * on the record because it answers it.
+ *
+ * **Ren's reply does NOT type** — it keeps the typing-indicator-then-message
+ * treatment. The human types; the AI thinks, then speaks.
  */
 export const REN = {
   turns: [
     { who: "ren" as const, text: "Something shifted just now. What happened?" },
-    { who: "him" as const, text: "boss moved the deadline. report due at 12. that's thirty minutes" },
+    { who: "him" as const, text: "boss moved it to 12. thirty minutes" },
     {
       who: "ren" as const,
       text: "Thirty minutes is enough — just not like this. Put Billie Jean on first. You always settle faster with MJ playing.",

@@ -2,7 +2,7 @@ import React from "react";
 import { Easing, interpolate, interpolateColors, useCurrentFrame } from "remotion";
 
 import { CharacterRig, Pose } from "./rig";
-import { BAND, FONT, GREY, MONO } from "./theme";
+import { BAND, GREY, MONO } from "./theme";
 import { Box } from "./ui";
 
 /**
@@ -74,58 +74,22 @@ export const RenAvatar: React.FC<{ x: number; y: number; size: number; state: Re
   );
 };
 
-/** Drifting music notes — beat 11 only. */
-export const MusicNotes: React.FC<{ x: number; y: number; w: number; h: number; startFrame: number }> = ({
-  x,
-  y,
-  w,
-  h,
-  startFrame,
-}) => {
-  const frame = useCurrentFrame();
-  const notes = [0, 1, 2, 3, 4];
-
-  return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, overflow: "hidden" }}>
-      {notes.map((i) => {
-        const local = frame - startFrame - i * 13;
-        if (local < 0) return null;
-        const cycle = local % 70;
-        const rise = interpolate(cycle, [0, 70], [h * 0.9, h * 0.08]);
-        const fade = interpolate(cycle, [0, 10, 52, 70], [0, 1, 1, 0], {
-          extrapolateLeft: "clamp",
-          extrapolateRight: "clamp",
-        });
-        const drift = Math.sin(cycle / 9 + i) * w * 0.06;
-        return (
-          <div
-            key={i}
-            style={{
-              position: "absolute",
-              left: w * (0.14 + i * 0.18) + drift,
-              top: rise,
-              fontFamily: FONT,
-              fontSize: h * 0.13,
-              color: GREY.graphite,
-              opacity: fade,
-            }}
-          >
-            {i % 2 === 0 ? "♪" : "♫"}
-          </div>
-        );
-      })}
-    </div>
-  );
-};
-
 /**
  * The viewfinder. Scaled up from the app's real 224×126 under liberty L1 —
  * at true size his face is a smudge on a phone and beat 8 needs a readable one.
  *
- * The rig fills the whole viewfinder rather than a 48%-wide box inside it. That is
- * both more honest (a webcam sees head, shoulders and a bit of backdrop, and people
- * sit close to laptops) and the only way the head is big enough to read: at the wide
- * composite framing it is ~40px on a phone, and at 48% width it was ~19px.
+ * **The box is still greybox furniture; what is inside it is not.** The real component
+ * is `apps/web/components/monitor/viewfinder.tsx` — `w-56` at `aspect-video`, so 224×126,
+ * with meadow corner brackets over the live feed. This stands in for its chrome at L1's
+ * size. The character sizes himself off the box's *aspect* rather than its pixels, so the
+ * swap to the real component re-frames him rather than needing him re-registered.
+ *
+ * The rig fills the whole box rather than a smaller inset. That is both more honest — a
+ * webcam sees head, shoulders and a bit of the room, and people sit close to laptops —
+ * and the only way the head is big enough to read: at the wide composite framing it is
+ * ~50px on a phone, and inset it was ~19px.
+ *
+ * The drifting notes moved inside the rig, so they scale with him instead of with the box.
  */
 export const Viewfinder: React.FC<{
   x: number;
@@ -139,18 +103,30 @@ export const Viewfinder: React.FC<{
   notesFrom?: number;
 }> = ({ x, y, w, h, pose, working, headphones, nod, notesFrom }) => (
   <>
-    <Box x={x} y={y} w={w} h={h} fill={GREY.panelAlt} border={GREY.graphite} radius={8} label="viewfinder" labelSize={10} />
-    <CharacterRig
-      x={x}
-      y={y}
-      w={w}
-      h={h}
-      pose={pose}
-      working={working}
-      headphones={headphones}
-      nod={nod}
-    />
-    {notesFrom === undefined ? null : <MusicNotes x={x} y={y} w={w} h={h} startFrame={notesFrom} />}
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        borderRadius: 8,
+        overflow: "hidden",
+      }}
+    >
+      <CharacterRig
+        x={0}
+        y={0}
+        w={w}
+        h={h}
+        pose={pose}
+        working={working}
+        headphones={headphones}
+        nod={nod}
+        notesFrom={notesFrom}
+      />
+    </div>
+    <Box x={x} y={y} w={w} h={h} fill="transparent" border={GREY.graphite} radius={8} />
   </>
 );
 

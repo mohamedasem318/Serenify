@@ -82,7 +82,7 @@ const Still: React.FC<{ state: Expression; x: number; y: number }> = ({ state, x
   return (
     <>
       <Plate x={x} y={y} w={280} h={280} />
-      <CharacterRig x={x} y={y} w={280} h={280} pose={pose} working={state !== "calm"} />
+      <CharacterRig x={x} y={y} w={280} h={280} pose={pose} working={state !== "calm"} uid={`still-${state}`} />
       <Label x={x} y={y + 292} w={280} text={state} />
     </>
   );
@@ -117,12 +117,12 @@ export const RigSpike: React.FC = () => {
       {/* The fall, large. */}
       <Label x={200} y={438} w={520} text="beat 8's fall · real timings · large" size={18} />
       <Plate x={200} y={470} w={520} h={520} />
-      <CharacterRig x={200} y={470} w={520} h={520} pose={fall} working={working} />
+      <CharacterRig x={200} y={470} w={520} h={520} pose={fall} working={working} uid="fall-large" />
 
       {/* The fall, at the size it actually plays at in the cut. */}
       <Label x={840} y={438} w={512} text="the same fall at real viewfinder size (512 × 288)" size={18} />
       <Plate x={840} y={470} w={512} h={288} />
-      <CharacterRig x={840} y={470} w={512} h={288} pose={fall} working={working} />
+      <CharacterRig x={840} y={470} w={512} h={288} pose={fall} working={working} uid="fall-real" />
 
       {/* And at beat 11: headphones, nod, still working. */}
       <Label x={840} y={790} w={512} text="beat 11 · easing · headphones · nod · still working" size={18} />
@@ -176,6 +176,8 @@ const Beat11Sample: React.FC<{ x: number; y: number }> = ({ x, y }) => {
       working={frame >= 62}
       headphones={frame >= 74}
       nod={frame >= 108}
+      notesFrom={84}
+      uid="beat11"
     />
   );
 };

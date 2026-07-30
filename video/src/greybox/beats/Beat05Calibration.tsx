@@ -239,8 +239,6 @@ export const Beat05Calibration: React.FC = () => {
                 fill={GREY.panelAlt}
                 border={GREY.border}
                 radius={12}
-                label="camera preview · 3:4"
-                labelSize={10}
               />
               {/*
                * FIRST SIGHT OF HIM, and the sheet is emphatic that everything in beats
@@ -263,10 +261,19 @@ export const Beat05Calibration: React.FC = () => {
                 }}
               >
                 <div style={{ filter: phase === "green" ? undefined : "blur(6px)" }}>
+                  {/*
+                   * He settles INTO the framing target, and the settle now scales *down*
+                   * from over-size rather than up from under-size. The rig carries its
+                   * own backdrop, so a transform that leaves it smaller than the preview
+                   * exposed L-shaped gaps of panel grey at two edges and the whole thing
+                   * read as a photograph floating in a box rather than as a camera feed.
+                   * 1.10 → 1.00 with a small offset keeps the box covered at every frame,
+                   * and "slightly too close, then adjusts" is what people actually do.
+                   */}
                   <div
                     style={{
-                      translate: `${(1 - settle) * 38}px ${(1 - settle) * 24}px`,
-                      scale: 0.86 + settle * 0.14,
+                      translate: `${(1 - settle) * 10}px ${(1 - settle) * 12}px`,
+                      scale: 1.1 - settle * 0.1,
                       transformOrigin: "50% 50%",
                     }}
                   >

@@ -1,20 +1,32 @@
 import React from "react";
 import { Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { GREY } from "./theme";
+import { OfficeBackdrop } from "./character/backdrop";
+import { CharacterBase, SHIRT } from "./character/base";
+import { FACE, Features, Hands, Headphones, MusicNote } from "./character/features";
 
 /**
  * ── THE CHARACTER RIG ───────────────────────────────────────────────────────
  *
- * A SPIKE, and its question is narrow: **can a face made of primitives fall
- * convincingly?** Two risks were travelling under one name — whether a rig can
- * produce the motion the beats require, and whether we can get good consistent art
- * — and the second was making the first look frightening. The first can be retired
- * with no art at all, which is what this is.
+ * **The art is real now.** The spike answered its question — a face made of primitives
+ * does carry beat 8's fall — and this is the same rig with the crude drawing swapped for
+ * a stripped Avataaars base (`character/av2-base.svg`, MIT; provenance in
+ * `character/NOTICE.md`). What did not change is the thing the spike was proving: the
+ * thirteen-number pose vector below is untouched, expressions are still points in it, and
+ * transitions are still interpolations.
  *
- * It is deliberately ugly. Arcs, dots, ellipses, one quadratic for the mouth. Do not
- * refine it; the point is that if *this* carries beat 8, then art is a swap rather
- * than a dependency.
+ * The page around the viewfinder is still greybox. That is deliberate — real `apps/web`
+ * components are a separate pass.
+ *
+ * ── WHAT THE BASE OWNS AND WHAT THE RIG OWNS ────────────────────────────────
+ *
+ * The base supplies skull, hair, ears, neck, nose and clothing. It ships with **no
+ * brows, eyes or mouth** — a head with its features baked in cannot be posed — so the rig
+ * draws those, in `character/features.tsx`, and the single most important constraint on
+ * this pass lives there: **Avataaars has no sclera.** Every facial feature in that system
+ * is `#000000` at an opacity. The crude rig's white eyeballs and dark pupils would have
+ * produced the same cartoon on better art, which is the one outcome that makes the swap
+ * pointless.
  *
  * ── THE ARCHITECTURAL CONSTRAINT ────────────────────────────────────────────
  *
@@ -32,7 +44,7 @@ import { GREY } from "./theme";
  * ── THE PART DECOMPOSITION ──────────────────────────────────────────────────
  *
  * Chosen for a webcam talking-head crop, where at the wide composite framing the head
- * is ~40px on a phone and only three or four features can register at all. So: few
+ * is ~50px on a phone and only three or four features can register at all. So: few
  * parts, each bold, each doing real work.
  *
  *   1 · head        position, tilt — carries the nod and the sink
@@ -41,12 +53,14 @@ import { GREY } from "./theme";
  *   4 · pupils      gaze offset
  *   5 · mouth       one curvature scalar (+smile / −frown), width, openness, skew
  *   6 · shoulders   slump, and the typing motion
- *   7 · hands       two blocks at the frame edge, alternating — "still working"
+ *   7 · hands       two shapes at the frame edge, alternating — "still working"
  *   8 · headphones  an overlay on the ears, beat 11 only
  *
- * The hair cap and the ears are not animated. They exist because they are where the
- * generated art's seams will be, and drawing them now proves the rig has somewhere to
- * attach them.
+ * The hair, the ears and the neck are not animated. They come from the base, and the
+ * ears are where the headphones attach — at the **measured** ear centres (71, 117) and
+ * (193, 117), which are five pixels below the eye line. The handover file claimed no ear
+ * geometry existed; it does, baked into the skin path, and `character/NOTICE.md` has the
+ * derivation.
  */
 
 // ── The pose vector ─────────────────────────────────────────────────────────
@@ -249,153 +263,165 @@ const useBlink = (): number => {
   return shut;
 };
 
+// ── The framing window ──────────────────────────────────────────────────────
+
+/**
+ * **The rig is sized against the viewfinder's inner box, never against absolute values.**
+ *
+ * The viewfinder this pass frames against is a real `apps/web` component
+ * (`components/monitor/viewfinder.tsx` — `w-56`, `aspect-video`, i.e. 224 × 126, drawn
+ * here at 320 × 180 under liberty L1). When the greybox page is replaced by real
+ * components that box changes size, and any character geometry expressed in viewfinder
+ * pixels would have to be re-registered by hand.
+ *
+ * So nothing below is in viewfinder pixels. The rig picks a **framing window** in the
+ * base's own `0 0 264 280` coordinates, hands it to the SVG as a viewBox, and lets the
+ * browser do the fitting. Change the box to any size or aspect and the character re-frames
+ * itself: the window keeps its top and bottom, and only its width follows the box.
+ *
+ *   top 22      two units into the hair, which is what a laptop webcam does to a person
+ *               sitting close. The chin lands at y 181 and the head fills ~68% of frame
+ *               height.
+ *   bottom 262  far enough below the collar (y 222) that a band of shirt is in frame at
+ *               the sides. Above ~240 the shoulders leave the frame entirely and he reads
+ *               as a floating head.
+ *
+ * At 16:9 that gives a 427-wide window against artwork only 264 wide — which is the whole
+ * reason the shoulder extension below exists.
+ */
+const WINDOW = { top: 22, bottom: 262 } as const;
+const WINDOW_H = WINDOW.bottom - WINDOW.top;
+
+/** The head clip line, at the neck. The two halves overlap by 2 to absorb head motion. */
+const NECK_SPLIT = 187;
+
+/**
+ * **The shoulder extension**, and it is not the scale transform the handover suggested.
+ *
+ * The base's shoulders span x 32–232 inside a 264-wide box — about 12% padding a side —
+ * against a framing spec that wants them running off both edges. A plain x-scale would
+ * fix that and wreck the crew neck with it: the neck opening is part of the same path, so
+ * scaling the shirt 2× scales the collar 2× and he ends up in a boat neck.
+ *
+ * So this draws a quadratic behind the base instead, in the shirt's exact `#25557C`.
+ *
+ * ── WHY IT TAKES OVER AT THE COLLAR AND NOT FURTHER OUT ─────────────────────
+ *
+ * The first version pinned the apex at y 228, safely below the collar notch, and it left a
+ * **visible step**: the base's own shoulder arc drops steeply — from (99, 199) to (32,
+ * 271), where it is already vertical — so a curve flat enough to reach the frame edges
+ * crossed it around x 45, at which point the two silhouettes met at about a 35° angle. He
+ * looked like he was wearing shoulder pads over a second shirt.
+ *
+ * The fix is to stop having two silhouettes. The apex sits at **y 199, level with the
+ * shirt's own shoulder tops**, so the extension emerges from behind the base right at the
+ * collar and every visible pixel of shoulder outboard of that is the extension's. The base
+ * shirt is then entirely *inside* it and contributes nothing to the outline — which is why
+ * there is no longer a crossing to hide.
+ *
+ * That apex would fill the crew neck, so the extension is clipped out of a box around it
+ * (x 96–170, above y 226). All three of that box's edges are behind solid shirt: at x 96
+ * and x 170 the shirt is solid from y ≈ 200 down — the neck opening only spans x 99–166 —
+ * and the notch bottoms out at y 222, above the box's floor.
+ *
+ * `edgeY` is then solved rather than chosen, from the requirement that the curve passes
+ * through the shirt's shoulder top at x 96. At 16:9 the curve is so flat there that the
+ * solution barely constrains it — thirteen units of `edgeY` move it four tenths of one —
+ * so it is clamped to keep a proper band of shirt in the bottom corners. At the 3:4
+ * portrait preview the half-width is small, the constraint bites, and the clamp does not
+ * apply: he simply shows more torso, which is what a portrait framing should do.
+ */
+const SHOULDER_APEX = 199;
+/** The base shirt's own top edge at x 96, which is where the extension has to meet it. */
+const SHOULDER_MEET = 200.5;
+
+const ShoulderExtension: React.FC<{ winX: number; winW: number; uid: string }> = ({
+  winX,
+  winW,
+  uid,
+}) => {
+  const a = winW / 2;
+  // Solving y(96) = SHOULDER_MEET for a symmetric quadratic gives exactly this. The
+  // clamp keeps at least 26 units of shirt in the bottom corners at wide aspects.
+  const edgeY = Math.min(
+    SHOULDER_APEX + (a * a * (SHOULDER_MEET - SHOULDER_APEX)) / 1296,
+    WINDOW.bottom - 26,
+  );
+  const x0 = winX - 2;
+  const x1 = winX + winW + 2;
+  // A quadratic sits at half its control's offset at the midpoint, so this puts the apex
+  // exactly on SHOULDER_APEX whatever the ends are doing.
+  const ctrlY = 2 * SHOULDER_APEX - edgeY;
+  const floor = WINDOW.bottom + 60;
+
+  return (
+    <>
+      <defs>
+        {/* Everything except the collar box, as the union of three rectangles. */}
+        <clipPath id={`${uid}-shoulder`}>
+          <rect x={x0 - 40} y={0} width={96 - x0 + 40} height={floor} />
+          <rect x={170} y={0} width={x1 - 170 + 40} height={floor} />
+          <rect x={x0 - 40} y={226} width={winW + 160} height={floor} />
+        </clipPath>
+      </defs>
+      <path
+        d={`M ${x0} ${edgeY} Q ${FACE.cx} ${ctrlY} ${x1} ${edgeY} L ${x1} ${floor} L ${x0} ${floor} Z`}
+        fill={SHIRT}
+        clipPath={`url(#${uid}-shoulder)`}
+      />
+    </>
+  );
+};
+
 // ── The drawing ─────────────────────────────────────────────────────────────
 
-/** Head geometry, in the 0–100 square the head SVG is drawn in. */
-const EYE = { dx: 13.5, cy: 51, rx: 7.2, ry: 8 } as const;
-const BROW = { dx: 13.5, y: 36, halfW: 9, weight: 5.6 } as const;
-const MOUTH = { cy: 71, halfW: 12 } as const;
-
-const Brow: React.FC<{ side: -1 | 1; pose: Pose }> = ({ side, pose }) => {
-  // The inner end moves and the outer end barely does, which is what gives a brow its
-  // meaning. `browInner` +1 lifts the inner end (distress); −1 drops it (tension).
-  const cx = 50 + side * BROW.dx;
-  const y = BROW.y - pose.browY * 4;
-  const innerX = cx - side * BROW.halfW;
-  const outerX = cx + side * BROW.halfW;
-  const innerY = y - pose.browInner * 4.2;
-  const outerY = y + pose.browInner * 1.1;
-
-  return (
-    <line
-      x1={innerX}
-      y1={innerY}
-      x2={outerX}
-      y2={outerY}
-      stroke={GREY.ink}
-      strokeWidth={BROW.weight}
-      strokeLinecap="round"
-    />
-  );
-};
-
-const Eye: React.FC<{ side: -1 | 1; pose: Pose; blink: number }> = ({ side, pose, blink }) => {
-  const cx = 50 + side * EYE.dx;
-  const openRy = EYE.ry * pose.eyeOpen;
-  // The lower lid is fixed and the upper lid descends — that is what a blink is, and
-  // it is why this needs no clip path.
-  const drop = Math.min(1, pose.lidDrop + blink);
-  const ry = Math.max(0.5, openRy * (1 - drop));
-  const cy = EYE.cy + openRy - ry;
-  const pupilR = Math.min(3.4, ry * 0.8);
-
-  return (
-    <>
-      <ellipse cx={cx} cy={cy} rx={EYE.rx * pose.eyeOpen} ry={ry} fill={GREY.white} />
-      <ellipse
-        cx={cx}
-        cy={cy + pose.gazeY * 1.6}
-        rx={pupilR}
-        ry={pupilR}
-        fill={GREY.ink}
-        opacity={ry < 1.2 ? 0 : 1}
-      />
-    </>
-  );
-};
-
-const Mouth: React.FC<{ pose: Pose }> = ({ pose }) => {
-  const halfW = MOUTH.halfW * pose.mouthWidth;
-  const x1 = 50 - halfW;
-  const x2 = 50 + halfW;
-  // One scalar drives the whole mouth: the quadratic's control point. Positive curve
-  // pulls it below the corners (a smile), negative above it (a frown).
-  const ctrlY = MOUTH.cy + pose.mouthCurve * 13;
-  const y1 = MOUTH.cy - pose.mouthCurve * 1.5 - pose.mouthSkew * 2;
-  const y2 = MOUTH.cy - pose.mouthCurve * 1.5 + pose.mouthSkew * 2;
-
-  return (
-    <>
-      {pose.mouthOpen > 0.04 ? (
-        <ellipse
-          cx={50}
-          cy={MOUTH.cy + pose.mouthCurve * 4}
-          rx={halfW * 0.62}
-          ry={pose.mouthOpen * 6.5}
-          fill={GREY.black}
-          opacity={0.55}
-        />
-      ) : null}
-      <path
-        d={`M ${x1} ${y1} Q 50 ${ctrlY} ${x2} ${y2}`}
-        fill="none"
-        stroke={GREY.ink}
-        strokeWidth={4.4}
-        strokeLinecap="round"
-      />
-    </>
-  );
-};
-
 /**
- * The head, drawn into a square. Everything is in 0–100 units so the whole thing
- * scales with one number, which is also the property an art swap has to preserve.
+ * Drifting notes, in the character's own coordinates so they hold their size against his
+ * head at any framing. Beat 11 only. The drift and the fade are the greybox's, unchanged
+ * — that read is liked; only the glyphs moved into the base's vocabulary.
  */
-const Head: React.FC<{ pose: Pose; blink: number; headphones: boolean }> = ({
-  pose,
-  blink,
-  headphones,
-}) => (
-  <svg viewBox="0 0 100 100" width="100%" height="100%" style={{ display: "block", overflow: "visible" }}>
-    {/* Ears. Not animated — they are where the headphones attach. */}
-    <ellipse cx={20} cy={55} rx={4.6} ry={7} fill={GREY.strong} />
-    <ellipse cx={80} cy={55} rx={4.6} ry={7} fill={GREY.strong} />
-
-    {/* Skull. */}
-    <ellipse cx={50} cy={54} rx={29} ry={33} fill={GREY.strong} />
-
-    {/* Hair cap. Not animated either; it exists to mark the seam the generated
-        drawing has to land on, and to stop the head reading as an egg. */}
-    <path
-      d="M 21 46 C 21 22 79 22 79 46 C 74 34 66 30 50 30 C 34 30 26 34 21 46 Z"
-      fill={GREY.graphite}
-    />
-
-    <Brow side={-1} pose={pose} />
-    <Brow side={1} pose={pose} />
-    <Eye side={-1} pose={pose} blink={blink} />
-    <Eye side={1} pose={pose} blink={blink} />
-
-    {/* Nose. A tick, and it never moves — it is the fixed reference the rest reads
-        against, which is most of why a crude face reads at all. */}
-    <line x1={50} y1={58} x2={50} y2={64} stroke={GREY.graphite} strokeWidth={3.6} strokeLinecap="round" />
-
-    <Mouth pose={pose} />
-
-    {headphones ? (
-      <>
-        {/* The band clears the brows. At its first pass it crossed them at y 36 and
-            ate the one feature carrying most of the expression. */}
-        <path
-          d="M 12 54 C 12 17 88 17 88 54"
-          fill="none"
-          stroke={GREY.graphite}
-          strokeWidth={5.5}
-          strokeLinecap="round"
-        />
-        <rect x={7} y={46} width={12} height={20} rx={6} fill={GREY.graphite} />
-        <rect x={81} y={46} width={12} height={20} rx={6} fill={GREY.graphite} />
-      </>
-    ) : null}
-  </svg>
-);
+const Notes: React.FC<{ startFrame: number; winX: number; winW: number }> = ({
+  startFrame,
+  winX,
+  winW,
+}) => {
+  const frame = useCurrentFrame();
+  return (
+    <>
+      {[0, 1, 2, 3, 4].map((i) => {
+        const local = frame - startFrame - i * 13;
+        if (local < 0) return null;
+        const cycle = local % 70;
+        const y = interpolate(cycle, [0, 70], [WINDOW.bottom - 20, WINDOW.top + 24]);
+        const fade = interpolate(cycle, [0, 10, 52, 70], [0, 1, 1, 0], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        });
+        const drift = Math.sin(cycle / 9 + i) * winW * 0.05;
+        return (
+          <MusicNote
+            key={i}
+            x={winX + winW * (0.12 + i * 0.18) + drift}
+            y={y}
+            scale={1.15}
+            opacity={fade}
+            beamed={i % 2 === 1}
+          />
+        );
+      })}
+    </>
+  );
+};
 
 /**
- * The character, in a webcam crop. Head and shoulders, front on.
+ * The character, in a webcam crop: office behind him, head and shoulders, front on, and
+ * the shoulders running off both sides of the frame.
  *
- * The shoulders deliberately bleed past the box on both sides — that is what a webcam
- * frame looks like, and a person whose shoulders end inside the frame reads as a
- * cut-out sticker.
+ * **Nothing here is in viewfinder pixels.** The box only decides the framing window's
+ * aspect; everything inside is in the base's own coordinates. So the same component fills
+ * beat 5's 3:4 calibration preview and the 16:9 viewfinder without a second set of
+ * numbers, and it will re-fit whatever inner box the real `apps/web` viewfinder turns out
+ * to have.
  */
 export const CharacterRig: React.FC<{
   x: number;
@@ -412,104 +438,82 @@ export const CharacterRig: React.FC<{
   headphones?: boolean;
   /** The music nod. Timed to ~117bpm, which is what Billie Jean actually is. */
   nod?: boolean;
-}> = ({ x, y, w, h, pose, working = false, headphones = false, nod = false }) => {
+  /** Frame the drifting notes start at. Beat 11 only. */
+  notesFrom?: number;
+  /** Disambiguates SVG ids when more than one rig is on screen (the spike bench). */
+  uid?: string;
+}> = ({ x, y, w, h, pose, working = false, headphones = false, nod = false, notesFrom, uid = "rig" }) => {
   const frame = useCurrentFrame();
   const blink = useBlink();
 
   const breath = Math.sin((frame / (26 * pose.breathRate)) * Math.PI * 2);
-  const sway = Math.sin(frame / 34) * 1.1;
+  const sway = Math.sin(frame / 34) * 1.4;
   // 15.4 frames per beat at 30fps is 117bpm. A nod on the beat rather than a wobble.
   const nodPhase = nod ? Math.sin((frame / 15.4) * Math.PI * 2) : 0;
   // Two-finger typing, crudely: the hands alternate and the shoulders take a little
   // of it. Small — it should read as busy, not as agitated.
   const typing = working ? Math.sin(frame / 3.1) : 0;
 
-  /**
-   * The head is sized off BOTH dimensions, because the rig has to work in a 16:9
-   * viewfinder and in beat 5's 3:4 calibration preview, and a head sized off height
-   * alone is wider than the portrait box.
-   *
-   * Everything below the head is then positioned FROM the head rather than from the
-   * box: the neck hangs off the chin and the shoulders overlap it. Placing the
-   * shoulders at a fixed fraction of the box left a 15px band of backdrop between the
-   * chin and the collar at 16:9, and a floating head is the one thing a talking-head
-   * crop cannot survive.
-   */
-  const headSize = Math.min(h * 0.82, w * 0.9);
-  const headLeft = (w - headSize) / 2 + sway;
-  const headTop = h * 0.03 + pose.headY + nodPhase * 2.6 + breath * 0.5;
-  // 0.87 of the head square is the bottom of the skull; see the ellipse in <Head>.
-  const chin = headTop + headSize * 0.87;
-  const shoulderTop = chin - headSize * 0.07 + pose.shoulderY + breath * 0.4 + Math.abs(typing) * 0.5;
+  // The window keeps its top and bottom; only its width follows the box's aspect.
+  const winW = (WINDOW_H * w) / h;
+  const winX = FACE.cx - winW / 2;
 
-  const HAND_W = w * 0.18;
-  const handTop = h - HAND_W * 0.5;
+  // The head pivots at the base of the neck, so a tilt swings the chin and not the collar.
+  const headDx = sway;
+  const headDy = pose.headY + nodPhase * 2.6 + breath * 0.5;
+  const headRot = pose.headTilt + nodPhase * 1.1;
+  const bodyDx = sway * 0.4;
+  const bodyDy = pose.shoulderY + breath * 0.4 + Math.abs(typing) * 0.5;
 
   return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h, overflow: "hidden" }}>
-      {/* Neck. Drawn first so the shoulders cover its bottom and the head its top. */}
-      <div
-        style={{
-          position: "absolute",
-          left: (w - headSize * 0.3) / 2 + sway * 0.7,
-          top: chin - headSize * 0.16,
-          width: headSize * 0.3,
-          height: headSize * 0.34,
-          backgroundColor: GREY.strong,
-        }}
-      />
-
-      {/* Shoulders, bleeding both sides. A person whose shoulders end inside the
-          frame reads as a cut-out sticker rather than as someone at a desk. */}
-      <div
-        style={{
-          position: "absolute",
-          left: -w * 0.08,
-          top: shoulderTop,
-          width: w * 1.16,
-          height: Math.max(0, h - shoulderTop) + h * 0.1,
-          borderRadius: `${w * 0.2}px ${w * 0.2}px 0 0`,
-          backgroundColor: GREY.fill,
-          translate: `${sway * 0.4}px 0px`,
-        }}
-      />
-
-      {/* Hands, rising over the desk edge at the bottom of the crop. Crude, and the
-          read comes from the alternation rather than the shape — but it is the only
-          unambiguous way to say "he never stopped working", which beat 11 needs it to
-          say. They are skin-coloured, not panel-coloured: at panel grey they matched
-          the viewfinder backdrop and read as two notches cut out of his shoulders. */}
-      {working
-        ? ([-1, 1] as const).map((side) => (
-            <div
-              key={side}
-              style={{
-                position: "absolute",
-                left: side === -1 ? w * 0.13 : w * 0.69,
-                top: handTop - Math.max(0, typing * side) * w * 0.032,
-                width: HAND_W,
-                height: HAND_W * 0.95,
-                borderRadius: `${HAND_W * 0.45}px ${HAND_W * 0.45}px 0 0`,
-                backgroundColor: GREY.strong,
-              }}
-            />
-          ))
-        : null}
-
-      {/* Head. */}
-      <div
-        style={{
-          position: "absolute",
-          left: headLeft,
-          top: headTop,
-          width: headSize,
-          height: headSize,
-          rotate: `${pose.headTilt + nodPhase * 1.1}deg`,
-          transformOrigin: "50% 100%",
-        }}
+    <div
+      style={{
+        position: "absolute",
+        left: x,
+        top: y,
+        width: w,
+        height: h,
+        overflow: "hidden",
+      }}
+    >
+      <svg
+        viewBox={`${winX} ${WINDOW.top} ${winW} ${WINDOW_H}`}
+        width="100%"
+        height="100%"
+        preserveAspectRatio="xMidYMid slice"
+        style={{ display: "block" }}
       >
-        <Head pose={pose} blink={blink} headphones={headphones} />
-      </div>
+        <defs>
+          {/* The two halves of him, split at the neck and overlapping by two units so the
+              head's whole range of motion never opens a gap. */}
+          <clipPath id={`${uid}-head`}>
+            <rect x={winX - 60} y={WINDOW.top - 120} width={winW + 120} height={NECK_SPLIT + 1 - (WINDOW.top - 120)} />
+          </clipPath>
+          <clipPath id={`${uid}-body`}>
+            <rect x={winX - 60} y={NECK_SPLIT - 1} width={winW + 120} height={400} />
+          </clipPath>
+        </defs>
+
+        <OfficeBackdrop x={winX} y={WINDOW.top} w={winW} h={WINDOW_H} />
+        <ShoulderExtension winX={winX} winW={winW} uid={uid} />
+
+        {/* Shoulders and clothing. */}
+        <g transform={`translate(${bodyDx} ${bodyDy})`} clipPath={`url(#${uid}-body)`}>
+          <CharacterBase uid={`${uid}-b`} part="body" />
+        </g>
+
+        {/* Head, and everything the expression vector moves. */}
+        <g transform={`rotate(${headRot} ${FACE.cx} 190) translate(${headDx} ${headDy})`}>
+          <g clipPath={`url(#${uid}-head)`}>
+            <CharacterBase uid={`${uid}-h`} part="head" />
+          </g>
+          <Features pose={pose} blink={blink} uid={uid} />
+          {headphones ? <Headphones /> : null}
+        </g>
+
+        {working ? <Hands bottom={WINDOW.bottom} typing={typing} /> : null}
+        {notesFrom === undefined ? null : <Notes startFrame={notesFrom} winX={winX} winW={winW} />}
+      </svg>
     </div>
   );
 };
