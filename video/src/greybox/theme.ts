@@ -35,24 +35,45 @@ export const FPS = 30;
 export const W = 1200;
 export const H = 675;
 
-/** Grey ramp. Named by role, not by lightness, so beats read at the call site. */
+/**
+ * Grey ramp. Named by role, not by lightness, so beats read at the call site.
+ *
+ * ── DARK, AS OF THE COMPONENT PASS ──────────────────────────────────────────────────
+ *
+ * The film is dark now. Every Serenify surface takes its colour from the app's own `:root.dark`
+ * tokens, so this ramp only dresses what is left: the surfaces that are still deliberately
+ * stand-ins (the mail client, the music player), the two closing cards, and any greybox
+ * furniture a beat has not yet been rebuilt around. Those have to read as **dark-mode grey**,
+ * not as light-mode grey sitting in a dark film — a stand-in in the wrong mode is louder than a
+ * stand-in, because the eye reads the mismatch before it reads the placeholder.
+ *
+ * **These are not the old values inverted.** Perceptual lightness is not symmetric about the
+ * midpoint, so flipping a light ramp gives muddy mid-greys with the wrong spacing between steps.
+ * This is built upward from the app's own dark page (`#101214`) the way the light ramp was built
+ * downward from its page, and it is kept a touch flatter than the OS chrome in `furniture.ts` so
+ * a stand-in never out-reads a real component sitting beside it.
+ *
+ * `white` and `black` keep their names and swap their jobs: `white` is now the brightest ink
+ * available on a dark field rather than a paper colour. The names are left alone because every
+ * call site reads them as roles, and renaming them would be a large diff that changes nothing.
+ */
 export const GREY = {
-  black: "#0f1113",
-  page: "#e4e5e7",
-  surface: "#eef0f1",
-  panel: "#d2d4d7",
-  panelAlt: "#dadce0",
-  field: "#e0e2e4",
-  fill: "#b6b9bc",
-  strong: "#9b9ea1",
-  graphite: "#7b7f83",
-  line: "#8d9195",
-  border: "#b9bcbf",
-  ink: "#1f2225",
-  body: "#4a4f53",
-  label: "#5f6468",
-  ghost: "#c6c9cc",
-  white: "#f7f8f9",
+  black: "#08090a",
+  page: "#101214",
+  surface: "#181b1e",
+  panel: "#22262a",
+  panelAlt: "#1e2225",
+  field: "#191c1f",
+  fill: "#2f3439",
+  strong: "#3a4046",
+  graphite: "#6b7278",
+  line: "#3a4046",
+  border: "#2a2f34",
+  ink: "#e2e5e8",
+  body: "#a8aeb4",
+  label: "#878e94",
+  ghost: "#2c3136",
+  white: "#f2f4f6",
 } as const;
 
 /**

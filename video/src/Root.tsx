@@ -15,6 +15,7 @@ import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
 import { GREYBOX_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
 import { RigSpike } from "./greybox/RigSpike";
+import { SwapProbe } from "./SwapProbe";
 import { HelloWorld } from "./HelloWorld";
 import { WebComponentProbe } from "./WebComponentProbe";
 import "./tailwind.css";
@@ -71,6 +72,14 @@ export function RemotionRoot() {
       </Folder>
 
       <Folder name="Pipeline-Checks">
+        <Composition
+          id="SwapProbe"
+          component={SwapProbe}
+          durationInFrames={30}
+          fps={30}
+          width={1920}
+          height={1400}
+        />
         <Composition
           id="HelloWorld"
           component={HelloWorld}

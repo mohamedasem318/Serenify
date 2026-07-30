@@ -1,7 +1,13 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { GREY, H, W } from "./theme";
+import { CAMERA, patchMeasurementForCamera } from "../app/measure-patch";
+import { H, W } from "./theme";
+
+// One-time. See `measure-patch.ts`: the camera's CSS scale otherwise leaks into every real
+// component that measures itself with `getBoundingClientRect`, which is how beat 11's trend
+// ended up three times too wide with its descending tail off the plot.
+patchMeasurementForCamera();
 
 /**
  * The camera rig.
@@ -106,13 +112,22 @@ export const Camera: React.FC<{
 
   // The output is 1920 wide, so a full-world shot is already 1.6×.
   const zoom = 1920 / w;
+  // Published so self-measuring components see LAYOUT pixels rather than screen pixels.
+  // Written during render on purpose: a component's measuring effect runs after this render
+  // commits, so the value it reads must already be this frame's.
+  CAMERA.zoom = zoom;
 
   return (
-    // The backdrop is the page grey, not black. Elements pinned to the right of
-    // the viewport — the toast, the viewfinder — cannot be framed tightly AND
-    // centred without the frame reaching past the world's edge, and a black
-    // sliver there would be far more visible than a few pixels of page colour.
-    <AbsoluteFill style={{ backgroundColor: GREY.page, overflow: "hidden" }}>
+    // The backdrop matches the PAGE, not black. Elements pinned to the right of the viewport —
+    // the toast, the viewfinder — cannot be framed tightly AND centred without the frame
+    // reaching past the world's edge, and a mismatched sliver there is far more visible than a
+    // few pixels of page colour.
+    //
+    // DARK PASS: this was `GREY.page` (#e4e5e7), which put a bright band along every frame edge
+    // that overshot the world — the beat-7 composite spills 5px past the bottom by design, and
+    // it read as a light bar under a dark film. It is now the app's own dark `--color-bg`, so
+    // the overshoot is invisible again exactly as it was meant to be.
+    <AbsoluteFill style={{ backgroundColor: "#101214", overflow: "hidden" }}>
       <div
         style={{
           position: "absolute",
