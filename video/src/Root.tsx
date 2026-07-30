@@ -14,6 +14,7 @@ import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
 import { GREYBOX_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
+import { RigSpike } from "./greybox/RigSpike";
 import { HelloWorld } from "./HelloWorld";
 import { WebComponentProbe } from "./WebComponentProbe";
 import "./tailwind.css";
@@ -54,15 +55,19 @@ export function RemotionRoot() {
             the jump now. See the flag in Beat06Later.tsx. */}
         <Composition id="Beat06-Later" component={Beat06Later} durationInFrames={60} fps={30} width={1920} height={1080} />
         <Composition id="Beat07-AtEase" component={Beat07AtEase} durationInFrames={120} fps={30} width={1920} height={1080} />
-        <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={180} fps={30} width={1920} height={1080} />
+        <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={200} fps={30} width={1920} height={1080} />
         <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={90} fps={30} width={1920} height={1080} />
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={210} fps={30} width={1920} height={1080} />
         <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={210} fps={30} width={1920} height={1080} />
-        {/* NEW: the closing subtitle card, between the demo and the wordmark. Its
-            copy is a placeholder at the right length — the candidate lines are in the
-            revision-4 report and Mohamed picks one. */}
         <Composition id="Beat12-Closing" component={Beat12Closing} durationInFrames={90} fps={30} width={1920} height={1080} />
-        <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={180} fps={30} width={1920} height={1080} />
+        <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={136} fps={30} width={1920} height={1080} />
+      </Folder>
+
+      {/* The character rig's own bench. Not a beat, never in the cut — it shows the
+          five poses static, and beat 8's fall at its real timings both large and at the
+          viewfinder's real on-screen size. See RigSpike.tsx. */}
+      <Folder name="Spikes">
+        <Composition id="CharacterRig" component={RigSpike} durationInFrames={180} fps={30} width={1920} height={1080} />
       </Folder>
 
       <Folder name="Pipeline-Checks">

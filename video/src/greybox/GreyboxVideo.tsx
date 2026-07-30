@@ -34,21 +34,21 @@ import { FONT, GREY } from "./theme";
  * in Studio and read straight off the sheet.
  *
  *   1 cold open     180          7 at ease        120
- *   2 signup        468 (−12)    8 the email      180
- *   3 dashboard     120 (−30)    9 questionnaire   90
+ *   2 signup        468          8 the email      200 (+20)
+ *   3 dashboard     120          9 questionnaire   90
  *   4 camera gate   150         10 Ren            210
- *   5 calibration   372 (+12)   11 return to ease 210 (+30)
- *   6 later          60         12 closing card   90 (NEW)
- *                               13 end card      180 (+30)
- *                                       total   2430 = 81.0s @ 30fps
+ *   5 calibration   372         11 return to ease 210
+ *   6 later          60         12 closing card   90
+ *                               13 end card      136 (−44)
+ *                                       total   2406 = 80.2s @ 30fps
  *
- * +4s on revision 3's 77s. Where it went: beat 11 finally lands and holds its
- * pull-out (+1s), the closing subtitle card is new (+3s), the end card's hold is
- * longer (+1s), and beat 5f pays 0.4s for a success state that is no longer cropped
- * — against beat 3's travelling lift getting tightened (−1s) and beat 2's wide hold
- * on a sparse screen getting shorter (−0.4s).
+ * −0.8s on revision 4's 81s: the end card's typing gives back 1.5s (it ran at ~13
+ * characters a second, which is a stall; the hold is untouched) and beat 8 spends 0.67s
+ * holding its tight framing through the fall. The character rig surfaced that one —
+ * before it, the fifteen most important frames in the video were playing at the width
+ * where a face reads least.
  */
-export const GREYBOX_DURATION = 2430;
+export const GREYBOX_DURATION = 2406;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -74,7 +74,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={120} name="7 · at ease">
         <Beat07AtEase />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={180} name="8 · the email">
+      <Series.Sequence durationInFrames={200} name="8 · the email">
         <Beat08Email />
       </Series.Sequence>
       <Series.Sequence durationInFrames={90} name="9 · questionnaire">
@@ -89,7 +89,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={90} name="12 · closing card">
         <Beat12Closing />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={180} name="13 · end card">
+      <Series.Sequence durationInFrames={136} name="13 · end card">
         <Beat13EndCard />
       </Series.Sequence>
     </Series>

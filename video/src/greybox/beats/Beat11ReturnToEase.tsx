@@ -6,6 +6,7 @@ import { Camera, frameRect, rect } from "../Camera";
 import { PLAYER } from "../copy";
 import { monitorWide, MonitorSurface, SESSION_BASE, VIEWFINDER } from "../surfaces";
 import { useEmphasis } from "../lift";
+import { useExpression } from "../rig";
 import { GREY, H, W } from "../theme";
 import { Box, Text } from "../ui";
 
@@ -21,7 +22,16 @@ import { Box, Text } from "../ui";
  * under liberty L2b the player itself is generic while Billie Jean and Michael
  * Jackson are named.
  *
- * **THE BEAT NOW HAS ITS PAYOFF.** It used to end still tight on the viewfinder: the
+ * **HE EASES *OVER* THE WORK, NOT INSTEAD OF IT.** The beat used to end with him
+ * relaxed and the deadline untouched, and there is a reading available — particularly
+ * for the managers this post is aimed at — where the stress app told an employee to
+ * listen to music instead of doing the urgent report. The clock says 11:30 and the
+ * deadline is 12. So: he never leaves the keyboard. The player opens, the headphones
+ * go on, and his hands keep going while the music plays and the reading comes down.
+ * The nod and the drifting notes stay — they are the point of the beat. What changed
+ * is that he does not stop. Staging only; the beat's length is unchanged.
+ *
+ * **THE BEAT HAS ITS PAYOFF.** It used to end still tight on the viewfinder: the
  * pull-out began at f128 and arrived at f180, the last frame, so it never landed and
  * never held. The trend's tail walking back down and the stateline returning to ease
  * are *the reason the beat exists* and both were off screen.
@@ -106,6 +116,13 @@ export const Beat11ReturnToEase: React.FC = () => {
   // The third firing of the emphasis rule. Rises as the camera lands, holds while the
   // returned reading is read, settles into the closing beat.
   const emphasis = useEmphasis(150, 18, 196, 14);
+  // tense → easing over 30 frames, starting as the headphones go on. Slower than the
+  // fall on purpose: coming back takes longer than going down.
+  const pose = useExpression([
+    { frame: 0, state: "tense" },
+    { frame: 74, state: "tense" },
+    { frame: 104, state: "easing" },
+  ]);
 
   return (
     <AbsoluteFill>
@@ -129,12 +146,15 @@ export const Beat11ReturnToEase: React.FC = () => {
           tension={tension}
           stateline={frame >= 158 ? "ease" : "tense"}
           climb={climb}
-          face={frame >= 74 ? "easing" : "tense"}
+          pose={pose}
+          // He is back at the keyboard from the moment the player closes, and he does
+          // not stop again. This is the whole restaging.
+          working={frame >= 62}
           headphones={frame >= 74}
           nod={frame >= 108}
           notesFrom={84}
           emphasis={emphasis}
-          sessionFrom={SESSION_BASE + 20}
+          sessionFrom={SESSION_BASE + 21}
         >
           <MusicPlayer open={open} playing={frame >= 24} progress={trackProgress} />
         </MonitorSurface>

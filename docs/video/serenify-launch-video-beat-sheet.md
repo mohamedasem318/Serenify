@@ -6,7 +6,12 @@
 desktop is scaled **1.6×** to fill the 1920×1080 output (L7). Not a 1920px browser with
 384px of dead gutter each side.
 
-**Pipeline:** real `apps/web` React components for every product screen. Drawn assets only for: the character, his facial expressions, the Gmail tab contents, the macOS notification, and the end card.
+**Pipeline:** real `apps/web` React components for every product screen. Drawn assets only for: the character, the Gmail tab contents, the macOS notification, and the end card.
+
+**The character is a RIG, not a set of drawings** — and the art brief is therefore **one**
+neutral head and shoulders rather than five expressions that all have to read as the same
+person. See "The character rig" below. Cross-expression consistency is the thing that burned
+the wordmark across four attempts, and the rig removes the need for it.
 
 **Governing rule:** at 1920×1080 in a phone-sized feed, wide shots are illegible. **Every readable moment is a push-in.** Full-desktop wide shots exist only as brief establishing or transition frames.
 
@@ -53,6 +58,7 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
 | L12 | **The in-place emphasis** — the stateline block grows 1.65× where it stands, is read, and settles. Nothing travels, the camera does not move | Holding bloom + stateline + viewfinder together means framing ~1096px of world, at which the app's `text-base` (16px) sub is ~6px on a phone. A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. |
+| L13 | **The character's face and hands are AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
 ---
 
@@ -83,11 +89,77 @@ These are deliberate. Do not "fix" them toward fidelity.
     viewfinder together as the "before". So the block grows *downward* from its own top
     edge rather than about its centre, and the reading card was relaid out to make the room
     below: the card is 40px taller and the trend sits 76px lower.
+- **EXPRESSIONS ARE TRANSFORMS ON SEPARABLE PARTS, NEVER DRAWINGS CROSS-FADED.** Beat 8 needs
+  the face to *fall* and beat 11 needs a nod; a cross-fade between two finished drawings
+  produces neither — on a face it reads as a jump cut. An expression is a vector of numbers,
+  and every transition is an interpolation between two points in that space. Same model as
+  Ren's avatar. See "The character rig".
+- **HE NEVER STOPS WORKING.** In beats 7, 8 and 11 his hands are at the keyboard. He stops
+  once, to read the email, and resumes in beat 11 *while* the reading comes down. This is not
+  a flourish: without it beat 11 reads as the stress app telling an employee to listen to
+  music instead of doing an urgent report, which is the worst available misreading and the
+  audience is managers.
 - **No red anywhere.** Attention = foggy. Stress = amber. Affirmative = meadow.
 - **No numeric stress value, ever.** No percentage, no score, no gauge. The bloom carries no number.
 - **The confirmatory questionnaire shows the TRUE-POSITIVE branch.** The landing hero shows the false alarm. This inversion is intentional.
 - **Copy is verbatim** from the app. Typographic apostrophes (`’`) preserved. Where a beat is too short to read full copy, push in on a fragment — do not paraphrase.
 - Several transitions in the real app are **full page reloads** (camera Permissions-Policy). Whether to show those honestly or smooth them is a greybox question, flagged below.
+
+---
+
+## The character rig
+
+**De-risked 2026-07-30, with no art.** Two risks were travelling under one name — whether a rig
+can produce the motion the beats require, and whether we can get good consistent art — and the
+second was making the first look frightening. The first is now settled: a face made of
+primitives **does** carry beat 8's fall, at the real timings, at phone size, in the cut. Studio
+composition `CharacterRig` under `Spikes` is the bench; `video/src/greybox/rig.tsx` is the rig.
+
+**An expression is a vector, not a picture.** Thirteen numbers — brow height, brow inner-end
+angle, eye aperture, lid drop, gaze, mouth curvature, mouth width, mouth openness, mouth skew,
+head tilt, head sink, shoulder slump, breath rate — and each named expression is a point in that
+space. Transitions are interpolations, which is the only way a *fall* and a *nod* exist at all.
+Expressions are keyframed exactly as camera shots are.
+
+| Part | What it carries |
+|---|---|
+| head | the nod, the sink, the tilt |
+| brows | the fall, more than anything else does |
+| eyes | aperture, and the blink at rest |
+| pupils | gaze — down at the keyboard when he is working |
+| mouth | one curvature scalar, plus width, openness and skew |
+| shoulders | slump, and the typing motion |
+| hands | two shapes at the desk edge, alternating — "still working" |
+| headphones | an overlay on the ears, beat 11 only |
+
+The hair cap, the ears and the neck are **not** animated. They exist to mark where the generated
+drawing's seams land, and to prove the rig has somewhere to attach them.
+
+**What the generated head must provide** — this is the art brief:
+
+- **One drawing. Neutral expression, mouth closed, eyes open, front on**, at the framing a
+  webcam gives: head and shoulders, head filling ~55% of frame height, shoulders running off
+  both sides. Nothing below the chest.
+- **Separable layers, and this is the load-bearing requirement.** The face's *features* are not
+  drawn: the delivered art supplies **skull, hair, ears, neck, shoulders/clothing** as separate
+  regions, and the rig draws brows, eyes, pupils and mouth over them. A head delivered with its
+  features baked in cannot be posed and is not usable.
+- **A flat skin region large enough to host the features** across the eye band (roughly the
+  middle third of the head's height) and the mouth band (lower third), free of texture, shading
+  gradients or drawn detail in those two zones. Shading elsewhere is fine.
+- **Transparent background.** The office backdrop is a static soft rectangle and is composited
+  behind.
+- Landmarks the rig needs to line up against: **eye-line height, inter-pupil distance, mouth
+  centre, chin, ear centres** (the headphones attach there). Any consistent proportion works;
+  the rig scales to it.
+
+**Tracing risk, flagged.** `potrace` handled Ren cleanly because Ren is near-monochrome. A
+multi-colour flat illustration — hair, skin, clothing — is a different job: potrace is a
+*bitonal* tracer, so a colour illustration has to be posterised and traced once per colour and
+the per-layer results then registered against each other, and any soft edge or gradient between
+regions produces ragged or overlapping boundaries. **This is a further argument for authored
+features**: the parts that must be crisp and separable are the parts the rig draws, so tracing
+only ever has to succeed on large flat regions where it is reliable.
 
 ---
 
@@ -305,7 +377,9 @@ The monitoring session, live and settled.
 - Stateline: **"You're at ease right now"** · "Steady and settled — nothing to do."
 - The session trend below, a steady meadow step-line
 - Corner readout: **`Session · 47:12`**, ticking. Animate the seconds — it's a small liveness cue that costs nothing.
-- The viewfinder (L1, enlarged), showing him **content and lightly smiling**, working
+- The viewfinder (L1, enlarged), showing him **content and lightly smiling**, working — hands
+  at the keyboard, gaze down at it. This is the face beat 8 has to fall *from*, so it is held
+  rather than played.
 
 Wide enough to hold bloom, stateline and viewfinder together. This is the "before" — the audience needs it registered so the fall lands.
 
@@ -326,7 +400,7 @@ own, once, covering both of its copy changes. That is the constraint that matter
 
 ---
 
-### 8 · The email · 0:49 – 0:55 (6s)
+### 8 · The email · 0:49 – 0:55.7 (6.7s)
 
 **The core beat. No cutaway, no cut.**
 
@@ -365,7 +439,9 @@ Sequencing matters here: let the **toast land and be read first**, then his face
 
 Then, in one continuous shot with the toast still up:
 
-1. He reads it. **His face falls.**
+1. He reads it. **His face falls** — 16 frames of continuous travel through the whole pose
+   vector at once, and **it happens at the TIGHT framing**, where his head is ~100px on a phone.
+   He also stops typing here, and does not start again until beat 11.
 2. The **bloom drifts** meadow → mixed → amber. The real transition is 1.3s ease, so a band change *drifts rather than snaps* — keep that, it's the honest behaviour and it looks better.
 3. The stateline changes: **"You're a little tense"** · "A bit of an edge lately. Maybe a slow breath."
 4. Then further: **"You're feeling tense"** · "This has held a while. Serenify can check in when you're ready."
@@ -373,11 +449,18 @@ Then, in one continuous shot with the toast still up:
    readings change while it is up, and it settles once. No settle-and-relift between them.
 5. The trend line below climbs and recolours.
 
-**Do not rush this.** Six seconds is the largest single allocation in the video and it's correct — this beat is the entire product thesis in one shot.
+**Do not rush this.** It is the largest single allocation in the video and it's correct — this beat is the entire product thesis in one shot.
+
+**Cost: 6s → 6.7s, and the character rig is what found it.** The camera used to arrive tight and
+begin pulling out immediately, so by the time the face fell the shot was already ~930px wide and
+his head was ~45px on a phone: the fifteen most important frames in the video were playing at the
+width where a face reads least. It was invisible while the face was a labelled grey box. The tight
+framing now **holds** through the fall, and the extra 20 frames are what keeps the second stateline
+change readable rather than paying for the fall out of it.
 
 ---
 
-### 9 · Confirmatory questionnaire · 0:55 – 0:58 (3s)
+### 9 · Confirmatory questionnaire · 0:55.7 – 0:58.7 (3s)
 
 The sticky confirmatory prompt appears beside the stage. He answers — **and confirms the stress is real.**
 
@@ -393,7 +476,7 @@ earlier. The prompt lands, then the click follows.
 
 ---
 
-### 10 · Ren · 0:58 – 1:05 (7s)
+### 10 · Ren · 0:58.7 – 1:05.7 (7s)
 
 The chat opens. **A real three-turn exchange, each message legible.**
 
@@ -440,13 +523,21 @@ change to the shot plan, not to the beat.
 
 ---
 
-### 11 · Return to ease · 1:05 – 1:12 (7s)
+### 11 · Return to ease · 1:05.7 – 1:12.7 (7s)
 
 He acts on it. In order:
 
 1. **Opens a music player**, plays the track. Generic app, drawn. **The track is named on screen: Billie Jean, Michael Jackson.** That naming is the point — it's the evidence Ren knew him. Brief; a couple of seconds, no lingering on the interface.
-2. **Puts headphones on.**
-3. **Music notes drift around him** in the viewfinder. He starts moving with it — small, a head nod, a shoulder. Not a dance number.
+2. **Puts headphones on** — and goes straight back to the keyboard.
+3. **Music notes drift around him** in the viewfinder. He starts moving with it — small, a head nod on the beat, a shoulder. Not a dance number.
+
+**HE EASES *OVER* THE WORK, NOT INSTEAD OF IT.** The beat used to end with him relaxed and the
+deadline untouched, and there is a reading available — particularly for the managers this post is
+aimed at — where the stress app told an employee to listen to music instead of doing the urgent
+report. The clock says 11:30 and the deadline is 12. So **he never leaves the keyboard**: his hands
+are going from the moment the player closes, all the way through the nod, the drift and the
+recovery. The nod and the notes stay — they are the point of the beat. What changed is that he
+does not stop. Staging only; the beat's length is unchanged.
 
 **No audio plays.** This is animation only; the VO track is Arabic narration and the cut must work silent regardless.
 
@@ -472,7 +563,7 @@ seconds at that framing — and the payoff takes 1.4s.
 
 ---
 
-### 12 · The closing subtitle card · 1:12 – 1:15 (3s) — NEW
+### 12 · The closing subtitle card · 1:12.7 – 1:15.7 (3s)
 
 A short card between the demo resolving and the wordmark reveal.
 
@@ -489,14 +580,27 @@ last idea the audience leaves with.
 - **It is its own beat, not a line inside the end card.** The end card already runs three timed
   events plus a hold; a fourth makes it a wall of text.
 
-**The copy is a PLACEHOLDER at the right length** (`CLOSING_LINE` in the greybox `copy.ts`).
-Candidates were proposed in the revision-4 report; Mohamed picks one. Deliberately **not** typed
-on — the end card types twice and a third typing effect in eight seconds is a tic. Framed at 760,
-the same as the end card, so the two read as one closing movement.
+**The line, DECIDED 2026-07-30:**
+
+> **A detection is a question, not a verdict.**
+
+Verbatim from `lib/landing/copy.ts` `NEVER_CARD_DECIDE_BODY`. It satisfies both constraints: it is
+a claim about how a reading is *treated*, which is exactly what beat 9 showed, so it implies no
+branch the video did not.
+
+**"Nothing moved until he answered." was REJECTED, and not on taste.** A great deal visibly moves
+before he answers — the bloom drifts to amber, the stateline changes twice, the trend line climbs —
+and the audience watches all of it in the thirty seconds before the questionnaire appears, so the
+line reads as contradicted by the footage. It works as landing-page copy, where "moved" means *no
+action was taken*; it does not survive being placed after a graph the audience just watched climb.
+Do not reconsider it.
+
+Deliberately **not** typed on — the end card types twice and a third typing effect in eight seconds
+is a tic. Framed at 760, the same as the end card, so the two read as one closing movement.
 
 ---
 
-### 13 · End card · 1:15 – 1:21 (6s)
+### 13 · End card · 1:15.7 – 1:20.2 (4.5s)
 
 **A sequence, not a static frame.** Three timed events:
 
@@ -504,44 +608,45 @@ the same as the end card, so the two read as one closing movement.
 2. then **"take care of yourself"** types on
 3. then **"serenify.tech"** types on
 
-Then hold — **and the hold is a second longer** (5s → 6s). This is where the VO lands its last
-line, so the hold is room in the cut rather than dead air.
+Then hold. This is where the VO lands its last line, so the hold is room in the cut rather than
+dead air.
 
 The wordmark's real animation gets designed later; greybox it as a placeholder and time the
 sequence. Typing rather than fading puts a readable pace on the two lines and gives the VO
 something to land against.
 
+**THE TYPING IS FASTER, THE HOLD IS NOT. Cost: 6s → 4.5s.** The typing was what felt slow: the
+reveal took 1.53s and the two lines typed at ~13 and ~12 characters a second, which is a deliberate
+pace at best and a stall at worst. They now run 1.0s, ~20 c/s and ~16 c/s. The hold after
+"serenify.tech" is **unchanged** at ~1.13s, including the second added in revision 4 — that is
+where the VO lands and it is not what feels slow. All 1.5s comes out of the typing.
+
 ---
 
-## Running total: ~81s
+## Running total: ~80.2s
 
-Well over the 40–60s target. The 77s→81s overrun is the **ending** — beat 11 finally landing its
-pull-out, and the new closing card — rather than the no-cut invariant that produced the 69s→77s
-one. **Do not trim on paper — trim in greybox**, where you can actually feel what's slow.
+Still well over the 40–60s target, and it now moves in the right direction for the first time.
+**Do not trim on paper — trim in greybox**, where you can actually feel what's slow.
 
-**+4s across this revision**, itemised:
+**−0.8s across this revision**, itemised:
 
 | Beat | Was | Now | What changed |
 |---|---|---|---|
-| 2 · signup | 16s | **15.6s** | −0.4s. The wide hold on the sparse verify screen, shortened rather than filled |
-| 3 · dashboard | 5s | **4s** | −1s. The travelling lift tightened; 20 words were never going to be read either way |
-| 5 · calibration | 12s | **12.4s** | +0.4s. Reading time for a success state that is no longer cropped |
-| 11 · return to ease | 6s | **7s** | +1s. The pull-out lands and holds, so the trend's descent is on screen |
-| 12 · closing card | — | **3s** | NEW. The thesis, named once |
-| 13 · end card | 5s | **6s** | +1s on the hold after "serenify.tech" |
+| 8 · the email | 6s | **6.7s** | +0.7s. The tight framing HOLDS through the fall. The rig found this |
+| 13 · end card | 6s | **4.5s** | −1.5s, all of it typing speed. The hold is untouched |
 
-Beat 1's corrected address-bar radii, beat 3's row-shaped banner, the clock (L11), the emphasis
-rule (L12) and its three firings, and the relaid-out reading card all cost **nothing**.
+Everything else is unchanged. The character rig itself, the restaged beat 11 — he never leaves the
+keyboard now — and the decided closing line all cost **nothing**.
 
 **Trim candidates, in order:**
 
 1. Beat 2, 15.6s → 12s. The performed mail sequence is where the fat is; the OTP choreography is not.
 2. Beat 5, 12.4s → 10.5s. 5d recording can lose a second and 5f's hold can lose half of one.
-3. Beat 13 end card, 6s → 4.5s.
-4. Beat 11, 7s → 6.5s. The music-player sub-beat, not the easing and not the pull-out.
+3. Beat 11, 7s → 6.5s. The music-player sub-beat, not the easing and not the pull-out.
+4. Beat 4, 5s → 4s. The scroll can move faster than it does.
 
-**Protect at all costs:** beat 8 (6s), beat 10's turn 3, the 5b first-sight-of-face hold, and
-beat 11's wide hold. Those four are the video.
+**Protect at all costs:** beat 8 (6.7s, and specifically its tight hold), beat 10's turn 3, the 5b
+first-sight-of-face hold, and beat 11's wide hold. Those four are the video.
 
 ---
 
@@ -561,14 +666,24 @@ beat 11's wide hold. Those four are the video.
   buys legibility, not reading time; the beat was shortened instead. See beat 3.
 - ~~Beat 8's punchline has no clock to do arithmetic against.~~ **The clock exists from beat 1 and
   is in the push-in.** See L11 and beat 8.
+- ~~Which closing line?~~ **Decided: "A detection is a question, not a verdict."** See beat 12.
+- ~~Can a rig produce the motion the beats require, and can a face of primitives fall
+  convincingly?~~ **Yes to both, and it is retired with no art.** See "The character rig".
+- ~~Beat 11 could read as the app telling an employee to skip an urgent report.~~ **Restaged: he
+  never leaves the keyboard.** See beat 11 and the invariant.
 
 **Still open:**
 
-- **Which closing line?** Beat 12 ships a placeholder. Candidates are in the revision-4 report; one
-  gets picked and lands next revision.
 - **Does the closing card land or stall the ending?** Three seconds of held text between the demo
   resolving and the wordmark is either the last idea or a speed bump. Judge it in this pass.
-- **Is 81s acceptable, and if not, what goes?** See the trim list above.
+- **Is 80.2s acceptable, and if not, what goes?** See the trim list above.
+- **Does the generated head arrive with separable regions?** The rig draws the features and needs
+  skull, hair, ears, neck and clothing as layers — not a head with a face baked into it. That is
+  the one way the art brief can come back unusable.
+- **Does the rig read at the wide composite framing?** At ~22px of head in beats 7 and 11 it is
+  *recognised* rather than read: you can tell smiling from not-smiling and little else. That is
+  correct for those beats — the fall plays tight — but it is worth watching for whether the
+  recovery in beat 11 needs its own closer moment.
 - Do the real full-page reloads (`<a href>` / `window.location.replace`) read as broken on video, or as honest? They're real; showing them is more faithful, but a hard white flash mid-video may just look like a mistake.
 - Beat 10's three-turn exchange is written for the video; `014-recommendations` doesn't exist. Keep the UI plausible against what 014 will actually ship.
 - Beat 10 turn 3 must read as *personal knowledge*, not a canned tip. If greybox shows it reading generic, that's a copy problem to fix before art.

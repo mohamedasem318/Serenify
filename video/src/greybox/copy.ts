@@ -167,26 +167,29 @@ export const PLAYER = {
   artist: "Michael Jackson",
 } as const;
 
-// ── Beat 12 · the closing subtitle card (PLACEHOLDER — awaiting Mohamed) ────
+// ── Beat 12 · the closing subtitle card ─────────────────────────────────────
 /**
- * PLACEHOLDER, and deliberately so. The line names the thesis of the whole project
- * — the model does not decide alone; the reading came back down because he was asked
- * and he answered — which the video demonstrates and never states.
+ * DECIDED 2026-07-30. **VERBATIM** — `lib/landing/copy.ts`
+ * `NEVER_CARD_DECIDE_BODY`, first sentence. The line names the thesis of the whole
+ * project — the model does not decide alone — which the video demonstrates across
+ * beats 8, 9 and 11 and never states.
  *
- * Two constraints on whatever replaces this:
+ * **"Nothing moved until he answered." was REJECTED, and not on taste.** A great
+ * deal visibly moves before he answers: the bloom drifts to amber, the stateline
+ * changes twice, the trend line climbs. The audience watches all of it in the thirty
+ * seconds before the questionnaire appears, so the line reads as contradicted by the
+ * footage. It works as landing-page copy, where "moved" means *no action was taken*;
+ * it does not survive being placed after a graph the audience just watched climb.
+ * Do not reconsider it.
  *
- *  1. **The video shows only the true-positive path.** The landing page shows both
- *     branches; this card cannot lean on the landing page's framing without implying
- *     a branch the video never showed. So no "sometimes the answer is no", and
- *     nothing that turns on the false alarm.
+ * Two constraints it satisfies, for the record:
+ *
+ *  1. **The video shows only the true-positive path.** "A question, not a verdict"
+ *     is a claim about how the reading is *treated*, which is exactly what beat 9
+ *     showed; it implies no branch the video did not show.
  *  2. It is **one line**, its own beat, not a fourth event inside the end card.
- *
- * The string below is a length-and-pacing stand-in in the landing page's voice
- * (`lib/landing/copy.ts`: "asks before it decides", "Nothing moves until you
- * answer", "Asking is not a courtesy; it is the correction"). Candidates are in the
- * revision report; Mohamed picks one and it lands next revision.
  */
-export const CLOSING_LINE = "Nothing moved until he answered.";
+export const CLOSING_LINE = "A detection is a question, not a verdict.";
 
 // ── Beat 13 · end card (SHEET) ──────────────────────────────────────────────
 export const END_CARD = {

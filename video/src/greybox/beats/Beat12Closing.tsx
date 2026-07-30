@@ -20,10 +20,9 @@ import { Box, Text } from "../ui";
  * **It is its own beat, not a line inside the end card.** The end card already runs
  * three timed events plus a hold; a fourth makes it a wall of text.
  *
- * **The copy is a PLACEHOLDER at the right length** — see `CLOSING_LINE` in
- * `copy.ts` for the two constraints on the real line and why the candidates are in
- * the revision report rather than here. What this pass tests is the pacing into the
- * end card: does a single held line here land, or does it stall the ending.
+ * **The copy is DECIDED** — "A detection is a question, not a verdict.", verbatim from
+ * `NEVER_CARD_DECIDE_BODY`. See `CLOSING_LINE` in `copy.ts` for why the alternative
+ * was rejected on a factual ground rather than a taste one.
  *
  * Deliberately NOT typed on. The end card types twice; a third typing effect in
  * eight seconds is a tic, and this line wants to arrive whole and be sat with.

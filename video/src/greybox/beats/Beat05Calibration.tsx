@@ -1,10 +1,10 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { FaceBox } from "../actors";
 import { Camera, frameRect, rect, shot, union } from "../Camera";
 import { AppHeader, Desktop } from "../chrome";
 import { CALIBRATION, DASHBOARD } from "../copy";
+import { CharacterRig, useExpression } from "../rig";
 import { COL_W, COL_X, GREY, H, MONO, W } from "../theme";
 import { Box, Button, Cursor, Text, TextBlock } from "../ui";
 
@@ -37,7 +37,6 @@ import { Box, Button, Cursor, Text, TextBlock } from "../ui";
 
 /** The 3:4 portrait framing target. */
 const PREVIEW = rect(480, 160, 240, 320);
-const FACE = rect(522, 224, 156, 216);
 const STATUS = rect(380, 498, 440, 24);
 const GREEN_ROOM = union(PREVIEW, STATUS);
 const UPLOADING = rect(400, 300, 400, 80);
@@ -115,6 +114,7 @@ const Brackets: React.FC<{ cleared: number }> = ({ cleared }) => {
 
 export const Beat05Calibration: React.FC = () => {
   const frame = useCurrentFrame();
+  const pose = useExpression([{ frame: 0, state: "calm" }]);
 
   const settle = interpolate(frame, [T.greenRoom, T.greenRoom + 34], [0, 1], {
     extrapolateLeft: "clamp",
@@ -242,15 +242,36 @@ export const Beat05Calibration: React.FC = () => {
                 label="camera preview · 3:4"
                 labelSize={10}
               />
-              <div style={{ filter: phase === "green" ? undefined : "blur(6px)" }}>
-                <div
-                  style={{
-                    translate: `${(1 - settle) * 38}px ${(1 - settle) * 24}px`,
-                    scale: 0.86 + settle * 0.14,
-                    transformOrigin: "50% 50%",
-                  }}
-                >
-                  <FaceBox x={FACE.x} y={FACE.y} w={FACE.w} h={FACE.h} state="calm" labelSize={24} />
+              {/*
+               * FIRST SIGHT OF HIM, and the sheet is emphatic that everything in beats
+               * 7–11 depends on the audience learning this face while it is calm. Not
+               * working here — he is sitting still for a calibration.
+               *
+               * The rig fills the whole preview, and the clip sits OUTSIDE the settle
+               * transform: he moves into the 3:4 framing target, and what clips him is
+               * the static preview rather than a box travelling with him.
+               */}
+              <div
+                style={{
+                  position: "absolute",
+                  left: PREVIEW.x,
+                  top: PREVIEW.y,
+                  width: PREVIEW.w,
+                  height: PREVIEW.h,
+                  overflow: "hidden",
+                  borderRadius: 12,
+                }}
+              >
+                <div style={{ filter: phase === "green" ? undefined : "blur(6px)" }}>
+                  <div
+                    style={{
+                      translate: `${(1 - settle) * 38}px ${(1 - settle) * 24}px`,
+                      scale: 0.86 + settle * 0.14,
+                      transformOrigin: "50% 50%",
+                    }}
+                  >
+                    <CharacterRig x={0} y={0} w={PREVIEW.w} h={PREVIEW.h} pose={pose} />
+                  </div>
                 </div>
               </div>
               {phase === "green" ? <Brackets cleared={cleared} /> : null}

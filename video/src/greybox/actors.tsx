@@ -1,6 +1,7 @@
 import React from "react";
 import { Easing, interpolate, interpolateColors, useCurrentFrame } from "remotion";
 
+import { CharacterRig, Pose } from "./rig";
 import { BAND, FONT, GREY, MONO } from "./theme";
 import { Box } from "./ui";
 
@@ -10,100 +11,15 @@ import { Box } from "./ui";
  */
 
 // ── The character ───────────────────────────────────────────────────────────
-
-/**
- * His expression is a story beat, and its *timing* is what beat 8 lives or dies
- * on — the toast must land, then the face must fall, then the bloom moves. So
- * the face is a grey box with a state label that changes on cue. Crude is the
- * point; legible and correctly timed is not optional.
- *
- * States, in the order the video uses them:
- *   calm (5b, first sight) → content (7) → falling (8) → tense (8) → easing (11)
- */
-export type FaceState = "calm" | "curious" | "content" | "falling" | "tense" | "easing";
-
-export const FaceBox: React.FC<{
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  state: FaceState;
-  labelSize?: number;
-  headphones?: boolean;
-  /** Small idle sway, plus the head nod beat 11 asks for. */
-  nod?: boolean;
-}> = ({ x, y, w, h, state, labelSize = 20, headphones = false, nod = false }) => {
-  const frame = useCurrentFrame();
-  const sway = Math.sin(frame / 22) * 2;
-  const bob = nod ? Math.sin(frame / 5) * 4 : 0;
-  const headW = w * 0.42;
-  const headH = h * 0.42;
-
-  return (
-    <div style={{ position: "absolute", left: x, top: y, width: w, height: h }}>
-      {/* Shoulders */}
-      <div
-        style={{
-          position: "absolute",
-          left: w * 0.12,
-          top: h * 0.66,
-          width: w * 0.76,
-          height: h * 0.34,
-          borderRadius: `${w * 0.2}px ${w * 0.2}px 0 0`,
-          backgroundColor: GREY.fill,
-          translate: `${sway * 0.4}px 0px`,
-        }}
-      />
-      {/* Head */}
-      <div
-        style={{
-          position: "absolute",
-          left: (w - headW) / 2,
-          top: h * 0.2,
-          width: headW,
-          height: headH,
-          borderRadius: headW * 0.34,
-          backgroundColor: GREY.strong,
-          translate: `${sway}px ${bob}px`,
-        }}
-      />
-      {headphones ? (
-        <div
-          style={{
-            position: "absolute",
-            left: (w - headW) / 2 - w * 0.05,
-            top: h * 0.2 - h * 0.05,
-            width: headW + w * 0.1,
-            height: headH * 0.66,
-            borderRadius: `${headW * 0.5}px ${headW * 0.5}px 0 0`,
-            border: `${Math.max(3, w * 0.028)}px solid ${GREY.graphite}`,
-            borderBottom: "none",
-            boxSizing: "border-box",
-            translate: `${sway}px ${bob}px`,
-          }}
-        />
-      ) : null}
-      {/* The state label. This is the actual payload of the component. */}
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          bottom: h * 0.04,
-          width: w,
-          textAlign: "center",
-          fontFamily: MONO,
-          fontSize: labelSize,
-          fontWeight: 700,
-          letterSpacing: 0.5,
-          color: GREY.ink,
-          whiteSpace: "nowrap",
-        }}
-      >
-        {`FACE: ${state}`}
-      </div>
-    </div>
-  );
-};
+//
+// His expression is a story beat and its *timing* is what beat 8 lives or dies on —
+// the toast lands, then the face falls, then the bloom moves.
+//
+// It used to be a grey box with a `FACE: content` label, which timed the beats but
+// could not answer whether the fall would ever read. It is now an actual rig; see
+// `rig.tsx` for the pose vector, the part decomposition and the reasoning. The labels
+// are gone deliberately: leaving them in would let the rig look like it works while
+// the text carried the information.
 
 // ── Ren ─────────────────────────────────────────────────────────────────────
 
@@ -205,27 +121,32 @@ export const MusicNotes: React.FC<{ x: number; y: number; w: number; h: number; 
 /**
  * The viewfinder. Scaled up from the app's real 224×126 under liberty L1 —
  * at true size his face is a smudge on a phone and beat 8 needs a readable one.
+ *
+ * The rig fills the whole viewfinder rather than a 48%-wide box inside it. That is
+ * both more honest (a webcam sees head, shoulders and a bit of backdrop, and people
+ * sit close to laptops) and the only way the head is big enough to read: at the wide
+ * composite framing it is ~40px on a phone, and at 48% width it was ~19px.
  */
 export const Viewfinder: React.FC<{
   x: number;
   y: number;
   w: number;
   h: number;
-  state: FaceState;
+  pose: Pose;
+  working?: boolean;
   headphones?: boolean;
   nod?: boolean;
   notesFrom?: number;
-  faceLabelSize?: number;
-}> = ({ x, y, w, h, state, headphones, nod, notesFrom, faceLabelSize = 20 }) => (
+}> = ({ x, y, w, h, pose, working, headphones, nod, notesFrom }) => (
   <>
     <Box x={x} y={y} w={w} h={h} fill={GREY.panelAlt} border={GREY.graphite} radius={8} label="viewfinder" labelSize={10} />
-    <FaceBox
-      x={x + w * 0.26}
-      y={y + h * 0.1}
-      w={w * 0.48}
-      h={h * 0.85}
-      state={state}
-      labelSize={faceLabelSize}
+    <CharacterRig
+      x={x}
+      y={y}
+      w={w}
+      h={h}
+      pose={pose}
+      working={working}
       headphones={headphones}
       nod={nod}
     />

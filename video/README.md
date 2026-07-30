@@ -54,7 +54,8 @@ Next dev server instead of its own.
 
 ```bash
 cd video
-npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 81.0s, ~18 MB)
+npm run render:greybox  # -> out/greybox.mp4  (the cut: 1920x1080, 80.2s, ~18 MB)
+npm run render:rig      # -> out/rig-spike.mp4  (the character rig's bench, 6s)
 npm run render:hello    # -> out/hello-world.mp4
 npm run render:probe    # -> out/web-component-probe.mp4
 
@@ -71,7 +72,7 @@ a real browser); later renders reuse it.
 ## The greybox — `src/greybox/`
 
 `Greybox` is the cut: all thirteen beats at the durations the beat sheet gives
-them, 2430 frames = **81.0s** at 30fps.
+them, 2406 frames = **80.2s** at 30fps.
 
 **The world is 1200×675, not 1920×1080.** The product renders at a 1200px-wide
 viewport and the whole desktop is scaled 1.6× to fill the output — a screen
@@ -94,9 +95,10 @@ Everything here gets thrown away. Do not refine it.
 |---|---|
 | Beat durations, to the frame | Every screen, panel, card and window |
 | The toolbar clock, and the internal clock it sits on | The clock's chrome (no browser draws one there) |
-| Every push-in, at its sheet framing | The character (a box with a `FACE: <state>` label) |
+| **The character's motion** — every expression, the fall, the nod, the blink, the typing | The character's *art* — he is arcs, dots and one quadratic |
+| Every push-in, at its sheet framing | The mail client, the music player, the toast |
 | Every performed action — tabs, clicks, scrolls | Ren's face (a circle with a `REN: <state>` label) |
-| The 2f OTP choreography, at recon timings | The mail client, the music player, the toast |
+| The 2f OTP choreography, at recon timings | The office backdrop (a flat rectangle) |
 | The 1.3s eased band drift (the only colour) | The wordmark, all icons, all art |
 | App copy, verbatim, at app sizes | Typeface, palette, tokens, polish |
 
@@ -145,6 +147,44 @@ The emphasis is also why `surfaces.tsx` relaid out the reading card. Growing abo
 block's centre sent its top edge into the bloom, and beat 7 exists to plant bloom,
 stateline and viewfinder together — so it grows *downward* from its own top edge, and
 the card is 40px taller with the trend 76px lower to make the room.
+
+## The character rig — `src/greybox/rig.tsx`
+
+**A spike, and it answers one question:** can a face made of primitives *fall* convincingly? Two
+risks were travelling under one name — whether a rig can produce the motion the beats need, and
+whether we can get good consistent art — and the second was making the first look frightening. The
+first is settled with no art at all.
+
+**An expression is a vector, not a picture.** Thirteen numbers (`Pose`), and each named expression
+— `calm`, `content`, `dismayed`, `tense`, `easing` — is a point in that space. Every transition is
+an interpolation between two points, which is the only way a fall or a nod exists: cross-fading two
+finished drawings gives neither, and on a face it reads as a jump cut. `useExpression` keyframes
+expressions exactly as `Camera` keyframes shots, so a transition is the default and a cut is hard to
+write by accident:
+
+```tsx
+const pose = useExpression([
+  { frame: 0,   state: "content"  },
+  { frame: 70,  state: "content"  },   // holds
+  { frame: 86,  state: "dismayed" },   // ← THE FALL, 16 frames of travel
+  { frame: 148, state: "tense"    },
+]);
+```
+
+Parts: head (nod, sink, tilt), brows (the fall, more than anything else), eyes (aperture + blink),
+pupils (gaze), mouth (one curvature scalar), shoulders (slump + typing), hands, headphones. The hair
+cap, ears and neck are **not** animated — they exist to mark where the generated drawing's seams
+land, and to prove the rig has somewhere to attach them.
+
+**Studio composition `CharacterRig`, under `Spikes`**, is the bench: the five poses static, plus
+beat 8's fall at its real timings both large and at the viewfinder's real on-screen size. Use it
+rather than the cut — a rig that fails only at small sizes is invisible in the cut, and a rig that
+fails everywhere is a finding worth surfacing before art exists.
+
+It also found a real defect in the cut. Beat 8's camera used to arrive tight and start pulling out
+immediately, so the fall played at ~930px of framing where the head is ~45px on a phone. Invisible
+while the face was a labelled grey box; obvious with a rig in it. The tight framing now holds
+through the fall.
 
 ## The two pipeline checks
 

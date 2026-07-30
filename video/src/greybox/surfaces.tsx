@@ -1,11 +1,12 @@
 import React from "react";
 import { useCurrentFrame, useVideoConfig } from "remotion";
 
-import { Bloom, FaceState, Trend, Viewfinder } from "./actors";
+import { Bloom, Trend, Viewfinder } from "./actors";
 import { frameRect, Rect, rect, Shot, union } from "./Camera";
 import { AppHeader, CLOCK, Desktop, SessionReadout } from "./chrome";
 import { STATELINE } from "./copy";
 import { Lift } from "./lift";
+import { Pose } from "./rig";
 import { FONT, FPS, GREY, VIEWPORT_Y } from "./theme";
 import { Box } from "./ui";
 
@@ -108,7 +109,10 @@ export const MonitorSurface: React.FC<{
   tension: number;
   stateline: StatelineKey;
   climb: number;
-  face: FaceState;
+  /** A point in the rig's pose space, usually from `useExpression`. See `rig.tsx`. */
+  pose: Pose;
+  /** His hands are going. On in 7, 8 and 11 — he never stops working. */
+  working?: boolean;
   headphones?: boolean;
   nod?: boolean;
   notesFrom?: number;
@@ -125,7 +129,8 @@ export const MonitorSurface: React.FC<{
   tension,
   stateline,
   climb,
-  face,
+  pose,
+  working,
   headphones,
   nod,
   notesFrom,
@@ -180,11 +185,11 @@ export const MonitorSurface: React.FC<{
         y={VIEWFINDER.y}
         w={VIEWFINDER.w}
         h={VIEWFINDER.h}
-        state={face}
+        pose={pose}
+        working={working}
         headphones={headphones}
         nod={nod}
         notesFrom={notesFrom}
-        faceLabelSize={20}
       />
       <SessionReadout x={READOUT.x} y={READOUT.y} seconds={sessionFrom + frame / (fps || FPS)} size={17} />
 

@@ -3,6 +3,7 @@ import { AbsoluteFill } from "remotion";
 
 import { Camera } from "../Camera";
 import { useEmphasis } from "../lift";
+import { useExpression } from "../rig";
 import { monitorWide, MonitorSurface } from "../surfaces";
 
 /**
@@ -31,6 +32,9 @@ import { monitorWide, MonitorSurface } from "../surfaces";
  */
 export const Beat07AtEase: React.FC = () => {
   const emphasis = useEmphasis(20, 18, 86, 16);
+  // Content throughout, and this is the face beat 8 has to fall FROM, so it is held
+  // rather than played. He is working: hands going, gaze down at the keyboard.
+  const pose = useExpression([{ frame: 0, state: "content" }]);
 
   return (
     <AbsoluteFill>
@@ -45,7 +49,8 @@ export const Beat07AtEase: React.FC = () => {
           tension={0}
           stateline="ease"
           climb={0}
-          face="content"
+          pose={pose}
+          working
           emphasis={emphasis}
         />
       </Camera>

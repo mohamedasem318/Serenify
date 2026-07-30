@@ -6,12 +6,13 @@ import { Camera, frameRect, union } from "../Camera";
 import { CLOCK, MailMark } from "../chrome";
 import { TOAST } from "../copy";
 import { useEmphasis } from "../lift";
+import { useExpression } from "../rig";
 import { monitorWide, MonitorSurface, SESSION_BASE, TOAST_BOX, VIEWFINDER } from "../surfaces";
 import { GREY } from "../theme";
 import { Box, Text } from "../ui";
 
 /**
- * Beat 8 · The email · 0:50–0:56 · 180 frames
+ * Beat 8 · The email · 0:49–0:55.7 · 200 frames
  *
  * The core beat, and the largest single allocation in the video. No cutaway, no
  * cut — one continuous camera move that goes in on the toast and his face, then
@@ -20,14 +21,23 @@ import { Box, Text } from "../ui";
  * point of the beat.
  *
  * The order is load-bearing, and is what the frame numbers below encode:
- *   the toast lands and is read  → f6–f78
- *   his face falls               → f78
- *   the bloom drifts             → f92 + 39 frames (1.3s ease — it drifts, it
+ *   the toast lands and is read  → f6–f70
+ *   HIS FACE FALLS               → f70–f86, and it happens at the TIGHT framing
+ *   the bloom drifts             → f104 + 39 frames (1.3s ease — it drifts, it
  *                                  does not snap)
- *   the stateline steps twice    → f104, f138, both under one raise
+ *   the stateline steps twice    → f130, f156, both under one raise
  *   the trend climbs and recolours
  *
  * The toast stays up throughout.
+ *
+ * **THE CAMERA NOW HOLDS TIGHT THROUGH THE FALL — 180 → 200 frames.** The rig spike
+ * surfaced this and it was invisible before it: the camera used to arrive tight at f48
+ * and start pulling out immediately, so by f78, where the face fell, the shot was
+ * already ~930px wide and his head was ~45px on a phone. The most important fifteen
+ * frames in the video were playing at the size where the rig reads least. The hold now
+ * runs f36–f92 and the whole fall is inside it, at ~100px of head. The 20 extra frames
+ * are what keeps the second stateline change (f156) readable rather than paying for the
+ * fall out of it.
  *
  * ── THE THREE-WAY FRAMING QUESTION, AND WHAT IT COST ────────────────────────
  *
@@ -40,8 +50,9 @@ import { Box, Text } from "../ui";
  * key text would become unreadable to keep a device on screen.
  *
  * So it is split across the one continuous move the beat already had:
- *   · **tight** (f18–f96) holds clock + toast + face. The toast is READ here.
- *   · **wide** (f96 on) holds the whole card, the viewfinder, and the toast still up
+ *   · **tight** (f36–f92) holds clock + toast + face. The toast is READ here and the
+ *     face falls here.
+ *   · **wide** (f130 on) holds the whole card, the viewfinder, and the toast still up
  *     — the stateline changes twice here, with the emphasis raised.
  *
  * What was given up: at the wide framing the toast is *present* but not *readable*.
@@ -105,16 +116,34 @@ export const Beat08Email: React.FC = () => {
     easing: Easing.out(Easing.cubic),
   });
 
-  // 1.3s at 30fps. The honest transition, and it looks better than a snap. Pushed
-  // from f86 to f92 so the drift is mostly on screen rather than mostly behind the
-  // tight shot.
-  const tension = useDrift(92, 39);
-  const climb = useDrift(104, 60);
-  const face = frame >= 96 ? "tense" : frame >= 78 ? "falling" : "content";
-  const stateline = frame >= 138 ? "tense" : frame >= 104 ? "little" : "ease";
+  // 1.3s at 30fps. The honest transition, and it looks better than a snap. It starts
+  // as the camera begins pulling out, so the drift is seen rather than spent behind
+  // the tight shot — the bloom is at world x 470 and not in the tight frame at all.
+  const tension = useDrift(104, 39);
+  const climb = useDrift(116, 60);
+  /**
+   * **THE FALL, as a keyframed transition rather than a state flip.**
+   *
+   * `falling` used to be a *state* the face switched into, which is the thing the rig
+   * exists to make impossible: on a face, switching reads as a jump cut. It is now 14
+   * frames of continuous travel through the whole pose vector at once — brows lifting
+   * at the inner ends, eyes widening, jaw going slack, head and shoulders sinking —
+   * and then a slower settle into `tense` under the second stateline change.
+   *
+   * He also stops typing at f70 and does not start again in this beat. That is what
+   * makes beat 11's "he never stopped working" land: there is something to resume.
+   */
+  const pose = useExpression([
+    { frame: 0, state: "content" },
+    { frame: 70, state: "content" },
+    { frame: 86, state: "dismayed" },
+    { frame: 110, state: "dismayed" },
+    { frame: 148, state: "tense" },
+  ]);
+  const stateline = frame >= 156 ? "tense" : frame >= 130 ? "little" : "ease";
 
-  /** One rise at f96 as the camera lands, two copy changes, one settle at f158. */
-  const emphasis = useEmphasis(96, 18, 158, 18);
+  /** One rise as the camera lands wide, two copy changes, one settle. */
+  const emphasis = useEmphasis(126, 18, 182, 16);
 
   const wide = monitorWide(20);
   const tight = frameRect(NOTICE, 12);
@@ -125,10 +154,12 @@ export const Beat08Email: React.FC = () => {
         keys={[
           // Continuity with beat 7's closing framing.
           { frame: 0, shot: wide },
-          { frame: 18, shot: frameRect(NOTICE, 80) },
-          { frame: 48, shot: tight },
-          { frame: 96, shot: wide },
-          { frame: 180, shot: monitorWide(14) },
+          { frame: 14, shot: frameRect(NOTICE, 80) },
+          { frame: 36, shot: tight },
+          // HOLD. The toast is read and the face falls, both at ~3.1×.
+          { frame: 92, shot: tight },
+          { frame: 130, shot: wide },
+          { frame: 200, shot: monitorWide(14) },
         ]}
       >
         <MonitorSurface
@@ -136,7 +167,8 @@ export const Beat08Email: React.FC = () => {
           tension={tension}
           stateline={stateline}
           climb={climb}
-          face={face}
+          pose={pose}
+          working={frame < 70}
           emphasis={emphasis}
           sessionFrom={SESSION_BASE + 4}
         >
