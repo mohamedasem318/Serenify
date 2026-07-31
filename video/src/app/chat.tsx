@@ -5,7 +5,9 @@ import { ChatShell } from "@/components/chat/chat-shell";
 import { Header } from "@/components/header/header";
 import type { ChatMessage, ConversationDetail } from "@/lib/api/chat-client";
 
+import { SANS } from "../fonts";
 import { PROTAGONIST } from "../greybox/copy";
+import { CHAT } from "./geometry";
 import { sec } from "./motion";
 import { AppShell } from "./shell";
 
@@ -64,6 +66,76 @@ export const msg = (id: string, role: ChatMessage["role"], content: string): Cha
   createdAt: "2026-07-30T11:30:00.000Z",
 });
 
+/**
+ * ── THE CARET, MEASURED — NOT THE REAL DOM ONE ───────────────────────────────────────
+ *
+ * `<ChatShell/>`'s textarea does carry a real caret, but two things about it defeat a
+ * frame-addressed render:
+ *
+ *  · The blink is wall-clock time (`animation`/UA default), not frame time, so a still render
+ *    cannot reproduce its phase — it is either arbitrarily on or arbitrarily off, never the
+ *    thing the frame actually asks for.
+ *  · The wrapper remounts the shell on every keystroke (see the note above `ChatPage`), so
+ *    `composerRef.current?.focus()` re-runs on a brand-new node each time — and focusing a
+ *    textarea whose value was set programmatically (not typed) lands the caret at the START of
+ *    the value, not the end. That is the actual "pinned to the left" bug: it is not a render
+ *    glitch, it is the real component doing exactly what `.focus()` on a fresh node does.
+ *
+ * So the real caret is hidden (`caret-color: transparent`, scoped to the composer by its own
+ * `data-testid`) and this one is drawn in its place, at a position derived from `draft` itself
+ * rather than from the DOM. Measuring the typed run's width needs the composer's REAL font —
+ * Inter, `text-[15px]`, weight 400 (`chat-shell.tsx:371`) — so a canvas `measureText` is used
+ * rather than a per-character guess: it is synchronous (no ref, no layout effect, no async wait),
+ * so it is exactly as frame-stable as everything else in this file, and it reads the same glyph
+ * metrics the render's own Chromium will actually paint, because `fonts.ts` has the same Inter
+ * face loaded into the document before any frame is allowed to render.
+ */
+const COMPOSER_FONT = `400 15px "${SANS}"`;
+/** 1px border + `px-3.5` (14px) — `chat-shell.tsx:371` — where the typed text itself begins. */
+const COMPOSER_TEXT_INSET = 15;
+
+let measureCtx: CanvasRenderingContext2D | null | undefined;
+
+const measureTypedWidth = (text: string): number => {
+  if (measureCtx === undefined) {
+    measureCtx =
+      typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+  }
+  // A per-character estimate, and only ever a fallback: `fonts.ts` gates the whole render on
+  // Inter being loaded, so a real render never reaches this branch.
+  if (!measureCtx) return text.length * 8.2;
+  measureCtx.font = COMPOSER_FONT;
+  return measureCtx.measureText(text).width;
+};
+
+/** The platform's own caret blink is ~530ms a half-phase; frame-driven here for determinism. */
+const CARET_BLINK_HALF = sec(0.53);
+
+const ComposerCaret: React.FC<{ text: string }> = ({ text }) => {
+  const frame = useCurrentFrame();
+  const on = Math.floor(frame / CARET_BLINK_HALF) % 2 === 0;
+  const height = 18;
+  return (
+    <>
+      <style>{`[data-testid="chat-composer-input"] { caret-color: transparent; }`}</style>
+      {on ? (
+        <div
+          aria-hidden
+          style={{
+            position: "absolute",
+            left: CHAT.textarea.x + COMPOSER_TEXT_INSET + measureTypedWidth(text),
+            top: CHAT.textarea.y + (CHAT.textarea.h - height) / 2,
+            width: 1,
+            height,
+            // `--color-ink` dark (`globals.css:148`) — the video is dark throughout.
+            backgroundColor: "#E2E5E8",
+          }}
+        />
+      ) : null}
+    </>
+  );
+};
+
 export const ChatPage: React.FC<{
   clock: string;
   messages: ChatMessage[];
@@ -71,9 +143,11 @@ export const ChatPage: React.FC<{
   draft?: string;
   /** L9 — the typing indicator the app does not have. The video depicts a later feature. */
   thinking?: boolean;
+  /** Draws the measured caret at the end of `draft` and blinks it. Only meaningful while typing. */
+  caret?: boolean;
   /** World-coordinate layer — the drawn cursor. */
   overlay?: React.ReactNode;
-}> = ({ clock, messages, draft = "", thinking = false, overlay }) => {
+}> = ({ clock, messages, draft = "", thinking = false, caret = false, overlay }) => {
   const detail: ConversationDetail = {
     conversation: { ...conversation, messageCount: messages.length },
     messages,
@@ -83,7 +157,12 @@ export const ChatPage: React.FC<{
     <AppShell
       clock={clock}
       url="serenify.tech/app/chat"
-      overlay={overlay}
+      overlay={
+        <>
+          {overlay}
+          {caret ? <ComposerCaret text={draft} /> : null}
+        </>
+      }
       header={
         <Header fullName={PROTAGONIST.fullName} email={PROTAGONIST.email} role="employee" />
       }

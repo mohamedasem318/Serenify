@@ -16,26 +16,54 @@ import { Rect, rect } from "../greybox/Camera";
  *
  * ── WHAT THE MEASUREMENTS CHANGED, IN ONE PLACE ─────────────────────────────────────
  *
- *  · The monitoring column is `max-w-3xl` = **768**, not the greybox's 700.
- *  · The stage card is **607.7 tall**, not 476. The bloom alone is `sm:size-72` = **288**,
- *    where the greybox drew 148.
- *  · **The viewfinder is INSIDE the stage card**, top-right, overlaying it at `z-10`
+ *  · The monitoring column ships at `max-w-3xl` = **768**, not the greybox's 700. **L14 narrows
+ *    it to `max-w-lg` = 512** — see `shell.tsx` § MONITOR_COL for the measured reason, and the
+ *    note below for what it bought.
+ *  · The stage card is **607.7 tall** as the app lays it out, not the greybox's 476 — and
+ *    **675.2 at L14**, which spends the difference on the reserved second sub line and the 70px
+ *    controls gap. The bloom alone is `sm:size-72` = **288**, where the greybox drew 148.
+ *  · **The viewfinder ships INSIDE the stage card**, top-right, overlaying it at `z-10`
  *    (`monitoring-session.tsx:805`) — not a separate panel 300px to the card's right. Its real
- *    size is 224×126.9.
- *  · The session readout is a row ABOVE the card, not a corner overlay.
- *  · The trend is a full card BELOW the stage, 101.5 tall with its own heading and legend.
+ *    unscaled size is 224×126.9. **L14 pins it beside the card instead**, outside the scroll
+ *    container; see § THE PINNED RIGHT COLUMN.
+ *  · The session readout ships as a row ABOVE the card, not a corner overlay. **L14 moves it
+ *    into the card's own `pt-16` band**, which is what freed the page scroll.
+ *  · The trend is a full card BELOW the stage: 101.5 tall EMPTY, **355.7 populated**, with its
+ *    own heading, subtitle, plot and six-key legend.
  *  · The calibration preview is **512×288 and 16:9**; only the bracket guide inside it is 3:4,
  *    at 168.5×224.6 (register item 5).
  *
- * ── THE CONSEQUENCE THAT COSTS THE MOST ─────────────────────────────────────────────
+ * ── THE CONSEQUENCE THAT COST THE MOST, AND WHAT L14 DID ABOUT IT ───────────────────
  *
  * The real monitoring page is **~973px tall** below the chrome, against a 583px viewport. It
  * scrolls, and it always did — the greybox only fitted because it was drawing a smaller card.
- * So the beats now carry a scroll offset (`SCROLL`), which is honest behaviour rather than a
- * device, and beat 11 travels between two of them. Measured directly: bloom-top to trend-bottom
- * is 664.2px and the viewport below the sticky header is 519px, so **the bloom and the trend
- * cannot be on screen together at this world.** Beat 11 is staged around that, in the sheet's
- * own causal order.
+ * At `max-w-3xl` that scroll was not a staging device but a trap, and three separate defects
+ * were all one fact:
+ *
+ *   · the POPULATED trend card's bottom (1227.4) is **918.4px** below the bloom's top (309), so
+ *     no 16:9 frame ≤1200 world px can hold the reading and the trend together;
+ *   · the viewfinder was rendered INSIDE the scrolling column, so at `SCROLL.monitor = 40` its
+ *     top landed at 269 against the toast's bottom at 291 — **the toast overlapped the
+ *     viewfinder by 22px**, which is the "notification covers the viewfinder" defect in beats
+ *     8 and 9. The old 18px gap was computed against the UNSCROLLED viewfinder;
+ *   · the two-line `tense` sub had 94px of room for a 93px block, i.e. an emphasis cap of
+ *     ~1.01× — the film's central device dead on the film's most important reading.
+ *
+ * **L14 is the rearrangement those measurements ask for**, and it is arrangement only — no
+ * component is re-styled, re-coloured or re-worded:
+ *
+ *   1. the column narrows to `max-w-lg` (512), which leaves the bloom exactly where it was
+ *      (x 456–744, centred) and frees the page from x 856 rightward;
+ *   2. the viewfinder, the mail toast and the confirmatory prompt move into a **pinned right
+ *      column at x 856–1176** that does NOT scroll. The toast/viewfinder overlap is gone by
+ *      construction, and 1176 is the drawn clock's own right edge — the sheet's "clock, toast
+ *      and viewfinder share a right edge" relationship, restored;
+ *   3. the `Session · MM:SS` readout moves out of a row ABOVE the card into the card's own
+ *      `pt-16` band. That row is what used to pin the scroll into a 39–41.5 window;
+ *   4. the stateline's sub **reserves two lines always**, so the block's height — and therefore
+ *      every framing derived from it — no longer changes when the copy does;
+ *   5. the stateline→controls gap goes 28 → 70, which is what buys L12's 1.25× back on the
+ *      two-line copy with 46.75px still clear of the controls.
  */
 
 // ── The shell ───────────────────────────────────────────────────────────────────────
@@ -44,34 +72,81 @@ import { Rect, rect } from "../greybox/Camera";
 export const VIEWPORT_Y = 92;
 /** `Header` — `sticky top-0 … h-16`. Measured 0,92 → 1200×64. */
 export const HEADER: Rect = rect(0, 92, 1200, 64);
-/** The toolbar clock (L11). Right edge shares the toast's and the viewfinder's — see below. */
-export const CLOCK: Rect = rect(923, 58, 140, 30);
+/**
+ * The toolbar clock (L11). Right edge 1176 — shared with the toast's and the viewfinder's.
+ *
+ * ── THIS RECT USED TO DISAGREE WITH THE DRAWN CLOCK, AND IT SLICED IT ───────────────
+ *
+ * It said x 923 (right edge 1063) while `shell.tsx:84` **draws** the clock at x 1036 (right edge
+ * 1176), because the previous pass moved the toast/viewfinder stack left to 1063 and moved this
+ * rect with it without moving the drawing. `BEAT8_CLOCK` frames `CLOCK ∪ TOAST`, so it framed
+ * 673–1133 and the drawn clock was cut at 1133: on a render it reads **"11:30 A"**. The one
+ * number in the film the whole of beat 8 depends on, with its meridiem sliced off.
+ *
+ * Geometry follows the drawing, never the other way round — the clock is not moved.
+ */
+export const CLOCK: Rect = rect(1036, 58, 140, 30);
 
 // ── The monitor page, at scroll 0 ───────────────────────────────────────────────────
 //
-// Measured with the real `<Header/>` mounted. Everything except the header shifts up by
-// `SCROLL.monitor` when a beat renders the page scrolled.
+// Measured with the real `<Header/>` mounted, at L14's arrangement (`max-w-lg`, the readout in
+// the card's top band, the sub reserving two lines, the 70px controls gap). Everything HERE
+// shifts up by `SCROLL.monitor` when a beat renders the page scrolled; the sticky header and the
+// pinned right column (`VIEWFINDER`, `TOAST`, `PROMPT`) never do.
 
 export const RAW = {
-  timerRow: rect(216, 188, 768, 44),
-  stage: rect(216, 244, 768, 607.7),
-  bloom: rect(456, 309, 288, 288),
-  statelineHead: rect(450.8, 621, 298.5, 36),
-  statelineSub: rect(456.2, 663, 287.6, 25.5),
-  controls: rect(449.4, 716.5, 301.2, 44),
-  footnote: rect(449.4, 792.5, 301.2, 18.2),
-  /** The REAL viewfinder, unscaled: `w-52 sm:w-56` `aspect-video` at `right-4 top-4`+`top-12`. */
-  viewfinder: rect(743, 309, 224, 126.9),
   /**
-   * **POPULATED, not empty.** The empty card is 101.5 tall — heading and one line — and the
-   * populated one is **355.7**, because it also carries the subtitle, a 718×210 plot and a
-   * six-key legend. Beat 11's landing was first derived from the empty height and framed the
-   * plot straight off the bottom edge; the card looked present and the line the beat exists to
-   * show was not in the shot.
+   * The `Session · MM:SS` readout and the back link, as ONE row inside the stage card's own
+   * `pt-16` band — not the row above the card the app draws. Nothing about the readout changes
+   * except which box it sits in, and that move is what freed the page scroll: the row above the
+   * card is what forced `SCROLL.monitor` into the old 39–41.5 window.
    */
-  trend: rect(216, 871.7, 768, 355.7),
-  /** The plot itself, inside the card. Measured 718×210 at y 962.2. */
-  trendPlot: rect(241, 962.2, 718, 210),
+  sessionReadout: rect(385, 209, 430, 44),
+  /** 675.2, not 673.2: the card's own 1px border top and bottom, which is easy to lose. */
+  stage: rect(344, 188, 512, 675.2),
+  bloom: rect(456, 253, 288, 288),
+  /** The `at_ease` head — the WIDEST of the three heads at 298.5. */
+  statelineHead: rect(450.8, 565, 298.5, 36),
+  /**
+   * The `at_ease` sub. **Two lines, always reserved** (`min-height: 51`) — see § THE SUB IS
+   * RESERVED below. The paragraph shrink-wraps to its content, so this is 287.6 wide.
+   */
+  statelineSub: rect(456.2, 607, 287.6, 51),
+  /**
+   * ── AND THE `tense` SUB, WHICH NOTHING HAD EVER MEASURED ──────────────────────────
+   *
+   * 430 wide — 142.4px wider than the `at_ease` one, because it is the only copy that wraps and
+   * a wrapped paragraph fills its `max-w-[42ch]` box (capped here by the card's own 430px
+   * content width) instead of shrink-wrapping. Every horizontal framing number in this file used
+   * to be derived from the 287.6 above, which meant **the `tense` sub was cropped at rest in
+   * beats 8 and 9 and nobody had seen it** — the same class of defect as the two-line clipping,
+   * for the same reason: every still anyone framed was an `at_ease` one.
+   *
+   * Both paragraphs are centred on x 600, so this is the rect the emphasis grows from.
+   */
+  statelineSubTense: rect(385, 607, 430, 51),
+  controls: rect(449.4, 728, 301.2, 44),
+  footnote: rect(449.4, 804, 301.2, 18.2),
+  /**
+   * The REAL viewfinder's UNSCALED size: `w-52 sm:w-56` `aspect-video`, 224 × 126.9. Only `w`/`h`
+   * are load-bearing now — the component is no longer laid out inside the scrolling card, so its
+   * position is `VIEWFINDER` below, in the pinned right column.
+   */
+  viewfinder: rect(615, 253, 224, 126.9),
+  /**
+   * **POPULATED, not empty.** The empty card is ~101.5 tall — heading and one line — and the
+   * populated one is not, because it also carries the subtitle, the plot and a six-key legend.
+   * Beat 11's landing was first derived from the empty height and framed the plot straight off
+   * the bottom edge; the card looked present and the line the beat exists to show was not in the
+   * shot.
+   *
+   * **It is still 355.7 at the 512 column**, which was worth checking rather than assuming: the
+   * plot keeps its declared 210 height and narrows to 462, and the six-key legend already fitted
+   * on its rows at 768 with room, so nothing wrapped. Measured, not scaled.
+   */
+  trend: rect(344, 883.2, 512, 355.7),
+  /** The plot itself, inside the card. 462 wide at this column, against 718 at `max-w-3xl`. */
+  trendPlot: rect(369, 973.7, 462, 210),
   welcome: rect(216, 1005.2, 768, 83.1),
   calibrationBanner: rect(216, 1112.3, 768, 87.5),
 } as const;
@@ -79,40 +154,55 @@ export const RAW = {
 /**
  * ── THE SCROLL OFFSETS, AND WHY THESE TWO ───────────────────────────────────────────
  *
- * `monitor` = 32. Chosen against two constraints that nearly conflict, both measured:
+ * `monitor` = 28, and beats 7, 8 and 9 never leave it — the page is static for three whole
+ * beats, which is what the pinned right column is for.
  *
- *   · At scroll 0 the stateline's SUB sits at y 663–688.5 and the viewport ends at 675 — the
- *     sub is clipped. Beat 7 cannot read at scroll 0 at all.
- *   · The session readout (`Session · 47:12`) lives in the row at y 188–232, and the sticky
- *     header covers everything above 156. Any scroll past 32 hides the readout, which beat 7
- *     lists as required content.
+ * **It is not zero, and the 28 is arithmetic rather than taste.** The app's authed `<main>` is
+ * `px-4 pt-6 sm:px-6 sm:pt-8`, so at this world content begins at 92 + 64 + 32 = **188**, and
+ * `MAIN_PT` is the shared shell every other authed beat is framed against (beats 3, 6 and 10) —
+ * it cannot be shortened for one page. 28px of honest page scroll puts the card top at **160**,
+ * 4px under the sticky header, and that is the whole of it:
  *
- * So 32 is the largest scroll that keeps the readout and the smallest that frees the sub.
- * It is not a taste value; it is the intersection of two measured constraints.
+ *   stateline head top (raw)      565
+ *   block height, 2 lines          93   (head 36 + `mt-1.5` 6 + reserved sub 51)
+ *   viewport bottom (raw)     675 + s
+ *   cap = (675 + s − 565) / 93 ≥ 1.25   ⟹   s ≥ 6.25
  *
- * `trend` = 634 centres the POPULATED trend card (871.7 – 1227.4, 355.7 tall) in the region
- * below the sticky header. Beat 11 travels 32 → 634 during its pull-out.
+ * so anything from ~7 up restores L12; 28 is chosen because it is exactly what removes the app's
+ * `pt-8` from the shot, and because the two remaining constraints are satisfied with room:
  *
- * **And the stateline cannot come with it**, which was measured rather than judged:
+ *   Pause/End controls stay BELOW the fold   728 − 28 = 700 > 675            ✓ 25px clear
+ *   the readout stays visible                it is INSIDE the card now       ✓ unconditionally
  *
- *   stateline head top → trend plot bottom     551.2 px
- *   viewport below the sticky header           519.0 px
- *                                              ─────────
- *                                              32 px short
+ * That second line is the one that changed. The old window was (39, 41.5] — a 2.5px slot — and
+ * the thing that pinned it was the `Session · MM:SS` row sitting ABOVE the card, under a sticky
+ * header. Moving the readout into the card's own `pt-16` band is what removed the constraint,
+ * and it is why 28 is now a choice with slack rather than an intersection with none.
  *
- * Thirty-two pixels, and there is no honest way to find them — the header is `sticky top-0` so
- * it cannot be scrolled away, and framing through it would put the returned copy behind the
- * header. So the beat reads the returned stateline in the shot BEFORE the move (it changes at
- * f146, framed) and lands on the trend card whole. Both are read, neither is cropped, and the
- * causal order is the sheet's own.
+ * `trend` = 580, and it is **the page scrolled to its end** rather than a framing device: the
+ * trend card is the last thing on the monitoring page (bottom at raw 1238.9), and 580 rests its
+ * bottom edge 16px above the viewport's, which is where a scrolled-to-the-bottom page sits. Beat
+ * 11 travels 28 → 580 in one continuous move, with the camera.
+ *
+ * It is also, checked rather than assumed, the offset at which beat 11's closing frame holds the
+ * FR-024 footnote ("Processed just for you — analyzed, then deleted.") whole rather than slicing
+ * it: at 580 the footnote's top lands 33.8px inside the frame's top edge. At the arithmetically
+ * tidier "centre the card in the viewport" value of 645.6 it clears by **1.0px**, which is a
+ * cropped line waiting to happen the next time anything about the card changes.
+ *
+ * **And the bloom still cannot come with it**, which is measured rather than judged: bloom top
+ * to trend bottom is 985.9px against a 519px viewport. What L14 changes is that the *viewfinder*
+ * can — it no longer scrolls, so beat 11's landing holds the trend card whole WITH his face,
+ * which is the pairing the beat actually needs.
  */
-export const SCROLL = { monitor: 40, trend: 634 } as const;
+export const SCROLL = { monitor: 28, trend: 580 } as const;
 
 /**
- * ── THE SUB IS NOT ALWAYS ONE LINE, AND THAT IS WHY `monitor` MOVED 32 → 40 ─────────
+ * ── THE SUB RESERVES TWO LINES, ALWAYS ──────────────────────────────────────────────
  *
- * `RAW.statelineSub` was measured at **25.5 tall — one line** — against the `at_ease` copy, which
- * is what the probe happened to render. Two of the three copies the film shows are one line:
+ * `RAW.statelineSub` used to be measured at **25.5 tall — one line** — against the `at_ease`
+ * copy, which is what the probe happened to render. Two of the three copies the film shows are
+ * one line:
  *
  *   at_ease         "Steady and settled — nothing to do."                        1 line
  *   a_little_tense  "A bit of an edge lately. Maybe a slow breath."              1 line
@@ -120,59 +210,69 @@ export const SCROLL = { monitor: 40, trend: 634 } as const;
  *                    ready."
  *
  * The sub is `max-w-[42ch]` (~393px at 17px Inter), and the `tense` copy is 62 characters, so it
- * wraps. At the old scroll of 32 its second line ran to raw y 714 against a viewport bottom of
- * 707, and **the descenders of the film's most important reading were sliced** — at rest, before
- * any emphasis, and the sheet's own rule is that a sliced line of text is always a failure. It
- * was invisible in review because every still anyone framed was an `at_ease` one.
+ * wraps. So the block's height, the controls' position, the footnote's position and **every
+ * framing derived from any of them** changed on the frame the copy changed — which is how the
+ * two-line `tense` sub came to be sliced by the viewport bottom at rest, in the one reading the
+ * film exists to deliver, invisibly, because every still anyone framed was an `at_ease` one.
  *
- * 40 is again the intersection of measured constraints, now three:
- *
- *   s > 39      the two-line `tense` sub clears the viewport bottom (714 − s ≤ 675)
- *   s ≤ 41.5    the Pause/End controls stay BELOW the fold (716.5 − s ≥ 675). Past this they
- *               appear, and the raised stateline lands on top of them.
- *   s as small  the `Session · 47:12` readout sits in the row at y 188–232 under a sticky header
- *   as possible ending at 156. At 40 the row's top 8px is covered and its centred text clears by
- *               ~14px; past ~48 the text itself goes under.
- *
- * The window is (39, 41.5]. There is no taste in it.
+ * So the sub now carries `min-height: 51px` — two lines of its own 25.5px leading — applied from
+ * the video side by a scoped stylesheet (`monitor.tsx` § `<StageLayout/>`). One-line copies keep
+ * an empty second line under them, which is what a layout that does not jump looks like. The
+ * block is **93px tall on every band**, and that is what makes `emphasisCapFor` a constant
+ * rather than a per-copy negotiation.
  */
 
 /**
- * ── AND THE EMPHASIS CANNOT SPEND ROOM THAT IS NOT THERE ────────────────────────────
+ * ── AND THE EMPHASIS NOW HAS THE ROOM IT WAS ALWAYS SPECIFIED WITH ──────────────────
  *
- * L12's 1.25× was derived against a one-line block. Measured against the two-line `tense` copy
- * it does not fit, and no scroll rescues it — the arithmetic is scroll-invariant:
+ * L12's 1.25× was derived against a one-line block. At `max-w-3xl`, scroll 40, with the controls
+ * 28px under the sub, the two-line `tense` block had 94px of room for 93px of block — a cap of
+ * **1.01×**, i.e. the device was dead on the film's most important reading, and the arithmetic
+ * was scroll-invariant so no scroll could rescue it.
  *
- *   raised two-line bottom   737.25 − s
- *   Pause/End controls top   716.5  − s
+ * Three of L14's five moves are what fix it, and they are all arrangement:
  *
- * The first is 20.75px below the second at EVERY scroll, so a 1.25× raise on the `tense` copy
- * either runs off the viewport or runs through the controls. There is no third option at this
- * layout. **This is the measured case for §7's Pass-B rearrangement** — moving the bloom,
- * stateline and trend into their own column is what buys the block the room it needs.
+ *   the readout leaves the row above the card   → the scroll is free
+ *   the sub reserves two lines                  → the block is 93 on every band
+ *   the stateline→controls gap 28 → 70          → the raise has somewhere to go
  *
- * So the factor is capped by the room actually available, per copy, and the cap is what makes
- * the device safe rather than a rule anyone has to remember:
+ * Measured at `SCROLL.monitor` = 28:
  *
- *   room = viewportBottom(raw) − block top = (675 + 40) − 621 = 94
- *   one line   block 621 → 688.5  = 67.5 tall → cap 1.39 → L12's 1.25 applies
- *   two lines  block 621 → 714    = 93   tall → cap 1.01 → the raise is unavailable
+ *   room  = (675 + 28) − 565         = 138
+ *   block = 36 + 6 + 51              =  93   on EVERY band
+ *   cap   = 138 / 93 = 1.484 → capped at L12's 1.25×
  *
- * That is not the device failing quietly. **The collapse IS the firing**: beat 8 raises on its
- * first copy change and the block settles as the second lands, so both changes carry movement
- * and nothing yo-yos — see `Beat08Email.tsx`.
+ *   raised block   565 → 681.25  (raw)   = 537 → 653.25 on screen
+ *   viewport bottom                       675      → **21.75px clear**
+ *   Pause/End controls top   728 (raw)    = 700     → **46.75px clear**
+ *   COMPOSITE's frame bottom              660       → **6.75px clear** (see `framing.ts`,
+ *                                                     whose margin is 30 for exactly this)
+ *
+ * `emphasisCapFor` keeps its `lines` parameter and keeps returning `Math.min(…)` against the
+ * real room, because the guard is what makes the device safe rather than a rule anyone has to
+ * remember — it simply no longer bites. It returns 1.25 for one line AND for two.
  */
 const STATELINE_LINE_H = 25.5;
 const VIEWPORT_BOTTOM_RAW = 675 + SCROLL.monitor;
 
-/** The natural (unraised) height of the stateline block, for a sub of `lines` lines. */
+/**
+ * The natural (unraised) height of the stateline block.
+ *
+ * `lines` is kept in the signature and deliberately ignored for the height: the sub's box is
+ * `min-height: 51` on every band (see above), so the block is the same 93px whether the copy
+ * wraps or not. A caller that passes 1 and a caller that passes 2 now get the same answer, which
+ * is the point of the reserve.
+ */
 export const statelineBlockHeight = (lines: number): number =>
-  RAW.statelineSub.y + STATELINE_LINE_H * lines - RAW.statelineHead.y;
+  Math.max(
+    RAW.statelineSub.y + STATELINE_LINE_H * lines - RAW.statelineHead.y,
+    RAW.statelineSub.y + RAW.statelineSub.h - RAW.statelineHead.y,
+  );
 
 /**
  * The largest factor the block can grow to without a line leaving the page's own viewport.
  * Never above L12's 1.25×, and never below 1 — a block that would already be clipped at rest is
- * a defect to fix at the scroll, not something to shrink out of.
+ * a defect to fix at the layout, not something to shrink out of.
  */
 export const emphasisCapFor = (lines: number): number => {
   const room = VIEWPORT_BOTTOM_RAW - RAW.statelineHead.y;
@@ -186,46 +286,52 @@ export const SUB_LINES = { at_ease: 1, a_little_tense: 1, tense: 2 } as const;
 export const scrolled = (r: Rect, s: number): Rect => rect(r.x, r.y - s, r.w, r.h);
 
 /**
- * ── LIBERTY L1, RE-DERIVED ──────────────────────────────────────────────────────────
+ * ── THE PINNED RIGHT COLUMN (L14), AND LIBERTY L1 INSIDE IT ─────────────────────────
  *
- * The app draws the viewfinder at 224×126.9. L1 enlarges it so the face is readable on a
- * phone, and the register (item 6) kept L1 explicitly while asking for the size to be
- * re-checked against the real component "and only against a measured figure". Here is the
- * measured figure.
+ * Three surfaces live at **x 856 – 1176** and none of them scrolls: the mail toast (beat 8), the
+ * viewfinder (beats 7–11) and the confirmatory prompt (beat 9). 1176 is the DRAWN clock's own
+ * right edge (`shell.tsx:84`), so the sheet's "the clock, the toast and the viewfinder share a
+ * right edge, so beat 8 frames one vertical stack rather than three unrelated things" is
+ * literally true again — the previous pass had moved the stack to 1063 and left the clock at
+ * 1176, which is the crop this pass found on a render.
  *
- * L1's declared size is 320×180, and it survives — but the direction it grows had to change.
- * Scaling it about its top-RIGHT corner (its anchor in the app) grows it leftward, and the
- * bloom's right edge is at 744 against the viewfinder's left at 743: **any leftward growth
- * covers the bloom's solid core**, which is opaque out to a 69px radius (the gradient's
- * `var(--bloom) 34%` stop over a 203.6px farthest-corner). Beat 7's entire job is to plant
- * bloom, stateline and viewfinder together, so that is not available.
+ *   clock       58 –  88     (browser chrome; never moves)
+ *   toast       96 – 200     (beat 8)
+ *   viewfinder 212 – 393.3   (beats 7–11)
+ *   prompt     424 – 714     (beat 9; its last 39px land on the camera backdrop, see PROMPT)
  *
- * So it grows from its top-LEFT instead: 743 → 1063, overhanging the stage card's right edge
- * (984) by 79px onto the page. That is within the component's own nature — it is an
- * `absolute … z-10` overlay, not a card child — and at narrower viewports the real component
- * overlaps the bloom itself. The bloom stays untouched, which is what beat 7 needs.
+ * **The 22px toast/viewfinder overlap is gone by construction**, not by tuning: the two were
+ * only ever colliding because the viewfinder was laid out inside the scrolling column and the
+ * gap had been computed against its UNSCROLLED position. Neither scrolls now, so the 12px
+ * between them is a fact rather than a coincidence — and 12px is adjacency, which is the whole
+ * of liberty L2: you watch his face fall *while the toast is up*.
+ *
+ * ── LIBERTY L1, UNCHANGED IN SIZE AND FREED IN DIRECTION ────────────────────────────
+ *
+ * The app draws the viewfinder at 224×126.9. L1 enlarges it to **320×181.3** so the face is
+ * readable on a phone, and the register (item 6) kept L1 explicitly while asking for the size to
+ * be re-checked against a measured figure. It is.
+ *
+ * What changes at L14 is that the growth direction stops being a compromise. It used to be
+ * pinned to the card's right edge and grown top-LEFT so it would not cover the bloom's opaque
+ * core; now the column is 512 wide and ends at 856, so the viewfinder starts where the card
+ * stops and grows into page that was empty anyway. The bloom is untouchable by geometry rather
+ * than by careful arrangement.
  */
 export const VF_SCALE = 320 / 224;
-export const VIEWFINDER: Rect = rect(743, RAW.viewfinder.y, 320, 126.9 * VF_SCALE);
+export const STACK_RIGHT = 1176;
+export const STACK_LEFT = STACK_RIGHT - 320;
+export const VIEWFINDER: Rect = rect(STACK_LEFT, 212, 320, 126.9 * VF_SCALE);
 
-/**
- * The toast and the clock right-align to the viewfinder's right edge (1063), restoring the
- * sheet's "clock, toast and viewfinder share a right edge so beat 8 frames one vertical stack"
- * relationship at the real geometry. The greybox's shared edge was 1176; the real viewfinder
- * cannot reach it without covering the bloom, so the STACK moved rather than the viewfinder.
- *
- * The omnibox shortens to 840 to clear the clock at 923 — the same trade L11 already made.
- */
-export const STACK_RIGHT = 1063;
 /**
  * 104 tall, not the greybox's 82: the boss's subject line wraps to two lines at 320 wide, and at
  * 82 the second line spilled out through the panel's rounded bottom edge. Measured from the
  * content — 12 pad + 15 meta + 19 sender + 2 × 17.5 subject + margins + 12 pad.
  *
- * Bottom lands at 291, which leaves 18px between the toast and the viewfinder's top at 309 —
- * adjacent, which is the whole of liberty L2: you watch his face fall *while the toast is up*.
+ * Top at 96 — 4px under the page's own top edge, which is where a macOS banner sits. Bottom at
+ * 200, 12px clear of the viewfinder.
  */
-export const TOAST: Rect = rect(743, 187, 320, 104);
+export const TOAST: Rect = rect(STACK_LEFT, 96, 320, 104);
 
 /**
  * ── THE EMPHASIS (L12), AND REGISTER ITEM 3 ─────────────────────────────────────────
@@ -234,38 +340,85 @@ export const TOAST: Rect = rect(743, 187, 320, 104);
  * framing of ~1096 world px, where the app's 17px sub lands at 6.5px on a phone and needs 1.6×
  * just to clear the ~10px legibility floor.
  *
- * At the real geometry the composite is **760 wide**, not 1096 — because the real viewfinder is
- * inside the card rather than 300px to its right, so the union of bloom + stateline + viewfinder
- * is far tighter. At 760 the sub already lands at 9.4px. The factor needed for legibility alone
- * is 1.064×, which is not a device; it is a rendering artefact.
+ * At the real geometry the composite is **884.8 wide**, not 1096, so the sub lands at 8.11px and
+ * the factor needed for legibility alone is 1.233× — which is a coincidence rather than a
+ * derivation, and is not what sets the number.
  *
- * **So the emphasis yields, which is exactly what register item 3 asks of it** — the layout does
- * not move to accommodate a video device. It goes to **1.25×**, chosen against two measured
- * clearances rather than taste:
+ * **The emphasis yields, which is exactly what register item 3 asks of it** — the layout does
+ * not move to accommodate a video device. It goes to **1.25×**, chosen against measured
+ * clearances rather than taste, at L14's arrangement and `SCROLL.monitor` = 28:
  *
- *   bloom bottom      565.0   (scroll 32)
- *   stateline top     589.0   ← the block grows DOWNWARD from here; its top never moves,
+ *   bloom bottom      513.0
+ *   stateline top     537.0   ← the block grows DOWNWARD from here; its top never moves,
  *                               so the bloom is untouchable by construction
- *   block at 1.25×    589.0 – 673.4
- *   controls top      684.5   → 11.1px of clearance
- *   frame bottom      680.4   → the block finishes inside the shot
+ *   block at 1.25×    537.0 – 653.25
+ *   controls top      700.0   → **46.75px** of clearance
+ *   viewport bottom   675.0   → **21.75px**
+ *   frame bottom      681.5   → the block finishes inside the shot, by 28.2px
  *
- * At 1.65× the block would reach 700.4 — through the controls and out of frame. The device
+ * At 1.65× the block would reach 690.5 — through the viewport's bottom edge. The device
  * survives as grammar (it still fires on every copy change, which is what makes it grammar);
  * only its amplitude yields, and legibility is better than it was because the shot is tighter.
  *
- * **This is the CEILING, not the applied factor.** The arithmetic above is a one-line block's;
- * `emphasisCapFor()` above re-derives it per copy against the real number of lines, and the
- * two-line `tense` sub does not fit at any scroll. See that function's header.
+ * **This is the CEILING, and at L14 it is also the applied factor on every band.** The
+ * arithmetic above was a one-line block's, and until L14 `emphasisCapFor()` re-derived it per
+ * copy and returned ~1.01 for the two-line `tense` sub — the device dead where it mattered most.
+ * The reserved sub and the 70px controls gap put the two-line block at 46.75px of clearance, so
+ * the cap is 1.25 for one line and for two. See `emphasisCapFor`'s header.
  */
 export const EMPHASIS_FACTOR = 1.25;
 
-/** The stateline block the emphasis raises: head + sub, as one. */
+/**
+ * ── THE TWO LAYOUT VALUES L14 CHANGES, AND WHERE THEY ARE APPLIED ───────────────────
+ *
+ * Both are applied from OUTSIDE `apps/web`, by the scoped stylesheet in `monitor.tsx`
+ * (`<StageLayout/>`) — the same mechanism `motion.tsx` uses four times over to reach into a
+ * component the video must not fork. Nothing in the product is edited; what changes is the
+ * arrangement the film renders it in, which is the register's own line about what a video pass
+ * may and may not do.
+ *
+ * They are declared here because every framing number above is derived from them.
+ */
+/** The sub's reserved height — two lines of its own 25.5px leading. */
+export const SUB_MIN_HEIGHT = STATELINE_LINE_H * 2;
+/** `op-surfaces.tsx:253` ships `mt-7` (28) on the controls row. L14 spends 70. */
+export const STATELINE_CONTROLS_GAP = 70;
+
+/**
+ * The stateline block the emphasis raises: head + sub, as one, at its WIDEST copy.
+ *
+ * Both paragraphs are centred on x 600 (`items-center` + `text-center`), and the widest thing
+ * the block ever contains is the `tense` sub at 430 — not the `at_ease` head at 298.5 this used
+ * to be derived from.
+ */
+const STATELINE_CX = RAW.statelineSubTense.x + RAW.statelineSubTense.w / 2;
+const STATELINE_W = Math.max(RAW.statelineHead.w, RAW.statelineSubTense.w);
 export const STATELINE_BLOCK: Rect = rect(
-  RAW.statelineHead.x,
+  STATELINE_CX - STATELINE_W / 2,
   RAW.statelineHead.y,
-  RAW.statelineHead.w,
+  STATELINE_W,
   RAW.statelineSub.y + RAW.statelineSub.h - RAW.statelineHead.y,
+);
+
+/**
+ * ── THE RECT THE DEVICE REACHES, WHICH IS NOT THE RECT THE BLOCK OCCUPIES ───────────
+ *
+ * `<Emphasis/>` scales both paragraphs about `top center`, so at full amplitude the block is
+ * `EMPHASIS_FACTOR` times as wide and as tall, growing outward from its own centre line and
+ * downward from its own top edge. **This is what the composite has to frame**, and framing the
+ * resting block instead is why the raise used to run off the left edge of the shot:
+ *
+ *   at rest      385.0 – 815.0   ×  565 – 658
+ *   raised 1.25× 331.3 – 868.8   ×  565 – 681.25
+ *
+ * Same class of arithmetic as `SUCCESS_FRAMED` and beat 5f's ripple: the bounding box that
+ * matters is the one the DEVICE reaches, not the one the component occupies while it is still.
+ */
+export const STATELINE_RAISED: Rect = rect(
+  STATELINE_CX - (STATELINE_W * EMPHASIS_FACTOR) / 2,
+  STATELINE_BLOCK.y,
+  STATELINE_W * EMPHASIS_FACTOR,
+  STATELINE_BLOCK.h * EMPHASIS_FACTOR,
 );
 
 // ── Calibration ─────────────────────────────────────────────────────────────────────
@@ -304,16 +457,32 @@ export const CALIB = {
  * That is why beat 5f has read as punched-in across three revisions: every previous framing
  * measured the component and cropped the ripple, so the payoff played with its own bloom
  * clipped by the frame edge. `SUCCESS_FRAMED` is the component grown by the ripple's real
- * overshoot on all four sides — the rect the camera must actually hold.
+ * overshoot — the rect the camera must actually hold.
+ *
+ * ── AND THE HORIZONTAL HALF OF THAT CONSTRUCTION WAS WRONG, WHICH IS WHY 5f SAT LEFT ──
+ *
+ * It used to build `x` from the BADGE — `SUCCESS_BADGE.x − RIPPLE_OVERSHOOT` = 499.2, with
+ * `w = 448` — so the rect's centre was **723.2** while the component's is **600**. Beat 5f's
+ * previous key is `shot(600, …)`, so the camera arrived on a rect centred 123px to the RIGHT of
+ * the thing it was framing: the success state sat left of frame, and the move onto it read as a
+ * pan the wrong way. That is the "sits left of frame, and the camera then pans further left"
+ * complaint, and it was a bad rect rather than a bad shot.
+ *
+ * **The vertical half is right and the horizontal half never applied.** The ripple reaches
+ * 499.2 → 700.8 horizontally, which is *inside* the component's own 376 → 824 — so the component
+ * governs x and the badge must not appear in the x arithmetic at all. It only governs y because
+ * the badge sits 24px below the component's top and the ripple overshoots by 52.8.
  */
 export const RIPPLE_OVERSHOOT = 52.8;
 export const SUCCESS: Rect = rect(376, 0, 448, 346.9);
 export const SUCCESS_BADGE: Rect = rect(552, 24, 96, 96);
+/** How far the ripple crosses the component's own TOP edge. The only axis it escapes on. */
+export const RIPPLE_TOP_OVERSHOOT = RIPPLE_OVERSHOOT - 24;
 export const SUCCESS_FRAMED: Rect = rect(
-  SUCCESS_BADGE.x - RIPPLE_OVERSHOOT,
-  SUCCESS.y - (RIPPLE_OVERSHOOT - 24),
-  Math.max(SUCCESS.w, SUCCESS_BADGE.w + RIPPLE_OVERSHOOT * 2),
-  SUCCESS.h + (RIPPLE_OVERSHOOT - 24),
+  SUCCESS.x,
+  SUCCESS.y - RIPPLE_TOP_OVERSHOOT,
+  SUCCESS.w,
+  SUCCESS.h + RIPPLE_TOP_OVERSHOOT,
 );
 
 // ── Beat 4's gate ───────────────────────────────────────────────────────────────────
@@ -410,15 +579,33 @@ export const VERIFY = {
  * `space-y-10` (40) separates the banner from the greeting, so beat 6's layout is not beat 3's
  * with a hole in it — everything below the missing banner moves up by 126, which is exactly the
  * "its absence is the beat's visible content" the sheet asks for.
+ *
+ * ── EVERY y HERE WAS 64px HIGH, AND IT IS THE SECOND HALF OF THE CURSOR DEFECT ──────
+ *
+ * These were probed **without the sticky `<Header/>` mounted**, unlike `RAW.*` (whose own header
+ * note says it was measured with it). The page is `VIEWPORT_Y` 92 + `HEADER_H` 64 + `MAIN_PT` 32
+ * = **content top 188**, and the old `calibrationBanner.y` was 124 = 92 + 32 — the header's
+ * exact height missing.
+ *
+ * The visible symptom was "the pointer draws above the control it's clicking" on **Set baseline**
+ * and **Start check-in**, and it survived fixing the cursor sprite's own hotspot because it is a
+ * different bug wearing the same face. What made it hard to see is that the **hover fired
+ * correctly on the button anyway** — `hover.tsx` addresses the DOM by CSS *selector* and never
+ * reads a coordinate, so it cannot corroborate one. A correct hover beside a missed click is
+ * therefore not a contradiction; it is the signature of a bad rect.
+ *
+ * Every value below is +64 from what was here, and the set is internally consistent at the new
+ * offset: banner 188 + 86 + `space-y-10` 40 = welcome 314, and welcome 188 + 83.1 + 40 =
+ * todayCard 311.1, which is the same arithmetic the old numbers satisfied 64px too high.
  */
 export const HOME = {
-  calibrationBanner: rect(24, 124, 1152, 86),
+  calibrationBanner: rect(24, 188, 1152, 86),
   /** "Set baseline". Beat 3 ends on a click of it. */
-  setBaseline: rect(948.8, 145, 114, 44),
+  setBaseline: rect(948.8, 209, 114, 44),
   /** With the banner above it (beat 3). */
-  welcomeWithBanner: rect(24, 250, 1152, 83.1),
+  welcomeWithBanner: rect(24, 314, 1152, 83.1),
   /** Without it (beat 6). */
-  welcome: rect(24, 124, 1152, 83.1),
+  welcome: rect(24, 188, 1152, 83.1),
 
   /**
    * ── THE THREE CARDS, AS THE REAL EMPTY STATES ─────────────────────────────────────
@@ -432,15 +619,15 @@ export const HOME = {
    * Beat 3's sits 126 lower, at 373.1, which is the calibration banner plus its own gap —
    * the same 126 the sheet already quotes for what moves when `has_anchor` flips.
    */
-  todayCard: rect(24, 247.1, 1152, 217.5),
-  todayCardWithBanner: rect(24, 373.1, 1152, 217.5),
+  todayCard: rect(24, 311.1, 1152, 217.5),
+  todayCardWithBanner: rect(24, 437.1, 1152, 217.5),
   /**
    * **"Start check-in", and beat 6 had been clicking a rectangle.** The CTA is 126.3 × 40 at
    * x 49, 152.5 down the card — so in beat 6's column it is at y 399.6. The beat used to draw
    * its own 152 × 44 button at (1000, 300) and click that, because the card underneath was a
    * stand-in with no button in it. Both the drawn button and the guessed position are gone.
    */
-  startCheckIn: rect(49, 399.6, 126.3, 40),
+  startCheckIn: rect(49, 463.6, 126.3, 40),
 } as const;
 
 /**
@@ -461,11 +648,43 @@ export const HOME = {
  */
 export const CHAT = {
   panel: rect(264, 188, 672, 460),
-  composer: rect(277, 534.1, 646, 44.5),
-  textarea: rect(277, 534.1, 592, 44.5),
+  composer: rect(277, 533.6, 646, 44.5),
+  textarea: rect(277, 533.6, 592, 44.5),
   /** The send button. Beat 10 ends its typing on a click of this. */
-  send: rect(879, 534.1, 44, 44),
+  send: rect(879, 533.6, 44, 44),
+
+  /**
+   * ── AND THE BEAT FRAMED THINGS THIS BLOCK DID NOT CONTAIN ─────────────────────────
+   *
+   * Everything above describes the composer, because the composer is where the click was. Beat
+   * 10's *shots* are unions of Ren's avatar with the message being read — and none of those rects
+   * existed, which is why the beat was the only one in the film framing hand-typed `shot(cx, cy,
+   * w)` values rather than `frameRect` over measured geometry. Framing you cannot derive is
+   * framing nobody can check.
+   */
+  /** The conversation header — `<RenAvatar/>`, "Ren", "here to listen". On screen the whole beat. */
+  header: rect(265, 189, 670, 68.7),
+  /** Ren's avatar inside it (L8 enlarges the drawing, not this box). */
+  renAvatar: rect(281, 205.8, 34, 34),
+  /** The scrolling message log. */
+  log: rect(265, 257.7, 670, 262.9),
+  /** Turn 1 — Ren opens. `self-start`, bordered. */
+  turn1: rect(281, 277.7, 349.5, 46.4),
+  /** Turn 2 — his, typed in the composer first. `self-end`, filled. */
+  turn2: rect(541.7, 338.1, 377.3, 44.4),
+  /** Turn 3 — Ren's suggestion. The beat's protected 60-frame hold lands here. */
+  turn3: rect(281, 396.4, 472.1, 70.8),
+  disclaimer: rect(277, 584.1, 646, 15.1),
+  footerBar: rect(265, 611.3, 670, 35.8),
 } as const;
+
+/**
+ * **The number that sets beat 10's scale, stated once so it stops being re-derived.** Ren's
+ * avatar sits at x 281 and *his* bubble runs to x 919, so **any** landing holding both is ≥638
+ * wide before margins. That is why turns 2 and 3 cannot reach the ~10px phone floor at this
+ * world, and it is a property of the conversation's own layout rather than of the framing.
+ */
+export const CHAT_OWNERSHIP_SPAN = 919 - 281;
 
 /**
  * ── BEAT 5a'S PRIVACY LINE, AND THE ROOM THE EMPHASIS HAS ───────────────────────────
@@ -489,11 +708,24 @@ export const CHAT = {
  * `max-w-md` boundary costs nothing — that boundary is invisible, with no border, no background
  * and nothing beside it to collide with.
  *
- * **What the emphasis does NOT buy here is legibility, and that is worth stating rather than
- * discovering later.** Beat 5a is deliberately wide (the sheet: "it STAYS WIDE"), so at 1021.5
- * world px the line's real 14px lands at **5.8px on a phone**, and 7.2px raised. The device is
- * carrying emphasis, not size — which is what §7 asked for, and it is why the instruction was
- * *motion only, do not recolour*. A framing that makes this line readable is Pass B's to find.
+ * ~~**What the emphasis does NOT buy here is legibility.**~~ **IT BUYS BOTH NOW — the framing was
+ * found.** At the old 1021.5-wide hold the line's 14px landed at **5.8px on a phone**, 7.2px
+ * raised, and this comment recorded that as a limitation of the device. It was a limitation of
+ * the *shot*. Beat 5a takes a **580**-wide landing held f32–76, where it reads at **10.19px
+ * seated and 12.74px raised** — over the floor at rest and comfortably over it under the raise.
+ *
+ * Three numbers made it available. The line is `text-sm` (**14px** — several notes about it had
+ * been reasoning from 17); the raise takes it to **523 wide**, so no frame under ~570 holds it
+ * whole; and a **27px page lift** opens a 344px vertical window between the lede's last line and
+ * the helper line's bottom, which 16:9 allows up to 611. 580 sits inside that with 7.1px of
+ * gutter each side.
+ *
+ * **The lift is a fix rather than a device**: preview (288) + `mt-4` (16) + card (204.2) = 508.2
+ * against 519px of visible page, so the column *fits* — `main`'s own `pt-8` just starts it 32px
+ * too low, which was slicing the helper line at the viewport's bottom edge at rest.
+ *
+ * The emphasis itself is untouched — same 1.25×, same downward growth, same `text-muted` grey and
+ * meadow shield. *Motion only, do not recolour* still holds; only the shot moved.
  */
 export const INTRO_PRIVACY = {
   /** Relative to the intro component's own top-left. */
@@ -507,17 +739,29 @@ export const INTRO_PRIVACY = {
  *
  * 1169.9px of page in a 583px viewport — very nearly exactly two screens, which is why the beat
  * scrolls and why the scroll is honest rather than a device.
+ *
+ * ── EVERY y HERE WAS 64px HIGH TOO — THE THIRD INSTANCE OF THE SAME PROBE ERROR ─────
+ *
+ * Identical to `HOME` above and found the same way: the block was probed **without the sticky
+ * `<Header/>` mounted**, so `section.y` read 124 = `VIEWPORT_Y` 92 + `MAIN_PT` 32 with the
+ * header's exact 64px missing. The symptom was beat 4's landing arriving mid-layout — body copy
+ * sliced at the top *and* bottom edges with no card border anywhere in frame, which looks like a
+ * badly chosen shot and was a rect describing a page that does not exist.
+ *
+ * Three blocks in this file were wrong in exactly this way (`HOME`, `GATE`, and the beat-10 chat
+ * rects), which is why the note at the top of the file now says to check the rect against a
+ * render rather than to trust that it was measured. Every value below is +64.
  */
 export const GATE = {
-  section: rect(312, 124, 576, 1169.9),
-  header: rect(316, 148, 568, 200.4),
+  section: rect(312, 188, 576, 1169.9),
+  header: rect(316, 212, 568, 200.4),
   /** "What happens" — the first bordered card. */
-  facts1: rect(316, 372.4, 568, 416.3),
+  facts1: rect(316, 436.4, 568, 416.3),
   /** "What declining changes" — the second bordered card. */
-  facts2: rect(316, 812.6, 568, 325.3),
-  buttons: rect(316, 1161.9, 568, 108),
+  facts2: rect(316, 876.6, 568, 325.3),
+  buttons: rect(316, 1225.9, 568, 108),
   /** "Allow camera and inference". The beat ends on it. */
-  allow: rect(316, 1161.9, 568, 48),
+  allow: rect(316, 1225.9, 568, 48),
   /**
    * ── THE PRIVACY PITCH IS IN THE FIRST CARD, NOT THE LAST ──────────────────────────
    *
@@ -532,27 +776,50 @@ export const GATE = {
    * the viewport is 583. It is the closest near-miss in the film and it is still a miss, so the
    * beat takes two landings inside one continuous move — the sheet's own remedy for exactly
    * this, applied once more.
+   *
+   * **THE KEY LINE IS `text-sm` — 14px, not 17.** `camera-consent-gate.tsx:149`. The "12.7px on
+   * a phone" figure this file and the beat sheet both quoted was derived from a size the
+   * component never uses, so the line was ~18% less legible than every note about it claimed.
    */
-  keyLine: rect(341, 615.1, 518, 91),
+  keyLine: rect(341, 679.1, 518, 91),
+  /** The bullet copy's real size. Every legibility figure for this beat derives from it. */
+  keyLineFontPx: 14,
 } as const;
 
 /**
- * ── THE CONFIRMATORY PROMPT LIVES IN SCREEN SPACE, NOT IN THE WORLD ─────────────────
+ * ── THE CONFIRMATORY PROMPT, BROUGHT INTO THE WORLD ─────────────────────────────────
  *
  * `<Notification/>` portals to `document.body` and is `fixed right-4 w-80 bottom-[…]`
  * (`notification.tsx:186`), so it resolves against the 1920×1080 OUTPUT frame and is outside the
  * camera's transform entirely. A wrapper around `<ConfirmatoryPrompt/>` cannot move it — the
- * portal escapes the wrapper — which is why beat 9's prompt sits bottom-right of the frame
- * regardless of where the camera is looking. **That is the known framing complaint and Pass B
- * owns it**; what is recorded here is only where the control is, so the cursor can reach it.
+ * portal escapes the wrapper — so beat 9's prompt used to sit bottom-right of the frame
+ * regardless of where the camera was looking, and the camera could not push in on the one
+ * surface the beat exists to show. That was the known framing complaint. **L14 closes it.**
  *
- * Measured in OUTPUT pixels, not world pixels. Anything drawn against these must sit outside
- * `<Camera>`.
+ * The mechanism is a scoped stylesheet on the portalled node (`monitor.tsx` § `<WorldPrompt/>`)
+ * that neutralises `right`/`bottom` and re-states `left`/`top`/`transform` as the camera's own
+ * per-frame projection of these WORLD coordinates. Radix keeps its portal, the component keeps
+ * every one of its classes, and the prompt behaves as if it had been laid out in the world:
+ * it moves and magnifies with the camera like everything else.
+ *
+ * **These are WORLD pixels**, and the panel is 320 × 290 measured (`w-80` + `p-6`, title, body
+ * and the three 44px options). It is the last surface in the pinned right column and the one
+ * element in the film deliberately allowed past the world's bottom edge: 424 + 290 = 714 against
+ * a 675-tall world, so its last 39px land on the camera backdrop — which is `--color-bg`, the
+ * same colour as the page under it (`Camera.tsx:130`), so the seam does not exist. Being
+ * portalled to the body it is drawn outside `Desktop`'s `overflow: hidden` for free; that is the
+ * one thing the portal was always good for.
+ *
+ * **424 is derived, not placed.** `BEAT9_PROMPT` is `frameRect(panel, 24)` and its height
+ * governs, so the frame's top edge lands exactly 24px above the panel. The viewfinder's bottom
+ * is at 393.3, so any y below 423.3 puts a sliver of the viewfinder in the top of beat 9's
+ * landing — a component sliced at rest, which is always a failure. 424 clears it by 6.7px and is
+ * the smallest value that does.
  */
-export const PROMPT_SCREEN = {
-  panel: rect(1584, 758, 320, 290),
-  /** "Yes, that's me" — the true-positive branch. */
-  yes: rect(1609, 875, 270, 44),
+export const PROMPT = {
+  panel: rect(STACK_LEFT, 424, 320, 290),
+  /** "Yes, that's me" — the true-positive branch. Offsets measured off the panel's own box. */
+  yes: rect(STACK_LEFT + 25, 424 + 117, 270, 44),
 } as const;
 
 /**

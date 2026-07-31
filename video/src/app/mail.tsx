@@ -1,7 +1,9 @@
 import React from "react";
 
+import { Wordmark } from "@/components/brand/wordmark";
+
 import { EMAIL } from "../greybox/copy";
-import { MAILAPP, OS_FONT, OS_TABULAR, STANDIN } from "./furniture";
+import { CARD_DISPLAY, MAILAPP, OS_FONT, OS_TABULAR, STANDIN } from "./furniture";
 import { MailMark } from "./shell";
 
 /*
@@ -310,7 +312,47 @@ const EmptyPane: React.FC = () => (
  * looks like in a mail client: a fixed-width, differently-styled document sitting in the client's
  * own chrome. Rendering it edge-to-edge would have made the mail client and the email indivisible
  * and lost the one visual cue that says "this is a message, not a page".
+ *
+ * ── THE CARD IS THE TEMPLATE'S OWN 520px, ROW BY ROW ─────────────────────────────────
+ *
+ * `confirmation.html`'s `.panel` is `max-width:520px`, and it is not one uniform inset: the
+ * wordmark/headline/body block, the button, the code block and the footer each carry their own
+ * top/bottom padding (30/10, 20/16, 10/0, 28/30 — see the row comments below), which is what gives
+ * the real email its rhythm instead of one even gutter. That row structure is reproduced here
+ * rather than collapsed into a single padding value, and the button's row is what makes it centred
+ * rather than flush left.
+ *
+ * ── THE CARD IS DRAWN IN THE TEMPLATE'S OWN DARK VALUES, NOT THE CLIENT'S FURNITURE ──
+ *
+ * `confirmation.html` ships a real `@media (prefers-color-scheme: dark)` block — this is not the
+ * film inventing a dark reading of a light template, it is the template's own author-specified
+ * dark appearance, and it is the one an actual dark mail client renders. Its hex values are used
+ * verbatim below (`EMAIL_DOC`) rather than the mail client's `STANDIN`/`MAILAPP` ramp: those exist
+ * for the *client's* chrome, and `furniture.ts` is explicit that they must never leak into a
+ * document the client is merely hosting. The wordmark is the one element that gets this for free —
+ * `<Wordmark/>`'s `text-ink`/`text-meadow-text` already resolve to the template's own dark hex
+ * under this scene's `.dark` root, so it needs no local override to match.
  */
+const EMAIL_DOC = {
+  /** `.panel` background, dark-mode override — `confirmation.html:15`. */
+  panel: "#181B1E",
+  /** `.panel` border and `.divider`, dark-mode override — `confirmation.html:15,21`. */
+  border: "#23272B",
+  /** `.panel`'s `border-top` and the button fill — the template's one accent, dark-mode override
+   *  — `confirmation.html:15,23`. Green, never red. */
+  accent: "#63B292",
+  /** `.headline` / `.code` text, dark-mode override — `confirmation.html:19,22`, and the same
+   *  value `<Wordmark/>`'s `text-ink` resolves to under `.dark` (`globals.css`). */
+  ink: "#E2E5E8",
+  /** `.body-copy` / `.muted`, dark-mode override — `confirmation.html:20`. */
+  muted: "#939A9F",
+  /** `.code` background, dark-mode override — the page's own bg, so the code reads as a cut-out
+   *  rather than a filled box — `confirmation.html:22`. */
+  codeBg: "#101214",
+  /** `.button` text on the accent fill, dark-mode override — `confirmation.html:23`. */
+  buttonInk: "#101214",
+} as const;
+
 const Message: React.FC = () => (
   <div
     style={{
@@ -342,75 +384,94 @@ const Message: React.FC = () => (
 
     <div style={{ height: 1, backgroundColor: MAILAPP.divider, margin: "16px 0 0" }} />
 
-    {/* The email itself. A 560-wide document card — the template's own 520 plus its padding. */}
+    {/* The email itself — 520px, the template's own `.panel` width and its own dark colours. */}
     <div
       style={{
         marginTop: 20,
-        width: 560,
+        width: 520,
         borderRadius: 12,
-        backgroundColor: STANDIN.surface,
-        border: `1px solid ${STANDIN.border}`,
-        padding: "26px 32px 24px",
+        backgroundColor: EMAIL_DOC.panel,
+        border: `1px solid ${EMAIL_DOC.border}`,
+        borderTop: `4px solid ${EMAIL_DOC.accent}`,
         boxSizing: "border-box",
+        overflow: "hidden",
       }}
     >
-      {/* The sender's own mark inside the message, as a transactional email opens. Drawn from
-          the same component, so it cannot drift from the tab or the toast. */}
-      <MailMark size={26} />
-
-      <div style={{ fontSize: 28, fontWeight: 700, color: STANDIN.ink, marginTop: 18 }}>
-        {EMAIL.headline}
-      </div>
-      <div style={{ fontSize: 15, color: STANDIN.body, lineHeight: 1.6, marginTop: 12 }}>
-        {EMAIL.body}
-      </div>
-
-      <div
-        style={{
-          marginTop: 20,
-          width: 168,
-          height: 42,
-          borderRadius: 8,
-          backgroundColor: STANDIN.fill,
-          border: `1px solid ${STANDIN.line}`,
-          color: STANDIN.ink,
-          fontSize: 15,
-          fontWeight: 600,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {EMAIL.button}
+      {/* Row 1 — the email's OWN header. This is `<Wordmark/>`, never the mail client's envelope
+          mark: the message is FROM Serenify, so its document carries Serenify's mark, exactly as
+          `confirmation.html:42` puts it first inside the card. `MailMark` stays where it
+          legitimately belongs — the tab, the sidebar, the sender avatar above, the beat-8 toast —
+          and only ever this one site, inside the email's own body, was wrong. */}
+      <div style={{ padding: "30px 28px 10px" }}>
+        <div style={{ fontSize: 24, lineHeight: 1, marginBottom: 28 }}>
+          <Wordmark />
+        </div>
+        <div
+          style={{
+            fontFamily: CARD_DISPLAY,
+            fontSize: 30,
+            fontWeight: 700,
+            lineHeight: 1.18,
+            color: EMAIL_DOC.ink,
+            marginBottom: 12,
+          }}
+        >
+          {EMAIL.headline}
+        </div>
+        <div style={{ fontSize: 16, lineHeight: 1.6, color: EMAIL_DOC.muted }}>{EMAIL.body}</div>
       </div>
 
-      <div style={{ fontSize: 12.5, fontWeight: 500, color: STANDIN.body, marginTop: 22 }}>
-        {EMAIL.codeLabel}
-      </div>
-      {/* The code. 25px at 4px tracking is the template's own, and it is the thing the whole
-          beat is travelling toward — so it is the only element here allowed to be loud. */}
-      <div
-        style={{
-          marginTop: 8,
-          height: 50,
-          borderRadius: 8,
-          backgroundColor: STANDIN.field,
-          border: `1px solid ${STANDIN.border}`,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 25,
-          fontWeight: 700,
-          letterSpacing: 4,
-          color: STANDIN.ink,
-          fontFeatureSettings: OS_TABULAR,
-        }}
-      >
-        {EMAIL.code}
+      {/* Row 2 — the CTA, CENTRED (`confirmation.html:48-50` wraps it in `align="center"`; the
+          greybox pass left it flush left against the card's edge, which is the second defect this
+          pass fixes). Sized to its own text and padding, not a fixed box, matching the template's
+          inline-block button. */}
+      <div style={{ padding: "20px 28px 16px", textAlign: "center" }}>
+        <div
+          style={{
+            display: "inline-block",
+            backgroundColor: EMAIL_DOC.accent,
+            color: EMAIL_DOC.buttonInk,
+            borderRadius: 8,
+            padding: "14px 20px",
+            fontSize: 15,
+            fontWeight: 700,
+          }}
+        >
+          {EMAIL.button}
+        </div>
       </div>
 
-      <div style={{ height: 1, backgroundColor: STANDIN.border, margin: "22px 0 14px" }} />
-      <div style={{ fontSize: 12, color: STANDIN.label, lineHeight: 1.6 }}>{EMAIL.footer}</div>
+      {/* Row 3 — the fallback code and its label. 25px at 4px tracking is the template's own, and
+          it is the thing the whole beat is travelling toward — so it is the loudest thing in the
+          card besides the button. `confirmation.html:53-56`. */}
+      <div style={{ padding: "10px 28px 0" }}>
+        <div style={{ fontSize: 13, fontWeight: 500, color: EMAIL_DOC.muted, marginBottom: 10 }}>
+          {EMAIL.codeLabel}
+        </div>
+        <div
+          style={{
+            boxSizing: "border-box",
+            backgroundColor: EMAIL_DOC.codeBg,
+            border: `1px solid ${EMAIL_DOC.border}`,
+            borderRadius: 8,
+            padding: "14px 16px",
+            fontSize: 25,
+            fontWeight: 700,
+            letterSpacing: 4,
+            textAlign: "center",
+            color: EMAIL_DOC.ink,
+            fontFeatureSettings: OS_TABULAR,
+          }}
+        >
+          {EMAIL.code}
+        </div>
+      </div>
+
+      {/* Row 4 — the divider and the fallback disclaimer. `confirmation.html:59-62`. */}
+      <div style={{ padding: "28px 28px 30px" }}>
+        <div style={{ borderTop: `1px solid ${EMAIL_DOC.border}`, marginBottom: 18 }} />
+        <div style={{ fontSize: 13, lineHeight: 1.6, color: EMAIL_DOC.muted }}>{EMAIL.footer}</div>
+      </div>
     </div>
   </div>
 );

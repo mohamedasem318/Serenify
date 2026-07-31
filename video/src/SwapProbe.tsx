@@ -22,7 +22,7 @@ import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prom
 
 import { AuthShell, CheckEmailSurface, SignupSurface } from "./app/auth";
 import { HOME_COL, RecentChatsEmpty as RecentChatsEmptyProbe } from "./app/home";
-import { trendPoints } from "./app/monitor";
+import { StageLayout, trendPoints } from "./app/monitor";
 import { fontsReady } from "./fonts";
 
 /** The chat panel needs a conversation to render its composer. Shape only; no messages. */
@@ -71,6 +71,12 @@ const TARGETS: [string, string][] = [
   ["bloom", "[data-testid='bloom']"],
   ["stateline-head", "[data-probe='ops'] p[aria-live='polite']"],
   ["stateline-sub", "[data-probe='ops'] p[aria-live='polite'] + p"],
+  // The `tense` copy is the WIDEST of the three and the only one that wraps, so it — not the
+  // `at_ease` copy the probe happens to render above — is what every horizontal framing number
+  // has to clear, at rest AND raised 1.25×. Measuring only `at_ease` is how the emphasis came to
+  // be derived against a block 105px narrower than the one it fires on.
+  ["stateline-head-tense", "[data-probe='ops-tense'] p[aria-live='polite']"],
+  ["stateline-sub-tense", "[data-probe='ops-tense'] p[aria-live='polite'] + p"],
   ["controls", "[data-probe='ops'] .mt-7"],
   ["footnote", "[data-probe='ops'] p.mt-8"],
   ["ops-block", "[data-probe='ops'] > div"],
@@ -229,18 +235,28 @@ export const SwapProbe: React.FC = () => (
           </div>
         }
       >
-        {/* The monitoring page, at its REAL layout — max-w-3xl, not the greybox's 700. */}
+        {/* The monitoring page, at the FILM's L14 layout — `max-w-lg` (512), the readout inside
+            the card's own `pt-16` band, the sub's two reserved lines and the 70px controls gap.
+            `<StageLayout/>` is the one component both this probe and `MonitorPage` render, so
+            what is measured here is what the beats draw; a probe that measured the shipped
+            spacing while the film drew something else is the exact failure this file exists to
+            end, and it is how the 22px toast/viewfinder overlap survived a whole pass. */}
+        <StageLayout />
         <div className={MONITOR_COL}>
-          <div data-probe="timerrow" className="mb-3 flex items-center gap-3 px-1">
-            <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
-              <span aria-hidden>←</span> Dashboard
-            </span>
-            <span className="ml-auto text-sm tabular-nums text-muted">
-              Session · <b className="font-semibold text-ink">47:12</b>
-            </span>
-          </div>
-
-          <div data-probe="stage" className={MONITOR_STAGE}>
+          <div data-probe="stage" data-emph className={MONITOR_STAGE}>
+            <div
+              data-probe="timerrow"
+              className="absolute inset-x-10 top-5 z-10 flex items-center gap-3"
+            >
+              <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
+                <span aria-hidden>←</span> Dashboard
+              </span>
+              <span className="ml-auto text-sm tabular-nums text-muted">
+                Session · <b className="font-semibold text-ink">47:12</b>
+              </span>
+            </div>
+            {/* The viewfinder is measured for its own UNSCALED size only — in the film it is
+                pinned in the right column at `VIEWFINDER`, outside the scrolling card. */}
             <div className="absolute right-4 top-4 z-10">
               <Viewfinder pinned>
                 <div className="absolute inset-0 bg-meadow/20" />
@@ -249,6 +265,20 @@ export const SwapProbe: React.FC = () => (
             <div data-probe="ops">
               <OpSurfaces
                 state={{ op: "active", band: "at_ease", skipCause: null }}
+                onAllow={() => {}}
+                onRetryBlocked={() => {}}
+              />
+            </div>
+          </div>
+
+          {/* The same card again on the `tense` band, for the ONE thing that differs: the sub
+              wraps to two lines at `max-w-[42ch]` and is therefore much wider than the `at_ease`
+              copy. Its y is meaningless (it is a second card further down the probe page); its
+              x and w are what beat 8's and beat 9's horizontal clearances are checked against. */}
+          <div data-emph className={`${MONITOR_STAGE} mt-6`}>
+            <div data-probe="ops-tense">
+              <OpSurfaces
+                state={{ op: "active", band: "tense", skipCause: null }}
                 onAllow={() => {}}
                 onRetryBlocked={() => {}}
               />

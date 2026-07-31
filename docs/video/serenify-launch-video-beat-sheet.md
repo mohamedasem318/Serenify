@@ -38,11 +38,42 @@ to inherit and was authored; it carries **its own token block, deliberately deco
 app's palette**, because a browser is not part of Serenify and must not move when the product's
 palette does.
 
-**Framing is now measured, not fitted.** `video/src/SwapProbe.tsx` renders the real components
+**Framing is measured, not fitted.** `video/src/SwapProbe.tsx` renders the real components
 at the real 1200px world and prints their bounding boxes; `video/src/app/geometry.ts` holds
 those numbers and `framing.ts` derives every shot from them. Three consecutive revisions logged
-crop complaints and all three traced to framing tuned against greybox rectangles. That is what
-this pass ends.
+crop complaints and all three traced to framing tuned against greybox rectangles.
+
+**A MEASURED NUMBER IS ONLY AS GOOD AS WHAT WAS ON THE PAGE WHEN IT WAS TAKEN, AND TWO OF THEM
+WERE NOT.** The discipline is right and it is not self-verifying, which is the thing to carry
+forward rather than the two bugs:
+
+- **THREE BLOCKS WERE 64px TOO HIGH — `HOME`, `GATE`, and beat 10's chat rects.** Each was probed
+  **without the sticky `<Header/>` mounted**, so each recorded a page that does not exist, and 64
+  is `HEADER_H` exactly. `RAW.*` was probed *with* it, and the two kinds sat in the same file
+  looking equally authoritative. The symptoms did not look like bad rects: a cursor drawing above
+  its button, and a landing arriving mid-layout with body copy sliced top and bottom.
+- **`CLOCK` disagreed with where the clock is actually drawn.** `geometry.ts` had it at x 923 and
+  `shell.tsx` drew it at x 1036, so `BEAT8_CLOCK` framed a rectangle the clock is not in and the
+  film's single most important number rendered as **"11:30 A"**, the M sliced off — in the shot
+  whose entire purpose is that the audience subtracts it from "by 12". Nothing measured this: the
+  rect was *derived* from a stated relationship ("the clock shares the stack's right edge") that
+  the drawn furniture never implemented.
+- **`SUCCESS_FRAMED`'s x came from the wrong element.** It grew the rect from the *badge* on both
+  axes, so its centre sat at 723.2 against the component's 600 — and beat 5f's key is
+  `shot(600, …)`, so the camera arrived 123px right of the thing it was framing. The ripple only
+  escapes on the **top** edge; horizontally it stays inside the component, so the badge has no
+  business in the x arithmetic. "The success state sits left of frame and the camera pans further
+  left" was one wrong axis in one derived rect.
+- **`RAW.statelineSub` recorded the `at_ease` width for all three copies.** The `tense` sub is the
+  only one that wraps, and a wrapped paragraph fills its box rather than shrink-wrapping: **430
+  wide, not 287.6.** Every horizontal framing number in the file descended from the smaller
+  number, so the film's most important reading was cropped by 51px at rest in beats 8 and 9.
+
+So the rule gains a second half. **Measure against the page the film actually renders; measure the
+worst case rather than the case that happened to be on screen; and check that the drawn furniture
+agrees with the rect that claims to describe it.** A number in `geometry.ts` is a claim about the
+render, and a claim is checkable — by rendering a still and looking at it, which is what found all
+five of these and none of which a probe would have caught on its own.
 
 **AND THE FILM SETS IN THE APP'S OWN TYPEFACE.** `apps/web` gets Inter and Outfit from
 `next/font/google`, which is a build-time mechanism with no counterpart in a Remotion bundle —
@@ -93,6 +124,29 @@ pressing**. It is measured now (`geometry.ts` § CHAT, probed against the real `
 Beat 2's new-tab button (which was hitting the top-left corner of a 22 × 22 target), beat 2's
 tab switch and beat 2's mail row are re-centred on the same principle. Beat 6's was a different
 and larger failure — see beat 6.
+
+**AND THE ARROW WAS NOT DRAWN ON ITS OWN CLICK POINT.** The sprite is a `0 0 13 20` viewBox whose
+tip is at path coordinate **(1, 1)**, and it was rendered as a plain flow child of the
+`left: x; top: y` wrapper — so the click coordinate landed on the SVG's **(0, 0) corner**, one
+glyph-unit up and left of the tip, and the click ring was concentric with the sprite's box rather
+than with the point being pressed. A cursor has a *hotspot*; this one did not have one. The SVG is
+offset by `−TIP` now and its transform origin is the tip, so the arrow's point sits exactly on the
+coordinate — one fix, every click in the film, including the ones nobody has looked at.
+
+**THAT WAS ONLY HALF OF IT, AND THE OTHER HALF IS WHY THE SYMPTOM SURVIVED THE FIX.** The pointer
+drew visibly above **Set baseline** and **Start check-in** by far more than one glyph-unit, and the
+cause is that **every rect in `geometry.ts`'s `HOME` block was 64px too high** — probed without the
+sticky `<Header/>` mounted, unlike `RAW.*`, whose own note says it was measured with it. The
+authed page is `VIEWPORT_Y` 92 + `HEADER_H` 64 + `MAIN_PT` 32 = **content top 188**, and
+`calibrationBanner.y` read **124**: 92 + 32, the header's exact height missing. Every value in the
+block is +64 now, and the set stays internally consistent at the new offset.
+
+**What made this hard to see is worth stating, because it will happen again.** The hover fired
+correctly on the button while the click missed it, and that combination *looks* like proof that the
+coordinate is right and only the drawing is wrong. It is not proof of anything:
+`hover.tsx` addresses the DOM by **CSS selector** and never reads a coordinate, so a correct hover
+beside a missed click is not a contradiction — it is the signature of a bad rect. **A hover cannot
+corroborate a position.** The two bugs wore the same face and only one of them was in the cursor.
 
 **`:HOVER` CAN NEVER FIRE IN A REMOTION RENDER, BECAUSE A RENDER HAS NO POINTER.** This is an
 invariant-level fact about the medium rather than a bug in any beat: **every `hover:` utility in
@@ -174,8 +228,8 @@ These are deliberate. Do not "fix" them toward fidelity.
 | L9 | **Ren gets a typing indicator, which the app does not have** | Needed to make the `thinking` state legible as a state rather than as dead air. The video depicts a feature that will be built later. **Decided — this is not a fidelity defect and must not be "fixed".** **And only motion satisfies the justification:** the dots must *travel*. A static stagger is a photograph of a typing indicator, which reads as decoration and gives the liberty nothing to have been taken for. See beat 10. |
 | L10 | **The travelling lift** — an element detaches from its layout, **travels** to centre frame at a narrower measure, is read, and settles back where it belongs | Some elements cannot be made legible by any camera move, and the reason is geometry: a 1152×86 banner in a 1200 viewport cannot be held whole *and* magnified in a 16:9 frame, so the tightest shot on it is the full frame. The lift stages the element instead of the shot. Content and type sizes stay real — the calibration banner is still `text-sm` — only position and measure are staged. **Used in exactly two places: beat 1's address bar and beat 3's calibration banner.** A third candidate gets reported rather than built. (Beat 7's stateline used to count against this cap; it is a different device — see L12 — and no longer does.) |
 | L11 | **A clock in the browser toolbar**, right-aligned at the omnibox row's end, at twice the chrome's own type size | Beat 8's payoff is arithmetic the audience does unaided — the clock says 11:30, the boss says "by 12", nobody says *thirty minutes*. With no legible clock there is no arithmetic and no payoff, so a clock is load-bearing and must exist **from beat 1** (one continuous recording cannot grow chrome halfway through). The honest place is the macOS menu bar, but a 24px bar holds ~16px of type — ~6px on a phone in a wide shot — so it would have to grow (page height, which L7's whole argument forbids spending) *and* beat 8's push-in would have to reach world y 0, widening 590 → ~711 and dropping the toast's own subject line to ~8px. The toolbar costs **zero page height** and widens beat 8's push-in by only ~4%. No real browser draws a clock there; that is the entire cost. **It is plain — no pulse, flash, tint or animation beyond the time changing.** Emphasis would convert a discovery into an instruction, and there is no colour available anyway: amber and meadow both carry band meaning. |
-| L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px, where the sub lands at 6.5px on a phone. The real composite is **760** — the real viewfinder sits inside the stage card rather than 300px to its right, so the union is far tighter — and at 760 the sub already lands at 9.4px. The factor needed for legibility alone is 1.064×, which is not a device. 1.25× is set by two measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and finishes 11.1px clear of the real Pause/End controls, with the sub at 11.8px. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. **A second copy takes the device: beat 5a's privacy line**, at the same 1.25× and at **full amplitude**, because there the room is simply there. It does not count against L10's travelling-lift cap — this is the in-place device, which is a rule rather than a budget, and it needs no camera travel, so it fits inside 5a's existing wide hold without moving a keyframe. See beat 5. |
-| L14 | **The monitoring surface is REARRANGED for the film** — viewfinder to the right, the bloom with its stateline and the trend to the left, as the greybox had it. **Pass B builds this; nothing in Pass A implements it.** | The real dashboard puts the top of the bloom and the bottom of the trend **664.2px apart in a 519px viewport**, so they cannot share a frame at any scroll and at any framing — 145px short. The component pass resolved it with a travelling camera at the moment beat 11 should be settling, which is the one place in the film a camera move is most expensive. Rearranging the columns is a knowing departure from the app's real layout, taken because the alternative is a camera move where the beat wants stillness. **It also buys back the two things Pass A had to concede.** Beat 8's `tense` stateline wraps to two lines, and a two-line block cannot take L12's 1.25× raise at this layout without either leaving the viewport or landing on the Pause/End controls — the arithmetic is scroll-invariant, so the emphasis yields to ~1.01× on that one copy. And beat 4's privacy line and its CTA miss sharing a frame by 11.8px. Both are the same shortage of vertical room, and a column layout is what has it. |
+| L12 | **The in-place emphasis** — the stateline block grows **1.25×** where it stands, is read, and settles. Nothing travels, the camera does not move | A separate landing on the block was priced at ~1.5s; this is **free**, because camera travel is what costs time. **It is a rule, not a budget** — see the invariant below. **The factor fell from 1.65× at the component swap, and that is register item 3 resolving.** 1.65 was derived against a composite framing of ~1096 world px. 1.25× is set by measured clearances instead: the block grows downward from its own top edge (so the bloom is untouchable by construction) and, at L14's 70px controls gap, finishes **46.75px clear** of the real Pause/End controls and inside the frame. At 1.65× it would run through the controls and out of the frame. The device survives as grammar; only its amplitude yields. **And at L14 it is genuinely buying legibility rather than only emphasis**: in the 884.75 composite the 17px sub reads at **8.11px** on a phone seated and **10.13px raised**, so the raise is what carries the film's central reading over the ~10px floor — on every band, not on two of three. **A second copy takes the device: beat 5a's privacy line**, at the same 1.25× and at **full amplitude**, because there the room is simply there. It does not count against L10's travelling-lift cap — this is the in-place device, which is a rule rather than a budget, and it needs no camera travel, so it fits inside 5a's existing wide hold without moving a keyframe. See beat 5. |
+| L14 | **The monitoring surface is REARRANGED for the film — BUILT.** The reading column narrows to `max-w-lg` (512), and the viewfinder, the mail toast and the confirmatory prompt move into a **pinned right column at x 856–1176 that does not scroll**. The session readout moves into the stage card's own top band; the stateline's sub reserves two lines always; the stateline→controls gap goes 28 → 70. Arrangement only — nothing is re-styled, re-coloured or re-worded. | **The number this row used to quote was wrong and too kind.** Bloom-top to trend-bottom is **918.4px**, not 664.2 — that figure used the *empty* 101.5-tall trend card, and the populated one is 355.7. Against a 519px viewport it is 399px short, not 145, and **no 16:9 frame ≤1200 world px can hold 918px of stack at all.** The column layout does not fix that and nothing does; what it fixes is everything the single scrolling column was breaking. (1) The viewfinder was rendered *inside* the scroll container, so at `SCROLL.monitor = 40` its top sat at 269 against the toast's bottom at 291 — **the toast overlapped the viewfinder by 22px**, which is the "notification covers the viewfinder" complaint in beats 8 and 9. The stated 18px gap had been computed against the *unscrolled* viewfinder. Pinned, the overlap is gone by construction. (2) The two-line `tense` block had 94px of room for 93px of block — an emphasis cap of **1.0108×**, the film's central device dead on the film's most important reading. The 70px controls gap buys **1.25× with 46.75px still clear**. (3) 1176 is the drawn clock's own right edge, so "clock, toast and viewfinder share a right edge" becomes true of the render rather than of a comment. (4) The viewfinder is now in **all three** of beat 11's landings, which it could not be before — it used to scroll away with the column. |
 | L13 | **The character's face is AUTHORED, not drawn** — features are primitives driven by numbers, over one generated head, with an authored torso behind it | The rig has to produce a *fall* and a *nod*, and neither can come out of cross-fading finished drawings. Authoring the features also collapses the art brief from five consistent expressions to one neutral head, which is the risk that actually matters. See "The character rig". |
 
 ---
@@ -208,16 +262,21 @@ These are deliberate. Do not "fix" them toward fidelity.
     of the rule.
   - **No yo-yo.** Beat 8's two copy changes land seconds apart, so the block goes up
     **once** and settles once. Never grow, settle, and grow again.
-  - **AND THE AMPLITUDE IS CAPPED BY THE ROOM THAT EXISTS.** L12's 1.25× was derived against a
-    ONE-LINE sub. `tense`'s sub is 62 characters at `max-w-[42ch]` and wraps to **two**, and a
-    two-line block cannot be raised here without either leaving the viewport or landing on the
-    Pause/End controls — the raised bottom is 20.75px below the controls' top at *every* scroll,
-    so no scroll fixes it. `emphasisCapFor()` re-derives the factor per copy: 1.25× for one
-    line, ~1.01× for two. **The collapse IS the second firing** — beat 8 raises on its first
-    change and the block settles as the second lands, so both carry movement and nothing
-    yo-yos. It also fixed a defect the emphasis merely made worse: the two-line `tense` sub was
-    being sliced by the page viewport *at rest*, which is why `SCROLL.monitor` moved 32 → 40.
-    **Getting the raise back on `tense` is L14's job.**
+  - ~~**AND THE AMPLITUDE IS CAPPED BY THE ROOM THAT EXISTS.**~~ **THE CAP IS GONE — L14 BOUGHT
+    THE RAISE BACK, ON EVERY COPY.** `tense`'s sub is 62 characters at `max-w-[42ch]` and wraps to
+    two lines, and at the old single-column layout a two-line block had 94px of room for 93px of
+    block: `emphasisCapFor(2)` returned **1.0108×**, so the device fired at an amplitude nobody
+    could see, on the film's most important reading. The arithmetic was scroll-invariant — the
+    raised bottom sat 20.75px below the controls at *every* scroll — so it was never something a
+    scroll was going to fix. The **70px stateline→controls gap** is what fixes it: room 138 against
+    a 93px block, capped back to L12's **1.25×** with 46.75px still clear of the controls.
+    `emphasisCapFor()` still exists and still re-derives per copy, but it now returns 1.25 for one
+    line and two alike, and **both beats' factor interpolations are deleted** — there is nothing
+    left to smooth between.
+  - **The settle is still where the second change lands.** Beat 8 raises on its first copy change
+    and settles as the second arrives, so both carry movement and nothing yo-yos. That was true
+    when the collapse was doing the work by accident; it is now a staged settle rather than a cap
+    running out.
   - **It must never cover the bloom.** Beat 7's job is to plant bloom, stateline and
     viewfinder together as the "before". So the block grows *downward* from its own top
     edge rather than about its centre, and the reading card was relaid out to make the room
@@ -453,6 +512,33 @@ a real client: sender, subject, timestamp, body, code. The copy AND the type sca
 4px tracking — not from invention. Generic in *branding* (L2b), never in content. Timestamp
 on the email: **10:21 AM** (see internal clock).
 
+**AND THE EMAIL WAS NOT THE EMAIL WE SEND. Three things, and the first inverts the sender.**
+
+- **It carried the MAIL CLIENT'S OWN ENVELOPE MARK where the Serenify wordmark belongs.** The
+  document is *from Serenify*; putting `MailMark` in its header says the message is from the mail
+  app about itself. Worse, `MailMark` is the signature beat 8's whole misread-risk hangs on — the
+  one glyph that says *this is not Serenify talking* — so spending it inside a Serenify email
+  spends the exact disambiguation beat 8 borrows. The header is the real `<Wordmark/>` now, which
+  is what `confirmation.html` puts there, and under the scene's `.dark` root its `text-ink` /
+  `text-meadow-text` resolve to **#E2E5E8 / #63B292** — the template's own dark-mode wordmark
+  colours, with nothing overridden. Every other `MailMark` site — the tab, the sidebar, the sender
+  avatar, beat 8's toast — is untouched, because those are the client's chrome and are where the
+  mark is correct.
+- **The "Confirm email" button was left-indented.** The template centres it (`align="center"`),
+  and it is a button sized to its own text rather than a fixed block flush to the card's left edge.
+- **The card as a whole diverged from what ships.** It was one uniform padding block at a guessed
+  **560px**; the template is **520** with **four rows on distinct paddings** — header/headline/body,
+  the centred CTA, the code label and code, then a rule and the footer. It renders in the
+  template's own `prefers-color-scheme: dark` values now rather than borrowing the mail client's
+  furniture ramp: card `#181B1E`, a 4px `#63B292` top rule, `#23272B` borders, body `#939A9F`.
+  **The two palettes never had to be reconciled** — `confirmation.html` ships a first-class dark
+  variant, so the document wears its own colours inside a dark client, which is what an HTML email
+  does. No red exists in either variant, so nothing about it tests the no-red rule.
+
+The lesson is the one this sheet keeps re-learning in a new place: **quoting a template's copy is
+not reproducing the template.** The words were right the whole time and the thing on screen was
+still not what lands in his inbox.
+
 **AND THE CLIENT IS BUILT — `video/src/app/mail.tsx`.** A real three-pane dark client: a sidebar
 with six folders and their unread counts, a message list with the Serenify mail unread at the
 top and **five plausible neighbour messages** under it, and a reading pane. The neighbours are
@@ -513,6 +599,21 @@ Total ~2.94s. **Play this close to real time.** It's the single most polished pi
   is not enough; abutting rects antialias against each other. Overlap by 1.5px and a seam is
   impossible.
 
+**AND THE VERIFY SCREEN HAD NO CODE INPUT ON IT.** The choreography was correct and the field it
+belongs to did not exist. `<CheckEmailSurface/>` renders the OTP panel only when it is handed a
+start frame (`auth.tsx:221-223` returns `null` without one), and the beat was gating that on the
+same flag that fires the sweep — which does not go true until f352, the tab click back to
+Serenify. So from the moment "Check your email" lands until f352, including **the whole wide hold
+whose entire job is to say which screen this is**, the six boxes were absent from the DOM. The
+audience watched a heading, a helper line, and then a row of filled meadow boxes arriving out of
+nothing.
+
+The gate was pure loss: `<OtpChoreography/>` already renders the correct unlit idle state for any
+frame before its start, because every interpolation in it clamps on the left. So the panel is
+mounted from the moment the state lands and the boxes are simply **there**, empty, waiting — which
+is what the screen is for. The digits now land into a field the audience has already seen, and the
+merge grows out of something rather than into existence.
+
 **Shot:** locked-off tight on the OTP row for the full choreography. No camera move — let the animation carry it.
 
 ~~**Do not dress the greybox verify screen.**~~ **There is no greybox verify screen.** It is the
@@ -530,6 +631,44 @@ viewport and is sliced by it.
 
 ---
 
+**BEAT 2 WAS THE WORST-FRAMED BEAT IN THE FILM, AND IT HAD TEN SEPARATE CROPS IN IT.** Not one
+bad landing — every landing. The beat is rebuilt against measured rects:
+
+| | frames | width | what it holds | reads |
+|---|---|---|---|---|
+| establish | f0–f16 | 880 | wordmark, toggle, heading, sub, three labelled fields | heading **17.3px** |
+| field group | f48–f70 | 664.5 | three fields and **all three** checklist rows | checklist 8.3px |
+| password | f88–f110 | 479.3 | email, password, the checklist lighting row by row | checklist **11.4px** |
+| consent | f134–f158 | 483.4 | the password group, the tick, "Create account" | consent **13.1px** |
+| verify | f182–f196 | 777.8 | heading, body and the OTP panel whole | heading **16.3px** |
+| chrome | f206–f250 | 1200 | the window, for the new-tab press | — |
+| mail list | f264–f282 | 309.3 | the unread row and its neighbour, both whole | subject **17.1px** |
+| the email | f324–f336 | 907.6 | the whole document card | code **11.6px** |
+| OTP | f390–f448 | 508.3 | the whole panel, through the merge | pill **43.2px** |
+| seam | f448–f467 | → 962.7 | the whole `(auth)` column, pulling out | — |
+
+The ten, in one list, because the pattern is what matters: a checklist row under the page fold;
+rows 2 and 3 sliced because `SIGNUP.fieldGroup` was measured against the **collapsed** checklist
+(669) rather than the three-row one (704); a consent landing whose top edge ran through the
+password input and whose bottom ran 59px past the window; a verify landing framing a rect 78px
+taller than the surface it described; **two clicks with their targets outside the frame** (the
+new-tab press, 130px above the top edge, and the tab switch back); a mail-list landing that sliced
+"Inbox" at the top and, from the click onward, cut the opened message's own sender and subject at
+the **right** edge — "Confi", "Se", "to"; an email landing with the card's whole bottom off-frame;
+and an OTP landing whose top edge cut the panel in half.
+
+**The email card does not fit the reading pane, and that is the client's honest behaviour.** It
+measures **520 × 482.5** and its bottom lands 37.4px below the fold, so the pane scrolls 52px
+between f278 and f300 — which reads as him scrolling down to read it, because that is what it is.
+The alternative was growing the world, which L7 forbids.
+
+**Both mail landings are new numbers, not inherited ones.** The old email rect said 560 × 470 at
+(536, 88); the built card is 520 × 482.5 at (536.25, 230.7) in world coordinates. The sheet
+already predicted this — "rects that changed size when the real mail client replaced the greybox"
+— and the landings were still derived from the old ones.
+
+---
+
 ### 3 · Dashboard, first arrival · 0:21.6 – 0:25.6 (4s)
 
 He lands on `/app`. Uncalibrated.
@@ -537,6 +676,24 @@ He lands on `/app`. Uncalibrated.
 **Arrives by pulling out, not by cutting.** After "Taking you in…" the camera pulls back from
 the OTP row and the dashboard is simply what is there when it gets wide. Then the two things
 that matter:
+
+**AND THE JOIN USED TO FLASH, WHICH IS THE "STRAY FRAME BEFORE THE DASHBOARD".** It was never a
+one-frame render glitch — beat 2's last sixteen frames are byte-identical to each other, and the
+camera is mathematically continuous across the join (beat 2 ended on `frameRect(VERIFY.otpRow, 40)`
+= `{600, 563.1, 432}` and beat 3 opened on the byte-identical `shot(600, 563.1, 432)`). **The
+camera was continuous and the content was not.** Under that tight 432-wide rectangle the screen
+swapped instantly from the green "Verified" pill to two unrelated dashboard card corners, because
+the beats are a hard cut in `<Series>`. A matched framing over unmatched content is a jump cut
+wearing a continuous camera's clothes.
+
+So the pull-out **starts in beat 2**, at f448, and beat 3 opens on the same derived shot **still
+rendering the verify surface** for its first twenty frames while the camera keeps widening. The
+navigation fires at **f20**, which is the measured frame at which the dashboard's own left edge is
+inside the shot. f10 was tried first and was wrong in the most instructive way: at 950 world px
+the frame cut "Good morning, Youssef" to "…d morning, Youssef" — the seam fix reintroducing
+exactly the defect it exists to remove.
+
+Beat 2's f467 and beat 3's f0 render to a **maximum channel delta of 0**. One continuous move.
 
 - **Welcome banner:** "Good morning, [name]" · "A space to check in with yourself." **The
   greeting is generated, not written** — `<WelcomeBanner/>` derives "Good morning" from the hour
@@ -642,14 +799,34 @@ declining changes", which is a real card, correctly rendered, and the wrong one.
 
 **And the two miss sharing a frame by 11.8px.** Key-line top to Allow's bottom is 594.8 against
 a 583px viewport. It is the closest near-miss in the film and it is still a miss — no scroll
-closes it. So the beat takes **two landings inside its one continuous move**: the key line
-alone at 566 world px, where its 17px copy reads at 12.7px on a phone, then a scroll-and-pull
-onto both controls for the click. That is this sheet's own remedy for this class of problem,
-applied once more.
+closes it. So the beat takes **three landings inside its one continuous move** — establish, the
+key line, then the CTA — which is this sheet's own remedy for this class of problem, applied once
+more.
 
-**Cost: 5s → 6s**, and it is the second landing. The beat had five seconds for four events on
-the assumption the last two shared a frame. **The vertical room L14 buys back is what would
-collapse this to one landing again.**
+| | frames | width | what it holds |
+|---|---|---|---|
+| **establish** | f0–f78 | 616 | the badge, the heading, the lede, and the first card's top border |
+| **key line** | f108–f142 | 659 | **all four bullets** of "What happens to the video", with the card's bottom and both side borders |
+| **CTA** | f170–f180 | 658 | the last three bullets of "What declining changes", its bottom border, **Allow** and **Not now** |
+
+**The landing used to arrive mid-layout, and that was a bad rect rather than a bad shot.** It
+held the key line surrounded by sentences sliced at *both* the top and bottom edges, with no card
+border anywhere in frame — a crop of something bigger, which is exactly what the framing rule
+forbids. `GATE.*` was 64px high on every value (the third instance of the header-less probe; see
+the note at the top of this file), so the shot was correct about a page that does not exist.
+
+**And its legibility was being quoted from the wrong type size.** The bullets are **`text-sm`,
+14px** (`camera-consent-gate.tsx:149`), not the 17 that "12.7px on a phone" was derived from. At
+the 659 landing they read at **8.96px** — under the floor, and that is stated rather than
+smoothed over. The card is 568 × 416.2, so a frame holding all four of its borders costs **≥740**
+world px, at which the copy drops to 7.98. There is no framing at this world that puts a
+416-tall card of 14px body copy over 10px, and the beat's own text says so: ~230 words,
+unreadable at any speed, do not try. What the landing has to do is show *a whole card of privacy
+copy, with the key sentence in it*, and it does. **The heading reads at 20.6px and the CTA label
+at 10.26px** — the two things the audience is actually meant to take away.
+
+**Cost: 5s → 6s.** The beat had five seconds for four events on the assumption the last two shared
+a frame.
 
 ---
 
@@ -692,22 +869,54 @@ compression directly, because a counter running fast reads as a counter running 
 cannot: at 40× the discs flutter five times a second and the pacer strobes, which is the one
 thing on screen that would contradict the word "calm". At the real 8s cycle a 1.5s window shows
 under a fifth of one breath and the label never changes, so the pacer's whole nature is
-invisible. So the cycle is the length of the window — **one complete breath, in and out, inside
-the compressed minute**. Shape, amplitude, easing and copy are all the component's; only the
-period is staged, and it is parameterised on the window rather than hard-coded, so shortening
-5d still shows exactly one breath.
+invisible.
 
-**5c WAS NOT COUNTING. IT WAS HOLDING A "3".** `<GetReadyCountdown/>` decrements through a
-`setTimeout`, and **no frame-addressed render ever fires a timeout**, so across all thirty of
-its frames the numeral was **"3"** and then the beat cut to the recording. What has been read as
-"too fast, too abrupt" for three revisions was never a fast count — it was a static numeral
-followed by a jump. **There was no count.** It is driven from the frame now, remounted per value
-with a `key` (because `from` only seeds initial state), keeping the component's own face, size,
-tabular figures, drop shadow and its 300ms zoom-and-fade.
+**ONE BREATH WAS NOT ENOUGH, AND THE REASON IS THAT THE POINT OF THE MINUTE IS THE ALTERNATION.**
+The cycle used to be the length of the window, which gave exactly one breath — in, out — two
+phases at 22.5 frames each. Two phases do not read as a rhythm; they read as one label that
+changed once, and at that compression the guide could not be read at all, which loses the whole
+reason for showing the minute. The audience has to see it **alternate**: breathe in, breathe out,
+breathe in. So the cycle is set from a **phase count** rather than from the window —
+**three phases, 15 frames each, half a second apiece** across 5d's 45 frames. Four would be
+11.25 frames, 375ms, which is the strobe this note already warns against; three is the only count
+that satisfies both ends, and the third phase gets its full fifteen frames before the cut, so no
+phase is clipped. Measured: **f195–209 "Breathe in" · f210–224 "Breathe out" · f225–239 "Breathe
+in."** Shape, amplitude, easing and copy are all the component's; only the period is staged, and
+the discs follow the same parameter, so the rise and fall stay locked to the words.
 
-**And it gets 45 frames — 15 a number, half a second each.** At the old thirty that would be a
-third of a second per number, which is a flicker rather than a beat settling; the reason the
-old timing was never questioned is that it was never running.
+**5c COUNTS, AND IT GETS 45 FRAMES — 15 a number, half a second each.** At the old thirty that
+would be a third of a second per number, which is a flicker rather than a beat settling. It is
+driven from the frame, keeping the component's own face, size, tabular figures, drop shadow and
+its 300ms zoom-and-fade.
+
+**AND "NO FRAME-ADDRESSED RENDER EVER FIRES A TIMEOUT" IS FALSE. That claim was the bug.**
+It was written here, and in `motion.tsx`'s own header, as an invariant about the medium. It is
+not one. **Remotion keeps ONE live browser page and steps the frame on it**, so wall-clock time
+keeps passing between frames and `setTimeout` fires exactly as it would anywhere else.
+`<GetReadyCountdown/>` schedules `setTimeout(() => setCount(c => c − 1), 1000)` on mount
+(`get-ready-countdown.tsx:29-33`), and that effect is **not** gated on reduced motion — the
+media-query shim changes which *variant* a component renders and stops no timers.
+
+So two clocks were driving one numeral: the component's internal `count`, ticking about once per
+real second, and the frame-derived value, stepping every fifteen frames. The numeral painted was
+`count`. And because `from` only seeds `useState` on mount, the `key={value}` remount **re-seeded
+`count` back up** every time the frame clock stepped — which is the rewind. Once `count` reached
+zero the component returned `null` (`:46`), which is where the blank stretches came from. The
+sequence on screen was `3 · 2 · 1 · 2 · 1 · 1`, and it was **non-deterministic** — the exact
+garble varied with render speed, so the same frame rendered two different numerals depending on
+whether the page was fresh.
+
+The fix keeps the real component — it is still the 128px `role="timer"` box — and hides only its
+stateful numeral behind a scoped `visibility: hidden`, with the frame-derived digit drawn over it
+carrying `get-ready-countdown.tsx:49`'s className character-for-character. That is the same seam
+`<BreathPacer/>` already uses one file over. Moving the `key` onto the frame would have fixed
+rendered frames and left the second clock alive for any frame held longer than a second.
+
+**The general lesson is larger than 5c.** Any component in this film that schedules a timer is
+running it against wall-clock time inside the render, and anything derived from that timer is
+outside the frame's control. The rule is not "timers do not fire" — it is **"a value the film
+addresses by frame must have exactly one source, and the component's own must be suppressed
+rather than out-run."**
 
 **THE FIFTEEN FRAMES COME OUT OF 5d, NOT OUT OF THE CAMERA, AND THAT CONSTRAINT DECIDED IT.**
 Framing is Pass B's and no keyframe moved. The camera holds BEAT5_GREENROOM to f150 and lands on
@@ -762,9 +971,29 @@ sentence more prominent in the video than it is in the product, which is a claim
 product rather than a staging *of* it. The `text-muted` grey and the meadow shield stay exactly
 as `intro.tsx` sets them.
 
-**And the emphasis buys emphasis, not legibility — record that honestly.** 5a is deliberately
-wide, and at 1021.5 world px the line's real 14px lands at **5.8px on a phone**, 7.2px raised. A
-framing that makes this line *readable* is Pass B's to find; see "Still open".
+~~**And the emphasis buys emphasis, not legibility.**~~ **IT BUYS BOTH NOW — the framing was
+found.** At 1021.5 world px the line's real 14px landed at **5.8px on a phone**, 7.2px raised.
+5a now takes a landing at **580 world px**, held f32–76, where it reads at **10.19px seated and
+12.74px raised** — over the floor at rest and comfortably over it under the emphasis.
+
+Three measured facts made it possible, and the first is a correction: **the line is `text-sm`,
+14px** — several notes about it had been reasoning from 17. L12's raise takes it to **523 wide**,
+so no frame narrower than about 570 can hold it whole. And a **27px page lift** opens a clean
+vertical window between the lede's last line (315.6) and the helper line's bottom (659.6) — 344px,
+which 16:9 allows up to 611. 580 sits inside that with 7.1px of gutter at both edges.
+
+**The lift is a fix, not a device.** The intro column is preview (288) + `mt-4` (16) + card
+(204.2) = 508.2 against 519px of visible page, so it *fits* — `main`'s own `pt-8` simply starts it
+32px too low, which was slicing **"Your browser will ask for permission next."** at the viewport's
+bottom edge at rest. The window is [21.2, 32] and 27 is the middle of it. It drops to 0 at 5e,
+where the content no longer overflows.
+
+**The instruction not to recolour stands and was not spent.** The emphasis is the same 1.25×,
+growing downward from the line's own top edge, in the component's own `text-muted` grey with its
+meadow shield. Only its *window* moved — 0–42 → 32–62 — so it fires while the camera is landed
+rather than while it is still travelling. **The sheet's "5a STAYS WIDE" was written when the beat
+had no other option**; a push-in that lands on a whole element and holds long enough to read is
+what the framing rule asks for everywhere else in this film, and it costs the beat nothing.
 
 **5e/5f corrected.** The earlier version covered the viewfinder with a success state and then cut
 to the dashboard, skipping the uploading line, the real success copy and the click. All three are
@@ -783,6 +1012,36 @@ crosses that edge by 28.8px**. Every previous framing measured the component and
 ripple, so the payoff played with its own bloom clipped by the frame — which looks exactly like a
 shot that is too tight, because it is one. The shot now frames the component grown by the
 ripple's real overshoot on all four sides.
+
+**BEAT 5'S FIVE LANDINGS, AND THE THREE CROPS THEY FIXED.**
+
+| | frames | width | what it holds |
+|---|---|---|---|
+| **intro, wide** | f0–f8 | 920 | the whole intro, nothing cut |
+| **intro, read** | f32–f76 | 580 | the three icon rows, the privacy line seated **and** raised, "Turn on camera" and its helper line |
+| **green room** | f98–f150 | 921 | the 512×288 preview **and** the green-room card, whole |
+| **capture** | f172–f268 | 590 | the preview, the countdown, the orb and its pacer, the capture bar and its mm:ss |
+| **success** | f306–f354 | 700 | the ripple and the component, **centred** |
+
+Three things were being sliced at rest and are not now: the green-room card's bottom border and
+21px of its padding, **"Beginning now — settle in."** (which the old countdown framing cut through
+at 504), and the helper line under the privacy claim. The first and third were the page starting
+32px too low, not the camera; see 5a's lift.
+
+**THE COUNTDOWN NO LONGER PUNCHES IN, AND THE CEILING ON HOW FAR IT COULD PULL BACK IS TIGHT.**
+5c used to land at `frameRect(CALIB.preview, 28)` — a macro shot of a numeral, which is what made
+a count that was already broken feel abrupt as well. It now shares the capture landing at **590**,
+where the count reads as part of the scene and the breathing guide's three phases are legible in
+the same shot at **10.01px**. That 590 is not a taste value: `<RecordingStage/>`'s card top is at
+489 and the get-ready line's bottom at 485, which caps the shot at 592, while the pacer's own 10px
+floor sits at 590.8. **The two constraints meet within three pixels.** The next framing that holds
+a whole element below it is ≥858.7, where the pacer falls to 6.88px and 5c would hold 154px of
+empty page.
+
+**And the f150 constraint survives the reframing.** The countdown still cannot start earlier:
+`<GreenRoom/>` unmounts on the phase flip and leaves a 204px hole under the held green-room
+framing, and the green room is now framed *wider* rather than tighter, so the hole would be more
+visible rather than less. 5c stays at f150 and 5d keeps its 45 frames.
 
 **Shot note for 5b:** this is the audience's first look at your protagonist's face. Give it a real hold. Everything in beats 7–11 depends on the audience having learned this face while it was calm.
 
@@ -832,6 +1091,13 @@ anything on making the jump read.
 
 **Shot:** locked on the full frame.
 
+**And that costs one number, recorded rather than smoothed over.** At the full 1200 the "Start
+check-in" CTA's own 14px label reads at **4.9px on a phone** — well under the floor. It stays,
+because the beat's content *is* the banner's absence and absence is only legible at full frame:
+any push-in tight enough to read the button would frame away the empty space that is the point.
+The audience does not need to read the label to see a cursor press a button, and the label was
+read four seconds earlier in beat 3.
+
 ---
 
 ### 7 · Working, at ease · 0:45 – 0:49 (4s)
@@ -852,26 +1118,44 @@ Wide enough to hold bloom, stateline and viewfinder together. This is the "befor
 because it needs **no camera travel**: the block grows where it stands while the camera holds
 the composite. The rise and the settle both fit inside the 4s the beat already had.
 
-**THE REAL COMPONENTS MADE THIS SHOT TIGHTER, AND EVERYTHING FOLLOWS FROM THAT.** The greybox
-framed ~1096 world px because it drew the viewfinder as a separate 320-wide panel 300px to the
-right of a 700-wide card. The real viewfinder is an overlay INSIDE the stage card, so the union
-of bloom + stateline + viewfinder is far tighter and the composite is **760** — a 1.58× push-in
-rather than a 1.09× one. Measured consequences, all improvements:
+**THE COMPOSITE IS 884.75, AND THE NUMBER IT REPLACED WAS FRAMING A RECT THAT DID NOT CONTAIN
+THE COPY.** The greybox framed ~1096 world px because it drew the viewfinder as a separate
+320-wide panel 300px to the right of a 700-wide card. The component pass replied with **760**, on
+the reasoning that the real viewfinder overlays the card and so the union is far tighter. Both
+were measured against the *`at_ease`* sub, and that turned out to be the whole problem:
 
-- the 17px sub lands at **9.4px** on a phone instead of 6.5px, and **11.8px** raised
-- **the emphasis therefore yields, 1.65× → 1.25×** (register item 3; see L12 for the arithmetic)
-- his head is **~66px** on a phone here, against the ~50px this sheet recorded
-- **the layout is the product's own** — register item 2. Nothing is padded: the card is
-  `min-h-[480px] … px-10 pb-10 pt-16`, the bloom is `sm:size-72` (288, where the greybox drew
-  148), and the real `mt-6` puts 24px between the bloom's bottom and the stateline's top. The
-  emphasis grows downward from that top edge, so it cannot reach the bloom by construction
-  rather than by arrangement.
+**THE `tense` SUB IS 430 WIDE, NOT 287.6, AND IT WAS CROPPED AT REST.** It is the only one of the
+three copies that wraps, and a wrapped paragraph **fills** its `max-w-[42ch]` box instead of
+shrink-wrapping to its longest line. `geometry.ts` recorded 287.6 — the `at_ease` width — and
+every horizontal framing number in the file was derived from it. The 760 composite began at world
+x 436, so in beats 8 and 9 **the film's most important reading was sliced by 51px, at rest, before
+any emphasis fired.** It was invisible in review for exactly the reason the two-line clipping was:
+every still anyone framed was an `at_ease` one. The composite now frames the **raised** rect of
+the **widest** copy — the same class of arithmetic as `SUCCESS_FRAMED`, and for the same reason:
+the bounding box that matters is not the one at rest.
 
-**The page sits scrolled 32px, and that is the page's behaviour rather than a device.** The real
-monitoring page is ~973px tall below the chrome against a 583px viewport, so it scrolls in the
-product too. 32 is the intersection of two measured constraints: below it the stateline's sub is
-clipped by the viewport bottom, above it the sticky header swallows the `Session · 47:12`
-readout.
+Measured consequences:
+
+- the 17px sub lands at **8.11px** on a phone at rest and **10.13px raised** — so the emphasis is
+  now carrying the sub over the legibility floor rather than decorating a line that was already
+  over it. That is what L12 is *for*, and it is available on every band rather than on two of three
+- his head is **~57px** on a phone here
+- **the layout is the product's own, rearranged rather than padded** — register item 2 stands. The
+  card is still `min-h-[480px] … px-10 pb-10 pt-16` with a `sm:size-72` (288) bloom and the real
+  `mt-6` between bloom and stateline; what L14 changed is the column's width, where the readout
+  sits, and the gap below the stateline. The emphasis still grows downward from the block's own
+  top edge, so it cannot reach the bloom by construction rather than by arrangement.
+
+**The page sits scrolled 28px, and that is the page's behaviour rather than a device.** The real
+monitoring page is taller than its viewport, so it scrolls in the product too. What changed is
+that the scroll is no longer trapped: the old 39–41.5 window existed because the `Session · 47:12`
+readout sat in a row *above* the card, where the sticky header ate it at any larger scroll. With
+the readout inside the card's own top band, the only remaining constraint is that the emphasis
+clear the viewport, which 28 satisfies with room.
+
+**And the raise now fires inside the hold.** The camera pushes f0–60 and stops; the raise runs
+f76–120. It used to fire while the camera was still arriving, which is what made the device read
+as ambient motion rather than as a response to the copy.
 
 **It settles HERE rather than handing the raised block to beat 8.** The intent was to carry it
 across the join, but beat 8's push-in frames from world x 708 and the raised block's right edge
@@ -946,14 +1230,23 @@ which is this sheet's own remedy for this class of problem applied once more:
 
 | | frames | width | what it holds | what reads |
 |---|---|---|---|---|
-| **clock** | f30–f68 | 460 | clock + toast | clock at **25.7px**, subject at **12.8px** |
-| **face** | f80–f118 | 565 | toast still up + his face | **THE FALL**, head at **88.7px** |
-| **wide** | f150 on | — | the whole card, viewfinder, toast | both stateline changes, one raise |
+| **clock** | f30–f68 | **368** | clock + toast | clock at **32.1px**, subject at **16.1px** |
+| **face** | f80–f118 | **614** | toast still up + his face | **THE FALL**, head at **82.3px** |
+| **wide** | f150 on | **884.75** | bloom, stateline, viewfinder | both stateline changes, one raise |
 
-It is strictly better than the greybox on both numbers the beat cares about: **the clock reads at
-25.7px instead of ~19, and the face falls at 88.7px instead of ~80.** The clock, the toast and
-the viewfinder still share a right edge — **1063** rather than 1176, because the real viewfinder
-cannot reach 1176 without covering the bloom, so the stack moved rather than the viewfinder.
+The clock, the toast and the viewfinder share a right edge at **1176** — the drawn clock's own,
+restored by L14's pinned right column. The previous pass had moved the *rect* to 1063 and left the
+*drawing* at 1176, which is why the clock rendered **"11:30 A"** with its meridiem cut off in the
+one shot the beat's whole arithmetic depends on.
+
+**THE TOAST DISMISSES AS THE CAMERA REACHES THE WIDE PHASE, AND THAT IS DECIDED.** It slides out
+at f120. Keeping it up through the wide would push that framing from 884.75 to ~1000 to hold a
+banner nobody is reading any more, and the wide phase is where the **emphasis** has to land —
+pushing the frame wider there is exactly the "the emphasis lands softer rather than harder"
+failure. L2 is untouched by this: L2 is about the *fall*, and the fall happens at the 614 framing
+with the toast up, which is the whole of what that liberty protects. A macOS banner auto-dismisses
+after a few seconds anyway, so the beat gains a small piece of fidelity rather than spending one.
+It is a slide-out, not a pop.
 
 Sequencing matters here: let the **toast land and be read first**, then his face reacts, then the bloom moves. The order is what makes it cause-and-effect rather than three things happening at once.
 
@@ -976,15 +1269,20 @@ same thing twice — *the reading changed while nobody could see it*:
   frame.
 - The stateline changed at f150 and f176 while this sheet, and the beat's own header, both said
   f130 and f156. The code had drifted twenty frames later than the plan, which put a dead second
-  between the fall settling and anything else moving. The changes land at **f138 and f164** —
-  f138 being the earliest the stateline is genuinely inside the widening frame, checked against
-  the camera rather than assumed.
+  between the fall settling and anything else moving.
 
-**The emphasis fires on the first change and settles as the second lands.** The previous cut
-raised it at f142, before the first change and during the camera's arrival, and never settled —
-so neither change carried movement. It still goes up **once** and never grows twice; what
-changed is that the settle is now doing work rather than being skipped. The `tense` copy's
-two-line sub is why the settle is available at all — see the invariant and L14.
+**ACT THREE NOW HAPPENS AFTER THE CAMERA STOPS, WHICH IS THE WHOLE POINT.** The camera lands wide
+at **f150**, and everything that has to be *watched* runs from there: the drift begins f136 (so
+its last two thirds play in frame), the copy changes land at **f158 and f180**, the raise runs
+**f158 → f174** and settles **f180 → f196**. Nothing fires mid-travel. The previous cut raised at
+f142 — before its first copy change and while the camera was still arriving — and never settled,
+so neither change carried movement, and the one that did read was competing with a moving frame.
+
+**The emphasis fires on the first change and settles as the second lands.** It goes up **once**
+and never grows twice. What is new is that the settle is a staged move rather than a cap running
+out: at the old layout the two-line `tense` copy could only reach ~1.01×, so the "settle" was the
+device failing quietly and being read as choreography. It now raises to the full 1.25× — see L14
+and the invariant.
 
 **Do not rush this.** It is the largest single allocation in the video and it's correct — this beat is the entire product thesis in one shot.
 
@@ -1008,13 +1306,25 @@ nothing touching it reads as a stray keyboard focus rather than as a person deci
 inverts the one beat whose entire subject is *he was asked and he answered*. The pointer travels
 to the option and presses it.
 
-It is drawn in SCREEN space, outside the camera, and that is forced rather than chosen:
-`<Notification/>` portals to `document.body` and is `fixed right-4 … bottom-[…]`
-(`notification.tsx:186`), so it resolves against the 1920×1080 output frame and is outside the
-camera's transform entirely — a wrapper cannot move it, because the portal escapes the wrapper.
-**That is also why the prompt sits bottom-right of the frame regardless of where the camera is
-looking**, which is the known framing complaint; Pass B owns it. What is fixed here is only that
-the click has a cause.
+~~It is drawn in SCREEN space, outside the camera.~~ **IT IS A WORLD RECT NOW, AND THAT WAS THE
+FRAMING COMPLAINT.** `<Notification/>` portals to `document.body` and is `fixed right-4 …
+bottom-[…]` (`notification.tsx:186`), so it resolved against the 1920×1080 output frame and sat
+outside the camera's transform entirely — which is why the prompt used to sit in the same corner
+of the frame **regardless of where the camera was looking**, and why the beat clicked it while the
+camera was holding on the orb. A beat whose entire subject is *he was asked and he answered* was
+answering a question that was not in the shot.
+
+It is placed in the pinned right column at **x 856–1176, y 424**, below the viewfinder, so the
+camera can push in on it like anything else. The landing is `frameRect(PROMPT, 24)` at **600.9**
+world px, where the option copy reads at **10.5px** on a phone — over the floor — and the click at
+f66 lands 24 frames into a held shot, on a target that is in frame. The pointer moved into world
+coordinates with it.
+
+Two edges are stated rather than hidden. The prompt is 320 wide at x 856, and no 16:9 frame at or
+above the 368px minimum, centred on it, clears the stage card's own right edge at 856 — so this
+landing's **left edge runs through the card and the tail of the `tense` sub**. That is a
+background element in a shot whose subject is the question and the three answers, and it is the
+kind of overlap the framing rule's full-bleed exception exists for. Beat 9's own copy is whole.
 
 **RESOLVED — the copy exists and is signed off.** `apps/web/components/questionnaire/confirmatory-prompt.tsx`:
 title **"Checking in"**, body **"Your signals have looked tense for a little while. Is that how
@@ -1104,6 +1414,26 @@ against a 44px control starting at x 879, aiming at x 872 — outside its left e
 against the real `<ChatShell/>`; see the pointer note at the top of this file. The button also
 gets the film's one **authored** hover treatment, because the shipped control declares none.
 
+**THE TYPING HAD NO CARET AND THE CURSOR WOULD NOT SIT STILL.** Two defects, unrelated to each
+other, both of which made the one moment in the film where he acts through *language* read wrong.
+
+- **The caret was pinned to the left of the field.** There was no authored caret at all — what was
+  on screen was the real textarea's own DOM caret, and it sat at position zero because
+  `<ChatShell/>` is remounted on every keystroke (the wrapper keys on the draft's length) and
+  `chat-shell.tsx:119` re-focuses the composer on each new node. Focusing a textarea whose value
+  was **set** rather than typed puts the caret at the start of the value, not the end. A real
+  caret could not have been used anyway: its blink is wall-clock, and this film addresses frames.
+  So the DOM caret is hidden with a scoped `caret-color: transparent` and an authored one is drawn
+  at the measured end of the typed run — advance taken from a synchronous canvas `measureText`
+  against the composer's real `400 15px Inter`, not a per-character guess, so it is frame-stable
+  and calibrated rather than approximated. It blinks on its own half-second.
+- **The cursor swiped across the field while he typed.** The pointer's path had three waypoints —
+  arrive at the composer at f30, reach send at f92 — and the typing runs to f98, so that single
+  eased leg dragged the cursor across the box through almost the whole typing window. A pointer
+  that drifts while someone is typing is wrong in the plainest way: his hand is on the keyboard.
+  A fourth waypoint holds the composer position through f98, so the leg is zero-motion, and the
+  travel to send is a short move arriving exactly on the click.
+
 **His message stays short — that constraint is unchanged and load-bearing.** 35 characters, ~1.7s
 at ~20 c/s. Never speed the typing to fit; shorten the line.
 
@@ -1130,6 +1460,35 @@ afford*. This one it can: the typing window opened four frames earlier, the send
 enough to hold the whole thread, 16px chat text is well under phone legibility, so turns 1 and 2
 would be unreadable. It settles on each message as it arrives and pushes further on turn 3. A
 change to the shot plan, not to the beat.
+
+**AND THE SHOT PLAN HAD STOPPED BEING DERIVABLE, WHICH IS WHY THIS BEAT WAS WRONG THROUGHOUT.**
+Beat 10 was the only beat in the film framing hand-typed `shot(cx, cy, w)` values — five of them,
+tied to no measured rect — because `geometry.ts`'s `CHAT` block described **only the composer**,
+which is where the click was. None of the things the beat actually frames existed as rects: the
+conversation header, Ren's avatar inside it, the log, the three bubbles. Framing you cannot derive
+is framing nobody can check, and this beat is the proof. The rects are measured now and the
+landings are unions of them again, which is what the greybox had:
+
+| | frames | width | what it holds |
+|---|---|---|---|
+| **panel** | f0–f14 | 889 | the whole chat panel, establishing |
+| **turn 1** | f32 | 470 | Ren's header **and** turn 1 — 13.48px |
+| **turn 2** | f38–f120 | 760 | the header, his bubble, the composer and the send — **one static hold** across the typing and the click |
+| **turn 3** | f146–f210 | 665 | the header and turn 3 — the protected hold, 64 frames |
+
+**Ren's avatar is in all four**, which is the requirement L8's enlargement exists to serve and
+which the header placement now guarantees by construction.
+
+**Turn 2 is deliberately one hold rather than a move down to the composer.** The pointer travels
+to the composer, clicks, and then rests — so if the camera drifted there it would be the only
+thing moving in a shot whose whole subject is a person typing. One static frame holds the typing,
+the send and the bubble that follows it.
+
+**AND ONE NUMBER SETS THIS BEAT'S SCALE, so it stops being re-litigated.** Ren's avatar sits at
+x 281 and *his* bubble runs to x 919: **any** landing holding both is ≥638 wide before margins.
+That is why turns 2 and 3 read at 8.33 and 9.52px rather than over 10 — a property of the
+conversation's own layout, not of the framing, and not fixable by a tighter shot without dropping
+the avatar, which is the one thing this beat may not do.
 
 **Dependency:** the recommendations surface is `014-recommendations` and does not exist. This copy is written for the video. Keep it plausible against what 014 will plausibly ship — don't put a UI on screen that the product will never have.
 
@@ -1162,6 +1521,15 @@ He acts on it. In order:
    time in tabular figures and a drag handle, and the track length is the real **4:54**. Title
    and artist are as before (L2b). The play button has a hover, and the pointer presses it.
 
+   **THE PLAYER'S THREE WINDOW CONTROLS STAY GREY, AND THIS IS CLOSED.** Recorded so nobody
+   re-opens it as an unfinished detail. macOS renders traffic lights **grey when a window is not
+   focused**, and the player is a background window the whole time it is on screen — he opens it,
+   presses play, and goes back to working in the browser — so grey is the faithful state rather
+   than a missing one. Colouring them would also introduce **red, amber and green**, which are the
+   three stress-band colours in this product, into a window sitting ~200px from a bloom that
+   genuinely is asserting a reading. Red is banned outright in this film. Two independent reasons,
+   same answer: do not colour them.
+
    **The sleeve is ORIGINAL abstract artwork — `video/src/app/albumart.tsx`.** The rule and its
    reasoning are in "The assets pass" below; what matters here is the design constraint it was
    built to. At beat 11's framing it is about **62px square on a phone**, so it is four elements
@@ -1187,24 +1555,38 @@ and it was missing: the move used to begin two-thirds of the way in and arrive o
 frame, so it never landed and never held, and everything that resolves resolved off screen. It now
 lands with 54 frames still to run.
 
-**THE THREE THINGS CANNOT SHARE ONE STATIC FRAME, AND THAT WAS MEASURED.** At the real geometry:
+**THE THREE THINGS CANNOT SHARE ONE STATIC FRAME, AND THE REAL NUMBER IS WORSE THAN THE ONE THIS
+SHEET QUOTED.** At the real geometry:
 
-    bloom top → trend bottom            664.2 px
+    bloom top → trend bottom            918.4 px    ← the POPULATED trend card
     viewport below the sticky header    519.0 px
                                         ─────────
-                                        145 px short, at every scroll and every framing
+                                        399 px short, at every scroll and every framing
 
-No camera move buys page height, and padding the layout until it fits is exactly what register
-item 2 exists to undo — the greybox only ever fitted because it drew a 476-tall card where the
-product has a 607.7-tall one. (A further 32px separates the stateline from the trend's plot, so
-even those two cannot be held together; the header is `sticky top-0` and cannot be scrolled away.)
+The 664.2 this sheet carried for two revisions used the **empty** 101.5-tall trend card; the
+populated one is 355.7. And 918px of stack is not a near-miss — a 16:9 frame holding it would have
+to be 1633 world px wide, in a 1200-wide world, at which the stateline's 17px sub reads at 4.4px
+on a phone. **No arrangement fixes this and L14 does not claim to.** What L14 fixes is that the
+viewfinder no longer scrolls away with the column, so it can be in every landing.
 
-**So the causal ORDER survives and the single static shot does not.** The bloom drifts and the
-stateline returns while both are framed; then the camera pulls out AND the page scrolls, in one
-continuous move, landing on the trend card whole for the descent. That is this sheet's own order
-with the camera following the story instead of waiting for it, and **the closing linger lands on
-the trend**, which is the thing the beat exists to show. The returned stateline is read at
-18.6px on a phone in the shot before the move. No cut.
+**So the causal ORDER survives, the single static shot does not, and the beat SETTLES anyway** —
+because the move happens early and the landing is long, rather than the camera arriving on the
+last frame:
+
+| | frames | width | what it holds |
+|---|---|---|---|
+| **player** | f18–f66 | 924 | the music player, the viewfinder, the stateline — he opens it and you watch him do it |
+| **return** | f98–f146 | 884.75 | the reading and the viewfinder: headphones, notes, the nod, the bloom's drift to meadow and the stateline's return, on a camera that has stopped |
+| **trend** | f180–f234 | 872 | the trend card **whole**, with the viewfinder — **54 frames of hold**, descent f184–223 |
+
+**The player and the trend were never co-framed, and they were not in the greybox either** —
+worth recording, because this sheet has twice implied otherwise. At the greybox the player's
+opacity reached 0 at **f72** while the payoff landed at **f160**; they are eighty-eight frames
+apart and always were. The reason is not framing, it is the page: the trend sits 855px down and
+the page has to travel to reach it, so that travel *is* the third landing. What is genuinely new
+is that **the viewfinder is in all three shots** — his face is present when he presses play, when
+the relief lands, and when the line walks back down. That is the continuity the beat actually
+needed, and the old arrangement could not provide it at any framing.
 
 In causal order:
 
@@ -1378,6 +1760,27 @@ was holding a static "3" — was **paid for out of 5d rather than added to the b
 | 5c counting for real, 45 frames | **+0.5s, taken out of 5d** — beat 5 stays 372 frames |
 | 5d's paced minute and its numerals | nothing |
 
+**±0.0s across the framing pass, and that is the point of it.** Every beat kept its exact frame
+count; what changed is where the camera is and what the page is arranged like. Not one duration
+moved, in either direction:
+
+| What changed | Cost |
+|---|---|
+| L14 — the monitoring rearrangement, and the pinned right column | nothing |
+| Five wrong rects (three 64px-high blocks, the clock, `SUCCESS_FRAMED`'s x) | nothing |
+| The `tense` sub measured at its real 430 width | nothing |
+| Beat 4 going to three landings inside its existing move | nothing — the move was already there |
+| Beat 5a's 580 landing and its 27px page lift | nothing — inside 5a's existing hold |
+| Beat 5c pulling back to share the capture landing | nothing |
+| Beat 9's prompt becoming a world rect the camera can reach | nothing |
+| Beat 10's landings derived from measured rects again | nothing |
+| Beat 8's toast dismissing at the wide phase | nothing |
+| The six OTP boxes existing before the sweep | nothing |
+| The countdown counting once, monotonically | nothing — the 45 frames were already spent |
+| Three legible breathing phases | nothing — same 45 frames, different period |
+| The confirmation email matching `confirmation.html` | nothing |
+| The cursor's hotspot, the caret, the stilled pointer | nothing |
+
 **Trim candidates, in order:**
 
 1. Beat 2, 15.6s → 12s. The performed mail sequence is where the fat is; the OTP choreography is not.
@@ -1464,8 +1867,13 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
 
 **Still open:**
 
-- **Does the closing card land or stall the ending?** Three seconds of held text between the demo
-  resolving and the wordmark is either the last idea or a speed bump. Judge it in this pass.
+- **Does the closing card land or stall the ending?** **It lands — and the reason is beat 11, not
+  beat 12.** The card was always going to read as a speed bump arriving out of a *settling* frame,
+  and that is what it used to do: beat 11's pull-out finished on its last frame, so the demo was
+  still resolving when the text appeared. Beat 11 now lands its trend shot with **54 frames still
+  to run**, so the card arrives out of stillness and reads as the last idea rather than as a pause.
+  Judged on the rendered cut, not on the description. **If it is ever reopened, reopen beat 11's
+  hold first** — that is the variable the card's reading depends on.
 - **Is 81.0s acceptable, and if not, what goes?** See the trim list above.
 - **Does the face need to be bigger?** It is **~80px crown-to-chin on a phone** at beat 8's tight
   framing — measured off a render, not estimated. The fall reads clearly there, so nothing was
@@ -1477,11 +1885,9 @@ first-sight-of-face hold, and beat 11's wide hold and its closing linger. Those 
   **Half of this is now answerable and the answer is yes:** the mark is the real `<Wordmark/>`,
   so the two-colour `seren`/`ify` split is on screen at domain size and it holds. What is still
   a judgement call is whether the travel reads as *derivation* or as a word moving.
-- **Does 5a's privacy line read, now that it has the emphasis?** No, and that is recorded rather
-  than hidden. The device buys **emphasis, not legibility**: 5a is deliberately wide, so at
-  1021.5 world px the line's real 14px lands at **5.8px on a phone**, 7.2px raised. A framing
-  that makes "Your video isn't stored — only the calm reading it produces." genuinely readable is
-  **Pass B's to find**, and it is the strongest candidate the beat has for one. See beat 5.
+- ~~**Does 5a's privacy line read, now that it has the emphasis?**~~ **YES — 10.19px seated,
+  12.74px raised**, at a 580-wide landing held f32–76, plus a 27px page lift that also un-slices
+  the helper line under it. It was 5.8/7.2. See beat 5.
 - Do the real full-page reloads (`<a href>` / `window.location.replace`) read as broken on video, or as honest? They're real; showing them is more faithful, but a hard white flash mid-video may just look like a mistake.
 - Beat 10's three-turn exchange is written for the video; `014-recommendations` doesn't exist. Keep the UI plausible against what 014 will actually ship.
 - Beat 10 turn 3 must read as *personal knowledge*, not a canned tip. If greybox shows it reading generic, that's a copy problem to fix before art.
@@ -1523,10 +1929,15 @@ components:
    real Pause/End controls, and inside the frame's bottom edge). See L12 for the arithmetic. The
    layout did not move.
 4. ~~**Frame the calibration success state against real geometry, ripple extent included.**~~
-   **DONE, and the cause was one number.** The ripple scales a 96px badge to 2.1 — 52.8px past
-   the badge on every side — and the badge sits 24px below the component's top edge, so the
-   ripple crosses it by **28.8px**. Every previous framing measured the component and cropped the
-   ripple. See beat 5.
+   **DONE — but the fix was half right for a pass, and the wrong half is why 5f then sat left of
+   frame.** The ripple scales a 96px badge to 2.1 — 52.8px past the badge on every side — and the
+   badge sits 24px below the component's top edge, so it crosses that edge by **28.8px**. That is
+   correct, and it is a **vertical** fact. The rect grew from the badge on **both** axes, though,
+   which put its centre at 723.2 against the component's 600 — so beat 5f's `shot(600, …)` arrived
+   123px to the left of the rect it was framing, and the move onto it read as a pan the wrong way.
+   Horizontally the ripple reaches 499.2 → 700.8, comfortably *inside* the component's 376 → 824,
+   so the component governs x and the badge has no business in that arithmetic. `SUCCESS_FRAMED`
+   grows on its top edge only now. See beat 5.
 5. ~~**The calibration viewfinder becomes 16:9.**~~ **DONE.** The box is 512 × 288 `aspect-video`;
    the 3:4 bracket guide floats inside it at 168.5 × 224.6. The take is reframed, and the
    centring nudge lands harder for a measurable reason — the bracket target is only 33% of the
@@ -1604,6 +2015,28 @@ components:
 10. **Do Ren's `attentive` and `thinking` states need properly drawn eyes?** They are `idle`'s eyes
     scaled. At the enlarged avatar size (L8), held for seconds, that may become visible in a way it
     is not in the app.
+
+**Opened by the framing pass:**
+
+11. **Three surfaces are scrolled by a scoped stylesheet rather than by a prop, and that is
+    brittle.** Beat 2e scrolls the mail client's reading pane 52px (the email card is 482.5 tall
+    and does not fit), beat 5a lifts the calibration column 27px, and both do it with a `<style>`
+    block targeting a structural selector — `[data-mailpane] > div > div:last-child` in the first
+    case. It works and it is the same seam `auth.tsx` already uses, but **it breaks silently if
+    `mail.tsx` reorders its children**, and a silent break here is a crop. `mail.tsx` wants a
+    `paneScroll` prop and `calibrate.tsx` wants a `scroll` prop, the way `consent.tsx` already has
+    one. Not done in this pass because both files were being edited for content at the same time.
+12. **The `(auth)` shell's header does not scroll with the form.** The scroll wraps only
+    `AuthPage`'s children, so at the 2b–2c scroll of 145 the "Create your account" heading passes
+    **under** the wordmark. No shot in the film holds on it, so nothing is visibly wrong today —
+    but any future wide framing during 2c would expose it, and it is the kind of defect that gets
+    found by a reframing rather than by a test.
+13. **Two rects in `geometry.ts` still describe surfaces smaller or larger than they render.**
+    `SIGNUP.fieldPassword` / `fieldGroup` were measured against the **collapsed** one-line password
+    checklist; expanded to three rows the block runs to y **704**, not 669. And `VERIFY.section`
+    carries h 442.1 (bottom 702.1) against a surface that ends at **649.5**. Beat 2 currently
+    carries local corrections for both. They belong in `geometry.ts`, and `framing.ts` should own
+    `BEAT2_SEAM`, which lives in the beat file and is imported by beat 3.
 
 ---
 

@@ -1,10 +1,11 @@
 import React from "react";
+import { interpolate, useCurrentFrame } from "remotion";
 
 import { TOAST as COPY } from "../greybox/copy";
 import { TOAST as T, OS_FONT, OS_TABULAR } from "./furniture";
 import { TOAST as BOX } from "./geometry";
 import { MailMark } from "./shell";
-import { useToastIn } from "./motion";
+import { EASE_OUT, sec, useToastIn } from "./motion";
 
 /**
  * ══ THE MAIL NOTIFICATION — AUTHORED FURNITURE, IN DARK ═════════════════════════════
@@ -148,8 +149,45 @@ const PANEL_RADIUS = 18;
  * so it would not fit either, and it would push the film's single most important line under the
  * size the beat's own framing arithmetic was built on.
  */
-export const MailToast: React.FC<{ startFrame: number }> = ({ startFrame }) => {
-  const { x, opacity } = useToastIn(startFrame);
+/**
+ * ── AND IT LEAVES, WHICH IS WHAT A BANNER DOES ──────────────────────────────────────
+ *
+ * `dismissFrom` is L14's one addition and it is a framing decision as much as a behavioural one.
+ * The toast is pinned at y 96–200 in the right column; beat 8's wide phase frames bloom ∪ sub ∪
+ * viewfinder at 777 world px, and **holding the toast in that union would push it to 1033** —
+ * taking the stateline's 17px sub from 9.2px on a phone to 6.9, i.e. under the floor, in the
+ * shot the whole beat is built to deliver.
+ *
+ * A macOS banner auto-dismisses, so the honest answer is to let it. **Liberty L2 is not spent
+ * by this**: L2 is "you watch his face fall while the toast is up", and the fall happens at
+ * f70–86 at the tight `BEAT8_FACE` framing with the toast beside it. Once the fall has landed
+ * the toast's only remaining job is done.
+ *
+ * The exit mirrors the entrance rather than inventing a curve — the same 0.42s, the same
+ * `EASE_OUT`, travelling back out to the right — because two macOS-shaped toasts on one screen
+ * with two different curves read as two different operating systems, and a toast that pops out
+ * having slid in reads as a dropped frame.
+ */
+const DISMISS_FRAMES = sec(0.42);
+/** How far it travels leaving. Further than the 28 it arrived by: it is going off-screen. */
+const DISMISS_X = 44;
+
+export const MailToast: React.FC<{ startFrame: number; dismissFrom?: number }> = ({
+  startFrame,
+  dismissFrom,
+}) => {
+  const frame = useCurrentFrame();
+  const inn = useToastIn(startFrame);
+  const out =
+    dismissFrom === undefined
+      ? 0
+      : interpolate(frame, [dismissFrom, dismissFrom + DISMISS_FRAMES], [0, 1], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+          easing: EASE_OUT,
+        });
+  const x = inn.x + out * DISMISS_X;
+  const opacity = inn.opacity * (1 - out);
 
   return (
     <div
@@ -161,7 +199,21 @@ export const MailToast: React.FC<{ startFrame: number }> = ({ startFrame }) => {
         height: BOX.h,
         translate: `${x}px 0`,
         opacity,
-        zIndex: 40,
+        /**
+         * ── 60, AND THE 40 IT REPLACES WAS A REAL BUG ──
+         *
+         * The app header is `sticky top-0 z-50` and is `position: absolute` inside a parent that
+         * makes no stacking context, so its z-50 competes DIRECTLY with this one in the desktop's
+         * own stacking context — it is not scoped to the page. At L14 the toast moved up to y
+         * 96–200 and began overlapping the header's 92–156 band, and at 40 the header painted
+         * straight through it: the theme toggle and the avatar sat on top of a macOS banner,
+         * which no operating system has ever done. Invisible before only because the toast used
+         * to sit at 187–291, entirely below the header.
+         *
+         * 60 clears the header's 50 and stays under the music player's 80 (a foreground window)
+         * and the cursor's 90 (a pointer is above everything).
+         */
+        zIndex: 60,
         borderRadius: PANEL_RADIUS,
         // The material. A two-stop vertical gradient, not a fill — see the note at the top of the
         // file. `backgroundColor` stays as the base so the panel is never transparent for a frame

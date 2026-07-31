@@ -2,80 +2,106 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { ConsentGatePage } from "../../app/consent";
-import { GATE, centre } from "../../app/geometry";
+import { BEAT4_ESTABLISH, BEAT4_LINE } from "../../app/framing";
+import { centre, GATE } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
-import { Camera, frameRect, rect, union } from "../Camera";
+import { Camera, rect, shot } from "../Camera";
 
 /**
  * Beat 4 · Camera consent gate · 180 frames
  *
  * ~230 words. Unreadable at any speed. Do not try.
  *
- * ══ IT IS THE REAL GATE NOW ═════════════════════════════════════════════════════════
+ * ══ PASS B · THE GATE'S GEOMETRY WAS 64px HIGH, AND THAT IS WHY IT LANDED MID-LAYOUT ══
  *
- * `<CameraConsentGate/>` — the badge, the heading, both bordered `<Facts/>` cards and both
- * buttons, with every string coming from `lib/consent/copy.ts`. The greybox drew the ~230 words
- * as bars, which was defensible while nothing in the beat was readable; what was not defensible
- * is that the ONE line the beat exists to deliver was a hand-typed copy of a shipped string.
+ * Every rect in `geometry.ts` § GATE used to sit **exactly 64px above where the component
+ * renders** — `section` 124 vs 188, `header` 148 vs 212, `facts1` 372.4 vs 436.4, `facts2` 812.6
+ * vs 876.6, `buttons` 1161.9 vs 1225.9, `keyLine` 615.1 vs 679.1. 64 is `HEADER_H`: the gate was
+ * probed **without the sticky `<Header/>` mounted**, which is the identical defect `geometry.ts`
+ * already documents for `HOME` ("every y here was 64px high"). **`GATE` now carries the fix** —
+ * this beat frames it directly rather than keeping a locally-corrected copy.
  *
- * ══ AND THE SWAP MOVED THE LINE ═════════════════════════════════════════════════════
+ * The visible symptom was exactly what a 64px error produces: a landing derived from `keyLine`
+ * framed 64px of the wrong page, so f150 held a wall of body copy sliced at the top and bottom
+ * edges with **no card border anywhere in shot**.
  *
- * The sheet stages this beat as "one landing holds the key line's card AND the button, both
- * complete", which rests on the privacy pitch being in the card nearest the CTA. **It is not.**
- * It is `CAMERA_GATE_WHAT_HAPPENS[2]` — the third bullet of the FIRST card, 550px further up the
- * page — and the first render after the swap landed on "What declining changes", which is a real
- * card, correctly rendered, and the wrong one.
+ * ══ AND THE KEY LINE IS `text-sm` (14px), NOT 17 ═════════════════════════════════════
  *
- * Key-line top to Allow's bottom is 594.8px against a 583px viewport, so **they miss sharing a
- * frame by 11.8px.** No scroll closes it; it is the closest near-miss in the film. So the beat
- * takes two landings inside one continuous move, which is this sheet's own remedy for this
- * class of problem:
+ * `Facts`' items are `text-pretty text-sm leading-relaxed` (`camera-consent-gate.tsx:149`). The
+ * sheet's "17px copy reads at 12.7px on a phone" was derived from a size the component does not
+ * use, and it is what made a 566-wide landing look sufficient. At 14px the same shot reads at
+ * **10.4px**, and the framing rule's cost is real rather than free:
  *
- *   f0–96    establish, and the page scrolls under a held camera — which is how a scroll reads
- *   f96–124  push to the key line ALONE, at 566 world px
- *   f124–150 HOLD. 17px of body copy lands at 12.7px on a phone, which is read, not recognised
- *   f150–168 the page scrolls the rest of the way AND the camera pulls to the buttons, together
- *   f172     he clicks "Allow camera and inference"
+ *   the whole card, all four edges     568 × 416.2 → 16:9 forces **≥ 740 world px** → ≤ 7.98px
+ *   its list + bottom border           568 × 362.7 → **659** → **8.96px**
+ *   its list alone                     518 × 331.8 → **611** →  9.67px
  *
- * **COST: 5s → 6s**, and it is the second landing. The beat had 5s for four events — establish,
- * scroll, read, click — on the assumption the last two shared a frame. They do not, so the
- * second landing needs its own second. This is the same bill the one-take invariant has paid
- * everywhere else in the film: the cost is paid rather than dodged.
+ * There is no framing that holds a bordered edge of this card and clears the 10px floor — the
+ * card is 568 wide in a 1200 world, so 16:9 charges 740px of width for its 416px of height. The
+ * landing takes **659** (its list, its bottom border and both side borders, with the frame's top
+ * edge in the 12px gutter under the heading and its bottom edge 4px under the card's own border)
+ * because a whole visible edge is the acceptance criterion and 8.96 vs 9.67 is not a reading.
+ *
+ * ══ TWO LANDINGS, ONE CONTINUOUS MOVE ═══════════════════════════════════════════════
+ *
+ *   f0–18     establish · badge, heading, lede and the first card's own heading, all whole
+ *   f18–80    the page scrolls under a held camera — which is how a scroll reads
+ *   f80–108   push to the key line's card body
+ *   f108–142  HOLD. 34 frames on four bullets at 8.96px
+ *   f142–170  the page flings to its bottom AND the camera pulls to the buttons, together
+ *   f174      he clicks "Allow camera and inference"
  */
 
 /**
- * Where the page sits while the key line is read.
+ * ── THE TWO SCROLL POSITIONS, BOTH DERIVED ─────────────────────────────────────────
  *
- * 330, not 380: at 380 the shot's top edge reaches world y 121.6 and catches the sticky app
- * header. The header is full-bleed furniture and the framing rule permits it running off the
- * left and right edges — but a nav bar hanging in the top of a shot whose subject is one
- * paragraph reads as a mis-framing rather than as background. At 330 the frame starts at 171.6,
- * clear of the header's 156.
+ * `A` = 250 puts the whole KEY landing inside the page's own 156–675 viewport (the frame runs
+ * 235.9 → 606.6) with the second card's top at 626.6, below the frame and out of shot.
+ * The window is [181.6, 329.9]; 250 sits in the middle of it.
+ *
+ * `B` = 682.9 is the page scrolled to its **bottom**: the gate is 1169.9 tall from y 188, so its
+ * last pixel is 1357.9 and the viewport's is 675. That is what makes the CTA landing composable —
+ * the frame's bottom edge and the page's own bottom edge coincide at 675, so the shot has no dead
+ * space under the buttons and no seam where it ends.
  */
-const SCROLL_A = 330;
-/** …and where it sits for the CTA. */
-const SCROLL_B = 560;
+const SCROLL_A = 250;
+const SCROLL_B = 1357.9 - 675;
 
 const shifted = (r: { x: number; y: number; w: number; h: number }, s: number) =>
   rect(r.x, r.y - s, r.w, r.h);
 
-/** The establishing shot: the badge, the heading and the top of the first card. */
-const ESTABLISH = frameRect(
-  union(GATE.header, rect(GATE.facts1.x, GATE.facts1.y, GATE.facts1.w, 180)),
-  24,
-);
-/** The privacy pitch, alone and whole. */
-const KEY = frameRect(shifted(GATE.keyLine, SCROLL_A), 24);
-/** Both controls, whole, with the CTA the beat ends on. */
-const CTA = frameRect(shifted(GATE.buttons, SCROLL_B), 30);
+/**
+ * The establishing shot and the key-line landing are `BEAT4_ESTABLISH` and `BEAT4_LINE` in
+ * `framing.ts` — both built from `GATE`, now that it carries the sticky header's 64px. Framed
+ * here rather than duplicated locally, the way every other beat frames its shots.
+ */
+
+/**
+ * **The CTA landing**, and its bottom edge is the page's.
+ *
+ * At `SCROLL_B` the gate's last pixel and the viewport's last pixel are both at world y 675, so a
+ * frame whose bottom edge is 675 ends exactly where the page does — no dead backdrop under the
+ * buttons, no seam. `frameRect` on the buttons alone would centre 353px of frame on a 108px block
+ * and hang 98.6px of nothing below it, which is why this one is placed rather than derived.
+ *
+ *   frame   x 271.1 – 928.9   y 305 – 675
+ *   holds   the second card's last three bullets whole (its top edge is above the frame, its
+ *           bottom border at 519 inside it), then both controls, then the page's own end
+ *   edge    top 305 sits in the 12px gutter between that card's first and second bullets
+ *   reads   the button's 16px label at 10.3px on a phone
+ */
+const CTA = shot(600, 490, 657.8);
 
 const ALLOW = centre(shifted(GATE.allow, SCROLL_B));
 
 export const Beat04CameraGate: React.FC = () => {
   const frame = useCurrentFrame();
 
-  const scroll = interpolate(frame, [26, 96, 150, 168], [0, SCROLL_A, SCROLL_A, SCROLL_B], {
+  // The scroll and the push-in OVERLAP by six frames on purpose: if the page settled on the
+  // exact frame the camera started, there would be one still frame of a card sliced by the
+  // establishing shot's bottom edge. Six frames of shared motion removes it.
+  const scroll = interpolate(frame, [18, 84, 142, 170], [0, SCROLL_A, SCROLL_A, SCROLL_B], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
@@ -85,12 +111,12 @@ export const Beat04CameraGate: React.FC = () => {
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: ESTABLISH },
+          { frame: 0, shot: BEAT4_ESTABLISH },
           // Held while the page scrolls, so the scroll reads as a scroll.
-          { frame: 96, shot: ESTABLISH },
-          { frame: 124, shot: KEY },
-          { frame: 150, shot: KEY },
-          { frame: 168, shot: CTA },
+          { frame: 78, shot: BEAT4_ESTABLISH },
+          { frame: 108, shot: BEAT4_LINE },
+          { frame: 142, shot: BEAT4_LINE },
+          { frame: 170, shot: CTA },
           { frame: 180, shot: CTA },
         ]}
       >
@@ -106,16 +132,19 @@ export const Beat04CameraGate: React.FC = () => {
               <Hover
                 selector="[data-probe='gate'] button"
                 treatment="meadow"
-                from={168}
+                from={172}
                 to={180}
               />
+              {/* The travel starts after the camera has landed, so the cursor is never drawn
+                  outside the frame it is travelling in — at f160 the camera is still flinging and
+                  a waypoint down at the buttons would be off-shot until it arrives. */}
               <Pointer
                 path={[
-                  { frame: 150, x: ALLOW.x + 230, y: ALLOW.y + 120 },
-                  { frame: 168, x: ALLOW.x, y: ALLOW.y },
+                  { frame: 162, x: ALLOW.x + 190, y: ALLOW.y + 78 },
+                  { frame: 172, x: ALLOW.x, y: ALLOW.y },
                 ]}
-                clicks={[172]}
-                visible={{ from: 148 }}
+                clicks={[174]}
+                visible={{ from: 160 }}
               />
             </>
           }
