@@ -10,7 +10,7 @@ import { SANS } from "../fonts";
 import { PROTAGONIST } from "../greybox/copy";
 import { CHAT, REN_AVATAR, REN_AVATAR_SIZE } from "./geometry";
 import { sec } from "./motion";
-import { AppShell } from "./shell";
+import { AppShell, VIEWPORT_Y } from "./shell";
 
 /**
  * ══ REN'S CHAT, AS THE REAL SHELL ═══════════════════════════════════════════════════
@@ -154,6 +154,12 @@ const ComposerCaret: React.FC<{ text: string }> = ({ text }) => {
  * (`OPEN_EYE_TRANSFORMS`, `:40-50`), measured values from the signed-off design, and this beat
  * uses them rather than inventing an expression.
  *
+ * **The film uses two of the four.** `attentive` is dropped entirely (2026-07-31): the 1.22×
+ * eye-scale is right at the 34px the product draws it at and reads as a stare at four times
+ * that, and the film is the only place the avatar is ever seen large. `idle` goes with it —
+ * beat 10's Ren is composing or he has just answered, and neither is idle. See
+ * `Beat10Ren.tsx` § REN'S ARC.
+ *
  * ── THE SEAM: SUPPRESS THE SHIPPED ONE, DRAW THE FRAME-ADDRESSED ONE OVER IT ────────
  *
  * `apps/web` is never modified for the video, and `<ChatShell/>` forwards no avatar prop — so the
@@ -205,8 +211,15 @@ export const ChatPage: React.FC<{
   messages: ChatMessage[];
   /** What is currently in the composer. Drives the real textarea via `handoffOpener`. */
   draft?: string;
-  /** L9 — the typing indicator the app does not have. The video depicts a later feature. */
-  thinking?: boolean;
+  /**
+   * L9 — the typing indicator the app does not have. The video depicts a later feature.
+   *
+   * It names the TURN being composed rather than taking a boolean, because the dots have to be
+   * drawn in the slot the message will land in. A `null` means Ren is not composing; being
+   * `thinking` is not the same thing (he is `thinking` for most of beat 10, including while the
+   * human types, and dots for all of that would be a lie about the surface).
+   */
+  composing?: "turn1" | "turn3" | null;
   /** Ren's own expression (L8). `<ChatShell/>` forwards no such prop — see `<RenFace/>`. */
   renState?: RenState;
   /** Draws the measured caret at the end of `draft` and blinks it. Only meaningful while typing. */
@@ -217,7 +230,7 @@ export const ChatPage: React.FC<{
   clock,
   messages,
   draft = "",
-  thinking = false,
+  composing = null,
   caret = false,
   renState = "idle",
   overlay,
@@ -262,8 +275,31 @@ export const ChatPage: React.FC<{
        * liberty rather than a fidelity defect: without it, Ren's `thinking` state is dead air
        * rather than a legible state. It is authored here, over the real shell, and it is
        * deliberately the only thing in this beat that is not the product's.
+       *
+       * **It is drawn in the slot its own message will land in**, so the dots are replaced by
+       * the thing they were announcing. It used to be one hard-coded (320, 300) — which happens
+       * to be turn 3's row, correct for the one window the beat then had and wrong for turn 1's.
+       * Both are `CHAT` rects now.
        */}
-      {thinking && <TypingIndicator />}
+      {composing ? <TypingIndicator slot={composing === "turn1" ? CHAT.turn1 : CHAT.turn3} /> : null}
+
+      {/*
+       * ── THE EMPTY-THREAD GREETING IS SUPPRESSED WHILE REN IS COMPOSING HIS FIRST LINE ──
+       *
+       * `<ChatShell/>` renders `emptyGreeting` whenever the log has no messages
+       * (`chat-shell.tsx:424`) — in the panel variant, a second `<RenAvatar/>` and "Hi, I'm Ren ·
+       * A calm place to think out loud." That is correct for a thread a person opened and wrong
+       * for this one: **Ren speaks first here**, and a greeting sitting under a typing indicator
+       * is two openings at once, with a sliced line of the greeting's body copy at the landing's
+       * bottom edge.
+       *
+       * It is only ever on screen for the 52 frames before turn 1 lands, and only in this beat.
+       * Same seam as `<RenFace/>`'s own `visibility: hidden` above — the component keeps every
+       * class it ships with; the film chooses which of its states is on screen.
+       */}
+      {composing === "turn1" ? (
+        <style>{`[data-renshell] .overflow-auto > .justify-center { display: none; }`}</style>
+      ) : null}
     </AppShell>
   );
 };
@@ -288,11 +324,13 @@ export const ChatPage: React.FC<{
  */
 const DOT_CYCLE = sec(0.9);
 
-const TypingIndicator: React.FC = () => {
+const TypingIndicator: React.FC<{ slot: { x: number; y: number } }> = ({ slot }) => {
   const frame = useCurrentFrame();
   return (
     <div
-      style={{ position: "absolute", left: 320, top: 300, zIndex: 5 }}
+      // World coordinates, less the viewport offset — the containing block is `Desktop`'s
+      // viewport div, which starts at `VIEWPORT_Y`. Same subtraction the pinned surfaces make.
+      style={{ position: "absolute", left: slot.x, top: slot.y - VIEWPORT_Y, zIndex: 5 }}
       className="flex w-fit items-center gap-1.5 rounded-2xl rounded-bl-sm border border-border bg-surface px-3.5 py-3"
     >
       {[0, 1, 2].map((i) => {

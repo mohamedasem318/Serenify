@@ -31,6 +31,26 @@
  * doing anything at all, so no arrangement of wrappers, widths or counter-scales can satisfy
  * both. Measuring in screen space and drawing in world space are the same degree of freedom.
  *
+ * ── AND THE CAMERA WAS NOT THE ONLY SCALE IN THE CHAIN ──────────────────────────────
+ *
+ * **The trend's plot was 42% of its card, and it is this same bug one level deeper.** The film
+ * draws `<SessionTrend/>` at a natural width and scales the wrapper down (`geometry.ts` § TREND),
+ * so the chain above a self-measuring component is `CAMERA.zoom × TREND_SCALE`, not
+ * `CAMERA.zoom`. Dividing out only the camera left the second factor in: the component measured
+ *
+ *     720 (layout content width) × 0.4167 = 300
+ *
+ * and drew a 300-wide SVG inside a 720-wide box. Two consequences, both confirmed on the render
+ * rather than reasoned about: at 300 the gutters collapse to their MIN values (84 / 24) so
+ * `plotWidth` is 192 instead of 520, and `capByLegibility = floor(192/24)+1 = 9` silently drops
+ * a window. The predicted gridline edge was 594px into the crop and the measured one was 595.
+ *
+ * It cannot be fixed by publishing a second module-level number the way `CAMERA.zoom` is,
+ * because a scale wrapper is a property of a SUBTREE — two of them could be on screen at once,
+ * and a component outside one must not have it divided out. So the wrapper DECLARES itself with
+ * `data-measure-scale` and the patch walks up from the element being measured. A `.closest()`
+ * per call is cheap, and it is only ever reached inside a camera (the early return below).
+ *
  * ── SCOPE ───────────────────────────────────────────────────────────────────────────
  *
  * Patching a DOM primitive is a big hammer, so it is kept as small as it can be: it is a single
@@ -44,6 +64,12 @@
 /** Set by `Camera` every render. 1 means "no camera", which is the identity case. */
 export const CAMERA = { zoom: 1 };
 
+/**
+ * The attribute a scaled subtree declares itself with. Put it on the SAME element that carries
+ * the `scale`, with the scale factor as its value.
+ */
+export const MEASURE_SCALE_ATTR = "data-measure-scale";
+
 let patched = false;
 
 export function patchMeasurementForCamera(): void {
@@ -53,8 +79,20 @@ export function patchMeasurementForCamera(): void {
   const original = Element.prototype.getBoundingClientRect;
   Element.prototype.getBoundingClientRect = function patchedRect(this: Element): DOMRect {
     const r = original.call(this);
-    const z = CAMERA.zoom;
-    if (!z || z === 1) return r;
+    let z = CAMERA.zoom || 1;
+    // Any scale wrapper between this element and the camera is part of the chain too — see the
+    // note above. `closest` includes the element itself, which is deliberate: the wrapper that
+    // carries the scale is also the element whose own box a caller might measure. The walk runs
+    // at zoom 1 as well, so that **the probe measures what the film draws** — a probe that
+    // measured an unscaled trend while the beats rendered a scaled one is precisely the class of
+    // divergence `SwapProbe.tsx` exists to prevent, and it costs one ancestor walk beside a call
+    // that already flushes layout.
+    const scoped = this.closest?.(`[${MEASURE_SCALE_ATTR}]`);
+    if (scoped) {
+      const extra = Number(scoped.getAttribute(MEASURE_SCALE_ATTR));
+      if (Number.isFinite(extra) && extra > 0) z *= extra;
+    }
+    if (z === 1) return r;
     const x = r.x / z;
     const y = r.y / z;
     const w = r.width / z;

@@ -82,8 +82,8 @@ import { useExpression } from "../rig";
  *
  * The stateline emphasis fired here on the first copy change and settled on the second, and its
  * justification was legibility: at the old 884.8-wide composite the 17px sub read at 8.11px on a
- * phone and the raise carried it to 10.13. At L15's 840 composite the HEAD reads at 18.1px and
- * the sub at 8.54, and the device would be growing a line that is already as legible as the shot
+ * phone and the raise carried it to 10.13. At L16's 927 composite the HEAD reads at 16.4px and
+ * the sub at 7.74, and the device would be growing a line that is already as legible as the shot
  * can make it — while costing 70px of card the trend now uses.
  *
  * **The one thing this beat loses with it is worth naming.** The raise was also directing the eye

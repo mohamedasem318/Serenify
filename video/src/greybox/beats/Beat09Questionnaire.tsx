@@ -51,7 +51,7 @@ import { useExpression } from "../rig";
  * pointer had to be drawn in output pixels to reach it. Everything about the beat was correct
  * except the one thing it is for.
  *
- * `PROMPT` is a world rect now — x 856–1176, y 425.3–715.3 in the pinned right column — and
+ * `PROMPT` is a world rect now — x 856–1176, y 450.3–740.3 in the pinned right column — and
  * `<WorldPrompt/>` (`monitor.tsx`) projects the portalled node through the camera's own transform
  * each frame. So:
  *

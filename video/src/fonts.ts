@@ -1,5 +1,6 @@
 import { loadFont as loadGeistMono } from "@remotion/google-fonts/GeistMono";
 import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
+import { loadFont as loadNunito } from "@remotion/google-fonts/Nunito";
 import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
 
 /**
@@ -61,6 +62,17 @@ import { loadFont as loadOutfit } from "@remotion/google-fonts/Outfit";
 const inter = loadInter("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] });
 const outfit = loadOutfit("normal", { weights: ["400", "500", "600", "700"], subsets: ["latin"] });
 const geistMono = loadGeistMono("normal", { weights: ["400", "700"], subsets: ["latin"] });
+/**
+ * **One line in the whole film wears this** — "take care of yourself" on the end card. It is a
+ * rounded humanist sans, chosen off `endcard-compare.png` against Fraunces and Instrument Serif:
+ * the *curvier* answer rather than the warmer-serif one. A single weight, because a single line
+ * needs one.
+ *
+ * It does not add a third face to that card — it REPLACES Inter there, so the end card is Outfit
+ * (the mark and the domain) plus Nunito (the line) and nothing else. Inter stays everywhere else
+ * in the film, including beat 12's closing card.
+ */
+const nunito = loadNunito("normal", { weights: ["400"], subsets: ["latin"] });
 
 /** `"Inter"` — the family name `--font-sans` resolves to. */
 export const SANS = inter.fontFamily;
@@ -68,6 +80,8 @@ export const SANS = inter.fontFamily;
 export const DISPLAY = outfit.fontFamily;
 /** `"Geist Mono"` — furniture only; the product has no mono. */
 export const MONO_FAMILY = geistMono.fontFamily;
+/** `"Nunito"` — the end card's one line, and nothing else in the film. */
+export const ROUNDED = nunito.fontFamily;
 
 /**
  * Every face, as one promise. Nothing awaits this in the film — `loadFont()` already holds a
@@ -77,4 +91,9 @@ export const MONO_FAMILY = geistMono.fontFamily;
  * look like a layout bug for the rest of the project's life.
  */
 export const fontsReady = (): Promise<unknown> =>
-  Promise.all([inter.waitUntilDone(), outfit.waitUntilDone(), geistMono.waitUntilDone()]);
+  Promise.all([
+    inter.waitUntilDone(),
+    outfit.waitUntilDone(),
+    geistMono.waitUntilDone(),
+    nunito.waitUntilDone(),
+  ]);

@@ -68,6 +68,22 @@ export const Lift: React.FC<{
   <div
     style={{
       position: "absolute",
+      /**
+       * ── IT WAS PASSING BEHIND THE PAGE'S OWN NAVBAR ──
+       *
+       * Beat 1's "grey thing emerging from the nav bar" is this wrapper. `<PublicNavbar/>` is
+       * `sticky top-0 z-50` (`public-navbar.tsx:88`) and this carried no `zIndex`, so a
+       * positioned element at `z-index: auto` lost to `z-50` regardless of DOM order and the
+       * lifted address bar was occluded for six frames on its way home — f63 cut by the navbar,
+       * f65 gone entirely, f67 back above it inside the omnibox row. **A browser's address bar
+       * can never be behind page content**, so this is a correction rather than a preference.
+       *
+       * 60 clears both sticky chromes in the film (`<PublicNavbar/>` and `<Header/>` are each
+       * `z-50`) and stays under the drawn cursor. The only other call site is beat 3's
+       * calibration banner, whose home (24, 188) and lifted (340, 283) rects both sit below the
+       * header's bottom edge at 156 — it never crosses anything, so the change is inert there.
+       */
+      zIndex: 60,
       left: home.x + (lifted.x - home.x) * t,
       top: home.y + (lifted.y - home.y) * t,
       width: home.w + (lifted.w - home.w) * t,

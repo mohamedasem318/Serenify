@@ -13,16 +13,17 @@ import { CharacterRig } from "../greybox/rig";
 import type { Pose } from "../greybox/rig";
 import { PROTAGONIST } from "../greybox/copy";
 import { projectWorld } from "./framing";
+import { MEASURE_SCALE_ATTR } from "./measure-patch";
 import {
   BLOOM_SIZE,
   CARD_PB,
   CARD_PT,
-  FOOTNOTE_GAP,
   PROMPT,
   RAW,
   SCROLL,
   SUB_MIN_HEIGHT,
   TREND,
+  TREND_GAP,
   TREND_NATURAL_W,
   TREND_SCALE,
   VF_SCALE,
@@ -40,8 +41,9 @@ import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell
  * screen changing.
  *
  * What is real here: `<Header/>`, `<OpSurfaces/>` (which renders the real `<Bloom/>`, the real
- * stateline at `text-3xl`/`text-base`, the real Pause / End controls and the real FR-024
- * footnote), `<Viewfinder/>`, `<SessionTrend/>`. What the video supplies: the page scroll, the
+ * stateline at `text-3xl`/`text-base`; its Pause / End controls and its FR-024 footnote are the
+ * two things the film removes — see `<StageLayout/>`), `<Viewfinder/>` and `<SessionTrend/>`.
+ * What the video supplies: the page scroll, the
  * character inside the viewfinder, and time.
  *
  * `<MonitoringSession/>` itself — the orchestrator — is deliberately NOT used. It owns
@@ -105,26 +107,28 @@ export const trendPoints = (opts: {
  *
  * **L14's problem was that the four things the monitoring act is about could not be in one
  * frame.** Bloom top to trend bottom was 985.9px against a 519px viewport, so the trend was a
- * separate landing 855px down the page and reaching it was a scroll. Five values fix it, and
- * four of the five are geometry:
+ * separate landing 855px down the page and reaching it was a scroll. Six values fix it, and
+ * four of the six are geometry:
  *
- *  1. **The orb comes down 288 → 176.** `sm:size-72` is the product's, and it is the single
+ *  1. **The orb comes down 288 → 176 → 96.** `sm:size-72` is the product's, and it is the single
  *     largest block of vertical page in the act. Its halo is `-inset-[28%]`, so the glow still
- *     spans 274px — the presence is barely touched and 112px of page comes back.
+ *     spans 150px. L16 takes the second step, to buy the trend a home inside this card.
  *  2. **The card's top band goes 64 → 48 and its bottom pad 40 → 24.** The band exists to hold
  *     the `Session · MM:SS` row (L14 moved it there); at `top-1` the row's 44px box fits 48
  *     exactly, so nothing is crowded.
  *  3. **`min-height` is released.** `sm:min-h-[480px]` would hold the card at its old height and
  *     centre the shortened contents inside it, which would give back none of the page.
  *  4. **The sub still reserves two lines.** `min-height: 51` — two of its own 25.5px lines.
- *     Without it the stateline block, the footnote and every framing derived from them change
- *     size on the frame the copy changes.
- *  5. **The Pause / End controls are REMOVED — and this one is a CONTENT liberty, not a
- *     geometric one (L15).** Everything else in this block resizes or repositions something the
- *     product ships; this deletes two real controls from a real surface. It is recorded in the
- *     liberties table with that distinction stated, because a reader who finds it later must be
- *     able to tell a staging decision from a fidelity defect. What it buys is the 114px between
- *     the stateline and the footnote — the exact room the trend needed.
+ *     Without it the stateline block, the trend and every framing derived from them change size
+ *     on the frame the copy changes.
+ *  5. **The Pause / End controls are REMOVED — a CONTENT liberty, not a geometric one (L15).**
+ *  6. **FR-024's footnote is REMOVED — the same, and it is L16.** "Processed just for you —
+ *     analyzed, then deleted." Everything else in this block resizes or repositions something
+ *     the product ships; these two delete real content from a real surface, and the distinction
+ *     is recorded rather than blurred, because a reader who finds it later must be able to tell a
+ *     staging decision from a fidelity defect. The footnote's 18.2px plus its gap is part of what
+ *     the trend now occupies, and the film states the same idea far more loudly twice: the camera
+ *     consent gate is a whole beat, and beat 5a's privacy line takes the in-place emphasis.
  *
  * The stateline→controls gap L14 spent 70px on is gone with the controls, and so is the
  * emphasis it was buying room for: see `geometry.ts` § THE EMPHASIS LEAVES THE STATELINE.
@@ -139,7 +143,14 @@ export const StageLayout: React.FC = () => (
     [data-emph] [data-testid="bloom"] { width: ${BLOOM_SIZE}px; height: ${BLOOM_SIZE}px; }
     [data-emph] p[aria-live="polite"] + p { min-height: ${SUB_MIN_HEIGHT}px; }
     [data-emph] div.mt-7 { display: none; }
-    [data-emph] p.mt-8 { margin-top: ${FOOTNOTE_GAP}px; }
+    [data-emph] p.mt-8 { display: none; }
+    /* The trend section ships its own \`mt-5\` (session-trend.tsx:313) for the page flow it
+       normally sits in, under the stage card. Inside the card its wrapper supplies the gap
+       (\`TREND_GAP\`), so the component's margin would be 20 layout px of double-spacing pushing
+       the card 9.6 screen px out through the bottom of its reserved box — which is exactly the
+       5px sliver the recon still showed between the two card edges. Zeroed, the trend card's
+       bottom sits \`CARD_PB\` above the stage card's, matching the air above it. */
+    [data-emph] [data-testid="session-trend"] { margin-top: 0 !important; }
   `}</style>
 );
 
@@ -323,6 +334,65 @@ export const MonitorPage: React.FC<{
               onAllow={() => {}}
               onRetryBlocked={() => {}}
             />
+
+            {/*
+             * ══ THE TREND, UNDER THE READING IT IS THE HISTORY OF (L16) ══════════════
+             *
+             * It was the next card down the scrolling column (pre-L15), then the second occupant
+             * of the pinned right column (L15). Both were arrangements the geometry forced rather
+             * than arrangements anybody wanted: in the column it shared a y with the confirmatory
+             * prompt, so beat 9 covered a graph with a notification, and the right column changed
+             * occupants three times across four beats.
+             *
+             * Here it is simply the last thing in the reading card — the session's history
+             * directly beneath the session's stateline, which is where it belongs and is what the
+             * product's own page does with it, only closer. What it costs is the orb (176 → 96)
+             * and FR-024's footnote; see `<StageLayout/>` above, where both are declared.
+             *
+             * ── DRAWN WIDE, THEN SCALED ──────────────────────────────────────────────
+             *
+             * The card's height is very nearly independent of its width
+             * (`session-trend-geometry.ts:53` fixes the plot's viewBox at `H = 210`), so a card
+             * rendered directly at 368 would still be ~350 tall and nothing would fit. Rendered
+             * at `TREND_NATURAL_W` and scaled, the same card arrives at 368 × 170.4 with every
+             * pixel of its shape intact.
+             *
+             * `data-measure-scale` is what makes the plot the width of the card it is in. The
+             * component measures its own container with `getBoundingClientRect`, which returns
+             * SCREEN pixels — so the scale on this wrapper was landing in the measurement exactly
+             * as the camera's zoom used to, and the plot was drawing at 42% of its box. The
+             * attribute declares the factor and `measure-patch.ts` divides it out; see its § AND
+             * THE CAMERA WAS NOT THE ONLY SCALE IN THE CHAIN.
+             *
+             * A transform does not affect layout, so the outer box reserves the SCALED size and
+             * the card's own bottom padding sits under it.
+             */}
+            <div
+              style={{
+                width: TREND.w,
+                height: TREND.h,
+                marginTop: TREND_GAP,
+                flexShrink: 0,
+              }}
+            >
+              <div
+                {...{ [MEASURE_SCALE_ATTR]: TREND_SCALE }}
+                style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}
+              >
+                <SessionTrend
+                  sessionId="video"
+                  active={false}
+                  load={async () => trendPoints({ climb, descend })}
+                  // Bumped every frame so the trend re-reads its (frame-derived) points. Without
+                  // it the component fetches once on mount and freezes: it looks correct in a
+                  // STILL — each still is a fresh page — and is static for the whole cut in a
+                  // video render, which is exactly the kind of defect that survives to the
+                  // finished file.
+                  refreshSignal={frame}
+                  now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
+                />
+              </div>
+            </div>
           </div>
 
         </div>
@@ -343,6 +413,14 @@ export const MonitorPage: React.FC<{
        * overlap**, which is the "the notification covers the viewfinder in beats 8 and 9"
        * complaint. The old 18px gap had been computed against the UNSCROLLED position, so the
        * arithmetic was right about a page nobody was rendering. Neither element scrolls now.
+       *
+       * ── AND ITS TOP EDGE IS THE ORB'S TOP EDGE (L16) ──
+       *
+       * `VIEWFINDER.y` is `RAW.bloom.y` — 237 — so the two columns begin on one line. Purely
+       * visual: the orb and the face are the composition's two pictures and they now share a
+       * horizontal. The toast moves down with it and keeps `PINNED_GAP` above the panel; see
+       * `geometry.ts` § TOAST for why the stage card's top edge was the wrong line to take, and
+       * what beat 8 would have paid for it.
        *
        * ── AND IT GROWS FROM ITS TOP-LEFT ──
        *
@@ -389,59 +467,6 @@ export const MonitorPage: React.FC<{
         </Viewfinder>
       </div>
 
-      {/*
-       * ══ THE TREND JOINS THE PINNED COLUMN, UNDER HIS FACE (L15) ══════════════════
-       *
-       * It used to be the next card down the scrolling column, 855px below the fold, and
-       * reaching it was a page scroll plus a camera travel — which is why the film's closing
-       * image was a graph arriving after the reading rather than beside it.
-       *
-       * ── AND IT IS DRAWN WIDE, THEN SCALED ─────────────────────────────────────────
-       *
-       * The card is **not** simply rendered at 320. Its height is almost independent of its
-       * width — `session-trend-geometry.ts:53` fixes the plot's viewBox at `H = 210` and the
-       * heading, subtitle, gutters and legend account for the rest — so a card rendered at 320
-       * would be ~370 tall, which is the whole problem again at a third of the width. Rendered
-       * at `TREND_NATURAL_W` and scaled to `TREND_RENDER_W`, the same card comes out 320 wide
-       * and a little under 150 tall — the plot keeps every pixel of its shape and simply arrives
-       * at the size the composition has room for. `geometry.ts` § TREND carries the measured
-       * numbers.
-       *
-       * **The cost is stated rather than buried.** At `TREND_SCALE` the card's 18px heading
-       * lands under the phone-legibility floor and its axis labels well under it — see
-       * `framing.ts` § PHONE. What this shot has to deliver is the LINE: a tail that climbed
-       * during beat 8 walking back down in meadow, which is a shape rather than a reading, and
-       * at the composite framing the plot is still ~150 × 45px on a phone. The same honesty
-       * beat 4's bullets and beat 6's CTA label already get.
-       *
-       * A transform does not affect layout, so the box below reserves the SCALED size and
-       * nothing under it moves.
-       */}
-      <div
-        style={{
-          position: "absolute",
-          left: TREND.x,
-          top: TREND.y - VIEWPORT_Y,
-          width: TREND.w,
-          height: TREND.h,
-          zIndex: 10,
-        }}
-      >
-        <div style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}>
-          <SessionTrend
-            sessionId="video"
-            active={false}
-            load={async () => trendPoints({ climb, descend })}
-            // Bumped every frame so the trend re-reads its (frame-derived) points. Without it
-            // the component fetches once on mount and freezes: it looks correct in a STILL —
-            // each still is a fresh page — and is static for the whole cut in a video render,
-            // which is exactly the kind of defect that survives to the finished file.
-            refreshSignal={frame}
-            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
-          />
-        </div>
-      </div>
-
       {children}
     </AppShell>
   );
@@ -475,6 +500,29 @@ export const MonitorPage: React.FC<{
  *
  * The result is a prompt that behaves as if it had been laid out in the world: it enters, moves
  * and magnifies with the camera, and `PROMPT.yes` is a world rect the pointer can travel to.
+ *
+ * ══ AND THE FOCUS RING IS SUPPRESSED — A FIDELITY CORRECTION, NOT A LIBERTY ═════════
+ *
+ * A meadow ring arrived on "Yes, that's me" the moment the prompt opened and was still there
+ * under the cursor's click. **It is `:focus-visible`, and `:focus-visible` cannot fire on a mouse
+ * click in a real browser** — `confirmatory-prompt.tsx:27` is
+ * `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow …`, which is a
+ * keyboard-navigation affordance and nothing else. Two things conspire to draw it here anyway:
+ * Radix's `<Dialog.Content>` moves focus to its first focusable child on open, and Chromium's
+ * focus-visible heuristic treats programmatic focus as keyboard-ish when no pointer input has
+ * ever happened — and in a render, none ever has. So the film was drawing a state **the product
+ * never shows to a mouse user**, on the one beat whose entire subject is *he was asked and he
+ * answered*.
+ *
+ * Removing it therefore makes the film MORE faithful rather than less, and it is recorded as a
+ * correction rather than in the liberties table. What remains on the control is what a real click
+ * genuinely produces: the cursor, its press dip and click ring (`pointer.tsx`), and the option's
+ * own shipped `hover:bg-[…]` easing over `transition-colors` (`hover.tsx` § promptOption).
+ *
+ * It is scoped to the prompt on purpose. Beat 2's signup ring is drawn deliberately by
+ * `auth.tsx`, which applies the component's own focus-visible declaration by selector because a
+ * render cannot provoke one — the opposite problem, at a site where a ring is genuinely what the
+ * product shows.
  */
 export const WorldPrompt: React.FC<{
   /** The camera's shot THIS frame — `useShotAt(keys)` in `framing.ts`. */
@@ -495,6 +543,13 @@ export const WorldPrompt: React.FC<{
           transform-origin: 0 0 !important;
           transform: scale(${p.zoom.toFixed(6)}) !important;
           opacity: ${enter.opacity.toFixed(4)} !important;
+        }
+        /* See § AND THE FOCUS RING IS SUPPRESSED. Tailwind's ring is a box-shadow, so both it
+           and the outline have to go. Plain :focus is left alone — the component styles only
+           :focus-visible. */
+        [data-testid="notification"] button:focus-visible {
+          box-shadow: none !important;
+          outline: none !important;
         }
       `}</style>
       {children}

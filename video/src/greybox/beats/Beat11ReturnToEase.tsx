@@ -2,7 +2,7 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { BEAT11_WIDE, PHONE } from "../../app/framing";
-import { RAW, TREND, VIEWFINDER } from "../../app/geometry";
+import { RAW, VIEWFINDER } from "../../app/geometry";
 import { useHover } from "../../app/hover";
 import { MonitorPage } from "../../app/monitor";
 import { useDrift } from "../../app/motion";
@@ -21,17 +21,21 @@ import { H, W } from "../theme";
  *
  * **It unions the STAGE CARD, not the stateline block** — the previous version framed the block
  * alone and the frame's left edge ran through the card, which is a content element cropped on
- * one side and reads as a crop rather than as ground. At L15's arrangement the card is 448 wide
- * and the whole union is only 876, so holding it whole costs nothing:
+ * one side and reads as a crop rather than as ground. The card is 448 wide and the whole union is
+ * only 876, so holding it whole costs nothing:
  *
- *   union   x 300.0 – 1176.0   (876.0)   ← the player, the card, the viewfinder, the trend
- *           y 188.0 –  589.2   (401.2)
- *   frameRect(m=20) → w = max(876 + 40, 441.2 × 16/9) = 916.0
+ *   union   x 300.0 – 1176.0   (876.0)   ← the player, the card (trend included), the viewfinder
+ *           y 188.0 –  669.4   (481.4)
+ *   frameRect(m=20) → w = max(876 + 40, 521.4 × 16/9) = 927.0
+ *
+ * At L16 that is `COMPOSITE`'s own width to the pixel — the card's height governs both — so the
+ * move off the player is a pan of 38px rather than a zoom, which is the smallest last move the
+ * film's demo has ever ended on.
  *
  * Placed on the page's own top edge for the same reason `COMPOSITE` is: centred on the union it
- * would reach world y 131, which is 25px into the sticky app header.
+ * would reach world y 169, showing a band of page above the card that the composite does not.
  */
-const playerFrame = frameRect(union(union(PLAYER_WIN, VIEWFINDER), union(RAW.stage, TREND)), 20);
+const playerFrame = frameRect(union(union(PLAYER_WIN, VIEWFINDER), RAW.stage), 20);
 const BEAT11_PLAYER = { ...playerFrame, cy: 156 + (playerFrame.w * 9) / 16 / 2 };
 
 /**

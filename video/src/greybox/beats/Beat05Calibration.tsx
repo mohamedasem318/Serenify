@@ -19,7 +19,7 @@ import { useExpression } from "../rig";
 import { H, W } from "../theme";
 
 /**
- * Beat 5 · Calibration · 402 frames
+ * Beat 5 · Calibration · 422 frames
  *
  * **ONE TAKE.** The chain is: intro → green room → countdown → recording → the uploading line
  * REPLACES the capture stage → the success state → he clicks it → the dashboard. Every step is
@@ -211,9 +211,22 @@ const T = {
   recording: 150 + COUNTDOWN_FRAMES,
   /** +30 (3.6): 5d goes 45 → 75 frames, so each breathing phase gets 25 rather than 15. */
   uploading: 270,
-  success: 312,
-  doneClick: 374,
-  dashboard: 384,
+  /**
+   * ── +20, AND THE FILM GROWS RATHER THAN 5d SHRINKING ──
+   *
+   * The punch-in onto the uploading line used to run f244 → f272 with the flip at f270 — 26
+   * frames into a 28-frame travel, so the camera had effectively arrived before the thing it
+   * moved for happened. It runs f264 → f292 now (the flip 21% in; see `framing.ts` §
+   * BEAT5_UPLOADING), which leaves 5d's last 20 frames on a static camera — and would leave the
+   * uploading line only 6 settled frames before the pull-out began.
+   *
+   * That hold is the only moment the line is on screen under a stopped camera, so it keeps its
+   * 26 frames and everything from here shifts **+20** instead. The beat goes 402 → 422 and the
+   * running total moves with it; 5d loses nothing.
+   */
+  success: 332,
+  doneClick: 394,
+  dashboard: 404,
 } as const;
 
 /**
@@ -310,17 +323,19 @@ export const Beat05Calibration: React.FC = () => {
           // 5c–5d · one hold across the count and the orb, wide enough to keep the page under it.
           { frame: 172, shot: BEAT5_PREVIEW },
           // 5e · the camera CLOSES IN across the flip. The capture stage is replaced at f270 —
-          // every pixel of the shot at once — and under a static camera that read as a cut. It
-          // now lands 26 frames into a move, which is what carries it.
-          { frame: 244, shot: BEAT5_PREVIEW },
-          { frame: 272, shot: BEAT5_UPLOADING },
-          { frame: 298, shot: BEAT5_UPLOADING },
+          // every pixel of the shot at once — and under a static camera that read as a cut. The
+          // move starts at f264 so the flip lands SIX frames in, while the camera is still
+          // visibly travelling; at f244 it was landing 26 frames into 28 and arriving first.
+          { frame: 264, shot: BEAT5_PREVIEW },
+          { frame: 292, shot: BEAT5_UPLOADING },
+          // …and the line keeps its full 26-frame settled hold. See `T.success`.
+          { frame: 318, shot: BEAT5_UPLOADING },
           // 5f · OUT, so the whole success state AND its ripple are in frame, and only then the
           // click. Register item 4, with the rect's x corrected.
-          { frame: 336, shot: BEAT5_SUCCESS },
-          { frame: 384, shot: BEAT5_SUCCESS },
+          { frame: 356, shot: BEAT5_SUCCESS },
+          { frame: 404, shot: BEAT5_SUCCESS },
           // …which lands on the dashboard, at the full frame beat 6 holds.
-          { frame: 402, shot: shot(W / 2, H / 2, W) },
+          { frame: 422, shot: shot(W / 2, H / 2, W) },
         ]}
       >
         <CalibratePage

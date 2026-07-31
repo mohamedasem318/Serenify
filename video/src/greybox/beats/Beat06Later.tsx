@@ -52,23 +52,44 @@ const START = centre(HOME.startCheckIn);
  *
  *   welcome            188 – 271.1
  *   today's check-in   311.1 – 528.6
- *   the row            568.6 – 744.9      ← the fold is at 675
+ *   the row            528.6 + G          ← the fold is at 675
  *
- * So **106px of two cards sat in shot with their bottom halves below the page's own edge.** No
+ * So **148px of two cards sat in shot with their bottom halves below the page's own edge.** No
  * framing could fix it: the column is 1152 wide at x 24–1176, so any frame tight enough to end
  * above the row slices the greeting, and the greeting is a line of type. (Beat 3 never had the
- * problem — with the banner present the row starts at 694.6, already below the fold.)
+ * problem — with the banner present the row starts below the fold already.)
  *
- * The gap under the check-in card is widened for the film so the row clears the fold entirely:
- * **146.4px is the exact amount** (744.9 − 675 + the 40 the gap already carries would put its top
- * at 675.0), and 150 is used so nothing lands on the edge itself. The row is still in the DOM and
- * still real — it is simply below the fold, where beat 3 already has it, and a page that
- * continues past its own viewport is what every page does.
+ * ── AND PUSHING THEM ALL THE WAY OUT WAS THE WRONG ANSWER ───────────────────────────
  *
- * The visible cost is ~146px of empty page under the check-in card. That reads as page; two cards
- * sliced in half read as a rendering fault.
+ * The gap was **150**, which put the row's top at 718.6 and the two cards off the page entirely.
+ * The beat then read as a dashboard with nothing under the check-in card, which is not what the
+ * product's own page looks like — "Things that might help" and "Recent chats" exist and the shot
+ * should say so.
+ *
+ * The gap is the whole control, and the relationship was **measured off the render rather than
+ * taken from the recon's arithmetic**, which was 42px optimistic about where the row starts:
+ *
+ *   G = 150 (before)   0px      not there at all
+ *   G = 148            0px      exactly on the fold
+ *   G = 118            30px     top border, corner radius, a sliver
+ *   G = 108            40px     the above plus the first line of each label breaking the fold
+ *   G = 70             76.3px   measured — too much; both headings and their subtitles show
+ *   G = 0              148px    two cards sliced in half — the state that was rejected
+ *
+ * **112 shows 34.4px, measured on the render** — enough that the cards exist, not enough that
+ * either is framed or
+ * emphasised. At the full 1200 frame anything inside them reads at ~5px, so what is on screen is
+ * shape rather than reading, which is the whole ask.
+ *
+ * ── AND IT IS A DELIBERATE EXCEPTION TO "NO CONTENT ELEMENT CROPPED AT REST" ────────
+ *
+ * Recorded so a later pass does not "fix" it. The framing rule bans a content element sliced by
+ * the FRAME; this crop is the **page's own fold**, at a shot that is the whole 1200-wide world
+ * and involves no framing decision at all. A page that continues past its viewport is what every
+ * page does, and beat 3 already shows these same two cards below the fold with the calibration
+ * banner in place. The camera crops nothing here.
  */
-const SUGGESTIONS_GAP = 150;
+const SUGGESTIONS_GAP = 112;
 
 export const Beat06Later: React.FC = () => (
   <AbsoluteFill>
@@ -77,9 +98,10 @@ export const Beat06Later: React.FC = () => (
         clock="10:43 AM"
         overlay={
           <>
-            {/* See `SUGGESTIONS_GAP` — the suggestions row is pushed clear of the page's fold
-                so it is below it entirely rather than cut in half by it. `space-y-10` puts the
-                margin on the row itself, so this addresses the row rather than the card. */}
+            {/* See `SUGGESTIONS_GAP` — the suggestions row sits so that 34.4px of it breaks the
+                page's fold: enough to show the two cards exist, not enough to frame either.
+                `space-y-10` puts the margin on the row itself, so this addresses the row rather
+                than the card. */}
             <style>{`[data-probe='help'], [data-probe='chats'] { }
               [data-probe='today'] + div { margin-top: ${SUGGESTIONS_GAP}px !important; }`}</style>
             {/*

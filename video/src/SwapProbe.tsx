@@ -22,7 +22,8 @@ import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prom
 
 import { AuthShell, CheckEmailSurface, SignupSurface } from "./app/auth";
 import { HOME_COL, RecentChatsEmpty as RecentChatsEmptyProbe } from "./app/home";
-import { TREND_NATURAL_W } from "./app/geometry";
+import { TREND, TREND_GAP, TREND_NATURAL_W, TREND_SCALE } from "./app/geometry";
+import { MEASURE_SCALE_ATTR } from "./app/measure-patch";
 import { StageLayout, trendPoints } from "./app/monitor";
 import { fontsReady } from "./fonts";
 
@@ -78,17 +79,23 @@ const TARGETS: [string, string][] = [
   // be derived against a block 105px narrower than the one it fires on.
   ["stateline-head-tense", "[data-probe='ops-tense'] p[aria-live='polite']"],
   ["stateline-sub-tense", "[data-probe='ops-tense'] p[aria-live='polite'] + p"],
-  ["footnote", "[data-probe='ops'] p.mt-8"],
   ["ops-block", "[data-probe='ops'] > div"],
   ["viewfinder", "[data-probe='stage'] [aria-hidden='false'], [data-probe='stage'] [data-pinned]"],
-  // Measured at `TREND_NATURAL_W` — the width the card is DRAWN at before L15 scales it to 320.
-  // Its height is what `RAW.trendNatural.h` has to carry, and every number in the composite
-  // descends from it.
-  ["session-trend", "[data-testid='session-trend']"],
-  ["trend-svg", "[data-testid='session-trend-svg']"],
-  ["trend-measured", "[data-testid='session-trend'] div.w-full"],
-  ["trend-subtitle", "[data-testid='session-trend-subtitle']"],
-  ["trend-empty", "[data-testid='session-trend-empty']"],
+  // ── The trend, in BOTH of the places it exists (L16) ──
+  //
+  // `trend-natural` is the card at `TREND_NATURAL_W`, which is the width it is DRAWN at; its
+  // height is what `RAW.trendNatural.h` carries and every number in the composite descends from
+  // it. `trend-in-card` is the same card scaled into the stage card, which is where the film
+  // actually puts it — so what is measured is what the beats render, including the fact that the
+  // wrapper's scale is divided back out of the component's own self-measurement.
+  ["ops-wrapper", "[data-probe='ops']"],
+  ["trend-box", "[data-probe='trendcard']"],
+  ["trend-in-card", "[data-probe='trendcard'] [data-testid='session-trend']"],
+  ["trend-in-card-svg", "[data-probe='trendcard'] [data-testid='session-trend-svg']"],
+  ["trend-natural", "[data-probe='trendnat'] [data-testid='session-trend']"],
+  ["trend-natural-svg", "[data-probe='trendnat'] [data-testid='session-trend-svg']"],
+  ["trend-measured", "[data-probe='trendnat'] [data-testid='session-trend'] div.w-full"],
+  ["trend-subtitle", "[data-probe='trendnat'] [data-testid='session-trend-subtitle']"],
   ["timer-row", "[data-probe='timerrow']"],
   ["welcome", "[data-probe='welcome'] header"],
   ["calibration-banner", "[data-probe='calib'] [role='region']"],
@@ -278,6 +285,25 @@ export const SwapProbe: React.FC = () => (
                 onRetryBlocked={() => {}}
               />
             </div>
+            {/* The trend, INSIDE the card (L16) — laid out exactly as `monitor.tsx` does, because
+                the stage card's height is now a function of it and every framing number descends
+                from that height. */}
+            <div
+              data-probe="trendcard"
+              style={{ width: TREND.w, height: TREND.h, marginTop: TREND_GAP, flexShrink: 0 }}
+            >
+              <div
+                {...{ [MEASURE_SCALE_ATTR]: TREND_SCALE }}
+                style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}
+              >
+                <SessionTrend
+                  sessionId="probe"
+                  active={false}
+                  load={async () => trendPoints({ climb: 1, descend: 0.5 })}
+                  now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
+                />
+              </div>
+            </div>
           </div>
 
           {/* The same card again on the `tense` band, for the ONE thing that differs: the sub
@@ -306,12 +332,11 @@ export const SwapProbe: React.FC = () => (
         </div>
 
         {/* Measured POPULATED, not empty — and at `TREND_NATURAL_W`, which is the width the film
-            DRAWS it at before scaling it to the 320 the pinned column has room for (L15). A card
-            measured at 512 and drawn at 768 is the same class of error as a rect probed without
-            the sticky header, so the probe renders it exactly as `monitor.tsx` does. */}
-        <div style={{ width: TREND_NATURAL_W }}>
+            DRAWS it at before scaling it into the stage card (L16). A card measured at 512 and
+            drawn at 768 is the same class of error as a rect probed without the sticky header. */}
+        <div data-probe="trendnat" style={{ width: TREND_NATURAL_W }}>
           <SessionTrend
-            sessionId="probe"
+            sessionId="probe-natural"
             active={false}
             load={async () => trendPoints({ climb: 1, descend: 0.5 })}
             now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}

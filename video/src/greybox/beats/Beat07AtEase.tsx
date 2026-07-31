@@ -21,7 +21,7 @@ import { useExpression } from "../rig";
  * ── AND THE STATELINE NO LONGER GROWS ────────────────────────────────────────────────
  *
  * L12's in-place raise is off the statelines. It existed to carry the 17px sub over the phone
- * legibility floor at a 884.8-wide composite; the composite is 840 and the head reads at 18.1px,
+ * legibility floor at a 884.8-wide composite; the composite is 927 and the head reads at 16.4px,
  * so the device was decorating a line that is legible at rest. It is unchanged elsewhere — beat
  * 5a's privacy line still takes it. See `geometry.ts` § THE EMPHASIS LEAVES THE STATELINE.
  *

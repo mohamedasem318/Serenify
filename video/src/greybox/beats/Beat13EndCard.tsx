@@ -3,7 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { Wordmark } from "@/components/brand/wordmark";
 
-import { CARD, CARD_DISPLAY, SANS_STACK } from "../../app/furniture";
+import { CARD, CARD_DISPLAY, CARD_LINE } from "../../app/furniture";
 import { useDarkRoot } from "../../app/shell";
 import { Camera, shot } from "../Camera";
 import { END_CARD } from "../copy";
@@ -13,7 +13,8 @@ import { H, W } from "../theme";
  * Hallmark · component: end-card · genre: editorial · theme: film-furniture (locked)
  * states: n/a — a non-interactive film frame
  * contrast: pass — CARD.ink #e8ebee and CARD.muted #a6acb2 on CARD.field #0b0c0e ≈ 17:1 / 9:1
- * pre-emit critique: P5 H5 E4 S5 R5 V4
+ * faces: 2 — Outfit (mark + .tech) · Nunito (the line). Inter no longer appears on this card.
+ * pre-emit critique: P5 H5 E5 S5 R5 V4
  */
 
 /**
@@ -21,10 +22,10 @@ import { H, W } from "../theme";
  *
  * **A sequence, not a static frame.** Three timed events:
  *
- *   1. the wordmark reveals             f0–30
- *   2. "take care of yourself" appears  f38–56
- *   3. the wordmark DUPLICATES and the copy travels down to the domain line f66–88,
- *      then `.tech` types onto the end of it f90–102
+ *   1. the wordmark reveals             f0–36
+ *   2. "take care of yourself" appears  f44–62
+ *   3. the wordmark DUPLICATES and the copy travels down to the domain line f72–94,
+ *      then `.tech` types onto the end of it f96–108
  *
  * ══ THE WORDMARK IS THE WORDMARK NOW ════════════════════════════════════════════════
  *
@@ -56,10 +57,19 @@ import { H, W } from "../theme";
  *
  * That is also why **"take care of yourself" no longer types.** It is the sentimental line and
  * it should not be competing with a mechanical effect, so it fades up with a short rise. It is
- * also **Inter, not Outfit, and not bold** — it is subordinate to the mark above it by design,
- * and setting it in the display face at 700 made it argue with the wordmark for the frame. A
- * wipe was the alternative reveal and was rejected for being the same *kind* of effect: the
- * point is to isolate the typewriter.
+ * also not Outfit and not bold — it is subordinate to the mark above it by design, and setting
+ * it in the display face at 700 made it argue with the wordmark for the frame. A wipe was the
+ * alternative reveal and was rejected for being the same *kind* of effect: the point is to
+ * isolate the typewriter.
+ *
+ * ── AND IT IS NUNITO NOW, NOT INTER ─────────────────────────────────────────────────
+ *
+ * Picked off `endcard-compare.png` against Fraunces and Instrument Serif: the *curvier* answer
+ * rather than the warmer-serif one. It replaces Inter here rather than joining it, so the card
+ * is two faces — Outfit for the mark and the domain, Nunito for the line — and the one place in
+ * the film where the product stops talking and a person does is the one place with a rounded
+ * face on it. Size, weight, colour and leading are untouched; only the family moves, and the
+ * wordmark and `.tech` are byte-identical to what they were. See `furniture.ts` § CARD_LINE.
  *
  * **The card sits on `CARD.field`**, three points below the app's own page, which is the whole
  * of how the film says "we have stepped outside the product" — no transition, no rule, no label.
@@ -75,19 +85,34 @@ import { H, W } from "../theme";
 /** Set false to fall back to typing `serenify.tech` whole. See the header. */
 const DERIVE = true;
 
+/**
+ * ── THE REVEAL COMES IN A TOUCH SLOWER, AND EVERYTHING KEEPS ITS SPACING ────────────
+ *
+ * The wipe ran 30 frames — exactly one second — and the mark arrived a little briskly for the
+ * first thing the audience sees after the film's last idea. It is **36 (1.20s)**: a fifth
+ * longer, which is a change of pace rather than a change of move. The clip is the same
+ * left-to-right `inset()`, the easing is the same `inOut(cubic)`, and the 1.04 settle still
+ * overlaps the wipe's last eight frames and finishes six after it.
+ *
+ * The other three events shift by the same **+6** so every gap between them is unchanged — the
+ * line still lands two frames after the mark has settled, the duplicate still detaches ten
+ * frames after the line has arrived. The beat's last event ends at f118 of 136, leaving 18
+ * frames of held card.
+ */
+const SHIFT = 6;
 const REVEAL_FROM = 0;
-const REVEAL_TO = 30;
-const LINE_FROM = 38;
-const LINE_TO = 56;
+const REVEAL_TO = 30 + SHIFT;
+const LINE_FROM = 38 + SHIFT;
+const LINE_TO = 56 + SHIFT;
 /** The duplicate detaches, shrinks and travels to the domain line. */
-const DUP_FROM = 66;
-const DUP_TO = 88;
+const DUP_FROM = 66 + SHIFT;
+const DUP_TO = 88 + SHIFT;
 /** ~12 c/s for five characters. Slower than a word would be typed, which reads deliberate. */
-const TECH_FROM = 90;
-const TECH_TO = 102;
+const TECH_FROM = 90 + SHIFT;
+const TECH_TO = 102 + SHIFT;
 /** The whole-domain fallback, at the treatment this beat used to have. */
-const DOMAIN_FROM = 78;
-const DOMAIN_TO = 102;
+const DOMAIN_FROM = 78 + SHIFT;
+const DOMAIN_TO = 102 + SHIFT;
 
 /**
  * The mark's own box. 72px of Outfit at `text-7xl`, centred — measured rather than guessed so the
@@ -263,7 +288,7 @@ export const Beat13EndCard: React.FC = () => {
             top: 322,
             width: 760,
             textAlign: "center",
-            fontFamily: SANS_STACK,
+            fontFamily: CARD_LINE,
             fontSize: 26,
             fontWeight: 400,
             lineHeight: 1.4,

@@ -206,7 +206,17 @@ export const QUESTIONNAIRE = {
 export const REN = {
   turns: [
     { who: "ren" as const, text: "Something shifted just now. What happened?" },
-    { who: "him" as const, text: "boss moved the report to 12. i have thirty minutes" },
+    /**
+     * **Verbatim, and the lowercase is his.** Decided 2026-07-31 — Mohamed's words, character
+     * for character, including the missing capitals and the full stop mid-line. Somebody typing
+     * at speed with a deadline in half an hour does not reach for the shift key, and that is the
+     * whole reason it is written this way.
+     *
+     * It is **78 characters** against the previous 49, and at the beat's own ~25 c/s that is 92
+     * frames of typing rather than 58. The rate is NOT raised to absorb it — "never sped to fit"
+     * is the rule and the copy is now fixed, so the beat grows instead. See `T` below.
+     */
+    { who: "him" as const, text: "boss moved the deadline to 12. i have only thirty minutes to finish the report" },
     {
       who: "ren" as const,
       text: "Thirty minutes is enough — just not like this. Put Billie Jean on first. You always settle faster with MJ playing.",

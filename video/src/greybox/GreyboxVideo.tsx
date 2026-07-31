@@ -34,28 +34,29 @@ import { FONT, GREY } from "./theme";
  * in Studio and read straight off the sheet.
  *
  *   1 cold open     180          7 at ease        120
- *   2 signup        432 (−36)    8 the email      200
+ *   2 signup        432          8 the email      200
  *   3 dashboard     120          9 questionnaire   90
- *   4 camera gate   120 (−60)   10 Ren            250 (+40)
- *   5 calibration   402 (+30)   11 return to ease 234
+ *   4 camera gate   120         10 Ren            332 (+82)
+ *   5 calibration   422 (+20)   11 return to ease 234
  *   6 later          60         12 closing card   90
  *                               13 end card      136
- *                                       total   2434 = 81.1s @ 30fps
+ *                                       total   2536 = 84.5s @ 30fps
  *
- * **−26 frames across this pass, and every one of the four moves is deliberate.**
+ * **+102 frames across this pass, and both moves are the brief's own.**
  *
- *   beat 2   468 → 432   the mail sequence's HOLDS, not its performed actions. Opening a tab,
- *                        typing a URL and clicking a message open all still happen in full;
- *                        eleven holds around them were outlasting their own read.
- *   beat 4   180 → 120   the privacy-line landing is gone. It held the same claim beat 5a holds
- *                        two beats later, and 5a's is the better one — tighter, more legible,
- *                        and at the moment the camera is about to turn on.
- *   beat 5   372 → 402   the compressed minute gets a second, so the breathing pacer's three
- *                        phases run 25 frames each rather than sitting on the 15-frame floor.
- *   beat 10  210 → 250   Ren gets a face landing. He had four real avatar states and used none
- *                        of them, and the previous pass punched in on him for six frames.
+ *   beat 5   402 → 422   the punch-in onto the uploading line was landing 26 frames into a
+ *                        28-frame travel, so the camera arrived before the thing it moved for
+ *                        happened. It starts 20 frames later; the uploading line keeps its full
+ *                        26-frame settled hold, so the beat grows rather than 5d shrinking.
+ *   beat 10  250 → 332   two causes, both decided rather than discovered. His message is 78
+ *                        characters instead of 49, which is 92 frames of typing at the beat's
+ *                        own 25 c/s rather than 58 (the rate is not raised — *never sped to
+ *                        fit*). And turn 1 is now READ inside a 440.5 landing rather than
+ *                        revealed by the move off his face, which is 36 frames it never had.
+ *
+ * Nothing was cut to pay for either, and no protected hold moved.
  */
-export const GREYBOX_DURATION = 2434;
+export const GREYBOX_DURATION = 2536;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -72,7 +73,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={120} name="4 · camera gate">
         <Beat04CameraGate />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={402} name="5 · calibration">
+      <Series.Sequence durationInFrames={422} name="5 · calibration">
         <Beat05Calibration />
       </Series.Sequence>
       <Series.Sequence durationInFrames={60} name="6 · later">
@@ -87,7 +88,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={90} name="9 · questionnaire">
         <Beat09Questionnaire />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={250} name="10 · Ren">
+      <Series.Sequence durationInFrames={332} name="10 · Ren">
         <Beat10Ren />
       </Series.Sequence>
       <Series.Sequence durationInFrames={234} name="11 · return to ease">
