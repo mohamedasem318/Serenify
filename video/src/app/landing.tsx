@@ -1,4 +1,5 @@
 import React from "react";
+import { continueRender, delayRender, useCurrentFrame } from "remotion";
 
 import { Hero } from "@/components/landing/hero";
 import { PublicNavbar } from "@/components/public/public-navbar";
@@ -25,14 +26,26 @@ import { Desktop, type TabSpec } from "./shell";
  *  · **There is a live story card beside it**, `<StoryCard/>`, which is a whole second product
  *    surface: a bloom, a readout, a narration line and four swapping panels.
  *
- * ── THE STORY CARD IS DETERMINISTIC HERE, FOR FREE ──────────────────────────────────
+ * ── THE STORY CARD OPENS ON ITS OWN FIRST BEAT, AND THAT TAKES CORRECTION (item 4.1) ─
  *
- * `useStoryClock` is a `setTimeout` chain, which is exactly the class of thing a frame-addressed
- * render cannot run — but it needs no special handling, because under the forced reduced-motion
- * shim it **arms no timer at all** (`use-story-clock.ts:139-150`) and lands on
- * `REPRESENTATIVE_BEAT_INDEX = 2`, the beat where the system stops and asks. That is a static,
- * reproducible frame, and it is also the right one: it is the beat the component itself picks
- * when it has to show one, and it is the product's thesis — which is what beat 1 is establishing.
+ * `useStoryClock` (`use-story-clock.ts:58-153`) starts at `useState(0)` — `STORY_BEATS[0]`,
+ * chapter 0, the "quiet" panel on the "at_ease" band, narration "A normal morning. Nothing to
+ * report." (`story-script.ts:88-95`) — which is exactly what a full-motion visitor's first
+ * paint shows. Left alone that would be a static, reproducible frame for free, the same way
+ * the rest of this render is: `useStoryClock` is a `setTimeout` chain, which is the class of
+ * thing a frame-addressed render cannot run, and under the forced reduced-motion shim it
+ * **arms no timer at all** (`use-story-clock.ts:141-150`).
+ *
+ * But the shim also flips a SECOND effect: `use-story-clock.ts:125-129` moves the index to
+ * `REPRESENTATIVE_BEAT_INDEX = 2` whenever `prefers-reduced-motion` reads true — the reduced-
+ * motion fallback's OWN choice of what to show a visitor who never scrolls or clicks a chapter
+ * marker. `shims/use-media-query.ts:44` forces that reading for the whole film (deliberately —
+ * see that file), so without correction this beat opens on `STORY_BEATS[2]`: the "prompt"
+ * panel, "tense" band — the stressed card, and a different beat than the one the page's own
+ * first paint shows.
+ *
+ * `<FirstBeat/>`, below, undoes exactly that second effect — through the product's own chapter-
+ * marker control, since `apps/web` cannot take a video-only prop. See its docstring.
  *
  * ── THE NAVBAR IS SIGNED OUT, AND THAT IS THE POINT ─────────────────────────────────
  *
@@ -42,6 +55,67 @@ import { Desktop, type TabSpec } from "./shell";
  * bundle, so `useTheme()` returns undefined and the component's own `mounted` guard renders its
  * stable placeholder. That is the shipped first-paint appearance, not a broken one.
  */
+
+/**
+ * ── FORCING THE STORY CARD ONTO `STORY_BEATS[0]` (item 4.1) ─────────────────────────
+ *
+ * apps/web MUST NOT change for this: no new prop on `<StoryCard/>`, no touching
+ * `REPRESENTATIVE_BEAT_INDEX`, no touching `useStoryClock`. So the correction goes through the
+ * product's OWN control — `<ChapterMarkers/>` (`components/landing/chapter-markers.tsx:58-77`)
+ * renders one real `<button data-chapter={n}>` per chapter, wired to
+ * `onSelect(chapter) => goTo(firstBeatIndexOfChapter(chapter))`. Chapter 0's first beat IS
+ * index 0 (`story-script.ts:88-95` is the first entry tagged `chapter: 0`), and `goTo`
+ * (`use-story-clock.ts:69-75`) sets `hasProgressed.current = true` on every call — the exact
+ * latch the reduced-motion effect checks before it is allowed to fire
+ * (`use-story-clock.ts:126`, `!hasProgressed.current`). Clicking that button both lands on
+ * beat 0 AND permanently disarms the effect that would otherwise select beat 2, and it does so
+ * without arming a timer: `goTo` only calls `setIndex`.
+ *
+ * EITHER EFFECT ORDER CONVERGES ON BEAT 0, so this needs no coordination with
+ * `use-story-clock.ts:125-129`, only proof that one of them has already run:
+ *
+ *  · If the reduced-motion effect fires first, index becomes 2 while `hasProgressed` is still
+ *    false. This click then sets index back to 0 and latches `hasProgressed` — nothing can move
+ *    it again afterwards, because the only other write to `index` is the reduced-motion effect,
+ *    and its own guard is now closed.
+ *  · If this click fires first, `hasProgressed` is already true by the time the reduced-motion
+ *    effect runs, so `use-story-clock.ts:126`'s guard skips it outright — index never leaves 0.
+ *
+ * Modeled on `<TrendSettle/>` (`app/monitor.tsx:175-204`): `delayRender` holds the frame, a
+ * `requestAnimationFrame` loop polls the real DOM rather than counting a fixed number of ticks
+ * (bounded at the same 40-try budget), and the cleanup calls `continueRender` unconditionally so
+ * an unmount never leaves the render hung. What it polls for is
+ * `[data-testid="story-card"][data-beat="0"]` — the story card's OWN reported state, proof the
+ * correction has actually landed in the DOM, not just that a click event was dispatched.
+ * Checking that first, before clicking anything, is what makes this idempotent across all 180
+ * frames of the beat: once beat 0 is showing, every later frame's effect exits on its first line
+ * and never touches the button again.
+ */
+const FirstBeat: React.FC = () => {
+  const frame = useCurrentFrame();
+  React.useEffect(() => {
+    const handle = delayRender(`landing-first-beat f${frame}`);
+    let raf = 0;
+    let tries = 0;
+    const wait = () => {
+      const onBeatZero =
+        document.querySelector('[data-testid="story-card"]')?.getAttribute("data-beat") === "0";
+      if (onBeatZero || tries++ > 40) {
+        continueRender(handle);
+        return;
+      }
+      // Only one `<ChapterMarkers/>` renders on this page, so the plain selector is unambiguous.
+      document.querySelector<HTMLButtonElement>('button[data-chapter="0"]')?.click();
+      raf = requestAnimationFrame(wait);
+    };
+    raf = requestAnimationFrame(wait);
+    return () => {
+      cancelAnimationFrame(raf);
+      continueRender(handle);
+    };
+  }, [frame]);
+  return null;
+};
 
 /** `app/(public)/layout.tsx:66` — the public shell's column. */
 export const PUBLIC_SHELL = "flex min-h-dvh flex-col bg-bg";
@@ -66,6 +140,7 @@ export const LandingPage: React.FC<{
         <Hero />
       </main>
     </div>
+    <FirstBeat />
     {children}
   </Desktop>
 );

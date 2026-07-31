@@ -33,6 +33,71 @@ const clamp = { extrapolateLeft: "clamp", extrapolateRight: "clamp" } as const;
 export const sec = (s: number) => Math.round(s * 30);
 
 /**
+ * ══ THE SHIM ANSWERS THE QUERY FOR JAVASCRIPT. THIS ANSWERS IT FOR CSS. ══════════════
+ *
+ * **`prefers-reduced-motion` was only ever forced on ONE of the two engines that read it**, and
+ * that gap is the whole of the "the checkmark flashes" class of defect — including the
+ * countdown's rewind, which was diagnosed as a `setTimeout` and was only half that story.
+ *
+ * `shims/use-media-query.ts` intercepts the JS **hook**, so any component that gates its motion
+ * by a JS branch — `reducedMotion ? <span/> : <motion.span/>`, or a conditional class string —
+ * takes its static variant correctly. `success-state.tsx`, `breathing-guide.tsx`,
+ * `recording-timer.tsx`, `use-story-clock.ts` and `ren-thread.tsx` are all that shape and are all
+ * genuinely silent in the film.
+ *
+ * **Nothing was answering it for the CSS engine.** Chromium evaluates `@media
+ * (prefers-reduced-motion: reduce)` itself, against a media feature the render never sets, so
+ * every `motion-reduce:` Tailwind variant in `apps/web` and every raw `transition:` in an inline
+ * style stayed LIVE — and a live CSS transition inside a frame-addressed render is a second clock
+ * on a value the film addresses by frame. Remotion keeps one browser page and steps the frame on
+ * it, so those transitions run against real elapsed wall-clock time between screenshots: what
+ * lands in a frame depends on how long the previous frame took to render.
+ *
+ * Three sites were confirmed, and the first is the film's central graphic:
+ *
+ *  · **`bloom.tsx:68,74`** — `transition: background 1.3s ease`, in the STATIC branch as well as
+ *    the animated one. `<BloomDrift/>` writes a frame-derived `--bloom` every frame, and the
+ *    component's own transition was chasing it. Sustained, across beats 8 and 11's ~39-frame
+ *    drifts, on the bloom.
+ *  · **`framing-overlay.tsx:32,82`** — `transition-colors duration-300` on the brackets and
+ *    `transition-shadow duration-500` on the meadow glow, both guarded only by
+ *    `motion-reduce:transition-none`. **This is the green-room checkmark flash.** The `<Check/>`
+ *    glyph is a plain boolean mount and was never the problem; what popped was the glow it sits
+ *    in, caught mid-transition at whatever wall-clock offset the capture happened to land on.
+ *  · **`globals.css:320`** — Ren's blink, a 7s infinite CSS `animation` on two eye groups.
+ *
+ * **Every rule below is transcribed from `apps/web/app/globals.css`, not invented** — it is that
+ * file's own `@media (prefers-reduced-motion: reduce)` blocks (`:209-216` and `:323-326`), stated
+ * unconditionally. That is deliberate: the fix must be what the product does when a user asks for
+ * less motion, or the film is rendering a state the product never ships. The `0.01ms` is the
+ * product's number too, and so is the `animation-iteration-count: 1` — `globals.css:204-208`
+ * explains why capping the count rather than the duration is load-bearing, and that reasoning
+ * carries here unchanged.
+ *
+ * The two Ren rules are declared because they cannot be derived: both eye pairs sit in the DOM at
+ * a base opacity of 1 and the blink is a crossfade *between* them, so a bare `animation: none`
+ * leaves an open and a closed pair drawn on top of each other. `globals.css:324-325` states the
+ * resting opacities for exactly this reason; they are quoted rather than re-reasoned.
+ *
+ * Mounted in `<Camera/>`, which every one of the thirteen beats renders — so this cannot be
+ * forgotten by a new beat, which is the failure mode a per-beat mount would have.
+ */
+export const StillMotion: React.FC = () => (
+  <style>{`
+    /* globals.css:209-216, stated unconditionally. */
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    /* globals.css:323-326. The resting face: open pair visible, closed pair hidden. */
+    .ren-eyes-open   { animation: none !important; opacity: 1 !important; }
+    .ren-eyes-closed { animation: none !important; opacity: 0 !important; }
+  `}</style>
+);
+
+/**
  * ── THE BLOOM'S BAND DRIFT ──────────────────────────────────────────────────────────
  *
  * Source: `components/monitor/bloom.tsx:68,74` — `transition: "background 1.3s ease"`, over

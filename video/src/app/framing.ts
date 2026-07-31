@@ -3,17 +3,14 @@ import { Easing, interpolate, useCurrentFrame } from "remotion";
 import { CameraKey, frameRect, Rect, rect, Shot, shot, union } from "../greybox/Camera";
 import {
   CLOCK,
-  EMPHASIS_FACTOR,
-  GATE,
   PHONE_PX,
   PROMPT,
   RAW,
-  SCROLL,
-  STATELINE_RAISED,
   SUCCESS_FRAMED,
   TOAST,
+  TREND,
+  TREND_SCALE,
   VIEWFINDER,
-  scrolled,
 } from "./geometry";
 
 /**
@@ -32,67 +29,72 @@ import {
  * element, and a sliced line of type is always a failure.
  */
 
-// ── The monitoring surface, at its beat scroll ──────────────────────────────────────
+// ── The monitoring surface ──────────────────────────────────────────────────────────
 //
-// The LEFT column scrolls; the right column does not. `VIEWFINDER`, `TOAST` and `PROMPT` are
-// already world rects and never take `scrolled()` — that is the whole of L14's fix for the
-// toast/viewfinder overlap, and framing them through a scroll offset would put it straight back.
+// **Nothing here takes `scrolled()` any more.** At L15's arrangement the whole act fits inside
+// the page's own 519px viewport (`geometry.ts` § SCROLL), so world coordinates and page
+// coordinates are the same thing on this surface and the offset that used to thread through
+// every rect is gone.
 
-const S = SCROLL.monitor;
-const bloom = scrolled(RAW.bloom, S);
-const head = scrolled(RAW.statelineHead, S);
-const sub = scrolled(RAW.statelineSub, S);
-const controls = scrolled(RAW.controls, S);
 const vf = VIEWFINDER;
-const trendAtMonitor = scrolled(RAW.trend, S);
-/** The stateline at the top of its raise, widest copy — what the composite must contain. */
-const raised = scrolled(STATELINE_RAISED, S);
 
 /**
- * **The composite** — bloom + stateline + viewfinder, all three whole. Beat 7's landing, beat
- * 8's wide phase, beat 9's opening and beat 11's near phase are all this one shot, which is what
- * makes those four beats read as one continuous screen rather than four visits to it.
+ * ══ THE COMPOSITE — AND IT HOLDS ALL FOUR THINGS NOW ════════════════════════════════
  *
- *   union   x 331.3 – 1176.0   (844.8)   ← the stateline RAISED, not at rest
- *           y 212.0 –  653.3   (441.3)
- *   frameRect(m=20) → w = max(844.8 + 40, (441.3 + 40) × 16/9) = 884.8
- *   frame   x 311.3 – 1196.0   y 183.8 – 681.5
+ * **This is the whole of L15.** Beat 7's landing, beat 8's wide phase, beat 9's opening and
+ * *every* landing of beat 11 after the music player are this one shot — which is what makes the
+ * four beats read as one continuous screen rather than four visits to it, and what lets the film
+ * close on a settled picture instead of a camera arriving.
  *
- * **Width governs here, so the real vertical clearance is 28.2px rather than the nominal 20.**
- * The frame overshoots the world's bottom edge by 6.5px — free, because the page background and
- * the camera backdrop are the same colour (`Camera.tsx:130`), so that edge is invisible.
+ *   union   x 376.0 – 1176.0   (800.0)   ← the stage card WHOLE, and the pinned column
+ *           y 188.0 –  589.2   (401.2)
+ *   frameRect(m=20) → w = max(800 + 40, (401.2 + 40) × 16/9) = 840.0
+ *   frame   x 356.0 – 1196.0   y 156.0 – 628.5
  *
- * ── IT FRAMES THE RAISE, NOT THE REST, AND THAT IS THE FIX FOR TWO REAL CROPS ───────
+ * **Width governs, so the vertical clearance is 35.6px rather than the nominal 20** — and the one
+ * thing that is placed rather than derived is where that slack goes. Centred on the union the
+ * frame's top edge lands at 152.4, which puts a 3.6px sliver of the sticky app header's bottom
+ * border across the top of the film's most-repeated shot. The frame's top is set to **156**, the
+ * header's own bottom edge, so the shot is page and nothing else; the union keeps 32px above and
+ * 39.3 below, and the whole frame lands inside the page's 156–675 band with nothing on the camera
+ * backdrop at any edge. That is a first for this surface.
  *
- * The union is `STATELINE_RAISED` — the block at L12's full 1.25×, at its widest copy — because
- * two separate things were being cropped and both were invisible in review for the same reason,
- * that every still anyone framed was an `at_ease` one:
+ * ── WHAT IT CONTAINS, AND WHY EACH ONE IS IN IT ─────────────────────────────────────
  *
- *  · **Horizontally.** The `tense` sub is 430 wide (it is the only copy that wraps, so it fills
- *    its box instead of shrink-wrapping); `geometry.ts` had recorded the `at_ease` sub's 287.6.
- *    The old 760-wide composite began at x 436 and the `tense` sub begins at 385 — so **it was
- *    sliced by 51px at rest** in beats 8 and 9, before any emphasis at all.
- *  · **Vertically.** The raise hangs 23.25px below the resting block, so at the sheet's usual
- *    24px margin the frame's bottom and the raised block's bottom were three quarters of a pixel
- *    apart. That is not clearance, it is luck.
+ *   the stage card   376 – 824   × 188 – 612.2   the orb, the stateline, FR-024's footnote
+ *   the viewfinder   856 – 1176  × 212 – 393.3   his face (L1)
+ *   the trend        856 – 1176  × 425.3 – …     the session's history (L15, scaled)
  *
- * Same class of arithmetic as beat 5f's ripple overshoot (`SUCCESS_FRAMED`): the bounding box
- * that matters is the one the DEVICE reaches, not the one the component occupies at rest.
+ * The card is **whole** — all four edges inside the frame, with margin. Every previous version of
+ * this shot ran the card off the top, the bottom and the left and defended it as "the ground the
+ * reading sits on", which was true and was also the only option: at 675 tall the card could not
+ * be held whole by any 16:9 frame ≤1200 world px. At 424.2 it can.
  *
- * **The cost is stated rather than buried.** Framing the widest copy raised, with the sub's box
- * reserving two lines on every band, makes this shot 884.8 rather than the 760 it used to claim
- * — so the 17px sub lands at **8.11px** on a phone at rest and **10.13px raised**. The device is
- * what carries it over the floor, which is exactly what L12 is for, and it is now available on
- * every band including the one the film turns on. The previous pass's 9.4px was a number
- * measured against copy the shot did not actually have to hold.
+ * ── AND IT FRAMES THE RESTING BLOCK, BECAUSE THERE IS NO RAISE TO CLEAR ─────────────
  *
- * The stage card runs off the top, the bottom and the left of this frame. That is deliberate and
- * unchanged from every previous pass: at 673 tall the card cannot be held whole by any 16:9
- * frame ≤1200 world px (it would need 1196 with zero margin), and cropped on three sides it
- * reads as the ground the reading sits on rather than as a cropped object. What must never be
- * cropped — the bloom, the stateline, the viewfinder — is not.
+ * The union used to be built from `STATELINE_RAISED` — the block at L12's 1.25×, at its widest
+ * copy — because framing the resting rect is what let the raise run off the left edge. With the
+ * emphasis off the statelines (`geometry.ts` § THE EMPHASIS LEAVES THE STATELINE) the widest
+ * thing the block reaches is the `tense` sub at rest, 366 wide inside a card that is in frame
+ * whole, so there is nothing left to clear.
+ *
+ * **The numbers all improve, and this is what the arrangement bought:**
+ *
+ *   the stateline head   36px → **18.09px** on a phone   (was 17.2 at 884.8)
+ *   the stateline sub    17px → **8.54px**                (was 8.11 at rest, 10.13 raised)
+ *   his face             119.7 → **60.14px**              (was 57.1)
+ *   the trend's plot     299 × 87.5 world → **150 × 44px** on a phone
+ *
+ * The sub is the one line that used to depend on the emphasis to clear the floor and now does not
+ * clear it either — 8.54 against ~10. It is a *secondary* line under a head that reads at 18.1px,
+ * and the head is the reading; that trade is stated rather than smoothed over.
  */
-export const COMPOSITE: Shot = frameRect(union(union(bloom, raised), vf), 20);
+const compositeFrame = frameRect(union(RAW.stage, union(vf, TREND)), 20);
+export const COMPOSITE: Shot = {
+  ...compositeFrame,
+  // Top edge on the app header's bottom — see above. `frameRect` would centre it 3.6px higher.
+  cy: 156 + (compositeFrame.w * 9) / 16 / 2,
+};
 
 /**
  * **Beat 8, phase 1** — the clock and the toast, where the toast is READ.
@@ -169,32 +171,19 @@ export const BEAT9_PROMPT: Shot = frameRect(PROMPT.panel, 24);
 export const BEAT11_NEAR: Shot = COMPOSITE;
 
 /**
- * **Beat 11's landing** — the session-trend card WHOLE, with his face beside it.
+ * **Beat 11's landing — and it is the same shot it has been holding since f98.**
  *
- * This is what the pinned right column buys the film. Before L14 the viewfinder was laid out
- * inside the scrolling column, so scrolling to the trend took his face off the screen and the
- * closing frame held a graph and nothing else. The viewfinder does not scroll now, so the beat's
- * payoff — the tail walking back down — plays next to the person it happened to.
+ * It used to be its own framing, reached by scrolling the page 580px and pulling the camera out
+ * at the same time, because the trend card sat 855px down and the bloom and the trend could not
+ * be on screen together at any framing. `BEAT11_NEAR` and `BEAT11_WIDE` were two different
+ * pictures and the film's last idea arrived in the second of them.
  *
- *   union   x 344.0 – 1176.0   (832.0)
- *           y 212.0 –  658.9   (446.9)
- *   frameRect(m=20) → w = max(832 + 40, 486.9 × 16/9) = 872.0
- *   frame   x 324.0 – 1196.0   y 190.2 – 680.7
- *
- * Width governs here, so the real vertical clearance is 21.8px rather than the nominal 20 — and
- * the FR-024 footnote, which is the last thing left of the stage card at this scroll, clears the
- * frame's top edge by 33.8px rather than being sliced by it. That is what `SCROLL.trend` = 580
- * is protecting; see its note.
- *
- * **The bloom still cannot come.** Bloom top to trend bottom is 985.9px against a 519px
- * viewport, so the beat plays the drift and the stateline's return at `BEAT11_NEAR` and then
- * pulls out AND scrolls in one continuous move — the sheet's causal order with the camera
- * following the story rather than waiting for it.
+ * At L15 they are one. The trend is pinned beside his face, the page does not move, and the
+ * beat's third landing is not a move at all — the descent plays inside a frame that has already
+ * settled. That is the "single settled picture" the closing image is supposed to be, and the
+ * cheapest way to get it turned out to be deleting a camera move rather than choreographing one.
  */
-export const BEAT11_WIDE: Shot = frameRect(
-  union(scrolled(RAW.trend, SCROLL.trend), VIEWFINDER),
-  20,
-);
+export const BEAT11_WIDE: Shot = COMPOSITE;
 
 // ── Projecting the world into output pixels ─────────────────────────────────────────
 
@@ -324,6 +313,27 @@ export const BEAT5_SUCCESS: Shot = { ...successFrame, cy: 156 + (successFrame.w 
  */
 export const BEAT5_INTRO: Shot = shot(600, 415.5, 920);
 
+/**
+ * **5e — the uploading line, and the flip that used to be a cut.**
+ *
+ * 5c/5d/5e all played inside one static `BEAT5_PREVIEW` hold, so at f240 the capture stage —
+ * preview, orb, pacer, progress bar, mm:ss — was **replaced in a single frame** under a camera
+ * that was not moving. Every pixel of the shot changed at once with nothing carrying it, which is
+ * a cut wearing a continuous camera's clothes, exactly like the beat 2 → 3 join this sheet has
+ * already fixed once.
+ *
+ * The camera closes in across the swap instead: it starts easing at f244 and lands at f272, so
+ * the surface changes 20 frames into a move. Not a transition effect — the same push-in grammar
+ * the rest of the film uses, put on the boundary that needed it.
+ *
+ *   frame   x 340 – 860   y 175.6 – 468.4      w = 520
+ *   reads   the line's 16px at **12.98px** on a phone, up from 11.4
+ *
+ * `cy` is `BEAT5_PREVIEW`'s, unchanged — the shot tightens on the same axis rather than panning,
+ * and `UPLOADING_DROP` (`calibrate.tsx`) is what puts the line on it.
+ */
+export const BEAT5_UPLOADING: Shot = shot(600, 321.95, 520);
+
 // ── Beat 4's gate ───────────────────────────────────────────────────────────────────
 
 /**
@@ -341,19 +351,23 @@ export const BEAT5_INTRO: Shot = shot(600, 415.5, 920);
 export const BEAT4_ESTABLISH: Shot = shot(600, 316.75, 616);
 
 /**
- * **Beat 4's key-line landing** — the first card's body: all four bullets, its bottom border and
- * both side borders, at 659 world px. `frameRect` over the card from just under its heading to
- * its own bottom edge, shifted by the beat's fixed scroll position (`SCROLL_A` = 250, see
- * `Beat04CameraGate.tsx`):
+ * ── THE SEAM INTO BEAT 4, SO THE SURFACE CHANGES UNDER A MOVING CAMERA ──────────────
  *
- *   rect     `GATE.facts1.x`, 239.9    `GATE.facts1.w` × 362.7
- *   frame    w = max(576, 370.7 × 16/9) = 659      h = 370.7
+ * "Set baseline" → "Before the camera turns on" used to be a straight cut: beat 3 held the full
+ * 1200 frame from f100 to its last frame, beat 4 opened on a 616 landing, and the page changed on
+ * the same frame the framing did. Two discontinuities on one boundary read as an edit, which is
+ * the one thing this film's own invariant forbids — *moving between two screens is a MOVE, not a
+ * cut.*
  *
- * Nothing is sliced at any edge, three of the card's four borders are in shot, and the bullet the
- * beat exists to deliver ("Nothing is kept…") is the third of four rather than a fragment between
- * two fragments.
+ * So the push-in **starts in beat 3**, at f108, and beat 4 opens on this same shot and finishes
+ * it. The navigation lands mid-move, where a change of surface reads as the thing the move was
+ * for. It is the same seam beat 2 already uses into beat 3 (`BEAT2_SEAM`), applied to the other
+ * boundary that was cutting.
+ *
+ * 900 is the midpoint of the travel rather than a chosen framing: 1200 → 616 is 584px of zoom and
+ * this splits it roughly in half, so neither beat carries a move that reads as a whip.
  */
-export const BEAT4_LINE: Shot = frameRect(rect(GATE.facts1.x, 239.9, GATE.facts1.w, 362.7), 4);
+export const BEAT4_SEAM: Shot = shot(600, 327, 900);
 
 // ── The legibility table ────────────────────────────────────────────────────────────
 
@@ -369,10 +383,21 @@ export const PHONE = {
   composite: {
     framedWidth: COMPOSITE.w,
     statelineHead: PHONE_PX(36, COMPOSITE.w),
+    /**
+     * **8.54px, and it no longer has a raise to lift it.** The stateline emphasis is off (see
+     * `geometry.ts`), so this is what the sub reads at, full stop. It is the secondary line under
+     * a head at 18.1px and it is stated rather than smoothed over — the same treatment beat 4's
+     * bullets get.
+     */
     statelineSub: PHONE_PX(17, COMPOSITE.w),
-    /** **1.25× on every band now** — see `emphasisCapFor`. It used to be ~1.01 on `tense`. */
-    statelineSubRaised: PHONE_PX(17 * EMPHASIS_FACTOR, COMPOSITE.w),
     faceHeight: PHONE_PX(FACE_H, COMPOSITE.w),
+    /**
+     * **The trend's type is under the floor at `TREND_SCALE`, and that is the trade L15 makes.**
+     * What the shot has to deliver is the LINE, not the labels: the plot is ~150 × 45px on a
+     * phone here, which is a shape anyone can read walking back down.
+     */
+    trendHeading: PHONE_PX(18 * TREND_SCALE, COMPOSITE.w),
+    trendPlotW: (TREND.w * 0.94 * 422) / COMPOSITE.w,
   },
   beat8Clock: {
     framedWidth: BEAT8_CLOCK.w,
@@ -390,11 +415,11 @@ export const PHONE = {
     option: PHONE_PX(15, BEAT9_PROMPT.w),
     title: PHONE_PX(18, BEAT9_PROMPT.w),
   },
-  /** Beat 11's landing. The trend's own axis labels are 12px; his face is the other half. */
+  /** Beat 11's landing IS the composite now — kept as a name so the beat still reads. */
   beat11Wide: {
     framedWidth: BEAT11_WIDE.w,
     faceHeight: PHONE_PX(FACE_H, BEAT11_WIDE.w),
-    trendHeading: PHONE_PX(18, BEAT11_WIDE.w),
+    trendHeading: PHONE_PX(18 * TREND_SCALE, BEAT11_WIDE.w),
   },
   beat5Success: {
     framedWidth: BEAT5_SUCCESS.w,
@@ -404,4 +429,4 @@ export const PHONE = {
   },
 } as const;
 
-export { controls, trendAtMonitor, vf as viewfinderFramed };
+export { vf as viewfinderFramed };

@@ -14,14 +14,19 @@ import type { Pose } from "../greybox/rig";
 import { PROTAGONIST } from "../greybox/copy";
 import { projectWorld } from "./framing";
 import {
+  BLOOM_SIZE,
+  CARD_PB,
+  CARD_PT,
+  FOOTNOTE_GAP,
   PROMPT,
   RAW,
   SCROLL,
-  STATELINE_CONTROLS_GAP,
   SUB_MIN_HEIGHT,
+  TREND,
+  TREND_NATURAL_W,
+  TREND_SCALE,
   VF_SCALE,
   VIEWFINDER,
-  emphasisCapFor,
 } from "./geometry";
 import { useBloomBreath, useBloomColor } from "./motion";
 import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell";
@@ -90,70 +95,53 @@ export const trendPoints = (opts: {
 };
 
 /**
- * ── THE IN-PLACE EMPHASIS, APPLIED FROM OUTSIDE THE COMPONENT ───────────────────────
- *
- * The stateline is two sibling `<p>`s inside `LiveStage`'s flex column
- * (`op-surfaces.tsx:299-306`), and their only common ancestor also holds the bloom and the
- * controls — so there is no single node to scale.
- *
- * Instead each paragraph is scaled about `top center` and translated by `(k − 1) × dy`, where
- * `dy` is its offset from the block's top. That is exactly equivalent to scaling the pair as
- * one block about the block's top edge, which is what L12 requires: **it grows downward from
- * its own top, so the bloom above it is untouchable by construction** — the constraint the
- * greybox met by moving the product's layout, and which register items 2 and 3 exist to undo.
- *
- * A transform does not affect layout, so the controls and the footnote below do not move. They
- * do not need to: at 1.25× the block finishes 11.1px clear of the controls (see `geometry.ts`).
- *
- * **`factor` is passed in rather than read from `EMPHASIS_FACTOR`, because it is not constant.**
- * L12's 1.25× was derived against a ONE-LINE sub; the `tense` copy wraps to two and does not fit
- * at any scroll (`emphasisCapFor()` in `geometry.ts` has the arithmetic). The beat interpolates
- * between the two caps so the collapse is a settle rather than a snap, and that settle is what
- * makes the second copy change carry movement — see `Beat08Email.tsx`.
- */
-/**
- * ── THE TWO LAYOUT VALUES L14 SPENDS, AS A SCOPED STYLESHEET ────────────────────────
+ * ══ THE ARRANGEMENT L15 SPENDS, AS A SCOPED STYLESHEET ══════════════════════════════
  *
  * The film cannot put a class on a shipped component's paragraph, and it must not fork one. So
- * the two arrangement changes L14 needs are declared here, by selector, against the same DOM the
- * measurement harness already addresses (`SwapProbe.tsx`) — the same mechanism `motion.tsx` uses
- * four times over and `hover.tsx` uses for every control in the film.
+ * every arrangement change is declared here, by selector, against the same DOM the measurement
+ * harness addresses (`SwapProbe.tsx`) — the same mechanism `motion.tsx` uses four times over and
+ * `hover.tsx` uses for every control in the film. `geometry.ts` holds the numbers, because every
+ * framing above is derived from them and they must not drift apart.
  *
- *  1. **The sub reserves two lines.** `min-height: 51` — two of its own 25.5px lines. Without it
- *     the stateline block, the controls, the footnote and every framing derived from them change
- *     size on the frame the copy changes, which is how the two-line `tense` sub came to be
- *     sliced by the viewport at rest in the one reading the film exists to deliver.
- *  2. **The stateline→controls gap goes 28 → 70.** This is the room L12's 1.25× grows into. With
- *     it the raised two-line block finishes **46.75px** clear of the Pause/End controls; without
- *     it the cap is 1.01× and the device is dead.
+ * **L14's problem was that the four things the monitoring act is about could not be in one
+ * frame.** Bloom top to trend bottom was 985.9px against a 519px viewport, so the trend was a
+ * separate landing 855px down the page and reaching it was a scroll. Five values fix it, and
+ * four of the five are geometry:
  *
- * Neither touches a colour, a size, a weight or a word. `geometry.ts` § SUB_MIN_HEIGHT holds the
- * numbers, because every framing above is derived from them and they must not drift apart.
+ *  1. **The orb comes down 288 → 176.** `sm:size-72` is the product's, and it is the single
+ *     largest block of vertical page in the act. Its halo is `-inset-[28%]`, so the glow still
+ *     spans 274px — the presence is barely touched and 112px of page comes back.
+ *  2. **The card's top band goes 64 → 48 and its bottom pad 40 → 24.** The band exists to hold
+ *     the `Session · MM:SS` row (L14 moved it there); at `top-1` the row's 44px box fits 48
+ *     exactly, so nothing is crowded.
+ *  3. **`min-height` is released.** `sm:min-h-[480px]` would hold the card at its old height and
+ *     centre the shortened contents inside it, which would give back none of the page.
+ *  4. **The sub still reserves two lines.** `min-height: 51` — two of its own 25.5px lines.
+ *     Without it the stateline block, the footnote and every framing derived from them change
+ *     size on the frame the copy changes.
+ *  5. **The Pause / End controls are REMOVED — and this one is a CONTENT liberty, not a
+ *     geometric one (L15).** Everything else in this block resizes or repositions something the
+ *     product ships; this deletes two real controls from a real surface. It is recorded in the
+ *     liberties table with that distinction stated, because a reader who finds it later must be
+ *     able to tell a staging decision from a fidelity defect. What it buys is the 114px between
+ *     the stateline and the footnote — the exact room the trend needed.
+ *
+ * The stateline→controls gap L14 spent 70px on is gone with the controls, and so is the
+ * emphasis it was buying room for: see `geometry.ts` § THE EMPHASIS LEAVES THE STATELINE.
  */
 export const StageLayout: React.FC = () => (
   <style>{`
+    [data-emph] {
+      min-height: 0 !important;
+      padding-top: ${CARD_PT}px !important;
+      padding-bottom: ${CARD_PB}px !important;
+    }
+    [data-emph] [data-testid="bloom"] { width: ${BLOOM_SIZE}px; height: ${BLOOM_SIZE}px; }
     [data-emph] p[aria-live="polite"] + p { min-height: ${SUB_MIN_HEIGHT}px; }
-    [data-emph] div.mt-7 { margin-top: ${STATELINE_CONTROLS_GAP}px; }
+    [data-emph] div.mt-7 { display: none; }
+    [data-emph] p.mt-8 { margin-top: ${FOOTNOTE_GAP}px; }
   `}</style>
 );
-
-const Emphasis: React.FC<{ t: number; factor: number }> = ({ t, factor }) => {
-  const k = 1 + (factor - 1) * t;
-  const dySub = RAW.statelineSub.y - RAW.statelineHead.y; // 42px, measured
-  return (
-    <style>{`
-      [data-emph] p[aria-live="polite"] {
-        transform-origin: top center;
-        scale: ${k};
-      }
-      [data-emph] p[aria-live="polite"] + p {
-        transform-origin: top center;
-        scale: ${k};
-        translate: 0 ${(k - 1) * dySub}px;
-      }
-    `}</style>
-  );
-};
 
 /**
  * ── HOLDING THE FRAME UNTIL THE TREND HAS SETTLED ───────────────────────────────────
@@ -235,15 +223,11 @@ export const MonitorPage: React.FC<{
   band: Band;
   /** 0 → meadow, 0.5 → the mid-gold, 1 → amber. Drifts continuously, independent of `band`. */
   tension: number;
-  /** 0 seated, 1 raised. Fires on every stateline copy change (L12). */
-  emphasis?: number;
   /**
-   * The factor a full raise reaches. Defaults to the one-line cap, which is L12's 1.25×. A beat
-   * whose copy changes line count interpolates it (see `emphasisCapFor` in `geometry.ts`) so the
-   * device never slices a line.
+   * Page scroll. **It is 0 for every monitoring beat now** — at L15's arrangement the whole act
+   * fits inside the page's own 519px viewport, which is what removes the travel down to the
+   * trend. Kept as a prop because the page is still a page and a future beat may need it.
    */
-  emphasisFactor?: number;
-  /** Page scroll. `SCROLL.monitor` for beats 7–9; beat 11 travels to `SCROLL.trend`. */
   scroll?: number;
   pose: Pose;
   working?: boolean;
@@ -261,8 +245,6 @@ export const MonitorPage: React.FC<{
   clock,
   band,
   tension,
-  emphasis = 0,
-  emphasisFactor = emphasisCapFor(1),
   scroll = SCROLL.monitor,
   pose,
   working,
@@ -291,7 +273,6 @@ export const MonitorPage: React.FC<{
     >
       <BloomDrift tension={tension} />
       <StageLayout />
-      <Emphasis t={emphasis} factor={emphasisFactor} />
       <TrendSettle />
 
       {/* The page scrolls under the sticky header. The real page is ~1100px tall below the
@@ -324,7 +305,7 @@ export const MonitorPage: React.FC<{
              */}
             <div
               data-probe="timerrow"
-              className="absolute inset-x-10 top-5 z-10 flex items-center gap-3"
+              className="absolute inset-x-10 top-1 z-10 flex items-center gap-3"
             >
               <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
                 <span aria-hidden>←</span> Dashboard
@@ -344,17 +325,6 @@ export const MonitorPage: React.FC<{
             />
           </div>
 
-          <SessionTrend
-            sessionId="video"
-            active={false}
-            load={async () => trendPoints({ climb, descend })}
-            // Bumped every frame so the trend re-reads its (frame-derived) points. Without it
-            // the component fetches once on mount and freezes: it looks correct in a STILL —
-            // each still is a fresh page — and is static for the whole cut in a video render,
-            // which is exactly the kind of defect that survives to the finished file.
-            refreshSignal={frame}
-            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
-          />
         </div>
       </div>
 
@@ -417,6 +387,59 @@ export const MonitorPage: React.FC<{
             notesFrom={notesFrom}
           />
         </Viewfinder>
+      </div>
+
+      {/*
+       * ══ THE TREND JOINS THE PINNED COLUMN, UNDER HIS FACE (L15) ══════════════════
+       *
+       * It used to be the next card down the scrolling column, 855px below the fold, and
+       * reaching it was a page scroll plus a camera travel — which is why the film's closing
+       * image was a graph arriving after the reading rather than beside it.
+       *
+       * ── AND IT IS DRAWN WIDE, THEN SCALED ─────────────────────────────────────────
+       *
+       * The card is **not** simply rendered at 320. Its height is almost independent of its
+       * width — `session-trend-geometry.ts:53` fixes the plot's viewBox at `H = 210` and the
+       * heading, subtitle, gutters and legend account for the rest — so a card rendered at 320
+       * would be ~370 tall, which is the whole problem again at a third of the width. Rendered
+       * at `TREND_NATURAL_W` and scaled to `TREND_RENDER_W`, the same card comes out 320 wide
+       * and a little under 150 tall — the plot keeps every pixel of its shape and simply arrives
+       * at the size the composition has room for. `geometry.ts` § TREND carries the measured
+       * numbers.
+       *
+       * **The cost is stated rather than buried.** At `TREND_SCALE` the card's 18px heading
+       * lands under the phone-legibility floor and its axis labels well under it — see
+       * `framing.ts` § PHONE. What this shot has to deliver is the LINE: a tail that climbed
+       * during beat 8 walking back down in meadow, which is a shape rather than a reading, and
+       * at the composite framing the plot is still ~150 × 45px on a phone. The same honesty
+       * beat 4's bullets and beat 6's CTA label already get.
+       *
+       * A transform does not affect layout, so the box below reserves the SCALED size and
+       * nothing under it moves.
+       */}
+      <div
+        style={{
+          position: "absolute",
+          left: TREND.x,
+          top: TREND.y - VIEWPORT_Y,
+          width: TREND.w,
+          height: TREND.h,
+          zIndex: 10,
+        }}
+      >
+        <div style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}>
+          <SessionTrend
+            sessionId="video"
+            active={false}
+            load={async () => trendPoints({ climb, descend })}
+            // Bumped every frame so the trend re-reads its (frame-derived) points. Without it
+            // the component fetches once on mount and freezes: it looks correct in a STILL —
+            // each still is a fresh page — and is static for the whole cut in a video render,
+            // which is exactly the kind of defect that survives to the finished file.
+            refreshSignal={frame}
+            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
+          />
+        </div>
       </div>
 
       {children}

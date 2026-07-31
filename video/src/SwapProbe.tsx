@@ -22,6 +22,7 @@ import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prom
 
 import { AuthShell, CheckEmailSurface, SignupSurface } from "./app/auth";
 import { HOME_COL, RecentChatsEmpty as RecentChatsEmptyProbe } from "./app/home";
+import { TREND_NATURAL_W } from "./app/geometry";
 import { StageLayout, trendPoints } from "./app/monitor";
 import { fontsReady } from "./fonts";
 
@@ -77,10 +78,12 @@ const TARGETS: [string, string][] = [
   // be derived against a block 105px narrower than the one it fires on.
   ["stateline-head-tense", "[data-probe='ops-tense'] p[aria-live='polite']"],
   ["stateline-sub-tense", "[data-probe='ops-tense'] p[aria-live='polite'] + p"],
-  ["controls", "[data-probe='ops'] .mt-7"],
   ["footnote", "[data-probe='ops'] p.mt-8"],
   ["ops-block", "[data-probe='ops'] > div"],
   ["viewfinder", "[data-probe='stage'] [aria-hidden='false'], [data-probe='stage'] [data-pinned]"],
+  // Measured at `TREND_NATURAL_W` — the width the card is DRAWN at before L15 scales it to 320.
+  // Its height is what `RAW.trendNatural.h` has to carry, and every number in the composite
+  // descends from it.
   ["session-trend", "[data-testid='session-trend']"],
   ["trend-svg", "[data-testid='session-trend-svg']"],
   ["trend-measured", "[data-testid='session-trend'] div.w-full"],
@@ -96,6 +99,11 @@ const TARGETS: [string, string][] = [
   ["framing-brackets", "[data-probe='framing'] .aspect-\\[3\\/4\\]"],
   ["header", "[data-probe='header'] header"],
   ["intro", "[data-probe='intro'] > div"],
+  // 4.3 — the push-in on "Turn on camera" was cropping the FIRST guideline row's icon tile.
+  // The window it has to land inside is [this row's top, the helper line's bottom], and neither
+  // end had ever been measured.
+  ["intro-row-1", "[data-probe='intro'] ul > li:first-child"],
+  ["intro-helper", "[data-probe='intro'] > div > div:last-child > p"],
   ["green-room", "[data-probe='greenroom'] > div"],
   ["recording-stage", "[data-probe='recstage'] > div"],
   ["consent-gate", "[data-probe='gate'] > *"],
@@ -235,8 +243,9 @@ export const SwapProbe: React.FC = () => (
           </div>
         }
       >
-        {/* The monitoring page, at the FILM's L14 layout — `max-w-lg` (512), the readout inside
-            the card's own `pt-16` band, the sub's two reserved lines and the 70px controls gap.
+        {/* The monitoring page, at the FILM's L15 layout — `max-w-md` (448), the 176 orb, the
+            readout inside the card's shortened top band, the sub's two reserved lines and no
+            Pause/End controls.
             `<StageLayout/>` is the one component both this probe and `MonitorPage` render, so
             what is measured here is what the beats draw; a probe that measured the shipped
             spacing while the film drew something else is the exact failure this file exists to
@@ -246,7 +255,7 @@ export const SwapProbe: React.FC = () => (
           <div data-probe="stage" data-emph className={MONITOR_STAGE}>
             <div
               data-probe="timerrow"
-              className="absolute inset-x-10 top-5 z-10 flex items-center gap-3"
+              className="absolute inset-x-10 top-1 z-10 flex items-center gap-3"
             >
               <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
                 <span aria-hidden>←</span> Dashboard
@@ -285,16 +294,6 @@ export const SwapProbe: React.FC = () => (
             </div>
           </div>
 
-          {/* Measured POPULATED, not empty. The empty card is 101.5 tall and the populated one
-              is not — beat 11's wide shot was derived from the empty height and framed the
-              plot straight off the bottom edge. */}
-          <SessionTrend
-            sessionId="probe"
-            active={false}
-            load={async () => trendPoints({ climb: 1, descend: 0.5 })}
-            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
-          />
-
           <div data-probe="welcome" className="mt-8">
             <WelcomeBanner fullName="Mohamed" />
           </div>
@@ -304,6 +303,19 @@ export const SwapProbe: React.FC = () => (
           <div data-probe="success" className="mt-6">
             <SuccessState onDone={() => {}} />
           </div>
+        </div>
+
+        {/* Measured POPULATED, not empty — and at `TREND_NATURAL_W`, which is the width the film
+            DRAWS it at before scaling it to the 320 the pinned column has room for (L15). A card
+            measured at 512 and drawn at 768 is the same class of error as a rect probed without
+            the sticky header, so the probe renders it exactly as `monitor.tsx` does. */}
+        <div style={{ width: TREND_NATURAL_W }}>
+          <SessionTrend
+            sessionId="probe"
+            active={false}
+            load={async () => trendPoints({ climb: 1, descend: 0.5 })}
+            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
+          />
         </div>
 
         {/* ── Calibration, at its REAL column (max-w-lg = 512) ── register item 5 ──

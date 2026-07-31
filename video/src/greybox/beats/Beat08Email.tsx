@@ -3,7 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { BEAT8_CLOCK, BEAT8_FACE, BEAT8_WIDE, COMPOSITE, PHONE } from "../../app/framing";
 import { MonitorPage } from "../../app/monitor";
-import { useDrift, useEmphasis } from "../../app/motion";
+import { useDrift } from "../../app/motion";
 import { MailToast } from "../../app/toast";
 import { Camera } from "../Camera";
 import { TOAST } from "../copy";
@@ -19,7 +19,7 @@ import { useExpression } from "../rig";
  *   HIS FACE FALLS                f70 – f86   (at the FACE framing, toast still up)
  *   the toast dismisses           f120 + 13   (a slide-out, as the camera widens off it)
  *   the bloom drifts              f136 + 39   (1.3s ease — it drifts, it does not snap)
- *   the stateline steps twice     f158, f180  (the raise fires on the first, settles on the second)
+ *   the stateline steps twice     f158, f180  (inside the wide hold, camera stopped)
  *   the trend climbs and recolours
  *
  * ══ THREE LANDINGS, ONE MOVE, AND THE CLOCK IS FINALLY WHOLE ════════════════════════
@@ -78,19 +78,20 @@ import { useExpression } from "../rig";
  *   f158         "A bit of an edge lately" — and the raise begins ON it.
  *   f180         "This has held a while…" — and the raise SETTLES as it lands.
  *
- * ── AND THE RAISE IS A FULL 1.25× ON BOTH COPIES NOW ────────────────────────────────
+ * ── AND THE RAISE IS GONE — L15 ─────────────────────────────────────────────────────
  *
- * This is what L14 was for. The `tense` sub wraps to two lines, and at the old layout a two-line
- * block had 94px of room for 93px of block: `emphasisCapFor(2)` returned **1.01**, so the film's
- * most important reading got no device at all, and the beat had to dress the collapse up as the
- * firing. With the sub reserving two lines and the controls 70px below it, the cap is **1.25 on
- * every band** — so the factor is a constant and the interpolation that used to hide the
- * shortfall is gone.
+ * The stateline emphasis fired here on the first copy change and settled on the second, and its
+ * justification was legibility: at the old 884.8-wide composite the 17px sub read at 8.11px on a
+ * phone and the raise carried it to 10.13. At L15's 840 composite the HEAD reads at 18.1px and
+ * the sub at 8.54, and the device would be growing a line that is already as legible as the shot
+ * can make it — while costing 70px of card the trend now uses.
  *
- * The rule the raise obeys is unchanged and is the whole reason the device is grammar rather
- * than decoration: **it begins on a copy change, it grows once, and it never yo-yos.** It rises
- * on the first change and settles on the second, so both changes carry movement and neither
- * carries a second growth.
+ * **The one thing this beat loses with it is worth naming.** The raise was also directing the eye
+ * at the moment the reading changed, and both of this beat's changes happen inside a static wide
+ * hold on copy that differs by a few words. What carries them instead is the order the beat
+ * already had: the bloom drifts first, then the head changes, then it changes again — three
+ * separate movements in a frame where nothing else is moving. If the escalation ever reads as
+ * easy to miss, the emphasis is the fix and it comes back for THIS transition only.
  */
 export const Beat08Email: React.FC = () => {
   const frame = useCurrentFrame();
@@ -125,19 +126,6 @@ export const Beat08Email: React.FC = () => {
   // Both changes land INSIDE the camera's third hold (f150 on), which is the retiming.
   const band = frame >= 180 ? "tense" : frame >= 158 ? "a_little_tense" : "at_ease";
 
-  /**
-   * The raise begins **on** the first copy change at f158, reaches full at f174, holds through
-   * the second change at f180 and settles by f196. One growth, two changes, no yo-yo — and both
-   * at the full 1.25×, which is what L14 bought back.
-   */
-  const emphasis = useEmphasis([
-    { frame: 0, up: 0 },
-    { frame: 158, up: 0 },
-    { frame: 174, up: 1 },
-    { frame: 180, up: 1 },
-    { frame: 196, up: 0 },
-  ]);
-
   return (
     <AbsoluteFill>
       <Camera
@@ -162,7 +150,6 @@ export const Beat08Email: React.FC = () => {
           climb={climb}
           pose={pose}
           working={frame < 70}
-          emphasis={emphasis}
           sessionFrom={47 * 60 + 16}
           // WORLD coordinates — an OS notification floats over the chrome and the page alike,
           // and the framing in `framing.ts` is derived from its world rect.

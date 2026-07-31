@@ -2,6 +2,7 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { CAMERA, patchMeasurementForCamera } from "../app/measure-patch";
+import { StillMotion } from "../app/motion";
 import { H, W } from "./theme";
 
 // One-time. See `measure-patch.ts`: the camera's CSS scale otherwise leaks into every real
@@ -128,6 +129,10 @@ export const Camera: React.FC<{
     // it read as a light bar under a dark film. It is now the app's own dark `--color-bg`, so
     // the overshoot is invisible again exactly as it was meant to be.
     <AbsoluteFill style={{ backgroundColor: "#101214", overflow: "hidden" }}>
+      {/* The CSS half of the reduced-motion answer. Mounted HERE, not per beat, because every
+          one of the thirteen beats renders a camera and a beat that forgot it would render a
+          live CSS transition against wall-clock time. See `motion.tsx` § StillMotion. */}
+      <StillMotion />
       <div
         style={{
           position: "absolute",
