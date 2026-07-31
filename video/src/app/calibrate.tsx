@@ -55,28 +55,74 @@ export type CalibPhase =
   | "success";
 
 /**
- * The 3 → 2 → 1, actually counting.
+ * The 3 → 2 → 1, actually counting — and counting **once, downward**.
  *
- * `<GetReadyCountdown/>` decrements through `setTimeout`, which never fires in a frame-addressed
- * render — so it rendered **"3" for the whole beat** and the shot cut to the recording from a
- * static numeral. That is what read as "too fast": there was no count, only a jump.
+ * ── THE COUNTDOWN THAT RAN BACKWARDS ────────────────────────────────────────────────
  *
- * `from` seeds the component's state once, so a changing prop cannot move it; the `key` is what
- * makes each number a fresh mount. Everything visible — the face, the size, the tabular figures,
- * the drop shadow, the 300ms zoom-and-fade — stays the component's. See `useCountdown`.
+ * The previous note here asserted that `<GetReadyCountdown/>`'s `setTimeout` "never fires in a
+ * frame-addressed render". **That is false, and it was the bug.** The reduced-motion shim only
+ * changes which *variant* a component renders; it does not stop timers, and nothing about a
+ * Remotion render stops them either — the renderer keeps ONE live browser page and steps the
+ * frame on it, so wall-clock time goes on passing between frames exactly as it does in a browser.
+ * `get-ready-countdown.tsx:29-33` is not gated on `reducedMotion` at all: it schedules
+ * `setTimeout(… , 1000)` on mount and decrements its own `count` every real second.
+ *
+ * So two clocks were driving one numeral. The component's `count` ran on the wall clock while
+ * `useCountdown`'s `value` ran on the frame, and `key={value}` — which was there to make each
+ * number a fresh mount — **re-seeded `count` back up to `value` every time the frame clock
+ * stepped**. The result, measured off a frame-by-frame render of f150–f194:
+ *
+ *     f151-158 "3"   f159-164 "2"   f166-169 "2"   f170-174 "1"   f179-184 "1"   f185+ blank
+ *
+ * — a count that went 3, 2, back to 2, 1, back to 1, then vanished (the component renders `null`
+ * once its own `count` hits 0, `:46`). Rendering the SAME frames as one-off stills, each on a
+ * fresh page with no wall clock behind it, gave "3" at f159 and "2" at f170: the frame-derived
+ * value, correct. That difference is the whole diagnosis.
+ *
+ * ── THE FIX: ONE CLOCK ──────────────────────────────────────────────────────────────
+ *
+ * The numeral on screen is now the frame's, unconditionally. The component still renders — it is
+ * the real 128px `role="timer"` box, and its own numeral is *hidden rather than removed* so its
+ * grid keeps its layout — and the digit drawn over it carries `get-ready-countdown.tsx:49`'s
+ * className character-for-character, so the face, the size, the tabular figures and the drop
+ * shadow are the component's own values and cannot drift from them. This is the seam
+ * `<BreathPacer/>` already uses one file over, and for the same reason: the component holds the
+ * thing we need to drive in React state, and the DOM is the only way in.
+ *
+ * Keying the mount on the frame instead would also have made every *rendered* frame correct, but
+ * it leaves the drift alive whenever a single frame is held for more than a second — a paused
+ * Studio, a slow frame — which is precisely the failure being fixed. Hiding the stateful numeral
+ * removes the second clock instead of outrunning it.
+ *
+ * The 300ms zoom-and-fade is unchanged: it is `enter`, on the wrapper, per value.
  */
+/** `get-ready-countdown.tsx:49`, verbatim. Quoted, not paraphrased — see above. */
+const COUNTDOWN_NUMERAL =
+  "font-display text-8xl leading-none tabular-nums text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.55)]";
+
 const Countdown: React.FC<{ from: number }> = ({ from }) => {
   const { value, enter } = useCountdown(from);
   return (
     <div
+      data-countdown
       style={{
+        position: "relative",
         opacity: enter,
         // `animate-in … zoom-in-75` — the component's own entrance, which its reduced-motion
         // branch strips. 0.75 → 1 over 300ms.
         scale: 0.75 + 0.25 * enter,
       }}
     >
+      {/* The component's own numeral, silenced. `visibility` rather than `display`, so the
+          `grid h-32 w-32 place-items-center` box it lives in is untouched. */}
+      <style>{`[data-countdown] [role="timer"] > span { visibility: hidden; }`}</style>
       <GetReadyCountdown key={value} from={value} onComplete={() => {}} />
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute inset-0 grid place-items-center ${COUNTDOWN_NUMERAL}`}
+      >
+        {value}
+      </span>
     </div>
   );
 };
@@ -164,7 +210,11 @@ export const CalibratePage: React.FC<{
   countdownFrom?: number;
   /** Frame the capture starts on. The breath's zero. */
   recordingFrom?: number;
-  /** One inhale+exhale, in frames. Beat 5d passes its own window; see `useOrbBreath`. */
+  /**
+   * One inhale+exhale, in frames. Beat 5d passes a **third of its window doubled**, so three
+   * pacer phases — in, out, in — play inside the compressed minute; see `useOrbBreath` and the
+   * arithmetic at `Beat05Calibration.tsx`.
+   */
   breathCycle?: number;
   /** World-coordinate layer over everything — the drawn cursor. */
   overlay?: React.ReactNode;

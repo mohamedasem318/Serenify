@@ -174,10 +174,18 @@ const ORB_SCALE = { min: 0.84, max: 1.12 } as const;
  * quarter of one breath, the discs barely move, and the label never changes — so the pacer's
  * whole nature, that it alternates, is invisible.
  *
- * So the cycle is a parameter, and beat 5d passes the length of its own window: **one complete
- * breath, in and out, inside the compressed minute.** The audience sees the orb fill and empty
- * once and reads "this is a breathing exercise", which is what the beat is for. The shape,
- * amplitude, easing and copy are all the component's; only the period is staged.
+ * So the cycle is a parameter — and what beat 5d passes it is derived from a **phase count**,
+ * not from the window.
+ *
+ * **ONE BREATH WAS NOT ENOUGH, AND THE REASON IS THAT THE POINT IS THE ALTERNATION.** Passing the
+ * window's own length gave exactly one breath: two phases, 22.5 frames each. Two phases do not
+ * read as a rhythm — they read as a label that changed once, too briefly to be read at all, which
+ * loses the whole reason for showing the minute. The audience has to see it alternate: in, out,
+ * in. Beat 5d passes `(window / 3) × 2` for **three phases at 15 frames each**, half a second
+ * apiece. Four would be 375ms, which is the strobe this note warns about two paragraphs up; three
+ * is the only count that satisfies both ends, and the third phase gets its full fifteen frames
+ * before the cut. The shape, amplitude, easing and copy are all the component's; only the period
+ * is staged, and the discs follow the same parameter so the rise and fall stay locked to the words.
  */
 export const useOrbBreath = (from = 0, cycleFrames = ORB_CYCLE_REAL): number => {
   const frame = useCurrentFrame();
@@ -235,18 +243,33 @@ export const BreathPacer: React.FC<{
  *
  * Source: `components/anchor/get-ready-countdown.tsx`.
  *
- * The sheet's note on 5c says the countdown is compressed to "one second total, not three", and
- * the beat gave it thirty frames — but **it was not counting at all.** `GetReadyCountdown` holds
- * its number in `useState` and decrements it with a `setTimeout(…, 1000)`, and the reduced-motion
- * shim plus a frame-addressed renderer mean no timer ever fires: the component mounted at `from`
- * and rendered **"3" for all thirty frames**, then the beat cut to the recording. What read as
- * "too fast" was a countdown that never happened followed by a jump.
+ * ⚠️ **"A FRAME-ADDRESSED RENDERER MEANS NO TIMER EVER FIRES" IS FALSE, AND BELIEVING IT WAS THE
+ * BUG.** This comment used to assert it as a fact about the medium. **Remotion keeps ONE live
+ * browser page and steps the frame on it**, so wall-clock time keeps passing between frames and
+ * `setTimeout` fires exactly as it would anywhere else. The reduced-motion shim does not help
+ * either: it changes which *variant* a component renders and stops no timers.
  *
- * So the number is driven from the frame, and the component is remounted per value with a `key` —
- * `from` only seeds the initial state, so a changing prop cannot move it. That is the same
- * technique `chat.tsx` uses to type into the real composer, and it keeps the numeral the
- * component's own: its `font-display text-8xl leading-none tabular-nums text-white` and its drop
- * shadow, not a redraw.
+ * `GetReadyCountdown` holds its number in `useState` and decrements it with a
+ * `setTimeout(…, 1000)` that is **not** gated on reduced motion (`get-ready-countdown.tsx:29-33`).
+ * So two clocks drove one numeral — the component's, ticking once a real second, and this hook's,
+ * stepping every fifteen frames — and the numeral painted was the component's. Worse, `from` only
+ * seeds `useState` on mount, so remounting per value with a `key` **re-seeded the internal count
+ * back up** every time the frame clock stepped. On screen: `3 · 2 · 1 · 2 · 1 · 1`, with blanks
+ * where the component had counted itself down to 0 and returned `null`. It was **non-deterministic**
+ * — the same frame rendered different numerals depending on how fast the page had been driven.
+ *
+ * So the number is driven from the frame and the component's own numeral is **suppressed** rather
+ * than out-run: `calibrate.tsx`'s `Countdown` hides it with a scoped `visibility: hidden` (not
+ * `display`, so the grid keeps its layout) and draws the frame-derived digit over it, carrying
+ * `get-ready-countdown.tsx:49`'s className character-for-character. Moving the `key` onto the
+ * frame would have fixed rendered frames and left the second clock alive for any frame held longer
+ * than a second. That is the same seam `<BreathPacer/>` and `chat.tsx` use, and it keeps the
+ * numeral the component's own: its `font-display text-8xl leading-none tabular-nums text-white`
+ * and its drop shadow, not a redraw.
+ *
+ * **The general rule, which is larger than 5c:** a value this film addresses by frame must have
+ * exactly one source, and where a component supplies its own it has to be suppressed. "Timers do
+ * not fire" is not available as an assumption anywhere in this project.
  *
  * **And it is given real time.** Three seconds of story in thirty frames is a third of a second
  * per number, which is below the threshold at which a digit reads as a beat rather than a flicker

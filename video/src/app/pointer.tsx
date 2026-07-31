@@ -101,6 +101,24 @@ const positionAt = (path: Waypoint[], frame: number): { x: number; y: number } =
  */
 const GLYPH = { w: 13, h: 20 } as const;
 
+/**
+ * ── THE HOTSPOT, NAMED RATHER THAN LEFT IMPLICIT ────────────────────────────────────
+ *
+ * The path's tip sits at (1, 1) in the glyph's own coordinates (see the path below), but the
+ * glyph was positioned as a plain flow child of the `left`/`top`-positioned wrapper — so the
+ * wrapper's origin, `(x, y)`, landed on the SVG's `(0, 0)` corner, and the tip rendered one
+ * glyph-unit down-and-right of the click point instead of on it. A single glyph-unit is small
+ * next to a 26px ring, but "the glyph's hotspot IS its tip" (the comment on the path below)
+ * was aspirational rather than true, and it is exactly the kind of drift a real cursor never
+ * has — a real hotspot is a single pixel, not "close to one".
+ *
+ * So the SVG is pulled back by the tip's own offset, making `(TIP.x, TIP.y)` in the path's
+ * coordinates coincide with the wrapper's `(0, 0)` — which is `(x, y)`, the click point — and
+ * the ring (already centred on the wrapper's origin) stays concentric with the tip rather than
+ * with the box.
+ */
+const TIP = { x: 1, y: 1 } as const;
+
 /** How long the click ring lives, and how long the press dips the glyph. */
 const RING_FRAMES = 14;
 const PRESS_FRAMES = 5;
@@ -161,9 +179,14 @@ export const Pointer: React.FC<{
         height={GLYPH.h}
         viewBox="0 0 13 20"
         style={{
+          position: "absolute",
+          // Pulled back by the tip's own offset so (TIP.x, TIP.y) — not (0, 0) — lands on the
+          // wrapper's origin, which is the click point. See TIP's own comment above.
+          left: -TIP.x,
+          top: -TIP.y,
           display: "block",
           scale: 1 - press * 0.12,
-          transformOrigin: "0 0",
+          transformOrigin: `${TIP.x}px ${TIP.y}px`,
           // A macOS pointer has a soft drop shadow, which is also what keeps it legible over
           // both the near-black page and the bright viewfinder.
           filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.55))",
@@ -173,7 +196,8 @@ export const Pointer: React.FC<{
          * The macOS arrow: tip at the origin, a straight-cut tail, and a narrow tang. The tip is
          * at (1,1) rather than (0,0) so the stroke's own half-width does not push the visible
          * point off the control the pointer is aimed at — the glyph's hotspot IS its tip, and
-         * every waypoint in every beat is a control's measured centre.
+         * every waypoint in every beat is a control's measured centre. (TIP mirrors this (1,1)
+         * so the wrapper — not just the path — agrees with it.)
          */}
         <path
           d="M1 1 L1 15.2 L4.7 11.7 L7.2 17.6 L9.9 16.5 L7.4 10.7 L12 10.4 Z"

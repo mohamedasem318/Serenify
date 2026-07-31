@@ -3,6 +3,7 @@ import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { CalibrationBanner } from "@/components/anchor/calibration-banner";
 
+import { AuthPage, CheckEmailSurface } from "../../app/auth";
 import { HOME, centre } from "../../app/geometry";
 import { HomePage } from "../../app/home";
 import { Hover } from "../../app/hover";
@@ -11,6 +12,7 @@ import { Camera, frameRect, rect, shot } from "../Camera";
 import { Lift, useLift } from "../lift";
 import { H, W } from "../theme";
 import { useFade } from "../ui";
+import { BEAT2_SEAM } from "./Beat02Signup";
 
 /**
  * Beat 3 · Dashboard, first arrival · 0:21.6–0:25.6 · 120 frames
@@ -56,43 +58,100 @@ import { useFade } from "../ui";
 /** Where the banner lives in the layout, measured. */
 const CALIB_HOME = HOME.calibrationBanner;
 /**
- * Staged: a 520px measure, which is what makes 14px readable at framing 580.
+ * Staged: a 520px measure, which is what makes the banner's real 14px readable at framing 560.
  *
- * `y` is 341 rather than the banner's own 124 for a framing reason: higher up, the shot on the
- * lifted card reaches into the welcome banner and catches a sliced word, which is what the
- * framing rule exists to forbid. At 341 everything the frame catches above it is card edges
- * behind a 0.9 scrim.
+ * **The height is 108, not 148.** At 520 wide the component reflows to three lines and renders
+ * **107.2 tall** — measured off the frame, not assumed — so a 148-tall lift box left 41px of
+ * empty container below the banner and pushed the framing 41px further out than the element
+ * needed. `Lift` sizes its box from this rect, so the box now tracks what the component actually
+ * draws.
+ *
+ * **And it sits at the world's vertical centre now** (283 + 54 = 337 ≈ 337.5), which is what
+ * "travels to centre frame" means. It used to be pushed down to 341 to keep the welcome banner's
+ * greeting out of the shot — a workaround for a scrim that was not opaque. See below.
  */
-const CALIB_LIFTED = rect(340, 341, 520, 148);
-/** Beat 2's closing framing, so this beat opens exactly where that one ended. */
-const OTP_SHOT = shot(600, 563.1, 432);
+const CALIB_LIFTED = rect(340, 283, 520, 108);
+
+/**
+ * ══ THE SEAM OUT OF BEAT 2 ═════════════════════════════════════════════════════════
+ *
+ * **This was a real defect and it is the one this beat owed.** Beat 2's last shot and this
+ * beat's first were byte-identical — `shot(600, 563.1, 432)` — so the camera was continuous, and
+ * under a 432px-wide rectangle the *content* swapped in one frame from the green "Verified" pill
+ * to two unrelated dashboard card corners. A continuous camera over a discontinuous surface at
+ * 4.4× magnification does not read as a page navigation; it reads as a dropped frame.
+ *
+ * Two changes, and **neither introduces a cut**:
+ *
+ *  1. **The pull-out starts inside beat 2**, at its f448, so this beat opens at 963.6 rather than
+ *     432 — a shot that holds the whole `(auth)` column, which is a width at which a whole-page
+ *     change has somewhere to be seen.
+ *  2. **This beat holds the verify surface for its first ten frames** while the camera keeps
+ *     pulling. The navigation lands at f10, at ~950 world px, where it reads as what it is: the
+ *     browser replacing one page with another.
+ *
+ * The shot below MUST equal `BEAT2_SEAM` in `Beat02Signup.tsx`. It is imported rather than
+ * restated so it cannot drift; both derive from the same rect. **It belongs in `framing.ts`** —
+ * see the report.
+ */
+/**
+ * **f20, and the exact frame is measured rather than picked.** The dashboard's welcome greeting
+ * starts at world x 24, so any frame narrower than ~1150 cuts "Good morning, Youssef" mid-word.
+ * At f10 the pull-out is only at 950 and the navigation frame read "…d morning, Youssef" — the
+ * seam fix reintroducing the defect it exists to remove. At f20 the camera is at **1188.5**, the
+ * welcome banner (24 → 1176) is inside the frame whole, and the change reads as what it is.
+ */
+const NAVIGATE_AT = 20;
+/** Beat 2's f467 shot, so this beat opens exactly where that one ended. */
+const SEAM_SHOT = BEAT2_SEAM;
 
 const SET_BASELINE = centre(HOME.setBaseline);
 
 export const Beat03Dashboard: React.FC = () => {
   const frame = useCurrentFrame();
-  const lift = useLift(28, 16, 78, 16);
-  const banner = useFade(14, 6);
+  const lift = useLift(34, 16, 82, 14);
+  const banner = useFade(NAVIGATE_AT + 4, 6);
   // The navigation lands during the pull-out, which is what makes it read as one continuous move
-  // rather than as two shots.
-  const onDashboard = frame >= 8;
+  // rather than as two shots — and, now, at a width where the change is legible as a navigation.
+  const onDashboard = frame >= NAVIGATE_AT;
+
+  if (!onDashboard) {
+    // Beat 2's closing surface, held. `otpFrom` is beat 2's `T.otp` (380) expressed in this
+    // beat's clock — beat 2 is 468 frames, so 380 − 468 = −88, and `<OtpChoreography/>` clamps
+    // every interpolation to its end state past the timeline. The pill is therefore the same
+    // pill, in the same state, on the same frame it was on one frame earlier.
+    return (
+      <AbsoluteFill>
+        <Camera keys={[{ frame: 0, shot: SEAM_SHOT }, { frame: 26, shot: shot(W / 2, H / 2, W) }]}>
+          <AuthPage
+            clock="10:21 AM"
+            url="serenify.tech/signup"
+            tabs={[{ label: "Serenify" }, { label: "Mail", mail: true }]}
+            active={0}
+          >
+            <CheckEmailSurface otpFrom={-88} note={1} />
+          </AuthPage>
+        </Camera>
+      </AbsoluteFill>
+    );
+  }
 
   return (
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: OTP_SHOT },
-          { frame: 24, shot: shot(W / 2, H / 2, W) },
-          { frame: 34, shot: shot(W / 2, H / 2, W) },
-          { frame: 56, shot: frameRect(CALIB_LIFTED, 30) },
-          { frame: 78, shot: frameRect(CALIB_LIFTED, 30) },
+          { frame: 0, shot: SEAM_SHOT },
+          { frame: 26, shot: shot(W / 2, H / 2, W) },
+          { frame: 40, shot: shot(W / 2, H / 2, W) },
+          { frame: 60, shot: frameRect(CALIB_LIFTED, 20) },
+          { frame: 82, shot: frameRect(CALIB_LIFTED, 20) },
           { frame: 100, shot: shot(W / 2, H / 2, W) },
           { frame: 120, shot: shot(W / 2, H / 2, W) },
         ]}
       >
         <HomePage
           clock="10:23 AM"
-          calibrationBanner={onDashboard}
+          calibrationBanner
           bannerOpacity={lift > 0.02 ? 0 : banner}
           overlay={
             <>
@@ -110,13 +169,19 @@ export const Beat03Dashboard: React.FC = () => {
                   height: H,
                   backgroundColor: "var(--color-bg)",
                   /*
-                   * 0.97, not 0.9. At 0.9 the welcome banner's `text-4xl` greeting still came
-                   * through the wash as a legible fragment — "…oussef" hanging in the top-left
-                   * of the shot — and a sliced word in frame is exactly what the scrim exists
-                   * to prevent. The greybox got away with 0.9 because its greeting was a small
-                   * grey run of text; the real `<WelcomeBanner/>` is 38px of Outfit at full ink.
+                   * **FULLY OPAQUE, and 0.97 was not enough.** The rendered frame at the landing
+                   * still carried three legible fragments through the wash — "…oussef" from the
+                   * `text-4xl` greeting in the top-left, "…oday is going." and "…ork and checks
+                   * in if something comes up." across the bottom — all of them cut by the frame
+                   * edges. A 3% transmission of 38px Outfit at full ink is a legible word, and a
+                   * sliced word in frame is exactly what this scrim exists to prevent.
+                   *
+                   * At 1 the wash still reads as a wash rather than as a cut, because it RAMPS:
+                   * `lift` carries it 0 → 1 over the travel, so the audience watches the page go
+                   * out behind the element that is leaving it. The device is the ramp, not the
+                   * residue.
                    */
-                  opacity: 0.97 * lift,
+                  opacity: lift,
                 }}
               />
 

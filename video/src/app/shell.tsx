@@ -51,8 +51,23 @@ export const MONITOR_STAGE =
   "rounded-3xl border border-border bg-surface px-6 pb-6 pt-16 shadow-soft " +
   "sm:min-h-[480px] sm:px-10 sm:pb-10";
 
-/** `monitoring-session.tsx:782` — the monitor page column. `max-w-3xl` = 768, NOT 1152. */
-export const MONITOR_COL = "mx-auto w-full max-w-3xl";
+/**
+ * `monitoring-session.tsx:782` — the monitor page column. The app ships `max-w-3xl` (768).
+ *
+ * ── L14: THE COLUMN NARROWS TO `max-w-lg` (512), AND IT IS THE ONLY WAY THE PAGE FITS ──
+ *
+ * Measured, not preferred. At 768 the populated trend card's bottom is 1227.4 and the bloom's top
+ * is 309 — **918.4px of stack**, against a 675-tall world. No 16:9 frame ≤1200 world px holds
+ * that, which is why beat 11 had to abandon holding the bloom and the trend together and why the
+ * emphasis had no room on the two-line `tense` copy.
+ *
+ * `max-w-lg` is the app's own next step down and is already used by the calibration column
+ * (`anchor-recorder.tsx:570`), so it is a width the product ships rather than a number invented
+ * for the film. It costs nothing where it matters: **the bloom is centred, so at 512 it lands at
+ * x 456–744 — exactly where it is at 768.** What moves is the empty page either side of it, and
+ * that is what the pinned right column (viewfinder / toast / prompt, x 856–1176) is built on.
+ */
+export const MONITOR_COL = "mx-auto w-full max-w-lg";
 
 /** `components/anchor/anchor-recorder.tsx:570` — the calibration column. `max-w-lg` = 512. */
 export const CALIBRATE_COL = "mx-auto w-full max-w-lg";

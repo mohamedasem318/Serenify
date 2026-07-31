@@ -8,12 +8,23 @@ import { SessionTrend } from "@/components/monitor/session-trend";
 import { Viewfinder } from "@/components/monitor/viewfinder";
 import type { SessionTrendPoint } from "@/lib/api/monitoring-reads";
 
+import type { Shot } from "../greybox/Camera";
 import { CharacterRig } from "../greybox/rig";
 import type { Pose } from "../greybox/rig";
 import { PROTAGONIST } from "../greybox/copy";
-import { RAW, SCROLL, VF_SCALE, VIEWFINDER, emphasisCapFor } from "./geometry";
+import { projectWorld } from "./framing";
+import {
+  PROMPT,
+  RAW,
+  SCROLL,
+  STATELINE_CONTROLS_GAP,
+  SUB_MIN_HEIGHT,
+  VF_SCALE,
+  VIEWFINDER,
+  emphasisCapFor,
+} from "./geometry";
 import { useBloomBreath, useBloomColor } from "./motion";
-import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y } from "./shell";
+import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell";
 
 /**
  * ══ THE MONITORING PAGE, AS THE REAL COMPONENTS ═════════════════════════════════════
@@ -100,6 +111,32 @@ export const trendPoints = (opts: {
  * between the two caps so the collapse is a settle rather than a snap, and that settle is what
  * makes the second copy change carry movement — see `Beat08Email.tsx`.
  */
+/**
+ * ── THE TWO LAYOUT VALUES L14 SPENDS, AS A SCOPED STYLESHEET ────────────────────────
+ *
+ * The film cannot put a class on a shipped component's paragraph, and it must not fork one. So
+ * the two arrangement changes L14 needs are declared here, by selector, against the same DOM the
+ * measurement harness already addresses (`SwapProbe.tsx`) — the same mechanism `motion.tsx` uses
+ * four times over and `hover.tsx` uses for every control in the film.
+ *
+ *  1. **The sub reserves two lines.** `min-height: 51` — two of its own 25.5px lines. Without it
+ *     the stateline block, the controls, the footnote and every framing derived from them change
+ *     size on the frame the copy changes, which is how the two-line `tense` sub came to be
+ *     sliced by the viewport at rest in the one reading the film exists to deliver.
+ *  2. **The stateline→controls gap goes 28 → 70.** This is the room L12's 1.25× grows into. With
+ *     it the raised two-line block finishes **46.75px** clear of the Pause/End controls; without
+ *     it the cap is 1.01× and the device is dead.
+ *
+ * Neither touches a colour, a size, a weight or a word. `geometry.ts` § SUB_MIN_HEIGHT holds the
+ * numbers, because every framing above is derived from them and they must not drift apart.
+ */
+export const StageLayout: React.FC = () => (
+  <style>{`
+    [data-emph] p[aria-live="polite"] + p { min-height: ${SUB_MIN_HEIGHT}px; }
+    [data-emph] div.mt-7 { margin-top: ${STATELINE_CONTROLS_GAP}px; }
+  `}</style>
+);
+
 const Emphasis: React.FC<{ t: number; factor: number }> = ({ t, factor }) => {
   const k = 1 + (factor - 1) * t;
   const dySub = RAW.statelineSub.y - RAW.statelineHead.y; // 42px, measured
@@ -253,105 +290,58 @@ export const MonitorPage: React.FC<{
       overlay={overlay}
     >
       <BloomDrift tension={tension} />
+      <StageLayout />
       <Emphasis t={emphasis} factor={emphasisFactor} />
       <TrendSettle />
 
-      {/* The page scrolls under the sticky header. The real page is ~973px tall below the
+      {/* The page scrolls under the sticky header. The real page is ~1100px tall below the
           chrome against a 583px viewport, so it scrolls in the product too — this is the
-          page's behaviour, not a video device. */}
+          page's behaviour, not a video device. Beats 7–9 hold ONE offset; only beat 11 moves. */}
       <div style={{ marginTop: -scroll }}>
         <div className={MONITOR_COL}>
-          {/* `monitoring-session.tsx:784-799` — the readout is a ROW ABOVE the card, not a
-              corner overlay. The greybox drew it floating at the card's right. */}
-          <div className="mb-3 flex items-center gap-3 px-1">
-            <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
-              <span aria-hidden>←</span> Dashboard
-            </span>
-            <span className="ml-auto text-sm tabular-nums text-muted">
-              Session ·{" "}
-              <b data-testid="session-timer" className="font-semibold text-ink">
-                {mm}:{ss}
-              </b>
-            </span>
-          </div>
-
-          <div style={{ position: "relative" }}>
-            <div data-bloom data-emph className={MONITOR_STAGE}>
-              <OpSurfaces
-                state={{ op: "active", band, skipCause: null }}
-                onAllow={() => {}}
-                onRetryBlocked={() => {}}
-              />
-            </div>
-
+          <div data-bloom data-emph className={MONITOR_STAGE}>
             {/*
-             * ── THE VIEWFINDER IS A SIBLING OF THE CARD, NOT A CHILD, AND IT HAS TO BE ──
+             * ── THE READOUT MOVES INTO THE CARD'S OWN `pt-16` BAND (L14) ──
              *
-             * In the app it is `absolute right-4 top-4 z-10` INSIDE the stage
-             * (`monitoring-session.tsx:805`) — an overlay that happens to be parented there. The
-             * stage also carries `overflow-hidden`, which is invisible at the app's own size
-             * because the viewfinder fits, and fatal at L1's: the first render of this pass had
-             * the enlarged viewfinder sliced clean off at the card's right edge.
+             * `monitoring-session.tsx:784-799` puts this row ABOVE the card. That row is the
+             * single thing that used to pin the page scroll: it sits at raw y 188–232 under a
+             * sticky header ending at 156, so any scroll past ~41 hid the `Session · MM:SS`
+             * readout that beat 7 lists as required content — while the two-line `tense` sub
+             * needed a scroll of at least 39 to clear the viewport bottom. A 2.5px window, and
+             * inside it the emphasis had no room at all.
              *
-             * So it is parented one level out and placed at its MEASURED position. The component
-             * is untouched and its appearance is identical — only its containing block differs,
-             * which is a video-side decision about clipping, not a change to the product.
+             * The card's `pt-16` is 64px of empty space directly above the bloom, and the row is
+             * 44 tall. So the row moves into it — absolutely positioned, so the card's own
+             * `justify-center` layout is untouched and the bloom does not move a pixel. Nothing
+             * is restyled: the same two spans, the same classes, the same words.
              *
-             * ── AND IT GROWS FROM ITS TOP-LEFT ──
-             *
-             * L1 enlarges it from 224×126.9 to 320×181.3. Growing from the top-RIGHT (its anchor
-             * in the app) pushes its left edge to 647, and the bloom's gradient is fully opaque
-             * out to x 669 — so it would cover the bloom's solid core, and beat 7's entire job is
-             * to plant bloom, stateline and viewfinder together. Growing from the top-LEFT keeps
-             * its left edge at the real 743, one pixel clear of the bloom's box, and spends the
-             * growth on the empty page to the card's right instead.
-             */}
-            {/*
-             * `<Viewfinder/>` is ITSELF `absolute right-0 top-12` (`viewfinder.tsx:49`), so it
-             * positions against whatever box it lands in. Dropped into a zero-width anchor — the
-             * shape the app's own `absolute right-4 top-4` pill wrapper has — `right-0` pins its
-             * RIGHT edge and L1's scale grows it leftward, straight over the bloom. That is what
-             * the first attempt did, and it is worth stating because the failure looks like a
-             * position bug rather than a growth-direction one.
-             *
-             * So it gets a real box of the component's own unscaled size plus its own `top-12`
-             * offset, scaled about the box's TOP-LEFT. The component's offsets resolve inside a
-             * box it can measure, and the growth goes right and down — onto the empty page beside
-             * the card, never onto the bloom.
+             * **`top-5`, not `top-3`, and that was found on a render rather than derived.** The
+             * composite's frame top lands at raw y 210, and at `top-3` the row's text cleared it
+             * by 3px — not sliced, but the kind of clearance that becomes a slice the next time
+             * anything moves. At `top-5` the row occupies raw 209–253, its text clears the frame
+             * by 11px, and its box finishes exactly on the bloom's top edge (253) — which costs
+             * nothing, since the row has no background and its text ends 12px above it.
              */}
             <div
-              style={{
-                position: "absolute",
-                // Offsets are relative to THE STAGE, which is what the `position: relative`
-                // wrapper starts at — not the timer row above it. Measuring from the row put the
-                // viewfinder 56px low, and the symptom was the beat-8 frame clipping its bottom
-                // edge rather than anything that looked like a position bug.
-                left: RAW.viewfinder.x - RAW.stage.x,
-                top: RAW.viewfinder.y - 48 * VF_SCALE - RAW.stage.y,
-                width: RAW.viewfinder.w,
-                height: RAW.viewfinder.h + 48,
-                zIndex: 10,
-                transformOrigin: "top left",
-                scale: VF_SCALE,
-              }}
+              data-probe="timerrow"
+              className="absolute inset-x-10 top-5 z-10 flex items-center gap-3"
             >
-              <Viewfinder pinned>
-                {/* The rig sizes itself off the box's ASPECT, never its pixels, so it re-fits
-                    whatever inner box the real component turns out to have — which is the case
-                    it was built for. Unscaled dims; the wrapper carries L1. */}
-                <CharacterRig
-                  x={0}
-                  y={0}
-                  w={RAW.viewfinder.w}
-                  h={RAW.viewfinder.h}
-                  pose={pose}
-                  working={working}
-                  headphones={headphones}
-                  nod={nod}
-                  notesFrom={notesFrom}
-                />
-              </Viewfinder>
+              <span className="inline-flex min-h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted">
+                <span aria-hidden>←</span> Dashboard
+              </span>
+              <span className="ml-auto text-sm tabular-nums text-muted">
+                Session ·{" "}
+                <b data-testid="session-timer" className="font-semibold text-ink">
+                  {mm}:{ss}
+                </b>
+              </span>
             </div>
+
+            <OpSurfaces
+              state={{ op: "active", band, skipCause: null }}
+              onAllow={() => {}}
+              onRetryBlocked={() => {}}
+            />
           </div>
 
           <SessionTrend
@@ -368,8 +358,163 @@ export const MonitorPage: React.FC<{
         </div>
       </div>
 
+      {/*
+       * ══ THE PINNED RIGHT COLUMN — THE VIEWFINDER (L14) ═══════════════════════════
+       *
+       * In the app the viewfinder is `absolute right-4 top-4 z-10` INSIDE the stage
+       * (`monitoring-session.tsx:805`) — an overlay that happens to be parented there. The stage
+       * also carries `overflow-hidden`, which is invisible at the app's own size because the
+       * viewfinder fits, and fatal at L1's: an early render of this pass had the enlarged
+       * viewfinder sliced clean off at the card's right edge.
+       *
+       * **It is now a sibling of the SCROLL CONTAINER, not of the card**, and that is the fix for
+       * the defect this pass was opened on. Laid out inside the scrolling column its top landed
+       * at 269 at `SCROLL.monitor` = 40, against the mail toast's bottom at 291 — a **22px
+       * overlap**, which is the "the notification covers the viewfinder in beats 8 and 9"
+       * complaint. The old 18px gap had been computed against the UNSCROLLED position, so the
+       * arithmetic was right about a page nobody was rendering. Neither element scrolls now.
+       *
+       * ── AND IT GROWS FROM ITS TOP-LEFT ──
+       *
+       * `<Viewfinder/>` is ITSELF `absolute right-0 top-12` (`viewfinder.tsx:49`), so it
+       * positions against whatever box it lands in. Dropped into a zero-width anchor — the shape
+       * the app's own `absolute right-4 top-4` pill wrapper has — `right-0` pins its RIGHT edge
+       * and L1's scale grows it leftward. So it gets a real box of the component's own unscaled
+       * size plus its own `top-12` offset, scaled about the box's TOP-LEFT; the component's
+       * offsets resolve inside a box it can measure, and `VIEWFINDER` is where the visible panel
+       * lands. The `- 48 · VF_SCALE` is that `top-12`, scaled.
+       *
+       * The offsets are relative to `Desktop`'s viewport div (the nearest positioned ancestor),
+       * which starts at `VIEWPORT_Y` — so world y minus 92. A pointer or a panel placed without
+       * that subtraction lands 92px low, which is the bug the mail toast had before `overlay`
+       * existed.
+       */}
+      <div
+        style={{
+          position: "absolute",
+          left: VIEWFINDER.x,
+          top: VIEWFINDER.y - 48 * VF_SCALE - VIEWPORT_Y,
+          width: RAW.viewfinder.w,
+          height: RAW.viewfinder.h + 48,
+          zIndex: 10,
+          transformOrigin: "top left",
+          scale: VF_SCALE,
+        }}
+      >
+        <Viewfinder pinned>
+          {/* The rig sizes itself off the box's ASPECT, never its pixels, so it re-fits
+              whatever inner box the real component turns out to have — which is the case
+              it was built for. Unscaled dims; the wrapper carries L1. */}
+          <CharacterRig
+            x={0}
+            y={0}
+            w={RAW.viewfinder.w}
+            h={RAW.viewfinder.h}
+            pose={pose}
+            working={working}
+            headphones={headphones}
+            nod={nod}
+            notesFrom={notesFrom}
+          />
+        </Viewfinder>
+      </div>
+
       {children}
     </AppShell>
+  );
+};
+
+/**
+ * ══ BRINGING THE PORTALLED PROMPT INTO THE WORLD (L14) ══════════════════════════════
+ *
+ * `<ConfirmatoryPrompt/>` wraps `<Notification/>`, which is a Radix dialog: it renders through
+ * `DialogPrimitive.Portal` into `document.body` and is `fixed right-4 w-80 bottom-[calc(…)]`
+ * (`notification.tsx:186`). Three consequences, and all three had to be answered:
+ *
+ *  · **The portal escapes any wrapper.** Beat 9 used to wrap the prompt in a translated div and
+ *    the div moved nothing — the node is not inside it. `Notification` forwards no `container`
+ *    prop, so there is no supported way to portal it somewhere else, and forking the component
+ *    is not available (the film renders the product, not a copy of it).
+ *  · **`fixed` resolves against the 1920×1080 OUTPUT frame**, not the world, so the prompt sat
+ *    bottom-right of the frame regardless of where the camera was looking. The camera could not
+ *    push in on the one surface beat 9 exists to show, and the cursor had to be drawn in screen
+ *    space to reach it. That is the beat's known framing complaint.
+ *  · Being a body child, it is **outside `Desktop`'s `overflow: hidden`** — which is the one
+ *    thing the portal is good for here, and is why the panel may hang 20px past the world's
+ *    bottom edge onto the camera backdrop.
+ *
+ * So the node is projected rather than moved: a scoped stylesheet re-states `left` / `top` /
+ * `transform` as **the camera's own transform applied to `PROMPT.panel`'s world coordinates**.
+ * `right`/`bottom` are neutralised so the component's own `right-4 bottom-[…]` stop competing;
+ * everything else about it — `w-80`, `p-6`, `rounded-card`, `bg-surface`, every word — is the
+ * product's. `!important` is required because framer-motion writes `transform` and `opacity`
+ * into `element.style` on every frame and an inline declaration outranks a plain rule.
+ *
+ * The result is a prompt that behaves as if it had been laid out in the world: it enters, moves
+ * and magnifies with the camera, and `PROMPT.yes` is a world rect the pointer can travel to.
+ */
+export const WorldPrompt: React.FC<{
+  /** The camera's shot THIS frame — `useShotAt(keys)` in `framing.ts`. */
+  shot: Shot;
+  /** The entrance: `x` in WORLD px (the component's own 24px slide), `opacity` 0→1. */
+  enter: { x: number; opacity: number };
+  children: React.ReactNode;
+}> = ({ shot, enter, children }) => {
+  const p = projectWorld(shot, PROMPT.panel.x + enter.x, PROMPT.panel.y);
+  return (
+    <>
+      <style>{`
+        [data-testid="notification"] {
+          right: auto !important;
+          bottom: auto !important;
+          left: ${p.left.toFixed(3)}px !important;
+          top: ${p.top.toFixed(3)}px !important;
+          transform-origin: 0 0 !important;
+          transform: scale(${p.zoom.toFixed(6)}) !important;
+          opacity: ${enter.opacity.toFixed(4)} !important;
+        }
+      `}</style>
+      {children}
+    </>
+  );
+};
+
+/**
+ * ── A SECOND CAMERA, FOR THE ONE LAYER THAT CANNOT LIVE INSIDE THE FIRST ────────────
+ *
+ * The portalled prompt is a child of `document.body` with `z-index: 50`, and `<Camera>`'s inner
+ * div carries a transform — which makes it a stacking context. **Anything rendered inside
+ * `<Camera>` is therefore trapped below the prompt**, cursor included, and a cursor that
+ * disappears behind the button it is pressing is worse than no cursor at all.
+ *
+ * So beat 9's pointer is drawn in a sibling layer that carries the SAME transform the camera
+ * does, at a z-index above the prompt's. Its children are authored in ordinary world
+ * coordinates and are magnified by the camera exactly as they would be inside it — which is what
+ * `pointer.tsx` requires ("the film is a screen recording of a 1200px screen blown up, and a
+ * magnified recording magnifies its cursor").
+ */
+export const WorldOverlay: React.FC<{
+  shot: Shot;
+  zIndex?: number;
+  children: React.ReactNode;
+}> = ({ shot, zIndex = 95, children }) => {
+  const zoom = 1920 / shot.w;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: WORLD.w,
+        height: WORLD.h,
+        transformOrigin: "0 0",
+        translate: `${960 - zoom * shot.cx}px ${540 - zoom * shot.cy}px`,
+        scale: zoom,
+        zIndex,
+      }}
+    >
+      {children}
+    </div>
   );
 };
 
