@@ -2,14 +2,14 @@ import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { ConsentGatePage } from "../../app/consent";
-import { BEAT4_ESTABLISH, BEAT4_LINE } from "../../app/framing";
+import { BEAT4_ESTABLISH, BEAT4_SEAM } from "../../app/framing";
 import { centre, GATE } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
 import { Camera, rect, shot } from "../Camera";
 
 /**
- * Beat 4 · Camera consent gate · 180 frames
+ * Beat 4 · Camera consent gate · 120 frames
  *
  * ~230 words. Unreadable at any speed. Do not try.
  *
@@ -43,29 +43,41 @@ import { Camera, rect, shot } from "../Camera";
  * edge in the 12px gutter under the heading and its bottom edge 4px under the card's own border)
  * because a whole visible edge is the acceptance criterion and 8.96 vs 9.67 is not a reading.
  *
- * ══ TWO LANDINGS, ONE CONTINUOUS MOVE ═══════════════════════════════════════════════
+ * ══ AND THE BEAT NOW HAS TWO LANDINGS, NOT THREE — IT WAS LINGERING ════════════════
  *
- *   f0–18     establish · badge, heading, lede and the first card's own heading, all whole
- *   f18–80    the page scrolls under a held camera — which is how a scroll reads
- *   f80–108   push to the key line's card body
- *   f108–142  HOLD. 34 frames on four bullets at 8.96px
- *   f142–170  the page flings to its bottom AND the camera pulls to the buttons, together
- *   f174      he clicks "Allow camera and inference"
+ * It used to establish, scroll, **pull out, push in on the privacy line and hold 34 frames on
+ * it**, then fling to the buttons: five movements and 180 frames for a beat whose content is a
+ * long page and a button. The middle landing is gone.
+ *
+ * **The reason is not pacing alone — it is that the claim was being made twice.** This landing
+ * held "Nothing is kept. There is no bucket, no table, and no file path where a clip lands.", and
+ * beat 5a lands on "Your video isn't stored — only the calm reading it produces." **Same claim,
+ * two beats apart**, which makes the second read as a repeat rather than as a promise. Only one
+ * of them can be the film's privacy moment, and it is 5a's: the line is tighter, it reads at
+ * 10.01px against this one's 8.96, and it lands at the moment the camera is actually about to
+ * turn on, which is when a privacy claim carries weight. This beat keeps the page — 230 words of
+ * it, visibly scrolling, which is the beat's real content — and hands the sentence to 5a.
+ *
+ * `BEAT4_LINE` is deleted from `framing.ts` with it; nothing else framed it.
+ *
+ *   f0–14     establish · badge, heading, lede and the first card's own heading, all whole
+ *             (the camera arrives here out of beat 3's move — see `BEAT4_SEAM`)
+ *   f14–72    the page scrolls under a held camera — which is how a scroll reads
+ *   f72–104   the page flings to its bottom AND the camera pulls to the buttons, together
+ *   f108      he clicks "Allow camera and inference"
  */
 
 /**
  * ── THE TWO SCROLL POSITIONS, BOTH DERIVED ─────────────────────────────────────────
  *
- * `A` = 250 puts the whole KEY landing inside the page's own 156–675 viewport (the frame runs
- * 235.9 → 606.6) with the second card's top at 626.6, below the frame and out of shot.
- * The window is [181.6, 329.9]; 250 sits in the middle of it.
+ * `A` is gone with the key-line landing — the beat scrolls once, straight through, rather than
+ * stopping halfway to read a sentence beat 5a now carries.
  *
  * `B` = 682.9 is the page scrolled to its **bottom**: the gate is 1169.9 tall from y 188, so its
  * last pixel is 1357.9 and the viewport's is 675. That is what makes the CTA landing composable —
  * the frame's bottom edge and the page's own bottom edge coincide at 675, so the shot has no dead
  * space under the buttons and no seam where it ends.
  */
-const SCROLL_A = 250;
 const SCROLL_B = 1357.9 - 675;
 
 const shifted = (r: { x: number; y: number; w: number; h: number }, s: number) =>
@@ -101,7 +113,10 @@ export const Beat04CameraGate: React.FC = () => {
   // The scroll and the push-in OVERLAP by six frames on purpose: if the page settled on the
   // exact frame the camera started, there would be one still frame of a card sliced by the
   // establishing shot's bottom edge. Six frames of shared motion removes it.
-  const scroll = interpolate(frame, [18, 84, 142, 170], [0, SCROLL_A, SCROLL_A, SCROLL_B], {
+  // ONE continuous scroll to the page's bottom, held under an establishing camera and finished
+  // under the pull to the buttons. It used to stop at 250 for 58 frames while the camera read a
+  // line — see the header.
+  const scroll = interpolate(frame, [14, 104], [0, SCROLL_B], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
@@ -111,13 +126,14 @@ export const Beat04CameraGate: React.FC = () => {
     <AbsoluteFill>
       <Camera
         keys={[
-          { frame: 0, shot: BEAT4_ESTABLISH },
+          // Beat 3's push-in arrives here — the surface changed under a moving camera rather
+          // than on a cut. See `BEAT4_SEAM`.
+          { frame: 0, shot: BEAT4_SEAM },
+          { frame: 14, shot: BEAT4_ESTABLISH },
           // Held while the page scrolls, so the scroll reads as a scroll.
-          { frame: 78, shot: BEAT4_ESTABLISH },
-          { frame: 108, shot: BEAT4_LINE },
-          { frame: 142, shot: BEAT4_LINE },
-          { frame: 170, shot: CTA },
-          { frame: 180, shot: CTA },
+          { frame: 72, shot: BEAT4_ESTABLISH },
+          { frame: 104, shot: CTA },
+          { frame: 120, shot: CTA },
         ]}
       >
         <ConsentGatePage
@@ -132,19 +148,19 @@ export const Beat04CameraGate: React.FC = () => {
               <Hover
                 selector="[data-probe='gate'] button"
                 treatment="meadow"
-                from={172}
-                to={180}
+                from={106}
+                to={120}
               />
               {/* The travel starts after the camera has landed, so the cursor is never drawn
                   outside the frame it is travelling in — at f160 the camera is still flinging and
                   a waypoint down at the buttons would be off-shot until it arrives. */}
               <Pointer
                 path={[
-                  { frame: 162, x: ALLOW.x + 190, y: ALLOW.y + 78 },
-                  { frame: 172, x: ALLOW.x, y: ALLOW.y },
+                  { frame: 96, x: ALLOW.x + 190, y: ALLOW.y + 78 },
+                  { frame: 106, x: ALLOW.x, y: ALLOW.y },
                 ]}
-                clicks={[174]}
-                visible={{ from: 160 }}
+                clicks={[108]}
+                visible={{ from: 94 }}
               />
             </>
           }

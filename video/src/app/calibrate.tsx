@@ -46,6 +46,13 @@ import { AppShell, CALIBRATE_COL, CALIBRATE_PREVIEW } from "./shell";
  * centering nudge land harder". It does, and for a measurable reason.
  */
 
+/**
+ * How far the uploading line drops so that it lands on the axis the capture stage occupied —
+ * 82px, which is `BEAT5_UPLOADING`'s centre (321.95) less where the bare paragraph falls (240).
+ * See the note at its call site.
+ */
+const UPLOADING_DROP = 82;
+
 export type CalibPhase =
   | "intro"
   | "green-room"
@@ -348,12 +355,29 @@ export const CalibratePage: React.FC<{
           </div>
         )}
 
-        {/* Verbatim from `anchor-recorder.tsx:693` — the uploading line REPLACES the capture
-            stage rather than sitting under it, which is the step the greybox used to skip. */}
+{/*
+         * Verbatim from `anchor-recorder.tsx:693` — the uploading line REPLACES the capture
+         * stage rather than sitting under it, which is the step the greybox used to skip.
+         *
+         * ── AND IT SAT IN THE TOP QUARTER OF THE FRAME ────────────────────────────────
+         *
+         * In the product this line appears *where the stage was* — the column above it still
+         * carries a heading and the stage's own box, so it lands around the middle of the page.
+         * This reproduction replaces the whole stage with the paragraph, so with only its own
+         * `py-10` above it the line landed at world y 228–252: a quarter of the way down a frame
+         * whose centre is 322, reading as a caption pinned to the top rather than as the app
+         * taking over.
+         *
+         * `UPLOADING_DROP` is the distance from where it falls to where the stage's own centre
+         * was, so the line arrives on the axis the preview just left. It is spacing, not copy:
+         * the paragraph keeps its verbatim class string and its verbatim words.
+         */}
         {phase === "uploading" && (
-          <p className="py-10 text-center text-base text-muted" aria-live="polite" role="status">
-            Setting your baseline — one calm moment…
-          </p>
+          <div style={{ paddingTop: UPLOADING_DROP }}>
+            <p className="py-10 text-center text-base text-muted" aria-live="polite" role="status">
+              Setting your baseline — one calm moment…
+            </p>
+          </div>
         )}
 
         {phase === "success" && (

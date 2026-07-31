@@ -8,6 +8,7 @@ import { HOME, centre } from "../../app/geometry";
 import { HomePage } from "../../app/home";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
+import { BEAT4_SEAM } from "../../app/framing";
 import { Camera, frameRect, rect, shot } from "../Camera";
 import { Lift, useLift } from "../lift";
 import { H, W } from "../theme";
@@ -146,7 +147,12 @@ export const Beat03Dashboard: React.FC = () => {
           { frame: 60, shot: frameRect(CALIB_LIFTED, 20) },
           { frame: 82, shot: frameRect(CALIB_LIFTED, 20) },
           { frame: 100, shot: shot(W / 2, H / 2, W) },
-          { frame: 120, shot: shot(W / 2, H / 2, W) },
+          // The click at f112, and then the push into beat 4 STARTS HERE — see `BEAT4_SEAM`.
+          // "Set baseline" → "Before the camera turns on" used to be a straight cut on a frame
+          // where the framing changed too; the navigation now lands inside a move that beat 4
+          // finishes.
+          { frame: 108, shot: shot(W / 2, H / 2, W) },
+          { frame: 120, shot: BEAT4_SEAM },
         ]}
       >
         <HomePage

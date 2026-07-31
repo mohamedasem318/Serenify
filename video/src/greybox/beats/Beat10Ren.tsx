@@ -2,14 +2,14 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { ChatPage, msg } from "../../app/chat";
-import { CHAT, PHONE_PX, centre } from "../../app/geometry";
+import { CHAT, PHONE_PX, REN_AVATAR, REN_AVATAR_SIZE, centre } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
-import { Camera, frameRect, rect, union } from "../Camera";
+import { Camera, frameRect, rect, shot, union } from "../Camera";
 import { REN } from "../copy";
 
 /**
- * Beat 10 · Ren · 210 frames
+ * Beat 10 · Ren · 250 frames
  *
  * A real three-turn exchange, each message legible, appearing one at a time with a real beat
  * between them.
@@ -37,42 +37,47 @@ import { REN } from "../copy";
  *
  * ── WHAT THE MEASUREMENTS DECIDE, AND IT IS NOT WHAT THE OLD PLAN ASSUMED ───────────
  *
- * The avatar is in the **header** now, not on the bubbles (`chat-shell.tsx:432`), so
- * `union(avatar, bubble)` is no longer a tight rect for two of the three turns: Ren's avatar sits
- * at x 281 and **his** reply runs out to x 919, so any landing holding both is ≥ 638 wide before
- * margins. That is the number that sets this beat's whole scale:
+ * The avatar is in the **header**, not on the bubbles (`chat-shell.tsx:432`), so
+ * `union(avatar, bubble)` is not a tight rect for two of the three turns: Ren sits at x 270 (at
+ * L8's 56px) and **his** reply runs out to x 919, so any landing holding both is ≥ 649 wide
+ * before margins. And the composer alone is 646 wide, so **every** shot that contains it is ≥
+ * 694 whatever else is in it:
  *
  *   the panel whole, all four edges     672 × 460 → 16:9 forces **888.9** → 15px reads 7.12px
- *   avatar + his bubble + the composer  →  **712** → 8.89px
+ *   avatar + his bubble + the composer  →  **760** → 8.33px
  *   avatar + all three bubbles          →  **664.9** → 9.52px
- *   avatar + Ren's opener alone         →  **469.5** → **13.48px**
+ *   Ren's face alone                    →  **360** → the 56px avatar at **65.6px**
  *
- * So the sheet's own camera correction — *the camera moves on every turn, because at a framing
- * wide enough to hold the whole thread 15px chat text is well under phone legibility* — is
- * arithmetic here rather than taste, and it is also the reason the landings crop the panel's own
- * chrome. **Nothing textual is ever sliced**: every frame edge below lands in a measured gutter.
- * What the tighter two landings give up is the panel's 1px side borders (L1) and 3.5px of them
- * (L3), which reads as a zoom into a screen recording rather than as a cut element.
+ * ══ THE BEAT IS STAGED AROUND HIS FACE NOW, NOT AROUND THE PANEL ════════════════════
+ *
+ * That table is why the beat used to have no good shot: at every framing wide enough to hold the
+ * conversation, Ren is a 30px mark and the chat text is under the phone floor, and the previous
+ * pass answered it by punching in on the avatar for **six frames** and pulling straight back out.
+ * Six frames is not a shot, it is a twitch — and it was punching in on a 34px circle in `idle`,
+ * because L8 had never been built and `<ChatShell/>` mounts the avatar with no props at all.
+ *
+ * So the beat lands on his face **once, properly**, while he composes the opener — and that is
+ * what pays for everything after it. The exchange's own landings still carry him (they have to:
+ * his `thinking` and `warm` states have to be on screen when they fire), but they no longer have
+ * to *introduce* him, so the beat stops asking one framing to do two jobs.
  *
  * ── THE CAMERA DOES NOT GO TO THE COMPOSER, BECAUSE THE POINTER DOES NOT ───────────
  *
- * `L2` is a single hold from f38 to f120. It already contains the composer, the send button, the
+ * `L2` is a single hold from f66 to f162. It contains the composer, the send button, the
  * conversation header and both bubbles, so the typing, the send click and his message landing all
  * happen inside one static frame — which is what the pointer's own fix asks for. A camera that
  * travelled down to the composer while the cursor sat still would be the only thing moving in the
  * shot, and would read as motion the scene does not have.
  *
- *   f0–14    the whole panel, whole — the one shot in the beat with nothing cropped
- *   f8       Ren's opener lands, and the camera settles onto it as it arrives
- *   f14–32   L1 · header + turn 1, at 13.48px
- *   f38–120  L2 · header + composer + turns 1 and 2. Click f38, typing f40–98, send f100
- *   f146–210 L3 · header + all three bubbles. **64 frames**, and turn 3's hold is protected
+ * ── WHAT IS GIVEN UP, STATED ───────────────────────────────────────────────────────
  *
- * ── THE AVATAR IS IN EVERY LANDING ─────────────────────────────────────────────────
- *
- * (281, 205.8) 34 × 34 sits inside all three frames — L1 by 60px on its left and 48 above, L2 by
- * 38.5 and 25, L3 by 13.5 and 50. That is the requirement L8 exists to protect and it is now a
- * property of the rects rather than of three hand-typed numbers.
+ * **Turn 1 is never read above 8.33px.** The old plan gave it its own 480-wide landing at
+ * 13.17px; that landing is gone, because it sat between the face hold and the working shot and
+ * cost the beat about 0.9s it does not have. Ren's opener is on screen alone in the thread for
+ * 82 frames — nearly three seconds — at the same size the film already accepts for turn 2 and
+ * for the composer, and the beat's opening now spends its time on the person saying it rather
+ * than on the sentence. If it ever reads as unreadable rather than merely small, the landing is
+ * `frameRect(union(REN_AVATAR, CHAT.turn1), 60)` at cy 292 and it costs ~26 frames.
  */
 
 /**
@@ -107,44 +112,56 @@ const CARET_AT = { x: CHAT.textarea.x + 62, y: CHAT.textarea.y + CHAT.textarea.h
 const PANEL_WHOLE = frameRect(CHAT.panel, 20);
 
 /**
- * **L1 — turn 1.** `frameRect(union(CHAT.renAvatar, CHAT.turn1), 60)`.
+ * **REN_FACE — the landing this beat is now staged around.**
  *
- * The union of the avatar (281, 205.8, 34 × 34) and turn 1 is identical to the union against the
- * header's wider content block (avatar + "Ren" / "here to listen"): turn 1 already extends past
- * both of the header content's own edges, so only the avatar's own corner is load-bearing here.
+ * The beat used to punch in on the avatar at f32 and pull back out at f38 — six frames — which
+ * does not read as a shot at all, it reads as a twitch. And it was punching in on a 34px circle
+ * in `idle`, because the shipped avatar was never enlarged and never given a state, so there was
+ * nothing there to land on.
  *
- *   union   x 281 – 630.5   y 205.8 – 324.1   (349.5 × 118.3)
- *   frame   w = max(469.5, 238.3 × 16/9 = 423.6) = **469.5**   h = 264.1
+ * Now the camera goes to his face and **stays**, while he composes. `REN_AVATAR` is 56px (L8) and
+ * `<RenFace/>` drives the expression from the frame, so the thing being held is a face doing
+ * something rather than a mark.
  *
- * Placed at cy 290 rather than at the rect's own centre (264.95), which would put the frame's top
- * edge at 132.9 — inside the app header. At 290 it runs **157.95 → 422.05**: clear of the header
- * by 2px, and its bottom edge lands in the empty log, 98px below turn 1's own bottom, so nothing
- * is cut. The panel's left border is in frame at 264 with 43px of page outside it; its right
- * border is not, which is what buys 13.48px.
+ * **It is placed rather than derived, and both numbers have a reason.** A `frameRect` over the
+ * avatar and the name block is ~229 world px — an 8.4× zoom, at which the header's 1px bottom
+ * border renders 8px thick and the shot reads as a magnified screenshot rather than as a camera.
+ * 300 is a 6.4× zoom — a little tighter than beat 8's clock landing (368, 5.2×), which is the
+ * tightest shot in the rest of the film — and it puts the 56px avatar at **78.8px on a phone**,
+ * about where the protagonist's own head sits in beat 8's fall.
+ *
+ *   frame   x 185 – 485   y 156 – 324.75      w = 300, h = 168.75
+ *   cx      335, the centre of the avatar and the name block together — not of the avatar alone,
+ *           which would put "here to listen" against the frame's right edge
+ *   cy      156 + h/2, so the frame's top edge sits on the app header's bottom rather than 34px
+ *           inside the browser chrome, which is where centring on the header band would put it
+ *   holds   the avatar, "Ren", "here to listen", the conversation header's own bottom border, and
+ *           the panel's top-left corner — which is what stops the shot reading as a floating mark
+ *   NOT in shot: turn 1's bubble (277.7 – 324.1), by 0.65px, and deliberately — the message
+ *           arrives while the camera is on his face and is REVEALED by the move off it. A bubble
+ *           half-cut by the frame edge during the hold would be the thing the eye went to.
  */
-const L1 = { ...frameRect(union(CHAT.renAvatar, CHAT.turn1), 60), cy: 290 };
+const REN_FACE = shot(335, 156 + (300 * 9) / 16 / 2, 300);
 
 /**
- * **L2 — turn 2, and everything the pointer does.** Held f38 → f120, static.
+ * **L2 — turn 2, and everything the pointer does.** Static across the typing and the send.
  *
- * It has to contain the avatar (205.8) and the composer, and the composer is 646 wide, so the
- * floor is already ~700. The frame's bottom edge then has a choice of two gutters:
+ * It has to contain the avatar (194.8, now that L8 is applied) and the composer, and the composer
+ * is 646 wide, so the floor is ~700. The frame's bottom edge then has a choice of two gutters:
  *
- *   581, between the form (578.1) and the disclaimer (584.1)   → w = 712, 8.89px, but the send
- *                                                                button sits **2.9px** off the
- *                                                                frame edge, which reads as cut
- *   605, between the disclaimer (599.2) and the footer (611.3) → w = 760, 8.33px, the disclaimer
- *                                                                whole and 26.9px under the send
+ *   581, between the form (578.1) and the disclaimer (584.1)   → the send button sits 2.9px off
+ *                                                                the frame edge, which reads cut
+ *   605, between the disclaimer (599.2) and the footer (611.3) → the disclaimer whole and 26.9px
+ *                                                                under the send
  *
- * The second is taken: half a phone-pixel is not a reading, and a control pressed 3px from the
- * frame's edge is the exact "landed mid-layout" look this pass exists to remove.
+ * The second is taken: a control pressed 3px from the frame's edge is the exact "landed
+ * mid-layout" look this pass exists to remove.
  *
  *   frame   x 220 – 980   y 177.5 – 605      w = 760, h = 427.5
- *   edges   top 177.5 is 10.5px above the panel's top border · bottom 605 is 6.3px above the
- *           footer bar and 5.8px below the disclaimer, both gutters, no text on either
- *   holds   panel side borders (44px outside each), header, turn 1, turn 2, textarea, send,
+ *   holds   panel side borders, the header AND REN'S FACE, turn 1, turn 2, textarea, send,
  *           disclaimer — everything except the panel's footer row and its bottom border
- *   reads   15px chat text at 8.33px
+ *   reads   15px chat text at 8.33px; Ren's 56px avatar at **31.1px**, which is what lets his
+ *           `thinking` squint read while he composes the reply
  */
 const L2 = { cx: 600, cy: 391.25, w: 760 };
 
@@ -152,59 +169,79 @@ const L2 = { cx: 600, cy: 391.25, w: 760 };
  * **L3 — turn 3, and the protected hold.**
  *
  * The tightest frame that holds Ren's avatar, all three bubbles whole and no sliced text.
- * Turn 2's right edge (919) and the avatar's left (281) fix the width floor at 638 + margins; the
+ * Turn 2's right edge (919) and the avatar's left (270) fix the width floor at 649 + margins; the
  * frame's bottom edge has to clear the composer's textarea, whose top is at 533.6, and its top
- * edge has to clear the app header at 156. Those two meet at **664.9**:
+ * edge has to clear the app header at 156. Those two meet at **664.9**.
  *
  *   frame   x 267.6 – 932.4   y 156 – 530      h = 374
- *   holds   panel top border (32px of margin), the header, turns 1, 2 and 3 whole, the log's own
- *           bottom border at 520.6 closing the thread
- *   edge    bottom 530 sits in the composer's 13px of top padding — above the textarea, below
- *           the border that separates them
+ *   holds   panel top border, the header, turns 1, 2 and 3 whole, the log's own bottom border at
+ *           520.6 closing the thread — and Ren, so his `warm` state is on screen when it lands
  *   reads   15px chat text at 9.52px
- *
- * The panel's side borders fall 3.5px outside this frame. Holding them costs w ≥ 672 + margins,
- * which pushes the frame's bottom through the textarea; the alternative placements either slice
- * the composer or hang a 6px sliver of the app header across the top of the shot, and a strip
- * running to the frame's edge reads better than a bar cut in half.
  */
 const L3 = { cx: 600, cy: 343, w: 664.9 };
 
 /**
- * ── THE TYPING WINDOW, UNCHANGED ────────────────────────────────────────────────────
+ * ══ THE CLOCK, RESTAGED AROUND HIS FACE ═════════════════════════════════════════════
  *
- * Turn 2 is 49 characters — "boss moved the report to 12. i have thirty minutes" — and types
- * f40–f98: 58 frames, about 25 characters a second. Faster than the ~20 c/s the sheet quotes, and
- * deliberately: he is hurried, and this is the one moment in the film where the hurry is his own
- * behaviour rather than something the UI is telling us.
+ *   f0–6      the panel, whole — brief, and the only shot in the beat that crops nothing
+ *   f6–24     in, onto REN_FACE
+ *   f12       `attentive` — he registers that someone is there
+ *   f24–46    HOLD on his face. `thinking` from f30: he is composing, and you watch him do it
+ *   f46–66    out to L2 — and turn 1 lands at f60, inside the move, so the message is REVEALED
+ *             by the camera opening rather than appearing beside a face nobody is looking at
+ *   f60       `attentive` again: he has spoken, and now he is listening
+ *   f52–70    the pointer travels to the composer
+ *   f72       the caret click, 6 frames after the camera has landed
+ *   f74–132   he types. 49 characters at ~25 c/s — hurried, and the hurry is his own behaviour
+ *   f138      **the pointer ARRIVES at the send button** and the button lights on that frame
+ *   f142      the click, four frames later. The bubble lands with it
+ *   f150      `thinking` again, and the typing indicator with it (L9)
+ *   f162–186  in to L3
+ *   f190      turn 3 lands, and Ren goes `warm` on the same frame
+ *   f190–250  the protected hold — 60 frames, untouched
  *
- * **Only two numbers in this block moved, and both moved for the framing.** Turn 1 lands at f8
- * rather than f20, so that L1 has a message to hold on when it lands at f14 rather than six
- * frames of an empty log; and the caret click is f38 rather than f34, so that it happens after
- * the camera has arrived at `L2` rather than a third of the way through the move — *every click
- * target is in frame when it is clicked* is the acceptance criterion it was failing. The send
- * stays at f100, the pointer still holds still from f30 to f98, and turn 3's hold is untouched.
+ * ── WHAT THE FACE LANDING BOUGHT, BESIDES THE PERFORMANCE ───────────────────────────
+ *
+ * The constraint this beat recorded — *any landing holding both the avatar at x 281 and his
+ * bubble ending at x 919 is ≥638px wide, which is why turns 2 and 3 read at 8.33 and 9.52px
+ * rather than over 10* — was true and was being paid on every shot in the beat, because the
+ * avatar had to be in all of them. Landing on the face **once**, properly, is what pays that debt
+ * instead: L2 and L3 still carry him (they have to, or his `thinking` and `warm` states play off
+ * screen), but the beat no longer needs a wide shot to introduce him.
+ *
+ * ── AND THE SEND USED TO READ AS A DOUBLE CLICK ─────────────────────────────────────
+ *
+ * The hover opened at `T.send − 8` while the pointer was still parked in the composer eight
+ * frames away — `hover.tsx` addresses the DOM by selector and never reads a coordinate, so
+ * nothing stopped it. The button lit, then the cursor crossed it, then the click fired: two
+ * separate acknowledgements of one press, which is exactly what a double click looks like.
+ *
+ * The order is causal now and each step has its own frames: the pointer's travel **ends** at
+ * `T.sendArrive`, the hover opens on that frame (a control acknowledges a cursor that has reached
+ * it), and the click lands four frames later at `T.send`. §2's rule — *it lights before it is
+ * pressed* — is intact; what was wrong was that it lit before it was *reached*.
  *
  * ── AND THE LINE USED TO VANISH FOR FOUR FRAMES BETWEEN THE COMPOSER AND THE BUBBLE ──
  *
- * `draft` clears at `T.send` (the composer empties the instant send is pressed — real apps do
- * this optimistically) but the message used to land at `T.bubble` = 104, four frames later. For
- * f100–f103 his typed sentence was on screen nowhere: gone from the composer, not yet a bubble —
- * which reads as a dropped frame. `bubble` now equals `send`: the composer clears and the bubble
- * lands on the same frame, so the line is never absent. Nothing else about the send/typing
- * timing moved.
+ * `draft` clears at `T.send` but the message used to land four frames later, so his typed
+ * sentence was on screen nowhere: gone from the composer, not yet a bubble. `bubble` equals
+ * `send`.
  */
 const T = {
-  turn1: 8,
-  cursorToComposer: 30,
-  caretClick: 38,
-  typeFrom: 40,
-  typeTo: 98,
-  send: 100,
-  /** Lands the same frame the composer clears — see the note above. Was 104. */
-  bubble: 100,
-  thinking: 116,
-  reply: 150,
+  attentive: 12,
+  composing: 30,
+  turn1: 60,
+  cursorToComposer: 70,
+  caretClick: 72,
+  typeFrom: 74,
+  typeTo: 132,
+  /** The pointer's travel ENDS here. The button lights on this frame, not eight before it. */
+  sendArrive: 138,
+  send: 142,
+  /** Lands the same frame the composer clears — see the note above. */
+  bubble: 142,
+  thinking: 150,
+  reply: 190,
 } as const;
 
 export const Beat10Ren: React.FC = () => {
@@ -226,37 +263,69 @@ export const Beat10Ren: React.FC = () => {
     ...(frame >= T.reply ? [msg("t3", "assistant" as const, REN.turns[2].text)] : []),
   ];
 
+  /**
+   * ── REN'S ARC, AND EVERY STEP LANDS ON AN EVENT ─────────────────────────────────
+   *
+   * The states are discrete in the product — `OPEN_EYE_TRANSFORMS` carries no transition — so
+   * they snap, and the only way a snap reads as a performance rather than as a glitch is if it
+   * is *caused*. Each change here sits on the frame something happens:
+   *
+   *   idle       → the thread is empty and nothing has been said
+   *   attentive  at f12, as the camera arrives on his face
+   *   thinking   at f30, inside the hold — this is the composing the beat lands on
+   *   attentive  at f60, ON turn 1 landing: he has spoken, now he is listening while the human
+   *              types the whole of turn 2
+   *   thinking   at f150, with the typing indicator (L9) — the second composing
+   *   warm       at f190, ON turn 3. The reply about the music is the one moment the product is
+   *              supposed to feel like it knows him, and `warm` is the state the product ships
+   *              for exactly that.
+   */
+  const renState =
+    frame >= T.reply
+      ? "warm"
+      : frame >= T.thinking
+        ? "thinking"
+        : frame >= T.turn1
+          ? "attentive"
+          : frame >= T.composing
+            ? "thinking"
+            : frame >= T.attentive
+              ? "attentive"
+              : "idle";
+
   return (
     <AbsoluteFill>
       <Camera
         keys={[
           // The panel, whole — the establishing frame, and the only one that crops nothing.
           { frame: 0, shot: PANEL_WHOLE },
-          { frame: 14, shot: PANEL_WHOLE },
-          // In on Ren's opener, which landed at f8. The camera settles on the message as it
-          // arrives rather than waiting for it.
-          { frame: 32, shot: L1 },
-          // Out to hold the composer BEFORE the caret click at f38, and then still: the typing,
-          // the send and his bubble all happen inside this one frame.
-          { frame: 38, shot: L2 },
-          { frame: 120, shot: L2 },
-          // In on the thread for turn 3, settled before it arrives at f150.
-          { frame: 146, shot: L3 },
-          { frame: 210, shot: L3 },
+          { frame: 6, shot: PANEL_WHOLE },
+          // In on HIS FACE, and hold there while he composes.
+          { frame: 24, shot: REN_FACE },
+          { frame: 46, shot: REN_FACE },
+          // Out to the working shot. Turn 1 lands at f60, inside this move — so the camera
+          // opening is what reveals it. Then still: the typing, the send and his bubble all
+          // happen inside one static frame.
+          { frame: 66, shot: L2 },
+          { frame: 162, shot: L2 },
+          // In on the thread for turn 3, settled before it arrives at f190.
+          { frame: 186, shot: L3 },
+          { frame: 250, shot: L3 },
         ]}
       >
         <ChatPage
           clock="11:31 AM"
           messages={messages}
+          renState={renState}
           draft={frame >= T.typeFrom && frame < T.send ? typed : ""}
           caret={frame >= T.typeFrom && frame < T.send}
           thinking={frame >= T.thinking && frame < T.reply}
           overlay={
             <>
               {/*
-               * §2 — the send button lights as the pointer reaches it. **It is the one control in
-               * the film with no shipped hover**: `chat-shell.tsx:388` is
-               * `bg-foggy text-on-accent transition-opacity disabled:opacity-50`, which is a
+               * §2 — the send button lights AS the pointer reaches it, not eight frames before.
+               * **It is the one control in the film with no shipped hover**: `chat-shell.tsx:388`
+               * is `bg-foggy text-on-accent transition-opacity disabled:opacity-50`, which is a
                * disabled state and an opacity transition with nothing to trigger it. So this
                * treatment is authored — as the house idiom (`hover:opacity-90`, which every
                * filled `<Button/>` variant ships) rather than as an invention, on an element that
@@ -265,8 +334,8 @@ export const Beat10Ren: React.FC = () => {
               <Hover
                 selector="[data-testid='chat-send']"
                 treatment="sendAuthored"
-                from={T.send - 8}
-                to={T.send + 10}
+                from={T.sendArrive}
+                to={T.send + 12}
               />
               {/*
                * The pointer TRAVELS to the composer, and then to send. Both clicks share a shot
@@ -276,28 +345,23 @@ export const Beat10Ren: React.FC = () => {
                *
                * ── AND IT USED TO SWIPE ACROSS THE FIELD WHILE HE TYPED ────────────────────
                *
-               * The third waypoint landed at `T.send - 8` = frame 92 — BEFORE typing even ends at
-               * `T.typeTo` (98). A path only has as many waypoints as it is given, so Remotion
-               * interpolated the whole leg from the composer to the send button continuously
-               * across frames 30–92, which spans nearly the entire typing window. The cursor was
-               * visibly dragging across the text box while he typed — exactly wrong, since a hand
-               * on the keyboard is not also dragging the mouse.
+               * The third waypoint used to land before typing ended, so Remotion interpolated the
+               * whole leg from the composer to the send button across nearly the entire typing
+               * window and the cursor visibly dragged across the text box while he typed —
+               * exactly wrong, since a hand on the keyboard is not also dragging the mouse.
                *
-               * So there is a fourth waypoint, at the composer's OWN position, timed to
-               * `T.typeTo`: identical (x, y) across a leg means zero motion, so the pointer holds
-               * still for the entire typing window and only travels afterward, arriving at send
-               * exactly as it is clicked. **The camera now holds still across the same window**,
-               * which is the other half of the same note — see `L2`.
-               *
-               * The first waypoint sits inside `PANEL_WHOLE` and inside `L1`, so the cursor is
-               * never drawn outside the frame it starts in.
+               * So there is a fourth waypoint at the composer's OWN position, timed to
+               * `T.typeTo`: identical (x, y) across a leg means zero motion. The travel to send
+               * then runs `typeTo → sendArrive` and **ends four frames before the click**, which
+               * is the other half of the double-click fix — the cursor arrives, the button
+               * acknowledges it, and only then is it pressed.
                */}
               <Pointer
                 path={[
                   { frame: 0, x: 640, y: 400 },
                   { frame: T.cursorToComposer, x: CARET_AT.x, y: CARET_AT.y },
                   { frame: T.typeTo, x: CARET_AT.x, y: CARET_AT.y },
-                  { frame: T.send, x: SEND_AT.x, y: SEND_AT.y },
+                  { frame: T.sendArrive, x: SEND_AT.x, y: SEND_AT.y },
                 ]}
                 clicks={[T.caretClick, T.send]}
               />
@@ -312,7 +376,8 @@ export const Beat10Ren: React.FC = () => {
 /** Checked, not asserted. `worldSize × 422 / framedWidth`, per landing. */
 export const BEAT10_LEGIBILITY = {
   panelWhole: { framedWidth: PANEL_WHOLE.w, chatText: PHONE_PX(15, PANEL_WHOLE.w) },
-  l1: { framedWidth: L1.w, chatText: PHONE_PX(15, L1.w) },
+  /** The face landing. Ren at 56 world px is 65.6px on a phone. */
+  renFace: { framedWidth: REN_FACE.w, avatar: PHONE_PX(REN_AVATAR_SIZE, REN_FACE.w) },
   l2: { framedWidth: L2.w, chatText: PHONE_PX(15, L2.w) },
   l3: { framedWidth: L3.w, chatText: PHONE_PX(15, L3.w) },
 } as const;

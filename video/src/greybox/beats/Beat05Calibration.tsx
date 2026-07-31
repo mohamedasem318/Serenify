@@ -7,6 +7,7 @@ import {
   BEAT5_INTRO,
   BEAT5_SUCCESS,
   BEAT5_PREVIEW,
+  BEAT5_UPLOADING,
   CALIB_TOP,
 } from "../../app/framing";
 import { CALIB, CONTROL, PHONE_PX, SUCCESS } from "../../app/geometry";
@@ -18,7 +19,7 @@ import { useExpression } from "../rig";
 import { H, W } from "../theme";
 
 /**
- * Beat 5 · Calibration · 372 frames
+ * Beat 5 · Calibration · 402 frames
  *
  * **ONE TAKE.** The chain is: intro → green room → countdown → recording → the uploading line
  * REPLACES the capture stage → the success state → he clicks it → the dashboard. Every step is
@@ -111,17 +112,35 @@ const PAGE_LIFT = 27;
  *     and the helper line's own bottom (659.6) — **344px**, so 16:9 allows up to 611
  *   the button is 432 wide and its click is at f66, so it has to be in the same shot
  *
- *   frame   x 310 – 890   y 340.5 – 666.7      w = 580
- *   holds   all three icon rows, the privacy line seated AND raised (28.5px of clearance each
+ *   frame   x 305 – 895   y 335.5 – 667.4      w = 590
+ *   holds   all three icon rows, the privacy line seated AND raised (33.5px of clearance each
  *           side of the raised 523), "Turn on camera" whole, and its helper line whole
- *   reads   **10.19px seated · 12.74px raised** — over the floor, from 5.8px
+ *   reads   **10.01px seated · 12.51px raised** — over the floor, from 5.8px
+ *
+ * ── AND THE FIRST GUIDELINE ROW HAD 7px OF HEADROOM, WHICH READS AS A CROP ──────────
+ *
+ * The window this shot has to land inside is bounded by two things nobody had measured: the
+ * lede's last line ends at **315.6** and the helper line's bottom is at **659.5**, so anything
+ * outside [315.6, 659.5] slices a line of type. The first guideline's icon tile — the 40px
+ * `bg-meadow/10` square beside "A quiet moment to yourself" — starts at **347.5**.
+ *
+ * At the old 580 the frame ran 340.5 → 666.7: nothing was actually sliced, and the tile had
+ * **7px** of headroom, which at this beat's 3.3× magnification is 23 output pixels. A content
+ * element sitting 23px off the frame edge reads as cropped whether or not it is, which is the
+ * complaint, and "it measures fine" is not an answer to it.
+ *
+ * The arithmetic is a fixed budget rather than a free choice: with the helper line in shot,
+ * `headroom + helperClearance = h − 312`. At 580 that is 14.25 and the split was 7/7.2. At **590**
+ * it is 19.9, split **12 / 7.9**, with 19.9 above the lede as well — every clearance grows and
+ * the seated line stays over the 10px floor at 10.01. Buying more headroom means a wider frame,
+ * and at 611 the seated line drops to 9.66; 590 is where both constraints are met.
  *
  * The emphasis itself is untouched: same 1.25×, same grow-downward-from-its-own-top-edge, same
  * `text-muted` grey and meadow shield. Only its WINDOW moved, so that it fires while the camera
  * is landed rather than while it is still travelling — the sheet's own rule that the two
  * movements in 5a must never compete for the eye.
  */
-const INTRO_READ = shot(600, 503.6, 580);
+const INTRO_READ = shot(600, 501.45, 590);
 
 /**
  * 5b (green room), 5c/5d (the countdown and the orb) and 5f (the success state) are
@@ -153,7 +172,20 @@ const INTRO_READ = shot(600, 503.6, 580);
  * is a strobe; two is what was there. The third phase starts at f225 with a full 15 frames to run
  * before the cut at f240, so no phase is clipped — and `BEAT5_PREVIEW` holds all of it at 10.01px.
  *
- * **Nothing after f240 moves, the beat stays 372 frames, and the running total is unchanged.**
+ * ── AND THE MINUTE GETS ANOTHER SECOND (3.6) ────────────────────────────────────────
+ *
+ * 5d ran **45 frames — 1.5s for a 60-second process**, a 40× compression, and at that rate the
+ * three breathing phases got 15 frames each: half a second per phase, which is the floor at which
+ * a pacer reads as a pacer rather than as a flicker. It was on the floor, so nothing in the beat
+ * could breathe.
+ *
+ * 5d is **75 frames** now (2.5s, 24× compression) and the phase count stays at three, so each
+ * phase gets **25 frames — five sixths of a second**. That is the difference between seeing that
+ * the label alternates and being able to follow it. The bar and the readout take the new
+ * compression directly, as they always did.
+ *
+ * **Everything after f270 shifts by +30 and nothing else about the beat changes.** The beat goes
+ * 372 → 402 frames.
  */
 /** 5d's pacer must alternate visibly, not once. Three phases: in → out → in. */
 const BREATH_PHASES = 3;
@@ -177,10 +209,11 @@ const T = {
   countdown: 150,
   /** …which now genuinely counts, at half a second a number. */
   recording: 150 + COUNTDOWN_FRAMES,
-  uploading: 240,
-  success: 282,
-  doneClick: 344,
-  dashboard: 354,
+  /** +30 (3.6): 5d goes 45 → 75 frames, so each breathing phase gets 25 rather than 15. */
+  uploading: 270,
+  success: 312,
+  doneClick: 374,
+  dashboard: 384,
 } as const;
 
 /**
@@ -276,14 +309,18 @@ export const Beat05Calibration: React.FC = () => {
           { frame: 150, shot: BEAT5_GREENROOM },
           // 5c–5d · one hold across the count and the orb, wide enough to keep the page under it.
           { frame: 172, shot: BEAT5_PREVIEW },
-          // …and it holds through the uploading line, which lands inside it at 11.4px.
-          { frame: 268, shot: BEAT5_PREVIEW },
+          // 5e · the camera CLOSES IN across the flip. The capture stage is replaced at f270 —
+          // every pixel of the shot at once — and under a static camera that read as a cut. It
+          // now lands 26 frames into a move, which is what carries it.
+          { frame: 244, shot: BEAT5_PREVIEW },
+          { frame: 272, shot: BEAT5_UPLOADING },
+          { frame: 298, shot: BEAT5_UPLOADING },
           // 5f · OUT, so the whole success state AND its ripple are in frame, and only then the
           // click. Register item 4, with the rect's x corrected.
-          { frame: 306, shot: BEAT5_SUCCESS },
-          { frame: 354, shot: BEAT5_SUCCESS },
-          // …which lands on the dashboard.
-          { frame: 372, shot: shot(W / 2, H / 2, W) },
+          { frame: 336, shot: BEAT5_SUCCESS },
+          { frame: 384, shot: BEAT5_SUCCESS },
+          // …which lands on the dashboard, at the full frame beat 6 holds.
+          { frame: 402, shot: shot(W / 2, H / 2, W) },
         ]}
       >
         <CalibratePage

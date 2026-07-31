@@ -45,6 +45,11 @@ export const MAIN_PT = 32;
  * orb/stateline and the trend so the emphasis would not overlap the bloom — which fixed a video
  * problem by changing the product's layout. This is the product's own spacing: `max-w-3xl`
  * (768), `min-h-[480px]` at sm, `px-10 pb-10 pt-16`, `rounded-3xl`. Nothing is padded.
+ *
+ * **The class string is still the product's, verbatim.** L15's three adaptations — the shorter
+ * top band, the shorter bottom pad and the released `min-height` — are applied by the scoped
+ * stylesheet in `monitor.tsx` § `<StageLayout/>` rather than by editing this string, so the
+ * divergence from the shipped card lives in exactly one place and can be read as a list.
  */
 export const MONITOR_STAGE =
   "relative flex min-h-[420px] flex-col items-center justify-center overflow-hidden " +
@@ -54,20 +59,28 @@ export const MONITOR_STAGE =
 /**
  * `monitoring-session.tsx:782` — the monitor page column. The app ships `max-w-3xl` (768).
  *
- * ── L14: THE COLUMN NARROWS TO `max-w-lg` (512), AND IT IS THE ONLY WAY THE PAGE FITS ──
+ * ── L14 NARROWED IT TO `max-w-lg` (512); L15 TAKES IT ONE MORE STEP TO `max-w-md` (448) ──
  *
- * Measured, not preferred. At 768 the populated trend card's bottom is 1227.4 and the bloom's top
- * is 309 — **918.4px of stack**, against a 675-tall world. No 16:9 frame ≤1200 world px holds
- * that, which is why beat 11 had to abandon holding the bloom and the trend together and why the
- * emphasis had no room on the two-line `tense` copy.
+ * Measured, not preferred, at both steps. At the shipped 768 the populated trend card's bottom
+ * was 1227.4 and the bloom's top 309 — **918.4px of stack** against a 675-tall world, which no
+ * 16:9 frame ≤1200 world px can hold; L14's 512 is what freed the page from x 856 rightward and
+ * gave the viewfinder, the toast and the prompt somewhere to be pinned.
  *
- * `max-w-lg` is the app's own next step down and is already used by the calibration column
- * (`anchor-recorder.tsx:570`), so it is a width the product ships rather than a number invented
- * for the film. It costs nothing where it matters: **the bloom is centred, so at 512 it lands at
- * x 456–744 — exactly where it is at 768.** What moves is the empty page either side of it, and
- * that is what the pinned right column (viewfinder / toast / prompt, x 856–1176) is built on.
+ * **448 is what makes the gutter a number rather than a coincidence.** `mx-auto` centres it at
+ * **376 – 824**, and the pinned column begins at 856 — so the gap between the card and everything
+ * in that column is exactly `PINNED_GAP`, 32. At 512 it was zero: the card ended where the column
+ * began, and the confirmatory prompt sat flush against it while carrying 30.7px of air above
+ * itself. Two gutters on one element, and the tighter one was nothing.
+ *
+ * Both widths are the app's own steps — `max-w-lg` is the calibration column
+ * (`anchor-recorder.tsx:570`) and `max-w-md` is the `(auth)` column
+ * (`app/(auth)/layout.tsx`) — so neither is a number invented for the film. And the bloom is
+ * centred, so it lands on x 600 at 768, at 512 and at 448 alike: what moves is the empty page
+ * either side of it. What DOES change at 448 is the stateline's own measure — the card's content
+ * width goes 430 → 366, and the two-line `tense` sub was re-checked there rather than assumed
+ * (`geometry.ts` § statelineSubTense).
  */
-export const MONITOR_COL = "mx-auto w-full max-w-lg";
+export const MONITOR_COL = "mx-auto w-full max-w-md";
 
 /** `components/anchor/anchor-recorder.tsx:570` — the calibration column. `max-w-lg` = 512. */
 export const CALIBRATE_COL = "mx-auto w-full max-w-lg";

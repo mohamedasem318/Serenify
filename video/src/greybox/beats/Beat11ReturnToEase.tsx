@@ -1,11 +1,11 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
-import { BEAT11_NEAR, BEAT11_WIDE, PHONE } from "../../app/framing";
-import { SCROLL, STATELINE_BLOCK, VIEWFINDER, scrolled } from "../../app/geometry";
+import { BEAT11_WIDE, PHONE } from "../../app/framing";
+import { RAW, TREND, VIEWFINDER } from "../../app/geometry";
 import { useHover } from "../../app/hover";
 import { MonitorPage } from "../../app/monitor";
-import { useDrift, useEmphasis } from "../../app/motion";
+import { useDrift } from "../../app/motion";
 import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN } from "../../app/player";
 import { Pointer } from "../../app/pointer";
 import { Camera, frameRect, union } from "../Camera";
@@ -13,25 +13,26 @@ import { useExpression } from "../rig";
 import { H, W } from "../theme";
 
 /**
- * ── THE PLAYER AND HIS FACE, IN ONE FRAME ───────────────────────────────────────────
+ * ── THE PLAYER OVER THE WHOLE COMPOSITION ───────────────────────────────────────────
  *
- * The window opens over the page and the viewfinder sits to its right, so the beat's first
- * landing holds both: he opens a player, and you can see it is him doing it. Before L14 the
- * viewfinder was an overlay inside the scrolling card at x 743–1063, and this union was 763 wide
- * against the player's own 648 — a difference too small to be worth the face. Pinned at
- * 856–1176 the union is 876, the shot is 924, and the face still lands at 54.7px on a phone.
+ * The window opens over the page and the composition sits behind and beside it, so the beat's
+ * first landing holds all of it: he opens a player, and you can see it is him doing it, on the
+ * screen the last three beats were on.
  *
- * **The stateline is in the union and it costs nothing**, which was found on a render rather
- * than derived. The player + viewfinder union is 876 wide and only 288 tall, so its WIDTH
- * governs the 16:9 frame — the shot is 924 either way, and centring it on the two of them alone
- * put its bottom edge at 615.9, straight through the second line of the `tense` sub at 604–630.
- * Adding the block to the union moves the frame's centre down 65px and crops nothing; the shot
- * does not get one pixel wider for it.
+ * **It unions the STAGE CARD, not the stateline block** — the previous version framed the block
+ * alone and the frame's left edge ran through the card, which is a content element cropped on
+ * one side and reads as a crop rather than as ground. At L15's arrangement the card is 448 wide
+ * and the whole union is only 876, so holding it whole costs nothing:
+ *
+ *   union   x 300.0 – 1176.0   (876.0)   ← the player, the card, the viewfinder, the trend
+ *           y 188.0 –  589.2   (401.2)
+ *   frameRect(m=20) → w = max(876 + 40, 441.2 × 16/9) = 916.0
+ *
+ * Placed on the page's own top edge for the same reason `COMPOSITE` is: centred on the union it
+ * would reach world y 131, which is 25px into the sticky app header.
  */
-const BEAT11_PLAYER = frameRect(
-  union(union(PLAYER_WIN, VIEWFINDER), scrolled(STATELINE_BLOCK, SCROLL.monitor)),
-  24,
-);
+const playerFrame = frameRect(union(union(PLAYER_WIN, VIEWFINDER), union(RAW.stage, TREND)), 20);
+const BEAT11_PLAYER = { ...playerFrame, cy: 156 + (playerFrame.w * 9) / 16 / 2 };
 
 /**
  * Beat 11 · Return to ease · 234 frames
@@ -46,44 +47,36 @@ const BEAT11_PLAYER = frameRect(
  * that, the beat reads as the stress app telling an employee to listen to music instead of
  * doing an urgent report — the worst available misreading, and the audience is managers.
  *
- * ══ WHAT IT HOLDS, AND WHAT IT HONESTLY CANNOT ══════════════════════════════════════
+ * ══ IT ALL RESOLVES IN ONE SETTLED FRAME NOW — L15 ══════════════════════════════════
  *
- * The sheet wants the bloom's drift, the stateline's return and the trend's descent to resolve
- * together in one wide shot that lands and holds. **The bloom and the trend cannot be on screen
- * together**, and this is measured rather than judged:
+ * The sheet has always wanted the bloom's drift, the stateline's return and the trend's descent
+ * to resolve together in one shot that lands and holds. For three revisions the answer was that
+ * they cannot: bloom top to trend bottom was 985.9px against a 519px viewport, so the trend was a
+ * separate landing reached by scrolling the page 580px while the camera pulled out, and the
+ * film's last idea arrived in a picture that had only just stopped moving.
  *
- *   bloom top → trend bottom           1028.7 px
- *   viewport below the sticky header    519.0 px
+ * **L15 makes it one picture.** The orb comes down to 176, the Pause/End controls go, and the
+ * trend joins the pinned column under his face — so the whole act fits inside the page's own
+ * viewport and `COMPOSITE` holds the orb, the stateline, the trend and the viewfinder together.
+ * The beat has TWO landings instead of three, the page never scrolls, and everything the beat
+ * exists to show happens inside a camera that stopped at f98:
  *
- * No camera move buys page height, and padding the layout until it fits is exactly what register
- * item 2 exists to undo. So the causal ORDER survives and the single static shot does not — the
- * beat has three landings inside ONE continuous move, and the camera never cuts.
+ *   · **player + composition** (f18–f66) — he opens it, and it is visibly him doing it.
+ *   · **the composite** (f98 to the end) — headphones, the notes, the nod, the bloom's drift back
+ *     to meadow, the stateline's return AND the trend's descent, on a camera that has stopped.
  *
- * **What L14 changes is which pairs are available.** The viewfinder no longer scrolls, so it can
- * be in every one of the three:
- *
- *   · **player + face** (924 wide, f18–f66) — he opens it, and it is visibly him doing it.
- *   · **the reading + face** (777, f98–f146) — headphones, the notes, the nod, the bloom's drift
- *     back to meadow and the stateline's return, all framed together.
- *   · **the trend + face** (872, f180 on) — the payoff. Before L14 scrolling to the trend took
- *     his face off the screen and the closing frame held a graph and nothing else.
- *
- * **The player, the trend and the face are never in one frame, and that is stated rather than
- * implied.** Not because the union is too wide — it is 916, which is affordable — but because
- * the trend is 853px down the page while the player is open, so no framing can contain both: the
- * page has to scroll to bring the trend up, and the scroll is what the third landing IS. This was
- * never true at the greybox either; the player's opacity was already 0 by f72 while the payoff
- * landed at f160, so the two were never actually co-framed there.
+ * **The player and the trend are still never co-framed**, and that is unchanged: the player
+ * window sits over the middle of the page and the beat's first landing is on it. What has changed
+ * is that leaving it is a single move onto a shot that then never moves again.
  *
  *   f6–f46   the pointer travels to the transport; the click is at f24
  *   f66      the window has finished closing (f50–f64), the camera starts across
+ *   f98      the camera LANDS on the composite and does not move again in this beat
  *   f100     he nods
- *   f106     the drift begins — bloom amber → meadow, 1.3s, while it is still framed
- *   f128     the copy returns to "at ease" and the emphasis rises ON it
- *   f146     the camera starts out and the page starts down, together
- *   f180     it lands wide on the trend + the viewfinder
- *   f184     the trend's tail walks back down (39f)
- *   f223–234 the linger. Nothing moves but his breath and the nod.
+ *   f106     the drift begins — bloom amber → meadow, 1.3s, framed
+ *   f128     the copy returns to "at ease"
+ *   f150     the trend's tail walks back down (39f) — in the same frame as the reading
+ *   f190–234 the linger. Nothing moves but his breath and the nod.
  *
  * ══ THE MUSIC PLAYER IS DRAWN NOW ═══════════════════════════════════════════════════
  *
@@ -163,27 +156,7 @@ export const Beat11ReturnToEase: React.FC = () => {
    * ends as if the tense half-hour had never occurred, which is both dishonest and the opposite
    * of the beat's point. The recovery is a tail, not an erasure.
    */
-  const descend = useDrift(0, 1, 184);
-
-  /**
-   * The third firing of the emphasis rule (L12): the raise begins **on** the copy change at
-   * f128, inside the second landing's hold. The audience has learned by now that when the block
-   * moves the reading changed, and that only holds if the movement is caused by the change
-   * rather than merely near it — and if the camera is not moving underneath it.
-   *
-   * **No factor is passed any more.** Beat 11 used to interpolate from `emphasisCapFor(2)` to
-   * `emphasisCapFor(1)` because the two-line `tense` copy could only be raised 1.01× and the
-   * one-line `at_ease` copy 1.25×, so the block would have jumped size on the frame the band
-   * flipped. The sub reserves two lines now, both caps are 1.25, and the interpolation had
-   * nothing left to smooth.
-   */
-  const emphasis = useEmphasis([
-    { frame: 0, up: 0 },
-    { frame: 128, up: 0 },
-    { frame: 144, up: 1 },
-    { frame: 200, up: 1 },
-    { frame: 214, up: 0 },
-  ]);
+  const descend = useDrift(0, 1, 150);
 
   // tense → easing over 30 frames, starting as the headphones go on. Slower than the fall on
   // purpose: coming back takes longer than going down. NOT the beat-7 expression — quieter,
@@ -194,15 +167,6 @@ export const Beat11ReturnToEase: React.FC = () => {
     { frame: 98, state: "easing" },
   ]);
 
-  // The page travels WITH the camera, in the same continuous move. See the header — the bloom
-  // and the trend cannot share a screen at this world, so the shot follows the causal chain down
-  // rather than trying to hold everything at once.
-  const scroll = interpolate(frame, [146, 180], [SCROLL.monitor, SCROLL.trend], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
-  });
-
   return (
     <AbsoluteFill>
       <Camera
@@ -211,14 +175,11 @@ export const Beat11ReturnToEase: React.FC = () => {
           // 1 · the player AND his face. He opens it; it is visibly him doing it.
           { frame: 18, shot: BEAT11_PLAYER },
           { frame: 66, shot: BEAT11_PLAYER },
-          // 2 · the reading and his face. The headphones, the notes, the nod, the bloom's drift
-          // back to meadow and the stateline's return all play inside this hold, on a camera
-          // that is not moving — which is what makes the emphasis land rather than cancel.
-          { frame: 98, shot: BEAT11_NEAR },
-          { frame: 146, shot: BEAT11_NEAR },
-          // 3 · …and OUT, the page scrolling with the lens, landing with 54 frames still to run.
-          // The trend card whole, WITH his face beside it. This is the payoff, and it settles.
-          { frame: 180, shot: BEAT11_WIDE },
+          // 2 · …and that is the last move in the film's demo. The composite holds the orb, the
+          // stateline, the trend AND his face, so the headphones, the notes, the nod, the drift
+          // back to meadow, the copy's return and the tail walking back down all play inside one
+          // frame that stopped 136 frames before the beat ends.
+          { frame: 98, shot: BEAT11_WIDE },
           { frame: 234, shot: BEAT11_WIDE },
         ]}
       >
@@ -228,14 +189,12 @@ export const Beat11ReturnToEase: React.FC = () => {
           tension={tension}
           climb={1}
           descend={descend}
-          scroll={scroll}
           pose={pose}
           // Back at the keyboard from the moment the player closes, and he does not stop again.
           working={frame >= 56}
           headphones={frame >= 68}
           nod={frame >= 100}
           notesFrom={78}
-          emphasis={emphasis}
           sessionFrom={47 * 60 + 33}
           overlay={
             <>

@@ -34,26 +34,28 @@ import { FONT, GREY } from "./theme";
  * in Studio and read straight off the sheet.
  *
  *   1 cold open     180          7 at ease        120
- *   2 signup        468          8 the email      200
+ *   2 signup        432 (−36)    8 the email      200
  *   3 dashboard     120          9 questionnaire   90
- *   4 camera gate   180 (+30)   10 Ren            210
- *   5 calibration   372         11 return to ease 234
+ *   4 camera gate   120 (−60)   10 Ren            250 (+40)
+ *   5 calibration   402 (+30)   11 return to ease 234
  *   6 later          60         12 closing card   90
  *                               13 end card      136
- *                                       total   2460 = 82.0s @ 30fps
+ *                                       total   2434 = 81.1s @ 30fps
  *
- * **+1.0s, and it is beat 4's second landing.** The privacy pitch the beat exists to
- * deliver turns out to be the third bullet of the FIRST consent card, not the last one —
- * the sheet's staging ("one landing holds the key line's card AND the button") rested on
- * an assumption the shipped copy does not meet. Key-line top to CTA bottom is 594.8px
- * against a 583px viewport, so the two miss sharing a frame by 11.8px and the beat needs
- * two landings inside its one continuous move. The extra second is the second landing.
+ * **−26 frames across this pass, and every one of the four moves is deliberate.**
  *
- * Everything else in this pass is ±0: the font, the component swaps, the cursor, the
- * emphasis retiming and the two closing cards all changed what is on screen without
- * changing how long anything is on screen for.
+ *   beat 2   468 → 432   the mail sequence's HOLDS, not its performed actions. Opening a tab,
+ *                        typing a URL and clicking a message open all still happen in full;
+ *                        eleven holds around them were outlasting their own read.
+ *   beat 4   180 → 120   the privacy-line landing is gone. It held the same claim beat 5a holds
+ *                        two beats later, and 5a's is the better one — tighter, more legible,
+ *                        and at the moment the camera is about to turn on.
+ *   beat 5   372 → 402   the compressed minute gets a second, so the breathing pacer's three
+ *                        phases run 25 frames each rather than sitting on the 15-frame floor.
+ *   beat 10  210 → 250   Ren gets a face landing. He had four real avatar states and used none
+ *                        of them, and the previous pass punched in on him for six frames.
  */
-export const GREYBOX_DURATION = 2460;
+export const GREYBOX_DURATION = 2434;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -61,16 +63,16 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={180} name="1 · cold open">
         <Beat01ColdOpen />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={468} name="2 · signup">
+      <Series.Sequence durationInFrames={432} name="2 · signup">
         <Beat02Signup />
       </Series.Sequence>
       <Series.Sequence durationInFrames={120} name="3 · dashboard">
         <Beat03Dashboard />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={180} name="4 · camera gate">
+      <Series.Sequence durationInFrames={120} name="4 · camera gate">
         <Beat04CameraGate />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={372} name="5 · calibration">
+      <Series.Sequence durationInFrames={402} name="5 · calibration">
         <Beat05Calibration />
       </Series.Sequence>
       <Series.Sequence durationInFrames={60} name="6 · later">
@@ -85,7 +87,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={90} name="9 · questionnaire">
         <Beat09Questionnaire />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={210} name="10 · Ren">
+      <Series.Sequence durationInFrames={250} name="10 · Ren">
         <Beat10Ren />
       </Series.Sequence>
       <Series.Sequence durationInFrames={234} name="11 · return to ease">

@@ -3,7 +3,6 @@ import { AbsoluteFill } from "remotion";
 
 import { COMPOSITE, PHONE } from "../../app/framing";
 import { MonitorPage } from "../../app/monitor";
-import { useEmphasis } from "../../app/motion";
 import { Camera } from "../Camera";
 import { useExpression } from "../rig";
 
@@ -13,7 +12,20 @@ import { useExpression } from "../rig";
  * The "before". The audience needs the settled state registered or the fall in beat 8 has
  * nothing to fall from.
  *
- * ── WHAT L14 CHANGED HERE ───────────────────────────────────────────────────────────
+ * ── WHAT L15 CHANGED HERE ───────────────────────────────────────────────────────────
+ *
+ * **The composite holds four things now, not three** — the orb, the stateline, the trend and his
+ * face — and the stage card is whole inside it for the first time. The page does not scroll, the
+ * emphasis does not fire, and the beat is one push onto one shot that the next four beats keep.
+ *
+ * ── AND THE STATELINE NO LONGER GROWS ────────────────────────────────────────────────
+ *
+ * L12's in-place raise is off the statelines. It existed to carry the 17px sub over the phone
+ * legibility floor at a 884.8-wide composite; the composite is 840 and the head reads at 18.1px,
+ * so the device was decorating a line that is legible at rest. It is unchanged elsewhere — beat
+ * 5a's privacy line still takes it. See `geometry.ts` § THE EMPHASIS LEAVES THE STATELINE.
+ *
+ * ── WHAT L14 CHANGED BEFORE THAT ────────────────────────────────────────────────────
  *
  * The composite is now bloom + stateline + **the pinned viewfinder at x 856–1176**, and the
  * page column is `max-w-lg` (512) rather than `max-w-3xl` (768). The bloom does not move — it
@@ -41,16 +53,6 @@ import { useExpression } from "../rig";
  * the raise fires inside that hold. Same shot, same duration, no cut.
  */
 export const Beat07AtEase: React.FC = () => {
-  // The block goes up, is read, and settles HERE — beat 8 raises its own, once, covering both
-  // of its copy changes. The join was tried and the framing does not allow it.
-  const emphasis = useEmphasis([
-    { frame: 0, up: 0 },
-    { frame: 60, up: 0 },
-    { frame: 76, up: 1 },
-    { frame: 104, up: 1 },
-    { frame: 120, up: 0 },
-  ]);
-
   // Content throughout. This is the face beat 8 has to fall FROM, so it is held rather than
   // played. He is working — gaze down at the keyboard, the shoulders carrying the typing.
   const pose = useExpression([{ frame: 0, state: "content" }]);
@@ -72,7 +74,6 @@ export const Beat07AtEase: React.FC = () => {
           climb={0}
           pose={pose}
           working
-          emphasis={emphasis}
         />
       </Camera>
     </AbsoluteFill>

@@ -94,108 +94,101 @@ export const CLOCK: Rect = rect(1036, 58, 140, 30);
 // shifts up by `SCROLL.monitor` when a beat renders the page scrolled; the sticky header and the
 // pinned right column (`VIEWFINDER`, `TOAST`, `PROMPT`) never do.
 
+/**
+ * ── THE ARRANGEMENT L15 SPENDS, AND WHERE IT IS APPLIED ─────────────────────────────
+ *
+ * All of it is applied from OUTSIDE `apps/web`, by the scoped stylesheet in `monitor.tsx`
+ * (`<StageLayout/>`) — the same mechanism `motion.tsx` uses four times over to reach into a
+ * component the video must not fork. Nothing in the product is edited; what changes is the
+ * arrangement the film renders it in.
+ *
+ * They are declared here because every framing number is derived from them.
+ */
+/** `sm:size-72` = 288 in the product. The halo is `-inset-[28%]`, so the glow still spans 274. */
+export const BLOOM_SIZE = 176;
+/** `pt-16` = 64 in the product. The readout row's 44px box fits 48 at `top-1`. */
+export const CARD_PT = 48;
+/** `sm:pb-10` = 40 in the product. */
+export const CARD_PB = 24;
+/** `mt-8` = 32 on FR-024's footnote in the product. */
+export const FOOTNOTE_GAP = 16;
+/** The sub's reserved height — two lines of its own 25.5px leading. */
+const STATELINE_LINE_H = 25.5;
+export const SUB_MIN_HEIGHT = STATELINE_LINE_H * 2;
+/** The gutter the pinned column keeps from the card AND between its own surfaces. */
+export const PINNED_GAP = 32;
+
+export const TREND_NATURAL_W = 768;
+export const TREND_RENDER_W = 320;
+export const TREND_SCALE = TREND_RENDER_W / TREND_NATURAL_W;
+
 export const RAW = {
   /**
-   * The `Session · MM:SS` readout and the back link, as ONE row inside the stage card's own
-   * `pt-16` band — not the row above the card the app draws. Nothing about the readout changes
-   * except which box it sits in, and that move is what freed the page scroll: the row above the
-   * card is what forced `SCROLL.monitor` into the old 39–41.5 window.
+   * The `Session · MM:SS` readout and the back link, as ONE row inside the stage card's own top
+   * band — not the row above the card the app draws. Nothing about the readout changes except
+   * which box it sits in, and that move is what freed the page scroll (L14).
    */
-  sessionReadout: rect(385, 209, 430, 44),
-  /** 675.2, not 673.2: the card's own 1px border top and bottom, which is easy to lose. */
-  stage: rect(344, 188, 512, 675.2),
-  bloom: rect(456, 253, 288, 288),
+  sessionReadout: rect(417, 193, 366, 44),
+  /** The stage card, at L15's arrangement. Whole in the composite for the first time. */
+  stage: rect(376, 188, 448, 401.2),
+  bloom: rect(512, 237, BLOOM_SIZE, BLOOM_SIZE),
   /** The `at_ease` head — the WIDEST of the three heads at 298.5. */
-  statelineHead: rect(450.8, 565, 298.5, 36),
+  statelineHead: rect(450.8, 437, 298.5, 36),
   /**
    * The `at_ease` sub. **Two lines, always reserved** (`min-height: 51`) — see § THE SUB IS
    * RESERVED below. The paragraph shrink-wraps to its content, so this is 287.6 wide.
    */
-  statelineSub: rect(456.2, 607, 287.6, 51),
+  statelineSub: rect(456.2, 479, 287.6, 51),
   /**
    * ── AND THE `tense` SUB, WHICH NOTHING HAD EVER MEASURED ──────────────────────────
    *
-   * 430 wide — 142.4px wider than the `at_ease` one, because it is the only copy that wraps and
-   * a wrapped paragraph fills its `max-w-[42ch]` box (capped here by the card's own 430px
-   * content width) instead of shrink-wrapping. Every horizontal framing number in this file used
-   * to be derived from the 287.6 above, which meant **the `tense` sub was cropped at rest in
-   * beats 8 and 9 and nobody had seen it** — the same class of defect as the two-line clipping,
-   * for the same reason: every still anyone framed was an `at_ease` one.
+   * It is the only one of the three copies that wraps, and a wrapped paragraph **fills** its
+   * `max-w-[42ch]` box (capped by the card's own content width) instead of shrink-wrapping.
+   * This file used to record the `at_ease` width for all three, which meant **the `tense` sub
+   * was cropped at rest in beats 8 and 9 and nobody had seen it** — every still anyone framed
+   * was an `at_ease` one.
    *
-   * Both paragraphs are centred on x 600, so this is the rect the emphasis grows from.
+   * At L15's `max-w-md` column the card's content width is 366, so it still wraps to exactly two
+   * lines. That was checked rather than assumed: at three lines `SUB_MIN_HEIGHT` and every
+   * framing derived from the block would be wrong by 25.5px.
+   *
+   * Both paragraphs are centred on x 600.
    */
-  statelineSubTense: rect(385, 607, 430, 51),
-  controls: rect(449.4, 728, 301.2, 44),
-  footnote: rect(449.4, 804, 301.2, 18.2),
+  statelineSubTense: rect(417, 479, 366, 51),
+  /** FR-024's footnote — the last thing in the card now that the controls are gone (L15). */
+  footnote: rect(449.4, 546, 301.2, 18.2),
   /**
    * The REAL viewfinder's UNSCALED size: `w-52 sm:w-56` `aspect-video`, 224 × 126.9. Only `w`/`h`
-   * are load-bearing now — the component is no longer laid out inside the scrolling card, so its
-   * position is `VIEWFINDER` below, in the pinned right column.
+   * are load-bearing — the component is not laid out inside the scrolling card, so its position
+   * is `VIEWFINDER` below, in the pinned right column.
    */
   viewfinder: rect(615, 253, 224, 126.9),
   /**
-   * **POPULATED, not empty.** The empty card is ~101.5 tall — heading and one line — and the
-   * populated one is not, because it also carries the subtitle, the plot and a six-key legend.
-   * Beat 11's landing was first derived from the empty height and framed the plot straight off
-   * the bottom edge; the card looked present and the line the beat exists to show was not in the
-   * shot.
+   * **The session trend, at its NATURAL width — the size it is drawn at before L15 scales it.**
    *
-   * **It is still 355.7 at the 512 column**, which was worth checking rather than assuming: the
-   * plot keeps its declared 210 height and narrows to 462, and the six-key legend already fitted
-   * on its rows at 768 with room, so nothing wrapped. Measured, not scaled.
+   * `w` is `TREND_NATURAL_W` and `h` is what the card measures there. Its height is very nearly
+   * independent of its width (`session-trend-geometry.ts:53` fixes the plot's viewBox at
+   * `H = 210`; the heading, subtitle, gutters and six-key legend account for the rest), which is
+   * exactly why drawing it wide and scaling it down is what makes it fit — see `TREND`.
    */
-  trend: rect(344, 883.2, 512, 355.7),
-  /** The plot itself, inside the card. 462 wide at this column, against 718 at `max-w-3xl`. */
-  trendPlot: rect(369, 973.7, 462, 210),
+  trendNatural: rect(0, 0, TREND_NATURAL_W, 355.7),
   welcome: rect(216, 1005.2, 768, 83.1),
   calibrationBanner: rect(216, 1112.3, 768, 87.5),
 } as const;
 
 /**
- * ── THE SCROLL OFFSETS, AND WHY THESE TWO ───────────────────────────────────────────
+ * ── THE PAGE NO LONGER SCROLLS, AND THAT IS THE POINT OF L15 ────────────────────────
  *
- * `monitor` = 28, and beats 7, 8 and 9 never leave it — the page is static for three whole
- * beats, which is what the pinned right column is for.
+ * `monitor` was 28 and `trend` was 580 — the page scrolled to its end so that beat 11 could
+ * reach a trend card sitting 855px down. At L15's arrangement the whole monitoring act is
+ * **401.2px of card beside 385.5px of pinned column, inside a 519px viewport**, so there is
+ * nothing below the fold and nothing to scroll to. Beat 11's third landing WAS that scroll; it
+ * is one settled frame now.
  *
- * **It is not zero, and the 28 is arithmetic rather than taste.** The app's authed `<main>` is
- * `px-4 pt-6 sm:px-6 sm:pt-8`, so at this world content begins at 92 + 64 + 32 = **188**, and
- * `MAIN_PT` is the shared shell every other authed beat is framed against (beats 3, 6 and 10) —
- * it cannot be shortened for one page. 28px of honest page scroll puts the card top at **160**,
- * 4px under the sticky header, and that is the whole of it:
- *
- *   stateline head top (raw)      565
- *   block height, 2 lines          93   (head 36 + `mt-1.5` 6 + reserved sub 51)
- *   viewport bottom (raw)     675 + s
- *   cap = (675 + s − 565) / 93 ≥ 1.25   ⟹   s ≥ 6.25
- *
- * so anything from ~7 up restores L12; 28 is chosen because it is exactly what removes the app's
- * `pt-8` from the shot, and because the two remaining constraints are satisfied with room:
- *
- *   Pause/End controls stay BELOW the fold   728 − 28 = 700 > 675            ✓ 25px clear
- *   the readout stays visible                it is INSIDE the card now       ✓ unconditionally
- *
- * That second line is the one that changed. The old window was (39, 41.5] — a 2.5px slot — and
- * the thing that pinned it was the `Session · MM:SS` row sitting ABOVE the card, under a sticky
- * header. Moving the readout into the card's own `pt-16` band is what removed the constraint,
- * and it is why 28 is now a choice with slack rather than an intersection with none.
- *
- * `trend` = 580, and it is **the page scrolled to its end** rather than a framing device: the
- * trend card is the last thing on the monitoring page (bottom at raw 1238.9), and 580 rests its
- * bottom edge 16px above the viewport's, which is where a scrolled-to-the-bottom page sits. Beat
- * 11 travels 28 → 580 in one continuous move, with the camera.
- *
- * It is also, checked rather than assumed, the offset at which beat 11's closing frame holds the
- * FR-024 footnote ("Processed just for you — analyzed, then deleted.") whole rather than slicing
- * it: at 580 the footnote's top lands 33.8px inside the frame's top edge. At the arithmetically
- * tidier "centre the card in the viewport" value of 645.6 it clears by **1.0px**, which is a
- * cropped line waiting to happen the next time anything about the card changes.
- *
- * **And the bloom still cannot come with it**, which is measured rather than judged: bloom top
- * to trend bottom is 985.9px against a 519px viewport. What L14 changes is that the *viewfinder*
- * can — it no longer scrolls, so beat 11's landing holds the trend card whole WITH his face,
- * which is the pairing the beat actually needs.
+ * Kept as an object, at 0, because the page is still a page: a beat that ever needs to move it
+ * should move a named value rather than a magic number.
  */
-export const SCROLL = { monitor: 28, trend: 580 } as const;
+export const SCROLL = { monitor: 0 } as const;
 
 /**
  * ── THE SUB RESERVES TWO LINES, ALWAYS ──────────────────────────────────────────────
@@ -209,119 +202,99 @@ export const SCROLL = { monitor: 28, trend: 580 } as const;
  *   tense           "This has held a while. Serenify can check in when you're    2 lines
  *                    ready."
  *
- * The sub is `max-w-[42ch]` (~393px at 17px Inter), and the `tense` copy is 62 characters, so it
- * wraps. So the block's height, the controls' position, the footnote's position and **every
- * framing derived from any of them** changed on the frame the copy changed — which is how the
- * two-line `tense` sub came to be sliced by the viewport bottom at rest, in the one reading the
- * film exists to deliver, invisibly, because every still anyone framed was an `at_ease` one.
- *
- * So the sub now carries `min-height: 51px` — two lines of its own 25.5px leading — applied from
- * the video side by a scoped stylesheet (`monitor.tsx` § `<StageLayout/>`). One-line copies keep
- * an empty second line under them, which is what a layout that does not jump looks like. The
- * block is **93px tall on every band**, and that is what makes `emphasisCapFor` a constant
- * rather than a per-copy negotiation.
+ * So the block's height, the footnote's position and **every framing derived from either** would
+ * change on the frame the copy changed. The sub carries `min-height: 51px` — two lines of its own
+ * 25.5px leading — applied from the video side by a scoped stylesheet (`monitor.tsx` §
+ * `<StageLayout/>`). One-line copies keep an empty second line under them, which is what a layout
+ * that does not jump looks like. The block is **93px tall on every band.**
  */
 
 /**
- * ── AND THE EMPHASIS NOW HAS THE ROOM IT WAS ALWAYS SPECIFIED WITH ──────────────────
+ * ══ THE EMPHASIS LEAVES THE STATELINE ═══════════════════════════════════════════════
  *
- * L12's 1.25× was derived against a one-line block. At `max-w-3xl`, scroll 40, with the controls
- * 28px under the sub, the two-line `tense` block had 94px of room for 93px of block — a cap of
- * **1.01×**, i.e. the device was dead on the film's most important reading, and the arithmetic
- * was scroll-invariant so no scroll could rescue it.
+ * L12's in-place grow-and-settle fired on every stateline copy change, and the reason it existed
+ * was legibility: at the old 884.8-wide composite the 17px sub landed at **8.11px on a phone**,
+ * under the floor, and the raise carried it to 10.13. The device was doing real work there.
  *
- * Three of L14's five moves are what fix it, and they are all arrangement:
+ * **L15's composite is tighter and the head reads at 18.1px**, so the reading is legible at rest
+ * and the device would be decorating a line that no longer needs it. Three costs stop being
+ * worth paying with it: it was why the card needed a 70px gap under the stateline (page the
+ * trend now uses), why every horizontal framing number had to clear a RAISED rect rather than a
+ * resting one, and a movement the audience had to be taught to read.
  *
- *   the readout leaves the row above the card   → the scroll is free
- *   the sub reserves two lines                  → the block is 93 on every band
- *   the stateline→controls gap 28 → 70          → the raise has somewhere to go
+ * **The device itself is unchanged and is not retired** — beat 5a's privacy line still takes it,
+ * at the same 1.25×, and `motion.tsx` still owns it. What is removed is its application to the
+ * statelines. `EMPHASIS_FACTOR` stays here because that is the copy 5a reads.
  *
- * Measured at `SCROLL.monitor` = 28:
- *
- *   room  = (675 + 28) − 565         = 138
- *   block = 36 + 6 + 51              =  93   on EVERY band
- *   cap   = 138 / 93 = 1.484 → capped at L12's 1.25×
- *
- *   raised block   565 → 681.25  (raw)   = 537 → 653.25 on screen
- *   viewport bottom                       675      → **21.75px clear**
- *   Pause/End controls top   728 (raw)    = 700     → **46.75px clear**
- *   COMPOSITE's frame bottom              660       → **6.75px clear** (see `framing.ts`,
- *                                                     whose margin is 30 for exactly this)
- *
- * `emphasisCapFor` keeps its `lines` parameter and keeps returning `Math.min(…)` against the
- * real room, because the guard is what makes the device safe rather than a rule anyone has to
- * remember — it simply no longer bites. It returns 1.25 for one line AND for two.
+ * **One thing to watch, and it is recorded rather than assumed away.** The emphasis was also
+ * directing the eye at the moment the reading changed — beat 8 steps "a little tense" → "tense"
+ * inside a static wide hold, and the two copies differ by a few words. If that escalation ever
+ * reads as easy to miss, the emphasis is the fix and it should come back **for that one
+ * transition only**, not for all three firings.
  */
-const STATELINE_LINE_H = 25.5;
-const VIEWPORT_BOTTOM_RAW = 675 + SCROLL.monitor;
-
-/**
- * The natural (unraised) height of the stateline block.
- *
- * `lines` is kept in the signature and deliberately ignored for the height: the sub's box is
- * `min-height: 51` on every band (see above), so the block is the same 93px whether the copy
- * wraps or not. A caller that passes 1 and a caller that passes 2 now get the same answer, which
- * is the point of the reserve.
- */
-export const statelineBlockHeight = (lines: number): number =>
-  Math.max(
-    RAW.statelineSub.y + STATELINE_LINE_H * lines - RAW.statelineHead.y,
-    RAW.statelineSub.y + RAW.statelineSub.h - RAW.statelineHead.y,
-  );
-
-/**
- * The largest factor the block can grow to without a line leaving the page's own viewport.
- * Never above L12's 1.25×, and never below 1 — a block that would already be clipped at rest is
- * a defect to fix at the layout, not something to shrink out of.
- */
-export const emphasisCapFor = (lines: number): number => {
-  const room = VIEWPORT_BOTTOM_RAW - RAW.statelineHead.y;
-  return Math.max(1, Math.min(EMPHASIS_FACTOR, room / statelineBlockHeight(lines)));
-};
-
-/** How many lines each band's sub wraps to at `max-w-[42ch]`. Measured, not guessed. */
-export const SUB_LINES = { at_ease: 1, a_little_tense: 1, tense: 2 } as const;
+export const EMPHASIS_FACTOR = 1.25;
 
 /** A raw rect shifted by a scroll offset. The sticky header never moves. */
 export const scrolled = (r: Rect, s: number): Rect => rect(r.x, r.y - s, r.w, r.h);
 
 /**
- * ── THE PINNED RIGHT COLUMN (L14), AND LIBERTY L1 INSIDE IT ─────────────────────────
+ * ── THE PINNED RIGHT COLUMN (L14/L15), AND LIBERTY L1 INSIDE IT ─────────────────────
  *
- * Three surfaces live at **x 856 – 1176** and none of them scrolls: the mail toast (beat 8), the
- * viewfinder (beats 7–11) and the confirmatory prompt (beat 9). 1176 is the DRAWN clock's own
- * right edge (`shell.tsx:84`), so the sheet's "the clock, the toast and the viewfinder share a
- * right edge, so beat 8 frames one vertical stack rather than three unrelated things" is
- * literally true again — the previous pass had moved the stack to 1063 and left the clock at
- * 1176, which is the crop this pass found on a render.
+ * Four surfaces live at **x 856 – 1176** and none of them scrolls: the mail toast (beat 8), the
+ * viewfinder (beats 7–11), the session trend (beats 7–11) and the confirmatory prompt (beat 9).
+ * 1176 is the DRAWN clock's own right edge (`shell.tsx:99`), so the sheet's "the clock, the toast
+ * and the viewfinder share a right edge, so beat 8 frames one vertical stack rather than three
+ * unrelated things" is literally true of the render.
  *
  *   clock       58 –  88     (browser chrome; never moves)
  *   toast       96 – 200     (beat 8)
  *   viewfinder 212 – 393.3   (beats 7–11)
- *   prompt     424 – 714     (beat 9; its last 39px land on the camera backdrop, see PROMPT)
+ *   trend      425.3 – …     (beats 7–11, scaled — see TREND)
+ *   prompt     425.3 – 715.3 (beat 9; it OVERLAYS the trend, which is what a notification does)
  *
- * **The 22px toast/viewfinder overlap is gone by construction**, not by tuning: the two were
- * only ever colliding because the viewfinder was laid out inside the scrolling column and the
- * gap had been computed against its UNSCROLLED position. Neither scrolls now, so the 12px
- * between them is a fact rather than a coincidence — and 12px is adjacency, which is the whole
- * of liberty L2: you watch his face fall *while the toast is up*.
+ * ── AND THE COLUMN'S GUTTER IS THE SAME NUMBER IN BOTH DIRECTIONS ───────────────────
  *
- * ── LIBERTY L1, UNCHANGED IN SIZE AND FREED IN DIRECTION ────────────────────────────
+ * The prompt used to sit **flush against the stage card** — the column began at 856 and the card
+ * ended at 856, so the horizontal gap was 0 — while carrying 30.7px of air above it to the
+ * viewfinder. Two different spacings on one element, and the tighter one was zero.
  *
- * The app draws the viewfinder at 224×126.9. L1 enlarges it to **320×181.3** so the face is
- * readable on a phone, and the register (item 6) kept L1 explicitly while asking for the size to
- * be re-checked against a measured figure. It is.
- *
- * What changes at L14 is that the growth direction stops being a compromise. It used to be
- * pinned to the card's right edge and grown top-LEFT so it would not cover the bloom's opaque
- * core; now the column is 512 wide and ends at 856, so the viewfinder starts where the card
- * stops and grows into page that was empty anyway. The bloom is untouchable by geometry rather
- * than by careful arrangement.
+ * `PINNED_GAP` is now both: the reading column is `max-w-md` (448), which `mx-auto` centres at
+ * **376 – 824**, so 856 is exactly 32 away; and the trend and the prompt each begin 32 below the
+ * viewfinder's bottom. That the column width the composition wanted happens to produce the gap
+ * the spacing wanted is luck, and it is recorded as luck — 448 was chosen first, for the bloom.
  */
 export const VF_SCALE = 320 / 224;
 export const STACK_RIGHT = 1176;
 export const STACK_LEFT = STACK_RIGHT - 320;
 export const VIEWFINDER: Rect = rect(STACK_LEFT, 212, 320, 126.9 * VF_SCALE);
+
+/**
+ * ── THE TREND, DRAWN WIDE AND SCALED DOWN ───────────────────────────────────────────
+ *
+ * **This is the one number that decides whether the monitoring act can be one shot**, so the
+ * arithmetic is written out. The card's height barely depends on its width: the plot's viewBox is
+ * fixed at `H = 210` (`session-trend-geometry.ts:53`) and the heading, subtitle, gutters and
+ * legend are the other ~140, so the card is ~350 tall at 512 and ~350 tall at 768. Rendered
+ * directly at the 320 the column has room for, it would still be ~370 tall and the act would be
+ * exactly as tall as it was before.
+ *
+ * Drawn at **768** — `max-w-3xl`, the width the app's own monitoring column ships at — and scaled
+ * to **320**, the same card comes out **320 × 148.2** — measured, at both widths: the card is
+ * 355.7 tall at 512 AND at 768. The plot loses no shape; it arrives smaller.
+ * Same class of liberty as L1 (the viewfinder scaled UP so a face is readable) and L8 (Ren's
+ * avatar), in the other direction.
+ *
+ * **What it costs, stated:** the card's 18px heading and its 12px axis labels fall under the
+ * phone-legibility floor at this scale. What the shot has to deliver is the LINE — a tail that
+ * climbed through beat 8 walking back down in meadow — and the plot is still ~150 × 45px on a
+ * phone at the composite framing. See `framing.ts` § PHONE.
+ */
+export const TREND: Rect = rect(
+  STACK_LEFT,
+  VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP,
+  TREND_RENDER_W,
+  RAW.trendNatural.h * TREND_SCALE,
+);
 
 /**
  * 104 tall, not the greybox's 82: the boss's subject line wraps to two lines at 320 wide, and at
@@ -334,62 +307,10 @@ export const VIEWFINDER: Rect = rect(STACK_LEFT, 212, 320, 126.9 * VF_SCALE);
 export const TOAST: Rect = rect(STACK_LEFT, 96, 320, 104);
 
 /**
- * ── THE EMPHASIS (L12), AND REGISTER ITEM 3 ─────────────────────────────────────────
+ * The stateline block: head + sub, as one, at its WIDEST copy.
  *
- * The greybox grew the stateline block **1.65×**. That factor was derived against a composite
- * framing of ~1096 world px, where the app's 17px sub lands at 6.5px on a phone and needs 1.6×
- * just to clear the ~10px legibility floor.
- *
- * At the real geometry the composite is **884.8 wide**, not 1096, so the sub lands at 8.11px and
- * the factor needed for legibility alone is 1.233× — which is a coincidence rather than a
- * derivation, and is not what sets the number.
- *
- * **The emphasis yields, which is exactly what register item 3 asks of it** — the layout does
- * not move to accommodate a video device. It goes to **1.25×**, chosen against measured
- * clearances rather than taste, at L14's arrangement and `SCROLL.monitor` = 28:
- *
- *   bloom bottom      513.0
- *   stateline top     537.0   ← the block grows DOWNWARD from here; its top never moves,
- *                               so the bloom is untouchable by construction
- *   block at 1.25×    537.0 – 653.25
- *   controls top      700.0   → **46.75px** of clearance
- *   viewport bottom   675.0   → **21.75px**
- *   frame bottom      681.5   → the block finishes inside the shot, by 28.2px
- *
- * At 1.65× the block would reach 690.5 — through the viewport's bottom edge. The device
- * survives as grammar (it still fires on every copy change, which is what makes it grammar);
- * only its amplitude yields, and legibility is better than it was because the shot is tighter.
- *
- * **This is the CEILING, and at L14 it is also the applied factor on every band.** The
- * arithmetic above was a one-line block's, and until L14 `emphasisCapFor()` re-derived it per
- * copy and returned ~1.01 for the two-line `tense` sub — the device dead where it mattered most.
- * The reserved sub and the 70px controls gap put the two-line block at 46.75px of clearance, so
- * the cap is 1.25 for one line and for two. See `emphasisCapFor`'s header.
- */
-export const EMPHASIS_FACTOR = 1.25;
-
-/**
- * ── THE TWO LAYOUT VALUES L14 CHANGES, AND WHERE THEY ARE APPLIED ───────────────────
- *
- * Both are applied from OUTSIDE `apps/web`, by the scoped stylesheet in `monitor.tsx`
- * (`<StageLayout/>`) — the same mechanism `motion.tsx` uses four times over to reach into a
- * component the video must not fork. Nothing in the product is edited; what changes is the
- * arrangement the film renders it in, which is the register's own line about what a video pass
- * may and may not do.
- *
- * They are declared here because every framing number above is derived from them.
- */
-/** The sub's reserved height — two lines of its own 25.5px leading. */
-export const SUB_MIN_HEIGHT = STATELINE_LINE_H * 2;
-/** `op-surfaces.tsx:253` ships `mt-7` (28) on the controls row. L14 spends 70. */
-export const STATELINE_CONTROLS_GAP = 70;
-
-/**
- * The stateline block the emphasis raises: head + sub, as one, at its WIDEST copy.
- *
- * Both paragraphs are centred on x 600 (`items-center` + `text-center`), and the widest thing
- * the block ever contains is the `tense` sub at 430 — not the `at_ease` head at 298.5 this used
- * to be derived from.
+ * Both paragraphs are centred on x 600 (`items-center` + `text-center`), and the widest thing the
+ * block ever contains is the `tense` sub — not the `at_ease` head this used to be derived from.
  */
 const STATELINE_CX = RAW.statelineSubTense.x + RAW.statelineSubTense.w / 2;
 const STATELINE_W = Math.max(RAW.statelineHead.w, RAW.statelineSubTense.w);
@@ -398,27 +319,6 @@ export const STATELINE_BLOCK: Rect = rect(
   RAW.statelineHead.y,
   STATELINE_W,
   RAW.statelineSub.y + RAW.statelineSub.h - RAW.statelineHead.y,
-);
-
-/**
- * ── THE RECT THE DEVICE REACHES, WHICH IS NOT THE RECT THE BLOCK OCCUPIES ───────────
- *
- * `<Emphasis/>` scales both paragraphs about `top center`, so at full amplitude the block is
- * `EMPHASIS_FACTOR` times as wide and as tall, growing outward from its own centre line and
- * downward from its own top edge. **This is what the composite has to frame**, and framing the
- * resting block instead is why the raise used to run off the left edge of the shot:
- *
- *   at rest      385.0 – 815.0   ×  565 – 658
- *   raised 1.25× 331.3 – 868.8   ×  565 – 681.25
- *
- * Same class of arithmetic as `SUCCESS_FRAMED` and beat 5f's ripple: the bounding box that
- * matters is the one the DEVICE reaches, not the one the component occupies while it is still.
- */
-export const STATELINE_RAISED: Rect = rect(
-  STATELINE_CX - (STATELINE_W * EMPHASIS_FACTOR) / 2,
-  STATELINE_BLOCK.y,
-  STATELINE_W * EMPHASIS_FACTOR,
-  STATELINE_BLOCK.h * EMPHASIS_FACTOR,
 );
 
 // ── Calibration ─────────────────────────────────────────────────────────────────────
@@ -679,6 +579,35 @@ export const CHAT = {
 } as const;
 
 /**
+ * ── LIBERTY L8, FINALLY APPLIED — REN'S AVATAR IS DRAWN LARGER ──────────────────────
+ *
+ * L8 has been in the liberties table since the greybox and was **never actually built**. The
+ * component pass replaced the drawn stand-in with the real `<ChatShell/>`, which mounts
+ * `<RenAvatar/>` with no props at all (`chat-shell.tsx:447`) — so Ren rendered at the shipped
+ * default of **34px, `state="idle"`, for all 210 frames**, in the one beat of the film where his
+ * face is on screen long enough to be read. The liberty survived as a row in a table describing
+ * something nobody could see.
+ *
+ * `apps/web` cannot take a video-only prop, so the shipped avatar is hidden and the video draws
+ * its own — the same component, from the same file, at a size and a state the beat chooses. The
+ * seam is `chat.tsx` § `<RenFace/>`, and it is the same one `calibrate.tsx` uses on the countdown
+ * numeral: suppress the component's own copy, draw the frame-addressed one over it.
+ *
+ * **56, and the number is bounded on both sides.** It grows about the shipped box's own centre
+ * (298, 222.8), so at 56 it occupies 270–326 × 194.8–250.8: inside the conversation header's own
+ * 189–257.7 band with 6px top and bottom, and its right edge stops 1px short of where "Ren"
+ * begins at 327. Anything larger overlaps the name; anything smaller does not earn the beat's
+ * face landing.
+ */
+export const REN_AVATAR_SIZE = 56;
+export const REN_AVATAR: Rect = rect(
+  CHAT.renAvatar.x + CHAT.renAvatar.w / 2 - REN_AVATAR_SIZE / 2,
+  CHAT.renAvatar.y + CHAT.renAvatar.h / 2 - REN_AVATAR_SIZE / 2,
+  REN_AVATAR_SIZE,
+  REN_AVATAR_SIZE,
+);
+
+/**
  * **The number that sets beat 10's scale, stated once so it stops being re-derived.** Ren's
  * avatar sits at x 281 and *his* bubble runs to x 919, so **any** landing holding both is ≥638
  * wide before margins. That is why turns 2 and 3 cannot reach the ~10px phone floor at this
@@ -810,16 +739,19 @@ export const GATE = {
  * portalled to the body it is drawn outside `Desktop`'s `overflow: hidden` for free; that is the
  * one thing the portal was always good for.
  *
- * **424 is derived, not placed.** `BEAT9_PROMPT` is `frameRect(panel, 24)` and its height
- * governs, so the frame's top edge lands exactly 24px above the panel. The viewfinder's bottom
- * is at 393.3, so any y below 423.3 puts a sliver of the viewfinder in the top of beat 9's
- * landing — a component sliced at rest, which is always a failure. 424 clears it by 6.7px and is
- * the smallest value that does.
+ * **425.3 is derived, not placed — and it is the same number the trend gets.** The panel's top
+ * is the viewfinder's bottom plus `PINNED_GAP`, which is also the gap between the reading column
+ * and this whole column. It used to be 424 with a 0px horizontal gutter beside it; see § THE
+ * PINNED RIGHT COLUMN for why one element carrying two different spacings was the defect.
+ *
+ * **It overlays the trend, which starts at the same y**, and that is correct rather than a
+ * collision: `<Notification/>` is `fixed` in the product and lands over whatever page content is
+ * under it. Beat 9 does not need the trend in shot.
  */
 export const PROMPT = {
-  panel: rect(STACK_LEFT, 424, 320, 290),
+  panel: rect(STACK_LEFT, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP, 320, 290),
   /** "Yes, that's me" — the true-positive branch. Offsets measured off the panel's own box. */
-  yes: rect(STACK_LEFT + 25, 424 + 117, 270, 44),
+  yes: rect(STACK_LEFT + 25, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP + 117, 270, 44),
 } as const;
 
 /**

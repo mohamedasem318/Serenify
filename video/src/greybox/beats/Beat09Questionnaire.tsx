@@ -4,7 +4,7 @@ import { AbsoluteFill } from "remotion";
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 
 import { BEAT8_WIDE, BEAT9_PROMPT, PHONE, useShotAt } from "../../app/framing";
-import { PROMPT, centre, emphasisCapFor } from "../../app/geometry";
+import { PROMPT, centre } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { MonitorPage, WorldOverlay, WorldPrompt } from "../../app/monitor";
 import { useToastIn } from "../../app/motion";
@@ -51,9 +51,9 @@ import { useExpression } from "../rig";
  * pointer had to be drawn in output pixels to reach it. Everything about the beat was correct
  * except the one thing it is for.
  *
- * `PROMPT` is a world rect now — x 856–1176, y 405–695, the last surface in the pinned right
- * column — and `<WorldPrompt/>` (`monitor.tsx`) projects the portalled node through the
- * camera's own transform each frame. So:
+ * `PROMPT` is a world rect now — x 856–1176, y 425.3–715.3 in the pinned right column — and
+ * `<WorldPrompt/>` (`monitor.tsx`) projects the portalled node through the camera's own transform
+ * each frame. So:
  *
  *  · the camera **pushes in on the prompt**, landing at `BEAT9_PROMPT` (601 world px) where the
  *    three options' 15px copy reads at **10.5px on a phone**, over the floor;
@@ -71,6 +71,17 @@ import { useExpression } from "../rig";
  * A focus ring arriving on an option with nothing touching it would read as a stray keyboard
  * focus rather than as a person deciding, which inverts the one beat whose entire subject is
  * *he was asked and he answered*. The hand is why the click has a cause.
+ *
+ * ── IT SITS 32px UNDER THE VIEWFINDER AND 32px OFF THE CARD (L15) ───────────────────
+ *
+ * It used to be flush against the stage card's right edge — 0px — while carrying 30.7px of air
+ * above it to the viewfinder: two different gutters on one element, and the tighter one was
+ * nothing. Both are `PINNED_GAP` now.
+ *
+ * **And it OVERLAYS the trend**, which is new and is correct: the trend joined the pinned column
+ * at L15 and starts at the same y. `<Notification/>` is `fixed` in the product and lands over
+ * whatever is under it, so a prompt covering the page's own content while it is up is the
+ * component's behaviour rather than a collision. Beat 9 does not need the trend in shot.
  */
 /** One array, used by `<Camera>` AND by the projection — they cannot disagree. */
 const KEYS: CameraKey[] = [
@@ -102,11 +113,6 @@ export const Beat09Questionnaire: React.FC = () => {
           tension={1}
           climb={1}
           pose={pose}
-          // Picks up beat 8 exactly: the raise fired on the first copy change and settled as the
-          // second landed, so the block is SEATED when this beat opens. Passing 1 would re-raise
-          // it on a cut boundary with nothing causing it.
-          emphasis={0}
-          emphasisFactor={emphasisCapFor(2)}
           sessionFrom={47 * 60 + 23}
         />
       </Camera>

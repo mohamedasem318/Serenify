@@ -2,12 +2,13 @@ import React from "react";
 import { useCurrentFrame } from "remotion";
 
 import { ChatShell } from "@/components/chat/chat-shell";
+import { RenAvatar, type RenState } from "@/components/chat/ren-avatar";
 import { Header } from "@/components/header/header";
 import type { ChatMessage, ConversationDetail } from "@/lib/api/chat-client";
 
 import { SANS } from "../fonts";
 import { PROTAGONIST } from "../greybox/copy";
-import { CHAT } from "./geometry";
+import { CHAT, REN_AVATAR, REN_AVATAR_SIZE } from "./geometry";
 import { sec } from "./motion";
 import { AppShell } from "./shell";
 
@@ -136,6 +137,69 @@ const ComposerCaret: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
+
+/**
+ * ══ REN HAS A FACE, AND IT PERFORMS — L8, BUILT ═════════════════════════════════════
+ *
+ * **He was inert in his own beat.** `<ChatShell/>` mounts `<RenAvatar/>` with no props
+ * (`chat-shell.tsx:447`), so he rendered at the shipped 34px default, in `idle`, for the whole
+ * exchange: a 34px circle that blinked on a wall-clock CSS loop while a message appeared beside
+ * it. He is the companion the product is built around and he had less presence than the mail
+ * notification in beat 8.
+ *
+ * `<RenAvatar/>` ships **four real states** (`ren-avatar.tsx:52`) and they are not decorative:
+ * `attentive` opens the eyes 1.22× and lifts them, `thinking` shrinks them to 0.62× and drops
+ * them down-right — a squint, away from the reader — and `warm` drops the open pair entirely and
+ * leaves the closed, smiling one. Those are the product's own numbers
+ * (`OPEN_EYE_TRANSFORMS`, `:40-50`), measured values from the signed-off design, and this beat
+ * uses them rather than inventing an expression.
+ *
+ * ── THE SEAM: SUPPRESS THE SHIPPED ONE, DRAW THE FRAME-ADDRESSED ONE OVER IT ────────
+ *
+ * `apps/web` is never modified for the video, and `<ChatShell/>` forwards no avatar prop — so the
+ * shell's own copy is hidden with a scoped `visibility: hidden` (which keeps its 34px box in the
+ * flex row, so "Ren" and "here to listen" do not move) and this one is drawn in the world
+ * overlay at `REN_AVATAR`. Exactly the seam `calibrate.tsx` uses on the countdown numeral and
+ * `otp.tsx` uses on the merge: the component keeps every path, colour and class it ships with;
+ * only which instance is on screen changes.
+ *
+ * ── AND THE BLINK BECOMES A FUNCTION OF THE FRAME ───────────────────────────────────
+ *
+ * Ren's blink is a **7s infinite CSS animation** crossfading two eye groups
+ * (`globals.css:310-321`) — wall-clock, not frame time, so in a render it landed wherever the
+ * previous frame's capture happened to leave it. `<StillMotion/>` (`motion.tsx`) pins both pairs
+ * at their resting opacities, which is the product's own reduced-motion answer and is correct as
+ * a default; here the two opacities are re-authored per frame instead, so he blinks on the
+ * film's clock. `[data-ren-face] .ren-eyes-*` outranks `StillMotion`'s `.ren-eyes-*` on
+ * specificity, which is how a beat opts back in.
+ *
+ * A `warm` Ren carries neither class — he is closed permanently — so the rules below simply do
+ * not apply to him, which is what the product does too.
+ */
+/** ~150ms closed, every ~5s. Human, and rare enough that two blinks fit the beat. */
+const BLINK_PERIOD = sec(5);
+const BLINK_CLOSED = 4;
+
+const RenFace: React.FC<{ state: RenState }> = ({ state }) => {
+  const frame = useCurrentFrame();
+  const closed = frame % BLINK_PERIOD >= BLINK_PERIOD - BLINK_CLOSED;
+  return (
+    <>
+      <style>{`
+        [data-renshell] svg[data-ren-state] { visibility: hidden; }
+        [data-ren-face] .ren-eyes-open   { opacity: ${closed ? 0 : 1} !important; }
+        [data-ren-face] .ren-eyes-closed { opacity: ${closed ? 1 : 0} !important; }
+      `}</style>
+      <div
+        data-ren-face
+        style={{ position: "absolute", left: REN_AVATAR.x, top: REN_AVATAR.y, zIndex: 6 }}
+      >
+        <RenAvatar size={REN_AVATAR_SIZE} state={state} />
+      </div>
+    </>
+  );
+};
+
 export const ChatPage: React.FC<{
   clock: string;
   messages: ChatMessage[];
@@ -143,11 +207,21 @@ export const ChatPage: React.FC<{
   draft?: string;
   /** L9 — the typing indicator the app does not have. The video depicts a later feature. */
   thinking?: boolean;
+  /** Ren's own expression (L8). `<ChatShell/>` forwards no such prop — see `<RenFace/>`. */
+  renState?: RenState;
   /** Draws the measured caret at the end of `draft` and blinks it. Only meaningful while typing. */
   caret?: boolean;
   /** World-coordinate layer — the drawn cursor. */
   overlay?: React.ReactNode;
-}> = ({ clock, messages, draft = "", thinking = false, caret = false, overlay }) => {
+}> = ({
+  clock,
+  messages,
+  draft = "",
+  thinking = false,
+  caret = false,
+  renState = "idle",
+  overlay,
+}) => {
   const detail: ConversationDetail = {
     conversation: { ...conversation, messageCount: messages.length },
     messages,
@@ -159,6 +233,7 @@ export const ChatPage: React.FC<{
       url="serenify.tech/app/chat"
       overlay={
         <>
+          <RenFace state={renState} />
           {overlay}
           {caret ? <ComposerCaret text={draft} /> : null}
         </>
@@ -167,7 +242,10 @@ export const ChatPage: React.FC<{
         <Header fullName={PROTAGONIST.fullName} email={PROTAGONIST.email} role="employee" />
       }
     >
-      <div className="mx-auto h-[460px] w-full max-w-2xl overflow-hidden rounded-2xl border border-border">
+      <div
+        data-renshell
+        className="mx-auto h-[460px] w-full max-w-2xl overflow-hidden rounded-2xl border border-border"
+      >
         <ChatShell
           key={`draft-${draft.length}-msgs-${messages.length}`}
           variant="panel"

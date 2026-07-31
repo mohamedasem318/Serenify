@@ -14,7 +14,7 @@ import { PROTAGONIST, SIGNUP } from "../copy";
 import { H, VIEWPORT_Y, W } from "../theme";
 
 /**
- * Beat 2 · Signup · 0:06–0:21.6 · 468 frames
+ * Beat 2 · Signup · 0:06–0:20.4 · 432 frames
  *
  * **ONE TAKE.** The sub-beats are phases of a single continuous shot. Nothing is cut to: the pan
  * from the password field to the consent row is a pan, the form → "Check your email" change is
@@ -109,6 +109,33 @@ const MAIL_CARD_SCROLLED = rect(
 
 const LIST_ROW = rect(MAIL_ROW.x, MAIL_ROW.y + VIEWPORT_Y, MAIL_ROW.w, MAIL_ROW.h);
 
+/**
+ * ══ 2e IS RETIMED — EVERY GAP BELOW IS A HOLD OR A TRANSITION, NONE IS A CUT ════════
+ *
+ * The tab operations are still performed in full: the new-tab click, the URL typing, the page
+ * load, the row click, the tab-switch click all still happen and are still on screen for as long
+ * as they take to read. Only the holds around them were outlasting their own read. Measured
+ * against the previous cut:
+ *
+ *   new tab, blank, before typing starts      10f → 6f   (`newTabClick` → `mailUrlFrom`)
+ *   URL typing                                16f → 16f  (unchanged — it is the performed action)
+ *   "Enter" to the page rendering               6f → 4f   (`mailEnter` → `mailLoaded`)
+ *   loaded hold, then the push onto the list   18f → 8f   (`mailLoaded` → the list landing)
+ *   the row, read before the click               8f → 8f (unchanged — the row has to be read)
+ *   the row, held after the click               10f → 6f  (the selected state registers, briefly)
+ *   pulling out from the list                   14f → 10f (list landing → the page-scale WINDOW)
+ *   the page-scale hold                         10f → 5f  (the click's consequence, briefly)
+ *   pushing onto the card                       18f → 13f (WINDOW → the card landing)
+ *   the card, read                              12f → 12f (unchanged — the code has to be read)
+ *   pulling back before the tab switch          10f → 8f
+ *
+ * 140 frames of 2e become 104 — a 36-frame (1.2s) cut, inside the sheet's 30–45f target for this
+ * pass. Every frame from `serenifyTabClick` on — the tab-switch click, the wide hold, the OTP
+ * choreography, the seam into beat 3 — shifts left by exactly those 36 frames and is otherwise
+ * untouched: the choreography still starts ten frames before the camera lands on it (`otp` →
+ * the `OTP_PANEL` key) and still runs its own 88 frames (2.94s) end to end.
+ */
+
 // ── Phase clock ─────────────────────────────────────────────────────────────────────
 
 const T = {
@@ -123,13 +150,13 @@ const T = {
   /** The form cross-fades to the "Check your email" state. */
   checkEmail: 162,
   newTabClick: 214,
-  mailUrlFrom: 224,
-  mailEnter: 240,
-  mailLoaded: 246,
-  openEmail: 272,
-  serenifyTabClick: 354,
+  mailUrlFrom: 220,
+  mailEnter: 236,
+  mailLoaded: 240,
+  openEmail: 256,
+  serenifyTabClick: 318,
   /** `playSuccess()`'s zero. The camera arrives ten frames into the halo sweep. */
-  otp: 380,
+  otp: 344,
 } as const;
 
 /**
@@ -441,26 +468,26 @@ export const Beat02Signup: React.FC = () => {
           // f200 while the frame's top edge was at world 190 — the control was 130px above the
           // shot that was clicking it.
           { frame: 206, shot: WINDOW },
-          { frame: 250, shot: WINDOW },
-          { frame: 264, shot: LIST_SHOT },
-          { frame: 282, shot: LIST_SHOT },
+          { frame: 242, shot: WINDOW },
+          { frame: 248, shot: LIST_SHOT },
+          { frame: 262, shot: LIST_SHOT },
           // …out again, so the message is met at page scale, then the slow push onto it.
-          { frame: 296, shot: WINDOW },
-          { frame: 306, shot: WINDOW },
-          { frame: 324, shot: CARD_TIGHT },
-          { frame: 336, shot: CARD_TIGHT },
+          { frame: 272, shot: WINDOW },
+          { frame: 277, shot: WINDOW },
+          { frame: 290, shot: CARD_TIGHT },
+          { frame: 302, shot: CARD_TIGHT },
           // F · performed tab switch back. The pull-out COMPLETES before the tab is pressed.
-          { frame: 346, shot: WINDOW },
+          { frame: 310, shot: WINDOW },
           // G · the wide hold, so the audience sees the screen it is on
-          { frame: 366, shot: WINDOW },
+          { frame: 330, shot: WINDOW },
           // H · in on the OTP panel
-          { frame: 390, shot: OTP_PANEL },
-          { frame: 448, shot: OTP_PANEL },
+          { frame: 354, shot: OTP_PANEL },
+          { frame: 412, shot: OTP_PANEL },
           // I · THE SEAM. The pull-out into beat 3 starts here, inside this beat, so that the
           // navigation lands at a width where it reads as a page change rather than as a glitch
           // frame under a 432px-wide shot. Beat 3 opens on this exact shot and holds this exact
           // surface for ten more frames.
-          { frame: 467, shot: BEAT2_SEAM },
+          { frame: 431, shot: BEAT2_SEAM },
         ]}
       >
         {onMail ? (
