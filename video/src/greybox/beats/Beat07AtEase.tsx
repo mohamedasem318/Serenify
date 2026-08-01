@@ -69,9 +69,10 @@ export const Beat07AtEase: React.FC = () => {
       >
         <MonitorPage
           clock="11:30 AM"
-          band="at_ease"
+          // At ease: one number, and everything reads it. See `monitor.tsx`
+          // § ONE READING, READ TWICE.
+          level={0}
           tension={0}
-          climb={0}
           pose={pose}
           working
         />

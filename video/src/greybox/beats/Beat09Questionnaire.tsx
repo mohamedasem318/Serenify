@@ -109,9 +109,10 @@ export const Beat09Questionnaire: React.FC = () => {
       <Camera keys={KEYS}>
         <MonitorPage
           clock="11:30 AM"
-          band="tense"
+          // Held where beat 8 left it — tense, and the session has peaked there.
+          level={1}
+          peak={1}
           tension={1}
-          climb={1}
           pose={pose}
           sessionFrom={47 * 60 + 23}
         />

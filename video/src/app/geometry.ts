@@ -165,17 +165,26 @@ export const RAW = {
    */
   sessionReadout: rect(417, 193, 366, 44),
   /**
-   * The stage card, at L16's arrangement — the orb at 96, no footnote, and the trend card
-   * inside it. Whole in the composite, as it has been since L15.
+   * The stage card, at L16's arrangement — the orb at 96, no footnote, and the trend inside it.
+   * Whole in the composite, as it has been since L15.
+   *
+   * **457.5, and the column is now one rhythm.** The trend's own card is stripped (see
+   * `trendNatural` and `monitor.tsx` § THE TREND IS NO LONGER A CARD INSIDE A CARD), which takes
+   * 23.9 scaled px out of the card AND removes the doubled air the nested `sm:p-6` was adding
+   * above the heading and under the plot. Every gap in the column is `CARD_PB` = 24 now, top to
+   * bottom, with the single exception of the stateline's own `mt-1.5` inside its block:
    *
    *   card top          188          (+1 border, +48 top band)
    *   bloom             237 –  333
-   *   stateline head    357 –  393   (`mt-6`)
+   *   stateline head    357 –  393   (`mt-6`      → 24 clear of the orb)
    *   stateline sub     399 –  450   (`mt-1.5`, two lines always reserved)
-   *   the trend card    474 – 644.4  (`TREND_GAP`)
-   *   card bottom       669.4        (+24 bottom pad, +1 border)
+   *   the trend         474 – 620.5  (`TREND_GAP` → 24 clear of the sub)
+   *   card bottom       645.5        (+24 bottom pad, +1 border)
+   *
+   * Measured on `SwapProbe`'s `stage`, not derived — the freed 23.9 is not given to anything, so
+   * the card is simply shorter and every framing that unions it tightens with it.
    */
-  stage: rect(376, 188, 448, 481.4),
+  stage: rect(376, 188, 448, 457.5),
   bloom: rect(552, 237, BLOOM_SIZE, BLOOM_SIZE),
   /** The `at_ease` head — the WIDEST of the three heads at 298.5. */
   statelineHead: rect(450.8, 357, 298.5, 36),
@@ -213,8 +222,17 @@ export const RAW = {
    * independent of its width (`session-trend-geometry.ts:53` fixes the plot's viewBox at
    * `H = 210`; the heading, subtitle, gutters and six-key legend account for the rest), which is
    * exactly why drawing it wide and scaling it down is what makes it fit — see `TREND`.
+   *
+   * **305.7, not 355.7 — the inner card is gone.** `<StageLayout/>` now strips the component's own
+   * `rounded-2xl border bg-surface shadow-soft sm:p-6`, so a card inside a card is one card. The
+   * 50px is that card's chrome exactly: 24 of top padding, 24 of bottom, and 2 of border. Measured
+   * on `SwapProbe`'s `trend-natural`, with `data-emph` on the probe's wrapper so the harness
+   * measures what the beats render.
+   *
+   * It also widened the plot: at `sm:p-6` the measured container was 720 inside a 768 card, and it
+   * is 768 now — the SVG is the full content width of the stage card for the first time.
    */
-  trendNatural: rect(0, 0, TREND_NATURAL_W, 355.7),
+  trendNatural: rect(0, 0, TREND_NATURAL_W, 305.7),
   welcome: rect(216, 1005.2, 768, 83.1),
   calibrationBanner: rect(216, 1112.3, 768, 87.5),
 } as const;

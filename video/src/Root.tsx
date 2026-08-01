@@ -69,7 +69,7 @@ export function RemotionRoot() {
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={332} fps={30} width={1920} height={1080} />
         <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={234} fps={30} width={1920} height={1080} />
         <Composition id="Beat12-Closing" component={Beat12Closing} durationInFrames={90} fps={30} width={1920} height={1080} />
-        <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={136} fps={30} width={1920} height={1080} />
+        <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={172} fps={30} width={1920} height={1080} />
       </Folder>
 
       {/* The character rig's own bench. Not a beat, never in the cut — it shows the

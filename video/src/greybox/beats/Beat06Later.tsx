@@ -72,14 +72,38 @@ const START = centre(HOME.startCheckIn);
  *   G = 150 (before)   0px      not there at all
  *   G = 148            0px      exactly on the fold
  *   G = 118            30px     top border, corner radius, a sliver
+ *   G = 112            34.4px   shape only — the state the last pass shipped, and it is what
+ *                               "34.4px is not enough" refers to
  *   G = 108            40px     the above plus the first line of each label breaking the fold
- *   G = 70             76.3px   measured — too much; both headings and their subtitles show
- *   G = 0              148px    two cards sliced in half — the state that was rejected
+ *   G = 80             66.3px   ← HERE. Both headings whole, with air under them
+ *   G = 60             86.3px   headings AND both subtitles — more page than the note asked for
+ *   G = 0             106.3px   two cards sliced through their body copy
  *
- * **112 shows 34.4px, measured on the render** — enough that the cards exist, not enough that
- * either is framed or
- * emphasised. At the full 1200 frame anything inside them reads at ~5px, so what is on screen is
- * shape rather than reading, which is the whole ask.
+ * ── AND 80 IS WHERE THE HEADINGS BECOME WHOLE, MEASURED ON THE RENDER ───────────────
+ *
+ * The note is *"their headers need to be readable — 'Things that might help' and 'Recent
+ * chats'"*, so the control is no longer "how much card is on screen" but **where the heading's
+ * own baseline lands against the fold**. Measured on a still of this beat at frame 1304:
+ *
+ *   G = 60    card top 942 · heading ink 986–1022 · subtitles 1046–1062 · fold 1080
+ *   G = 80    card top 974 · heading ink 1017–1053 · subtitle top 1077 · fold 1080
+ *
+ * At 80 both headings clear the fold by 27px and it is the **subtitles** the page cuts, which is
+ * the same relationship the beat always had, one line further down. `Recent chats`' whole header
+ * row comes with it — the "with Ren" qualifier and the "+ New chat" control — because they share
+ * the heading's line.
+ *
+ * The move is 32px UP into the gap, and **nothing above it moves**: the check-in card's bottom
+ * border is at output y 845 at G = 112 and at G = 80 alike. The greeting is untouched, which is
+ * what the note asked to confirm. Nothing collides — the 112 gap was 32px of empty page and this
+ * spends exactly that.
+ *
+ * **It is still not readable ON A PHONE, and that is stated rather than implied.** `CardTitle` is
+ * `text-xl` (20px), so at this beat's full 1200 frame it lands at `PHONE_PX(20, 1200)` = **7.03px**
+ * — up from the ~5px the body copy reads at, still under the film's own 10px floor. The three
+ * things that would clear it are a tighter framing, the in-place emphasis, or a camera move, and
+ * all three are excluded here by the beat and by the note. What the shot delivers is a header that
+ * can be read at desk size and recognised at phone size.
  *
  * ── AND IT IS A DELIBERATE EXCEPTION TO "NO CONTENT ELEMENT CROPPED AT REST" ────────
  *
@@ -89,7 +113,7 @@ const START = centre(HOME.startCheckIn);
  * page does, and beat 3 already shows these same two cards below the fold with the calibration
  * banner in place. The camera crops nothing here.
  */
-const SUGGESTIONS_GAP = 112;
+const SUGGESTIONS_GAP = 80;
 
 export const Beat06Later: React.FC = () => (
   <AbsoluteFill>
@@ -98,10 +122,11 @@ export const Beat06Later: React.FC = () => (
         clock="10:43 AM"
         overlay={
           <>
-            {/* See `SUGGESTIONS_GAP` — the suggestions row sits so that 34.4px of it breaks the
-                page's fold: enough to show the two cards exist, not enough to frame either.
-                `space-y-10` puts the margin on the row itself, so this addresses the row rather
-                than the card. */}
+            {/* See `SUGGESTIONS_GAP` — the suggestions row sits so that 66.3px of it breaks the
+                page's fold: both headings whole with air under them, and the SUBTITLES are what
+                the page cuts. Not framed, not emphasised — the fold does the cropping, not the
+                camera. `space-y-10` puts the margin on the row itself, so this addresses the row
+                rather than the card. */}
             <style>{`[data-probe='help'], [data-probe='chats'] { }
               [data-probe='today'] + div { margin-top: ${SUGGESTIONS_GAP}px !important; }`}</style>
             {/*

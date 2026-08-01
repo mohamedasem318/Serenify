@@ -1,6 +1,17 @@
-import { Easing, interpolate, useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "remotion";
 
-import { CameraKey, frameRect, Rect, rect, Shot, shot, union } from "../greybox/Camera";
+import {
+  CameraKey,
+  EASE_ARRIVE,
+  EASE_DEPART,
+  frameRect,
+  Rect,
+  rect,
+  Shot,
+  shot,
+  shotAt,
+  union,
+} from "../greybox/Camera";
 import {
   CLOCK,
   PHONE_PX,
@@ -51,35 +62,42 @@ const vf = VIEWFINDER;
  * three — and the card grew to carry it:
  *
  *   union   x 376.0 – 1176.0   (800.0)   ← the stage card WHOLE, and the viewfinder
- *           y 188.0 –  669.4   (481.4)
- *   frameRect(m=20) → w = max(800 + 40, (481.4 + 40) × 16/9) = 927.0
- *   frame   x 312.5 – 1239.5   y 156.0 – 677.4
+ *           y 188.0 –  645.5   (457.5)
+ *   frameRect(m=20) → w = max(800 + 40, (457.5 + 40) × 16/9) = 884.4
+ *   frame   x 333.8 – 1218.2   y 156.0 – 653.5
  *
- * **Height governs now**, where at L15 width did — the card is 80px taller, so 16:9 charges 87
- * more world px for it. The frame's top is still placed rather than derived: centred on the union
- * it would land at 168 and show 12px of page above the card, but pinning it to **156**, the app
- * header's own bottom edge, makes the shot the page below the header and nothing else. The frame
- * then ends at 677.4 against a page that ends at 675, so the composite is very nearly exactly the
- * viewport — which is the picture this act has been trying to be since L14.
+ * **Height governs now**, where at L15 width did — so the card's height is what this shot's width
+ * costs, and anything that shortens the card tightens the frame for free. The frame's top is still
+ * placed rather than derived: centred on the union it would show a band of page above the card, but
+ * pinning it to **156**, the app header's own bottom edge, makes the shot the page below the header
+ * and nothing else.
+ *
+ * ── AND IT TIGHTENED 42.6px WHEN THE TREND STOPPED BEING A CARD ─────────────────────
+ *
+ * 927.0 → **884.4**. Nothing here was retuned: `<StageLayout/>` strips the trend's own
+ * `rounded-2xl border bg-surface sm:p-6`, the stage card is 457.5 tall instead of 481.4
+ * (`geometry.ts` § stage), and this shot is `frameRect` over it. The frame follows the geometry,
+ * which is the whole reason every landing in this pass goes through `frameRect` rather than
+ * through hand arithmetic.
  *
  * ── WHAT IT CONTAINS, AND WHY EACH ONE IS IN IT ─────────────────────────────────────
  *
- *   the stage card   376 – 824   × 188 – 669.4   the orb, the stateline, AND the trend
+ *   the stage card   376 – 824   × 188 – 645.5   the orb, the stateline, AND the trend
  *   the viewfinder   856 – 1176  × 237 – 418.3   his face (L1), its top on the orb's top
  *
  * The card is **whole** — all four edges inside the frame, with margin.
  *
- * **What the arrangement costs and buys, against L15's 840:**
+ * **What the arrangement reads at**, against L15's 840 and L16's own 927:
  *
- *   the stateline head   36px → **16.39px** on a phone   (was 18.09)
- *   the stateline sub    17px → **7.74px**                (was 8.54)
- *   his face             119.7 → **54.5px**               (was 60.1)
- *   the trend's plot     **~158 × 45px** on a phone, and FILLED for the first time (was ~150 × 44
- *                        with the series drawn across 42% of it — see `measure-patch.ts`)
+ *   the stateline head   36px → **17.18px** on a phone   (927: 16.39 · L15: 18.09)
+ *   the stateline sub    17px → **8.11px**                (927: 7.74 · L15: 8.54)
+ *   his face             119.7 → **57.1px**               (927: 54.5 · L15: 60.1)
+ *   the trend's plot     **~166 × 47px** on a phone, and FILLED (was ~158 × 45 — and the plot
+ *                        itself widened 720 → 768 when the inner card's padding went)
  *
- * Every reading in the shot pays about 9% for the trend joining it, and the head — which is the
- * reading — stays at 16.4px against a ~10px floor. The sub is a secondary line under it and does
- * not clear the floor, which was already true at L15 and is stated rather than smoothed over.
+ * The head — which is the reading — is at 17.2px against a ~10px floor. The sub is a secondary
+ * line under it and still does not clear the floor, which was true at L15 and at 927 alike and is
+ * stated rather than smoothed over.
  */
 const compositeFrame = frameRect(union(RAW.stage, vf), 20);
 export const COMPOSITE: Shot = {
@@ -196,27 +214,14 @@ export const BEAT11_WIDE: Shot = COMPOSITE;
  * by hand (`monitor.tsx` § `<WorldPrompt/>`), and the drawn cursor has to sit in a sibling layer
  * above it (§ `<WorldOverlay/>`). Both need this frame's shot.
  *
- * **It must match `Camera` exactly** — same keys, same clamping, same `Easing.inOut(Easing.cubic)`.
- * A beat passes the SAME array to both, so the only way they can disagree is if `Camera`'s easing
- * is retuned and this is not; that would show up as the prompt lagging the picture during beat
- * 9's push-in, which is worth naming because it would look like a motion bug rather than a
- * duplication one.
+ * **It must match `Camera` exactly**, and it no longer merely promises to: it CALLS `Camera`'s
+ * own `shotAt`. It used to re-declare the interpolation, with a comment warning that retuning one
+ * and not the other would show up as the prompt lagging the picture during beat 9's push-in. That
+ * warning came due the moment `CameraKey` grew a per-segment `ease` (see `Camera.tsx`) — a
+ * re-declared `interpolate` takes one easing for the whole list and would have ignored it. There
+ * is one implementation now and this is a hook around it.
  */
-export const useShotAt = (keys: CameraKey[]): Shot => {
-  const frame = useCurrentFrame();
-  if (keys.length < 2) return keys[0].shot;
-  const at = keys.map((k) => k.frame);
-  const opts = {
-    extrapolateLeft: "clamp" as const,
-    extrapolateRight: "clamp" as const,
-    easing: Easing.inOut(Easing.cubic),
-  };
-  return {
-    cx: interpolate(frame, at, keys.map((k) => k.shot.cx), opts),
-    cy: interpolate(frame, at, keys.map((k) => k.shot.cy), opts),
-    w: interpolate(frame, at, keys.map((k) => k.shot.w), opts),
-  };
-};
+export const useShotAt = (keys: CameraKey[]): Shot => shotAt(useCurrentFrame(), keys);
 
 /**
  * A world point in OUTPUT pixels, under `shot`.
@@ -382,10 +387,41 @@ export const BEAT4_ESTABLISH: Shot = shot(600, 316.75, 616);
  * for. It is the same seam beat 2 already uses into beat 3 (`BEAT2_SEAM`), applied to the other
  * boundary that was cutting.
  *
- * 900 is the midpoint of the travel rather than a chosen framing: 1200 → 616 is 584px of zoom and
- * this splits it roughly in half, so neither beat carries a move that reads as a whip.
+ * ── AND IT WAS STILL READING AS TWO MOVES, BECAUSE THE CAMERA STOPPED ON THE SEAM ───
+ *
+ * Halving the travel is not the same as making it continuous. Both segments took `Camera`'s
+ * default `Easing.inOut(cubic)`, which eases **out** at the end of beat 3 and **in** at the start
+ * of beat 4 — so the camera decelerated to a dead stop on the boundary frame and started again.
+ * Two segments that each begin and end at rest are two moves however tightly they abut, which is
+ * exactly the note: *"the timing reads as two separate moves rather than one."*
+ *
+ * A single gesture is one acceleration and one deceleration, handed over **at speed**. Beat 3
+ * departs on `EASE_DEPART` (`Easing.in(cubic)`, no settle) and beat 4 arrives on `EASE_ARRIVE`
+ * (`Easing.out(cubic)`, no start), and this shot is placed where their velocities match rather
+ * than at the midpoint of the distance:
+ *
+ *   beat 3 carries fraction `p` over 12 frames, so it hands over at 3p/12 per frame
+ *   beat 4 carries `1 − p` over 14 frames, so it takes over at 3(1 − p)/14
+ *   equal  ⇒  14p = 12(1 − p)  ⇒  **p = 6/13 = 0.4615**
+ *
+ * — and the shot is that fraction along the travel from the full 1200 frame to `BEAT4_ESTABLISH`,
+ * on every axis:
+ *
+ *   cy   337.5 → 316.75   at 6/13  =  327.923
+ *   w   1200   → 616      at 6/13  =  930.462
+ *
+ * It lands close to the old hand-picked 900/327 — the point was never that the midpoint was badly
+ * placed, it was that both halves came to rest on it. **The surface change is now the fastest
+ * frame of the move rather than its only stationary one**, which is what the seam wanted in the
+ * first place.
  */
-export const BEAT4_SEAM: Shot = shot(600, 327, 900);
+const SEAM_T = 6 / 13;
+const seamAlong = (from: number, to: number) => from + (to - from) * SEAM_T;
+export const BEAT4_SEAM: Shot = shot(
+  600,
+  seamAlong(337.5, BEAT4_ESTABLISH.cy),
+  seamAlong(1200, BEAT4_ESTABLISH.w),
+);
 
 // ── The legibility table ────────────────────────────────────────────────────────────
 

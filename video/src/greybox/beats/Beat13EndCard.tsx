@@ -86,20 +86,33 @@ import { H, W } from "../theme";
 const DERIVE = true;
 
 /**
- * ── THE REVEAL COMES IN A TOUCH SLOWER, AND EVERYTHING KEEPS ITS SPACING ────────────
+ * ── THE REVEAL IS DOUBLED, AND EVERYTHING KEEPS ITS SPACING ─────────────────────────
  *
- * The wipe ran 30 frames — exactly one second — and the mark arrived a little briskly for the
- * first thing the audience sees after the film's last idea. It is **36 (1.20s)**: a fifth
- * longer, which is a change of pace rather than a change of move. The clip is the same
- * left-to-right `inset()`, the easing is the same `inOut(cubic)`, and the 1.04 settle still
- * overlaps the wipe's last eight frames and finishes six after it.
+ * The wipe ran 30 frames — exactly one second — and was taken to 36 (1.20s) last pass. That was
+ * **"a touch", and the note is that it needs considerably more than a touch**: this is the last
+ * image in the film and it should be able to be watched arriving, not merely registered.
  *
- * The other three events shift by the same **+6** so every gap between them is unchanged — the
+ * It is **72 frames (2.40s)** — double the last value, 2.4× the original. Nothing about the move
+ * changes: the same left-to-right `inset()`, the same `inOut(cubic)`. What changes is that the
+ * mark now takes as long to unveil as a held shot elsewhere in the film takes to read, which is
+ * the pace an end card is entitled to. The settle is stretched with it (see `settle` below) so
+ * the arrival itself has room rather than snapping shut at the end of a long wipe.
+ *
+ * The other three events shift by the same **+42** so every gap between them is unchanged — the
  * line still lands two frames after the mark has settled, the duplicate still detaches ten
- * frames after the line has arrived. The beat's last event ends at f118 of 136, leaving 18
- * frames of held card.
+ * frames after the line has arrived, the domain still types at ~12 c/s. Only the wipe is slower;
+ * the sequence after it plays at exactly the rhythm that was signed off.
+ *
+ *   wipe            f0 – f72
+ *   line            f80 – f98
+ *   the duplicate   f108 – f130
+ *   `.tech` types   f132 – f144, caret out at f154
+ *   held card       f154 – f172        ← the same 18 frames the last pass left
+ *
+ * **The beat grows 136 → 172 (+36) and the film with it.** It is the last beat, so nothing is
+ * pushed and no hold anywhere else is spent: `GREYBOX_DURATION` carries the +36.
  */
-const SHIFT = 6;
+const SHIFT = 42;
 const REVEAL_FROM = 0;
 const REVEAL_TO = 30 + SHIFT;
 const LINE_FROM = 38 + SHIFT;
@@ -149,7 +162,10 @@ export const Beat13EndCard: React.FC = () => {
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
-  const settle = interpolate(frame, [REVEAL_TO - 8, REVEAL_TO + 6], [1.04, 1], {
+  // Stretched with the wipe — 14 frames of settle at the end of a 36-frame reveal read as part of
+  // the same arrival; at the end of a 72-frame one they read as a flinch. 26 frames, overlapping
+  // the wipe's last sixteen and finishing ten after it, keeps the proportion the move had.
+  const settle = interpolate(frame, [REVEAL_TO - 16, REVEAL_TO + 10], [1.04, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),

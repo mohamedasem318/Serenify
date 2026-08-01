@@ -14,6 +14,7 @@ import { Beat10Ren } from "./beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./beats/Beat12Closing";
 import { Beat13EndCard } from "./beats/Beat13EndCard";
+import { Settle } from "./settle";
 import { FONT, GREY } from "./theme";
 
 /**
@@ -36,30 +37,34 @@ import { FONT, GREY } from "./theme";
  *   1 cold open     180          7 at ease        120
  *   2 signup        432          8 the email      200
  *   3 dashboard     120          9 questionnaire   90
- *   4 camera gate   120         10 Ren            332 (+82)
- *   5 calibration   422 (+20)   11 return to ease 234
+ *   4 camera gate   120         10 Ren            332
+ *   5 calibration   422          11 return to ease 234
  *   6 later          60         12 closing card   90
- *                               13 end card      136
- *                                       total   2536 = 84.5s @ 30fps
+ *                               13 end card      172 (+36)
+ *                                       total   2572 = 85.7s @ 30fps
  *
- * **+102 frames across this pass, and both moves are the brief's own.**
+ * **+36 frames this pass, and all of it is the wordmark reveal.**
  *
- *   beat 5   402 → 422   the punch-in onto the uploading line was landing 26 frames into a
- *                        28-frame travel, so the camera arrived before the thing it moved for
- *                        happened. It starts 20 frames later; the uploading line keeps its full
- *                        26-frame settled hold, so the beat grows rather than 5d shrinking.
- *   beat 10  250 → 332   two causes, both decided rather than discovered. His message is 78
- *                        characters instead of 49, which is 92 frames of typing at the beat's
- *                        own 25 c/s rather than 58 (the rate is not raised — *never sped to
- *                        fit*). And turn 1 is now READ inside a 440.5 landing rather than
- *                        revealed by the move off his face, which is 36 frames it never had.
+ *   beat 13  136 → 172   the reveal was *"still far too fast"* at 36 frames and needed
+ *                        "considerably more than a touch". The wipe is 72 (2.40s) and the four
+ *                        events after it shift by the same +42, so every gap between them is
+ *                        unchanged and the held card keeps its 18 frames. It is the LAST beat, so
+ *                        nothing is pushed by it. See `Beat13EndCard.tsx` § THE REVEAL IS DOUBLED.
  *
- * Nothing was cut to pay for either, and no protected hold moved.
+ * **Beat 11 gained a landing and did not gain a frame.** The punch-in onto the music player is
+ * paid for out of its own establishing hold and out of the player window's close overlapping the
+ * camera's departure; the closing composite still holds for 136 frames, f98 to the end.
+ *
+ * Nothing was cut, and no protected hold moved.
  */
-export const GREYBOX_DURATION = 2536;
+export const GREYBOX_DURATION = 2572;
 
 export const GreyboxVideo: React.FC = () => (
   <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
+    {/* Outside the Series, so it is mounted exactly once for the whole cut and every beat gets
+        the same hold. See `settle.tsx` — the renderer was emitting one wrong frame in a few
+        hundred, and no beat could have known to guard against it. */}
+    <Settle />
     <Series>
       <Series.Sequence durationInFrames={180} name="1 · cold open">
         <Beat01ColdOpen />
@@ -97,7 +102,7 @@ export const GreyboxVideo: React.FC = () => (
       <Series.Sequence durationInFrames={90} name="12 · closing card">
         <Beat12Closing />
       </Series.Sequence>
-      <Series.Sequence durationInFrames={136} name="13 · end card">
+      <Series.Sequence durationInFrames={172} name="13 · end card">
         <Beat13EndCard />
       </Series.Sequence>
     </Series>

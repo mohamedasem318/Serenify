@@ -299,7 +299,7 @@ export const SwapProbe: React.FC = () => (
                 <SessionTrend
                   sessionId="probe"
                   active={false}
-                  load={async () => trendPoints({ climb: 1, descend: 0.5 })}
+                  load={async () => trendPoints({ level: 0.5, peak: 1 })}
                   now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
                 />
               </div>
@@ -334,11 +334,11 @@ export const SwapProbe: React.FC = () => (
         {/* Measured POPULATED, not empty — and at `TREND_NATURAL_W`, which is the width the film
             DRAWS it at before scaling it into the stage card (L16). A card measured at 512 and
             drawn at 768 is the same class of error as a rect probed without the sticky header. */}
-        <div data-probe="trendnat" style={{ width: TREND_NATURAL_W }}>
+        <div data-probe="trendnat" data-emph style={{ width: TREND_NATURAL_W, padding: 0 }}>
           <SessionTrend
             sessionId="probe-natural"
             active={false}
-            load={async () => trendPoints({ climb: 1, descend: 0.5 })}
+            load={async () => trendPoints({ level: 0.5, peak: 1 })}
             now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
           />
         </div>

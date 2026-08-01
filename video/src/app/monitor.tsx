@@ -67,22 +67,109 @@ import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell
 
 export type MonitorBand = Band;
 
-/** A trend that walks up into tense and, when `descend` is set, walks back down again. */
+/**
+ * ══ ONE READING, READ TWICE — THE STATELINE AND THE TREND ═══════════════════════════
+ *
+ * **The defect this replaces was three independent authored timelines on one value.** The film
+ * addresses everything by frame, and the monitoring act's escalation was written out three times
+ * over, in three places, with three different shapes:
+ *
+ *   the bloom       `useDrift(0, 1, 136)`                      beat 8 — a 1.3s colour drift
+ *   the stateline   `frame >= 180 ? tense : frame >= 158 …`    beat 8 — two hard frame thresholds
+ *   the trend       `climb = useDrift(0, 1, 146)`              beat 8 — a THIRD ramp, ten frames
+ *                                                              later and a different curve
+ *
+ * Nothing tied them together, so they only agreed by hand. They did not:
+ *
+ *  · **Beat 8's climb did not show.** `climb`'s own band crossings landed at ≈f162 and ≈f169 —
+ *    seven frames apart — while the stateline stepped at f158 and f180. So the graph crossed both
+ *    thresholds inside a quarter of a second, which reads as *already elevated, then one step*,
+ *    while the copy was still on its first change.
+ *  · **Beat 11's recovery lagged by nearly two seconds.** The bloom finished drifting to meadow at
+ *    f145 and the copy returned at f128, but `descend` did not START until f150 and did not finish
+ *    until f189. The orb and the stateline read at ease and the graph caught up 1.4s later.
+ *
+ * ── SO THERE IS ONE NUMBER NOW ──────────────────────────────────────────────────────
+ *
+ * `level` is **the reading**, 0 (at ease) to 1 (fully tense). `bandOf` turns it into the band the
+ * stateline shows, and `trendPoints` places the NEWEST window at exactly `level` — so the
+ * stateline and the right-hand end of the graph are the same number read two ways and cannot
+ * drift apart at any frame. Each beat authors the curve once; nothing downstream re-authors it.
+ *
+ * The band thresholds live here rather than inline in the series builder, because they are now
+ * load-bearing in two directions: the beats place their `level` keyframes ON them so that the
+ * copy changes land on exactly the frames the sheet gives them (see `useReading`).
+ *
+ * **The bloom is deliberately still its own curve, and that is stated rather than hidden.** Its
+ * drift is `transition: background 1.3s ease` — the component's own, reproduced at the component's
+ * own duration — and beat 8 lands it at f175 while the stateline only reaches "tense" at f180. One
+ * scalar with fixed thresholds cannot produce both, so folding the bloom in would mean retiming
+ * either the drift or a signed-off copy change. It is anchored to the same escalation and it is
+ * the one reader still authored separately.
+ */
+export const LITTLE_AT = 0.28;
+export const TENSE_AT = 0.66;
+
+/** The reading's band. `>=` so a beat can place a keyframe exactly ON a threshold. */
+export const bandOf = (level: number): Band =>
+  level >= TENSE_AT ? "tense" : level >= LITTLE_AT ? "a_little_tense" : "at_ease";
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/**
+ * The session's shape: a rise into whatever the session has PEAKED at, then a tail that walks
+ * back to wherever the reading is NOW.
+ *
+ * `peak` and `level` are separate because **the history does not un-happen** — beat 11's recovery
+ * is a tail, not an erasure. Lowering the peak instead would flatten the stretch that climbed
+ * during beat 8, so the graph would end as if the tense half-hour had never occurred.
+ *
+ * The tail **blends** from the risen curve toward `level` rather than subtracting from it, so
+ * **`v(p = 1) === level` exactly** whatever the peak. That identity is the whole point: the newest
+ * window is the reading, so `bandOf(level)` is both what the stateline says and what the graph's
+ * right-hand end draws, on the same frame. (Subtracting a flat `peak − level` from the tail was
+ * the first attempt and it drove the windows behind the newest one below their own risen value —
+ * the hump vanished as the reading came down, which is the erasure this shape exists to avoid.)
+ *
+ * ── AND ONLY THE LAST TEN WINDOWS ARE EVER DRAWN ────────────────────────────────────
+ *
+ * Measured on the render, not assumed: `<SessionTrend/>` caps how many windows it plots by
+ * legibility (`capByLegibility` — see `measure-patch.ts`, which documents the same mechanism from
+ * the other end) and at this card's width that cap is **10**. Twenty-two are handed to it; the
+ * ten most recent are what appears.
+ *
+ * That is why the shape's knees are where they are. Ten windows is `p` from 12/21 = 0.571 to 1,
+ * so anything that happens below p ≈ 0.57 is invisible — the previous shape put its whole rising
+ * edge at 0.35–0.80, which meant the visible part of the graph was already halfway up before the
+ * beat started and had only one step left in it. **That is the "starts already elevated and steps
+ * once" reading, and it is a framing problem in the series rather than a timing one.** The rise
+ * now spans 0.42–0.80 and the tail 0.80–1.00, so the visible ten hold the whole climb:
+ *
+ *   level            what the ten drawn windows read as
+ *   ───────────────  ─────────────────────────────────────────────────────────
+ *   0                at ease ×10                                  (beats 7, and 8 before f136)
+ *   LITTLE_AT        at ease ×5, a little tense ×5                (beat 8, f158)
+ *   TENSE_AT         at ease ×1, a little ×4, tense ×5            (beat 8, f180 — all three)
+ *   1                a little ×3, tense ×7                        (beat 8 f200, beat 9, beat 10)
+ *   0.27, peak 1     a little ×3, tense ×4, a little ×2, AT EASE  (beat 11, f128)
+ *   0,    peak 1     a little ×3, tense ×4, a little, at ease ×2  (beat 11, f170)
+ */
 export const trendPoints = (opts: {
-  /** 0 → flat meadow, 1 → fully climbed into tense. */
-  climb: number;
-  /** 0 → held, 1 → the tail has walked all the way back to at-ease (beat 11). */
-  descend: number;
+  /** The reading NOW — the newest window's value, and the stateline's own number. */
+  level: number;
+  /** The highest the session has reached. Never falls; see above. */
+  peak: number;
 }): SessionTrendPoint[] => {
   const N = 22;
   const out: SessionTrendPoint[] = [];
   for (let i = 0; i < N; i++) {
     const p = i / (N - 1);
-    // A rising edge that reaches `climb`, then a falling tail governed by `descend`.
-    const up = Math.max(0, Math.min(1, (p - 0.35) / 0.45)) * opts.climb;
-    const down = Math.max(0, Math.min(1, (p - 0.72) / 0.28)) * opts.descend;
-    const v = Math.max(0, up - down);
-    const band: Band = v > 0.66 ? "tense" : v > 0.28 ? "a_little_tense" : "at_ease";
+    // Reaches `peak` at p = 0.80, inside the drawn window rather than before it.
+    const rise = clamp01((p - 0.42) / 0.38) * opts.peak;
+    // The last fifth blends from the risen curve to the reading. t = 1 at p = 1, so v = level.
+    const t = clamp01((p - 0.8) / 0.2);
+    const v = Math.max(0, rise * (1 - t) + opts.level * t);
+    const band: Band = bandOf(v);
     out.push({
       id: `w${i}`,
       // Fixed epoch — `Date.now()` is unavailable in a Remotion script and a moving clock
@@ -144,13 +231,29 @@ export const StageLayout: React.FC = () => (
     [data-emph] p[aria-live="polite"] + p { min-height: ${SUB_MIN_HEIGHT}px; }
     [data-emph] div.mt-7 { display: none; }
     [data-emph] p.mt-8 { display: none; }
-    /* The trend section ships its own \`mt-5\` (session-trend.tsx:313) for the page flow it
-       normally sits in, under the stage card. Inside the card its wrapper supplies the gap
-       (\`TREND_GAP\`), so the component's margin would be 20 layout px of double-spacing pushing
-       the card 9.6 screen px out through the bottom of its reserved box — which is exactly the
-       5px sliver the recon still showed between the two card edges. Zeroed, the trend card's
-       bottom sits \`CARD_PB\` above the stage card's, matching the air above it. */
-    [data-emph] [data-testid="session-trend"] { margin-top: 0 !important; }
+    /* ══ THE TREND IS NO LONGER A CARD INSIDE A CARD ═════════════════════════════
+     *
+     * \`session-trend.tsx:313\` is
+     * \`mt-5 rounded-2xl border border-border bg-surface p-5 shadow-soft sm:p-6\` — a card, which
+     * is right on the product's own page where it is one of several stacked surfaces, and wrong
+     * inside the stage card where it is the last block of ONE surface. Two borders, two fills and
+     * two shadows nested a few pixels apart read as a panel that has been pasted in.
+     *
+     * **And its \`sm:p-6\` was the loose spacing.** Every gap in this column is \`CARD_PB\` = 24:
+     * bloom → head, head → sub, sub → trend (\`TREND_GAP\`), trend → card bottom. But the nested
+     * card added its OWN 24 inside those, so the visible air above "This session" was 48 and the
+     * air under the plot was 48, against 24 everywhere else. Stripping the card removes exactly
+     * that doubling — the freed room is not given to anything, it simply stops being there, and
+     * the column reads at one rhythm. The \`mt-5\` goes with it for the same reason it always did.
+     */
+    [data-emph] [data-testid="session-trend"] {
+      margin-top: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
   `}</style>
 );
 
@@ -230,9 +333,19 @@ const BloomDrift: React.FC<{ tension: number }> = ({ tension }) => {
 
 export const MonitorPage: React.FC<{
   clock: string;
-  /** Which band's copy + stateline tone the real component shows. Changes discretely. */
-  band: Band;
-  /** 0 → meadow, 0.5 → the mid-gold, 1 → amber. Drifts continuously, independent of `band`. */
+  /**
+   * **The reading**, 0 → at ease, 1 → fully tense. The stateline's band and the trend's newest
+   * window both come from this one number — see § ONE READING, READ TWICE. It replaces the `band`
+   * / `climb` / `descend` props, which were three separate authorings of the same escalation.
+   */
+  level: number;
+  /** The highest the session has reached. Beat 11's tail walks down; the history does not. */
+  peak?: number;
+  /**
+   * 0 → meadow, 0.5 → the mid-gold, 1 → amber. The one reader still on its own curve: it is the
+   * component's own 1.3s `transition: background`, and beat 8 lands it five frames before the
+   * stateline reaches "tense". See § ONE READING, READ TWICE.
+   */
   tension: number;
   /**
    * Page scroll. **It is 0 for every monitoring beat now** — at L15's arrangement the whole act
@@ -245,8 +358,6 @@ export const MonitorPage: React.FC<{
   headphones?: boolean;
   nod?: boolean;
   notesFrom?: number;
-  climb?: number;
-  descend?: number;
   /** Seconds elapsed when the beat starts; the readout ticks on from there. */
   sessionFrom?: number;
   /** World-coordinate layer — the mail toast lives here, not in the page. */
@@ -254,7 +365,8 @@ export const MonitorPage: React.FC<{
   children?: React.ReactNode;
 }> = ({
   clock,
-  band,
+  level,
+  peak,
   tension,
   scroll = SCROLL.monitor,
   pose,
@@ -262,13 +374,14 @@ export const MonitorPage: React.FC<{
   headphones,
   nod,
   notesFrom,
-  climb = 0,
-  descend = 0,
   sessionFrom = 47 * 60 + 12,
   overlay,
   children,
 }) => {
   const frame = useCurrentFrame();
+  // The stateline and the trend, from the same number, on the same frame.
+  const band = bandOf(level);
+  const sessionPeak = peak ?? level;
   const seconds = sessionFrom + frame / 30;
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(Math.floor(seconds % 60)).padStart(2, "0");
@@ -382,7 +495,7 @@ export const MonitorPage: React.FC<{
                 <SessionTrend
                   sessionId="video"
                   active={false}
-                  load={async () => trendPoints({ climb, descend })}
+                  load={async () => trendPoints({ level, peak: sessionPeak })}
                   // Bumped every frame so the trend re-reads its (frame-derived) points. Without
                   // it the component fetches once on mount and freezes: it looks correct in a
                   // STILL — each still is a fresh page — and is static for the whole cut in a

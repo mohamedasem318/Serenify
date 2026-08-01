@@ -4,8 +4,8 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 import { BEAT11_WIDE, PHONE } from "../../app/framing";
 import { RAW, VIEWFINDER } from "../../app/geometry";
 import { useHover } from "../../app/hover";
-import { MonitorPage } from "../../app/monitor";
-import { useDrift } from "../../app/motion";
+import { LITTLE_AT, MonitorPage, TENSE_AT } from "../../app/monitor";
+import { useDrift, useReading } from "../../app/motion";
 import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN } from "../../app/player";
 import { Pointer } from "../../app/pointer";
 import { Camera, frameRect, union } from "../Camera";
@@ -39,6 +39,42 @@ const playerFrame = frameRect(union(union(PLAYER_WIN, VIEWFINDER), RAW.stage), 2
 const BEAT11_PLAYER = { ...playerFrame, cy: 156 + (playerFrame.w * 9) / 16 / 2 };
 
 /**
+ * ── AND THEN IT PUNCHES IN, BECAUSE THE TRACK STARTING IS THE PAYOFF ────────────────
+ *
+ * The shot above is the *establishing* one — he opens a player, and you can see it is him doing
+ * it. It is 916 world px wide, which is a wide framing for a 600px window, and the note is exact
+ * about what that costs: **"It is the moment Ren's suggestion pays off and it currently sits in a
+ * loose wide framing."** So the click has a consequence now — the camera goes to the player.
+ *
+ * `frameRect(PLAYER_WIN, 20)` gives the width by the framing rule's own arithmetic: 640, holding
+ * a 600-wide window with 20px of clearance each side. A 1.43× punch, and at 640 the window is very
+ * nearly the only thing in frame.
+ *
+ * ── THE VERTICAL IS PLACED, AND THE REASON IS THE TREND ─────────────────────────────
+ *
+ * `frameRect` would centre 360px of frame on the window and land at y 180–540. **The trend's top
+ * edge is at 474**, and the window's bottom is at 500 — 26px apart — so *no* frame that holds the
+ * window whole can exclude the trend. The geometry forbids it, the same way beat 4's card cannot
+ * be held whole and magnified at 16:9.
+ *
+ * What can be minimised is how much of it shows, so the frame's bottom edge is placed at the
+ * window's own bottom plus the same 20px margin the sides get:
+ *
+ *   frame   x 280 – 920   y 160 – 520
+ *   window  x 300 – 900   y 220 – 500      20px left, right and below; the slack goes UP
+ *   above   the stage card's top border (188) and its empty top band — page, not content
+ *   below   20px of the card under the window, which is where the trend's heading begins
+ *
+ * Twenty pixels of page below a window is a frame edge falling on background, which is what a
+ * frame edge is allowed to do. Forty — which is what centring gives — starts to read as a second
+ * object cut in half.
+ */
+const BEAT11_PLAYER_LANDING = (() => {
+  const f = frameRect(PLAYER_WIN, 20);
+  return { ...f, cy: PLAYER_WIN.y + PLAYER_WIN.h + 20 - (f.w * 9) / 32 };
+})();
+
+/**
  * Beat 11 · Return to ease · 234 frames
  *
  * He acts on it, in order: opens a music player and plays the track, puts headphones on, and
@@ -69,18 +105,33 @@ const BEAT11_PLAYER = { ...playerFrame, cy: 156 + (playerFrame.w * 9) / 16 / 2 }
  *   · **the composite** (f98 to the end) — headphones, the notes, the nod, the bloom's drift back
  *     to meadow, the stateline's return AND the trend's descent, on a camera that has stopped.
  *
- * **The player and the trend are still never co-framed**, and that is unchanged: the player
- * window sits over the middle of the page and the beat's first landing is on it. What has changed
- * is that leaving it is a single move onto a shot that then never moves again.
+ * ── AND THERE ARE THREE LANDINGS NOW, BECAUSE THE TRACK STARTING IS A MOMENT ────────
+ *
+ * The establishing shot held for 48 frames and nothing in it changed after the click, so the one
+ * event the beat is named for — *he presses play and the music goes on* — happened in a 916-wide
+ * frame and then simply continued. The camera goes to the player on the click now. See
+ * `BEAT11_PLAYER_LANDING` above for the framing and for why its bottom edge is placed rather than
+ * centred.
  *
  *   f6–f46   the pointer travels to the transport; the click is at f24
- *   f66      the window has finished closing (f50–f64), the camera starts across
+ *   f18–f24  the establishing shot, held across the click
+ *   f24–f42  THE PUNCH IN — 916 → 640, beginning on the click
+ *   f42–f60  held on the player. The scrubber runs; this is the payoff
+ *   f56–f70  the window closes, overlapping the camera's departure at f60
+ *   f60–f98  the pull-out to the composite
+ *   f68      the headphones go on — deliberately while he is out of frame. It is a hard swap
+ *            (`rig.tsx`: `{headphones ? <Headphones/> : null}`), and a pop nobody sees is a pop
+ *            that never happened
  *   f98      the camera LANDS on the composite and does not move again in this beat
  *   f100     he nods
  *   f106     the drift begins — bloom amber → meadow, 1.3s, framed
- *   f128     the copy returns to "at ease"
- *   f150     the trend's tail walks back down (39f) — in the same frame as the reading
+ *   f128     the copy returns to "at ease" — and the trend's newest reading with it, same frame
+ *   f170     the tail has finished walking down
  *   f190–234 the linger. Nothing moves but his breath and the nod.
+ *
+ * **The closing hold is untouched: 136 frames, f98 to the end.** The punch is paid for entirely
+ * out of the establishing hold and out of the window's close overlapping the move instead of
+ * preceding it.
  *
  * ══ THE MUSIC PLAYER IS DRAWN NOW ═══════════════════════════════════════════════════
  *
@@ -111,14 +162,23 @@ const BEAT11_PLAYER = { ...playerFrame, cy: 156 + (playerFrame.w * 9) / 16 / 2 }
 export const Beat11ReturnToEase: React.FC = () => {
   const frame = useCurrentFrame();
 
-  // It finishes closing at f64, two frames before the camera starts across — so the window is
-  // never cropped by a frame edge while it is still on screen.
-  const open = interpolate(frame, [0, 14, 50, 64], [0, 1, 1, 0], {
+  /**
+   * It used to finish closing at f64, two frames before the camera started across, so that the
+   * window was never cropped by a frame edge while it was still on screen. **That constraint is
+   * satisfied differently now and the two motions can overlap.** From f42 the camera is at
+   * `BEAT11_PLAYER_LANDING`, where the window sits inside the frame with 20px of margin, and the
+   * pull-out only ever makes the frame bigger — so there is no frame in the beat that crops it.
+   *
+   * The close therefore runs f56–f70 and the camera leaves at f60: the window shrinks away AS the
+   * camera widens, one gesture, and the page it was covering is revealed by the move rather than
+   * after it.
+   */
+  const open = interpolate(frame, [0, 14, 56, 70], [0, 1, 1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
-  const trackProgress = interpolate(frame, [24, 64], [0, 0.18], {
+  const trackProgress = interpolate(frame, [24, 70], [0, 0.18], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
@@ -155,12 +215,41 @@ export const Beat11ReturnToEase: React.FC = () => {
   /**
    * **THE TAIL WALKS BACK DOWN — the history does not un-happen.**
    *
-   * `climb` stays at 1 and `descend` animates. Driving the descent by lowering `climb` instead
+   * `peak` stays at 1 and `level` animates. Driving the descent by lowering the peak instead
    * flattens the WHOLE line, including the stretch that climbed during beat 8 — so the graph
    * ends as if the tense half-hour had never occurred, which is both dishonest and the opposite
    * of the beat's point. The recovery is a tail, not an erasure.
+   *
+   * ── AND IT USED TO ARRIVE 1.4 SECONDS AFTER EVERYTHING ELSE ────────────────────────
+   *
+   * The graph was a separate authored ramp — `descend = useDrift(0, 1, 150)` — against a
+   * stateline that returned at f128 and a bloom that finished drifting at f145. So it **started**
+   * 22 frames after the copy had already said "at ease" and did not finish until f189: the orb
+   * and the stateline resolved and the graph caught up nearly two seconds later. That is the
+   * reported lag, and it was not an offset to nudge — it was a second clock. See `monitor.tsx`
+   * § ONE READING, READ TWICE.
+   *
+   * `level` is now the same number the stateline reads, and its keys are placed so the copy's
+   * return frame IS the graph's:
+   *
+   *   f0–f106     1.00        tense, held
+   *   f106–f127   → 0.68      the tail starts walking down AS THE BLOOM DRIFTS, inside the band
+   *   f128        0.27        → "at ease", and the newest window crosses with it, same frame
+   *   f170        0.00        the tail settles, well inside the closing hold
+   *
+   * The crossing is one frame wide on purpose: the recovery skips `a_little_tense` because the
+   * **stateline does**, and a continuous value that dwelt in between would put the graph in a band
+   * the copy was not showing — the exact disagreement being fixed. The step is 0.41 of the plot on
+   * the newest windows, and it lands on the frame the copy changes and inside the bloom's own
+   * drift, so the beat's three resolutions happen together rather than in sequence.
    */
-  const descend = useDrift(0, 1, 150);
+  const level = useReading([
+    { frame: 0, level: 1 },
+    { frame: 106, level: 1 },
+    { frame: 127, level: TENSE_AT + 0.02 },
+    { frame: 128, level: LITTLE_AT - 0.01 },
+    { frame: 170, level: 0 },
+  ]);
 
   // tense → easing over 30 frames, starting as the headphones go on. Slower than the fall on
   // purpose: coming back takes longer than going down. NOT the beat-7 expression — quieter,
@@ -178,21 +267,31 @@ export const Beat11ReturnToEase: React.FC = () => {
           { frame: 0, shot: { cx: W / 2, cy: H / 2, w: W } },
           // 1 · the player AND his face. He opens it; it is visibly him doing it.
           { frame: 18, shot: BEAT11_PLAYER },
-          { frame: 66, shot: BEAT11_PLAYER },
-          // 2 · …and that is the last move in the film's demo. The composite holds the orb, the
+          // …held across the click at f24, so the press and what it causes are one shot.
+          { frame: 24, shot: BEAT11_PLAYER },
+          // 2 · THE TRACK STARTS AND THE CAMERA GOES TO IT. The punch begins ON the click — it
+          // is the click's consequence, not a separate idea — and lands 18 frames later.
+          { frame: 42, shot: BEAT11_PLAYER_LANDING },
+          // HOLD. Eighteen frames of the player at 640, the scrubber running, before anything
+          // else moves. This is the payoff the note asked for.
+          { frame: 60, shot: BEAT11_PLAYER_LANDING },
+          // 3 · …and that is the last move in the film's demo. The composite holds the orb, the
           // stateline, the trend AND his face, so the headphones, the notes, the nod, the drift
           // back to meadow, the copy's return and the tail walking back down all play inside one
           // frame that stopped 136 frames before the beat ends.
+          //
+          // **The closing hold is UNCHANGED at 136 frames.** The punch is paid for out of the
+          // establishing shot's own 48-frame hold, which was the loosest thing in the beat, and
+          // out of the window's close overlapping this move rather than preceding it.
           { frame: 98, shot: BEAT11_WIDE },
           { frame: 234, shot: BEAT11_WIDE },
         ]}
       >
         <MonitorPage
           clock="11:30 AM"
-          band={frame >= 128 ? "at_ease" : "tense"}
+          level={level}
+          peak={1}
           tension={tension}
-          climb={1}
-          descend={descend}
           pose={pose}
           // Back at the keyboard from the moment the player closes, and he does not stop again.
           working={frame >= 56}
@@ -218,7 +317,12 @@ export const Beat11ReturnToEase: React.FC = () => {
                 path={[
                   { frame: 6, x: PLAY_CENTRE.x - 170, y: PLAY_CENTRE.y + 120 },
                   { frame: 20, x: PLAY_CENTRE.x, y: PLAY_CENTRE.y },
-                  { frame: 46, x: PLAY_CENTRE.x + 260, y: PLAY_CENTRE.y + 210 },
+                  // The hand comes off the button toward the keyboard. It used to travel to
+                  // (+260, +210), which is world y 637 — fine under the 916 establishing shot and
+                  // 117px BELOW the punch-in's bottom edge, so the cursor would have slid out of
+                  // the frame it was travelling in. It now finishes inside `BEAT11_PLAYER_LANDING`
+                  // (x 280–920, y 160–520) with room for its own height.
+                  { frame: 46, x: PLAY_CENTRE.x + 170, y: PLAY_CENTRE.y + 56 },
                 ]}
                 clicks={[24]}
                 visible={{ from: 4, to: 56 }}

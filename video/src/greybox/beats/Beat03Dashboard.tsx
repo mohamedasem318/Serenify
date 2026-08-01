@@ -9,7 +9,7 @@ import { HomePage } from "../../app/home";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
 import { BEAT4_SEAM } from "../../app/framing";
-import { Camera, frameRect, rect, shot } from "../Camera";
+import { Camera, EASE_DEPART, frameRect, rect, shot } from "../Camera";
 import { Lift, useLift } from "../lift";
 import { H, W } from "../theme";
 import { useFade } from "../ui";
@@ -151,7 +151,10 @@ export const Beat03Dashboard: React.FC = () => {
           // "Set baseline" → "Before the camera turns on" used to be a straight cut on a frame
           // where the framing changed too; the navigation now lands inside a move that beat 4
           // finishes.
-          { frame: 108, shot: shot(W / 2, H / 2, W) },
+          //
+          // `EASE_DEPART` rather than the default: this segment must hand over to beat 4 AT SPEED,
+          // not settle onto the seam. It settling there is what made one gesture read as two.
+          { frame: 108, shot: shot(W / 2, H / 2, W), ease: EASE_DEPART },
           { frame: 120, shot: BEAT4_SEAM },
         ]}
       >

@@ -2,8 +2,8 @@ import React from "react";
 import { AbsoluteFill, useCurrentFrame } from "remotion";
 
 import { BEAT8_CLOCK, BEAT8_FACE, BEAT8_WIDE, COMPOSITE, PHONE } from "../../app/framing";
-import { MonitorPage } from "../../app/monitor";
-import { useDrift } from "../../app/motion";
+import { LITTLE_AT, MonitorPage, TENSE_AT } from "../../app/monitor";
+import { useDrift, useReading } from "../../app/motion";
 import { MailToast } from "../../app/toast";
 import { Camera } from "../Camera";
 import { TOAST } from "../copy";
@@ -100,7 +100,37 @@ export const Beat08Email: React.FC = () => {
   // arriving, so nearly all of the drift plays with the bloom in frame — which is the whole
   // point of the sheet keeping the drift rather than snapping the band.
   const tension = useDrift(0, 1, 136);
-  const climb = useDrift(0, 1, 146);
+
+  /**
+   * ── THE READING, AND IT IS ONE NUMBER NOW ──────────────────────────────────────────
+   *
+   * The stateline's two copy changes and the trend's climb used to be two separate authorings —
+   * `frame >= 158 / >= 180` against `useDrift(0, 1, 146)` — and they did not agree: the trend's
+   * own band crossings landed at ≈f162 and ≈f169, seven frames apart, so the graph crossed both
+   * thresholds in a quarter of a second while the copy was still on its first change. That is the
+   * *"starts already elevated and steps once"* reading. Full account in `monitor.tsx` § ONE
+   * READING, READ TWICE.
+   *
+   * The keys are placed **on** the band thresholds, so the crossings ARE the sheet's frames:
+   *
+   *   f136        0.00          the escalation starts as the bloom does
+   *   f157        just under    still "at ease" — the graph is climbing inside the band
+   *   f158        LITTLE_AT     → "A bit of an edge lately", on the exact frame
+   *   f179        just under    still "a bit of an edge" — still climbing
+   *   f180        TENSE_AT      → "This has held a while…", on the exact frame
+   *   f200        1.00          the beat ends at the top of the reading
+   *
+   * So the graph WALKS at ease → a little tense → tense and arrives at each band on the frame the
+   * copy does, instead of jumping two bands between them.
+   */
+  const level = useReading([
+    { frame: 136, level: 0 },
+    { frame: 157, level: LITTLE_AT - 0.01 },
+    { frame: 158, level: LITTLE_AT },
+    { frame: 179, level: TENSE_AT - 0.02 },
+    { frame: 180, level: TENSE_AT },
+    { frame: 200, level: 1 },
+  ]);
 
   /**
    * **THE FALL, as a keyframed transition rather than a state flip.** `falling` used to be a
@@ -122,10 +152,6 @@ export const Beat08Email: React.FC = () => {
     { frame: 180, state: "tense" },
   ]);
 
-  // The real component's own bands and copy — `BAND_DISPLAY` in `use-monitoring-session.ts`.
-  // Both changes land INSIDE the camera's third hold (f150 on), which is the retiming.
-  const band = frame >= 180 ? "tense" : frame >= 158 ? "a_little_tense" : "at_ease";
-
   return (
     <AbsoluteFill>
       <Camera
@@ -145,9 +171,10 @@ export const Beat08Email: React.FC = () => {
       >
         <MonitorPage
           clock={TOAST.clock}
-          band={band}
+          // `peak` defaults to `level`, which is right here: the session is at its highest the
+          // whole way up. Beat 11 is where the two part company.
+          level={level}
           tension={tension}
-          climb={climb}
           pose={pose}
           working={frame < 70}
           sessionFrom={47 * 60 + 16}
