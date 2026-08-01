@@ -157,10 +157,26 @@ export const Beat13EndCard: React.FC = () => {
   // was present, correct, and invisible.
   useDarkRoot();
 
+  /**
+   * **`out(quad)`, not `inOut(cubic)`, and the reason is momentum rather than taste.**
+   *
+   * Beat 12's line finishes leaving at its f86 and this beat opens on the same `CARD.field`, so
+   * the only thing that ends the black is the mark starting to uncover. An ease-IN spends its
+   * first frames at a standstill — `inOut(cubic)` is at 0.4% after six frames and 3% after twelve
+   * — and over 72 frames that is most of a second of nothing, on top of beat 12's own tail. The
+   * card lost its momentum exactly where it should have picked it up.
+   *
+   * `out(quad)` leaves the gate at full speed and decelerates the whole way: 16% by f6, 44% by
+   * f18, 75% by f36, 94% by f54, arriving at f72. The mark starts uncovering on the first frame
+   * after the cut and is still visibly completing three quarters of the way through, which is what
+   * "watched arriving" asks for. `out(cubic)` was the other candidate and is too front-loaded —
+   * 96% by f48 leaves the last 24 frames imperceptible, so the reveal would *feel* shorter than it
+   * is.
+   */
   const wipe = interpolate(frame, [REVEAL_FROM, REVEAL_TO], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
+    easing: Easing.out(Easing.quad),
   });
   // Stretched with the wipe — 14 frames of settle at the end of a 36-frame reveal read as part of
   // the same arrival; at the end of a 72-frame one they read as a flinch. 26 frames, overlapping
@@ -217,10 +233,28 @@ export const Beat13EndCard: React.FC = () => {
             textAlign: "center",
             scale: settle,
             transformOrigin: "50% 50%",
-            clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)`,
           }}
         >
-          <Wordmark className="text-7xl leading-none" />
+          {/*
+           * ══ THE CLIP IS ON THE MARK'S OWN BOX, NOT ON THE 1200-WIDE ROW ══════════════
+           *
+           * **This is why the card was reading as black for a second, and why slowing the wipe
+           * twice never helped.** `inset(0 X% 0 0)` is a percentage of the element it is on, and
+           * it was on the full-width centring row — so the first ~37% of every wipe uncovered
+           * nothing but empty page to the left of the mark, and the last ~37% uncovered empty page
+           * to the right of it. **Only the middle ~25% of the wipe was on the glyphs.**
+           *
+           * At the 36-frame wipe that was about **3 frames of actual reveal**, which is exactly
+           * why it read as "far too fast" twice over; and doubling the wipe to 72 doubled the dead
+           * lead-in rather than the reveal, which is why the card then sat black before the mark
+           * arrived. The duration was never the defect.
+           *
+           * An `inline-block` shrink-wraps to the glyphs, so the percentage is now a percentage of
+           * the WORDMARK. The whole 72 frames are spent on it.
+           */}
+          <span style={{ display: "inline-block", clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)` }}>
+            <Wordmark className="text-7xl leading-none" />
+          </span>
         </div>
 
         {/*

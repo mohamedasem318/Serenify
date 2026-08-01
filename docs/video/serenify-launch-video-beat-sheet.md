@@ -2065,10 +2065,24 @@ Inter's at the same size and that is left alone deliberately, because the softer
 register the swap was made for. **The wordmark and the `.tech` treatment are byte-identical to
 what they were.** Beat 12's closing card keeps Inter; nothing else in the film uses Nunito.
 
-**AND THE WORDMARK'S REVEAL IS DOUBLED: 36 → 72 frames (1.20s → 2.40s).** 30 → 36 was *"a
-touch"* and the note is that it needs considerably more than a touch: this is the last image in
-the film and it should be able to be **watched arriving**, not merely registered. It is the same
-left-to-right `inset()` clip and the same `inOut(cubic)`; only the pace changes, and the 1.04
+**AND THE REVEAL'S REAL DEFECT WAS THE CLIP, NOT THE DURATION.** `inset(0 X% 0 0)` is a
+percentage of the element it is set on, and it was set on the **full-width centring row** — so the
+first ~37% of every wipe uncovered empty page to the left of the mark and the last ~37% uncovered
+empty page to its right. **Only the middle quarter of the wipe was ever on the glyphs**, which at
+the 36-frame version was about **three frames of actual reveal**. That is why it read as "far too
+fast" twice; and why doubling the wipe to 72 doubled the dead lead-in rather than the reveal, so
+the card then sat on black for most of a second before the mark appeared. The clip is on the
+mark's own `inline-block` box now, so the whole duration is spent on the wordmark: 2% of it
+uncovered at f1, 21% at f8, 57% at f24, 92% at f48, arriving at f72.
+
+**The easing changes with it: `out(quad)`, not `inOut(cubic)`.** Beat 12's line finishes leaving at
+its f86 and this beat opens on the same `CARD.field`, so the only thing that ends the black is the
+mark starting to uncover — and an ease-*in* spends its first frames at a standstill (0.4% after six
+frames). `out(quad)` leaves at full speed and decelerates the whole way, so the mark starts
+uncovering on the first frame after the cut and is still visibly completing three quarters of the
+way through.
+
+**AND THE WIPE IS 72 FRAMES (2.40s), from 36.** It is the same left-to-right `inset()`; the 1.04
 settle stretches with it (26 frames rather than 14) so the arrival is not a flinch at the end of a
 long wipe. The other three events shift by the same **+42**, so every gap between them is
 unchanged — the line still lands two frames after the mark has settled, the duplicate still
@@ -2320,9 +2334,25 @@ jump, exactly as described, and invisible to a luminance or whole-frame-delta sc
    neighbours, and it is confirmed by matching an earlier frame pixel-for-pixel. The shipped file
    is encoded from the verified sequence.
 
-On the current tree that reconciliation found **2 disagreements in 2572 frames**, both of them the
-second render's (its f71 was a pixel copy of f62), so the shipped sequence needed no repair. **Do
-not judge a frame-level artifact off a single render**; diff two.
+**The race has a second form: a stale compositor LAYER rather than a stale frame.** The music
+player's scrubber was reported as jumping backwards between 0:24 and 0:26 of the track while the
+elapsed time beside it kept counting correctly. `progress` is a linear `interpolate` and cannot go
+backwards, and rendering those frames in isolation gives a perfectly even +1.5px/frame — so it is
+the renderer again. An element carrying `opacity` plus a transform is promoted to its own
+compositor layer, and a layer can be a frame or two behind while the rest of the picture is
+current; the fill and the handle were in that layer and the text was not. Two things follow:
+
+- **Do not promote a layer you do not need promoted.** `player.tsx` emits its `opacity` and `scale`
+  only while the window is animating; through the hold it is ordinary painted content.
+- **The reconciliation metric must be LOCAL.** The player's window is 0.28% of the frame, so a
+  20px displacement of it moves a whole-frame mean by ~0.05 — invisible to any useful threshold.
+  The check that ships this film compares **per-tile** maxima (60px tiles at 960×540), and it
+  caught frames the whole-frame version had passed.
+
+On the current tree that reconciliation found **2 tile-level disagreements in 2572 frames** — one
+in each render — so one frame was repaired from the other and the shipped file verifies against
+its reconciled source at a worst tile difference of 1.24 against a threshold of 3.0. **Do not judge
+a frame-level artifact off a single render**; diff two, and diff them locally.
 
 ## Open questions for greybox
 

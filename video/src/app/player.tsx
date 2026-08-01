@@ -169,12 +169,36 @@ export const MusicPlayer: React.FC<{
   const barY = PLAYER_WIN.y + 150;
   const barW = 352;
 
+  /**
+   * ══ THE WINDOW IS NOT A COMPOSITED LAYER WHILE IT IS OPEN ═══════════════════════════
+   *
+   * The scrubber and the elapsed time were reported as glitching between 0:24 and 0:26 of the
+   * track. They are both `progress`, which is a linear `interpolate` — it cannot go backwards —
+   * and the elapsed TEXT was correct on every frame. What moved was the fill and the handle, on
+   * **two frames**, by 15 world px backwards and 22 forwards.
+   *
+   * Measured: rendering those same frames in isolation gives a perfectly even +1.5px/frame, so it
+   * is the renderer, not the composition — the same race `greybox/settle.tsx` documents, in its
+   * other form. `opacity` plus a `scale` promotes this wrapper to **its own compositor layer**, and
+   * a layer can be a frame or two stale on its own while the rest of the frame is current. That is
+   * why it read as the scrubber disagreeing with its own timer: the text is in the page's layer
+   * and the window was in a stale one. It is also why a whole-frame reconciliation missed it — the
+   * region is 0.28% of the frame.
+   *
+   * So the two properties that promote it are **emitted only while it is actually animating**.
+   * During the open hold — which is every frame the beat lands on it — the window is ordinary
+   * painted content in the page's own layer and cannot fall behind it. `zIndex` stays: it makes a
+   * stacking context, not a composited layer, and it is what keeps the viewfinder from punching a
+   * webcam feed through a window he has just opened.
+   */
+  const animating = open < 1;
+
   return (
     <div
       style={{
-        opacity: open,
-        scale: 0.94 + open * 0.06,
-        transformOrigin: "50% 50%",
+        ...(animating
+          ? { opacity: open, scale: 0.94 + open * 0.06, transformOrigin: "50% 50%" }
+          : null),
         fontFamily: OS_FONT,
         position: "relative",
         // See the header — a foreground window occludes the browser and everything in it.

@@ -57,6 +57,26 @@ import { continueRender, delayRender, useCurrentFrame } from "remotion";
  *
  * The cleanup calls `continueRender` unconditionally, so an unmount can never leave a render
  * hung — the same contract the other two hold to.
+ *
+ * ── AND IT HAS A SECOND FORM: A STALE *LAYER* RATHER THAN A STALE FRAME ─────────────
+ *
+ * The music player's scrubber was reported as glitching, and it is this same race one level down.
+ * An element with `opacity` plus a transform is promoted to **its own compositor layer**, and a
+ * layer can be a frame or two behind while the rest of the picture is current — so the fill and
+ * the handle moved backwards for two frames while the elapsed TEXT beside them, which lives in the
+ * page's layer, kept counting correctly. Rendering those frames in isolation gave a perfectly even
+ * progression, which is what identifies it as the renderer rather than the composition.
+ *
+ * Two consequences worth carrying:
+ *
+ *  · **Do not promote a layer you do not need promoted.** `player.tsx` now emits its `opacity` and
+ *    `scale` only while the window is actually animating; through the hold it is ordinary painted
+ *    content and cannot fall behind the frame it is in.
+ *  · **The reconciliation metric must be LOCAL.** A whole-frame mean cannot see this — the player's
+ *    window is 0.28% of the picture, so a 20px displacement of it moves the frame mean by ~0.05,
+ *    far under any useful threshold. The check that ships this film compares **per-tile** maxima
+ *    (60px tiles at 960×540) between two renders, and it caught frames the whole-frame version had
+ *    passed.
  */
 
 /**
