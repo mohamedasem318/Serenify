@@ -9,7 +9,19 @@ import { Camera, shot } from "../Camera";
 import { H, W } from "../theme";
 
 /**
- * Beat 6 · "Later" · 0:43–0:45 · 60 frames
+ * Beat 6 · "Later" · 0:42.5–0:43.7 · 36 frames
+ *
+ * ── IT USED TO SIT FOR 38 FRAMES AFTER THE CLICK ────────────────────────────────────
+ *
+ * The click is at f22 and the beat ran to f60, so **38 of its 60 frames were a locked-off wide of
+ * a dashboard on which nothing happened** — the largest dead hold in the film outside the two
+ * protected ones, and the frame the second half's slowdown begins on. Nothing in the beat changes
+ * after the press: the page does not respond, the camera does not move, and the next surface is
+ * beat 7's.
+ *
+ * It holds **14** now, which is the first half's own post-click band (beat 4 holds 12 after its
+ * gate click, beat 1 holds 12 after "Get started"). Everything before the click is untouched —
+ * the pointer's travel, the hover and the press are on exactly the frames they were.
  *
  * Continues straight from beat 5, which lands on the dashboard itself. The calibration banner is
  * gone — **that absence is the beat's visible content** — and he clicks "Start check-in".
@@ -134,7 +146,7 @@ export const Beat06Later: React.FC = () => (
              * (`todays-checkin-card.tsx:166`), so `hover:opacity-90`, snapped: the shipped
              * `transition-colors` does not cover opacity.
              */}
-            <Hover selector="[data-probe='today'] a" treatment="meadow" from={18} to={40} />
+            <Hover selector="[data-probe='today'] a" treatment="meadow" from={18} to={36} />
             <Pointer
               path={[
                 { frame: 0, x: START.x + 190, y: START.y + 120 },

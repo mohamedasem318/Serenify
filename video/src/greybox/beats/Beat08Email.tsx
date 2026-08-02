@@ -10,17 +10,31 @@ import { TOAST } from "../copy";
 import { useExpression } from "../rig";
 
 /**
- * Beat 8 · The email · 200 frames
+ * Beat 8 · The email · 184 frames
  *
  * The core beat and the largest single allocation in the video. No cutaway, no cut — one
  * continuous camera move. The order is load-bearing and is what the frame numbers encode:
  *
  *   the toast lands and is read   f6 – f70    (at the CLOCK framing)
  *   HIS FACE FALLS                f70 – f86   (at the FACE framing, toast still up)
- *   the toast dismisses           f120 + 13   (a slide-out, as the camera widens off it)
- *   the bloom drifts              f136 + 39   (1.3s ease — it drifts, it does not snap)
- *   the stateline steps twice     f158, f180  (inside the wide hold, camera stopped)
+ *   the toast dismisses           f104 + 13   (a slide-out, as the camera widens off it)
+ *   the bloom drifts              f120 + 39   (1.3s ease — it drifts, it does not snap)
+ *   the stateline steps twice     f142, f164  (inside the wide hold, camera stopped)
  *   the trend climbs and recolours
+ *
+ * ── THE FACE HELD FOR 32 FRAMES AFTER THE FALL HAD FINISHED ─────────────────────────
+ *
+ * The only cut in this beat, and it is the one place the beat sat still with nothing changing:
+ * the fall finishes at f86, `dismayed` is then a **constant** pose until f140, and the camera did
+ * not leave `BEAT8_FACE` until f118. So there were 32 settled frames on a face that had already
+ * arrived, against a first half whose dead dwell runs 6 frames at the median. The camera leaves
+ * at **f102** now — 16 frames of settle on the fall, which is the beat's own hold band — and
+ * everything after it shifts by the same **−16**, so every gap in the third act is unchanged and
+ * the drift, both copy changes and the trend's crossings keep their exact spacing.
+ *
+ * **Nothing that has to be READ is touched.** The toast keeps its whole 38-frame hold at the
+ * clock framing — that is the film's only piece of arithmetic — and the second stateline change
+ * keeps its 20 frames to the end of the beat.
  *
  * ══ THREE LANDINGS, ONE MOVE, AND THE CLOCK IS FINALLY WHOLE ════════════════════════
  *
@@ -31,9 +45,9 @@ import { useExpression } from "../rig";
  * rather than losing the clock. Three landings, one continuous move, still no cut:
  *
  *   · **clock** (368 wide, f30–f68) — clock + toast. The toast is READ here.
- *   · **face**  (614 wide, f80–f118) — the toast still up, and his face. THE FALL happens here.
- *   · **wide**  (777 wide, f150 on) — the reading and his face. Both stateline changes happen
- *     here, under one raise, on a camera that has stopped.
+ *   · **face**  (614 wide, f80–f102) — the toast still up, and his face. THE FALL happens here.
+ *   · **wide**  (777 wide, f134 on) — the reading and his face. Both stateline changes happen
+ *     here, on a camera that has stopped.
  *
  * ── THE CLOCK WAS BEING SLICED, AND IT IS THE DEFECT THIS BEAT TURNS ON ─────────────
  *
@@ -70,13 +84,13 @@ import { useExpression } from "../rig";
  * everything that happens at the third one, twenty frames later, so that it happens *inside the
  * hold*:
  *
- *   f118 – f150  the move out to `BEAT8_WIDE`. The toast slides out at f120 (see below).
- *   f150         the camera STOPS, and does not move again in this beat.
- *   f136 – f175  the bloom's 1.3s drift. The bloom is fully framed from ~f141, so five sixths
+ *   f102 – f134  the move out to `BEAT8_WIDE`. The toast slides out at f104 (see below).
+ *   f134         the camera STOPS, and does not move again in this beat.
+ *   f120 – f159  the bloom's 1.3s drift. The bloom is fully framed from ~f125, so five sixths
  *                of it plays in shot; starting it after the camera settles would put the
  *                escalation's first move a full second after the fall's last.
- *   f158         "A bit of an edge lately" — and the raise begins ON it.
- *   f180         "This has held a while…" — and the raise SETTLES as it lands.
+ *   f142         "A bit of an edge lately".
+ *   f164         "This has held a while…".
  *
  * ── AND THE RAISE IS GONE — L15 ─────────────────────────────────────────────────────
  *
@@ -99,7 +113,7 @@ export const Beat08Email: React.FC = () => {
   // 1.3s, the component's own `transition: background 1.3s ease`. It begins as the camera is
   // arriving, so nearly all of the drift plays with the bloom in frame — which is the whole
   // point of the sheet keeping the drift rather than snapping the band.
-  const tension = useDrift(0, 1, 136);
+  const tension = useDrift(0, 1, 120);
 
   /**
    * ── THE READING, AND IT IS ONE NUMBER NOW ──────────────────────────────────────────
@@ -111,25 +125,27 @@ export const Beat08Email: React.FC = () => {
    * *"starts already elevated and steps once"* reading. Full account in `monitor.tsx` § ONE
    * READING, READ TWICE.
    *
-   * The keys are placed **on** the band thresholds, so the crossings ARE the sheet's frames:
+   * The keys are placed **on** the band thresholds, so the crossings ARE the sheet's frames. They
+   * moved with the beat's third act (−16) and their spacing is untouched, which is what keeps the
+   * sync the retime is not allowed to spend:
    *
-   *   f136        0.00          the escalation starts as the bloom does
-   *   f157        just under    still "at ease" — the graph is climbing inside the band
-   *   f158        LITTLE_AT     → "A bit of an edge lately", on the exact frame
-   *   f179        just under    still "a bit of an edge" — still climbing
-   *   f180        TENSE_AT      → "This has held a while…", on the exact frame
-   *   f200        1.00          the beat ends at the top of the reading
+   *   f120        0.00          the escalation starts as the bloom does
+   *   f141        just under    still "at ease" — the graph is climbing inside the band
+   *   f142        LITTLE_AT     → "A bit of an edge lately", on the exact frame
+   *   f163        just under    still "a bit of an edge" — still climbing
+   *   f164        TENSE_AT      → "This has held a while…", on the exact frame
+   *   f184        1.00          the beat ends at the top of the reading
    *
    * So the graph WALKS at ease → a little tense → tense and arrives at each band on the frame the
    * copy does, instead of jumping two bands between them.
    */
   const level = useReading([
-    { frame: 136, level: 0 },
-    { frame: 157, level: LITTLE_AT - 0.01 },
-    { frame: 158, level: LITTLE_AT },
-    { frame: 179, level: TENSE_AT - 0.02 },
-    { frame: 180, level: TENSE_AT },
-    { frame: 200, level: 1 },
+    { frame: 120, level: 0 },
+    { frame: 141, level: LITTLE_AT - 0.01 },
+    { frame: 142, level: LITTLE_AT },
+    { frame: 163, level: TENSE_AT - 0.02 },
+    { frame: 164, level: TENSE_AT },
+    { frame: 184, level: 1 },
   ]);
 
   /**
@@ -146,10 +162,10 @@ export const Beat08Email: React.FC = () => {
     { frame: 0, state: "content" },
     { frame: 70, state: "content" },
     { frame: 86, state: "dismayed" },
-    { frame: 140, state: "dismayed" },
+    { frame: 124, state: "dismayed" },
     // The settle into `tense` finishes under the second stateline change, which is what makes
     // the copy and the face read as one event rather than two.
-    { frame: 180, state: "tense" },
+    { frame: 164, state: "tense" },
   ]);
 
   return (
@@ -162,11 +178,11 @@ export const Beat08Email: React.FC = () => {
           // HOLD. The toast lands and is read, with the clock beside it — whole, this time.
           { frame: 68, shot: BEAT8_CLOCK },
           { frame: 80, shot: BEAT8_FACE },
-          // HOLD. The whole fall (f70–f86) and its settle play inside this one.
-          { frame: 118, shot: BEAT8_FACE },
-          { frame: 150, shot: BEAT8_WIDE },
-          // HOLD, to the end. Drift, both copy changes and the raise all happen here.
-          { frame: 200, shot: BEAT8_WIDE },
+          // HOLD. The whole fall (f70–f86) plays inside this one, with 16 frames of settle on it.
+          { frame: 102, shot: BEAT8_FACE },
+          { frame: 134, shot: BEAT8_WIDE },
+          // HOLD, to the end. The drift and both copy changes all happen here.
+          { frame: 184, shot: BEAT8_WIDE },
         ]}
       >
         <MonitorPage
@@ -181,10 +197,10 @@ export const Beat08Email: React.FC = () => {
           // WORLD coordinates — an OS notification floats over the chrome and the page alike,
           // and the framing in `framing.ts` is derived from its world rect.
           //
-          // It leaves at f120, as the camera starts widening, and is gone by f133 — see
+          // It leaves at f104, as the camera starts widening, and is gone by f117 — see
           // `toast.tsx` § dismissFrom. The fall is over; keeping it would cost the stateline
           // 2.3px of phone legibility in the shot the beat exists to deliver.
-          overlay={<MailToast startFrame={6} dismissFrom={120} />}
+          overlay={<MailToast startFrame={6} dismissFrom={104} />}
         />
       </Camera>
     </AbsoluteFill>

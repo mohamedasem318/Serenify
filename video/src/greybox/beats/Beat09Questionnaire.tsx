@@ -13,7 +13,15 @@ import { Camera, CameraKey } from "../Camera";
 import { useExpression } from "../rig";
 
 /**
- * Beat 9 · Confirmatory questionnaire · 90 frames
+ * Beat 9 · Confirmatory questionnaire · 76 frames
+ *
+ * ── AND IT USED TO SIT FOR 24 FRAMES AFTER HE HAD ANSWERED ──────────────────────────
+ *
+ * The prompt has no response state — clicking "Yes, that's me" changes nothing on screen — so the
+ * frames after the click were a settled camera on a surface that had stopped moving. The beat
+ * ends **10** frames after the press now, which is the first half's own band. The prompt's read
+ * is untouched: it is on screen from its entrance at f6 and framed at `BEAT9_PROMPT` from f42, so
+ * the three options get their whole 60 frames before the click rather than after it.
  *
  * He answers, and confirms the stress is real — the TRUE-POSITIVE branch. The landing hero
  * deliberately shows the false alarm; that inversion is intentional and is not reconciled.
@@ -87,11 +95,11 @@ import { useExpression } from "../rig";
 const KEYS: CameraKey[] = [
   // Picks up beat 8's closing framing and holds four frames past the prompt's arrival — the
   // camera reacts to it rather than anticipating it — then eases in and HOLDS. The click at f66
-  // happens 24 frames after the camera has stopped.
+  // happens 24 frames after the camera has stopped, and the beat ends 10 frames after the click.
   { frame: 0, shot: BEAT8_WIDE },
   { frame: 10, shot: BEAT8_WIDE },
   { frame: 42, shot: BEAT9_PROMPT },
-  { frame: 90, shot: BEAT9_PROMPT },
+  { frame: 76, shot: BEAT9_PROMPT },
 ];
 
 export const Beat09Questionnaire: React.FC = () => {
@@ -144,7 +152,7 @@ export const Beat09Questionnaire: React.FC = () => {
         selector="[data-testid='notification'] button:first-of-type"
         treatment="promptOption"
         from={60}
-        to={90}
+        to={76}
       />
 
       {/* World coordinates, magnified by the camera — see the header for why the layer is a

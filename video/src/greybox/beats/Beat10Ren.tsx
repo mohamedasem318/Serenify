@@ -9,7 +9,7 @@ import { Camera, frameRect, rect, shot, union } from "../Camera";
 import { REN } from "../copy";
 
 /**
- * Beat 10 · Ren · 250 frames
+ * Beat 10 · Ren · 310 frames
  *
  * A real three-turn exchange, each message legible, appearing one at a time with a real beat
  * between them.
@@ -63,7 +63,7 @@ import { REN } from "../copy";
  *
  * ── THE CAMERA DOES NOT GO TO THE COMPOSER, BECAUSE THE POINTER DOES NOT ───────────
  *
- * `L2` is a single hold from f66 to f162. It contains the composer, the send button, the
+ * `L2` is a single hold from f94 to f222. It contains the composer, the send button, the
  * conversation header and both bubbles, so the typing, the send click and his message landing all
  * happen inside one static frame — which is what the pointer's own fix asks for. A camera that
  * travelled down to the composer while the cursor sat still would be the only thing moving in the
@@ -196,23 +196,35 @@ const L3 = { cx: 600, cy: 343, w: 664.9 };
  *
  *   f0–6      the panel, whole — brief, and the only shot in the beat that crops nothing
  *   f6–24     in, onto REN_TURN1
- *   f0–52     `thinking`, with the typing indicator in turn 1's own slot: he is composing, and
+ *   f0–38     `thinking`, with the typing indicator in turn 1's own slot: he is composing, and
  *             you watch him do it from the first frame of the beat
- *   f24–88    HOLD on the landing
- *   f52       turn 1 lands, into the frame that was already holding the slot it lands in, and is
+ *   f24–74    HOLD on the landing
+ *   f38       turn 1 lands, into the frame that was already holding the slot it lands in, and is
  *             read at **14.37px** — 36 frames, 1.2s, before the camera moves
- *   f88–108   out to L2
- *   f100–114  the pointer travels to the composer
- *   f116      the caret click, 8 frames after the camera has landed
- *   f118–210  he types. **78 characters** at ~25 c/s — hurried, and the hurry is his own
- *   f216      **the pointer ARRIVES at the send button** and the button lights on that frame
- *   f220      the click, four frames later. The bubble lands with it
- *   f228      `thinking` again, and the typing indicator with it (L9), now in turn 3's slot
- *   f244–268  in to L3
- *   f272      turn 3 lands, and Ren closes his eyes on the same frame
- *   f272–332  the protected hold — 60 frames, untouched
+ *   f74–94    out to L2
+ *   f86–100   the pointer travels to the composer
+ *   f102      the caret click, 8 frames after the camera has landed
+ *   f104–196  he types. **78 characters** at ~25 c/s — hurried, and the hurry is his own
+ *   f202      **the pointer ARRIVES at the send button** and the button lights on that frame
+ *   f206      the click, four frames later. The bubble lands with it
+ *   f214      `thinking` again, and the typing indicator with it (L9), now in turn 3's slot
+ *   f222–246  in to L3
+ *   f250      turn 3 lands, and Ren closes his eyes on the same frame
+ *   f250–310  the protected hold — 60 frames, untouched
  *
- * ── THE BEAT GOES 250 → 332, AND BOTH REASONS ARE THE BRIEF'S ──────────────────────
+ * ══ AND THE BEAT COMES BACK 332 → 310, OUT OF THE TWO INDICATORS ════════════════════
+ *
+ * **Both cuts are typing indicators, and an indicator is looked at rather than read.** L9 exists
+ * to make `thinking` legible as a state; once it has been legible, every further frame of it is a
+ * moving element the audience has already understood. They ran 52 and 44 frames — 1.7s and 1.5s
+ * — against a beat whose own protected reads are 36 and 60. They run **38 and 36** now.
+ *
+ * **The two reads are untouched, to the frame.** Turn 1 still gets its 36 frames at 14.37px
+ * inside `REN_TURN1`, and turn 3 still gets the protected 60 at L3. What moved is only when they
+ * start. The typing itself is untouched at 92 frames for 78 characters: 25.4 c/s is already
+ * faster than a person types, so it is not a beat playing out slower than the action it depicts.
+ *
+ * ── THE BEAT WENT 250 → 332, AND BOTH REASONS ARE THE BRIEF'S ──────────────────────
  *
  *  · **His message is 78 characters, not 49.** At the beat's own ~25 c/s that is 92 frames of
  *    typing rather than 58. The rate is not raised to absorb it — *never sped to fit* — so the
@@ -249,23 +261,23 @@ const L3 = { cx: 600, cy: 343, w: 664.9 };
  * `send`.
  */
 const T = {
-  turn1: 52,
-  cursorToComposer: 114,
-  caretClick: 116,
-  typeFrom: 118,
+  turn1: 38,
+  cursorToComposer: 100,
+  caretClick: 102,
+  typeFrom: 104,
   /** 92 frames for 78 characters — 25.4 c/s, the same rate the 49-character line was typed at. */
-  typeTo: 210,
+  typeTo: 196,
   /** The pointer's travel ENDS here. The button lights on this frame, not eight before it. */
-  sendArrive: 216,
-  send: 220,
+  sendArrive: 202,
+  send: 206,
   /** Lands the same frame the composer clears — see the note above. */
-  bubble: 220,
-  thinking: 228,
-  reply: 272,
+  bubble: 206,
+  thinking: 214,
+  reply: 250,
 } as const;
 
 /** The beat's own length, so the last camera key and `Root.tsx` cannot drift apart. */
-export const BEAT10_FRAMES = 332;
+export const BEAT10_FRAMES = 310;
 
 export const Beat10Ren: React.FC = () => {
   const frame = useCurrentFrame();
@@ -298,12 +310,12 @@ export const Beat10Ren: React.FC = () => {
    * What is left is the arc the beat actually has:
    *
    *   thinking   from f0 — he is composing his opener, and the typing indicator says so. It runs
-   *              through turn 1 landing at f52 and does not change when it does: he has spoken,
+   *              through turn 1 landing at f38 and does not change when it does: he has spoken,
    *              and now he is waiting on a person who is typing, which is the same state
    *   thinking   through the whole of turn 2's typing and through his own composing of turn 3 —
    *              one continuous state, not two, because nothing happens between them that would
    *              cause a change
-   *   warm       at f272, ON turn 3. **The eyes close.** `warm` drops the open pair entirely and
+   *   warm       at f250, ON turn 3. **The eyes close.** `warm` drops the open pair entirely and
    *              leaves the closed, smiling one (`ren-avatar.tsx:90`), so the moment the Michael
    *              Jackson suggestion lands is the moment his eyes shut — which is the product's
    *              own state for exactly this and the only expression change in the beat.
@@ -315,7 +327,7 @@ export const Beat10Ren: React.FC = () => {
 
   /**
    * L9's indicator follows what Ren is actually doing, and it is only ever up while he is
-   * COMPOSING — not while he is merely `thinking`. He is `thinking` for 272 of the beat's 332
+   * COMPOSING — not while he is merely `thinking`. He is `thinking` for 250 of the beat's 310
    * frames; dots for all of them would be a lie about the surface and a moving element under
    * every other thing the beat is trying to show.
    *
@@ -334,15 +346,15 @@ export const Beat10Ren: React.FC = () => {
           { frame: 0, shot: PANEL_WHOLE },
           { frame: 6, shot: PANEL_WHOLE },
           // In on his face AND the slot his opener will land in, and HOLD there across the
-          // landing: he composes, the line arrives at f52, and it is read at 14.37px.
+          // landing: he composes, the line arrives at f38, and it is read at 14.37px.
           { frame: 24, shot: REN_TURN1 },
-          { frame: 88, shot: REN_TURN1 },
+          { frame: 74, shot: REN_TURN1 },
           // Out to the working shot. Then still: the typing, the send and his bubble all
           // happen inside one static frame.
-          { frame: 108, shot: L2 },
-          { frame: 244, shot: L2 },
-          // In on the thread for turn 3, settled before it arrives at f272.
-          { frame: 268, shot: L3 },
+          { frame: 94, shot: L2 },
+          { frame: 222, shot: L2 },
+          // In on the thread for turn 3, settled before it arrives at f250.
+          { frame: 246, shot: L3 },
           { frame: BEAT10_FRAMES, shot: L3 },
         ]}
       >
@@ -393,7 +405,7 @@ export const Beat10Ren: React.FC = () => {
                 path={[
                   // It sets off during the move off the landing, so it is already travelling by
                   // the time L2 settles rather than starting from a dead stop inside it.
-                  { frame: 100, x: 640, y: 400 },
+                  { frame: 86, x: 640, y: 400 },
                   { frame: T.cursorToComposer, x: CARET_AT.x, y: CARET_AT.y },
                   { frame: T.typeTo, x: CARET_AT.x, y: CARET_AT.y },
                   { frame: T.sendArrive, x: SEND_AT.x, y: SEND_AT.y },
