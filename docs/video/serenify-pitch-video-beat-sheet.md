@@ -989,11 +989,32 @@ those beats are bright type at high magnification over a moving camera, where a 
 produces a large delta, and the rest of the film is near-black and mostly static, where the same
 slip produces almost none.
 
-**The fix is the one `settle.tsx` names as its own acceptance test** — *"raise it if a diffed pair
-of renders ever disagrees again"*. `<Settle/>`'s rAF budget becomes a prop: **6 by default, so the
-launch cut's render path is untouched, and 20 for the pitch composition.** Raising it can only
-remove wrong frames, never change what is drawn — it moves when the screenshot is taken, not what
-is in it — so it is a correctness knob paid for in render time, and this cut has the time.
+### And the fix is NOT more settle — it is fewer tabs
+
+`settle.tsx`'s own acceptance test says to raise its rAF budget when a diffed pair disagrees.
+**Raising it from 6 to 20 made the rate exactly twice as bad** — 101 disagreeing frames in the
+same 900-frame region, against 51. The inversion is the finding: more rAFs means more **wall
+clock** per frame, and Remotion keeps *one live page* across the whole render, so anything in the
+page still driven by real elapsed time drifts further the longer each frame is held. Settling
+harder feeds the bug it was meant to starve. This is the launch sheet's *"no frame-addressed
+render ever fires a timeout is false"* finding, surfacing in a site `<StillMotion/>` does not
+cover.
+
+Three measurements pin it, and the first is what makes the other two readable:
+
+- **The composition is deterministic.** Two `remotion still` renders of output frame 517 are
+  identical to **MSE 0.00**. A still renders one frame in a fresh page, so no wall-clock state
+  accumulates — which is also why **a still is the ground truth** the other two are measured
+  against. The bug is in the render path, not in anything this cut authored.
+- **A video-render frame can be flatly wrong, not merely late.** At output f494 one render sits
+  **4.30** from its still — h264 noise against a lossless PNG — and the other **12,790.99**.
+- **`--concurrency=2` clears it.** Six frames that had been wrong come back at **3.4–16.8** MSE
+  from their stills: encoding noise, brighter frames scoring higher, no outlier.
+
+**So the settle budget stays at 6 for both cuts, and the pitch cut renders at `--concurrency=2`.**
+It costs about 2× per frame and it is the difference between a correct film and one with a page
+visibly jumping in beat 2. The `ticks` prop stays because it costs nothing and the next person to
+hit this should find the measurement rather than the guess — but **do not raise it to fix a race.**
 
 ---
 
