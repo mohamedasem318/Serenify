@@ -19,7 +19,10 @@ import { Beat10Ren } from "./greybox/beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
-import { GreyboxVideo, RETIMED_DURATION } from "./greybox/GreyboxVideo";
+import { CardJoinCompare, CARD_JOIN_COMPARE_DURATION } from "./greybox/CardJoinCompare";
+import { CUT_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
+import { Interstitial, INTERSTITIAL_FRAMES } from "./greybox/beats/Interstitial";
+import { INTERSTITIALS } from "./greybox/copy";
 import { RigSpike } from "./greybox/RigSpike";
 import { SwapProbe } from "./SwapProbe";
 import { HelloWorld } from "./HelloWorld";
@@ -29,9 +32,11 @@ import "./tailwind.css";
 /**
  * `Greybox` is the cut: all thirteen beats of
  * `docs/video/serenify-launch-video-beat-sheet.md`, **read at the rates of Mohamed's
- * Premiere re-cut** — 2238 frames of output over 2448 authored ones. The beats below are
- * registered at their **authored** durations and are unretimed, which is what makes one of
- * them scrubbable on its own. See `retime.tsx` and `GreyboxVideo.tsx`.
+ * Premiere re-cut** — 2261 frames of output over 2448 authored ones — plus the **four
+ * interstitial cards**, which are not retimed at all and add 240 output frames on top, for
+ * **2501**. The beats below are registered at their **authored** durations and are unretimed,
+ * which is what makes one of them scrubbable on its own. See `retime.tsx` and
+ * `GreyboxVideo.tsx`.
  *
  * Every beat is ALSO registered on its own under `Greybox-Beats`, so a single
  * beat can be scrubbed and re-timed without playing the sixty seconds in front
@@ -48,7 +53,7 @@ export function RemotionRoot() {
       <Composition
         id="Greybox"
         component={GreyboxVideo}
-        durationInFrames={RETIMED_DURATION}
+        durationInFrames={CUT_DURATION}
         fps={30}
         width={1920}
         height={1080}
@@ -74,11 +79,31 @@ export function RemotionRoot() {
         <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={172} fps={30} width={1920} height={1080} />
       </Folder>
 
+      {/* The four interstitial cards, registered so each can be scrubbed on its own. They are
+          OUTPUT-timeline material — not beats, never retimed — so unlike the beats above these
+          run at exactly the duration the cut gives them. See `beats/Interstitial.tsx`. */}
+      <Folder name="Greybox-Cards">
+        <Composition id="Card1-Calm" component={Interstitial} defaultProps={{ line: INTERSTITIALS.calm }} durationInFrames={INTERSTITIAL_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="Card2-Quiet" component={Interstitial} defaultProps={{ line: INTERSTITIALS.quiet }} durationInFrames={INTERSTITIAL_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="Card3-Changes" component={Interstitial} defaultProps={{ line: INTERSTITIALS.changes }} durationInFrames={INTERSTITIAL_FRAMES} fps={30} width={1920} height={1080} />
+        <Composition id="Card4-Down" component={Interstitial} defaultProps={{ line: INTERSTITIALS.down }} durationInFrames={INTERSTITIAL_FRAMES} fps={30} width={1920} height={1080} />
+      </Folder>
+
       {/* The character rig's own bench. Not a beat, never in the cut — it shows the
           five poses static, and beat 8's fall at its real timings both large and at the
           viewfinder's real on-screen size. See RigSpike.tsx. */}
       <Folder name="Spikes">
         <Composition id="CharacterRig" component={RigSpike} durationInFrames={180} fps={30} width={1920} height={1080} />
+        {/* The 7 → 8 join, three ways back to back — what ships now, the dissolve, and the
+            dissolve at a shorter hold. A bench, never in the cut. See CardJoinCompare.tsx. */}
+        <Composition
+          id="CardJoinCompare"
+          component={CardJoinCompare}
+          durationInFrames={CARD_JOIN_COMPARE_DURATION}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
 
       <Folder name="Pipeline-Checks">

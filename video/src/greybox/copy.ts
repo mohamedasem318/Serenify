@@ -231,6 +231,60 @@ export const PLAYER = {
   artist: "Michael Jackson",
 } as const;
 
+// ── The four interstitial cards (SHEET) ─────────────────────────────────────
+/**
+ * DECIDED 2026-08-04. The Egyptian Arabic VO is dropped and LinkedIn autoplays muted, so
+ * **on-screen text is the film's only narration** — and it goes on cards rather than as an
+ * overlay. The three reasons are in `beats/Interstitial.tsx`; the placement argument is in
+ * `GreyboxVideo.tsx`.
+ *
+ * **THESE FOUR ARE ONE SENTENCE ACROSS THE FILM.** Read in order:
+ *
+ *   "First it learns what calm looks like. Then it stays quiet. Until something changes.
+ *    Then it helps you come back down."
+ *
+ * Keep them in that relationship. **Do not re-word one in isolation** — in particular
+ * **"First" is load-bearing**, because it is what gives the two "Then"s something to continue
+ * from, and that is the whole reason the first card exists rather than only the last three.
+ *
+ * **"calm" is deliberate.** The calibration beat the first card introduces reads "Setting your
+ * baseline — one calm moment…" (`CALIBRATION.uploading`, verbatim app copy), so the card and its
+ * beat speak the same language.
+ *
+ * ── NO LANDING-COPY SWAP WAS AVAILABLE, AND THAT WAS CHECKED ────────────────
+ *
+ * Beat 12's line is verbatim from `lib/landing/copy.ts`, which is what keeps the film's claims
+ * tied to the product's own, so each of these four was checked against that file for a near-exact
+ * equivalent. None has one. What was considered and rejected, so nobody re-checks it:
+ *
+ *  · **"First it learns what calm looks like."** — the nearest landing string is `HOW_STEPS[0]`,
+ *    "Serenify captures a short baseline of your ordinary face at rest", which is a description
+ *    of a mechanism rather than the same sentence. The genuinely near-exact phrasing —
+ *    "what your calm looks like" (the dashboard banner) and "We've learned what calm looks like
+ *    for you" (the calibration success state) — is **app** copy, not landing copy, and both are
+ *    already on screen in beats 3 and 5; quoting one on the card that introduces them would make
+ *    the card a caption of the surface behind it.
+ *  · **"Then it stays quiet."** — `PANEL_RESOLVED_BODY` has "Serenify goes quiet and keeps
+ *    watching", which is loosely similar and is about a *declined* prompt, a branch this film
+ *    never shows. Not a substitute.
+ *  · **"Until something changes."** — `NARRATION.climbing` is "Signals climb, and keep climbing",
+ *    a different claim about a different thing.
+ *  · **"Then it helps you come back down."** — `NARRATION.backToAtEase` is "Back to at ease —
+ *    because they were asked, not told", which is both a different claim and an **"X, not Y."**
+ *    construction. That construction is beat 12's and is reserved: reusing it here would make the
+ *    closing card the repeat of a device rather than the film's one claim.
+ */
+export const INTERSTITIALS = {
+  /** Between beat 4 (the camera gate) and beat 5 (calibration). */
+  calm: "First it learns what calm looks like.",
+  /** Between beat 5 (calibration) and beat 6 (later) — the film's one unexplained time jump. */
+  quiet: "Then it stays quiet.",
+  /** Between beat 7 (at ease) and beat 8 (the email) — the inciting incident. */
+  changes: "Until something changes.",
+  /** Between beat 9 (questionnaire) and beat 10 (Ren) — it stops measuring and starts talking. */
+  down: "Then it helps you come back down.",
+} as const;
+
 // ── Beat 12 · the closing subtitle card ─────────────────────────────────────
 /**
  * DECIDED 2026-07-30. **VERBATIM** — `lib/landing/copy.ts`
