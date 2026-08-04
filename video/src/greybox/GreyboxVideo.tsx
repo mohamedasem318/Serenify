@@ -1,5 +1,11 @@
 import React from "react";
-import { AbsoluteFill, Sequence, useCurrentFrame as useRenderedFrame } from "remotion";
+import {
+  AbsoluteFill,
+  Easing,
+  interpolate,
+  Sequence,
+  useCurrentFrame as useRenderedFrame,
+} from "remotion";
 
 import { Beat01ColdOpen } from "./beats/Beat01ColdOpen";
 import { Beat02Signup } from "./beats/Beat02Signup";
@@ -14,7 +20,7 @@ import { Beat10Ren } from "./beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./beats/Beat12Closing";
 import { Beat13EndCard } from "./beats/Beat13EndCard";
-import { Interstitial, INTERSTITIAL_FRAMES } from "./beats/Interstitial";
+import { Interstitial, INTERSTITIAL_FRAMES, veilAt } from "./beats/Interstitial";
 import { INTERSTITIALS } from "./copy";
 import {
   RETIMED_DURATION,
@@ -239,13 +245,78 @@ const beatIndexAt = (authored: number): number => {
  * `at` is therefore an **output** frame of the film, and each is the first output frame of the
  * beat the card precedes: 840 is beat 5's f0, 1216 is beat 6's, 1321 is beat 8's, 1581 is beat
  * 10's. All four sit before the turn-1 split at out 1619, so none of them moved when it landed.
+ *
+ * ── ONE CARD IS JOINED DIFFERENTLY, AND ONLY THE JOIN DIFFERS ───────────────────────
+ *
+ * **The 7 → 8 card is the one of the four with no discontinuity to cover.** Beats 7 and 8 join on
+ * the *identical* shot on the *identical* surface — beat 7 lands on `COMPOSITE` at its f36 and
+ * holds there, and beat 8 opens on `COMPOSITE` — so a hard cut to a card and a hard cut back is
+ * the grammar of a scene change placed where there is no scene change. It read as **cutting away
+ * and cutting back**; what it has to read as is **the film pausing to say something and then
+ * resuming.**
+ *
+ * So that card **dissolves**. The outgoing frame is held underneath — film frame `at − 1`, which
+ * is beat 7's f71, a genuinely static frame at the identical framing beat 8 opens on — and the
+ * whole card, ground and line together, fades up over it in **14 frames**, holds, and fades back
+ * down over 12 into the frame the shot left. The picture gives way and returns; nothing cuts.
+ *
+ * **The card itself is untouched, and that is the constraint that shaped this.** Same typeface,
+ * weight, size, ground, framing and 60-frame duration treatment as the other three — settled and
+ * static f15–f48 either way. All that differs is how it is arrived at and departed from, which is
+ * the only thing that may differ: giving one card its own *look* would break the device the other
+ * three depend on, which is a worse trade than leaving the seam as it was. **The other three keep
+ * the hard cut, because each of them genuinely covers a change of composition** and a dissolve
+ * there would soften a join whose job is to be invisible.
+ *
+ * Not the typewriter, not the end card's wipe.
  */
 const CARDS = [
-  { at: 840, line: INTERSTITIALS.calm },
-  { at: 1216, line: INTERSTITIALS.quiet },
-  { at: 1321, line: INTERSTITIALS.changes },
-  { at: 1581, line: INTERSTITIALS.down },
+  { at: 840, line: INTERSTITIALS.calm, dissolve: false },
+  { at: 1216, line: INTERSTITIALS.quiet, dissolve: false },
+  { at: 1321, line: INTERSTITIALS.changes, dissolve: true },
+  { at: 1581, line: INTERSTITIALS.down, dissolve: false },
 ] as const;
+
+/**
+ * The dissolving card's own veil: 0 → 1 over 14 frames, 1 → 0 over the last 12. The card's
+ * internal ramp (f3–f15 in, f48–f60 out) is left exactly as the other three have it, so the line
+ * is settled across the same f15–f48 and the two ramps only ever compound at the edges.
+ */
+/**
+ * The film at one output frame, mounted the way the cut mounts it: the beat dispatched by the
+ * retime map, its integer part on the `<Sequence>` offset and its remainder in `SubFrameContext`.
+ *
+ * `film` is deliberately a separate argument from `out`. Passing a FIXED `film` while `out`
+ * advances holds the picture still — which is what puts beat 7's last frame under the dissolving
+ * card for all sixty of its frames. `key` is the beat's own name either way, so the beat stays
+ * mounted across the card exactly as it stays mounted across its own run.
+ */
+export const FilmFrame: React.FC<{ out: number; film: number }> = ({ out, film }) => {
+  const source = sourceFrameAt(film);
+  const authored = Math.min(Math.floor(source), SOURCE_DURATION - 1);
+  const subFrame = source - authored;
+
+  const i = beatIndexAt(authored);
+  const { name, frames, Beat } = BEATS[i];
+  const local = authored - BEAT_STARTS[i];
+
+  return (
+    <SubFrameContext.Provider value={subFrame}>
+      {/* `from` is solved so the child sees `local`: it reads `out - from`. */}
+      <Sequence key={name} layout="none" from={out - local} durationInFrames={frames}>
+        <Beat />
+      </Sequence>
+    </SubFrameContext.Provider>
+  );
+};
+
+/**
+ * The stretch `CardJoinCompare` renders: the whole of beat 7 and the whole of beat 8, in FILM
+ * output frames, with the 7 → 8 card's insertion point in the middle. Beat 7 opens at authored
+ * 1310 and beat 8 closes at authored 1566; both beats are read at 1.000×, so the film frames are
+ * these. Stated here rather than in the bench so the two cannot drift apart.
+ */
+export const CARD_JOIN_SECTION = { start: 1249, cardAt: 1321, end: 1505 } as const;
 
 /** Each card's first frame in the FINAL output, i.e. with the cards before it already inserted. */
 const CARD_STARTS = CARDS.map((c, i) => c.at + i * INTERSTITIAL_FRAMES);
@@ -274,30 +345,27 @@ export const GreyboxVideo: React.FC = () => {
   const at = resolve(out);
 
   if ("card" in at) {
+    const card = CARDS[at.card];
     return (
       <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
         <Settle />
-        {/* No `SubFrameContext` — a card is output-timeline material and is never retimed, so it
-            reads Remotion's own frame and runs at exactly its authored 60. */}
-        <Sequence
-          key={`card-${at.card}`}
-          layout="none"
-          from={CARD_STARTS[at.card]}
-          durationInFrames={INTERSTITIAL_FRAMES}
-        >
-          <Interstitial line={CARDS[at.card].line} />
-        </Sequence>
+        {/* The held outgoing frame, under the dissolve. Only the 7 → 8 card has one. */}
+        {card.dissolve ? <FilmFrame out={out} film={card.at - 1} /> : null}
+        <AbsoluteFill style={{ opacity: card.dissolve ? veilAt(at.local) : 1 }}>
+          {/* No `SubFrameContext` — a card is output-timeline material and is never retimed, so
+              it reads Remotion's own frame and runs at exactly its authored 60. */}
+          <Sequence
+            key={`card-${at.card}`}
+            layout="none"
+            from={CARD_STARTS[at.card]}
+            durationInFrames={INTERSTITIAL_FRAMES}
+          >
+            <Interstitial line={card.line} dissolve={card.dissolve} />
+          </Sequence>
+        </AbsoluteFill>
       </AbsoluteFill>
     );
   }
-
-  const source = sourceFrameAt(at.film);
-  const authored = Math.min(Math.floor(source), SOURCE_DURATION - 1);
-  const subFrame = source - authored;
-
-  const i = beatIndexAt(authored);
-  const { name, frames, Beat } = BEATS[i];
-  const local = authored - BEAT_STARTS[i];
 
   return (
     <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
@@ -306,12 +374,7 @@ export const GreyboxVideo: React.FC = () => {
           rather than on the frame being read. See `settle.tsx` — the renderer was emitting one
           wrong frame in a few hundred, and no beat could have known to guard against it. */}
       <Settle />
-      <SubFrameContext.Provider value={subFrame}>
-        {/* `from` is solved so the child sees `local`: it reads `out - from`. */}
-        <Sequence key={name} layout="none" from={out - local} durationInFrames={frames}>
-          <Beat />
-        </Sequence>
-      </SubFrameContext.Provider>
+      <FilmFrame out={out} film={at.film} />
     </AbsoluteFill>
   );
 };

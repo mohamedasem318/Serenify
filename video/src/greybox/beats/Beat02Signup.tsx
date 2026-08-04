@@ -199,6 +199,52 @@ const typed = (value: string, frame: number, from: number, over: number) => {
  * below ~135 the submit's own bottom edge is under the fold; above ~150 the "Already have an
  * account? Sign in" footnote rises into the viewport and is sliced by it.
  */
+/**
+ * ══ THE PUSH ONTO THE EMAIL — 6 FRAMES → 16, AND THE NUMBER IS DERIVED ══════════════
+ *
+ * It read as faster than every other move in the film, and it **was**: measured as **peak
+ * shot-width speed per output frame** — the metric the consent-gate push was diagnosed with —
+ * across all 36 camera moves in the cut, this one was
+ *
+ *   445.4 px/frame,  against a median of 51.6 and a body that tops out at 126.7
+ *
+ * the fastest move in the film by **3.5×** over the fastest move outside this beat. It closed
+ * `WINDOW` (1200) onto `LIST_SHOT` (309.3) — a 3.9× magnification, Δ890.7, the largest single
+ * width change anywhere in the cut — in **six frames, 0.2s**. (Peak, not mean: `inOut(cubic)`
+ * puts 3× the mean rate through the middle of a move, so peak = 3·Δw/span, and every move in the
+ * film is on that curve or on `EASE_DEPART`/`EASE_ARRIVE`, whose peaks are also 3×.)
+ *
+ * **The duration is derived from the beat's own events rather than picked**, and they bound it
+ * hard on both sides:
+ *
+ *   · It cannot start before **`mailEnter` (236)**. Before that he is still typing the address,
+ *     and a camera closing on a row of an inbox that does not exist yet is a camera anticipating
+ *     its own edit. Starting exactly on the keystroke is the earliest honest frame — the page
+ *     paints at `mailLoaded` (240) under an already-moving camera, which is the same device the
+ *     `BEAT4_SEAM` handoff uses deliberately.
+ *   · It must land before the click at **`openEmail` (256)**, and this film's own idiom for the
+ *     gap is **four frames** — beat 10's send: the pointer arrives, the control lights, the click
+ *     lands four frames later. Here the pointer reaches the row at `openEmail − 6` (250) and the
+ *     hover opens there, so the camera settles two frames after the row has acknowledged it and
+ *     four before it is pressed. Nothing about the click, the hover or the pointer moves.
+ *
+ * That gives **236 → 252, sixteen frames**, and drops the peak to **167.0 px/frame — a 62%
+ * reduction.** Everything the move lands on is untouched: `LIST_SHOT` is the same framing, the
+ * hold runs to the same f262, and the beat is still 432 frames, so nothing downstream of it and
+ * no segment of the retime map moves.
+ *
+ * **WHAT SIXTEEN FRAMES DOES NOT DO, STATED RATHER THAN GLOSSED.** 167.0 is still above the
+ * body's 126.7 — it is no longer a 3.5× outlier, but it is not median either. Family would need
+ * **21 frames**, and the beat has no more to give: the remaining five can only come from delaying
+ * `openEmail`, which pushes the click, the pane scroll, the pull-out and the tab switch, and the
+ * tail of this beat is the tightest budget in the film. That is a change to beat 2's timing rather
+ * than to this move's speed, so it is reported and not taken.
+ *
+ * **AND ITS PARTNER IS NOW THE FILM'S FASTEST MOVE.** The pull-out `LIST_SHOT → WINDOW` at f262
+ * → f272 is the same Δ890.7 over ten frames — **267.2 px/frame**, second in the film before this
+ * change and first after it. It was not reported and is not touched here; it is recorded so the
+ * next pass does not have to re-measure to find it.
+ */
 const SCROLL_2B = 45;
 const SIGNUP_SCROLL = 145;
 
@@ -469,8 +515,10 @@ export const Beat02Signup: React.FC = () => {
           // f200 while the frame's top edge was at world 190 — the control was 130px above the
           // shot that was clicking it.
           { frame: 206, shot: WINDOW },
-          { frame: 242, shot: WINDOW },
-          { frame: 248, shot: LIST_SHOT },
+          // …and the push onto the email in the inbox. See § THE PUSH ONTO THE EMAIL below for
+          // why it starts on `mailEnter` and lands four frames before the click.
+          { frame: T.mailEnter, shot: WINDOW },
+          { frame: T.openEmail - 4, shot: LIST_SHOT },
           { frame: 262, shot: LIST_SHOT },
           // …out again, so the message is met at page scale, then the slow push onto it.
           { frame: 272, shot: WINDOW },

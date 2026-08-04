@@ -19,6 +19,7 @@ import { Beat10Ren } from "./greybox/beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
+import { CardJoinCompare, CARD_JOIN_COMPARE_DURATION } from "./greybox/CardJoinCompare";
 import { CUT_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
 import { Interstitial, INTERSTITIAL_FRAMES } from "./greybox/beats/Interstitial";
 import { INTERSTITIALS } from "./greybox/copy";
@@ -93,6 +94,16 @@ export function RemotionRoot() {
           viewfinder's real on-screen size. See RigSpike.tsx. */}
       <Folder name="Spikes">
         <Composition id="CharacterRig" component={RigSpike} durationInFrames={180} fps={30} width={1920} height={1080} />
+        {/* The 7 → 8 join, three ways back to back — what ships now, the dissolve, and the
+            dissolve at a shorter hold. A bench, never in the cut. See CardJoinCompare.tsx. */}
+        <Composition
+          id="CardJoinCompare"
+          component={CardJoinCompare}
+          durationInFrames={CARD_JOIN_COMPARE_DURATION}
+          fps={30}
+          width={1920}
+          height={1080}
+        />
       </Folder>
 
       <Folder name="Pipeline-Checks">
