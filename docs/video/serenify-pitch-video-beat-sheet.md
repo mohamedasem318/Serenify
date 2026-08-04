@@ -1,6 +1,7 @@
 # Serenify — Egypt IoT Challenge pitch cut · beat sheet v1
 
-**Format:** 16:9, 1920×1080, 30fps. **5,962 frames — 198.7s, 3:18.7.**
+**Format:** 16:9, 1920×1080, 30fps. **5,584 frames — 186.1s, 3:06.1.** (The first render was
+5,962; §4 has the silent-watch trim that took 378 frames out of it.)
 
 **Submission context:** a file uploaded to a judging panel, watched **with sound on**, once,
 by people whose job is to evaluate it. Not a scrolling feed. Every constraint in this sheet
@@ -26,15 +27,17 @@ from depending on something being said. That is the single change that unlocks e
 **2. It is slower on purpose.** The launch cut was tuned for a phone in a feed, where a beat
 that outlasts its own read loses the viewer. A panel watching a submission does not scroll away.
 Every beat gets room for a person to talk over it, and the pacing target inverts: the launch
-cut's problem was dead dwell, this cut's problem would be a narrator racing a picture.
+cut's problem was dead dwell, this cut's problem would be a narrator racing a picture. **And it has been cut once against
+that, in silence** — see §4: mechanism came out, every read time stayed.
 
-**3. It shows the false-alarm branch**, which the launch cut did not. New sequence 7b–7e, ~35s,
+**3. It shows the false-alarm branch**, which the launch cut did not. New sequence 7b–7e, ~30s,
 between beats 7 and 8. See §6.
 
 **4. The four interstitial cards are removed.** They existed because the dropped VO left the
 film with no narration. The narration is back. See §5.
 
-**5. A roadmap card is added** between beats 11 and 12. See §8.
+**5. A roadmap timeline is added** between beats 11 and 12 — four nodes on a drawn spine, the
+shipped one solid and the three ahead of it hollow. See §8.
 
 ---
 
@@ -138,28 +141,50 @@ exactly.
 
 ### The table
 
-| # | Beat | Authored | Pitch cut | Δ |
-|---|---|---|---|---|
-| 1 | Cold open | 180 | **300** | +120 |
-| 2 | Signup | 432 | **600** | +168 |
-| 3 | Dashboard, first arrival | 120 | **300** | +180 |
-| 4 | Camera consent gate | 120 | **270** | +150 |
-| 5 | Calibration | 422 | **900** | +478 |
-| 6 | "Later" | 36 | **60** | +24 |
-| 7 | Working, at ease | 72 | **240** | +168 |
-| **7b–7e** | **False alarm — NEW** | — | **1,050** | +1,050 |
-| 8 | The email | 184 | **330** | +146 |
-| 9 | Confirmatory questionnaire | 76 | **240** | +164 |
-| 10 | Ren | 310 | **660** | +350 |
-| 11 | Return to ease | 234 | **450** | +216 |
-| **R** | **Roadmap card — NEW** | — | **240** | +240 |
-| 12 | Closing subtitle card | 90 | **90** | 0 |
-| 13 | End card | 172 | **172** | 0 |
-| — | tail hold | — | **60** | +60 |
-| | **total** | | **5,962** | |
+**These are the numbers after the silent-watch trim, and they are what ships.** The first pitch
+render came in at 5,962 and was watched **without narration** — which is not how it ships, and
+most of the added time exists to hold room for a narrator, so in silence much of it correctly
+felt slow. The pass that produced the column below is one distinction applied fourteen times,
+and it is stated here because it governs every number in §7 too:
 
-**5,962 frames = 198.73s = 3:18.7.** Inside the 5,900–6,100 window with 62 frames of headroom
-below and 138 above.
+- **Mechanism is dead time.** Chrome assembling, a camera travelling, a cursor crossing a panel,
+  a surface still on screen after it has been clicked. No narrator fills any of that. Cut hard.
+- **State change is where explanation lives.** Calibration breathing, a reading climbing, Ren
+  replying, the descent in beat 11. Those read slow in silence and land correctly with a voice
+  over them. **Not one read time in the film moves** — beat 3's lifted banner, beat 5's minute,
+  beat 8's clock, turn 1, the typing at 15 c/s, turn 3's protected hold, beat 11's descent are
+  all exactly as §7 argues for them.
+
+| # | Beat | Authored | First render | **Ships** | Δ vs authored | trim |
+|---|---|---|---|---|---|---|
+| 1 | Cold open | 180 | 300 | **210** | +30 | −90 |
+| 2 | Signup | 432 | 600 | **600** | +168 | 0 |
+| 3 | Dashboard, first arrival | 120 | 300 | **300** | +180 | 0 |
+| 4 | Camera consent gate | 120 | 270 | **270** | +150 | 0 |
+| 5 | Calibration | 422 | 900 | **900** | +478 | 0 |
+| 6 | "Later" | 36 | 60 | **60** | +24 | 0 |
+| 7 | Working, at ease | 72 | 240 | **240** | +168 | 0 |
+| **7b–7e** | **False alarm — NEW** | — | 1,050 | **906** | +906 | −144 |
+| 8 | The email | 184 | 330 | **330** | +146 | 0 |
+| 9 | Confirmatory questionnaire | 76 | 240 | **240** | +164 | 0 |
+| 10 | Ren | 310 | 660 | **598** | +288 | −62 |
+| 11 | Return to ease | 234 | 450 | **368** | +134 | −82 |
+| **R** | **Roadmap timeline — NEW** | — | 240 | **240** | +240 | 0 |
+| 12 | Closing subtitle card | 90 | 90 | **90** | 0 | 0 |
+| 13 | End card | 172 | 172 | **172** | 0 | 0 |
+| — | tail hold | — | 60 | **60** | +60 | 0 |
+| | **total** | | 5,962 | **5,584** | | **−378** |
+
+**5,584 frames = 186.13s = 3:06.1.**
+
+**The 5,900–6,100 window is retired, not breached.** It was derived from the brief's own target
+band before the film existed, and it is not a constraint a cut can be held to once the cut has
+been watched: 378 frames of mechanism do not become necessary because a number says so. What
+replaced it is the rule above — remove what is dead and stop — and the film stopping at 3:06
+rather than being trimmed toward any figure. There was no runtime target for this pass.
+
+Beat 9's total does not move but its **segmentation** does: it now spends 14 output frames on a
+push (§7 · beat 9) and 82 rather than 96 on the read that follows.
 
 ### The three numbers that are not the brief's
 
@@ -179,7 +204,9 @@ arithmetic work:
   out, in, out, in, out — which is the first version of this beat where the minute reads as a
   minute of breathing rather than as a demonstration of a label changing. Everything else in
   beat 5 takes its share of the +418 the brief already granted.
-- **Beat 10 · 600 → 660 (20s → 22s).** This pays a debt the launch sheet records twice and never
+- **Beat 10 · 600 → 660 (20s → 22s), and 598 after the trim.** The typing, turn 1 and turn 3 keep
+  every frame this argues for; the 62 that came back out are four camera and cursor legs (§7 ·
+  beat 10). This pays a debt the launch sheet records twice and never
   settled. Turn 2 is 78 characters; the rule is *never speed the typing to fit, shorten the line
   instead*; the authored rate was already 25.4 c/s, declared "faster than a person types", and
   the Premiere cut took it to 35.6. At 660 frames the typing runs **156 frames — 15 c/s**, which
@@ -201,9 +228,7 @@ the same held picture of `serenify.tech`. That is the one place in beat 13 where
 added without touching a decision Mohamed has already made twice.
 
 **And the 60-frame tail hold is genuinely severable.** It sits on the final frame for Mohamed to
-trim in Premiere. Cutting all 60 gives **5,902 frames — still inside 5,900–6,100.** Cutting the
-60 *and* shortening the end card's hold back to its shipped 58 gives 5,859, which is under; so
-if both are wanted, the frames come back from beat 5's 5d, in that order.
+trim in Premiere. Cutting all 60 gives **5,524 frames, 3:04.1**, and nothing else moves.
 
 ---
 
@@ -314,7 +339,7 @@ pass, not silently corrected here.
 
 ---
 
-## §6 · The false-alarm sequence · 7b–7e · 1,050 frames (35s)
+## §6 · The false-alarm sequence · 7b–7e · 906 frames (30.2s)
 
 Placed between beat 7 and beat 8, on the same surface and the same shot beat 7 lands on.
 
@@ -386,8 +411,13 @@ brows are considered.
 |---|---|---|---|---|
 | **7b** | 210 | 7.0 | `COMPOSITE`, static | he settles into `focused`. The reading is still at ease. |
 | **7c** | 300 | 10.0 | `COMPOSITE`, static | the climb: bloom drifts, stateline steps twice, trend walks up |
-| **7d** | 300 | 10.0 | push to `BEAT9_PROMPT`, land, hold | the prompt fires and is read whole; the cursor goes to **"No, I'm okay"** |
-| **7e** | 240 | 8.0 | pull back to `COMPOSITE`, hold | the prompt is gone. He works. The reading comes down on its own. |
+| **7d** | 201 | 6.7 | push to `BEAT9_PROMPT`, land, hold | the prompt fires and is read whole; the cursor goes to **"No, I'm okay"** |
+| **7e** | 195 | 6.5 | pull back to `COMPOSITE`, hold | the prompt is gone. He works. The reading comes down on its own. |
+
+**906, not 1,050, and all 144 come out of 7d and 7e's tail.** 7d's read hold goes 164 → 110; the
+hold on the prompt's *absence* goes 60 → 15; and 7e gives back the 45 frames of settled tail it
+would otherwise have gained for free once its descent moved earlier (6.4). 7b and 7c do not
+change length at all — what changed inside 7c is *where* its two copy steps fall.
 
 **7b · 210 frames.** Opens on the frame beat 7 ended on — same `COMPOSITE`, same static camera,
 nothing cuts. He is at ease and typing. Over f0–f60 the rig travels from beat 7's contented pose
@@ -404,14 +434,27 @@ before it.
 toast and no fall. One `level` scalar (L18) drives the bloom, the stateline and the trend's
 right-hand end.
 
-- f0–f120 — the bloom drifts meadow → mixed → amber on the component's own 1.3s ease. Let it
+- f0–f39 — the bloom drifts meadow → mixed → amber on the component's own 1.3s ease. Let it
   drift, never snap.
-- f120 — stateline steps to **"You're a little tense"** · "A bit of an edge lately. Maybe a slow
-  breath." The trend's drawn ten walk to `at ease ×5 + a little ×5` **on the same frame**, per
-  L18.
-- f200 — stateline steps to **"You're feeling tense"** · "This has held a while. Serenify can
+- **f40** — stateline steps to **"You're a little tense"** · "A bit of an edge lately. Maybe a
+  slow breath." The trend's drawn ten walk to `at ease ×5 + a little ×5` **on the same frame**,
+  per L18.
+- **f67** — stateline steps to **"You're feeling tense"** · "This has held a while. Serenify can
   check in when you're ready." Trend to `at ease + a little ×4 + tense ×5`.
-- f200–f300 — trend continues to `a little ×3 + tense ×7`. Amber holds.
+- f67–f300 — trend continues to `a little ×3 + tense ×7`. Amber holds.
+
+**THE TWO STEPS WERE AT f120 AND f200 AND THE FIRST RENDER SHOWED WHY THAT IS A DEFECT.** The
+bloom finishes drifting to amber at f39. With the copy not stepping until f120, **the film ran
+81 frames — 2.7 seconds — of an amber orb under a stateline still reading "You're at ease right
+now"**, and 7e did the same in reverse (bloom from f45, copy at f120). That is not slow pacing,
+it is the surface asserting two states at once, and it reads as a glitch because it is an
+inconsistency.
+
+L18 is what stops the *graph* disagreeing with the *words*; it says nothing about either
+disagreeing with the **orb**, which runs on the component's own 1.3s CSS ease and is the largest
+thing on screen. So the steps move inside that ease: f120 → **f40**, and the second moves forward
+in proportion, 200 × 40/120 = **f67**. 7c's own 300 frames do not change. This came from the
+sheet rather than from the build, which is why the correction is here and not only in the code.
 
 **The copy, the bands and the thresholds are byte-identical to beat 8's.** What differs is the
 *pacing* — 7c gives the climb 10 seconds where beat 8 gives it about 6.5 — and it differs because
@@ -420,34 +463,43 @@ happening. That is the honest reason and it is also the useful one: the audience
 difference between the two sequences without being able to name it, and the surfaces being
 identical is what makes the feeling land on the *cause* rather than on the UI.
 
-**7d · 300 frames.** The prompt fires. `ConfirmatoryPrompt` mounts at `PROMPT.panel`, in the
-pinned right column, 32px below the viewfinder.
+**7d · 201 frames.** The prompt fires. `ConfirmatoryPrompt` mounts at `PROMPT.panel`, in the
+pinned right column, 32px below the viewfinder. It enters on the component's **own** slide — 24
+world px over 0.2s (`notification.tsx:196-199`) — and that is a correction: the video's shared
+`useToastIn` runs 0.42s over 28px, and at 2.1× the shipped duration the entrance read as a
+defect. See 6.4a.
 
 - f0–f36 — the camera pushes `COMPOSITE` → `BEAT9_PROMPT` (600.9 world px, option copy at
   10.5px on a phone).
-- f36–f200 — **held, and read whole.** Title **"Checking in"**, body **"Your signals have looked
+- f36–f146 — **held, and read whole.** Title **"Checking in"**, body **"Your signals have looked
   tense for a little while. Is that how you're feeling?"**, and all three options:
   **"Yes, that's me"** / **"No, I'm okay"** / **"Maybe — talk about it"**. This is the audience's
-  first sight of this surface and it gets 5.5 seconds of static camera on it. **No focus ring** —
-  see the launch sheet's beat 9: `:focus-visible` cannot fire on a mouse click and the film must
-  not draw a state the product never shows a mouse user.
-- f200–f236 — the pointer travels to `PROMPT.no`. Its hover opens on the frame the pointer
+  first sight of this surface. **110 frames, not 164** — it is not free, but 3.7 seconds is what
+  it takes and 5.5 was more. **No focus ring** — see the launch sheet's beat 9: `:focus-visible`
+  cannot fire on a mouse click and the film must not draw a state the product never shows a mouse
+  user.
+- f146–f182 — the pointer travels to `PROMPT.no`. Its hover opens on the frame the pointer
   arrives (a control acknowledges a cursor that has *reached* it), and the click lands **four
   frames later** — this film's own idiom.
-- f240 — the click. `onFalseAlarm` fires.
-- f240–f300 — the prompt unmounts. See 6.4 for what does and does not happen next.
+- f186 — the click. `onFalseAlarm` fires.
+- f186–f201 — the prompt **slides out** over the component's own 0.2s and is gone. Fifteen frames
+  from the click to the pull-back, not sixty. See 6.4.
 
-**7e · 240 frames.** The camera pulls back f0–f36 to `COMPOSITE` and does not move again.
+**7e · 195 frames.** The camera pulls back f0–f36 to `COMPOSITE` and does not move again.
 
-- f0–f36 — the pull-back. He is already typing; he never stopped.
+- f0–f36 — the pull-back. He is already typing; he never stopped. **The cursor leaves with it**,
+  on the frame the camera starts, rather than on a timer of its own 36 frames earlier.
 - f45 — **the earliest frame at which anything about the reading may change.** Not before. See
-  6.4.
-- f45–f180 — the bloom drifts amber → meadow on its own 1.3s ease; the `level` scalar walks down
+  6.4. The floor is expressed in 7e's own frames and always was; 7e begins earlier now, so its
+  absolute frame moves and the rule does not.
+- f45–f135 — the bloom drifts amber → meadow on its own 1.3s ease; the `level` scalar walks down
   and the trend's tail walks with it; the stateline returns to **"You're at ease right now"** ·
-  "Steady and settled — nothing to do." at f120, the same frame the trend crosses.
-- f180–f240 — settled. Nothing moves but his breath and the typing. The film's picture at 7e's
+  "Steady and settled — nothing to do." at **f75**, the same frame the trend crosses, and inside
+  the bloom's drift for the reason 7c's steps moved.
+- f135–f195 — settled. Nothing moves but his breath and the typing. The film's picture at 7e's
   last frame is the same picture beat 8's first frame opens on, which is what lets beat 8 join
-  it with no cut at all.
+  it with no cut at all. **Sixty frames, as originally specified** — moving the return earlier
+  would otherwise have handed this tail 45 free frames, which is the trim pass undoing itself.
 
 ### 6.4 · The dismissal must not imply the model learns
 
@@ -461,23 +513,64 @@ the handler:
       },
 
 `finalize()` sets `visible` false and persists the answer. **There is no toast, no banner, no
-"thanks", no confirmation text, no state change on the monitoring surface at all.** The prompt
-simply is not there any more. That is the real dismissal path, and it is exactly what the
-constraint requires, so **the film adds nothing.**
+"thanks", no confirmation text, no state change on the monitoring surface at all** — searched
+again on the second pass and confirmed: `monitoring-session.tsx` mounts no toast anywhere,
+`armFalseAlarmNextSessionSuppression()` writes a `sessionStorage` key that nothing renders, and
+`false_alarm` reaches no other surface in `apps/web`.
 
-Three prohibitions, stated because each is a thing somebody will want to add:
+### But it is NOT a hard unmount, and that IS a shipped response
+
+**This section stopped one call short of the answer.** `finalize()` flips `open`, and
+`<Notification/>` wraps its content in an **`AnimatePresence`** whose desktop `exit` is
+`{opacity: 0, x: 24}` on the component's own 0.2s (`notification.tsx:196-199`) — the exact mirror
+of the entrance. The app's response to a dismissal is the prompt **sliding back out the way it
+came in**. It is shipped, it is visible, and the film was depicting it as a cut.
+
+So the film draws it, and doing so breaks none of the three prohibitions below. It is not an
+acknowledgement of the **answer** — the identical exit plays for "Yes, that's me" and for a
+session-end expiry — nothing in it could read as adaptation, and it touches no band, no threshold
+and no trend. It is the prompt leaving. **This is the correct fix for the empty frames after the
+click**, and it is why the absence hold could go to 15 rather than being padded back out.
+
+### 6.4a · And the entrance was running at 2.1× the shipped duration
+
+Reported as "the prompt glitches on mount", and it is worth recording what it was because it
+looks like a rendering fault and is not one: two independent renders of the whole entrance are
+**MSE 0.00**, so it is not the frame race §10 documents.
+
+`notification.tsx:196-199` declares `x: 24` on `duration: 0.2`. The video's shared `useToastIn`
+runs **0.42s over 28px** — one value with two sources, and the video's copy more than twice as
+long. That matters here specifically because **a single alpha over a near-black ground does not
+fade a dark panel and light type at the same apparent rate.** At opacity 0.17 the prompt's
+`bg-surface` is invisible while `text-ink` is already a legible grey, so the title, the body and
+the three option rows materialise **with no card, no border and no shadow under them** and the
+panel appears afterwards, beneath type that is already there. At the shipped 0.2s that phase is
+two or three frames and reads as an entrance; at 0.42s it is six or seven and reads as a defect.
+
+The real prompt takes the real numbers. `useToastIn` is left alone: it drives beat 8's mail
+toast, which is authored and has no component behind it, and beat 9, which is shared with the
+launch cut and may not move.
+
+### The three prohibitions
+
+Stated because each is a thing somebody will want to add:
 
 - **No acknowledgement of any kind.** No check, no fade-to-confirmed, no "got it". The
   temptation is real — a click with no visible response feels unfinished — and it is the wrong
-  instinct here. What responds to the click is *the prompt disappearing*, and 7d's last 60 frames
-  exist so that absence has room to register.
+  instinct here. What responds to the click is *the prompt going*, and 7d's last frames exist so
+  that departure has room to register. **Fifteen frames, not sixty.** The 60 was over-specified:
+  with six of them now carrying the shipped exit, the remaining nine are the beat of empty column
+  the disappearance needs, and the pull-back begins from there rather than 45 frames later. Three
+  things had been stacking — 60 frames of the prompt being gone, the cursor leaving 60 frames
+  after the click, and only then a 36-frame pull-back — into about four seconds on empty space.
+  The cursor now leaves *with* the pull-back.
 - **No copy, glyph, motion or colour anywhere on screen that could read as adaptation.** No
   "learning", no "updated", no threshold moving visibly, no trend re-drawing its history, no
   progress toward anything.
 - **Nothing about the reading may be tied to the click frame.** This is the subtle one. If the
   bloom starts drifting back on the frame he clicks, the film has depicted the answer *moving the
   model*, which is precisely the thing the sequence must not say. **The earliest permitted band
-  movement is 7e f45 — 45 frames after the click**, with the pull-back finished and him visibly
+  movement is 7e f45 — 60 frames after the click**, with the pull-back finished and him visibly
   back at the keyboard for a beat first. The on-screen cause of the descent is **him settling**,
   not him answering. (`armFalseAlarmNextSessionSuppression()` does affect a *later* session, and
   nothing on screen shows it. It is not depicted and must not be.)
@@ -498,19 +591,23 @@ sheet's `CLOCK` bug in a new place: one value with two sources.
 The line is re-solved end to end, preserving the gaps rather than re-deriving them — each beat
 picks up where the previous one's own `local ÷ 30` left it:
 
+**And it has to be re-solved a second time by the trim pass, for the same reason.** A cut that
+gets shorter moves the line exactly as a cut that got longer did: 7b–7e lost 144 frames and beat
+10 lost 62, so every readout downstream of them moves. The table below is the shipped one.
+
 | | readout | frames |
 |---|---|---|
 | beat 7 | 47:12 → 47:20 | 240 |
-| **7b–7e** | **47:20 → 47:55** | 1,050 |
-| beat 8 | 47:55 → 48:06 | 330 |
-| beat 9 | 48:06 → 48:14 | 240 |
-| beat 10 | 48:14 → 48:36 | 660 — the chat draws no readout, and the launch cut already treats the session as continuing across it |
-| beat 11 | 48:36 → … | 450 |
+| **7b–7e** | **47:20 → 47:50** | 906 |
+| beat 8 | 47:50 → 48:01 | 330 |
+| beat 9 | 48:01 → 48:09 | 240 |
+| beat 10 | 48:09 → 48:29 | 598 — the chat draws no readout, and the launch cut already treats the session as continuing across it |
+| beat 11 | 48:29 → … | 368 |
 
-**And the toolbar clock survives it, which is the number that actually mattered.** 10:43 + 48:06
-= 11:31:06, so beats 9 and 11 genuinely read **11:31** and say so. Beat 8 does not: it runs
-11:30:55 → 11:31:06, and `BEAT8_CLOCK` — **the only shot in the film where the toolbar clock is
-legible** — is up across output frames 30–106, which is 11:30:56 to 11:30:58. It reads **11:30**,
+**And the toolbar clock survives it, which is the number that actually mattered.** 10:43 + 48:01
+= 11:31:01, so beats 9 and 11 genuinely read **11:31** and say so. Beat 8 does not: it runs
+11:30:50 → 11:31:01, and `BEAT8_CLOCK` — **the only shot in the film where the toolbar clock is
+legible** — is up across output frames 30–106, which is 11:30:51 to 11:30:53. It reads **11:30**,
 and the film's single piece of arithmetic (11:30, "by 12", *thirty minutes*) is untouched.
 `COMPOSITE` and `BEAT9_OPTIONS` both frame from world y 156, the app header's own bottom, and the
 drawn clock sits at y 58 — so beats 9 and 11 never have it in shot either way, and their 11:31 is
@@ -523,8 +620,10 @@ rather than asserted.
 
 ### 6.6 · And beat 9 must not read as a repeat
 
-Covered in §7 under beat 9. The short version: it is shorter, it opens already landed, and it is
-framed on the choice rather than on the question.
+Covered in §7 under beat 9. The short version: it is shorter, it arrives in 14 frames rather than
+36, and it is framed on the choice rather than on the question. (*"It opens already landed"* was
+the first render's answer and is superseded — see §7 · beat 9 for why a hard punch-in reads as a
+cut error rather than as a differentiation.)
 
 ---
 
@@ -551,18 +650,26 @@ about time, not about content.
 
 ---
 
-### 1 · Cold open · 180 → 300 (+120)
+### 1 · Cold open · 180 → 210 (+30, trimmed from 300)
 
 Unchanged in structure: the lifted omnibox, `serenify.tech` typed, the lift settling home as the
 page paints, the push to the hero block, the click on "Get started".
 
-**After the authored motion:** the +120 is spent as **a slower ease on the lift and the push, not
-as a hold.** The lift's travel and the settle stretch across 100 frames rather than 60, and the
-push to the hero block takes 80 rather than 44. Two reasons: the beat's job is *this is deployed*
-and a slow arrival at a live URL says that better than a fast one plus dead air; and it is the
-narrator's opening, which needs an unhurried picture under it. **The 20 frames that are not in
-the moves go to the hero landing**, which holds 40 frames rather than 20 before the click — the
-headline reads at 46.5px on a phone and a panel will actually read it.
+**After the authored motion:** the first render spent the +120 as **a slower ease on the lift and
+the push**, on the grounds that a slow arrival at a live URL says *this is deployed* better than
+a fast one and that the narrator's opening needs an unhurried picture under it.
+
+**The first half of that is right and the second is not, and the silent watch is what separated
+them.** A browser assembling itself and a camera travelling are the purest mechanism in the film:
+nobody narrates them, and the picture they arrive at is what the narrator's opening needs, not
+the arriving. So both moves go back to **roughly half** — the lift's travel and settle 100 → 50,
+the push to the hero block 80 → 40, i.e. 0.44× → 0.88× and 0.43× → 0.85×, still slower than
+authored but no longer a crawl.
+
+**Both holds are untouched, and that is the whole point of halving the moves.** The lifted
+omnibox keeps its 52 frames of `serenify.tech` being typed — a performed action at its own rate,
+not mechanism — and the hero keeps its 68 (40 before the click, 28 through it). The headline
+reads at 46.5px on a phone for exactly as long as it did.
 
 ### 2 · Signup · 432 → 600 (+168)
 
@@ -694,7 +801,7 @@ this section gives a genuine hold to. See `video/src/pitch.tsx`.
 **And it hands to 7b on the identical frame**, so the false-alarm sequence opens with nothing
 having changed but him.
 
-### 7b–7e · False alarm · 1,050 (NEW)
+### 7b–7e · False alarm · 906 (NEW, trimmed from 1,050)
 
 See §6.
 
@@ -731,10 +838,36 @@ moves, both move together, because they are one number.
 
 **This beat must not read as a repeat of 7d, and three things make sure of it.**
 
-**1. It opens already landed.** 7d pushes from `COMPOSITE` to `BEAT9_PROMPT` over 36 frames; beat
-9 does not push at all. Beat 8 ends wide, the prompt fires, and the camera is **already** at the
-prompt when the beat opens — the transition into it is beat 8's own move finishing. The audience
-has seen this surface arrive once; watching it arrive again is the repeat.
+**1. It arrives in 14 frames rather than 36.** The first render had this open **already landed**
+— no camera keys apart, straight into the tighter shot — on the reasoning that the audience has
+seen this surface arrive once and watching it arrive again is the repeat.
+
+**On screen that does not read as a differentiation. It reads as a cut error.** A hard punch-in
+to a tighter framing is a mistake, not an edit, and nothing in the picture distinguishes the two.
+So the beat gets a push, designed so that it cannot be confused with 7d's:
+
+- **14 output frames against 7d's 36.** Fast enough that the two are not the same gesture at any
+  speed of watching.
+- **1.12× against 7d's 1.54×.** 7d travels `COMPOSITE` → `BEAT9_PROMPT`, 927 → 601 world px, on a
+  surface that has just appeared. This is a settle onto a shot that is already essentially
+  framed. **It does not re-establish**: the wider end is still inside the option group, so no
+  frame of it shows the title or the body coming into view.
+- **Its top edge is pinned and the extra 12% goes downward.** A shot centred on the same point
+  and 12% larger moves that edge 12.5 world px *up*, into the body copy — which would open the
+  beat on the very sliced line of type the note below exists to forbid. Pinning the top means the
+  wider end shows no new type at all, only more of the page below the panel's own bottom border.
+- It runs on **its own 1.000× segment** in the time map, so "14 frames" is fourteen frames of the
+  film; inside the beat's opening read segment it would have played over 32.
+
+**AND THE PROMPT IS ALREADY UP WHEN THE BEAT OPENS, WHICH IS WHAT "ALREADY LANDED" SHOULD HAVE
+MEANT.** The tighter framing turned the component's f6 slide-in into **nineteen frames of empty
+page**: the launch cut opens on `BEAT8_WIDE`, the whole composition, so a prompt sliding in at f6
+arrives into a shot with a great deal else in it; the pitch cut opens framed on the option group,
+where there is nothing else at all. The beat began on a near-black rectangle. So under the pitch
+cut the prompt does not slide — beat 8's tail is 142 output frames of a static composite, the
+prompt has had every opportunity to fire, and when the camera arrives it is up. **Playing its
+entrance a second time is the actual repeat.** The launch cut keeps its own entrance to the
+frame.
 
 **2. It is framed on the choice, not on the question.** 7d frames `PROMPT.panel` whole — title,
 body, three options — because the surface is new. Beat 9 frames **tighter, on the option group**,
@@ -761,17 +894,21 @@ whole, inside the panel's own border. That is a better version of the intent tha
 specified — the audience gets the tail of what he was asked and the three things he can say —
 and it is what "framed on the choice" was reaching for.
 
-**3. It is shorter.** 240 frames against 7d's 300, and the difference is all read time: 7d holds
-164 frames on the panel before the pointer sets off, beat 9 holds **90**.
+**3. It is shorter.** 240 frames against 7d's **201**, and the difference is still read time: 7d
+holds 110 frames on the panel before the pointer sets off, beat 9 holds **96** (14 of push and
+82 of hold). The margin narrowed when 7d's own read hold came down from 164 — which is fine,
+because 1 and 2 are what carry this, and 7d earns its extra length by being the first sight of
+the surface rather than by being long.
 
-**After the authored motion:** f0–f90 the hold, f90–f126 the pointer travels to `PROMPT.yes`, the
-hover opens on arrival, the click lands four frames later at f130. **f130–f240 is not dead** — it
+**After the authored motion:** f0–f14 the push, f14–f96 the hold, f96–f126 the pointer travels to
+`PROMPT.yes`, the hover opens on arrival, the click lands four frames later at f130.
+**f130–f240 is not dead** — it
 is the navigation. `onConfirm` fires, the page navigates to `/app/chat?handoff=confirmatory_yes`,
 and the camera begins its hand-over into beat 10 at speed (§5.3). The launch cut's 24 dead frames
 after the click were dead because there was nothing after them; here there is a real transition
 and it is performed rather than cut to.
 
-### 10 · Ren · 310 → 660 (+350)
+### 10 · Ren · 310 → 598 (+288, trimmed from 660)
 
 Structure unchanged: four landings — the panel establish (889), his face and his opener (433.5),
 turn 2's static hold (760), turn 3 (665). Two avatar states, `thinking` and `warm`, the eyes
@@ -804,7 +941,24 @@ being added:
 1. **The pitch cut authors these durations directly and runs the beat at 1.00×.** That is the
 whole point of re-authoring rather than re-cutting: the two sets of numbers stop existing.
 
-### 11 · Return to ease · 234 → 450 (+216)
+#### And the trim pass takes 62, none of it read time
+
+**This beat is PARTLY DEFENDED and is not flattened.** It is the film's densest explanatory
+stretch and the place a narrator has most to say, so every message's read time above stands
+exactly as argued. What comes out is the four stretches in it that are neither reading nor
+writing:
+
+| | | |
+|---|---|---|
+| −20 | the opening | the panel's establishing hold and the move onto Ren's face, 106 → 86. Ren composing keeps his landing; the *camera getting there* stops taking 3.5s |
+| −18 | the move to the working shot | plus the cursor crossing the panel to the composer, 70 → 52. Two mechanisms in one segment, neither of them looked at |
+| −12 | the pointer's travel to send | 50 → 38. The hover on arrival and the click are inside the same segment and are unaffected — this is only the travel |
+| −12 | the second typing indicator | 48 → 36, i.e. **back to the launch cut's own number.** The +12 above bought "enough to see the wave travel twice"; the launch sheet's cut to 36 was right on its own terms, and in silence the surplus reads as a wait |
+
+**Untouched, and listed so the next pass does not reach for them:** turn 1's 60, the typing's 156
+(15 c/s — *never sped to fit*), and turn 3's protected 170.
+
+### 11 · Return to ease · 234 → 368 (+134, trimmed from 450)
 
 Structure unchanged: the player established over the composition, the punch onto it at 640, the
 play click, headphones, notes, the nod, the pull-out, the closing composite at 884.
@@ -826,13 +980,49 @@ play click, headphones, notes, the nod, the pull-out, the closing composite at 8
   camera clamped, level clamped, everything ambient still at real speed — which is **the
   linger**, and the launch sheet's own argument for it is that beat 12 lands better arriving out
   of a settled frame than out of a settling one. **The 31 frames Mohamed deleted from beat 11's
-  tail in Premiere are not restored as a tail**; the linger here is in front of the roadmap card
-  and is measured against a 199s film.
+  tail in Premiere are not restored as a tail**; the linger here is in front of the roadmap card.
 
 **The recovery still skips `a little tense` because the stateline does** — the reading crosses
 both thresholds inside one frame, so the graph is never in a band the copy is not showing.
 
-### R · Roadmap card · 240 (NEW)
+#### The trim pass takes 82, from the move and from the tail
+
+- **−28, the pull-out.** It is a camera move and it compresses like every other camera move in
+  this pass: 78 → 50, i.e. 0.49× → 0.76×. **The shot it lands on is the payoff of the whole film
+  and holds** — the descent below still runs its 136 frames at 1.000× — and the relief travelling
+  into `easing` finishes inside the move exactly as it did.
+- **−54, the linger.** 134 → 80. The film still **ends on a settle rather than on a cut**: 2.7
+  seconds of a frame in which nothing moves but his breath, the nod and the drifting notes, which
+  is the last thing the audience feels. It was the longest single hold in the film.
+
+**The descent is not touched**, and that is the reason all 82 come out of the move and the tail.
+
+#### And the music player's clock was changing speed twice
+
+Reported as the timer and the scrubber glitching, and it is a different bug from the compositor
+race `player.tsx` records and fixed — **that fix held**: two independent renders of the whole
+window agree to MSE 0.00 on every frame but one.
+
+The scrubber, its handle and the elapsed readout are one `progress` value, interpolated across
+the beat's own f24–f70. That is right for every *animation* in a retimed beat and wrong for a
+**clock**, because a position in a piece of music is a rate. The pitch cut runs f24–f42 at 0.90×,
+f42–f60 at 0.31× and f60–f98 at 0.49×, so the track ran at **31× real time, then 10.7×, then
+16.8×** — and the three-fold deceleration lands on f42, the exact frame the camera stops on the
+window and the audience starts reading the numbers.
+
+So the position is driven from the beat's own **output** frame at one constant, declared rate:
+**10×**, which is the slowest rate at which the handle still visibly travels during the 18-frame
+landing hold. At real time it would move about two pixels there and the window would read as
+paused under a pause glyph, which is worse than a fast clock.
+
+This is the launch sheet's `CLOCK` bug in its third form — one value with two sources, where the
+second source is the time map itself — and the seam that fixes it (`retime.tsx` §
+`BeatOutFrameContext`) is `null` in the launch cut, which never had the bug because it runs the
+beat at one rate. **The session readout has the same shape and is deliberately not changed**: at
+these rates it ticks once per 96 output frames rather than once per 30, which nobody counts, and
+touching it would re-open §6.5's arithmetic for no visible gain.
+
+### R · Roadmap timeline · 240 (NEW)
 
 See §8.
 
@@ -870,64 +1060,134 @@ output and the 172 this cut specifies goes. See §4.
 ### tail hold · 60 (NEW)
 
 Sixty frames of the end card's **final frame**, held, for Mohamed to trim in Premiere. Nothing
-animates. If all 60 go, the film is 5,902 frames and still inside the window.
+animates. If all 60 go, the film is 5,524 frames — 3:04.1 — and nothing else moves.
 
 ---
 
-## §8 · The roadmap card · 240 frames (8s)
+## §8 · The roadmap timeline · 240 frames (8s)
 
 Between beat 11 and beat 12. **The most severable part of this cut — if it is dropped, drop it
-cleanly**: remove the 240 frames entirely, the film becomes 5,722 (under the floor), and the
-frames come back from beat 5's 5d and beat 10's turn-3 hold in that order. It has no dependency
-in either direction; nothing else in the cut refers to it.
+cleanly**: remove the 240 frames entirely, the film becomes 5,344, and the frames come back from
+beat 5's 5d and beat 10's turn-3 hold in that order. It has no dependency in either direction;
+nothing else in the cut refers to it.
 
-**What it says.** Three lines, stating what is next: audio, physiological signals, and their
-fusion.
+### The two-column text grid is rejected
 
-**Composition — a list, not a centred sentence.** This is the binding constraint. Beat 12's card
-is the film's one claim and it is a centred sentence; a second centred sentence eight seconds
-before it competes with it and turns the closing card into the second of a pair. So: **flush
-left, three rows, a two-column grid** — a short tense marker in one column and the item in the
-other.
+The first version of this section specified three rows — `Next` / `Then` / `Then` — flush left in
+a two-column grid, on the argument that a *list* rather than a centred sentence keeps it from
+competing with beat 12's one claim. That argument is sound and the composition it produced is
+not: **three rows of text is a slide**, and a slide eight seconds before the closing card is the
+second of a pair whatever its alignment. It is deleted, not amended.
 
-    Next    Voice — strain in how something is said
-    Then    Physiology — heart rate, breathing, skin conductance
-    Then    Face, voice and body read as one signal
+### A horizontal timeline. Four nodes. A drawn spine, left to right.
 
-**Two changes from the first draft of these rows, both decided and both shipped.** Row 2 gained
-**breathing**: the training data carries ECG, EDA *and* RESP, and a panel that knows the dataset
-would read the omission. Its label then shortened, `Physiological signals` → **`Physiology`**,
-because the longer row overflowed the 760 framing — measured on a still, not guessed, and taken
-as step (1) of the fallback order, so the list after the em-dash is untouched and the type never
-shrank. Row 3 stopped saying **"all three"**: once row 2 named three *signals*, the count was
-ambiguous, so the row names the modalities instead — and names **the face**, the one that is
-already shipped and that the card otherwise never mentioned.
+A timeline says *these are in an order and you are at the start of it* with its geometry, before
+a word is read. That is the one thing this card exists to say, and it is the one thing three rows
+of text could only assert.
 
-**Tokens and type, reused not re-designed.** Same ground (`CARD.field`, #0b0c0e), same ink, same
-face (Outfit), same weight (500), same tracking (−0.01em), same **760** framing as beat 12 and
-the end card. **Size 27px world = 14.99px phone-equivalent** — the size the four interstitials
-used, which is clear of the 14px floor and visibly under beat 12's 34px/18.88px. The `Next` /
-`Then` column is the same size at `CARD.muted`. Entry and exit are the interstitials' own gesture
-— **a fade with eight pixels of rise**, in over 12 frames, settled 216, out over 12. Not the
-typewriter (reserved for domains), not the end card's wipe.
+### The state is carried by the drawing, not by colour
 
-**Unmistakably future tense, and this is a hard requirement rather than a preference.** The
-`Next` / `Then` / `Then` column carries it structurally, so no row can be read as a shipped
-capability even out of context. **Three phrasings are banned outright:** any present-tense verb
-with Serenify as its subject ("Serenify listens…"), any progressive ("we're building…", which
-reads as in-flight and invites a "when"), and any claim of accuracy or improvement from the
-fusion. The rows name *signals*, not outcomes.
+The obvious way to mark "shipped" against "coming" is colour, and **there is no colour
+available**: meadow, amber and crimson all carry a band meaning in this product, foggy is Ren's
+structural colour, and there is no red anywhere in this film. Spending any of them here would put
+a reading on a card that is not about a reading. So the contrast is in the ink and the stroke,
+and it is absolute rather than a shade:
 
-**This copy is AUTHORED, and that is declared here rather than blurred.** Every other word in the
-film is verbatim from `apps/web` or from `lib/landing/copy.ts`. There is no app copy about a
-roadmap, because a roadmap is not a product surface. This card is the film's **second** authored
-element, after the one authored hover treatment on the chat send button — and, like that one, it
-is declared where it lives. **It must not be mistaken for app copy in a later pass and it must
-not be back-ported into `apps/web`.**
+- **Node 1 is solid, and its segment of the spine is solid.** It is shipped.
+- **Nodes 2–4 are hollow, and their spine is broken** — a 6/10 dash at `CARD.muted`, 2px against
+  the solid segment's 3px, at 0.5 opacity against 0.85.
 
-**Colour.** Near-black ground, off-white type, and nothing else is available: meadow, amber and
-crimson all carry band meaning, foggy is Ren's structural colour, and there is no red anywhere in
-this film.
+A filled dot on a drawn line against three open rings on a dotted one needs no legend and no word.
+That is the test this had to pass: **the card must not spend a line of copy explaining its own
+notation.**
+
+### The four nodes
+
+    Now      Face — how strain shows in a face
+    Next     Voice — strain in how something is said
+    Then     Physiology — heart rate, breathing, skin conductance
+    Then     Face, voice and body read as one signal
+
+**Anchoring on the shipped modality is what makes the other three credible**, and it is the
+reason node 1 exists. Three future nodes on their own are a wish list; three future nodes hanging
+off a solid one the audience has just watched work for three minutes are a direction. `Face` is
+also the modality the two-column version never mentioned at all.
+
+**Row 4 must not depend on the reader counting anything.** An earlier draft said "all three",
+which is ambiguous the moment row 3 names three signals of its own. It names the modalities.
+
+**Row 3's label is `Physiology`, not `Physiological signals`** — measured, not guessed. At this
+framing the longer label pushes the row to five wrapped lines and its block into the frame's
+bottom edge. Taken as step (1) of the fallback order below: shorten the label before the em-dash
+first, never shrink the type. The list after the dash is untouched.
+
+### Unmistakably future tense, and this is a hard requirement
+
+The `Now` / `Next` / `Then` / `Then` row carries it structurally, so no row can be read as a
+shipped capability out of context — and node 1, the one that *is* a shipped capability, is the
+one marked `Now`. **Three phrasings are banned outright:** any present-tense verb with Serenify
+as its subject ("Serenify listens…"), any progressive ("we're building…", which reads as
+in-flight and invites a "when"), and any claim of accuracy or improvement from the fusion. **The
+rows name signals, not outcomes.**
+
+### Tokens, type and framing — one decision, and it is arithmetic
+
+Same ground (`CARD.field`, #0b0c0e), same ink, same face (Outfit), same weight (500), same
+tracking (−0.01em) as beat 12 and the end card. **The 760 framing does not carry over**, and it
+cannot: four columns is what forces the frame wider, and the frame is what sets the type size,
+because the floor is a *phone-equivalent* number — `PHONE_PX(s, w) = s·422/w`.
+
+| | |
+|---|---|
+| frame | **1040** world px, cx 600 · x 80–1120, y 63.5–648.5 |
+| type | **35px world = 14.20px phone-equivalent** — over the 14px floor, and visibly under beat 12's 34px/18.88px |
+| content | 4 columns × 235 + 3 gutters × 20 = 1000, x 100–1100, 20px clear each side |
+| nodes | x 111, 366, 621, 876 · r 11 · spine y 290 |
+
+The columns then have to be wide enough that no single word overflows one. 35px Outfit runs about
+19px a character, so the longest unbroken word in the copy — `conductance`, 11 characters — needs
+~212px against a 235px column. **That check is what decides whether a row keeps its wording**, and
+it is the fallback order: (1) shorten the label before the em-dash, (2) shorten the list after it,
+(3) never shrink the type.
+
+The frame's vertical centre is placed on the **content's** — the tense markers' top edge at 200 to
+the deepest column's last line at 512, so cy 356 — rather than on the world's. Centring on 379
+left the block visibly top-weighted; placing a frame edge rather than deriving it is established
+grammar here (`COMPOSITE`, `BEAT5_SUCCESS`, `BEAT9_OPTIONS`).
+
+### The reveal is sequential, so the timeline is read in its own direction
+
+A timeline that arrives whole is a diagram; one that draws itself left to right is a direction of
+travel, and the direction is the content. Each node's spine segment **draws first** and the node
+and its text land on the end of it, which is the order a line is actually drawn in.
+
+| frame | |
+|---|---|
+| 0–12 | node 1 and its two lines. There is no segment before it |
+| 24–42 | the solid segment draws; node 2 lands at 42 |
+| 60–78 | the first broken segment draws; node 3 lands at 78 |
+| 96–114 | the second broken segment draws; node 4 lands at 114 |
+| 126–228 | settled. The whole timeline still, for 3.4s |
+| 228–240 | out |
+
+Entry and exit are the interstitials' own gesture — **a fade with eight pixels of rise**, 12
+frames each way. Not the typewriter (reserved for domains), not the end card's wipe.
+
+### This copy is AUTHORED, and that is declared here rather than blurred
+
+Every other word in the film is verbatim from `apps/web` or from `lib/landing/copy.ts`. There is
+no app copy about a roadmap, because a roadmap is not a product surface. This card is the film's
+**second** authored element, after the one authored hover treatment on the chat send button — and,
+like that one, it is declared where it lives. **It must not be mistaken for app copy in a later
+pass and it must not be back-ported into `apps/web`.**
+
+### And Hallmark is deliberately not invoked on it
+
+`hallmark` is the routing rule for UI work in this repository and it is **wrong for this file**.
+It is a web-page skill: it forbids re-drawn browser chrome, which beat 1 is built on, and its
+token and theme systems fight this cut's locked film furniture. Running it here would fight the
+edit. The card takes beat 12's and the end card's tokens unchanged, and the contrast is checked
+by hand — `CARD.ink` on `CARD.field` ≈ 17:1, `CARD.muted` on `CARD.field` ≈ 8.9:1.
 
 ---
 
@@ -973,7 +1233,7 @@ The composition is a pure function of frame, so any disagreement is a race by de
 
 | | |
 |---|---|
-| frames rendered | 5,962 |
+| frames rendered | 5,962 (the first render — the measurement predates the trim) |
 | median cross-render MSE | **0.00** — most of the film is bit-identical between runs |
 | frames disagreeing beyond the noise floor | **51 (0.86%)** |
 | the launch cut's post-`<Settle/>` rate | ~1 in 2,572 |
@@ -1011,7 +1271,35 @@ Three measurements pin it, and the first is what makes the other two readable:
 - **`--concurrency=2` clears it.** Six frames that had been wrong come back at **3.4–16.8** MSE
   from their stills: encoding noise, brighter frames scoring higher, no outlier.
 
-**So the settle budget stays at 6 for both cuts, and the pitch cut renders at `--concurrency=2`.**
+### And at 5,584 frames the race is still there, so the cut is reconciled from three renders
+
+`--concurrency=2` **reduces** the race; it does not close it. Three renders of the trimmed cut,
+diffed pairwise frame by frame (`ffmpeg psnr`, per-frame `mse_avg`):
+
+| | |
+|---|---|
+| median cross-render MSE | **0.00** — most of the film is bit-identical between runs |
+| frames disagreeing beyond MSE 1.0, worst-of-three | **161 (2.88%)** |
+| how many of those are structural rather than sub-pixel | **4** |
+
+**Majority vote, then verified against stills**, which are the ground truth for the reason §10
+already gives — a still renders one frame in a fresh page, so no wall-clock state accumulates:
+
+| render | outlier frames | worst | verdict |
+|---|---|---|---|
+| r1 | 32 | 220.9 | wrong at f3103 (confirmed against the still: 334.7 vs 8.4) |
+| **r2** | **49** | **22.2** | **correct on every structural frame. SHIPPED** |
+| r3 | 80 | 2840.6 | wrong at f3499 and f3597 (2275.4 and 4278.0 against their stills) |
+
+r2's own 49 outliers are all in the 1–22 band and cluster on **beat 11's punch-in and beat 1's
+two compressed moves** — fast camera travel over bright type at high magnification, where a
+sub-pixel slip produces a large delta and no visible artifact. The two catastrophic frames are
+both in beat 8 and both belong to r3 alone.
+
+**So: render three, diff them pairwise, take the majority, and confirm the disputed frames against
+stills before shipping.** One render is not evidence of anything at this length.
+
+**And the settle budget stays at 6 for both cuts, and the pitch cut renders at `--concurrency=2`.**
 It costs about 2× per frame and it is the difference between a correct film and one with a page
 visibly jumping in beat 2. The `ticks` prop stays because it costs nothing and the next person to
 hit this should find the measurement rather than the guess — but **do not raise it to fix a race.**
@@ -1071,3 +1359,41 @@ Recorded rather than silently resolved.
    `video/src/pitch.tsx`. `GreyboxVideo.tsx`, its BEATS table, its four interstitial cards and
    `retime.tsx`'s Premiere segment table are untouched and still render the launch film. The two
    cuts share the beat components, which is the point — a beat copied is a beat that drifts.
+
+### From the first render, watched in silence
+
+10. **§6.3 shipped a band/stateline desync and it came from this sheet, not from the build.** 7c's
+    two copy steps were 81 frames after the bloom had finished drifting to amber and 7e's return
+    was 75 frames after the descent began. **CORRECTED in §6.3** — the steps moved into the ease
+    in both directions. L18 guarantees the graph and the words agree; nothing was guaranteeing
+    either of them agreed with the **orb**, which is the largest thing on screen and runs on its
+    own CSS transition. That gap is worth naming as a class, not just fixing as an instance.
+
+11. **§6.4 read one call too shallow, and the app does respond to a dismissal.** `finalize()`
+    flips `open`, and `<Notification/>`'s `AnimatePresence` plays a 0.2s slide-and-fade **exit**.
+    **CORRECTED in §6.4** — it is shipped behaviour, it breaks none of the section's three
+    prohibitions, and depicting it is what fixes the empty frames after the click properly rather
+    than by trimming. Flagged as a method note: reading a handler is not the same as reading what
+    the surface does when the handler's state change lands.
+
+12. **`useToastIn` is not the `<Notification/>`'s numbers, despite its own comment saying so.**
+    0.42s / 28px against the component's 0.2s / 24px. **CORRECTED for the real prompt only** —
+    §6.4a — because the helper also drives beat 8's authored mail toast and beat 9, which is
+    shared with the launch cut. The two remaining callers are a known divergence, recorded here
+    rather than fixed, since changing them would change the launch film.
+
+13. **A clock inside a retimed beat changes speed with the beat.** Beat 11's track position ran
+    at 31× / 10.7× / 16.8× real time because it was authored in the beat's own frames. **BUILT** —
+    `retime.tsx` § `BeatOutFrameContext`, `null` outside a cut that retimes beats. **The session
+    readout has the same shape and is deliberately left alone** (§7 · beat 11): it ticks slowly
+    rather than wrongly, nobody counts it, and touching it re-opens §6.5's arithmetic.
+
+14. **Beat 9's "opens already landed" produced nineteen frames of empty page.** The prompt's own
+    f6 entrance is invisible under a shot framed tight on it. **CORRECTED in §7 · beat 9** — under
+    the pitch cut the prompt is up when the beat opens, and the beat arrives on a 14-frame push
+    rather than on nothing. Both halves of that were a first render finding, not a preference.
+
+15. **The 5,900–6,100 frame window is retired.** It predates the film existing and it cannot
+    survive the film being watched: 378 frames of mechanism do not become necessary because a
+    number says so. §4 records what replaced it. **No runtime target was set for the trim pass**,
+    and the film stopping at 3:06.1 is where the dead time ran out rather than where a figure was.

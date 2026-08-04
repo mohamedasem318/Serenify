@@ -91,7 +91,7 @@ export function RemotionRoot() {
         <Composition id="Beat07-AtEase" component={Beat07AtEase} durationInFrames={72} fps={30} width={1920} height={1080} />
         {/* The pitch cut's new false-alarm sequence, 7b–7e as ONE beat. See the pitch beat
             sheet §6 and the header in Beat07bFalseAlarm.tsx. */}
-        <Composition id="Beat07b-FalseAlarm" component={Beat07bFalseAlarm} durationInFrames={1050} fps={30} width={1920} height={1080} />
+        <Composition id="Beat07b-FalseAlarm" component={Beat07bFalseAlarm} durationInFrames={906} fps={30} width={1920} height={1080} />
         <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={184} fps={30} width={1920} height={1080} />
         <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={76} fps={30} width={1920} height={1080} />
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={310} fps={30} width={1920} height={1080} />

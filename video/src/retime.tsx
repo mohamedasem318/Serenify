@@ -167,3 +167,33 @@ export const SubFrameContext = React.createContext(0);
  */
 export const useCurrentFrame = (): number =>
   useRenderedFrame() + React.useContext(SubFrameContext);
+
+/**
+ * ══ AND ONE THING A BEAT SOMETIMES NEEDS THAT IS *NOT* ITS AUTHORED FRAME ═══════════
+ *
+ * How many **output** frames into the beat we are. Null wherever no cut is mounted.
+ *
+ * Everything a beat draws is a function of its authored frame, and that is correct for every
+ * *animation* — the whole point of a time map is that a move re-renders at the in-between
+ * positions. It is wrong for a **clock**. A clock is a real rate, and a beat whose segments run
+ * at 0.90× then 0.31× then 0.49× is a beat in which any value derived from the authored frame
+ * changes speed twice.
+ *
+ * That is the launch sheet's `CLOCK` bug in its third form and it is what beat 11's music player
+ * hit: the scrubber and the elapsed readout are one `progress` value, authored across the beat's
+ * own f24–f70, and the pitch cut stretches that span unevenly — so the track ran at 31× real
+ * time, then 10.7×, then 16.8×, with the sharpest change landing on the exact frame the camera
+ * settles onto the window. Nothing about it is a rendering race (see `player.tsx`, which fixed a
+ * genuine one): two independent renders of the whole window are MSE 0.00.
+ *
+ * So a clock inside a retimed beat reads THIS, and the rate it runs at is a rate in the film the
+ * audience is watching rather than a rate in a timeline nobody sees. **Beat-relative, not
+ * absolute**, so a beat still needs to know nothing about where it sits in the cut.
+ *
+ * `null` is the launch cut and every per-beat composition, where the two frames are the same
+ * number and the distinction does not exist.
+ */
+export const BeatOutFrameContext = React.createContext<number | null>(null);
+
+/** See `BeatOutFrameContext`. Null outside a cut that retimes beats. */
+export const useBeatOutFrame = (): number | null => React.useContext(BeatOutFrameContext);

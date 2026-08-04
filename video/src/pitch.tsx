@@ -19,10 +19,10 @@ import { BeatRRoadmap } from "./greybox/beats/BeatRRoadmap";
 import { PITCH_SETTLE_TICKS, Settle } from "./greybox/settle";
 import { FONT, GREY } from "./greybox/theme";
 import { PITCH, PitchContext } from "./pitch-context";
-import { SubFrameContext } from "./retime";
+import { BeatOutFrameContext, SubFrameContext } from "./retime";
 
 /**
- * ══ THE PITCH CUT — 5,962 FRAMES, 198.7s, 3:18.7 ════════════════════════════════════
+ * ══ THE PITCH CUT — 5,584 FRAMES, 186.1s, 3:06.1 ════════════════════════════════════
  *
  * `docs/video/serenify-pitch-video-beat-sheet.md` is the spec. This file is its §4 frame table
  * and its §7 per-beat notes, made executable.
@@ -41,17 +41,39 @@ import { SubFrameContext } from "./retime";
  * on purpose — a panel does not scroll away, and a beat has to leave room for a person to talk
  * over it.
  *
- * Three structural differences from the launch cut, all of them in the table below:
+ * ── AND IT HAS BEEN CUT ONCE, IN SILENCE, WHICH IS THE PASS BELOW ──────────────────
+ *
+ * Mohamed watched the first render **without narration**, which is not how it ships — and most of
+ * the added time exists to hold room for a narrator, so in silence much of it correctly feels
+ * slow. The trim pass that produced the numbers below is therefore not "make it shorter": it is
+ * one distinction applied fourteen times.
+ *
+ *   **Mechanism is dead time.** Chrome assembling, a camera travelling, a cursor crossing a
+ *   panel, a surface still on screen after it has been clicked. No narrator fills those, so they
+ *   come out — beat 1's two moves halve, beat 10's three camera/cursor legs compress, beat 11's
+ *   pull-out compresses, and 7d stops holding on an absence for two seconds.
+ *
+ *   **State change is where explanation lives.** Calibration breathing, a reading climbing, Ren
+ *   replying, the descent in beat 11. Those read slow in silence and land correctly with a voice
+ *   over them, so **every read time in the film is untouched** — turn 1, the typing at 15 c/s,
+ *   turn 3's protected hold, beat 3's lifted banner, beat 5's minute, beat 8's clock, beat 11's
+ *   descent. Not one of them moves.
+ *
+ * −378 frames, 5,962 → 5,584. The `Δ` column below is against the **authored** duration, as it
+ * always was; the trim column is against the first pitch render.
+ *
+ * ── THREE STRUCTURAL DIFFERENCES FROM THE LAUNCH CUT, ALL OF THEM IN THE TABLE ─────
  *
  *   · the four interstitial cards are REMOVED. They existed because the dropped VO left the film
  *     with no narration; the narration is back. Three seams they were covering re-open and are
  *     answered in the sheet's §5 — 4 → 5 by the app's own click-and-reload causality, 5 → 6 by a
  *     narrated line the script now OWES, and 9 → 10 by the shipped navigation that "Yes, that's
  *     me" genuinely performs (`confirmatory-trigger.ts:422` → `/app/chat?handoff=…`).
- *   · a NEW false-alarm sequence, 7b–7e, 1,050 frames, between beats 7 and 8. It supersedes the
+ *   · a NEW false-alarm sequence, 7b–7e, 906 frames, between beats 7 and 8. It supersedes the
  *     launch cut's "the questionnaire shows the true-positive branch" invariant; the reason is
  *     recorded in the sheet's §3 rather than the rule being silently dropped.
- *   · a NEW roadmap card, 240 frames, between beats 11 and 12.
+ *   · a NEW roadmap TIMELINE, 240 frames, between beats 11 and 12 — four nodes on a drawn
+ *     spine, the shipped one solid and the three ahead of it hollow. Sheet §8.
  *
  * ── THE MAP IS PER-BEAT, AND THAT IS THE WHOLE DESIGN ───────────────────────────────
  *
@@ -62,7 +84,7 @@ import { SubFrameContext } from "./retime";
  *
  * So each beat carries **its own segment list, in its own local frames**, and the beats are
  * concatenated. A beat's segments are independent of every other beat's, which means inserting
- * 1,050 frames after beat 7 moves nothing at all in beats 8–13.
+ * 906 frames after beat 7 moves nothing at all in beats 8–13.
  *
  * The two mechanisms `retime.tsx` established are kept, because both are load-bearing:
  *
@@ -126,25 +148,25 @@ interface PitchBeat {
  * is prose about this table, and `PITCH_DURATION` below is computed rather than asserted. A
  * duration that appears in two places is the launch cut's `CLOCK` bug waiting to happen.
  *
- *   beat                    authored     out       Δ
- *   ──────────────────────  ────────  ──────  ──────
- *    1 cold open                 180     300    +120
- *    2 signup                    432     600    +168
- *    3 dashboard                 120     300    +180
- *    4 camera gate               120     270    +150
- *    5 calibration               422     900    +478
- *    6 later                      36      60     +24
- *    7 at ease                    72     240    +168
- *   7b–7e false alarm             —    1050   +1050   NEW
- *    8 the email                 184     330    +146
- *    9 questionnaire              76     240    +164
- *   10 Ren                       310     660    +350
- *   11 return to ease            234     450    +216
- *    R roadmap                    —      240    +240   NEW
- *   12 closing card               90      90       0
- *   13 end card                  172     232     +60   172 + the 60-frame tail hold
- *                             ──────  ──────
- *                               2448    5962          198.73s · 3:18.7
+ *   beat                    authored     out       Δ    trim   what came out
+ *   ──────────────────────  ────────  ──────  ──────  ─────  ─────────────────────────────
+ *    1 cold open                 180     210     +30    −90   the chrome assembling, the push
+ *    2 signup                    432     600    +168      0
+ *    3 dashboard                 120     300    +180      0
+ *    4 camera gate               120     270    +150      0
+ *    5 calibration               422     900    +478      0
+ *    6 later                      36      60     +24      0
+ *    7 at ease                    72     240    +168      0
+ *   7b–7e false alarm             —     906    +906   −144   7d's read hold, the absence hold   NEW
+ *    8 the email                 184     330    +146      0
+ *    9 questionnaire              76     240    +164      0   (re-split: a 14-frame push)
+ *   10 Ren                       310     598    +288    −62   two camera legs, two cursor legs
+ *   11 return to ease            234     368    +134    −82   the pull-out, the tail
+ *    R roadmap                    —      240    +240      0   NEW — a timeline, sheet §8
+ *   12 closing card               90      90       0      0
+ *   13 end card                  172     232     +60      0   172 + the 60-frame tail hold
+ *                             ──────  ──────          ─────
+ *                               2448    5584           −378   186.13s · 3:06.1
  */
 export const PITCH_BEATS: readonly PitchBeat[] = [
   {
@@ -156,16 +178,28 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
      * live URL says *this is deployed* better than a fast one plus dead air, and it is the
      * narrator's opening, which needs an unhurried picture under it.
      *
-     * The lift's travel and settle take 100 output frames rather than 44; the push to the hero
-     * block takes 80 rather than 34; the hero landing holds 40 before the click rather than 28.
-     * The beat's tail after the click is 1.000× — it is the seam into beat 2.
+     * ── AND THE TWO MOVES ARE HALVED, BECAUSE THEY ARE MECHANISM ───────────────────────
+     *
+     * The trim pass' one distinction, in the beat that shows it most plainly. **Two of this
+     * beat's five segments are a browser assembling itself and a camera travelling** — the lift
+     * seating into the chrome as the page paints, and the push down onto the hero block. Nobody
+     * narrates a camera move; they are the definition of dead time in a silent watch and they are
+     * not much better with a voice over them. Both go back to roughly half the time they were
+     * given: 100 → 50 and 80 → 40, i.e. 0.44× → 0.88× and 0.43× → 0.85×.
+     *
+     * **The two holds are untouched, and that is the whole point of halving the moves.** The
+     * lifted omnibox still gets its 52 frames of `serenify.tech` being typed — a performed action
+     * at its own rate — and the hero still gets its 68 (40 before the click, 28 through it), so
+     * the headline, the lede and both CTAs are readable for exactly as long as they were. A slow
+     * arrival at a live URL is still what says *this is deployed*; it just stops taking six
+     * seconds to arrive.
      */
     segs: [
-      [0, 46, 52], // the lifted omnibox, `serenify.tech` typed
-      [46, 90, 100], // the lift travels home as the page paints
-      [90, 124, 80], // the push to the hero block
-      [124, 152, 40], // the hero, read, before the click
-      [152, 180, 28], // 1.000× — the seam
+      [0, 46, 52], // the lifted omnibox, `serenify.tech` typed — a performed action, untouched
+      [46, 90, 50], // the lift travels home as the page paints — 100 → 50, MECHANISM
+      [90, 124, 40], // the push to the hero block — 80 → 40, MECHANISM
+      [124, 152, 40], // the hero, read, before the click — UNTOUCHED
+      [152, 180, 28], // 1.000× — the seam. Untouched
     ],
   },
   {
@@ -340,10 +374,11 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
   {
     name: "7b–7e · false alarm",
     Beat: Beat07bFalseAlarm,
-    authored: 1050,
+    authored: 906,
     /**
-     * NEW — sheet §6. 1,050 frames, authored at its own rate throughout, so no segment here does
-     * anything but pass the frame through.
+     * NEW — sheet §6. 906 frames, authored at its own rate throughout, so no segment here does
+     * anything but pass the frame through. **Every number in this sequence lives in the beat
+     * file**, which is why the trim below is 144 frames of that file rather than of this table.
      *
      *   7b    0– 210   he settles into `focused` over 60 frames. The reading is still at ease,
      *                  which is the point: the audience sees him look strained WHILE the app says
@@ -351,15 +386,14 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
      *   7c  210– 510   the climb — identical amber, identical copy, identical band thresholds to
      *                  beat 8's. Only the pacing differs, and it differs because nothing else is
      *                  happening in it
-     *   7d  510– 810   the prompt, read whole at `BEAT9_PROMPT`, and the cursor goes to
-     *                  **"No, I'm okay"**
-     *   7e  810–1050   the prompt is gone. Nothing acknowledges the answer, because the shipped
-     *                  handler acknowledges nothing (`confirmatory-trigger.ts:424`). The reading
-     *                  comes down from f855 — 45 frames after the click, never on it, because a
-     *                  descent tied to the click frame is a film depicting a model that learns
-     *                  from being corrected. It does not.
+     *   7d  510– 711   the prompt, read whole at `BEAT9_PROMPT`, and the cursor goes to
+     *                  **"No, I'm okay"**. 300 → 201: the read hold goes 164 → 110 and the hold
+     *                  on the prompt's ABSENCE goes 60 → 15
+     *   7e  711– 906   the prompt is gone. The reading comes down from 7e f45 — never on the
+     *                  click, because a descent tied to the click frame is a film depicting a
+     *                  model that learns from being corrected. It does not
      */
-    segs: [[0, 1050, 1050]],
+    segs: [[0, 906, 906]],
   },
   {
     name: "8 · the email",
@@ -397,9 +431,19 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
     /**
      * §7: **this beat must not read as a repeat of 7d**, and three things make sure of it.
      *
-     *   1. It opens ALREADY LANDED. 7d pushes in over 36 frames; this does not push at all. The
-     *      audience has seen this surface arrive once, and watching it arrive again is the repeat.
-     *      (The framing swap is `PitchContext`'s `beat9Options`; see `Beat09Questionnaire.tsx`.)
+     *   1. It **arrives in 14 frames rather than 36**, and does not re-establish. The first pitch
+     *      render had it open already landed — no move at all — and that read as a cut error
+     *      rather than as an edit: a hard punch-in to a tighter shot is a mistake, not a
+     *      differentiation. So it gets a push, and it is emphatically not 7d's push: 14 output
+     *      frames against 36, over a 1.12× settle rather than 927 → 601, so the shot is *arrived
+     *      at* rather than jumped to and cannot be mistaken for the same move. Beat 8's own
+     *      closing move hands over into it. (The framing is `PitchContext`'s `beat9Options`; see
+     *      `Beat09Questionnaire.tsx` § `BEAT9_OPTIONS_IN`.)
+     *
+     *      **Its segment is 1.000×, which is the reason for the re-split below.** 14 authored
+     *      frames inside the old opening segment would have played over 32 output frames; the
+     *      push has to be 14 frames of the FILM, so it gets its own segment at rate 1 and the
+     *      read that follows absorbs the difference. The beat's 240 does not move.
      *   2. It is framed on the CHOICE, not the question — `BEAT9_OPTIONS`, the three option rows,
      *      rather than `BEAT9_PROMPT`, the whole panel. The title and body are partly out of frame
      *      by design.
@@ -410,7 +454,8 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
      * the 9 → 10 seam the fourth interstitial card used to cover (sheet §5.3).
      */
     segs: [
-      [0, 42, 96], // landed on the options from f0 — the read
+      [0, 14, 14], // 1.000× — THE PUSH. Fourteen frames of the film, not of the timeline
+      [14, 42, 82], // the options, read
       [42, 60, 50], // the pointer's travel, deliberate
       [60, 76, 94], // the hover, the click, and the beat before the navigation
     ],
@@ -441,15 +486,35 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
      *
      * Beat 10 is otherwise unchanged: the composer-seeding divergence recorded in the sheet's §10
      * item 2 is known and is deliberately not fixed in this cut.
+     *
+     * ── AND THE TRIM PASS TAKES 62 FRAMES, NONE OF THEM READ TIME ──────────────────────
+     *
+     * This beat is the film's densest explanatory stretch and it is where the narrator has the
+     * most to say, so it is **partly defended**: it is not flattened, and every message's read
+     * time is left exactly as argued above. What comes out is the four stretches in it that are
+     * neither reading nor writing —
+     *
+     *   −20  the opening: the panel's establishing hold and the move onto Ren's face. Ren
+     *        composing still gets his landing; the CAMERA getting there stops taking 3.5s
+     *   −18  the move to the working shot, plus the cursor crossing the panel to the composer.
+     *        Two mechanisms in one segment and neither is looked at
+     *   −12  the pointer's travel to send. The hover on arrival and the click are inside the
+     *        segment and are unaffected — this is only the travel
+     *   −12  the second typing indicator, 48 → 36, i.e. back to the launch cut's own number. §7's
+     *        +12 bought "enough to see the wave travel twice"; the launch sheet's cut to 36 was
+     *        right on its own terms and an indicator is looked at, not read
+     *
+     * Untouched, and listed so the next pass does not reach for them: turn 1's 60, the typing's
+     * 156 (15 c/s — *never sped to fit*), and turn 3's protected 170.
      */
     segs: [
-      [0, 38, 106], // the panel, the move, and Ren composing — his face landing gets its hold
-      [38, 74, 60], // TURN 1, READ — 36 → 60 (§7)
-      [74, 104, 70], // the move to the working shot, the cursor, the caret click
-      [104, 196, 156], // THE TYPING — 92 → 156, i.e. 15 c/s (§7)
-      [196, 214, 50], // the pointer to send, the hover on arrival, the click, the bubble
-      [214, 250, 48], // the second typing indicator — 36 → 48 (§7)
-      [250, 310, 170], // TURN 3 — the protected hold, 60 → 170
+      [0, 38, 86], // the panel, the move, Ren composing — 106 → 86, MECHANISM (his hold stays)
+      [38, 74, 60], // TURN 1, READ — 36 → 60 (§7). UNTOUCHED
+      [74, 104, 52], // the move to the working shot, the cursor, the caret — 70 → 52, MECHANISM
+      [104, 196, 156], // THE TYPING — 92 → 156, i.e. 15 c/s (§7). UNTOUCHED
+      [196, 214, 38], // the pointer to send, the hover on arrival, the click — 50 → 38, MECHANISM
+      [214, 250, 36], // the second typing indicator — 48 → 36, the launch cut's own number
+      [250, 310, 170], // TURN 3 — the protected hold, 60 → 170. UNTOUCHED
     ],
   },
   {
@@ -470,16 +535,31 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
      * things in the frame that have to look like a person enjoying a song.
      *
      * The 31 frames Mohamed deleted from beat 11's tail in Premiere are not restored as a tail;
-     * the linger here is in front of the roadmap card and is measured against a 199s film.
+     * the linger here is in front of the roadmap card and is measured against a 186s film.
+     *
+     * ── AND THE TRIM PASS TAKES 82, FROM THE MOVE AND FROM THE TAIL ────────────────────
+     *
+     *   −28  **the pull-out.** It is a camera move and it compresses like every other camera move
+     *        in this pass: 78 → 50, i.e. 0.49× → 0.76×. The shot it lands on is the payoff of the
+     *        whole film and is not touched — the descent below still runs its 136 frames at
+     *        1.000×, and the relief travelling into `easing` finishes inside the move as it did
+     *   −54  **the linger.** 134 → 80. The film still ends on a settle rather than on a cut —
+     *        2.7s of a frame in which nothing moves but his breath, the nod and the notes — and
+     *        80 frames is still more than the 103 the beat's authored end plus Mohamed's own
+     *        Premiere deletion would have left. It was the longest single hold in the film
+     *
+     * **The descent is not touched, and that is the point of taking it all out of the move and
+     * the tail.** The bloom's drift, the stateline's return, the trend's tail walking down, the
+     * nod and the notes all still play at 1.000× across their 136 frames.
      */
     segs: [
       [0, 18, 18],
       [18, 24, 6],
       [24, 42, 20], // the punch onto the player, beginning on the click
-      [42, 60, 58], // the player, landed — the track named and read (§7 +40)
-      [60, 98, 78], // the pull-out, and the relief travelling into `easing` (§7 +40)
-      [98, 234, 136], // 1.000× — the whole descent, at real speed
-      [234, 368, 134], // 1.000× — the linger, alive: his breath, the nod, the notes
+      [42, 60, 58], // the player, landed — the track named and read (§7 +40). UNTOUCHED
+      [60, 98, 50], // the pull-out — 78 → 50, MECHANISM
+      [98, 234, 136], // 1.000× — the whole descent, at real speed. UNTOUCHED
+      [234, 368, 80], // 1.000× — the linger, alive: his breath, the nod, the notes. 134 → 80
     ],
   },
   {
@@ -487,13 +567,18 @@ export const PITCH_BEATS: readonly PitchBeat[] = [
     Beat: BeatRRoadmap,
     authored: 240,
     /**
-     * NEW — sheet §8. Three rows, flush left, in a two-column grid: a list rather than a centred
-     * sentence, because beat 12's card is the film's one claim and a second centred sentence
-     * eight seconds before it competes with it.
+     * NEW — sheet §8. **A horizontal timeline: four nodes on a drawn spine, revealed left to
+     * right.** The two-column text grid the first render shipped is rejected and gone.
+     *
+     * The state is carried by the DRAWING, not by colour, because the palette has none to spare —
+     * meadow, amber and crimson all carry a band meaning, foggy is Ren's, and there is no red in
+     * this film. Node 1 is solid and its segment of the spine is solid: it is shipped. Nodes 2–4
+     * are hollow on a broken spine. That contrast is the entire "this is what's coming" and it
+     * needs no word to explain it.
      *
      * **The most severable part of this cut.** If the schedule slips it comes out whole — 240
-     * frames, no dependency in either direction, and the film is 5,722, under the floor, with the
-     * frames coming back from beat 5's 5d and beat 10's turn-3 hold in that order.
+     * frames, no dependency in either direction, and the film is 5,344, with the frames coming
+     * back from beat 5's 5d and beat 10's turn-3 hold in that order.
      */
     segs: [[0, 240, 240]],
   },
@@ -613,9 +698,14 @@ export const PitchFrame: React.FC<{ out: number }> = ({ out }) => {
 
   return (
     <SubFrameContext.Provider value={subFrame}>
-      <Sequence key={name} layout="none" from={out - authored} durationInFrames={placed.mount}>
-        <Beat />
-      </Sequence>
+      {/* How many OUTPUT frames into this beat we are — the one thing a clock inside a retimed
+          beat has to read instead of its authored frame. See `retime.tsx` § AND ONE THING A BEAT
+          SOMETIMES NEEDS. Beat 11's track position is the only consumer today. */}
+      <BeatOutFrameContext.Provider value={out - placed.out0}>
+        <Sequence key={name} layout="none" from={out - authored} durationInFrames={placed.mount}>
+          <Beat />
+        </Sequence>
+      </BeatOutFrameContext.Provider>
     </SubFrameContext.Provider>
   );
 };
