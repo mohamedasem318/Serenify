@@ -1,5 +1,6 @@
 import React from "react";
-import { Easing, interpolate, interpolateColors, useCurrentFrame } from "remotion";
+import { Easing, interpolate, interpolateColors } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { CharacterRig, Pose } from "./rig";
 import { BAND, GREY, MONO } from "./theme";

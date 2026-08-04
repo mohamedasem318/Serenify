@@ -1,5 +1,6 @@
 import React from "react";
-import { continueRender, delayRender, useCurrentFrame } from "remotion";
+import { continueRender, delayRender } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { Hero } from "@/components/landing/hero";
 import { PublicNavbar } from "@/components/public/public-navbar";

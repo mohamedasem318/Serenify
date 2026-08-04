@@ -1,5 +1,5 @@
 import React from "react";
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { ChatShell } from "@/components/chat/chat-shell";
 import { RenAvatar, type RenState } from "@/components/chat/ren-avatar";

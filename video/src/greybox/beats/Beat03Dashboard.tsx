@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { CalibrationBanner } from "@/components/anchor/calibration-banner";
 

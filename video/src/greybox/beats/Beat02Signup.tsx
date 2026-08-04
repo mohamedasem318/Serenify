@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { AuthPage, CheckEmailSurface, SignupSurface } from "../../app/auth";
 import { STANDIN } from "../../app/furniture";

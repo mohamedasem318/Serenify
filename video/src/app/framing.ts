@@ -1,4 +1,4 @@
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import {
   CameraKey,

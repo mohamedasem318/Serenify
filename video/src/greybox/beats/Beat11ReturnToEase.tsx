@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { BEAT11_WIDE, PHONE } from "../../app/framing";
 import { RAW, VIEWFINDER } from "../../app/geometry";

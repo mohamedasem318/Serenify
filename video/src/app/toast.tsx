@@ -1,5 +1,6 @@
 import React from "react";
-import { interpolate, useCurrentFrame } from "remotion";
+import { interpolate } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { TOAST as COPY } from "../greybox/copy";
 import { TOAST as T, OS_FONT, OS_TABULAR } from "./furniture";
