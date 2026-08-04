@@ -14,6 +14,8 @@ import { Beat10Ren } from "./beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./beats/Beat12Closing";
 import { Beat13EndCard } from "./beats/Beat13EndCard";
+import { Interstitial, INTERSTITIAL_FRAMES } from "./beats/Interstitial";
+import { INTERSTITIALS } from "./copy";
 import {
   RETIMED_DURATION,
   SOURCE_DURATION,
@@ -140,6 +142,12 @@ export const GREYBOX_DURATION = 2448;
  *                          ──────  ─────  ─────
  *                            2448   2238   −210   81.6s → 74.6s
  *
+ * **Two things have happened to that table since, and neither re-cuts it.** Beat 10's turn 1 got
+ * its read back — `retime.tsx` splits the 1.400× segment so source 1680–1716 runs at 0.706×, so
+ * beat 10 is 236 → **259** and the cut is 2238 → **2261** — and the four interstitial cards were
+ * inserted into the OUTPUT timeline below, adding **240** frames the map knows nothing about.
+ * The film is **2501 frames, 83.4s**. Every other rate and boundary in the map is untouched.
+ *
  * **Beats 2, 3, 4, 7, 8 and 9 are at 1.00× and are not touched at any frame** — which is the
  * whole of the first act after the cold open, and the whole of the email and the questionnaire.
  * The reductions are the calibration, Ren, and the end card.
@@ -192,12 +200,98 @@ const beatIndexAt = (authored: number): number => {
   return 0;
 };
 
+/**
+ * ══ THE FOUR CARDS ══════════════════════════════════════════════════════════════════
+ *
+ * The Egyptian Arabic VO is dropped and LinkedIn autoplays muted, so **on-screen text is the
+ * film's only narration** — on cards, not overlaid. The three reasons and the treatment are in
+ * `beats/Interstitial.tsx`; the copy and the landing-copy check are in `copy.ts`.
+ *
+ * ── WHY THESE FOUR SEAMS AND NO OTHERS ──────────────────────────────────────────────
+ *
+ * A card earns its place where the film jumps in time or changes who is acting, or where the run
+ * of lines needs a premise. **And the card is the transition**: where one sits, it covers the
+ * change of composition, which is why they are at seams rather than inside beats.
+ *
+ *   4 → 5    "First it learns what calm looks like."     states what the film is about to show,
+ *                                                        and gives the three that follow
+ *                                                        something to continue from
+ *   5 → 6    "Then it stays quiet."                      covers the film's only unexplained
+ *                                                        time jump
+ *   7 → 8    "Until something changes."                  the inciting incident
+ *   9 → 10   "Then it helps you come back down."         the app stops measuring and starts
+ *                                                        talking
+ *
+ * Every other seam is a chain where each screen causes the next and the UI narrates itself.
+ *
+ * **The first card does not go earlier than beat 4.** Between beats 3 and 4 it would land
+ * immediately before the camera gate's own heading — "Before the camera turns on" — which is text
+ * stacked on text. After the gate resolves, the screen is clear.
+ *
+ * ── THE CARDS RIDE THE OUTPUT TIMELINE, NOT THE AUTHORED ONE ────────────────────────
+ *
+ * A card is **new material**, not a retimed beat, so it is inserted after `sourceFrameAt` has been
+ * read and it runs at exactly its own 60 frames. The alternative — giving each card a slot in the
+ * authored timeline — would have shifted every source frame in `retime.tsx`'s segment table
+ * downstream of each of the four insertions: thirteen hand-moved numbers reproducing a cut that
+ * is already approved, for no gain. Nothing in the segment table knows these exist.
+ *
+ * `at` is therefore an **output** frame of the film, and each is the first output frame of the
+ * beat the card precedes: 840 is beat 5's f0, 1216 is beat 6's, 1321 is beat 8's, 1581 is beat
+ * 10's. All four sit before the turn-1 split at out 1619, so none of them moved when it landed.
+ */
+const CARDS = [
+  { at: 840, line: INTERSTITIALS.calm },
+  { at: 1216, line: INTERSTITIALS.quiet },
+  { at: 1321, line: INTERSTITIALS.changes },
+  { at: 1581, line: INTERSTITIALS.down },
+] as const;
+
+/** Each card's first frame in the FINAL output, i.e. with the cards before it already inserted. */
+const CARD_STARTS = CARDS.map((c, i) => c.at + i * INTERSTITIAL_FRAMES);
+
+/** The film's own length, cards included. */
+export const CUT_DURATION = RETIMED_DURATION + CARDS.length * INTERSTITIAL_FRAMES;
+
+/**
+ * Where an output frame lands: on one of the four cards, or on the film at the film frame the
+ * retime map should be asked about.
+ */
+const resolve = (out: number): { card: number; local: number } | { film: number } => {
+  for (let i = 0; i < CARD_STARTS.length; i++) {
+    if (out < CARD_STARTS[i]) return { film: out - i * INTERSTITIAL_FRAMES };
+    if (out < CARD_STARTS[i] + INTERSTITIAL_FRAMES) {
+      return { card: i, local: out - CARD_STARTS[i] };
+    }
+  }
+  return { film: out - CARDS.length * INTERSTITIAL_FRAMES };
+};
+
 export const GreyboxVideo: React.FC = () => {
   // Remotion's own frame, deliberately — this is the OUTPUT frame the renderer is producing, and
   // it is the only place in the composition that wants it rather than the source frame.
   const out = useRenderedFrame();
+  const at = resolve(out);
 
-  const source = sourceFrameAt(out);
+  if ("card" in at) {
+    return (
+      <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
+        <Settle />
+        {/* No `SubFrameContext` — a card is output-timeline material and is never retimed, so it
+            reads Remotion's own frame and runs at exactly its authored 60. */}
+        <Sequence
+          key={`card-${at.card}`}
+          layout="none"
+          from={CARD_STARTS[at.card]}
+          durationInFrames={INTERSTITIAL_FRAMES}
+        >
+          <Interstitial line={CARDS[at.card].line} />
+        </Sequence>
+      </AbsoluteFill>
+    );
+  }
+
+  const source = sourceFrameAt(at.film);
   const authored = Math.min(Math.floor(source), SOURCE_DURATION - 1);
   const subFrame = source - authored;
 
@@ -223,3 +317,4 @@ export const GreyboxVideo: React.FC = () => {
 };
 
 export { RETIMED_DURATION };
+

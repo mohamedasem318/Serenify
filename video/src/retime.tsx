@@ -63,7 +63,8 @@ export type Segment = {
 };
 
 /**
- * The fourteen track items of the sequence, in order, read out of the project file's
+ * The fourteen track items of the sequence, in order — **now fifteen entries, one of them split
+ * after the fact; see the note at the foot of this comment** — read out of the project file's
  * `VideoClipTrackItem` → `SubClip` → `VideoClip` chain. Output bounds come from `TrackItem`'s
  * `Start`/`End`, source bounds from the clip's `InPoint`/`OutPoint`, both in Premiere's
  * 254016000000-ticks-per-second units at 30fps.
@@ -79,8 +80,32 @@ export type Segment = {
  * They are Premiere's, they are under a frame, and inventing a correction would be inventing a
  * timing the cut does not have.
  *
- * The one discontinuity that is **not** an artifact is before segment 11: source 2155 → 2186,
+ * The one discontinuity that is **not** an artifact is before segment 12: source 2155 → 2186,
  * **31 frames deleted**, the tail of beat 11 immediately before the closing card.
+ *
+ * ── ONE SEGMENT WAS SPLIT AFTERWARDS, AND IT IS THE ONE READ THE CUT DID NOT AFFORD ──
+ *
+ * The cut ran beat 10 at 1.400× from its f47, which took Ren's opener — *"Something shifted just
+ * now. What happened?"* — to **0.94s**. Seven words at a typical silent reading rate need about
+ * **1.7s**. The previous pass flagged it, left it as cut because the decision was Mohamed's, and
+ * recorded both sets of numbers so they could never be confused; **the decision is now made and
+ * the read gets its time back.**
+ *
+ * So the 1.400× segment is split at the read rather than the whole beat being slowed. Source
+ * **1680 → 1716** is beat 10's own f38 → f74: the frame turn 1 lands on, to the frame the camera
+ * leaves on. It runs at **0.706×** over 51 output frames — **1.70s**, from 28.3 frames — and the
+ * remainder of the beat keeps its rate (1.398× against the cut's 1.400×; the endpoints are exact
+ * and the 0.17% is a rounding to whole output frames, worth about a tenth of a frame mid-segment).
+ *
+ * **Slowing below the authored rate is safe here and would not be everywhere.** The camera is
+ * static across those 36 authored frames, the message has landed, and the only things moving are
+ * Ren's blink and his `thinking` pose — all frame-derived, so Remotion genuinely draws the
+ * in-between positions rather than repeating frames, which is the whole argument for a time map
+ * over a resample. **Turn 3's protected hold is untouched** (still inside the 1.398× stretch at
+ * 44 output frames) and beat 10's typing stays at 35.6 c/s, both of which were signed off as cut.
+ *
+ * Everything after the split shifts **+23 output frames**; no other rate, boundary or source
+ * frame in the table moved.
  */
 export const SEGMENTS: readonly Segment[] = [
   { out0: 0, out1: 123, src0: 0, src1: 123 }, //             1.000×   beat 1
@@ -90,19 +115,26 @@ export const SEGMENTS: readonly Segment[] = [
   { out0: 970, out1: 1005, src0: 999, src1: 1044.5 }, //     1.300×   beat 5
   { out0: 1005, out1: 1171, src0: 1045, src1: 1211 }, //     1.000×   beat 5
   { out0: 1171, out1: 1224, src0: 1211, src1: 1285.2 }, //   1.400×   beats 5–6
-  { out0: 1224, out1: 1628, src0: 1285, src1: 1689 }, //     1.000×   beats 6–10
-  { out0: 1628, out1: 1813, src0: 1689, src1: 1948 }, //     1.400×   beat 10
-  { out0: 1813, out1: 2020, src0: 1948, src1: 2155 }, //     1.000×   beats 10–11
-  { out0: 2020, out1: 2107, src0: 2186, src1: 2273 }, //     1.000×   beat 12   ← 31f CUT above
-  { out0: 2107, out1: 2145, src0: 2273, src1: 2371.8 }, //   2.600×   beats 12–13
-  { out0: 2145, out1: 2180, src0: 2371.5437, src1: 2431.0097 }, // 1.699×   beat 13
-  { out0: 2180, out1: 2238, src0: 2431.0097, src1: 2447.8097 }, // 0.290×   beat 13
+  { out0: 1224, out1: 1619, src0: 1285, src1: 1680 }, //     1.000×   beats 6–10
+  { out0: 1619, out1: 1670, src0: 1680, src1: 1716 }, //     0.706×   beat 10 · TURN 1'S READ
+  { out0: 1670, out1: 1836, src0: 1716, src1: 1948 }, //     1.398×   beat 10
+  { out0: 1836, out1: 2043, src0: 1948, src1: 2155 }, //     1.000×   beats 10–11
+  { out0: 2043, out1: 2130, src0: 2186, src1: 2273 }, //     1.000×   beat 12   ← 31f CUT above
+  { out0: 2130, out1: 2168, src0: 2273, src1: 2371.8 }, //   2.600×   beats 12–13
+  { out0: 2168, out1: 2203, src0: 2371.5437, src1: 2431.0097 }, // 1.699×   beat 13
+  { out0: 2203, out1: 2261, src0: 2431.0097, src1: 2447.8097 }, // 0.290×   beat 13
 ];
 
 /** The authored timeline the map reads from — `GREYBOX_DURATION` before the re-cut. */
 export const SOURCE_DURATION = 2448;
 
-/** The cut's own length. 74.6s at 30fps, against the source's 81.6s. */
+/**
+ * The cut's own length, **before the four interstitial cards**. 75.4s at 30fps, against the
+ * source's 81.6s — 74.6s before turn 1's read was given its 23 frames back.
+ *
+ * The cards are not in this number: they are inserted into the *output* timeline downstream of
+ * this map, in `GreyboxVideo.tsx`, which is what publishes the film's real duration.
+ */
 export const RETIMED_DURATION = SEGMENTS[SEGMENTS.length - 1].out1;
 
 /**

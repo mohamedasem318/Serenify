@@ -1,6 +1,12 @@
 # Serenify — LinkedIn launch video · beat sheet v1
 
-**Format:** 16:9, 1920×1080, ~60s. Silent-first — every beat must read with no audio. Egyptian Arabic VO is recorded last, over a locked cut.
+**Format:** 16:9, 1920×1080, ~60s. Silent-first — every beat must read with no audio. ~~Egyptian Arabic VO is recorded last, over a locked cut.~~
+
+**THE VO IS DROPPED, SO ON-SCREEN TEXT IS THE FILM'S ONLY NARRATION (2026-08-04).** LinkedIn
+autoplays muted, and a film whose narration is in a soundtrack nobody hears has no narration. It
+goes on **cards** rather than as an overlay — see "The four interstitial cards" below for the three
+reasons, the copy and the placement argument. "Silent-first" stops being a discipline and becomes
+the only mode; nothing in the film may now depend on something being *said*.
 
 **Render viewport:** the product is rendered at a **1200px-wide viewport** and the whole
 desktop is scaled **1.6×** to fill the 1920×1080 output (L7). Not a 1920px browser with
@@ -495,6 +501,102 @@ by the framing window's height against the viewfinder's, not by the shoulders, s
 them cost nothing; the twelve units of headroom the headphone band needed cost about 2%. The
 lever if it ever has to be bought back is **L1's viewfinder size**, and only against a measured
 figure.
+
+---
+
+## The four interstitial cards
+
+The Egyptian Arabic voice-over is dropped and LinkedIn autoplays muted, so **on-screen text is now
+the film's only narration.** It goes on cards, not as an overlay. Three reasons, recorded so the
+decision is not relitigated mid-build:
+
+- The film is near-black with dark UI, so overlaid text needs a **scrim** — sitting on top of
+  surfaces that took nine passes to frame.
+- A caption floating over a screen **breaks the conceit that you are watching a screen.**
+- The film already punctuates with a card (beat 12), so a card is **existing vocabulary** rather
+  than a new device introduced in the last pass.
+
+**And the card is the transition.** Where a card sits, it covers the change of composition. That
+is the point of putting them at these four seams and not elsewhere.
+
+| Position | Line |
+|---|---|
+| Between **beat 4** (the camera gate) and **beat 5** (calibration) | **First it learns what calm looks like.** |
+| Between **beat 5** (calibration) and **beat 6** (later) | **Then it stays quiet.** |
+| Between **beat 7** (at ease) and **beat 8** (the email) | **Until something changes.** |
+| Between **beat 9** (questionnaire) and **beat 10** (Ren) | **Then it helps you come back down.** |
+
+**Why these four seams and no others.** A card earns its place where the film jumps in time or
+changes who is acting, or where the run of lines needs a premise. The first states what the film is
+about to show and gives the three that follow something to continue from; the second covers the
+only unexplained time jump in the film; the third marks the inciting incident; the fourth marks the
+app ceasing to measure and beginning to talk. Every other seam is a chain where each screen causes
+the next and the UI narrates itself.
+
+**The first card does not go earlier than beat 4.** Placed between beats 3 and 4 it would land
+immediately before the camera gate's own heading, "Before the camera turns on" — text stacked on
+text. After the gate resolves, the screen is clear.
+
+**The four lines are ONE SENTENCE across the film.** Read in order: *"First it learns what calm
+looks like. Then it stays quiet. Until something changes. Then it helps you come back down."* Keep
+them in that relationship — **do not re-word one in isolation.** In particular **"First" is
+load-bearing**: it is what gives the two "Then"s something to continue from, which is why the first
+card exists at all.
+
+**"Calm" is deliberate.** The calibration line the first card introduces reads "Setting your
+baseline — one calm moment…", so the card and its beat speak the same language.
+
+**No landing-copy swap was available, and each was checked.** Beat 12's card takes its line verbatim
+from `lib/landing/copy.ts`, which is what keeps the film's claims tied to the product's own, so all
+four of these were checked against that file. None has a near-exact equivalent there; the four
+near-misses are recorded in `video/src/greybox/copy.ts` § `INTERSTITIALS` so nobody re-checks them.
+The closest phrasing of the first card — "what your calm looks like" — is **app** copy, in the
+dashboard banner and the calibration success state, both already on screen in beats 3 and 5;
+quoting one on the card that introduces them would make the card a caption of the surface behind it.
+
+**Two constructions are reserved and do not appear on these cards:**
+
+- **"X, not Y."** That is beat 12's construction and the film's one claim. Reusing it would make the
+  closing card the repeat of a device.
+- **The typewriter.** Reserved for domains — beat 1's omnibox and the end card's `.tech`. That
+  reservation is the reason the bookend works.
+
+**Treatment — beat 12's card, one size down.** Same face (Outfit), same weight (500), same tracking
+(−0.01em), same ground (`CARD.field` #0b0c0e, three points deeper than the app's own page), same
+ink, same centred composition, same **760** framing. They read as the same object as the closing
+card, not as a second design.
+
+**But beat 12 stays the largest text in the film.** It is 34px world at 760, which is **18.88px
+phone-equivalent** (`world × 422 ÷ frameWidth`, this sheet's own arithmetic). The four are **27px →
+14.99px**: clear of the 14px floor, and visibly — 79% — under the claim. They are connective
+tissue; beat 12 is the claim. Both constraints hold at once with room to spare, so the stop-and-
+report escape was not needed.
+
+**Colour.** Near-black ground, off-white type, and **nothing else is available**: meadow, amber and
+crimson all carry band meaning and foggy is Ren's structural colour. No red anywhere.
+
+**Duration: 60 frames (2.00s) each** — in over f3–f15, **settled and static f15–f48 (33 frames,
+1.10s)**, out over f48–f60. Short display text needs time to be read at a glance and then
+registered, not just decoded, so the settled window is the number that matters and it clears its 1s
+floor with margin.
+
+**Entry and exit are a fade with eight pixels of rise** — beat 12's own gesture, so the four read as
+one device *and* as the same object as the card they lead to. Not the typewriter, not the end
+card's wipe.
+
+**They are OUTPUT-timeline material, not authored beats.** A card is new material rather than a
+retimed one, so it is inserted after the Premiere map has been read and runs at exactly its own 60
+frames. Giving each a slot in the authored timeline would have shifted every source frame in
+`retime.tsx`'s segment table downstream of each of the four insertions — thirteen hand-moved
+numbers reproducing a cut that is already approved, for no gain. `CARDS` in `GreyboxVideo.tsx`
+holds their four output frames; each is verified to land on the first frame of the beat it
+precedes.
+
+**One honest note on the third card.** Beats 7 and 8 already join on the *identical* shot
+(`COMPOSITE`) on the *identical* surface — the two beats were deliberately built to be continuous
+there. So that card is the one of the four that does not cover a change of composition; it is
+placed for what it marks, the inciting incident, and it interrupts a continuity rather than hiding
+a discontinuity. That is the trade and it is recorded rather than blurred.
 
 ---
 
@@ -1910,6 +2012,27 @@ and the typing rate are therefore under the floors this section sets. Left as cu
 Mohamed's and he has watched it — and recorded here so the two sets of numbers are never confused
 for each other.
 
+**TURN 1 IS THE ONE OF THOSE THREE THAT IS NOW OVERRULED (2026-08-04), AND IT IS THE ONLY ONE.**
+*"Something shifted just now. What happened?"* is seven words; at a typical silent reading rate they
+need about **1.7s**, and the cut gave them **0.94s**. The previous pass flagged it and left it as
+cut deliberately, because the decision was Mohamed's. It is made: the read gets its time back.
+
+The fix is in the **time map**, not in this beat — no keyframe here moves. `retime.tsx` splits the
+1.400× segment at the read: source **1680 → 1716**, which is this beat's own **f38 → f74** (the
+frame turn 1 lands on, to the frame the camera leaves on), runs at **0.706×** over **51 output
+frames — 1.70s**, from 28.3. Everything after it shifts +23 output frames and no other rate,
+boundary or source frame in the table moves.
+
+**Slowing below the authored rate is safe here and would not be everywhere.** The camera is static
+across those 36 authored frames, the message has landed, and the only things moving are Ren's blink
+and his `thinking` pose — both frame-derived, so Remotion genuinely draws the in-between positions
+rather than repeating frames. That is the whole argument for a time map over a resample, spent
+here.
+
+**The other two stay exactly as cut.** Turn 3 keeps its 44 output frames (1.47s), and the typing
+keeps its 35.6 c/s — which reads as text *appearing* rather than as a person typing, and is
+accepted as that.
+
 **Ren's avatar is in all four**, which is the requirement L8's enlargement exists to serve and
 which the header placement now guarantees by construction.
 
@@ -1982,7 +2105,7 @@ typing again from the moment the player closes, all the way through the nod, the
 recovery. The nod and the notes stay — they are the point of the beat. What changed is that he
 does not stop.
 
-**No audio plays.** This is animation only; the VO track is Arabic narration and the cut must work silent regardless.
+**No audio plays.** This is animation only. ~~the VO track is Arabic narration and the cut must work silent regardless.~~ **There is no VO track at all now** — see the top of this file — so "must work silent" stops being a hedge and becomes the only condition.
 
 Then, **after the head nod, THE CAMERA PULLS OUT AND HOLDS.** That pull-out is the beat's payoff
 and it was missing: the move used to begin two-thirds of the way in and arrive on the very last
@@ -2101,8 +2224,10 @@ is a tic. Framed at 760, the same as the end card, so the two read as one closin
 3. then **`serenify.tech` derives from the wordmark**: the wordmark duplicates on screen, the
    copy shrinks and travels down to the domain line, and only **`.tech`** types in after it
 
-Then hold. This is where the VO lands its last line, so the hold is room in the cut rather than
-dead air.
+Then hold. ~~This is where the VO lands its last line, so the hold is room in the cut rather than
+dead air.~~ **With the VO dropped the hold has to earn itself visually**, and it does — the
+Premiere cut stretches these last 17 authored frames over 58 (0.60s → 1.93s), which is the film
+resting on the domain rather than waiting for a line that is no longer coming.
 
 **This makes the typewriter *mean* something.** All three elements used to type, which made
 typing the card's house style rather than a gesture. Now the only thing that types in the whole
@@ -2189,12 +2314,30 @@ pace at best and a stall at worst. All 1.5s came out of the typing. The reveal i
 that only `.tech` types there are five characters left to spend it on — they run ~12 c/s, which
 is slower per character than the old lines and still much shorter, because a five-character
 suffix typed at speed reads as a glitch rather than as typing. The hold after the domain lands is
-**unchanged** at ~1.13s, including the second added in revision 4 — that is where the VO lands
-and it is not what feels slow.
+**unchanged** at ~1.13s, including the second added in revision 4 — ~~that is where the VO lands
+and~~ **the VO is dropped, and the hold is kept anyway**: it is not what feels slow, and the film
+now ends on a held domain rather than on a line being spoken over one.
 
 ---
 
-## Running total: ~74.6s
+## Running total: ~83.4s
+
+**2501 frames.** The Premiere cut's 2238 (74.6s), **+23** for beat 10's turn 1 getting its read
+back, **+240** for the four interstitial cards. Two additions on top of an approved cut, both
+requested and both stated where they land:
+
+| | frames | seconds |
+|---|---|---|
+| the Premiere cut, as approved | 2238 | 74.6 |
+| beat 10 · turn 1 restored to 1.70s | +23 | +0.8 |
+| the four interstitial cards, 60 each | +240 | +8.0 |
+| **the film** | **2501** | **83.4** |
+
+**The cards are the whole of the growth, and they are narration rather than pacing.** With the VO
+gone they are not an addition to the film's runtime so much as a relocation of its soundtrack onto
+the screen; 8s of type is what carrying the narration visually costs. Trimming toward the 40–60s
+target, if it is ever taken up again, has to come out of the beats and not out of these — a card
+under its floor is runtime spent on something nobody finishes reading.
 
 Still over the 40–60s target. **Do not trim on paper — trim in greybox**, where you can actually
 feel what's slow — which is exactly how the −124 pass below was found, and the pass above it went
@@ -2589,6 +2732,28 @@ tile, the new cut's **46 against the control's 52**, and a count is only ever co
 produced by the same run of the same script. This is the same lesson the metric already carries —
 verify against a control, not an absolute — applied one level down, to the tool.
 
+**AND THE CARDS PASS RAN IT WITH A ZERO-THRESHOLD METRIC, WHICH IS WHY ITS COUNTS LOOK WORSE.**
+`Greybox` is a pure function of frame, so two correct renders must produce **byte-identical PNGs** —
+which means md5 alone finds every disagreement and resolves the two-of-three majority, with no
+pixel decode and no threshold to choose. Across the 2501 frames of `greybox-2026-08-04-cards.mp4`,
+three renders disagreed on **209**: outlier A on 72, B on 64, C on 56, with **17 having no
+two-of-three majority** (left as A). `out/seqX` is the verified sequence — render A with its 72
+outliers replaced — and the shipped file is encoded from it, at the settings above, **verified by
+diffing the x264 options string in its SEI against the premiere cut's: identical.**
+
+**Those 209 are not comparable to the previous passes' 58 and 68, and the reason is the
+threshold, not the film.** The earlier figures came from a per-tile pixel metric that ignores
+sub-threshold differences; this one counts every non-identical byte. Spot-measured on ten of the
+209, the picture is the same regime as before: **B and C agree at max |Δ| = 0 while A differs**,
+and A's deltas are mostly 4–15 levels over a handful of pixels — 1px card borders under a moving
+camera. **One is a real race and is exactly what the procedure exists to catch: f1615, max |Δ| 130
+over 25,925 pixels.** It was replaced.
+
+The lesson is the one this section already carries, one level further in: **a count is only
+comparable to a count produced by the same metric.** Byte-identity is the stricter and the
+cheaper test, it needs no control to interpret, and it is the one to use from here — but its
+number must never be read against a thresholded one.
+
 **Do not judge a frame-level artifact off a single render**; diff three, diff them locally, and
 compare the encode against the last one that shipped.
 
@@ -2708,6 +2873,33 @@ compare the encode against the last one that shipped.
   toast's squircle icon is a clip-path over the **same shared `MailMark`** the client uses rather
   than a second drawing of it, so the two cannot drift apart. What is left to judge is
   recognition across the gap, which only the render can answer.
+
+---
+
+## The remaining hard seams — REPORTED, not built
+
+The film's camera is continuous **inside** a beat by invariant, so most beat boundaries are moves
+rather than cuts: beats 2→3 and 3→4 join on explicit named seam shots (`BEAT2_SEAM`, `BEAT4_SEAM`,
+the second velocity-matched with `EASE_DEPART` → `EASE_ARRIVE`), 8→9 picks up beat 8's closing
+framing and holds it four more frames before easing on, and 12→13 shares one solid `CARD.field`
+ground so only the wordmark's wipe ends the black.
+
+With the four cards in, **four boundaries are still hard changes of composition** — the picture
+changes with neither a camera move nor a card covering it. This is the report; **nothing here is
+built in this pass**, and this list is the input to the next one.
+
+| Boundary | Out of | Into | What changes |
+|---|---|---|---|
+| **1 → 2** | landing hero, `HERO_SHOT` ≈610 | signup column, `SIGNUP_ESTABLISH` 880 | Different page at a wider framing with no carry-through. The "Get started" click that motivates it happens inside beat 1, so the *cause* is on screen — but beat 2 opens on a new surface and a new width regardless. |
+| **6 → 7** | dashboard, full 1200 | monitoring, ≈1017 | Different surface at a similar width, with no seam shot — the one boundary in the first act that was not given the treatment 2→3 and 3→4 were built for. |
+| **10 → 11** | chat panel, `L3` ≈665 | monitoring, full 1200 | Different surface and the largest width jump in the film, ~1.8×. |
+| **11 → 12** | live monitoring composite, 927 | the closing card, solid `CARD.field` at 760 | The most abrupt of the four: the "live app" register drops for the title-card register instantly, with no device of any kind. |
+
+**And the third card is the one that does the opposite.** Beats 7 and 8 already join on the
+*identical* shot on the *identical* surface — deliberately, "the beats join on the same shot" — so
+"Until something changes." interrupts a continuity rather than covering a discontinuity. It is
+placed for what it marks, not for what it hides. Recorded here so a later pass does not read the
+four cards as four fixed seams.
 
 ---
 
