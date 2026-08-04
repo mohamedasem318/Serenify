@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, interpolate } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { LANDING, centre } from "../../app/geometry";
 import { OS, OS_FONT, OS_TABULAR } from "../../app/furniture";

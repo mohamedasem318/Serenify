@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, useCurrentFrame } from "remotion";
+import { AbsoluteFill } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { ChatPage, msg } from "../../app/chat";
 import { CHAT, PHONE_PX, REN_AVATAR, REN_AVATAR_SIZE, centre } from "../../app/geometry";

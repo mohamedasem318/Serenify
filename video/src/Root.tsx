@@ -19,7 +19,7 @@ import { Beat10Ren } from "./greybox/beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
-import { GREYBOX_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
+import { GreyboxVideo, RETIMED_DURATION } from "./greybox/GreyboxVideo";
 import { RigSpike } from "./greybox/RigSpike";
 import { SwapProbe } from "./SwapProbe";
 import { HelloWorld } from "./HelloWorld";
@@ -28,8 +28,10 @@ import "./tailwind.css";
 
 /**
  * `Greybox` is the cut: all thirteen beats of
- * `docs/video/serenify-launch-video-beat-sheet.md` at their sheet durations, in
- * grey rectangles, with real camera moves.
+ * `docs/video/serenify-launch-video-beat-sheet.md`, **read at the rates of Mohamed's
+ * Premiere re-cut** — 2238 frames of output over 2448 authored ones. The beats below are
+ * registered at their **authored** durations and are unretimed, which is what makes one of
+ * them scrubbable on its own. See `retime.tsx` and `GreyboxVideo.tsx`.
  *
  * Every beat is ALSO registered on its own under `Greybox-Beats`, so a single
  * beat can be scrubbed and re-timed without playing the sixty seconds in front
@@ -46,7 +48,7 @@ export function RemotionRoot() {
       <Composition
         id="Greybox"
         component={GreyboxVideo}
-        durationInFrames={GREYBOX_DURATION}
+        durationInFrames={RETIMED_DURATION}
         fps={30}
         width={1920}
         height={1080}

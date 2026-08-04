@@ -1,5 +1,6 @@
 import React from "react";
-import { useCurrentFrame, useVideoConfig } from "remotion";
+import { useVideoConfig } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { Bloom, Trend, Viewfinder } from "./actors";
 import { frameRect, Rect, rect, Shot, union } from "./Camera";

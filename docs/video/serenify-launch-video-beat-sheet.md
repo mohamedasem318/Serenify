@@ -1901,6 +1901,15 @@ frames at 14.37px inside its landing, turn 3 still gets its protected 60 at L3, 
 itself is untouched at 92 frames for 78 characters, because 25.4 c/s is already faster than a
 person types.
 
+**EVERY NUMBER IN THIS BEAT IS AUTHORED, AND THE FILM NOW READS THEM AT 1.40×.** The Premiere cut
+(see "Running total") runs beat 10 at 1.40× from its f47 to its f306, which is the typing, the
+send, the thinking and turn 3. The beat's own timeline is unchanged and this is still what the
+sheet describes; what lands on screen is **turn 1 at 28.3 frames instead of 36**, **turn 3 at 44
+instead of its protected 60**, and **the typing at 35.6 c/s instead of 25.4**. Both protected reads
+and the typing rate are therefore under the floors this section sets. Left as cut — the decision is
+Mohamed's and he has watched it — and recorded here so the two sets of numbers are never confused
+for each other.
+
 **Ren's avatar is in all four**, which is the requirement L8's enlargement exists to serve and
 which the header placement now guarantees by construction.
 
@@ -2144,6 +2153,15 @@ event ends at f154 of **172**, leaving the same 18 frames of held card.
 **This is the only beat that grows, and it is the last one**, so nothing downstream is pushed and
 no hold anywhere else is spent: **136 → 172 (+36)**.
 
+**AND THE PREMIERE CUT TAKES THE WIPE BACK BELOW THE VERSION THAT WAS REJECTED.** Everything above
+is the authored beat and is unchanged; the film reads it at **2.60×** across the reveal and
+**1.70×** through the domain, so the 72-frame wipe lands in **27.7 frames (0.92s)** — faster than
+the 36 (1.20s) that was reported as *"still far too fast"* and doubled in the first place. `.tech`
+types in 7.1 frames rather than 12. The one part that grows is the **held card at the end**: its
+last 17 authored frames, in which nothing animates at all, are held over **58** — 0.60s → 1.93s,
+which is the "final `serenify.tech` moment slowed down and held longer". Left as cut; see "Running
+total" for why it is recorded rather than corrected.
+
 **The duplicate travels BEHIND the line, dipped to under half opacity in transit.** Its path
 from the wordmark to the domain row is almost vertical and the line sits across the middle of
 it; drawn in front and fully opaque it blanked half of "take care of yourself" for most of the
@@ -2176,13 +2194,98 @@ and it is not what feels slow.
 
 ---
 
-## Running total: ~81.6s
+## Running total: ~74.6s
 
 Still over the 40–60s target. **Do not trim on paper — trim in greybox**, where you can actually
-feel what's slow — which is exactly how this pass found its −124.
+feel what's slow — which is exactly how the −124 pass below was found, and the pass above it went
+one better: it was trimmed in **Premiere**, on the render.
 
-**−124 frames across this pass, all of them in the second half, and none of them a read** — 2572 →
-**2448** frames, 85.7s → 81.6s.
+**−210 frames, and the cut is MOHAMED'S rather than a proposal to him** — 2448 → **2238** frames,
+81.6s → 74.6s. The remaining notes on `out/greybox-2026-08-02.mp4` were all pacing, so rather than
+another round trip he took the render into Premiere Pro and re-cut it himself. **That cut is the
+approved timing.** What is reproduced here is `serenify launch video.prproj`, segment for segment.
+
+**The project file is the spec, not the description of it.** Three things were described — mostly
+speed changes, a few frames removed before the closing card, the final `serenify.tech` moment
+slowed and held. All three are in the file. Three things are in it that the description did not
+carry, and the third is the one that matters:
+
+- **Seven speed-ups, not a few**, and two are large: 2.00× inside beat 5 and 2.60× across the end
+  card. The others are 1.30× (twice), 1.40× (twice) and 1.70×.
+- **The frames removed before the closing card are 31** — a full second, not a few frames. They are
+  the *tail* of beat 11, so the one-take invariant holds: this is a beat shortened, not an edit
+  placed inside one. It is the film's only cut and everything else in the pass is a duration.
+- **The end card's wordmark reveal is compressed to 27.7 frames, 0.92s.** It was **72 (2.40s)**,
+  and it is 72 because 36 frames was reported as *"still far too fast"* and needed "considerably
+  more than a touch" — so his own cut now runs the reveal **faster than the version he rejected**.
+  Left exactly as he cut it, because he has watched this cut and approved it; recorded here because
+  it is the one change in the pass that reverses a stated decision rather than extending one.
+
+| Beat | Frames | What happens to it |
+|---|---|---|
+| 1 · cold open | 180 → **168** | 1.30× across the omnibox lift. −0.4s |
+| 2 · signup | 432 → **432** | 1.00×. Untouched at every frame. |
+| 3 · dashboard | 120 → **120** | 1.00×. Untouched. |
+| 4 · camera gate | 120 → **120** | 1.00×. Untouched. |
+| 5 · calibration | 422 → **376** | 2.00× through the countdown, then 1.30×, then 1.40× on the tail. −1.5s |
+| 6 · "Later" | 36 → **33** | beat 5's 1.40× tail runs three frames into it. −0.1s |
+| 7 · at ease | 72 → **72** | 1.00×. Untouched. |
+| 8 · the email | 184 → **184** | 1.00×. Untouched — the whole email beat, at its authored rate. |
+| 9 · questionnaire | 76 → **76** | 1.00×. Untouched. |
+| 10 · Ren | 310 → **236** | 1.40× across the typing, the send, the thinking and turn 3. −2.5s |
+| 11 · return to ease | 234 → **203** | 1.00×, and **its last 31 frames deleted**. −1.0s |
+| 12 · closing card | 90 → **89** | 1.00× for the line; only its last 3 frames catch the end card's 2.60×. |
+| 13 · end card | 172 → **129** | 2.60× across the reveal, 1.70× through the domain, then its last 17 frames held over 58. −1.4s |
+
+**The whole of the first act after the cold open is at 1.00×, and so are the email and the
+questionnaire** — beats 2, 3, 4, 7, 8 and 9 do not lose a frame. The reductions are the
+calibration, Ren and the end card.
+
+**The two reads that went under their protected holds are beat 10's, and both are left as cut.**
+Beat 8's toast and stateline changes, beat 9's prompt before the click and beat 12's line are all
+inside 1.00× segments and keep every frame they had.
+
+| Read | Protected | Cut | Rate |
+|---|---|---|---|
+| beat 10 · turn 1, at 14.37px | 36f (1.20s) | **28.3f (0.94s)**, −21% | 42 chars at 35.0 → **44.5 c/s** |
+| beat 10 · turn 3, at 9.52px | 60f (2.00s) | **44.0f (1.47s)**, −27% | 114 chars at 57.0 → **77.7 c/s** |
+
+**And beat 10's typing is now 35.6 characters a second.** It was 25.4 — already declared *"faster
+than a person types"* and protected by *never sped to fit, shorten the line instead*. The 1.40×
+does to the rate what the rule forbids doing to it directly. The copy is Mohamed's, verbatim and
+fixed, so the only levers are the rate and the beat's length; this pass took the rate.
+
+**The final `serenify.tech` moment is a HOLD being extended, not a move being slowed.** Every
+authored event in beat 13 has finished by its local f144; the 0.29× segment covers f155–f172, which
+is a static card. 17 authored frames over 58 output ones — 0.60s → 1.93s of the same picture.
+
+**And the trend's sync is safe by construction here rather than by care.** Its band keys live in
+beats 8 and 11, and both are **entirely at 1.00×** — there is no retimed frame anywhere near a
+crossing. It is verified on the render regardless, because it has broken twice.
+
+── **how the cut is reproduced, and why it comes out cleaner than the export** ──
+
+`video/src/retime.tsx` holds the fourteen segments and maps every output frame onto a **fractional**
+authored frame; `GreyboxVideo.tsx` dispatches the beat and splits that frame in two, the integer
+part riding a `<Sequence>` offset and the remainder riding `SubFrameContext`. **Every beat's own
+timeline is untouched** — each is still registered at its authored duration and still scrubs at its
+authored rate on its own in Studio.
+
+**A time map rather than thirteen re-keyed beats, and the reason is the trend.** Six beats change
+speed *inside themselves* — beat 5 at five different rates, beat 13 at three. Re-authoring those
+would mean splitting each beat's timeline at arbitrary frames and rescaling every key by hand, with
+L18's band keys having to move in step with the stateline at every one of them. The map cannot get
+that wrong: the stateline and the graph read the same remapped frame, so they move together with no
+second place for a key to be forgotten.
+
+**The fractional frame is the quality argument.** Premiere resamples an already-rendered clip;
+Remotion re-renders, so an eased move compressed to 1.40× can be drawn at the positions *between*
+authored frames rather than at the nearest one. Rounding would have reproduced Premiere's sampling
+exactly and bought nothing. A file that keeps importing Remotion's own `useCurrentFrame` degrades
+to that sampling rather than breaking, which is why the seam is safe.
+
+**−124 frames across the pass before it, all of them in the second half, and none of them a read** —
+2572 → **2448** frames, 85.7s → 81.6s.
 
 **The note was that the film slows from the "Start check-in" click onward and stays slow, and the
 measurement is the argument.** Two numbers, taken per camera landing across every beat: the
@@ -2458,6 +2561,12 @@ other two agree on. The shipped file is encoded from it, at the same settings th
 — libx264 CBR **10220 kbps**, `nal-hrd=cbr filler=1`, yuv420p, everything else the x264 defaults
 (verified by diffing the x264 options string in both files' SEI: identical).
 
+**The Premiere cut ran the same procedure and landed in the same regime**, which is the useful
+result: retiming did not make the race worse. Across its 2238 frames three renders disagreed on
+**68** — outlier A on 15, B on 22, C on 27, **4 with no two-of-three majority**, against 58 and
+22/16/16/4 before. `out/seqP` is its verified sequence — render A with its **15** outliers replaced
+— and `out/greybox-2026-08-04-premiere-cut.mp4` is encoded from it at the settings above.
+
 **And the encode verifies against a CONTROL rather than against an absolute.** A per-tile figure
 means nothing on its own — chroma subsampling alone puts colour edges tens of levels apart — so the
 number to beat is the *previous* cut measured the same way. Luma, 60px tiles at 960×540, area
@@ -2467,6 +2576,18 @@ downscale on both sides:
 |---|---|---|---|
 | `greybox.mp4` vs `out/seq1` | 2572 | 48 | 315 |
 | `greybox-2026-08-02.mp4` vs `out/seqV` | 2448 | 53 | 299 |
+| `greybox-2026-08-02.mp4` vs `out/seqV` — re-measured 2026-08-04 | 2448 | **52** | 2384 |
+| `greybox-2026-08-04-premiere-cut.mp4` vs `out/seqP` | 2238 | **46** | 2196 |
+
+**READ THOSE LAST TWO ROWS TOGETHER AND IGNORE THE `over 3.0` COLUMN ACROSS ROWS.** The control was
+re-measured alongside the new cut because the two must go through one script to be comparable, and
+the point survives being demonstrated: **worst tile reproduces (53 → 52, the same number), and the
+count does not (299 → 2384).** The extremes are robust to how the two sides are brought into a
+common colour space; the bulk of the distribution sits close enough to the threshold that a
+different RGB↔YUV round trip moves almost every frame across it. So the row to trust is the worst
+tile, the new cut's **46 against the control's 52**, and a count is only ever comparable to a count
+produced by the same run of the same script. This is the same lesson the metric already carries —
+verify against a control, not an absolute — applied one level down, to the tool.
 
 **Do not judge a frame-level artifact off a single render**; diff three, diff them locally, and
 compare the encode against the last one that shipped.

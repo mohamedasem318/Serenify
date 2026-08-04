@@ -1,5 +1,6 @@
 import React from "react";
-import { continueRender, delayRender, useCurrentFrame } from "remotion";
+import { continueRender, delayRender } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { Header } from "@/components/header/header";
 import type { Band } from "@/components/monitor/use-monitoring-session";

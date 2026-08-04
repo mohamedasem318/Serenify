@@ -1,5 +1,5 @@
 import React from "react";
-import { useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { BreathingOrb } from "@/components/anchor/breathing-guide";
 import { FramingOverlay } from "@/components/anchor/framing-overlay";

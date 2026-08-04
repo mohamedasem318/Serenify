@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing, interpolate } from "remotion";
+import { useCurrentFrame } from "../../retime";
 
 import { ConsentGatePage } from "../../app/consent";
 import { BEAT4_ESTABLISH, BEAT4_SEAM } from "../../app/framing";

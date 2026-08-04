@@ -1,5 +1,6 @@
 import React from "react";
-import { AbsoluteFill, Easing, useCurrentFrame } from "remotion";
+import { AbsoluteFill, Easing } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 import { CAMERA, patchMeasurementForCamera } from "../app/measure-patch";
 import { StillMotion } from "../app/motion";

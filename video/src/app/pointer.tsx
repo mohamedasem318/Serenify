@@ -1,5 +1,6 @@
 import React from "react";
-import { Easing, interpolate, useCurrentFrame } from "remotion";
+import { Easing, interpolate } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 /**
  * ══ THE CURSOR ══════════════════════════════════════════════════════════════════════

@@ -1,5 +1,5 @@
 import React from "react";
-import { AbsoluteFill, Series } from "remotion";
+import { AbsoluteFill, Sequence, useCurrentFrame as useRenderedFrame } from "remotion";
 
 import { Beat01ColdOpen } from "./beats/Beat01ColdOpen";
 import { Beat02Signup } from "./beats/Beat02Signup";
@@ -14,6 +14,12 @@ import { Beat10Ren } from "./beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./beats/Beat12Closing";
 import { Beat13EndCard } from "./beats/Beat13EndCard";
+import {
+  RETIMED_DURATION,
+  SOURCE_DURATION,
+  sourceFrameAt,
+  SubFrameContext,
+} from "../retime";
 import { Settle } from "./settle";
 import { FONT, GREY } from "./theme";
 
@@ -107,52 +113,113 @@ import { FONT, GREY } from "./theme";
  */
 export const GREYBOX_DURATION = 2448;
 
-export const GreyboxVideo: React.FC = () => (
-  <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
-    {/* Outside the Series, so it is mounted exactly once for the whole cut and every beat gets
-        the same hold. See `settle.tsx` — the renderer was emitting one wrong frame in a few
-        hundred, and no beat could have known to guard against it. */}
-    <Settle />
-    <Series>
-      <Series.Sequence durationInFrames={180} name="1 · cold open">
-        <Beat01ColdOpen />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={432} name="2 · signup">
-        <Beat02Signup />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={120} name="3 · dashboard">
-        <Beat03Dashboard />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={120} name="4 · camera gate">
-        <Beat04CameraGate />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={422} name="5 · calibration">
-        <Beat05Calibration />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={36} name="6 · later">
-        <Beat06Later />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={72} name="7 · at ease">
-        <Beat07AtEase />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={184} name="8 · the email">
-        <Beat08Email />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={76} name="9 · questionnaire">
-        <Beat09Questionnaire />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={310} name="10 · Ren">
-        <Beat10Ren />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={234} name="11 · return to ease">
-        <Beat11ReturnToEase />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={90} name="12 · closing card">
-        <Beat12Closing />
-      </Series.Sequence>
-      <Series.Sequence durationInFrames={172} name="13 · end card">
-        <Beat13EndCard />
-      </Series.Sequence>
-    </Series>
-  </AbsoluteFill>
-);
+/**
+ * ══ AND THE CUT IS NOW THE PREMIERE ONE — 2448 AUTHORED FRAMES READ IN 2238 ═════════
+ *
+ * The durations above are the **authored** timeline and they are unchanged; every beat still
+ * runs at its own rate when scrubbed on its own in Studio, and every keyframe inside every beat
+ * is where it was. What changed is the rate at which the film reads them, taken frame for frame
+ * off `serenify launch video.prproj` — see `../retime.tsx` for the segment table and for why the
+ * cut is a time map rather than thirteen re-keyed beats.
+ *
+ *   beat                 authored    cut     Δ    what happens to it
+ *   ──────────────────── ────────  ─────  ─────   ────────────────────────────────────────
+ *    1 cold open              180    168    −12   1.30× across the omnibox lift
+ *    2 signup                 432    432      0   untouched
+ *    3 dashboard              120    120      0   untouched
+ *    4 camera gate            120    120      0   untouched
+ *    5 calibration            422    376    −46   2.00×, then 1.30×, then 1.40× on the tail
+ *    6 later                   36     33     −3   the 1.40× tail runs into it
+ *    7 at ease                 72     72      0   untouched
+ *    8 the email              184    184      0   untouched
+ *    9 questionnaire           76     76      0   untouched
+ *   10 Ren                    310    236    −74   1.40× across the typing, the send and turn 3
+ *   11 return to ease         234    203    −31   1.00×, and its LAST 31 FRAMES DELETED
+ *   12 closing card            90     88     −2   untouched but for its last 3 frames
+ *   13 end card               172    130    −42   2.60×, 1.70×, then its last 17f over 58
+ *                          ──────  ─────  ─────
+ *                            2448   2238   −210   81.6s → 74.6s
+ *
+ * **Beats 2, 3, 4, 7, 8 and 9 are at 1.00× and are not touched at any frame** — which is the
+ * whole of the first act after the cold open, and the whole of the email and the questionnaire.
+ * The reductions are the calibration, Ren, and the end card.
+ *
+ * ── ONE CUT, AND IT IS THE ONLY ONE ─────────────────────────────────────────────────
+ *
+ * Source 2155 → 2186: the last 31 frames of beat 11, immediately before the closing card. It is
+ * a beat's **tail** being shortened, not an edit placed inside one, so the one-take invariant is
+ * intact — the film still never cuts within a beat. Everything else here is a duration.
+ *
+ * ── AND THE SERIES IS GONE, BECAUSE A SERIES CANNOT HOLD A FRACTIONAL FRAME ─────────
+ *
+ * `<Series>` slices its children on integer frame boundaries, and the whole point of re-rendering
+ * a retimed beat rather than resampling one is that the frame handed to it is fractional. So the
+ * beat is dispatched directly and mounted under a `<Sequence>` whose offset carries the integer
+ * part, with `SubFrameContext` carrying the remainder. `key` is the beat's own name, so a beat
+ * mounts once and stays mounted for its whole run exactly as `<Series>` had it — the `delayRender`
+ * gates in `landing.tsx` and `monitor.tsx` depend on that and would otherwise re-fire every frame.
+ */
+const BEATS = [
+  { name: "1 · cold open", frames: 180, Beat: Beat01ColdOpen },
+  { name: "2 · signup", frames: 432, Beat: Beat02Signup },
+  { name: "3 · dashboard", frames: 120, Beat: Beat03Dashboard },
+  { name: "4 · camera gate", frames: 120, Beat: Beat04CameraGate },
+  { name: "5 · calibration", frames: 422, Beat: Beat05Calibration },
+  { name: "6 · later", frames: 36, Beat: Beat06Later },
+  { name: "7 · at ease", frames: 72, Beat: Beat07AtEase },
+  { name: "8 · the email", frames: 184, Beat: Beat08Email },
+  { name: "9 · questionnaire", frames: 76, Beat: Beat09Questionnaire },
+  { name: "10 · Ren", frames: 310, Beat: Beat10Ren },
+  { name: "11 · return to ease", frames: 234, Beat: Beat11ReturnToEase },
+  { name: "12 · closing card", frames: 90, Beat: Beat12Closing },
+  { name: "13 · end card", frames: 172, Beat: Beat13EndCard },
+] as const;
+
+/** First authored frame of each beat. */
+const BEAT_STARTS = BEATS.reduce<number[]>((acc, b, i) => {
+  acc.push(i === 0 ? 0 : acc[i - 1] + BEATS[i - 1].frames);
+  return acc;
+}, []);
+
+if (BEAT_STARTS[BEATS.length - 1] + BEATS[BEATS.length - 1].frames !== SOURCE_DURATION) {
+  throw new Error("the beat table and the retime map disagree about the authored length");
+}
+
+const beatIndexAt = (authored: number): number => {
+  for (let i = BEATS.length - 1; i > 0; i--) {
+    if (authored >= BEAT_STARTS[i]) return i;
+  }
+  return 0;
+};
+
+export const GreyboxVideo: React.FC = () => {
+  // Remotion's own frame, deliberately — this is the OUTPUT frame the renderer is producing, and
+  // it is the only place in the composition that wants it rather than the source frame.
+  const out = useRenderedFrame();
+
+  const source = sourceFrameAt(out);
+  const authored = Math.min(Math.floor(source), SOURCE_DURATION - 1);
+  const subFrame = source - authored;
+
+  const i = beatIndexAt(authored);
+  const { name, frames, Beat } = BEATS[i];
+  const local = authored - BEAT_STARTS[i];
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: GREY.black, fontFamily: FONT }}>
+      {/* Outside the beat, so it is mounted exactly once for the whole cut and every beat gets
+          the same hold — and outside the provider, because it keys on the frame being RENDERED
+          rather than on the frame being read. See `settle.tsx` — the renderer was emitting one
+          wrong frame in a few hundred, and no beat could have known to guard against it. */}
+      <Settle />
+      <SubFrameContext.Provider value={subFrame}>
+        {/* `from` is solved so the child sees `local`: it reads `out - from`. */}
+        <Sequence key={name} layout="none" from={out - local} durationInFrames={frames}>
+          <Beat />
+        </Sequence>
+      </SubFrameContext.Provider>
+    </AbsoluteFill>
+  );
+};
+
+export { RETIMED_DURATION };

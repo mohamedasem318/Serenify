@@ -1,5 +1,6 @@
 import React from "react";
-import { Easing, interpolate, interpolateColors, useCurrentFrame } from "remotion";
+import { Easing, interpolate, interpolateColors } from "remotion";
+import { useCurrentFrame } from "../retime";
 
 /**
  * ── RE-AUTHORED MOTION ──────────────────────────────────────────────────────────────
