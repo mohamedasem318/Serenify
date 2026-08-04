@@ -3,12 +3,13 @@ import { AbsoluteFill } from "remotion";
 
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 
-import { BEAT8_WIDE, BEAT9_PROMPT, PHONE, useShotAt } from "../../app/framing";
+import { BEAT8_WIDE, BEAT9_OPTIONS, BEAT9_PROMPT, PHONE, useShotAt } from "../../app/framing";
 import { PROMPT, centre } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { MonitorPage, WorldOverlay, WorldPrompt } from "../../app/monitor";
 import { useToastIn } from "../../app/motion";
 import { Pointer } from "../../app/pointer";
+import { usePitch } from "../../pitch-context";
 import { Camera, CameraKey } from "../Camera";
 import { useExpression } from "../rig";
 
@@ -91,8 +92,27 @@ import { useExpression } from "../rig";
  * whatever is under it, so a prompt covering the page's own content while it is up is the
  * component's behaviour rather than a collision. Beat 9 does not need the trend in shot.
  */
+/**
+ * ── AND THE PITCH CUT FRAMES IT DIFFERENTLY, BECAUSE BY THEN IT IS THE SECOND PROMPT ─
+ *
+ * The pitch cut shows this surface twice: once in the false-alarm sequence, where it is new and
+ * is pushed in on and read whole, and once here. The launch cut's landing — hold on beat 8's
+ * wide, then ease in on the whole panel — is exactly what would make the second one read as a
+ * repeat of the first.
+ *
+ * So under `PitchContext` the beat **opens already landed**, on the three option rows rather
+ * than on the panel. No push. The title and the body are partly out of frame by design: the
+ * audience knows the question, and the subject of the second prompt is which button the cursor
+ * goes to. Nothing else about the beat changes — same prompt, same pointer, same hover, same
+ * click. See the pitch sheet §7 · beat 9 and `framing.ts` § THE PITCH CUT'S BEAT 9.
+ */
+const PITCH_KEYS: CameraKey[] = [
+  { frame: 0, shot: BEAT9_OPTIONS },
+  { frame: 76, shot: BEAT9_OPTIONS },
+];
+
 /** One array, used by `<Camera>` AND by the projection — they cannot disagree. */
-const KEYS: CameraKey[] = [
+const LAUNCH_KEYS: CameraKey[] = [
   // Picks up beat 8's closing framing and holds four frames past the prompt's arrival — the
   // camera reacts to it rather than anticipating it — then eases in and HOLDS. The click at f66
   // happens 24 frames after the camera has stopped, and the beat ends 10 frames after the click.
@@ -103,6 +123,10 @@ const KEYS: CameraKey[] = [
 ];
 
 export const Beat09Questionnaire: React.FC = () => {
+  // null outside the pitch composition, where each beat keeps its own constant.
+  const readout = usePitch().session?.beat9;
+  // `beat9Options` is false everywhere except the pitch composition.
+  const KEYS = usePitch().beat9Options ? PITCH_KEYS : LAUNCH_KEYS;
   const enter = useToastIn(6);
   const shot = useShotAt(KEYS);
   const yes = centre(PROMPT.yes);
@@ -116,13 +140,14 @@ export const Beat09Questionnaire: React.FC = () => {
     <AbsoluteFill>
       <Camera keys={KEYS}>
         <MonitorPage
-          clock="11:30 AM"
+          clock={readout?.clock ?? "11:30 AM"}
           // Held where beat 8 left it — tense, and the session has peaked there.
           level={1}
           peak={1}
           tension={1}
           pose={pose}
-          sessionFrom={47 * 60 + 23}
+          // 48:06 under the pitch cut — see `pitch-context.tsx` § THE INTERNAL CLOCK.
+          sessionFrom={readout?.from ?? 47 * 60 + 23}
         />
       </Camera>
 

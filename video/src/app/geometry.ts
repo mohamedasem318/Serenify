@@ -874,7 +874,59 @@ export const PROMPT = {
   panel: rect(STACK_LEFT, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP, 320, 290),
   /** "Yes, that's me" — the true-positive branch. Offsets measured off the panel's own box. */
   yes: rect(STACK_LEFT + 25, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP + 117, 270, 44),
+  /**
+   * "No, I'm okay" — the FALSE-ALARM branch, which the pitch cut shows and the launch cut did
+   * not. See the pitch sheet §6.1.
+   *
+   * **This is arithmetic on `yes`, not a new measurement.** The three options are a
+   * `flex flex-col gap-2` of `min-h-11` rows (`confirmatory-prompt.tsx:24,51`), so each row is
+   * 44 tall and each gap is 8 — one row below `yes` is exactly +52 on y, with the same 25px
+   * inset off the panel and the same 270 width. Nothing was probed for this and nothing needed
+   * to be: the row pitch is in the component's own class list.
+   */
+  no: rect(STACK_LEFT + 25, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP + 169, 270, 44),
+  /** The third option, for the union below. Same pitch again. */
+  maybe: rect(STACK_LEFT + 25, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP + 221, 270, 44),
 } as const;
+
+/**
+ * The three option rows as one rect — the pitch cut's beat 9 frames THIS rather than
+ * `PROMPT.panel`, because by then the surface is known and the subject is the choice rather
+ * than the question. See the pitch sheet §7 · beat 9.
+ *
+ * Derived from the three rows above, which are themselves derived from `yes`. No new
+ * measurement is involved at any step.
+ */
+/**
+ * ── AND ITS TOP EDGE IS PLACED, BECAUSE A CENTRED ONE CUT THE BODY LINE ─────────────
+ *
+ * The first version of this rect was the three option rows alone, centred. Rendered, its top
+ * edge landed **29.5px above the first option** — which is inside the prompt's body copy, so the
+ * shot opened on *"…little while. Is that how you're feeling?"* sliced through the middle of its
+ * letterforms. The launch sheet's framing rule has no exception for that: full-bleed furniture
+ * may run off the frame, and **a sliced line of text is always a failure.** "Partly out of frame
+ * by design" is a description of the title and body being ABSENT, not of them being cut in half.
+ *
+ * So two changes, both of which the launch sheet already has grammar for:
+ *
+ *  · **the rect runs down to the panel's own bottom border**, so the shot lands on a whole
+ *    element boundary below rather than on empty page;
+ *  · **the top edge is PLACED rather than centred** — 14px above the first option, inside the
+ *    `gap-2` the component itself puts there, so the frame's edge falls in air and crosses no
+ *    glyph. `COMPOSITE` and `BEAT5_SUCCESS` both place their top edge on the app header's bottom
+ *    for the same class of reason; a placed edge is established grammar here, not a special case.
+ *
+ * What survives from the intent: the title and the body are out of the shot, the subject is the
+ * three answers, and the framing is visibly not `BEAT9_PROMPT`'s.
+ */
+const OPTIONS_TOP = PROMPT.yes.y - 14;
+
+export const PROMPT_OPTIONS: Rect = rect(
+  PROMPT.panel.x,
+  OPTIONS_TOP,
+  PROMPT.panel.w,
+  PROMPT.panel.y + PROMPT.panel.h - OPTIONS_TOP,
+);
 
 /**
  * ── THE CONTROLS, RELATIVE TO THEIR OWN COMPONENT ───────────────────────────────────

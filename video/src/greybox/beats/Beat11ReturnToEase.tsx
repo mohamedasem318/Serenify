@@ -9,6 +9,7 @@ import { LITTLE_AT, MonitorPage, TENSE_AT } from "../../app/monitor";
 import { useDrift, useReading } from "../../app/motion";
 import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN } from "../../app/player";
 import { Pointer } from "../../app/pointer";
+import { usePitch } from "../../pitch-context";
 import { Camera, frameRect, union } from "../Camera";
 import { useExpression } from "../rig";
 import { H, W } from "../theme";
@@ -161,6 +162,8 @@ const BEAT11_PLAYER_LANDING = (() => {
  */
 
 export const Beat11ReturnToEase: React.FC = () => {
+  // null outside the pitch composition, where each beat keeps its own constant.
+  const readout = usePitch().session?.beat11;
   const frame = useCurrentFrame();
 
   /**
@@ -289,7 +292,7 @@ export const Beat11ReturnToEase: React.FC = () => {
         ]}
       >
         <MonitorPage
-          clock="11:30 AM"
+          clock={readout?.clock ?? "11:30 AM"}
           level={level}
           peak={1}
           tension={tension}
@@ -299,7 +302,8 @@ export const Beat11ReturnToEase: React.FC = () => {
           headphones={frame >= 68}
           nod={frame >= 100}
           notesFrom={78}
-          sessionFrom={47 * 60 + 33}
+          // 48:36 under the pitch cut — see `pitch-context.tsx` § THE INTERNAL CLOCK.
+          sessionFrom={readout?.from ?? 47 * 60 + 33}
           overlay={
             <>
               <MusicPlayer

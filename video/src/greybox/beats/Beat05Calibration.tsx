@@ -15,6 +15,7 @@ import { CALIB, CONTROL, PHONE_PX, SUCCESS } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { COUNTDOWN_FRAMES, useCaptureMinute, useEmphasis } from "../../app/motion";
 import { Pointer } from "../../app/pointer";
+import { usePitch } from "../../pitch-context";
 import { Camera, shot } from "../Camera";
 import { useExpression } from "../rig";
 import { H, W } from "../theme";
@@ -188,8 +189,16 @@ const INTRO_READ = shot(600, 501.45, 590);
  * **Everything after f270 shifts by +30 and nothing else about the beat changes.** The beat goes
  * 372 → 402 frames.
  */
-/** 5d's pacer must alternate visibly, not once. Three phases: in → out → in. */
-const BREATH_PHASES = 3;
+/**
+ * 5d's pacer must alternate visibly, not once. Three phases: in → out → in.
+ *
+ * **The count comes from `PitchContext` now, and 3 is still what this cut gets** — the default
+ * is the launch cut, so nothing here changes unless the pitch composition's provider is above
+ * it. The pitch cut runs 5d over 240 output frames rather than 75 and takes **six** phases at 40
+ * frames each; at three that window would be 2.7s a phase, slower than a breath, and the label
+ * would alternate twice in eight seconds. See `../../pitch-context.tsx`.
+ */
+const BREATH_PHASES_LAUNCH = 3;
 
 /**
  * ── THE INTRO'S BEATS MOVED 18 FRAMES LATER, AND NOTHING ELSE DID ──────────────────
@@ -250,6 +259,9 @@ const IM_READY = { x: IM_READY_RAW.x, y: IM_READY_RAW.y - PAGE_LIFT };
 const BACK_HOME = at(SUCCESS, CONTROL.backToHome);
 
 export const Beat05Calibration: React.FC = () => {
+  // 3 outside the pitch composition, which is every other place this beat is mounted.
+  const { breathPhases } = usePitch();
+  const BREATH_PHASES = breathPhases || BREATH_PHASES_LAUNCH;
   const frame = useCurrentFrame();
 
   // **The audience's first look at his face**, and everything in beats 7–11 depends on their

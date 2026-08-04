@@ -87,12 +87,30 @@ import { continueRender, delayRender, useCurrentFrame } from "remotion";
  */
 const SETTLE_TICKS = 6;
 
-export const Settle: React.FC = () => {
+/**
+ * ── AND THE PITCH CUT NEEDED MORE, WHICH IS THIS FILE'S OWN ACCEPTANCE TEST FIRING ──
+ *
+ * *"Raise it if a diffed pair of renders ever disagrees again — that check is the acceptance
+ * test, not the eye."* It disagreed. Two full renders of the 5,962-frame pitch cut differed at
+ * **51 frames (0.86%)** — the launch cut's post-`Settle` rate is ~1 in 2,572 — and the worst of
+ * them were not sub-pixel: at output f517 the two renders showed beat 2's signup page at
+ * **different scroll positions**, one of them about fourteen frames behind the other. That is the
+ * stale-surface race, at the size the launch sheet reported it, on a film 2.4× longer.
+ *
+ * `ticks` makes the budget per-composition rather than global. **The default is still 6, so the
+ * launch cut's render path is unchanged**; the pitch composition passes a larger one. Raising it
+ * can only ever remove wrong frames — it changes when the screenshot is taken, never what is
+ * drawn — so this is a correctness knob traded against render time, and the pitch cut has the
+ * time to spend.
+ */
+export const PITCH_SETTLE_TICKS = 20;
+
+export const Settle: React.FC<{ ticks?: number }> = ({ ticks = SETTLE_TICKS }) => {
   const frame = useCurrentFrame();
   React.useEffect(() => {
     const handle = delayRender(`settle f${frame}`);
     let raf = 0;
-    let left = SETTLE_TICKS;
+    let left = ticks;
     const tick = () => {
       if (left-- <= 0) {
         continueRender(handle);
@@ -105,6 +123,6 @@ export const Settle: React.FC = () => {
       cancelAnimationFrame(raf);
       continueRender(handle);
     };
-  }, [frame]);
+  }, [frame, ticks]);
   return null;
 };

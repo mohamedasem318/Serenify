@@ -188,6 +188,53 @@ export const POSE = {
     shoulderY: 4.5,
     breathRate: 0.66,
   },
+  focused: {
+    // ══ CONCENTRATION, AND IT IS NOT DISTRESS ═══════════════════════════════════════
+    //
+    // The pitch cut's false-alarm sequence (7b–7e) needs him to look strained while nothing is
+    // actually wrong: he is stuck on a hard problem, he frowns at the screen, and the reading
+    // climbs off his face rather than off any event. If the audience reads this as distress the
+    // sequence has no false alarm in it, so the separation from `dismayed` and `tense` has to be
+    // structural rather than a matter of degree.
+    //
+    // **`browInner` is NEGATIVE here, and it is the whole of it.** The rule this file already
+    // carries — inner ends RAISED is sadness and worry, inner ends PULLED DOWN is anger — was
+    // written to stop `tense` reading as anger, and it fixes the direction of every distress
+    // pose in the film at positive. Effort lives on the other side of that axis: brows drawn
+    // together and DOWN at the inner ends, which is the configuration `tense` is forbidden to
+    // use. So `focused` and every distress pose sit in disjoint half-spaces on one coordinate,
+    // and no interpolation between two poses in this table can be mistaken for the other family.
+    //
+    // Three supporting axes, all of which say "at work" rather than "hit by something":
+    //
+    //   gazeY   +0.5   further DOWN than `content` — he is looking at the keyboard and the
+    //                  problem, where `dismayed` takes the gaze UP off it to read a toast
+    //   headY   0      no sink. Every distress pose in this table sinks the head into the
+    //                  shoulders; effort does not
+    //   shoulderY −0.3 slightly RAISED rather than slumped — the hunch of somebody leaning in,
+    //                  which is also what keeps the typing motion reading as typing
+    //
+    // The mouth is closed and barely curved, narrowed a little by the effort. Not the pressed
+    // line of `tense` (0.86) and not `content`'s smile. `eyeOpen` narrows rather than widens:
+    // concentration squints, alarm stares.
+    //
+    // And one thing that is not in the vector: this is a pose he is ALREADY HOLDING when 7b
+    // opens, travelled into over 60 frames. `dismayed` is a 16-frame fall. A held pose and a
+    // fall do not read alike before the brows are even considered.
+    browY: -0.4,
+    browInner: -0.5,
+    eyeOpen: 0.88,
+    lidDrop: 0.1,
+    gazeY: 0.5,
+    mouthCurve: -0.12,
+    mouthWidth: 0.93,
+    mouthOpen: 0,
+    mouthSkew: 0,
+    headTilt: -1,
+    headY: 0,
+    shoulderY: -0.3,
+    breathRate: 0.92,
+  },
   easing: {
     // Not the beat-7 expression. Softer lids, a smaller and slightly lopsided smile.
     browY: 0.05,

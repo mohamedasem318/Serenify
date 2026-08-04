@@ -6,6 +6,7 @@ import { BEAT8_CLOCK, BEAT8_FACE, BEAT8_WIDE, COMPOSITE, PHONE } from "../../app
 import { LITTLE_AT, MonitorPage, TENSE_AT } from "../../app/monitor";
 import { useDrift, useReading } from "../../app/motion";
 import { MailToast } from "../../app/toast";
+import { usePitch } from "../../pitch-context";
 import { Camera } from "../Camera";
 import { TOAST } from "../copy";
 import { useExpression } from "../rig";
@@ -109,6 +110,8 @@ import { useExpression } from "../rig";
  * easy to miss, the emphasis is the fix and it comes back for THIS transition only.
  */
 export const Beat08Email: React.FC = () => {
+  // null outside the pitch composition, where each beat keeps its own constant.
+  const readout = usePitch().session?.beat8;
   const frame = useCurrentFrame();
 
   // 1.3s, the component's own `transition: background 1.3s ease`. It begins as the camera is
@@ -187,14 +190,16 @@ export const Beat08Email: React.FC = () => {
         ]}
       >
         <MonitorPage
-          clock={TOAST.clock}
+          clock={readout?.clock ?? TOAST.clock}
           // `peak` defaults to `level`, which is right here: the session is at its highest the
           // whole way up. Beat 11 is where the two part company.
           level={level}
           tension={tension}
           pose={pose}
           working={frame < 70}
-          sessionFrom={47 * 60 + 16}
+          // 47:55 under the pitch cut, which puts 35s of false alarm in front of this beat.
+          // See `pitch-context.tsx` § THE INTERNAL CLOCK. 47:16 everywhere else.
+          sessionFrom={readout?.from ?? 47 * 60 + 16}
           // WORLD coordinates — an OS notification floats over the chrome and the page alike,
           // and the framing in `framing.ts` is derived from its world rect.
           //
