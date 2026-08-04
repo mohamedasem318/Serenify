@@ -117,6 +117,34 @@ const FirstBeat: React.FC = () => {
   return null;
 };
 
+/**
+ * ── PINNING THE HEADLINE, BECAUSE A `vw` CLAMP CAN BE CAUGHT HALF-RESOLVED ──────────
+ *
+ * `hero.tsx:52` sizes the headline `clamp(2.125rem, 5.6vw, 3.5rem)`. Two frames of the shipped
+ * cut — f165 and f167, the "Get started" click — came out with the `<h1>` at 3.5rem but its
+ * `<span class="text-meadow-text">` still at the 2.125rem **minimum**, so "asks before it
+ * decides." fitted on one line instead of two, the copy column lost a line, and `lg:items-center`
+ * re-centred the whole column 75px up the frame and back. That is the reported *"the landing
+ * page's left side jumps down and back up"*, and it is a render-time race — see
+ * `greybox/settle.tsx` for the measurement that separates it from the composition.
+ *
+ * `<Settle/>` gives the resolution more animation frames, but a layout that can only be right
+ * *after* an asynchronous viewport-unit resolution is the wrong thing to be racing at all. So the
+ * one viewport-dependent size in the film is made a constant.
+ *
+ * **It changes nothing that is drawn.** The render viewport is 1920 wide, so `5.6vw` is 107.52px
+ * and the clamp has been pinned to its 3.5rem maximum on every correct frame already; 56px is
+ * what the film has always shown, now stated rather than derived. (It is also why the headline is
+ * 56 here and not the 67.2 a real 1200px browser gives: `vw` is the OUTPUT viewport, not the
+ * 1200px world. That is pre-existing and is not changed by this — only made visible.)
+ *
+ * `apps/web` is untouched: this is a scoped stylesheet against the film's own `data-public`
+ * wrapper, the same seam `motion.tsx` and `hover.tsx` use into every other shipped surface.
+ */
+const HeroTypePinned: React.FC = () => (
+  <style>{`[data-public] h1 { font-size: 56px !important; }`}</style>
+);
+
 /** `app/(public)/layout.tsx:66` — the public shell's column. */
 export const PUBLIC_SHELL = "flex min-h-dvh flex-col bg-bg";
 
@@ -132,6 +160,7 @@ export const LandingPage: React.FC<{
   children?: React.ReactNode;
 }> = ({ clock, url = "serenify.tech", tabs, caret, scroll = 0, overlay, children }) => (
   <Desktop clock={clock} url={url} tabs={tabs} caret={caret} overlay={overlay}>
+    <HeroTypePinned />
     <div className={PUBLIC_SHELL} style={{ marginTop: -scroll }}>
       <PublicNavbar />
       {/* `data-public` is the handle beat 1's hover addresses. The components are untouched — a

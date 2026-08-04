@@ -149,6 +149,32 @@ export const useDrift = (from: number, to: number, startFrame: number): number =
 };
 
 /**
+ * ── THE READING, AS ONE KEYFRAMED VALUE ─────────────────────────────────────────────
+ *
+ * The monitoring act's escalation and recovery, 0 (at ease) to 1 (fully tense). See `monitor.ts`
+ * § ONE READING, READ TWICE for why it exists: the stateline's band and the trend's newest window
+ * are both derived from this, so they cannot disagree at any frame.
+ *
+ * **A beat places its keyframes ON `LITTLE_AT` / `TENSE_AT`**, which is what makes the copy
+ * changes land on the exact frames the sheet gives them while the value in between still moves
+ * continuously — so the graph walks rather than stepping, and the two things step together.
+ *
+ * Linear between keys on purpose. The easing that matters is in the placement of the keys — a
+ * curve applied on top would move the threshold crossings off the frames the beat pinned them to,
+ * which is precisely the failure this replaces.
+ */
+export const useReading = (keys: { frame: number; level: number }[]): number => {
+  const frame = useCurrentFrame();
+  if (keys.length < 2) return keys[0].level;
+  return interpolate(
+    frame,
+    keys.map((k) => k.frame),
+    keys.map((k) => k.level),
+    clamp,
+  );
+};
+
+/**
  * ── THE BLOOM'S BREATHING ───────────────────────────────────────────────────────────
  *
  * Source: `components/monitor/bloom.tsx:97-104`. Two framer-motion loops on one 6.5s cycle,

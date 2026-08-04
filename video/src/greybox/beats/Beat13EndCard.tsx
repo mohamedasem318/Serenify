@@ -3,7 +3,7 @@ import { AbsoluteFill, Easing, interpolate, useCurrentFrame } from "remotion";
 
 import { Wordmark } from "@/components/brand/wordmark";
 
-import { CARD, CARD_DISPLAY, SANS_STACK } from "../../app/furniture";
+import { CARD, CARD_DISPLAY, CARD_LINE } from "../../app/furniture";
 import { useDarkRoot } from "../../app/shell";
 import { Camera, shot } from "../Camera";
 import { END_CARD } from "../copy";
@@ -13,7 +13,8 @@ import { H, W } from "../theme";
  * Hallmark · component: end-card · genre: editorial · theme: film-furniture (locked)
  * states: n/a — a non-interactive film frame
  * contrast: pass — CARD.ink #e8ebee and CARD.muted #a6acb2 on CARD.field #0b0c0e ≈ 17:1 / 9:1
- * pre-emit critique: P5 H5 E4 S5 R5 V4
+ * faces: 2 — Outfit (mark + .tech) · Nunito (the line). Inter no longer appears on this card.
+ * pre-emit critique: P5 H5 E5 S5 R5 V4
  */
 
 /**
@@ -21,10 +22,10 @@ import { H, W } from "../theme";
  *
  * **A sequence, not a static frame.** Three timed events:
  *
- *   1. the wordmark reveals             f0–30
- *   2. "take care of yourself" appears  f38–56
- *   3. the wordmark DUPLICATES and the copy travels down to the domain line f66–88,
- *      then `.tech` types onto the end of it f90–102
+ *   1. the wordmark reveals             f0–36
+ *   2. "take care of yourself" appears  f44–62
+ *   3. the wordmark DUPLICATES and the copy travels down to the domain line f72–94,
+ *      then `.tech` types onto the end of it f96–108
  *
  * ══ THE WORDMARK IS THE WORDMARK NOW ════════════════════════════════════════════════
  *
@@ -56,10 +57,19 @@ import { H, W } from "../theme";
  *
  * That is also why **"take care of yourself" no longer types.** It is the sentimental line and
  * it should not be competing with a mechanical effect, so it fades up with a short rise. It is
- * also **Inter, not Outfit, and not bold** — it is subordinate to the mark above it by design,
- * and setting it in the display face at 700 made it argue with the wordmark for the frame. A
- * wipe was the alternative reveal and was rejected for being the same *kind* of effect: the
- * point is to isolate the typewriter.
+ * also not Outfit and not bold — it is subordinate to the mark above it by design, and setting
+ * it in the display face at 700 made it argue with the wordmark for the frame. A wipe was the
+ * alternative reveal and was rejected for being the same *kind* of effect: the point is to
+ * isolate the typewriter.
+ *
+ * ── AND IT IS NUNITO NOW, NOT INTER ─────────────────────────────────────────────────
+ *
+ * Picked off `endcard-compare.png` against Fraunces and Instrument Serif: the *curvier* answer
+ * rather than the warmer-serif one. It replaces Inter here rather than joining it, so the card
+ * is two faces — Outfit for the mark and the domain, Nunito for the line — and the one place in
+ * the film where the product stops talking and a person does is the one place with a rounded
+ * face on it. Size, weight, colour and leading are untouched; only the family moves, and the
+ * wordmark and `.tech` are byte-identical to what they were. See `furniture.ts` § CARD_LINE.
  *
  * **The card sits on `CARD.field`**, three points below the app's own page, which is the whole
  * of how the film says "we have stepped outside the product" — no transition, no rule, no label.
@@ -75,19 +85,47 @@ import { H, W } from "../theme";
 /** Set false to fall back to typing `serenify.tech` whole. See the header. */
 const DERIVE = true;
 
+/**
+ * ── THE REVEAL IS DOUBLED, AND EVERYTHING KEEPS ITS SPACING ─────────────────────────
+ *
+ * The wipe ran 30 frames — exactly one second — and was taken to 36 (1.20s) last pass. That was
+ * **"a touch", and the note is that it needs considerably more than a touch**: this is the last
+ * image in the film and it should be able to be watched arriving, not merely registered.
+ *
+ * It is **72 frames (2.40s)** — double the last value, 2.4× the original. Nothing about the move
+ * changes: the same left-to-right `inset()`, the same `inOut(cubic)`. What changes is that the
+ * mark now takes as long to unveil as a held shot elsewhere in the film takes to read, which is
+ * the pace an end card is entitled to. The settle is stretched with it (see `settle` below) so
+ * the arrival itself has room rather than snapping shut at the end of a long wipe.
+ *
+ * The other three events shift by the same **+42** so every gap between them is unchanged — the
+ * line still lands two frames after the mark has settled, the duplicate still detaches ten
+ * frames after the line has arrived, the domain still types at ~12 c/s. Only the wipe is slower;
+ * the sequence after it plays at exactly the rhythm that was signed off.
+ *
+ *   wipe            f0 – f72
+ *   line            f80 – f98
+ *   the duplicate   f108 – f130
+ *   `.tech` types   f132 – f144, caret out at f154
+ *   held card       f154 – f172        ← the same 18 frames the last pass left
+ *
+ * **The beat grows 136 → 172 (+36) and the film with it.** It is the last beat, so nothing is
+ * pushed and no hold anywhere else is spent: `GREYBOX_DURATION` carries the +36.
+ */
+const SHIFT = 42;
 const REVEAL_FROM = 0;
-const REVEAL_TO = 30;
-const LINE_FROM = 38;
-const LINE_TO = 56;
+const REVEAL_TO = 30 + SHIFT;
+const LINE_FROM = 38 + SHIFT;
+const LINE_TO = 56 + SHIFT;
 /** The duplicate detaches, shrinks and travels to the domain line. */
-const DUP_FROM = 66;
-const DUP_TO = 88;
+const DUP_FROM = 66 + SHIFT;
+const DUP_TO = 88 + SHIFT;
 /** ~12 c/s for five characters. Slower than a word would be typed, which reads deliberate. */
-const TECH_FROM = 90;
-const TECH_TO = 102;
+const TECH_FROM = 90 + SHIFT;
+const TECH_TO = 102 + SHIFT;
 /** The whole-domain fallback, at the treatment this beat used to have. */
-const DOMAIN_FROM = 78;
-const DOMAIN_TO = 102;
+const DOMAIN_FROM = 78 + SHIFT;
+const DOMAIN_TO = 102 + SHIFT;
 
 /**
  * The mark's own box. 72px of Outfit at `text-7xl`, centred — measured rather than guessed so the
@@ -119,12 +157,31 @@ export const Beat13EndCard: React.FC = () => {
   // was present, correct, and invisible.
   useDarkRoot();
 
+  /**
+   * **`out(quad)`, not `inOut(cubic)`, and the reason is momentum rather than taste.**
+   *
+   * Beat 12's line finishes leaving at its f86 and this beat opens on the same `CARD.field`, so
+   * the only thing that ends the black is the mark starting to uncover. An ease-IN spends its
+   * first frames at a standstill — `inOut(cubic)` is at 0.4% after six frames and 3% after twelve
+   * — and over 72 frames that is most of a second of nothing, on top of beat 12's own tail. The
+   * card lost its momentum exactly where it should have picked it up.
+   *
+   * `out(quad)` leaves the gate at full speed and decelerates the whole way: 16% by f6, 44% by
+   * f18, 75% by f36, 94% by f54, arriving at f72. The mark starts uncovering on the first frame
+   * after the cut and is still visibly completing three quarters of the way through, which is what
+   * "watched arriving" asks for. `out(cubic)` was the other candidate and is too front-loaded —
+   * 96% by f48 leaves the last 24 frames imperceptible, so the reveal would *feel* shorter than it
+   * is.
+   */
   const wipe = interpolate(frame, [REVEAL_FROM, REVEAL_TO], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
-    easing: Easing.inOut(Easing.cubic),
+    easing: Easing.out(Easing.quad),
   });
-  const settle = interpolate(frame, [REVEAL_TO - 8, REVEAL_TO + 6], [1.04, 1], {
+  // Stretched with the wipe — 14 frames of settle at the end of a 36-frame reveal read as part of
+  // the same arrival; at the end of a 72-frame one they read as a flinch. 26 frames, overlapping
+  // the wipe's last sixteen and finishing ten after it, keeps the proportion the move had.
+  const settle = interpolate(frame, [REVEAL_TO - 16, REVEAL_TO + 10], [1.04, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
@@ -176,10 +233,28 @@ export const Beat13EndCard: React.FC = () => {
             textAlign: "center",
             scale: settle,
             transformOrigin: "50% 50%",
-            clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)`,
           }}
         >
-          <Wordmark className="text-7xl leading-none" />
+          {/*
+           * ══ THE CLIP IS ON THE MARK'S OWN BOX, NOT ON THE 1200-WIDE ROW ══════════════
+           *
+           * **This is why the card was reading as black for a second, and why slowing the wipe
+           * twice never helped.** `inset(0 X% 0 0)` is a percentage of the element it is on, and
+           * it was on the full-width centring row — so the first ~37% of every wipe uncovered
+           * nothing but empty page to the left of the mark, and the last ~37% uncovered empty page
+           * to the right of it. **Only the middle ~25% of the wipe was on the glyphs.**
+           *
+           * At the 36-frame wipe that was about **3 frames of actual reveal**, which is exactly
+           * why it read as "far too fast" twice over; and doubling the wipe to 72 doubled the dead
+           * lead-in rather than the reveal, which is why the card then sat black before the mark
+           * arrived. The duration was never the defect.
+           *
+           * An `inline-block` shrink-wraps to the glyphs, so the percentage is now a percentage of
+           * the WORDMARK. The whole 72 frames are spent on it.
+           */}
+          <span style={{ display: "inline-block", clipPath: `inset(0 ${(1 - wipe) * 100}% 0 0)` }}>
+            <Wordmark className="text-7xl leading-none" />
+          </span>
         </div>
 
         {/*
@@ -263,7 +338,7 @@ export const Beat13EndCard: React.FC = () => {
             top: 322,
             width: 760,
             textAlign: "center",
-            fontFamily: SANS_STACK,
+            fontFamily: CARD_LINE,
             fontSize: 26,
             fontWeight: 400,
             lineHeight: 1.4,

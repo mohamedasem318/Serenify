@@ -1,6 +1,17 @@
-import { Easing, interpolate, useCurrentFrame } from "remotion";
+import { useCurrentFrame } from "remotion";
 
-import { CameraKey, frameRect, Rect, rect, Shot, shot, union } from "../greybox/Camera";
+import {
+  CameraKey,
+  EASE_ARRIVE,
+  EASE_DEPART,
+  frameRect,
+  Rect,
+  rect,
+  Shot,
+  shot,
+  shotAt,
+  union,
+} from "../greybox/Camera";
 import {
   CLOCK,
   PHONE_PX,
@@ -39,57 +50,56 @@ import {
 const vf = VIEWFINDER;
 
 /**
- * ══ THE COMPOSITE — AND IT HOLDS ALL FOUR THINGS NOW ════════════════════════════════
+ * ══ THE COMPOSITE — TWO COLUMNS, AND ALL FOUR THINGS ════════════════════════════════
  *
- * **This is the whole of L15.** Beat 7's landing, beat 8's wide phase, beat 9's opening and
- * *every* landing of beat 11 after the music player are this one shot — which is what makes the
- * four beats read as one continuous screen rather than four visits to it, and what lets the film
- * close on a settled picture instead of a camera arriving.
+ * Beat 7's landing, beat 8's wide phase, beat 9's opening and *every* landing of beat 11 after
+ * the music player are this one shot — which is what makes the four beats read as one continuous
+ * screen rather than four visits to it, and what lets the film close on a settled picture instead
+ * of a camera arriving.
  *
- *   union   x 376.0 – 1176.0   (800.0)   ← the stage card WHOLE, and the pinned column
- *           y 188.0 –  589.2   (401.2)
- *   frameRect(m=20) → w = max(800 + 40, (401.2 + 40) × 16/9) = 840.0
- *   frame   x 356.0 – 1196.0   y 156.0 – 628.5
+ * **L16 changes what is in it without changing what it holds.** The trend moved out of the pinned
+ * column and into the stage card, under the stateline, so the union is two rects rather than
+ * three — and the card grew to carry it:
  *
- * **Width governs, so the vertical clearance is 35.6px rather than the nominal 20** — and the one
- * thing that is placed rather than derived is where that slack goes. Centred on the union the
- * frame's top edge lands at 152.4, which puts a 3.6px sliver of the sticky app header's bottom
- * border across the top of the film's most-repeated shot. The frame's top is set to **156**, the
- * header's own bottom edge, so the shot is page and nothing else; the union keeps 32px above and
- * 39.3 below, and the whole frame lands inside the page's 156–675 band with nothing on the camera
- * backdrop at any edge. That is a first for this surface.
+ *   union   x 376.0 – 1176.0   (800.0)   ← the stage card WHOLE, and the viewfinder
+ *           y 188.0 –  645.5   (457.5)
+ *   frameRect(m=20) → w = max(800 + 40, (457.5 + 40) × 16/9) = 884.4
+ *   frame   x 333.8 – 1218.2   y 156.0 – 653.5
+ *
+ * **Height governs now**, where at L15 width did — so the card's height is what this shot's width
+ * costs, and anything that shortens the card tightens the frame for free. The frame's top is still
+ * placed rather than derived: centred on the union it would show a band of page above the card, but
+ * pinning it to **156**, the app header's own bottom edge, makes the shot the page below the header
+ * and nothing else.
+ *
+ * ── AND IT TIGHTENED 42.6px WHEN THE TREND STOPPED BEING A CARD ─────────────────────
+ *
+ * 927.0 → **884.4**. Nothing here was retuned: `<StageLayout/>` strips the trend's own
+ * `rounded-2xl border bg-surface sm:p-6`, the stage card is 457.5 tall instead of 481.4
+ * (`geometry.ts` § stage), and this shot is `frameRect` over it. The frame follows the geometry,
+ * which is the whole reason every landing in this pass goes through `frameRect` rather than
+ * through hand arithmetic.
  *
  * ── WHAT IT CONTAINS, AND WHY EACH ONE IS IN IT ─────────────────────────────────────
  *
- *   the stage card   376 – 824   × 188 – 612.2   the orb, the stateline, FR-024's footnote
- *   the viewfinder   856 – 1176  × 212 – 393.3   his face (L1)
- *   the trend        856 – 1176  × 425.3 – …     the session's history (L15, scaled)
+ *   the stage card   376 – 824   × 188 – 645.5   the orb, the stateline, AND the trend
+ *   the viewfinder   856 – 1176  × 237 – 418.3   his face (L1), its top on the orb's top
  *
- * The card is **whole** — all four edges inside the frame, with margin. Every previous version of
- * this shot ran the card off the top, the bottom and the left and defended it as "the ground the
- * reading sits on", which was true and was also the only option: at 675 tall the card could not
- * be held whole by any 16:9 frame ≤1200 world px. At 424.2 it can.
+ * The card is **whole** — all four edges inside the frame, with margin.
  *
- * ── AND IT FRAMES THE RESTING BLOCK, BECAUSE THERE IS NO RAISE TO CLEAR ─────────────
+ * **What the arrangement reads at**, against L15's 840 and L16's own 927:
  *
- * The union used to be built from `STATELINE_RAISED` — the block at L12's 1.25×, at its widest
- * copy — because framing the resting rect is what let the raise run off the left edge. With the
- * emphasis off the statelines (`geometry.ts` § THE EMPHASIS LEAVES THE STATELINE) the widest
- * thing the block reaches is the `tense` sub at rest, 366 wide inside a card that is in frame
- * whole, so there is nothing left to clear.
+ *   the stateline head   36px → **17.18px** on a phone   (927: 16.39 · L15: 18.09)
+ *   the stateline sub    17px → **8.11px**                (927: 7.74 · L15: 8.54)
+ *   his face             119.7 → **57.1px**               (927: 54.5 · L15: 60.1)
+ *   the trend's plot     **~166 × 47px** on a phone, and FILLED (was ~158 × 45 — and the plot
+ *                        itself widened 720 → 768 when the inner card's padding went)
  *
- * **The numbers all improve, and this is what the arrangement bought:**
- *
- *   the stateline head   36px → **18.09px** on a phone   (was 17.2 at 884.8)
- *   the stateline sub    17px → **8.54px**                (was 8.11 at rest, 10.13 raised)
- *   his face             119.7 → **60.14px**              (was 57.1)
- *   the trend's plot     299 × 87.5 world → **150 × 44px** on a phone
- *
- * The sub is the one line that used to depend on the emphasis to clear the floor and now does not
- * clear it either — 8.54 against ~10. It is a *secondary* line under a head that reads at 18.1px,
- * and the head is the reading; that trade is stated rather than smoothed over.
+ * The head — which is the reading — is at 17.2px against a ~10px floor. The sub is a secondary
+ * line under it and still does not clear the floor, which was true at L15 and at 927 alike and is
+ * stated rather than smoothed over.
  */
-const compositeFrame = frameRect(union(RAW.stage, union(vf, TREND)), 20);
+const compositeFrame = frameRect(union(RAW.stage, vf), 20);
 export const COMPOSITE: Shot = {
   ...compositeFrame,
   // Top edge on the app header's bottom — see above. `frameRect` would centre it 3.6px higher.
@@ -106,13 +116,16 @@ export const COMPOSITE: Shot = {
  * the clock rendered **"11:30 A"**.
  *
  *   union   x 856.0 – 1176.0   (320.0)
- *           y  58.0 –  200.0   (142.0)
- *   frameRect(m=24) → w = max(368, 190 × 16/9) = 368.0
+ *           y  58.0 –  205.0   (147.0)
+ *   frameRect(m=24) → w = max(368, 195 × 16/9) = 368.0
  *
- * The clock reads at 32.1px on a phone and the toast's subject at 16.1px — both up on the
- * previous pass's 25.7 / 12.8, because the stack is shorter now that the toast sits 96–200
- * instead of 187–291. That is what lets the audience do the arithmetic unaided: 11:30, "by 12",
- * and nobody says *thirty minutes*.
+ * The clock reads at 32.1px on a phone and the toast's subject at 16.1px. That is what lets the
+ * audience do the arithmetic unaided: 11:30, "by 12", and nobody says *thirty minutes*.
+ *
+ * **L16 moved the toast (96–200 → 101–205) and this shot did not move**, because width still
+ * governs at 368: the union grew 5px taller and 16:9 charges 346.7 for it, under the 368 the
+ * stack's own width already costs. That was the constraint the viewfinder's new top edge was
+ * chosen against — see `geometry.ts` § TOAST.
  */
 export const BEAT8_CLOCK: Shot = frameRect(union(CLOCK, TOAST), 24);
 
@@ -120,8 +133,8 @@ export const BEAT8_CLOCK: Shot = frameRect(union(CLOCK, TOAST), 24);
  * **Beat 8, phase 2** — the toast still up, and his face, where the FALL happens.
  *
  *   union   x 856.0 – 1176.0   (320.0)
- *           y  96.0 –  393.3   (297.3)
- *   frameRect(m=24) → w = max(368, 345.3 × 16/9) = 613.9
+ *           y 101.0 –  418.3   (317.3)
+ *   frameRect(m=24) → w = max(368, 365.3 × 16/9) = 649.4
  *
  * ── WHY THE BEAT HAS THREE LANDINGS AND NOT THE SHEET'S TWO ─────────────────────────
  *
@@ -132,9 +145,10 @@ export const BEAT8_CLOCK: Shot = frameRect(union(CLOCK, TOAST), 24);
  * clock+toast (368) → toast+face (614) → wide. One continuous move, no cut — the sheet's own
  * remedy for this class of problem.
  *
- * L14 improves both numbers it cares about again: **the clock reads at 32.1px and the face falls
- * at 82.3px**, against 25.7 / 88.7 before. The face gives up 6px and the clock — the number the
- * whole beat turns on, and the one that was being sliced — gains 6.4.
+ * **The clock reads at 32.1px and the face falls at 77.8px.** L16 costs the face 4.5px — the
+ * viewfinder's top moved down 25 to meet the orb's, so the toast-to-face union is 20px taller —
+ * and it is the price of the alignment. The clock landing, which is the beat's whole payload, is
+ * unchanged.
  */
 export const BEAT8_FACE: Shot = frameRect(union(TOAST, vf), 24);
 
@@ -145,9 +159,9 @@ export const BEAT8_FACE: Shot = frameRect(union(TOAST, vf), 24);
  * It is `COMPOSITE`, exactly, and that is a consequence of L14 rather than a shortcut. The toast
  * is not in the union because **the toast dismisses as the camera arrives here** — a macOS
  * banner auto-dismisses, the fall has already happened at the tight framing (which is what L2
- * protects), and keeping it would push this shot from 884.8 to 1035 world px and take the sub
- * from 8.11px on a phone to 6.93. The dismissal is a real slide-out on the component's own
- * curve, not a pop; see `toast.tsx` § dismissFrom.
+ * protects), and keeping it would push this shot wider and take the sub further under the floor.
+ * The dismissal is a real slide-out on the component's own curve, not a pop; see `toast.tsx` §
+ * dismissFrom.
  */
 export const BEAT8_WIDE: Shot = COMPOSITE;
 
@@ -158,9 +172,13 @@ export const BEAT8_WIDE: Shot = COMPOSITE;
  * where the camera looked.
  *
  *   rect    x 856.0 – 1176.0   (320.0)
- *           y 424.0 –  714.0   (290.0)
+ *           y 450.3 –  740.3   (290.0)
  *   frameRect(m=24) → w = max(368, 338 × 16/9) = 600.9
- *   frame   x 715.6 – 1316.4   y 400.0 – 738.0   (the viewfinder's bottom is 393.3 — clear)
+ *   frame   x 715.6 – 1316.4   y 426.3 – 764.3   (the viewfinder's bottom is 418.3 — clear by 8)
+ *
+ * **And it covers nothing now (L16).** The trend used to start at the prompt's own y in the
+ * pinned column, so the prompt landed on top of a graph; the trend is in the stage card and the
+ * prompt arrives into empty page.
  *
  * The three options are 15px copy, which lands at **10.5px** on a phone — over the floor, which
  * is the point of pushing in on it at all.
@@ -196,27 +214,14 @@ export const BEAT11_WIDE: Shot = COMPOSITE;
  * by hand (`monitor.tsx` § `<WorldPrompt/>`), and the drawn cursor has to sit in a sibling layer
  * above it (§ `<WorldOverlay/>`). Both need this frame's shot.
  *
- * **It must match `Camera` exactly** — same keys, same clamping, same `Easing.inOut(Easing.cubic)`.
- * A beat passes the SAME array to both, so the only way they can disagree is if `Camera`'s easing
- * is retuned and this is not; that would show up as the prompt lagging the picture during beat
- * 9's push-in, which is worth naming because it would look like a motion bug rather than a
- * duplication one.
+ * **It must match `Camera` exactly**, and it no longer merely promises to: it CALLS `Camera`'s
+ * own `shotAt`. It used to re-declare the interpolation, with a comment warning that retuning one
+ * and not the other would show up as the prompt lagging the picture during beat 9's push-in. That
+ * warning came due the moment `CameraKey` grew a per-segment `ease` (see `Camera.tsx`) — a
+ * re-declared `interpolate` takes one easing for the whole list and would have ignored it. There
+ * is one implementation now and this is a hook around it.
  */
-export const useShotAt = (keys: CameraKey[]): Shot => {
-  const frame = useCurrentFrame();
-  if (keys.length < 2) return keys[0].shot;
-  const at = keys.map((k) => k.frame);
-  const opts = {
-    extrapolateLeft: "clamp" as const,
-    extrapolateRight: "clamp" as const,
-    easing: Easing.inOut(Easing.cubic),
-  };
-  return {
-    cx: interpolate(frame, at, keys.map((k) => k.shot.cx), opts),
-    cy: interpolate(frame, at, keys.map((k) => k.shot.cy), opts),
-    w: interpolate(frame, at, keys.map((k) => k.shot.w), opts),
-  };
-};
+export const useShotAt = (keys: CameraKey[]): Shot => shotAt(useCurrentFrame(), keys);
 
 /**
  * A world point in OUTPUT pixels, under `shot`.
@@ -322,9 +327,27 @@ export const BEAT5_INTRO: Shot = shot(600, 415.5, 920);
  * a cut wearing a continuous camera's clothes, exactly like the beat 2 → 3 join this sheet has
  * already fixed once.
  *
- * The camera closes in across the swap instead: it starts easing at f244 and lands at f272, so
- * the surface changes 20 frames into a move. Not a transition effect — the same push-in grammar
- * the rest of the film uses, put on the boundary that needed it.
+ * The camera closes in across the swap instead. Not a transition effect — the same push-in
+ * grammar the rest of the film uses, put on the boundary that needed it.
+ *
+ * ── AND IT WAS ARRIVING BEFORE THE THING IT MOVED FOR ───────────────────────────────
+ *
+ * The move ran **f244 → f272** and the flip is at **f270** — 26 frames into a 28-frame travel,
+ * which under `Easing.inOut(Easing.cubic)` is ~99.5% of the distance. So what played was an
+ * abrupt push while the breathing minute was still running, a moment of stillness, and then the
+ * surface changing under a camera that had already stopped: the cut wearing a continuous
+ * camera's clothes, reintroduced at the other end of the move. Both this file and
+ * `Beat05Calibration.tsx` carried comments ("20 frames into a move", "26 frames into a move")
+ * and neither was what the numbers did.
+ *
+ * It runs **f264 → f292** now, so the flip lands **6 frames in — 21% of the travel** — where the
+ * camera is still visibly moving and the change of surface reads as the thing the move was for.
+ * It also gives 5d its last two-thirds of a second back to a static camera.
+ *
+ * **The cost is paid by the film, not by 5d.** The uploading line's settled hold is 26 frames
+ * and it is doing work — it is the only moment the line is on screen under a stopped camera — so
+ * the pull-out to `BEAT5_SUCCESS` moves f298 → f318 and everything after it shifts by the same
+ * 20. Beat 5 goes 402 → 422 frames. 5d keeps every frame it had.
  *
  *   frame   x 340 – 860   y 175.6 – 468.4      w = 520
  *   reads   the line's 16px at **12.98px** on a phone, up from 11.4
@@ -364,10 +387,41 @@ export const BEAT4_ESTABLISH: Shot = shot(600, 316.75, 616);
  * for. It is the same seam beat 2 already uses into beat 3 (`BEAT2_SEAM`), applied to the other
  * boundary that was cutting.
  *
- * 900 is the midpoint of the travel rather than a chosen framing: 1200 → 616 is 584px of zoom and
- * this splits it roughly in half, so neither beat carries a move that reads as a whip.
+ * ── AND IT WAS STILL READING AS TWO MOVES, BECAUSE THE CAMERA STOPPED ON THE SEAM ───
+ *
+ * Halving the travel is not the same as making it continuous. Both segments took `Camera`'s
+ * default `Easing.inOut(cubic)`, which eases **out** at the end of beat 3 and **in** at the start
+ * of beat 4 — so the camera decelerated to a dead stop on the boundary frame and started again.
+ * Two segments that each begin and end at rest are two moves however tightly they abut, which is
+ * exactly the note: *"the timing reads as two separate moves rather than one."*
+ *
+ * A single gesture is one acceleration and one deceleration, handed over **at speed**. Beat 3
+ * departs on `EASE_DEPART` (`Easing.in(cubic)`, no settle) and beat 4 arrives on `EASE_ARRIVE`
+ * (`Easing.out(cubic)`, no start), and this shot is placed where their velocities match rather
+ * than at the midpoint of the distance:
+ *
+ *   beat 3 carries fraction `p` over 12 frames, so it hands over at 3p/12 per frame
+ *   beat 4 carries `1 − p` over 14 frames, so it takes over at 3(1 − p)/14
+ *   equal  ⇒  14p = 12(1 − p)  ⇒  **p = 6/13 = 0.4615**
+ *
+ * — and the shot is that fraction along the travel from the full 1200 frame to `BEAT4_ESTABLISH`,
+ * on every axis:
+ *
+ *   cy   337.5 → 316.75   at 6/13  =  327.923
+ *   w   1200   → 616      at 6/13  =  930.462
+ *
+ * It lands close to the old hand-picked 900/327 — the point was never that the midpoint was badly
+ * placed, it was that both halves came to rest on it. **The surface change is now the fastest
+ * frame of the move rather than its only stationary one**, which is what the seam wanted in the
+ * first place.
  */
-export const BEAT4_SEAM: Shot = shot(600, 327, 900);
+const SEAM_T = 6 / 13;
+const seamAlong = (from: number, to: number) => from + (to - from) * SEAM_T;
+export const BEAT4_SEAM: Shot = shot(
+  600,
+  seamAlong(337.5, BEAT4_ESTABLISH.cy),
+  seamAlong(1200, BEAT4_ESTABLISH.w),
+);
 
 // ── The legibility table ────────────────────────────────────────────────────────────
 
@@ -384,17 +438,18 @@ export const PHONE = {
     framedWidth: COMPOSITE.w,
     statelineHead: PHONE_PX(36, COMPOSITE.w),
     /**
-     * **8.54px, and it no longer has a raise to lift it.** The stateline emphasis is off (see
+     * **7.74px, and it no longer has a raise to lift it.** The stateline emphasis is off (see
      * `geometry.ts`), so this is what the sub reads at, full stop. It is the secondary line under
-     * a head at 18.1px and it is stated rather than smoothed over — the same treatment beat 4's
+     * a head at 16.4px and it is stated rather than smoothed over — the same treatment beat 4's
      * bullets get.
      */
     statelineSub: PHONE_PX(17, COMPOSITE.w),
     faceHeight: PHONE_PX(FACE_H, COMPOSITE.w),
     /**
-     * **The trend's type is under the floor at `TREND_SCALE`, and that is the trade L15 makes.**
-     * What the shot has to deliver is the LINE, not the labels: the plot is ~150 × 45px on a
-     * phone here, which is a shape anyone can read walking back down.
+     * **The trend's type is under the floor at `TREND_SCALE`, and that is the trade L15/L16
+     * make.** What the shot has to deliver is the LINE, not the labels: the plot is ~158 × 45px
+     * on a phone here — and it is the FULL width of the card for the first time, because the
+     * measurement patch now divides this wrapper's scale out as well as the camera's.
      */
     trendHeading: PHONE_PX(18 * TREND_SCALE, COMPOSITE.w),
     trendPlotW: (TREND.w * 0.94 * 422) / COMPOSITE.w,

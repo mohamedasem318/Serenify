@@ -6,7 +6,7 @@ import { BEAT4_ESTABLISH, BEAT4_SEAM } from "../../app/framing";
 import { centre, GATE } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { Pointer } from "../../app/pointer";
-import { Camera, rect, shot } from "../Camera";
+import { Camera, EASE_ARRIVE, rect, shot } from "../Camera";
 
 /**
  * Beat 4 · Camera consent gate · 120 frames
@@ -128,7 +128,12 @@ export const Beat04CameraGate: React.FC = () => {
         keys={[
           // Beat 3's push-in arrives here — the surface changed under a moving camera rather
           // than on a cut. See `BEAT4_SEAM`.
-          { frame: 0, shot: BEAT4_SEAM },
+          //
+          // `EASE_ARRIVE` rather than the default: beat 3 hands this move over AT SPEED, so this
+          // half must take it over at speed and only decelerate. Easing IN here would have been
+          // the camera starting from rest a second time, which is the "two separate moves"
+          // reading — the seam shot is placed where the two velocities match.
+          { frame: 0, shot: BEAT4_SEAM, ease: EASE_ARRIVE },
           { frame: 14, shot: BEAT4_ESTABLISH },
           // Held while the page scrolls, so the scroll reads as a scroll.
           { frame: 72, shot: BEAT4_ESTABLISH },

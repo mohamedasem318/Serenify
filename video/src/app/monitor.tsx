@@ -13,16 +13,17 @@ import { CharacterRig } from "../greybox/rig";
 import type { Pose } from "../greybox/rig";
 import { PROTAGONIST } from "../greybox/copy";
 import { projectWorld } from "./framing";
+import { MEASURE_SCALE_ATTR } from "./measure-patch";
 import {
   BLOOM_SIZE,
   CARD_PB,
   CARD_PT,
-  FOOTNOTE_GAP,
   PROMPT,
   RAW,
   SCROLL,
   SUB_MIN_HEIGHT,
   TREND,
+  TREND_GAP,
   TREND_NATURAL_W,
   TREND_SCALE,
   VF_SCALE,
@@ -40,8 +41,9 @@ import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell
  * screen changing.
  *
  * What is real here: `<Header/>`, `<OpSurfaces/>` (which renders the real `<Bloom/>`, the real
- * stateline at `text-3xl`/`text-base`, the real Pause / End controls and the real FR-024
- * footnote), `<Viewfinder/>`, `<SessionTrend/>`. What the video supplies: the page scroll, the
+ * stateline at `text-3xl`/`text-base`; its Pause / End controls and its FR-024 footnote are the
+ * two things the film removes — see `<StageLayout/>`), `<Viewfinder/>` and `<SessionTrend/>`.
+ * What the video supplies: the page scroll, the
  * character inside the viewfinder, and time.
  *
  * `<MonitoringSession/>` itself — the orchestrator — is deliberately NOT used. It owns
@@ -65,22 +67,109 @@ import { AppShell, MONITOR_COL, MONITOR_STAGE, VIEWPORT_Y, WORLD } from "./shell
 
 export type MonitorBand = Band;
 
-/** A trend that walks up into tense and, when `descend` is set, walks back down again. */
+/**
+ * ══ ONE READING, READ TWICE — THE STATELINE AND THE TREND ═══════════════════════════
+ *
+ * **The defect this replaces was three independent authored timelines on one value.** The film
+ * addresses everything by frame, and the monitoring act's escalation was written out three times
+ * over, in three places, with three different shapes:
+ *
+ *   the bloom       `useDrift(0, 1, 136)`                      beat 8 — a 1.3s colour drift
+ *   the stateline   `frame >= 180 ? tense : frame >= 158 …`    beat 8 — two hard frame thresholds
+ *   the trend       `climb = useDrift(0, 1, 146)`              beat 8 — a THIRD ramp, ten frames
+ *                                                              later and a different curve
+ *
+ * Nothing tied them together, so they only agreed by hand. They did not:
+ *
+ *  · **Beat 8's climb did not show.** `climb`'s own band crossings landed at ≈f162 and ≈f169 —
+ *    seven frames apart — while the stateline stepped at f158 and f180. So the graph crossed both
+ *    thresholds inside a quarter of a second, which reads as *already elevated, then one step*,
+ *    while the copy was still on its first change.
+ *  · **Beat 11's recovery lagged by nearly two seconds.** The bloom finished drifting to meadow at
+ *    f145 and the copy returned at f128, but `descend` did not START until f150 and did not finish
+ *    until f189. The orb and the stateline read at ease and the graph caught up 1.4s later.
+ *
+ * ── SO THERE IS ONE NUMBER NOW ──────────────────────────────────────────────────────
+ *
+ * `level` is **the reading**, 0 (at ease) to 1 (fully tense). `bandOf` turns it into the band the
+ * stateline shows, and `trendPoints` places the NEWEST window at exactly `level` — so the
+ * stateline and the right-hand end of the graph are the same number read two ways and cannot
+ * drift apart at any frame. Each beat authors the curve once; nothing downstream re-authors it.
+ *
+ * The band thresholds live here rather than inline in the series builder, because they are now
+ * load-bearing in two directions: the beats place their `level` keyframes ON them so that the
+ * copy changes land on exactly the frames the sheet gives them (see `useReading`).
+ *
+ * **The bloom is deliberately still its own curve, and that is stated rather than hidden.** Its
+ * drift is `transition: background 1.3s ease` — the component's own, reproduced at the component's
+ * own duration — and beat 8 lands it at f175 while the stateline only reaches "tense" at f180. One
+ * scalar with fixed thresholds cannot produce both, so folding the bloom in would mean retiming
+ * either the drift or a signed-off copy change. It is anchored to the same escalation and it is
+ * the one reader still authored separately.
+ */
+export const LITTLE_AT = 0.28;
+export const TENSE_AT = 0.66;
+
+/** The reading's band. `>=` so a beat can place a keyframe exactly ON a threshold. */
+export const bandOf = (level: number): Band =>
+  level >= TENSE_AT ? "tense" : level >= LITTLE_AT ? "a_little_tense" : "at_ease";
+
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
+
+/**
+ * The session's shape: a rise into whatever the session has PEAKED at, then a tail that walks
+ * back to wherever the reading is NOW.
+ *
+ * `peak` and `level` are separate because **the history does not un-happen** — beat 11's recovery
+ * is a tail, not an erasure. Lowering the peak instead would flatten the stretch that climbed
+ * during beat 8, so the graph would end as if the tense half-hour had never occurred.
+ *
+ * The tail **blends** from the risen curve toward `level` rather than subtracting from it, so
+ * **`v(p = 1) === level` exactly** whatever the peak. That identity is the whole point: the newest
+ * window is the reading, so `bandOf(level)` is both what the stateline says and what the graph's
+ * right-hand end draws, on the same frame. (Subtracting a flat `peak − level` from the tail was
+ * the first attempt and it drove the windows behind the newest one below their own risen value —
+ * the hump vanished as the reading came down, which is the erasure this shape exists to avoid.)
+ *
+ * ── AND ONLY THE LAST TEN WINDOWS ARE EVER DRAWN ────────────────────────────────────
+ *
+ * Measured on the render, not assumed: `<SessionTrend/>` caps how many windows it plots by
+ * legibility (`capByLegibility` — see `measure-patch.ts`, which documents the same mechanism from
+ * the other end) and at this card's width that cap is **10**. Twenty-two are handed to it; the
+ * ten most recent are what appears.
+ *
+ * That is why the shape's knees are where they are. Ten windows is `p` from 12/21 = 0.571 to 1,
+ * so anything that happens below p ≈ 0.57 is invisible — the previous shape put its whole rising
+ * edge at 0.35–0.80, which meant the visible part of the graph was already halfway up before the
+ * beat started and had only one step left in it. **That is the "starts already elevated and steps
+ * once" reading, and it is a framing problem in the series rather than a timing one.** The rise
+ * now spans 0.42–0.80 and the tail 0.80–1.00, so the visible ten hold the whole climb:
+ *
+ *   level            what the ten drawn windows read as
+ *   ───────────────  ─────────────────────────────────────────────────────────
+ *   0                at ease ×10                                  (beats 7, and 8 before f136)
+ *   LITTLE_AT        at ease ×5, a little tense ×5                (beat 8, f158)
+ *   TENSE_AT         at ease ×1, a little ×4, tense ×5            (beat 8, f180 — all three)
+ *   1                a little ×3, tense ×7                        (beat 8 f200, beat 9, beat 10)
+ *   0.27, peak 1     a little ×3, tense ×4, a little ×2, AT EASE  (beat 11, f128)
+ *   0,    peak 1     a little ×3, tense ×4, a little, at ease ×2  (beat 11, f170)
+ */
 export const trendPoints = (opts: {
-  /** 0 → flat meadow, 1 → fully climbed into tense. */
-  climb: number;
-  /** 0 → held, 1 → the tail has walked all the way back to at-ease (beat 11). */
-  descend: number;
+  /** The reading NOW — the newest window's value, and the stateline's own number. */
+  level: number;
+  /** The highest the session has reached. Never falls; see above. */
+  peak: number;
 }): SessionTrendPoint[] => {
   const N = 22;
   const out: SessionTrendPoint[] = [];
   for (let i = 0; i < N; i++) {
     const p = i / (N - 1);
-    // A rising edge that reaches `climb`, then a falling tail governed by `descend`.
-    const up = Math.max(0, Math.min(1, (p - 0.35) / 0.45)) * opts.climb;
-    const down = Math.max(0, Math.min(1, (p - 0.72) / 0.28)) * opts.descend;
-    const v = Math.max(0, up - down);
-    const band: Band = v > 0.66 ? "tense" : v > 0.28 ? "a_little_tense" : "at_ease";
+    // Reaches `peak` at p = 0.80, inside the drawn window rather than before it.
+    const rise = clamp01((p - 0.42) / 0.38) * opts.peak;
+    // The last fifth blends from the risen curve to the reading. t = 1 at p = 1, so v = level.
+    const t = clamp01((p - 0.8) / 0.2);
+    const v = Math.max(0, rise * (1 - t) + opts.level * t);
+    const band: Band = bandOf(v);
     out.push({
       id: `w${i}`,
       // Fixed epoch — `Date.now()` is unavailable in a Remotion script and a moving clock
@@ -105,26 +194,28 @@ export const trendPoints = (opts: {
  *
  * **L14's problem was that the four things the monitoring act is about could not be in one
  * frame.** Bloom top to trend bottom was 985.9px against a 519px viewport, so the trend was a
- * separate landing 855px down the page and reaching it was a scroll. Five values fix it, and
- * four of the five are geometry:
+ * separate landing 855px down the page and reaching it was a scroll. Six values fix it, and
+ * four of the six are geometry:
  *
- *  1. **The orb comes down 288 → 176.** `sm:size-72` is the product's, and it is the single
+ *  1. **The orb comes down 288 → 176 → 96.** `sm:size-72` is the product's, and it is the single
  *     largest block of vertical page in the act. Its halo is `-inset-[28%]`, so the glow still
- *     spans 274px — the presence is barely touched and 112px of page comes back.
+ *     spans 150px. L16 takes the second step, to buy the trend a home inside this card.
  *  2. **The card's top band goes 64 → 48 and its bottom pad 40 → 24.** The band exists to hold
  *     the `Session · MM:SS` row (L14 moved it there); at `top-1` the row's 44px box fits 48
  *     exactly, so nothing is crowded.
  *  3. **`min-height` is released.** `sm:min-h-[480px]` would hold the card at its old height and
  *     centre the shortened contents inside it, which would give back none of the page.
  *  4. **The sub still reserves two lines.** `min-height: 51` — two of its own 25.5px lines.
- *     Without it the stateline block, the footnote and every framing derived from them change
- *     size on the frame the copy changes.
- *  5. **The Pause / End controls are REMOVED — and this one is a CONTENT liberty, not a
- *     geometric one (L15).** Everything else in this block resizes or repositions something the
- *     product ships; this deletes two real controls from a real surface. It is recorded in the
- *     liberties table with that distinction stated, because a reader who finds it later must be
- *     able to tell a staging decision from a fidelity defect. What it buys is the 114px between
- *     the stateline and the footnote — the exact room the trend needed.
+ *     Without it the stateline block, the trend and every framing derived from them change size
+ *     on the frame the copy changes.
+ *  5. **The Pause / End controls are REMOVED — a CONTENT liberty, not a geometric one (L15).**
+ *  6. **FR-024's footnote is REMOVED — the same, and it is L16.** "Processed just for you —
+ *     analyzed, then deleted." Everything else in this block resizes or repositions something
+ *     the product ships; these two delete real content from a real surface, and the distinction
+ *     is recorded rather than blurred, because a reader who finds it later must be able to tell a
+ *     staging decision from a fidelity defect. The footnote's 18.2px plus its gap is part of what
+ *     the trend now occupies, and the film states the same idea far more loudly twice: the camera
+ *     consent gate is a whole beat, and beat 5a's privacy line takes the in-place emphasis.
  *
  * The stateline→controls gap L14 spent 70px on is gone with the controls, and so is the
  * emphasis it was buying room for: see `geometry.ts` § THE EMPHASIS LEAVES THE STATELINE.
@@ -139,7 +230,30 @@ export const StageLayout: React.FC = () => (
     [data-emph] [data-testid="bloom"] { width: ${BLOOM_SIZE}px; height: ${BLOOM_SIZE}px; }
     [data-emph] p[aria-live="polite"] + p { min-height: ${SUB_MIN_HEIGHT}px; }
     [data-emph] div.mt-7 { display: none; }
-    [data-emph] p.mt-8 { margin-top: ${FOOTNOTE_GAP}px; }
+    [data-emph] p.mt-8 { display: none; }
+    /* ══ THE TREND IS NO LONGER A CARD INSIDE A CARD ═════════════════════════════
+     *
+     * \`session-trend.tsx:313\` is
+     * \`mt-5 rounded-2xl border border-border bg-surface p-5 shadow-soft sm:p-6\` — a card, which
+     * is right on the product's own page where it is one of several stacked surfaces, and wrong
+     * inside the stage card where it is the last block of ONE surface. Two borders, two fills and
+     * two shadows nested a few pixels apart read as a panel that has been pasted in.
+     *
+     * **And its \`sm:p-6\` was the loose spacing.** Every gap in this column is \`CARD_PB\` = 24:
+     * bloom → head, head → sub, sub → trend (\`TREND_GAP\`), trend → card bottom. But the nested
+     * card added its OWN 24 inside those, so the visible air above "This session" was 48 and the
+     * air under the plot was 48, against 24 everywhere else. Stripping the card removes exactly
+     * that doubling — the freed room is not given to anything, it simply stops being there, and
+     * the column reads at one rhythm. The \`mt-5\` goes with it for the same reason it always did.
+     */
+    [data-emph] [data-testid="session-trend"] {
+      margin-top: 0 !important;
+      padding: 0 !important;
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
+      border-radius: 0 !important;
+    }
   `}</style>
 );
 
@@ -219,9 +333,19 @@ const BloomDrift: React.FC<{ tension: number }> = ({ tension }) => {
 
 export const MonitorPage: React.FC<{
   clock: string;
-  /** Which band's copy + stateline tone the real component shows. Changes discretely. */
-  band: Band;
-  /** 0 → meadow, 0.5 → the mid-gold, 1 → amber. Drifts continuously, independent of `band`. */
+  /**
+   * **The reading**, 0 → at ease, 1 → fully tense. The stateline's band and the trend's newest
+   * window both come from this one number — see § ONE READING, READ TWICE. It replaces the `band`
+   * / `climb` / `descend` props, which were three separate authorings of the same escalation.
+   */
+  level: number;
+  /** The highest the session has reached. Beat 11's tail walks down; the history does not. */
+  peak?: number;
+  /**
+   * 0 → meadow, 0.5 → the mid-gold, 1 → amber. The one reader still on its own curve: it is the
+   * component's own 1.3s `transition: background`, and beat 8 lands it five frames before the
+   * stateline reaches "tense". See § ONE READING, READ TWICE.
+   */
   tension: number;
   /**
    * Page scroll. **It is 0 for every monitoring beat now** — at L15's arrangement the whole act
@@ -234,8 +358,6 @@ export const MonitorPage: React.FC<{
   headphones?: boolean;
   nod?: boolean;
   notesFrom?: number;
-  climb?: number;
-  descend?: number;
   /** Seconds elapsed when the beat starts; the readout ticks on from there. */
   sessionFrom?: number;
   /** World-coordinate layer — the mail toast lives here, not in the page. */
@@ -243,7 +365,8 @@ export const MonitorPage: React.FC<{
   children?: React.ReactNode;
 }> = ({
   clock,
-  band,
+  level,
+  peak,
   tension,
   scroll = SCROLL.monitor,
   pose,
@@ -251,13 +374,14 @@ export const MonitorPage: React.FC<{
   headphones,
   nod,
   notesFrom,
-  climb = 0,
-  descend = 0,
   sessionFrom = 47 * 60 + 12,
   overlay,
   children,
 }) => {
   const frame = useCurrentFrame();
+  // The stateline and the trend, from the same number, on the same frame.
+  const band = bandOf(level);
+  const sessionPeak = peak ?? level;
   const seconds = sessionFrom + frame / 30;
   const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
   const ss = String(Math.floor(seconds % 60)).padStart(2, "0");
@@ -323,6 +447,65 @@ export const MonitorPage: React.FC<{
               onAllow={() => {}}
               onRetryBlocked={() => {}}
             />
+
+            {/*
+             * ══ THE TREND, UNDER THE READING IT IS THE HISTORY OF (L16) ══════════════
+             *
+             * It was the next card down the scrolling column (pre-L15), then the second occupant
+             * of the pinned right column (L15). Both were arrangements the geometry forced rather
+             * than arrangements anybody wanted: in the column it shared a y with the confirmatory
+             * prompt, so beat 9 covered a graph with a notification, and the right column changed
+             * occupants three times across four beats.
+             *
+             * Here it is simply the last thing in the reading card — the session's history
+             * directly beneath the session's stateline, which is where it belongs and is what the
+             * product's own page does with it, only closer. What it costs is the orb (176 → 96)
+             * and FR-024's footnote; see `<StageLayout/>` above, where both are declared.
+             *
+             * ── DRAWN WIDE, THEN SCALED ──────────────────────────────────────────────
+             *
+             * The card's height is very nearly independent of its width
+             * (`session-trend-geometry.ts:53` fixes the plot's viewBox at `H = 210`), so a card
+             * rendered directly at 368 would still be ~350 tall and nothing would fit. Rendered
+             * at `TREND_NATURAL_W` and scaled, the same card arrives at 368 × 170.4 with every
+             * pixel of its shape intact.
+             *
+             * `data-measure-scale` is what makes the plot the width of the card it is in. The
+             * component measures its own container with `getBoundingClientRect`, which returns
+             * SCREEN pixels — so the scale on this wrapper was landing in the measurement exactly
+             * as the camera's zoom used to, and the plot was drawing at 42% of its box. The
+             * attribute declares the factor and `measure-patch.ts` divides it out; see its § AND
+             * THE CAMERA WAS NOT THE ONLY SCALE IN THE CHAIN.
+             *
+             * A transform does not affect layout, so the outer box reserves the SCALED size and
+             * the card's own bottom padding sits under it.
+             */}
+            <div
+              style={{
+                width: TREND.w,
+                height: TREND.h,
+                marginTop: TREND_GAP,
+                flexShrink: 0,
+              }}
+            >
+              <div
+                {...{ [MEASURE_SCALE_ATTR]: TREND_SCALE }}
+                style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}
+              >
+                <SessionTrend
+                  sessionId="video"
+                  active={false}
+                  load={async () => trendPoints({ level, peak: sessionPeak })}
+                  // Bumped every frame so the trend re-reads its (frame-derived) points. Without
+                  // it the component fetches once on mount and freezes: it looks correct in a
+                  // STILL — each still is a fresh page — and is static for the whole cut in a
+                  // video render, which is exactly the kind of defect that survives to the
+                  // finished file.
+                  refreshSignal={frame}
+                  now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
+                />
+              </div>
+            </div>
           </div>
 
         </div>
@@ -343,6 +526,14 @@ export const MonitorPage: React.FC<{
        * overlap**, which is the "the notification covers the viewfinder in beats 8 and 9"
        * complaint. The old 18px gap had been computed against the UNSCROLLED position, so the
        * arithmetic was right about a page nobody was rendering. Neither element scrolls now.
+       *
+       * ── AND ITS TOP EDGE IS THE ORB'S TOP EDGE (L16) ──
+       *
+       * `VIEWFINDER.y` is `RAW.bloom.y` — 237 — so the two columns begin on one line. Purely
+       * visual: the orb and the face are the composition's two pictures and they now share a
+       * horizontal. The toast moves down with it and keeps `PINNED_GAP` above the panel; see
+       * `geometry.ts` § TOAST for why the stage card's top edge was the wrong line to take, and
+       * what beat 8 would have paid for it.
        *
        * ── AND IT GROWS FROM ITS TOP-LEFT ──
        *
@@ -389,59 +580,6 @@ export const MonitorPage: React.FC<{
         </Viewfinder>
       </div>
 
-      {/*
-       * ══ THE TREND JOINS THE PINNED COLUMN, UNDER HIS FACE (L15) ══════════════════
-       *
-       * It used to be the next card down the scrolling column, 855px below the fold, and
-       * reaching it was a page scroll plus a camera travel — which is why the film's closing
-       * image was a graph arriving after the reading rather than beside it.
-       *
-       * ── AND IT IS DRAWN WIDE, THEN SCALED ─────────────────────────────────────────
-       *
-       * The card is **not** simply rendered at 320. Its height is almost independent of its
-       * width — `session-trend-geometry.ts:53` fixes the plot's viewBox at `H = 210` and the
-       * heading, subtitle, gutters and legend account for the rest — so a card rendered at 320
-       * would be ~370 tall, which is the whole problem again at a third of the width. Rendered
-       * at `TREND_NATURAL_W` and scaled to `TREND_RENDER_W`, the same card comes out 320 wide
-       * and a little under 150 tall — the plot keeps every pixel of its shape and simply arrives
-       * at the size the composition has room for. `geometry.ts` § TREND carries the measured
-       * numbers.
-       *
-       * **The cost is stated rather than buried.** At `TREND_SCALE` the card's 18px heading
-       * lands under the phone-legibility floor and its axis labels well under it — see
-       * `framing.ts` § PHONE. What this shot has to deliver is the LINE: a tail that climbed
-       * during beat 8 walking back down in meadow, which is a shape rather than a reading, and
-       * at the composite framing the plot is still ~150 × 45px on a phone. The same honesty
-       * beat 4's bullets and beat 6's CTA label already get.
-       *
-       * A transform does not affect layout, so the box below reserves the SCALED size and
-       * nothing under it moves.
-       */}
-      <div
-        style={{
-          position: "absolute",
-          left: TREND.x,
-          top: TREND.y - VIEWPORT_Y,
-          width: TREND.w,
-          height: TREND.h,
-          zIndex: 10,
-        }}
-      >
-        <div style={{ width: TREND_NATURAL_W, transformOrigin: "top left", scale: TREND_SCALE }}>
-          <SessionTrend
-            sessionId="video"
-            active={false}
-            load={async () => trendPoints({ climb, descend })}
-            // Bumped every frame so the trend re-reads its (frame-derived) points. Without it
-            // the component fetches once on mount and freezes: it looks correct in a STILL —
-            // each still is a fresh page — and is static for the whole cut in a video render,
-            // which is exactly the kind of defect that survives to the finished file.
-            refreshSignal={frame}
-            now={() => Date.UTC(2026, 6, 30, 10, 47, 0)}
-          />
-        </div>
-      </div>
-
       {children}
     </AppShell>
   );
@@ -475,6 +613,29 @@ export const MonitorPage: React.FC<{
  *
  * The result is a prompt that behaves as if it had been laid out in the world: it enters, moves
  * and magnifies with the camera, and `PROMPT.yes` is a world rect the pointer can travel to.
+ *
+ * ══ AND THE FOCUS RING IS SUPPRESSED — A FIDELITY CORRECTION, NOT A LIBERTY ═════════
+ *
+ * A meadow ring arrived on "Yes, that's me" the moment the prompt opened and was still there
+ * under the cursor's click. **It is `:focus-visible`, and `:focus-visible` cannot fire on a mouse
+ * click in a real browser** — `confirmatory-prompt.tsx:27` is
+ * `focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-meadow …`, which is a
+ * keyboard-navigation affordance and nothing else. Two things conspire to draw it here anyway:
+ * Radix's `<Dialog.Content>` moves focus to its first focusable child on open, and Chromium's
+ * focus-visible heuristic treats programmatic focus as keyboard-ish when no pointer input has
+ * ever happened — and in a render, none ever has. So the film was drawing a state **the product
+ * never shows to a mouse user**, on the one beat whose entire subject is *he was asked and he
+ * answered*.
+ *
+ * Removing it therefore makes the film MORE faithful rather than less, and it is recorded as a
+ * correction rather than in the liberties table. What remains on the control is what a real click
+ * genuinely produces: the cursor, its press dip and click ring (`pointer.tsx`), and the option's
+ * own shipped `hover:bg-[…]` easing over `transition-colors` (`hover.tsx` § promptOption).
+ *
+ * It is scoped to the prompt on purpose. Beat 2's signup ring is drawn deliberately by
+ * `auth.tsx`, which applies the component's own focus-visible declaration by selector because a
+ * render cannot provoke one — the opposite problem, at a site where a ring is genuinely what the
+ * product shows.
  */
 export const WorldPrompt: React.FC<{
   /** The camera's shot THIS frame — `useShotAt(keys)` in `framing.ts`. */
@@ -495,6 +656,13 @@ export const WorldPrompt: React.FC<{
           transform-origin: 0 0 !important;
           transform: scale(${p.zoom.toFixed(6)}) !important;
           opacity: ${enter.opacity.toFixed(4)} !important;
+        }
+        /* See § AND THE FOCUS RING IS SUPPRESSED. Tailwind's ring is a box-shadow, so both it
+           and the outline have to go. Plain :focus is left alone — the component styles only
+           :focus-visible. */
+        [data-testid="notification"] button:focus-visible {
+          box-shadow: none !important;
+          outline: none !important;
         }
       `}</style>
       {children}

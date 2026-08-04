@@ -62,21 +62,56 @@ const URL = "serenify.tech";
 const OMNIBOX_LIFTED = rect(380, 288, 440, 52);
 
 /**
- * The hero's copy column, measured — headline, lede, both CTAs and the data line, all four edges
- * inside the frame.
+ * ══ THE HERO BLOCK IS CENTRED IN THE FRAME, AND THE DATA LINE IS WHAT PAYS FOR IT ═══
  *
- * **Then shifted left so the story card stays out of it.** `frameRect` is 742 wide here because
- * the column is 369 tall and 16:9 charges for the height; centred on the column that puts the
- * frame's right edge at 690, and `<StoryCard/>`'s left edge is at 626 — so the shot caught 64px
- * of the card, including a sliced line of its narration. A sliced line of text is always a
- * failure. The frame is the same SIZE; only its centre moves, and what it gives up on the left
- * is page background the camera's own backdrop matches exactly.
+ * The shot used to frame the whole copy column — headline, lede, both CTAs **and the data line**
+ * — and then **shift the frame left** so `<StoryCard/>` stayed out of it. That shift is the
+ * off-centre reading: the frame is 741.9 wide for a 510-wide column, and the clamp put 183 of the
+ * 232px of slack on the left and 49 on the right. The column's centre line sat **71.9 world px
+ * right of the frame's**, which at 2.588× is **186px of a 1920 frame** — a 486px left gutter
+ * against a 114px right one.
+ *
+ * ── CENTRING IT ON THE FULL COLUMN IS GEOMETRICALLY IMPOSSIBLE, AND THAT IS ARITHMETIC ──
+ *
+ * The column is 369.3 tall, so 16:9 charges **at least 656.5** of width for it at zero margin.
+ * Centred on the column (cx 319) that puts the frame's right edge at 647.3 at best and 690 at the
+ * shot's real size — and the story card's left border is at **626**. So *every* centred frame that
+ * holds the whole column whole reaches into the card: 21.3 world px in the best case, 63.9 at
+ * margin 24, which is the card's border, the corner of its bloom and two sliced lines of its
+ * narration. Rendered and confirmed, not derived: `out/hero-centred.png`.
+ *
+ * ── SO THE BLOCK BEING CENTRED IS THE ONE WITHOUT THE DATA LINE ────────────────────
+ *
+ * Headline, lede and both CTAs — 325.3 tall rather than 369.3, which is what drops the 16:9 floor
+ * far enough to fit. `FR-024`'s data line ("Your camera is read, then forgotten. Only the reading
+ * is kept.") sits **below** the frame's bottom edge, wholly out rather than sliced, which is the
+ * framing rule's own alternative to cropping. Its idea is not lost from the film: beat 4 is a
+ * whole beat of camera consent and beat 5a's privacy line takes the in-place emphasis at full
+ * amplitude.
+ *
+ * ── AND THE WIDTH IS DERIVED FROM THE CARD, NOT PICKED ─────────────────────────────
+ *
+ * `HERO_W` is the **widest centred frame whose right edge still clears the card's left border**,
+ * so the margin around the block is the largest the geometry allows rather than a number chosen
+ * to fit. It comes out at 610, i.e. **8.9 world px of clearance on all four sides** — 28px of a
+ * 1920 frame — and the push is 3.15× rather than 2.59×, so the 67.2px headline reads at 46.5px on
+ * a phone instead of 38.2.
+ *
+ *   frame        x  14.0 – 624.0   y 266.0 – 609.1
+ *   block        x  64.0 – 574.0   y 274.9 – 600.2      centred, 8.9 clear on every side
+ *   story card   x 626.0                                 2.0 clear of the frame's right edge
+ *   data line    y 620 –                                 10.9 below the frame's bottom edge
  */
-const HERO_SHOT = (() => {
-  const base = frameRect(LANDING.heroCopy, 24);
-  const maxRight = LANDING.storyCard.x - 8;
-  return { ...base, cx: Math.min(base.cx, maxRight - base.w / 2) };
-})();
+const HERO_BLOCK = rect(
+  LANDING.heroCopy.x,
+  LANDING.heroCopy.y,
+  LANDING.heroCopy.w,
+  LANDING.ctaGetStarted.y + LANDING.ctaGetStarted.h - LANDING.heroCopy.y,
+);
+const HERO_CX = HERO_BLOCK.x + HERO_BLOCK.w / 2;
+/** The widest centred frame whose right edge still clears the story card's left border by 2. */
+const HERO_W = 2 * (LANDING.storyCard.x - 2 - HERO_CX);
+const HERO_SHOT = shot(HERO_CX, HERO_BLOCK.y + HERO_BLOCK.h / 2, HERO_W);
 const CTA = centre(LANDING.ctaGetStarted);
 
 export const Beat01ColdOpen: React.FC = () => {
@@ -122,13 +157,22 @@ export const Beat01ColdOpen: React.FC = () => {
                   from={152}
                   to={180}
                 />
+                {/*
+                 * It rises into frame from BELOW, which is the only edge that is reliably
+                 * off-frame while the camera is still pulling in — everything to the left, right
+                 * and above is inside the wider intermediate frames. The tighter landing (609.1
+                 * rather than 668.2 at the bottom) is why both numbers moved: the travel starts
+                 * 12 frames earlier so it still crosses the frame edge as the camera settles at
+                 * f124 rather than ten frames after it, and `visible` opens at f118, where the
+                 * cursor is still 10px under the closing frame's own bottom edge.
+                 */}
                 <Pointer
                   path={[
-                    { frame: 108, x: CTA.x + 240, y: CTA.y + 96 },
+                    { frame: 96, x: CTA.x + 260, y: CTA.y + 56 },
                     { frame: 152, x: CTA.x, y: CTA.y },
                   ]}
                   clicks={[168]}
-                  visible={{ from: 104 }}
+                  visible={{ from: 118 }}
                 />
               </>
             }

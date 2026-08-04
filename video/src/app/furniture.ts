@@ -1,4 +1,4 @@
-import { DISPLAY, MONO_FAMILY, SANS } from "../fonts";
+import { DISPLAY, MONO_FAMILY, ROUNDED, SANS } from "../fonts";
 
 /*
  * Hallmark · component: os-furniture + closing-cards · genre: modern-minimal (chrome) + editorial (cards)
@@ -340,3 +340,21 @@ export const OS_MONO = `${MONO_FAMILY}, ui-monospace, monospace`;
 export const CARD_DISPLAY = `${DISPLAY}, sans-serif`;
 /** Body type on the closing cards — subordinate to the mark above it, so never the display face. */
 export const SANS_STACK = `${SANS}, system-ui, sans-serif`;
+/**
+ * ── "take care of yourself", AND ONLY THAT LINE ─────────────────────────────────────
+ *
+ * The end card's sentimental line, in **Nunito**. Picked off `endcard-compare.png` against
+ * Fraunces and Instrument Serif — the *curvier* answer rather than the warmer-serif one, and the
+ * one that stays closest to Outfit's own geometry so the card reads as one voice with a softer
+ * second register rather than as two typefaces arguing.
+ *
+ * **It replaces Inter on that card rather than joining it.** The end card is now Outfit (the mark
+ * and `.tech`) plus this, which is two families where three would have been one too many. Beat
+ * 12's closing card keeps `SANS_STACK`; nothing else in the film uses this.
+ *
+ * Everything else about the line is untouched — 26px, weight 400, `CARD.muted`, 1.4 leading,
+ * roman. Nunito's strokes are a shade lighter than Inter's at the same size and that is left
+ * alone deliberately: the softer weight IS the register the swap was made for, and thickening it
+ * back would spend the change.
+ */
+export const CARD_LINE = `${ROUNDED}, system-ui, sans-serif`;

@@ -9,7 +9,7 @@ import { Camera, frameRect, rect, shot, union } from "../Camera";
 import { REN } from "../copy";
 
 /**
- * Beat 10 · Ren · 250 frames
+ * Beat 10 · Ren · 310 frames
  *
  * A real three-turn exchange, each message legible, appearing one at a time with a real beat
  * between them.
@@ -63,7 +63,7 @@ import { REN } from "../copy";
  *
  * ── THE CAMERA DOES NOT GO TO THE COMPOSER, BECAUSE THE POINTER DOES NOT ───────────
  *
- * `L2` is a single hold from f66 to f162. It contains the composer, the send button, the
+ * `L2` is a single hold from f94 to f222. It contains the composer, the send button, the
  * conversation header and both bubbles, so the typing, the send click and his message landing all
  * happen inside one static frame — which is what the pointer's own fix asks for. A camera that
  * travelled down to the composer while the cursor sat still would be the only thing moving in the
@@ -112,36 +112,47 @@ const CARET_AT = { x: CHAT.textarea.x + 62, y: CHAT.textarea.y + CHAT.textarea.h
 const PANEL_WHOLE = frameRect(CHAT.panel, 20);
 
 /**
- * **REN_FACE — the landing this beat is now staged around.**
+ * **REN_TURN1 — his face AND his opening line, in one landing.**
  *
  * The beat used to punch in on the avatar at f32 and pull back out at f38 — six frames — which
- * does not read as a shot at all, it reads as a twitch. And it was punching in on a 34px circle
- * in `idle`, because the shipped avatar was never enlarged and never given a state, so there was
- * nothing there to land on.
+ * does not read as a shot at all, it reads as a twitch. The pass after that gave him a real
+ * 300-wide face landing and held it, and deliberately kept turn 1 **out** of frame (by 0.65px),
+ * revealing the bubble with the move off his face. That paid for the performance and left the
+ * opener itself never read above **8.33px** — its widest framing in the cut was L2's 760.
  *
- * Now the camera goes to his face and **stays**, while he composes. `REN_AVATAR` is 56px (L8) and
- * `<RenFace/>` drives the expression from the frame, so the thing being held is a face doing
- * something rather than a mark.
+ * **One framing holds both, comfortably, and the constraint that said otherwise was about the
+ * wrong bubble.** `CHAT_OWNERSHIP_SPAN` — the ≥638px floor — pairs the avatar with *his* reply,
+ * which is `self-end` and runs to x 919. Ren's own opener is `self-start` and ends at **630.5**:
  *
- * **It is placed rather than derived, and both numbers have a reason.** A `frameRect` over the
- * avatar and the name block is ~229 world px — an 8.4× zoom, at which the header's 1px bottom
- * border renders 8px thick and the shot reads as a magnified screenshot rather than as a camera.
- * 300 is a 6.4× zoom — a little tighter than beat 8's clock landing (368, 5.2×), which is the
- * tightest shot in the rest of the film — and it puts the 56px avatar at **78.8px on a phone**,
- * about where the protagonist's own head sits in beat 8's fall.
+ *   union(REN_AVATAR, CHAT.turn1)   x 270.0 – 630.5   (360.5)
+ *                                   y 194.8 – 324.1   (129.3)
+ *   frameRect(m=40)                 w = max(440.5, 209.3 × 16/9 = 372.1) = **440.5**  (width governs)
  *
- *   frame   x 185 – 485   y 156 – 324.75      w = 300, h = 168.75
- *   cx      335, the centre of the avatar and the name block together — not of the avatar alone,
- *           which would put "here to listen" against the frame's right edge
- *   cy      156 + h/2, so the frame's top edge sits on the app header's bottom rather than 34px
- *           inside the browser chrome, which is where centring on the header band would put it
- *   holds   the avatar, "Ren", "here to listen", the conversation header's own bottom border, and
- *           the panel's top-left corner — which is what stops the shot reading as a floating mark
- *   NOT in shot: turn 1's bubble (277.7 – 324.1), by 0.65px, and deliberately — the message
- *           arrives while the camera is on his face and is REVEALED by the move off it. A bubble
- *           half-cut by the frame edge during the hold would be the thing the eye went to.
+ * At 440.5 turn 1 reads at **14.37px** on a phone — 1.7× the 8.33 it had — and the avatar at
+ * **40.2px**. The panel's right edge runs off frame, which every beat-10 landing except the 889
+ * establisher already does.
+ *
+ * ── AND THE WIDTH IS SET BY THE BUBBLE, NOT BY THE AVATAR ──────────────────────────
+ *
+ * Which is what makes L8's size a free variable here: turn 1's right edge governs the union, so
+ * the landing is 434.5 at a 48px avatar and 432.5 at 36. The three variants Mohamed is choosing
+ * between are the same shot with a different face in it, not three different shots.
+ *
+ * **The message now lands INSIDE this hold rather than being revealed by the move off it** — Ren
+ * composes it on screen (`thinking`, with the typing indicator in turn 1's own slot), it arrives,
+ * and it is read at the size the recon found. That is the whole of §3.2.
+ *
+ * ── AND THE TOP EDGE IS PLACED, NOT CENTRED ────────────────────────────────────────
+ *
+ * Width governs, so the frame is 243.8 tall against a 129.3 union and the slack has to go
+ * somewhere. Centred it lands at y 137.5, which puts 18.5px of the sticky app header — and a
+ * slice of one of its icon buttons — across the top of the shot. `cy` puts the top edge on
+ * **156**, the header's own bottom, exactly as `COMPOSITE` and `BEAT5_SUCCESS` do: the union
+ * keeps 38.8px above and 75.7 below, all of it the chat panel's own empty log, and nothing of
+ * the header is in frame.
  */
-const REN_FACE = shot(335, 156 + (300 * 9) / 16 / 2, 300);
+const renTurn1Frame = frameRect(union(REN_AVATAR, CHAT.turn1), 40);
+const REN_TURN1 = { ...renTurn1Frame, cy: 156 + (renTurn1Frame.w * 9) / 16 / 2 };
 
 /**
  * **L2 — turn 2, and everything the pointer does.** Static across the typing and the send.
@@ -181,33 +192,55 @@ const L2 = { cx: 600, cy: 391.25, w: 760 };
 const L3 = { cx: 600, cy: 343, w: 664.9 };
 
 /**
- * ══ THE CLOCK, RESTAGED AROUND HIS FACE ═════════════════════════════════════════════
+ * ══ THE CLOCK, RESTAGED AROUND THE OPENER ═══════════════════════════════════════════
  *
  *   f0–6      the panel, whole — brief, and the only shot in the beat that crops nothing
- *   f6–24     in, onto REN_FACE
- *   f12       `attentive` — he registers that someone is there
- *   f24–46    HOLD on his face. `thinking` from f30: he is composing, and you watch him do it
- *   f46–66    out to L2 — and turn 1 lands at f60, inside the move, so the message is REVEALED
- *             by the camera opening rather than appearing beside a face nobody is looking at
- *   f60       `attentive` again: he has spoken, and now he is listening
- *   f52–70    the pointer travels to the composer
- *   f72       the caret click, 6 frames after the camera has landed
- *   f74–132   he types. 49 characters at ~25 c/s — hurried, and the hurry is his own behaviour
- *   f138      **the pointer ARRIVES at the send button** and the button lights on that frame
- *   f142      the click, four frames later. The bubble lands with it
- *   f150      `thinking` again, and the typing indicator with it (L9)
- *   f162–186  in to L3
- *   f190      turn 3 lands, and Ren goes `warm` on the same frame
- *   f190–250  the protected hold — 60 frames, untouched
+ *   f6–24     in, onto REN_TURN1
+ *   f0–38     `thinking`, with the typing indicator in turn 1's own slot: he is composing, and
+ *             you watch him do it from the first frame of the beat
+ *   f24–74    HOLD on the landing
+ *   f38       turn 1 lands, into the frame that was already holding the slot it lands in, and is
+ *             read at **14.37px** — 36 frames, 1.2s, before the camera moves
+ *   f74–94    out to L2
+ *   f86–100   the pointer travels to the composer
+ *   f102      the caret click, 8 frames after the camera has landed
+ *   f104–196  he types. **78 characters** at ~25 c/s — hurried, and the hurry is his own
+ *   f202      **the pointer ARRIVES at the send button** and the button lights on that frame
+ *   f206      the click, four frames later. The bubble lands with it
+ *   f214      `thinking` again, and the typing indicator with it (L9), now in turn 3's slot
+ *   f222–246  in to L3
+ *   f250      turn 3 lands, and Ren closes his eyes on the same frame
+ *   f250–310  the protected hold — 60 frames, untouched
  *
- * ── WHAT THE FACE LANDING BOUGHT, BESIDES THE PERFORMANCE ───────────────────────────
+ * ══ AND THE BEAT COMES BACK 332 → 310, OUT OF THE TWO INDICATORS ════════════════════
  *
- * The constraint this beat recorded — *any landing holding both the avatar at x 281 and his
- * bubble ending at x 919 is ≥638px wide, which is why turns 2 and 3 read at 8.33 and 9.52px
- * rather than over 10* — was true and was being paid on every shot in the beat, because the
- * avatar had to be in all of them. Landing on the face **once**, properly, is what pays that debt
- * instead: L2 and L3 still carry him (they have to, or his `thinking` and `warm` states play off
- * screen), but the beat no longer needs a wide shot to introduce him.
+ * **Both cuts are typing indicators, and an indicator is looked at rather than read.** L9 exists
+ * to make `thinking` legible as a state; once it has been legible, every further frame of it is a
+ * moving element the audience has already understood. They ran 52 and 44 frames — 1.7s and 1.5s
+ * — against a beat whose own protected reads are 36 and 60. They run **38 and 36** now.
+ *
+ * **The two reads are untouched, to the frame.** Turn 1 still gets its 36 frames at 14.37px
+ * inside `REN_TURN1`, and turn 3 still gets the protected 60 at L3. What moved is only when they
+ * start. The typing itself is untouched at 92 frames for 78 characters: 25.4 c/s is already
+ * faster than a person types, so it is not a beat playing out slower than the action it depicts.
+ *
+ * ── THE BEAT WENT 250 → 332, AND BOTH REASONS ARE THE BRIEF'S ──────────────────────
+ *
+ *  · **His message is 78 characters, not 49.** At the beat's own ~25 c/s that is 92 frames of
+ *    typing rather than 58. The rate is not raised to absorb it — *never sped to fit* — so the
+ *    beat carries the +34.
+ *  · **Turn 1 is now read rather than revealed.** It lands inside a 440.5 hold and gets 36
+ *    frames there, where before it appeared during the move out and was never read above 8.33px.
+ *    That is the other +48.
+ *
+ * Nothing was cut to pay for either. The protected 60-frame hold on turn 3 is untouched.
+ *
+ * ── WHAT THE LANDING BOUGHT, BESIDES THE PERFORMANCE ───────────────────────────────
+ *
+ * The constraint this beat recorded — *any landing holding both the avatar and his bubble ending
+ * at x 919 is ≥638px wide, which is why turns 2 and 3 read at 8.33 and 9.52px rather than over
+ * 10* — is about **turn 2**. It was being quoted at turn 1 as well, and turn 1 is `self-start`
+ * and 288px narrower. Ren's own opener escapes the constraint entirely; his reply does not.
  *
  * ── AND THE SEND USED TO READ AS A DOUBLE CLICK ─────────────────────────────────────
  *
@@ -228,21 +261,23 @@ const L3 = { cx: 600, cy: 343, w: 664.9 };
  * `send`.
  */
 const T = {
-  attentive: 12,
-  composing: 30,
-  turn1: 60,
-  cursorToComposer: 70,
-  caretClick: 72,
-  typeFrom: 74,
-  typeTo: 132,
+  turn1: 38,
+  cursorToComposer: 100,
+  caretClick: 102,
+  typeFrom: 104,
+  /** 92 frames for 78 characters — 25.4 c/s, the same rate the 49-character line was typed at. */
+  typeTo: 196,
   /** The pointer's travel ENDS here. The button lights on this frame, not eight before it. */
-  sendArrive: 138,
-  send: 142,
+  sendArrive: 202,
+  send: 206,
   /** Lands the same frame the composer clears — see the note above. */
-  bubble: 142,
-  thinking: 150,
-  reply: 190,
+  bubble: 206,
+  thinking: 214,
+  reply: 250,
 } as const;
+
+/** The beat's own length, so the last camera key and `Root.tsx` cannot drift apart. */
+export const BEAT10_FRAMES = 310;
 
 export const Beat10Ren: React.FC = () => {
   const frame = useCurrentFrame();
@@ -264,34 +299,44 @@ export const Beat10Ren: React.FC = () => {
   ];
 
   /**
-   * ── REN'S ARC, AND EVERY STEP LANDS ON AN EVENT ─────────────────────────────────
+   * ── REN'S ARC — TWO STATES, AND `attentive` IS GONE ─────────────────────────────
+   *
+   * **`attentive` is dropped from the film entirely** (decided 2026-07-31). At the size the face
+   * landing holds him it reads as unsettling rather than as attention: `OPEN_EYE_TRANSFORMS`
+   * scales the pair to **1.22×** and lifts them, which at a conversational scale is a stare. It
+   * is a good state at the 34px the product ships it at and a bad one at four times that, and the
+   * film is the only place it is ever seen large. It appears nowhere now.
+   *
+   * What is left is the arc the beat actually has:
+   *
+   *   thinking   from f0 — he is composing his opener, and the typing indicator says so. It runs
+   *              through turn 1 landing at f38 and does not change when it does: he has spoken,
+   *              and now he is waiting on a person who is typing, which is the same state
+   *   thinking   through the whole of turn 2's typing and through his own composing of turn 3 —
+   *              one continuous state, not two, because nothing happens between them that would
+   *              cause a change
+   *   warm       at f250, ON turn 3. **The eyes close.** `warm` drops the open pair entirely and
+   *              leaves the closed, smiling one (`ren-avatar.tsx:90`), so the moment the Michael
+   *              Jackson suggestion lands is the moment his eyes shut — which is the product's
+   *              own state for exactly this and the only expression change in the beat.
    *
    * The states are discrete in the product — `OPEN_EYE_TRANSFORMS` carries no transition — so
-   * they snap, and the only way a snap reads as a performance rather than as a glitch is if it
-   * is *caused*. Each change here sits on the frame something happens:
-   *
-   *   idle       → the thread is empty and nothing has been said
-   *   attentive  at f12, as the camera arrives on his face
-   *   thinking   at f30, inside the hold — this is the composing the beat lands on
-   *   attentive  at f60, ON turn 1 landing: he has spoken, now he is listening while the human
-   *              types the whole of turn 2
-   *   thinking   at f150, with the typing indicator (L9) — the second composing
-   *   warm       at f190, ON turn 3. The reply about the music is the one moment the product is
-   *              supposed to feel like it knows him, and `warm` is the state the product ships
-   *              for exactly that.
+   * they snap, and the one snap left sits on the frame its message arrives.
    */
-  const renState =
-    frame >= T.reply
-      ? "warm"
-      : frame >= T.thinking
-        ? "thinking"
-        : frame >= T.turn1
-          ? "attentive"
-          : frame >= T.composing
-            ? "thinking"
-            : frame >= T.attentive
-              ? "attentive"
-              : "idle";
+  const renState = frame >= T.reply ? "warm" : "thinking";
+
+  /**
+   * L9's indicator follows what Ren is actually doing, and it is only ever up while he is
+   * COMPOSING — not while he is merely `thinking`. He is `thinking` for 250 of the beat's 310
+   * frames; dots for all of them would be a lie about the surface and a moving element under
+   * every other thing the beat is trying to show.
+   *
+   * Two windows, each ending on the message it was promising: f0 → turn 1, and the second
+   * composing → turn 3. Each draws in the slot its own bubble will occupy, so the dots are
+   * replaced by the thing they were announcing rather than sitting somewhere else on the page.
+   */
+  const composingTurn1 = frame < T.turn1;
+  const composingTurn3 = frame >= T.thinking && frame < T.reply;
 
   return (
     <AbsoluteFill>
@@ -300,17 +345,17 @@ export const Beat10Ren: React.FC = () => {
           // The panel, whole — the establishing frame, and the only one that crops nothing.
           { frame: 0, shot: PANEL_WHOLE },
           { frame: 6, shot: PANEL_WHOLE },
-          // In on HIS FACE, and hold there while he composes.
-          { frame: 24, shot: REN_FACE },
-          { frame: 46, shot: REN_FACE },
-          // Out to the working shot. Turn 1 lands at f60, inside this move — so the camera
-          // opening is what reveals it. Then still: the typing, the send and his bubble all
+          // In on his face AND the slot his opener will land in, and HOLD there across the
+          // landing: he composes, the line arrives at f38, and it is read at 14.37px.
+          { frame: 24, shot: REN_TURN1 },
+          { frame: 74, shot: REN_TURN1 },
+          // Out to the working shot. Then still: the typing, the send and his bubble all
           // happen inside one static frame.
-          { frame: 66, shot: L2 },
-          { frame: 162, shot: L2 },
-          // In on the thread for turn 3, settled before it arrives at f190.
-          { frame: 186, shot: L3 },
-          { frame: 250, shot: L3 },
+          { frame: 94, shot: L2 },
+          { frame: 222, shot: L2 },
+          // In on the thread for turn 3, settled before it arrives at f250.
+          { frame: 246, shot: L3 },
+          { frame: BEAT10_FRAMES, shot: L3 },
         ]}
       >
         <ChatPage
@@ -319,7 +364,7 @@ export const Beat10Ren: React.FC = () => {
           renState={renState}
           draft={frame >= T.typeFrom && frame < T.send ? typed : ""}
           caret={frame >= T.typeFrom && frame < T.send}
-          thinking={frame >= T.thinking && frame < T.reply}
+          composing={composingTurn1 ? "turn1" : composingTurn3 ? "turn3" : null}
           overlay={
             <>
               {/*
@@ -358,7 +403,9 @@ export const Beat10Ren: React.FC = () => {
                */}
               <Pointer
                 path={[
-                  { frame: 0, x: 640, y: 400 },
+                  // It sets off during the move off the landing, so it is already travelling by
+                  // the time L2 settles rather than starting from a dead stop inside it.
+                  { frame: 86, x: 640, y: 400 },
                   { frame: T.cursorToComposer, x: CARET_AT.x, y: CARET_AT.y },
                   { frame: T.typeTo, x: CARET_AT.x, y: CARET_AT.y },
                   { frame: T.sendArrive, x: SEND_AT.x, y: SEND_AT.y },
@@ -376,8 +423,15 @@ export const Beat10Ren: React.FC = () => {
 /** Checked, not asserted. `worldSize × 422 / framedWidth`, per landing. */
 export const BEAT10_LEGIBILITY = {
   panelWhole: { framedWidth: PANEL_WHOLE.w, chatText: PHONE_PX(15, PANEL_WHOLE.w) },
-  /** The face landing. Ren at 56 world px is 65.6px on a phone. */
-  renFace: { framedWidth: REN_FACE.w, avatar: PHONE_PX(REN_AVATAR_SIZE, REN_FACE.w) },
+  /**
+   * The landing that holds his face AND his opener. The line reads at **14.37px** against the
+   * 8.33 it had at L2, which is the whole of §3.2; the avatar's figure moves with L8's size.
+   */
+  renTurn1: {
+    framedWidth: REN_TURN1.w,
+    avatar: PHONE_PX(REN_AVATAR_SIZE, REN_TURN1.w),
+    chatText: PHONE_PX(15, REN_TURN1.w),
+  },
   l2: { framedWidth: L2.w, chatText: PHONE_PX(15, L2.w) },
   l3: { framedWidth: L3.w, chatText: PHONE_PX(15, L3.w) },
 } as const;

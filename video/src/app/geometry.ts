@@ -104,22 +104,57 @@ export const CLOCK: Rect = rect(1036, 58, 140, 30);
  *
  * They are declared here because every framing number is derived from them.
  */
-/** `sm:size-72` = 288 in the product. The halo is `-inset-[28%]`, so the glow still spans 274. */
-export const BLOOM_SIZE = 176;
+/**
+ * ── L16 · THE TREND MOVES INTO THE CARD, AND TWO THINGS GIVE FOR IT ─────────────────
+ *
+ * L15 put the trend in the pinned right column, beside his face. It reads there, and it costs
+ * the column an occupant it then has to swap: the confirmatory prompt lands on the same y, so
+ * beat 9 covers the trend with the prompt. **The trend belongs under the reading it is the
+ * history of**, which is the left card, and the right column then holds one thing — the
+ * viewfinder — with the toast above it and the prompt below it, neither replacing anything.
+ *
+ * The recon priced the move and it does not fit for free: at the card's own content width the
+ * column runs 587.6px against a 519px viewport. **Two blocks give, not one:**
+ *
+ *  · **The orb comes down 176 → 96.** It is the largest block of vertical page in the act and it
+ *    is the only one big enough. The halo is `-inset-[28%]`, so the glow still spans 150.
+ *  · **FR-024's footnote is DELETED — and this is a CONTENT liberty, not a geometric one**, the
+ *    same category as L15's Pause / End controls and recorded with the same distinction. See the
+ *    liberties table (L16): it removes a real privacy statement from a real surface, and it is
+ *    acceptable only because the film states that idea more loudly twice over — the camera
+ *    consent gate is a whole beat, and beat 5a's privacy line carries the in-place emphasis.
+ *
+ * Everything else in this block resizes or repositions something the product ships.
+ */
+/** `sm:size-72` = 288 in the product; 176 at L15. The halo is `-inset-[28%]` → the glow spans 150. */
+export const BLOOM_SIZE = 96;
 /** `pt-16` = 64 in the product. The readout row's 44px box fits 48 at `top-1`. */
 export const CARD_PT = 48;
 /** `sm:pb-10` = 40 in the product. */
 export const CARD_PB = 24;
-/** `mt-8` = 32 on FR-024's footnote in the product. */
-export const FOOTNOTE_GAP = 16;
 /** The sub's reserved height — two lines of its own 25.5px leading. */
 const STATELINE_LINE_H = 25.5;
 export const SUB_MIN_HEIGHT = STATELINE_LINE_H * 2;
 /** The gutter the pinned column keeps from the card AND between its own surfaces. */
 export const PINNED_GAP = 32;
 
+/**
+ * The air between the stateline block and the trend card inside the stage card. It is
+ * `CARD_PB`, deliberately: the trend then carries the same 24px above it as the card's own
+ * padding gives it below, so the nested card sits in the stage card's content box with equal air
+ * on both sides rather than with a gap chosen by eye.
+ */
+export const TREND_GAP = CARD_PB;
+
+/**
+ * ── THE TREND'S WIDTH IS THE CARD'S OWN CONTENT WIDTH, NOT A CHOSEN NUMBER ─────────
+ *
+ * `max-w-md` (448) less `sm:px-10` (40 each side) = **368**. Drawing it at anything else would
+ * be a number to defend; drawn at the content width it is simply a card inside a card, and its
+ * left and right edges are the stage card's own padding box.
+ */
 export const TREND_NATURAL_W = 768;
-export const TREND_RENDER_W = 320;
+export const TREND_RENDER_W = 368;
 export const TREND_SCALE = TREND_RENDER_W / TREND_NATURAL_W;
 
 export const RAW = {
@@ -129,16 +164,35 @@ export const RAW = {
    * which box it sits in, and that move is what freed the page scroll (L14).
    */
   sessionReadout: rect(417, 193, 366, 44),
-  /** The stage card, at L15's arrangement. Whole in the composite for the first time. */
-  stage: rect(376, 188, 448, 401.2),
-  bloom: rect(512, 237, BLOOM_SIZE, BLOOM_SIZE),
+  /**
+   * The stage card, at L16's arrangement — the orb at 96, no footnote, and the trend inside it.
+   * Whole in the composite, as it has been since L15.
+   *
+   * **457.5, and the column is now one rhythm.** The trend's own card is stripped (see
+   * `trendNatural` and `monitor.tsx` § THE TREND IS NO LONGER A CARD INSIDE A CARD), which takes
+   * 23.9 scaled px out of the card AND removes the doubled air the nested `sm:p-6` was adding
+   * above the heading and under the plot. Every gap in the column is `CARD_PB` = 24 now, top to
+   * bottom, with the single exception of the stateline's own `mt-1.5` inside its block:
+   *
+   *   card top          188          (+1 border, +48 top band)
+   *   bloom             237 –  333
+   *   stateline head    357 –  393   (`mt-6`      → 24 clear of the orb)
+   *   stateline sub     399 –  450   (`mt-1.5`, two lines always reserved)
+   *   the trend         474 – 620.5  (`TREND_GAP` → 24 clear of the sub)
+   *   card bottom       645.5        (+24 bottom pad, +1 border)
+   *
+   * Measured on `SwapProbe`'s `stage`, not derived — the freed 23.9 is not given to anything, so
+   * the card is simply shorter and every framing that unions it tightens with it.
+   */
+  stage: rect(376, 188, 448, 457.5),
+  bloom: rect(552, 237, BLOOM_SIZE, BLOOM_SIZE),
   /** The `at_ease` head — the WIDEST of the three heads at 298.5. */
-  statelineHead: rect(450.8, 437, 298.5, 36),
+  statelineHead: rect(450.8, 357, 298.5, 36),
   /**
    * The `at_ease` sub. **Two lines, always reserved** (`min-height: 51`) — see § THE SUB IS
    * RESERVED below. The paragraph shrink-wraps to its content, so this is 287.6 wide.
    */
-  statelineSub: rect(456.2, 479, 287.6, 51),
+  statelineSub: rect(456.2, 399, 287.6, 51),
   /**
    * ── AND THE `tense` SUB, WHICH NOTHING HAD EVER MEASURED ──────────────────────────
    *
@@ -154,9 +208,7 @@ export const RAW = {
    *
    * Both paragraphs are centred on x 600.
    */
-  statelineSubTense: rect(417, 479, 366, 51),
-  /** FR-024's footnote — the last thing in the card now that the controls are gone (L15). */
-  footnote: rect(449.4, 546, 301.2, 18.2),
+  statelineSubTense: rect(417, 399, 366, 51),
   /**
    * The REAL viewfinder's UNSCALED size: `w-52 sm:w-56` `aspect-video`, 224 × 126.9. Only `w`/`h`
    * are load-bearing — the component is not laid out inside the scrolling card, so its position
@@ -164,14 +216,23 @@ export const RAW = {
    */
   viewfinder: rect(615, 253, 224, 126.9),
   /**
-   * **The session trend, at its NATURAL width — the size it is drawn at before L15 scales it.**
+   * **The session trend, at its NATURAL width — the size it is drawn at before L16 scales it.**
    *
    * `w` is `TREND_NATURAL_W` and `h` is what the card measures there. Its height is very nearly
    * independent of its width (`session-trend-geometry.ts:53` fixes the plot's viewBox at
    * `H = 210`; the heading, subtitle, gutters and six-key legend account for the rest), which is
    * exactly why drawing it wide and scaling it down is what makes it fit — see `TREND`.
+   *
+   * **305.7, not 355.7 — the inner card is gone.** `<StageLayout/>` now strips the component's own
+   * `rounded-2xl border bg-surface shadow-soft sm:p-6`, so a card inside a card is one card. The
+   * 50px is that card's chrome exactly: 24 of top padding, 24 of bottom, and 2 of border. Measured
+   * on `SwapProbe`'s `trend-natural`, with `data-emph` on the probe's wrapper so the harness
+   * measures what the beats render.
+   *
+   * It also widened the plot: at `sm:p-6` the measured container was 720 inside a 768 card, and it
+   * is 768 now — the SVG is the full content width of the stage card for the first time.
    */
-  trendNatural: rect(0, 0, TREND_NATURAL_W, 355.7),
+  trendNatural: rect(0, 0, TREND_NATURAL_W, 305.7),
   welcome: rect(216, 1005.2, 768, 83.1),
   calibrationBanner: rect(216, 1112.3, 768, 87.5),
 } as const;
@@ -181,7 +242,7 @@ export const RAW = {
  *
  * `monitor` was 28 and `trend` was 580 — the page scrolled to its end so that beat 11 could
  * reach a trend card sitting 855px down. At L15's arrangement the whole monitoring act is
- * **401.2px of card beside 385.5px of pinned column, inside a 519px viewport**, so there is
+ * **481.4px of card beside 181.3px of pinned viewfinder, inside a 519px viewport**, so there is
  * nothing below the fold and nothing to scroll to. Beat 11's third landing WAS that scroll; it
  * is one settled frame now.
  *
@@ -202,7 +263,7 @@ export const SCROLL = { monitor: 0 } as const;
  *   tense           "This has held a while. Serenify can check in when you're    2 lines
  *                    ready."
  *
- * So the block's height, the footnote's position and **every framing derived from either** would
+ * So the block's height, the trend card's position and **every framing derived from either** would
  * change on the frame the copy changed. The sub carries `min-height: 51px` — two lines of its own
  * 25.5px leading — applied from the video side by a scoped stylesheet (`monitor.tsx` §
  * `<StageLayout/>`). One-line copies keep an empty second line under them, which is what a layout
@@ -238,60 +299,83 @@ export const EMPHASIS_FACTOR = 1.25;
 export const scrolled = (r: Rect, s: number): Rect => rect(r.x, r.y - s, r.w, r.h);
 
 /**
- * ── THE PINNED RIGHT COLUMN (L14/L15), AND LIBERTY L1 INSIDE IT ─────────────────────
+ * ── THE PINNED RIGHT COLUMN (L14/L15/L16), AND LIBERTY L1 INSIDE IT ─────────────────
  *
- * Four surfaces live at **x 856 – 1176** and none of them scrolls: the mail toast (beat 8), the
- * viewfinder (beats 7–11), the session trend (beats 7–11) and the confirmatory prompt (beat 9).
- * 1176 is the DRAWN clock's own right edge (`shell.tsx:99`), so the sheet's "the clock, the toast
- * and the viewfinder share a right edge, so beat 8 frames one vertical stack rather than three
- * unrelated things" is literally true of the render.
+ * Three surfaces live at **x 856 – 1176** and none of them scrolls: the mail toast (beat 8), the
+ * viewfinder (beats 7–11) and the confirmatory prompt (beat 9). 1176 is the DRAWN clock's own
+ * right edge (`shell.tsx:99`), so the sheet's "the clock, the toast and the viewfinder share a
+ * right edge, so beat 8 frames one vertical stack rather than three unrelated things" is
+ * literally true of the render.
  *
  *   clock       58 –  88     (browser chrome; never moves)
- *   toast       96 – 200     (beat 8)
- *   viewfinder 212 – 393.3   (beats 7–11)
- *   trend      425.3 – …     (beats 7–11, scaled — see TREND)
- *   prompt     425.3 – 715.3 (beat 9; it OVERLAYS the trend, which is what a notification does)
+ *   toast      101 – 205     (beat 8)
+ *   viewfinder 237 – 418.3   (beats 7–11)
+ *   prompt     450.3 – 740.3 (beat 9)
  *
- * ── AND THE COLUMN'S GUTTER IS THE SAME NUMBER IN BOTH DIRECTIONS ───────────────────
+ * ── THE COLUMN STOPS SWAPPING OCCUPANTS — L16 ───────────────────────────────────────
  *
- * The prompt used to sit **flush against the stage card** — the column began at 856 and the card
- * ended at 856, so the horizontal gap was 0 — while carrying 30.7px of air above it to the
- * viewfinder. Two different spacings on one element, and the tighter one was zero.
+ * The trend has left it for the stage card, so nothing in this column ever replaces anything
+ * else. The viewfinder is the column: it is on screen for all five monitoring beats and it never
+ * moves. The toast arrives above it in beat 8 and the prompt arrives below it in beat 9, each
+ * into empty page, each leaving the viewfinder exactly where it was. That is the whole structural
+ * simplification L16 buys, and it is why the prompt no longer lands on top of a graph.
  *
- * `PINNED_GAP` is now both: the reading column is `max-w-md` (448), which `mx-auto` centres at
- * **376 – 824**, so 856 is exactly 32 away; and the trend and the prompt each begin 32 below the
- * viewfinder's bottom. That the column width the composition wanted happens to produce the gap
+ * ── AND THE VIEWFINDER'S TOP IS THE ORB'S TOP ───────────────────────────────────────
+ *
+ * 237 is `[data-testid="bloom"]`'s own top edge (the card's 188 + its border + the 48px top
+ * band), so the two columns begin on one line: the orb and the face, the composition's two
+ * pictures, share a horizontal. It used to be 212, which was 25px above the orb and level with
+ * nothing.
+ *
+ * **The alternative was the stage CARD's top edge, and it is not takeable — see § THE TOAST.**
+ *
+ * ── THE COLUMN'S GUTTER IS THE SAME NUMBER IN EVERY DIRECTION ───────────────────────
+ *
+ * `PINNED_GAP` is all of them: the reading column is `max-w-md` (448), which `mx-auto` centres at
+ * **376 – 824**, so 856 is exactly 32 away; the toast ends 32 above the viewfinder; the prompt
+ * begins 32 below it. That the column width the composition wanted happens to produce the gap
  * the spacing wanted is luck, and it is recorded as luck — 448 was chosen first, for the bloom.
  */
 export const VF_SCALE = 320 / 224;
 export const STACK_RIGHT = 1176;
 export const STACK_LEFT = STACK_RIGHT - 320;
-export const VIEWFINDER: Rect = rect(STACK_LEFT, 212, 320, 126.9 * VF_SCALE);
+/** The orb's own top edge: `RAW.stage.y` + 1px border + `CARD_PT`. */
+export const VIEWFINDER: Rect = rect(STACK_LEFT, RAW.bloom.y, 320, 126.9 * VF_SCALE);
 
 /**
- * ── THE TREND, DRAWN WIDE AND SCALED DOWN ───────────────────────────────────────────
+ * ── THE TREND, DRAWN WIDE AND SCALED DOWN — NOW INSIDE THE STAGE CARD ───────────────
  *
- * **This is the one number that decides whether the monitoring act can be one shot**, so the
- * arithmetic is written out. The card's height barely depends on its width: the plot's viewBox is
- * fixed at `H = 210` (`session-trend-geometry.ts:53`) and the heading, subtitle, gutters and
- * legend are the other ~140, so the card is ~350 tall at 512 and ~350 tall at 768. Rendered
- * directly at the 320 the column has room for, it would still be ~370 tall and the act would be
- * exactly as tall as it was before.
+ * **The card's height barely depends on its width**, which is the fact that makes any of this
+ * work: the plot's viewBox is fixed at `H = 210` (`session-trend-geometry.ts:53`) and the
+ * heading, subtitle, gutters and legend are the other ~145, so the card measures 355.7 tall at
+ * 512 AND at 768. Rendered directly at the 368 the stage card has room for, it would still be
+ * ~350 tall and would not fit at any orb size at all.
  *
  * Drawn at **768** — `max-w-3xl`, the width the app's own monitoring column ships at — and scaled
- * to **320**, the same card comes out **320 × 148.2** — measured, at both widths: the card is
- * 355.7 tall at 512 AND at 768. The plot loses no shape; it arrives smaller.
- * Same class of liberty as L1 (the viewfinder scaled UP so a face is readable) and L8 (Ren's
- * avatar), in the other direction.
+ * to **368**, the stage card's own content width, the same card comes out **368 × 170.4**. The
+ * plot loses no shape; it arrives smaller. Same class of liberty as L1 (the viewfinder scaled UP
+ * so a face is readable) and L8 (Ren's avatar), in the other direction.
+ *
+ * **And the plot is finally the width of the card it is in.** `<SessionTrend/>` measures its own
+ * container with `getBoundingClientRect` and the video's measurement patch was dividing out the
+ * camera's zoom but not this wrapper's scale, so the component measured 300 where it should have
+ * measured 720: the gutters collapsed to their minimums, `plotWidth` was 192 instead of 520, and
+ * `capByLegibility` silently dropped a window. The series was never too short — fill-to-width was
+ * working on a plot 2.7× too narrow. See `measure-patch.ts` § AND THE CAMERA WAS NOT THE ONLY
+ * SCALE IN THE CHAIN.
  *
  * **What it costs, stated:** the card's 18px heading and its 12px axis labels fall under the
  * phone-legibility floor at this scale. What the shot has to deliver is the LINE — a tail that
- * climbed through beat 8 walking back down in meadow — and the plot is still ~150 × 45px on a
- * phone at the composite framing. See `framing.ts` § PHONE.
+ * climbed through beat 8 walking back down in meadow — and the plot is ~158 × 45px on a phone at
+ * the composite framing, filled edge to edge for the first time. See `framing.ts` § PHONE.
+ *
+ * x is the stage card's own padding box (376 + 1 border + 40 `sm:px-10` ≈ 416), so the nested
+ * card's left and right edges ARE the card's content edges. y is the stateline block's bottom
+ * plus `TREND_GAP`; below it sits `CARD_PB`, the same 24.
  */
 export const TREND: Rect = rect(
-  STACK_LEFT,
-  VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP,
+  416,
+  RAW.statelineSub.y + RAW.statelineSub.h + TREND_GAP,
   TREND_RENDER_W,
   RAW.trendNatural.h * TREND_SCALE,
 );
@@ -301,10 +385,24 @@ export const TREND: Rect = rect(
  * 82 the second line spilled out through the panel's rounded bottom edge. Measured from the
  * content — 12 pad + 15 meta + 19 sender + 2 × 17.5 subject + margins + 12 pad.
  *
- * Top at 96 — 4px under the page's own top edge, which is where a macOS banner sits. Bottom at
- * 200, 12px clear of the viewfinder.
+ * ── IT IS DERIVED FROM THE VIEWFINDER NOW, NOT FROM THE PAGE'S TOP EDGE ─────────────
+ *
+ * `VIEWFINDER.y − PINNED_GAP − 104` = **101 – 205**: it keeps the column's own gutter from the
+ * face below it rather than sitting "4px under the page's top edge", which was a number about a
+ * page rather than about the stack it belongs to. It clears the drawn clock's bottom (88) by 13.
+ *
+ * ── AND THIS IS WHY THE VIEWFINDER CANNOT START AT THE STAGE CARD'S TOP ─────────────
+ *
+ * At the card's top edge (188) the viewfinder would leave 100px between the clock and itself and
+ * the toast is 104 tall, so the toast would have to go BELOW the viewfinder — and beat 8's first
+ * landing is `frameRect(CLOCK ∪ TOAST)`, whose whole job is that the audience reads *11:30* and
+ * *moved the deadline to 12* in one frame. With the toast at ~401 that union is 447px tall and
+ * 16:9 charges **880.5 world px** for it: the clock falls 32.1 → 13.4px on a phone and the
+ * subject line **16.1 → 6.7px, under the floor**, in the shot the film's only piece of arithmetic
+ * happens in. At the orb's top edge the union is 147 tall, the landing is 368 wide, and both
+ * numbers are exactly what they were. The alignment that costs nothing is the one that was taken.
  */
-export const TOAST: Rect = rect(STACK_LEFT, 96, 320, 104);
+export const TOAST: Rect = rect(STACK_LEFT, VIEWFINDER.y - PINNED_GAP - 104, 320, 104);
 
 /**
  * The stateline block: head + sub, as one, at its WIDEST copy.
@@ -570,10 +668,24 @@ export const CHAT = {
   log: rect(265, 257.7, 670, 262.9),
   /** Turn 1 — Ren opens. `self-start`, bordered. */
   turn1: rect(281, 277.7, 349.5, 46.4),
-  /** Turn 2 — his, typed in the composer first. `self-end`, filled. */
-  turn2: rect(541.7, 338.1, 377.3, 44.4),
-  /** Turn 3 — Ren's suggestion. The beat's protected 60-frame hold lands here. */
-  turn3: rect(281, 396.4, 472.1, 70.8),
+  /**
+   * Turn 2 — his, typed in the composer first. `self-end`, filled.
+   *
+   * **It is TWO lines now**, and that is a consequence of the copy rather than of the layout:
+   * the message went 49 → 78 characters (2026-07-31, verbatim and fixed), so the bubble fills
+   * its measure and wraps. 70.8 is the same two-line height turn 3 already had — one line is
+   * 44.4 and the leading is 26.4 — and its right edge is unchanged at 919, so nothing derived
+   * from `CHAT_OWNERSHIP_SPAN` moves.
+   */
+  turn2: rect(541.7, 338.1, 377.3, 70.8),
+  /**
+   * Turn 3 — Ren's suggestion. The beat's protected 60-frame hold lands here.
+   *
+   * **+26.4 with turn 2's second line.** This is also the slot the typing indicator draws in
+   * while Ren composes it (`chat.tsx` § TypingIndicator), so a stale y here puts the dots on
+   * top of the bubble above them rather than where the reply lands.
+   */
+  turn3: rect(281, 422.8, 472.1, 70.8),
   disclaimer: rect(277, 584.1, 646, 15.1),
   footerBar: rect(265, 611.3, 670, 35.8),
 } as const;
@@ -593,13 +705,24 @@ export const CHAT = {
  * seam is `chat.tsx` § `<RenFace/>`, and it is the same one `calibrate.tsx` uses on the countdown
  * numeral: suppress the component's own copy, draw the frame-addressed one over it.
  *
- * **56, and the number is bounded on both sides.** It grows about the shipped box's own centre
- * (298, 222.8), so at 56 it occupies 270–326 × 194.8–250.8: inside the conversation header's own
+ * ── 56 WAS THE CEILING, AND THE CEILING WAS THE WRONG PLACE TO SIT ─────────────────
+ *
+ * 56 was derived as the largest avatar that fits: it grows about the shipped box's own centre
+ * (298, 222.8), so at 56 it occupies 270–326 × 194.8–250.8, inside the conversation header's own
  * 189–257.7 band with 6px top and bottom, and its right edge stops 1px short of where "Ren"
- * begins at 327. Anything larger overlaps the name; anything smaller does not earn the beat's
- * face landing.
+ * begins at 327. That is a bound, not a judgement — and **at the beat's face landing it is too
+ * big**, which is what the `ren-face-plus-turn1.png` still showed. A companion's avatar reading
+ * at 53.6px beside a 14.4px line of his own speech makes the face the subject and the sentence
+ * the caption, and beat 10's subject is the exchange.
+ *
+ * **42 is provisional and is Mohamed's pick to make.** Three variants of the same landing are
+ * rendered for him — **48 · 42 · 36** — which read at 46.0 / 40.2 / 34.5px on a phone at the
+ * 440.5 framing. The framing itself barely moves across them: the landing's width is governed by
+ * turn 1's own right edge at x 630.5, not by the avatar, so 48 gives 434.5 and 36 gives 432.5
+ * against 42's 433.5. Varying the size does not re-frame the shot, which is why the variants are
+ * comparable at all. See `Beat10Ren.tsx` § REN_TURN1.
  */
-export const REN_AVATAR_SIZE = 56;
+export const REN_AVATAR_SIZE = 42;
 export const REN_AVATAR: Rect = rect(
   CHAT.renAvatar.x + CHAT.renAvatar.w / 2 - REN_AVATAR_SIZE / 2,
   CHAT.renAvatar.y + CHAT.renAvatar.h / 2 - REN_AVATAR_SIZE / 2,
@@ -733,20 +856,19 @@ export const GATE = {
  *
  * **These are WORLD pixels**, and the panel is 320 × 290 measured (`w-80` + `p-6`, title, body
  * and the three 44px options). It is the last surface in the pinned right column and the one
- * element in the film deliberately allowed past the world's bottom edge: 424 + 290 = 714 against
- * a 675-tall world, so its last 39px land on the camera backdrop — which is `--color-bg`, the
- * same colour as the page under it (`Camera.tsx:130`), so the seam does not exist. Being
- * portalled to the body it is drawn outside `Desktop`'s `overflow: hidden` for free; that is the
- * one thing the portal was always good for.
+ * element in the film deliberately allowed past the world's bottom edge: 450.3 + 290 = 740.3
+ * against a 675-tall world, so its last 65px land on the camera backdrop — which is
+ * `--color-bg`, the same colour as the page under it (`Camera.tsx:130`), so the seam does not
+ * exist. Being portalled to the body it is drawn outside `Desktop`'s `overflow: hidden` for
+ * free; that is the one thing the portal was always good for.
  *
- * **425.3 is derived, not placed — and it is the same number the trend gets.** The panel's top
- * is the viewfinder's bottom plus `PINNED_GAP`, which is also the gap between the reading column
- * and this whole column. It used to be 424 with a 0px horizontal gutter beside it; see § THE
- * PINNED RIGHT COLUMN for why one element carrying two different spacings was the defect.
+ * **450.3 is derived, not placed.** The panel's top is the viewfinder's bottom plus
+ * `PINNED_GAP`, which is also the gap between the reading column and this whole column, and the
+ * gap the toast keeps above the viewfinder. One number in every direction.
  *
- * **It overlays the trend, which starts at the same y**, and that is correct rather than a
- * collision: `<Notification/>` is `fixed` in the product and lands over whatever page content is
- * under it. Beat 9 does not need the trend in shot.
+ * **It covers nothing — L16.** It used to land on top of the session trend, which shared its y in
+ * the pinned column; the trend is inside the stage card now, so the prompt arrives into empty
+ * page beneath a viewfinder that does not move. The right column stops swapping occupants.
  */
 export const PROMPT = {
   panel: rect(STACK_LEFT, VIEWFINDER.y + VIEWFINDER.h + PINNED_GAP, 320, 290),
