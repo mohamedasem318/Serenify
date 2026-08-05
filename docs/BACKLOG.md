@@ -2344,7 +2344,7 @@ Re-evaluate when CI first gains a Playwright job (see **#41**), because a Linux 
 coverage hole without the local hang ever being solved.
 
 ### 360 px single-column card alignment misses by 8 px against a ≤ 4 px bar — pre-existing, and the consent gate had been masking it (#178)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#178 OPEN**.
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#178 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: responsive layout / test masking
 **Observed**: 2026-07-27, after fixing the e2e fixtures blocked by feature 013's app-shell consent
 gate (PR #173). The failure appeared only *because* that fix unblocked the page.
@@ -2387,7 +2387,7 @@ tablet typography bump (**#45**) and the rest of the standing design-system queu
 touch the same card surfaces at the same widths.
 
 ### e2e `SUPABASE_SERVICE_ROLE_KEY` is undocumented — and `.env.local.example` is the wrong home for it (#179)
-**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#179 OPEN**.
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#179 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: contributor setup / test infrastructure documentation
 **Observed**: 2026-07-27, while recording the pre-bump Playwright baseline for the Next
 16.2.6 → 16.2.11 patch bump (#176). Cost one full aborted suite run before it was diagnosed.
@@ -2427,7 +2427,7 @@ current machines already have a working `.env.local`, but it is a hard stop for 
 including CI, if a Playwright job ever lands (**#41**).
 
 ### Signup refusal is silent on the no-JavaScript path — ST-9 FAILED and knowingly accepted (#184)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#184 OPEN**.
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#184 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: progressive enhancement / consent gate UX
 **Observed**: 2026-07-28, running **ST-9** during feature-013 P8 Stage 1
 (`specs/013-public-surface-and-legal/smoke-tests.md`).
@@ -2893,7 +2893,7 @@ terminology is binding, and `:11` was a line this feature had already edited.
 user impact and should lead.
 
 ### `anchor-egress.spec.ts` fails on firefox against Next's dev-only `__nextjs_original-stack-frames` — harness gap, proven pre-existing (#197)
-**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#197 OPEN.**
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#197 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: e2e harness / FR-050 · SC-014
 **Observed**: 2026-07-28, in feature 013's T147 pre-merge e2e run.
 
@@ -3006,7 +3006,7 @@ split bought a clean regression signal, not an isolated attribution of the laten
 of C1, accepted with reasons).
 
 ### Recent chats card asserts "no recent chats" before the query resolves — a definitive empty state where a loading state belongs (#201)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#201 OPEN.**
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#201 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: chat / home surface
 **Observed**: while diagnosing #200 on `serenify.tech`, 2026-07-28
 
@@ -3034,7 +3034,7 @@ with `null` meaning unresolved, rendering a skeleton or nothing until the query 
 wrong claim, not a broken flow.
 
 ### Stale pre-Next-16 claims that `proxy.ts` runs on the Edge runtime (#202)
-**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#202 OPEN.**
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#202 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: docs accuracy / Next 16 migration residue
 **Observed**: during the #200 investigation, 2026-07-28
 
@@ -3060,7 +3060,7 @@ new dated correction entry rather than an edit of the original.
 **Address by**: next docs pass. No behaviour depends on it.
 
 ### No `global-error.tsx` — a root-layout failure still falls through to Next's default screen (#203)
-**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#203 OPEN.**
+**Status**: **RESOLVED 2026-08-05 — PR #240.** GitHub issue **#203 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 **Category**: follow-up to #200 C4
 **Observed**: not observed — logged as a known gap when the error boundary was added
 
