@@ -114,6 +114,43 @@ describe("ChatPill — Talk to Ren (FR-012/013)", () => {
     expect(actions.loadCurrentConversation).toHaveBeenCalled();
     await waitFor(() => expect(screen.getByTestId("chat-shell-stub")).toBeInTheDocument());
   });
+
+  it("waits with Ren's existing `thinking` pose — not a bare Loading — until the load resolves", async () => {
+    let resolve!: (value: { ok: true; data: null }) => void;
+    (actions.loadCurrentConversation as Mock).mockImplementation(
+      () => new Promise((r) => { resolve = r; }),
+    );
+    const user = userEvent.setup();
+    render(<ChatPill />);
+    await user.click(screen.getByTestId("chat-pill"));
+
+    const waiting = await screen.findByTestId("pill-loading");
+    // The avatar's own `thinking` state (ren-avatar.tsx) — no new state was invented.
+    expect(waiting.querySelector('[data-ren-state="thinking"]')).not.toBeNull();
+    expect(screen.queryByTestId("chat-shell-stub")).toBeNull();
+    expect(screen.queryByText(/^Loading…$/)).toBeNull();
+
+    await act(async () => { resolve({ ok: true, data: null }); });
+    await waitFor(() => expect(screen.getByTestId("chat-shell-stub")).toBeInTheDocument());
+    expect(screen.queryByTestId("pill-loading")).toBeNull();
+  });
+
+  it("a FAILED load shows the error state with retry — never a silent fresh composer", async () => {
+    (actions.loadCurrentConversation as Mock).mockResolvedValueOnce({ ok: false, kind: "network" });
+    const user = userEvent.setup();
+    render(<ChatPill />);
+    await user.click(screen.getByTestId("chat-pill"));
+
+    expect(await screen.findByTestId("pill-load-error")).toBeInTheDocument();
+    // The old behaviour: `ok:false` fell into detail=null → a fresh composer, which
+    // asserts "no current chat" on the strength of a request that failed.
+    expect(screen.queryByTestId("chat-shell-stub")).toBeNull();
+
+    // Retry falls through to beforeEach's ok mock and the panel recovers.
+    await user.click(screen.getByTestId("pill-load-retry"));
+    await waitFor(() => expect(screen.getByTestId("chat-shell-stub")).toBeInTheDocument());
+    expect(screen.queryByTestId("pill-load-error")).toBeNull();
+  });
 });
 
 describe("ChatPill header — minimize vs end (standard chat-widget pattern)", () => {

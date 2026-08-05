@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const { push } = vi.hoisted(() => ({ push: vi.fn() }));
@@ -87,6 +87,53 @@ describe("RecentChatsCard (FR-015/015a)", () => {
     render(<RecentChatsCard />);
     await user.click(await screen.findByText("A heavy week at work"));
     expect(push).toHaveBeenCalledWith("/app/chat?c=c1");
+  });
+
+  it("shows a loading skeleton — never the empty-state copy — before the query resolves (#201)", async () => {
+    // A deferred promise keeps the query unresolved for as long as the test needs:
+    // this is the window in which the old card asserted "no chats" definitively.
+    let resolve!: (value: { ok: true; data: typeof rows }) => void;
+    (actions.loadConversations as Mock).mockImplementation(
+      () => new Promise((r) => { resolve = r; }),
+    );
+    render(<RecentChatsCard />);
+
+    expect(screen.getByTestId("recent-chats-loading")).toBeInTheDocument();
+    expect(screen.queryByText(/haven't started a chat yet/i)).not.toBeInTheDocument();
+
+    await act(async () => { resolve({ ok: true, data: rows }); });
+    expect(await screen.findByText("A heavy week at work")).toBeInTheDocument();
+    expect(screen.queryByTestId("recent-chats-loading")).not.toBeInTheDocument();
+  });
+
+  it("shows a resolved-empty state only after an ok-but-empty answer (#201)", async () => {
+    (actions.loadConversations as Mock).mockResolvedValue({ ok: true, data: [] });
+    render(<RecentChatsCard />);
+    expect(await screen.findByText(/haven't started a chat yet/i)).toBeInTheDocument();
+    expect(screen.queryByTestId("recent-chats-error")).not.toBeInTheDocument();
+  });
+
+  it("shows the error state — never the empty-state copy — on a failed load, and retries (#201)", async () => {
+    (actions.loadConversations as Mock).mockResolvedValueOnce({ ok: false, kind: "network" });
+    const user = userEvent.setup();
+    render(<RecentChatsCard />);
+
+    expect(await screen.findByTestId("recent-chats-error")).toBeInTheDocument();
+    expect(screen.queryByText(/haven't started a chat yet/i)).not.toBeInTheDocument();
+
+    // The retry falls through to beforeEach's default ok mock — the card recovers.
+    await user.click(screen.getByTestId("recent-chats-retry"));
+    expect(await screen.findByText("A heavy week at work")).toBeInTheDocument();
+    expect(screen.queryByTestId("recent-chats-error")).not.toBeInTheDocument();
+  });
+
+  it("shares the sibling cards' 24px header inset so the left edges align (#178)", async () => {
+    render(<RecentChatsCard />);
+    const header = screen.getByRole("heading", { name: /recent chats/i }).parentElement;
+    // CardHeader is p-6; the bespoke header row must match its horizontal inset —
+    // the earlier px-4 is the 8px x-offset employee-dashboard-shell.spec.ts measures.
+    expect(header?.className).toContain("px-6");
+    await screen.findByText("A heavy week at work");
   });
 
   it("caps the visible list at ~5 rows and scrolls the rest inside the card", async () => {

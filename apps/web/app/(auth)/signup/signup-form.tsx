@@ -22,6 +22,12 @@ import {
 type Props = {
   initialCheckEmail?: boolean;
   initialEmail?: string | null;
+  /**
+   * A refusal carried across a no-JS POST (#184): the page rebuilds the SignUpResult
+   * the marker stands for and this form renders it through the same branches a JS
+   * submission uses. A later JS submission overwrites it wholesale.
+   */
+  initialRefusal?: SignUpResult | null;
   /** Current `terms_privacy` revision id, resolved by the server component. */
   termsVersionId: string;
 };
@@ -29,12 +35,13 @@ type Props = {
 export function SignupForm({
   initialCheckEmail = false,
   initialEmail = null,
+  initialRefusal = null,
   termsVersionId,
 }: Props) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [submitState, setSubmitState] = useState<SignUpResult | null>(
-    initialCheckEmail ? { status: "ok" } : null,
+    initialCheckEmail ? { status: "ok" } : initialRefusal,
   );
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(
     initialEmail,
@@ -148,12 +155,20 @@ export function SignupForm({
     submitState?.status === "exists"
       ? "This email already has an account. Sign in, or reset your password."
       : null;
+  // Server-side validation refusals for accept_terms render AT the acknowledgement
+  // field (below), where the JS path shows them; everything else renders in the
+  // generic alert box. On the JS path RHF catches validation before submission, so
+  // this branch is effectively the no-JS refusal surface (#184).
   const errorMessage =
     submitState?.status === "error"
       ? submitState.message
-      : submitState?.status === "validation"
+      : submitState?.status === "validation" && submitState.field !== "accept_terms"
         ? submitState.message
         : null;
+  const termsRefusalMessage =
+    submitState?.status === "validation" && submitState.field === "accept_terms"
+      ? submitState.message
+      : undefined;
 
   return (
     <section className="space-y-8">
@@ -225,7 +240,7 @@ export function SignupForm({
           </p>
         )}
 
-        {errorMessage && submitState?.status === "error" && (
+        {errorMessage && (
           <p
             role="alert"
             className="rounded-control border border-foggy/30 bg-foggy/10 px-3 py-2 text-sm text-ink"
@@ -245,7 +260,9 @@ export function SignupForm({
 
         <TermsAcknowledgementField
           versionId={termsVersionId}
-          error={errors.accept_terms?.message}
+          // RHF's client-side error wins; the carried no-JS refusal (#184) fills in when
+          // RHF never ran. It reads from submitState, so any JS submission replaces it.
+          error={errors.accept_terms?.message ?? termsRefusalMessage}
           registration={register("accept_terms")}
         />
 

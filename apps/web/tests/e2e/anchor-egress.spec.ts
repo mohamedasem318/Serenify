@@ -94,6 +94,19 @@ function isBenignDataDestination(req: Request): boolean {
   }
   // (3) same-origin Next server actions (header-scoped — see the file header)
   if (req.headers()["next-action"] !== undefined) return true;
+  // (4) Next's dev-only error-overlay symbolication (#197): a console message during
+  //     the green room makes the dev server symbolicate the stack via a text/plain
+  //     POST to /__nextjs_original-stack-frames — a dev-harness artifact carrying
+  //     stack frames, not capture data, and firefox trips it where chromium doesn't.
+  //     PATH-SCOPED ON PURPOSE: only the `/__nextjs_` dev namespace passes, never a
+  //     blanket same-origin/localhost pass — the broad catch-all below is what proves
+  //     no disguised frame leak, and it must keep proving it. The console message that
+  //     TRIGGERS the overlay on firefox is still unidentified and stays open debt.
+  try {
+    if (/^\/__nextjs_/.test(new URL(url).pathname)) return true;
+  } catch {
+    /* unparseable url → not allowlisted */
+  }
   return false;
 }
 

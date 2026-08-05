@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { endChat, loadCurrentConversation } from "@/app/(authed)/app/chat/actions";
 import { ChatShell, type PanelChatState } from "@/components/chat/chat-shell";
+import { RenAvatar } from "@/components/chat/ren-avatar";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,6 +47,11 @@ export function ChatPill() {
 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  // A failed load is its own terminal state. `loadCurrentConversation` reserves
+  // `ok:true, data:null` for "no current chat"; `ok:false` is a genuine miss, and the
+  // pill used to fold it into `detail = null` — silently opening a fresh composer over
+  // an API that just failed. Three states now: loading · failed · resolved.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [detail, setDetail] = useState<ConversationDetail | null>(null);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
 
@@ -63,6 +69,7 @@ export function ChatPill() {
   const openFresh = useCallback(() => {
     setDetail(null);
     setLoading(false);
+    setLoadFailed(false);
     setOpen(true);
   }, []);
 
@@ -82,16 +89,29 @@ export function ChatPill() {
     };
   }, [suppressed]);
 
-  async function handleOpen() {
-    setOpen(true);
+  // Shared by first-open and the error state's "Try again" — same load, same states.
+  async function loadCurrent() {
     setLoading(true);
+    setLoadFailed(false);
     const res = await loadCurrentConversation();
     setLoading(false);
     // The backend is the single source of truth for "current": its
     // get_current_conversation excludes finalized (ended) chats, so after an end this
     // resolves to null → a fresh composer, even across a navigation/remount. No
     // client-side "skip the reload" flag to carry. An unfinished chat still resumes.
-    setDetail(res.ok ? res.data : null);
+    // A FAILED load resolves to the error state, never to a fresh composer — a fresh
+    // composer is a statement ("no current chat"), and a failed request never made one.
+    if (res.ok) {
+      setDetail(res.data);
+    } else {
+      setDetail(null);
+      setLoadFailed(true);
+    }
+  }
+
+  async function handleOpen() {
+    setOpen(true);
+    await loadCurrent();
   }
 
   // MINIMIZE: collapse to the nub, conversation stays live (reopening resumes it).
@@ -168,7 +188,37 @@ export function ChatPill() {
             </button>
           </div>
           {loading ? (
-            <p className="m-auto text-sm text-muted">Loading…</p>
+            // The waiting state is Ren, thinking — the avatar's existing `thinking`
+            // pose (ren-avatar.tsx), not a new state and not a bare "Loading…". Sized
+            // and stacked like the panel's compact greeting so resolve doesn't jump.
+            <div
+              role="status"
+              data-testid="pill-loading"
+              className="m-auto flex flex-col items-center gap-1.5 px-6 text-center"
+            >
+              <RenAvatar size={38} state="thinking" />
+              <p className="text-sm text-muted">{BOT_NAME} is catching up…</p>
+            </div>
+          ) : loadFailed ? (
+            // Resolved-error: say so and offer the same load again. Voice and the foggy
+            // inline retry mirror chat-shell's send-failure rows (Amendment 19 surface).
+            <div
+              data-testid="pill-load-error"
+              className="m-auto flex flex-col items-center gap-1.5 px-6 text-center"
+            >
+              <RenAvatar size={38} />
+              <p role="status" className="text-sm leading-relaxed text-muted">
+                {BOT_NAME} had trouble connecting.
+              </p>
+              <button
+                type="button"
+                data-testid="pill-load-retry"
+                onClick={() => void loadCurrent()}
+                className="rounded-md px-2 py-1 font-semibold text-foggy underline active:opacity-80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foggy"
+              >
+                Try again
+              </button>
+            </div>
           ) : (
             <ChatShell
               variant="panel"

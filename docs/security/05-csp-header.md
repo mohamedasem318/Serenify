@@ -152,8 +152,11 @@ includeSubDomains` (no `preload`). COEP intentionally unset.
 - The audit's `crypto.randomUUID()` nonce was replaced with
   `crypto.getRandomValues(new Uint8Array(16))` (128-bit per the CSP3 floor;
   Mohamed's adjudication) — and the `node:crypto` `randomBytes` import from the
-  fix-pass sketch was avoided because it is unavailable in the Edge runtime the
-  middleware runs in.
+  fix-pass sketch was avoided because the middleware of the day ran on the Edge
+  runtime, where it is unavailable. (Stale premise, corrected 2026-08-05 — see
+  DECISIONS.md: Next 16 renamed middleware to `proxy.ts` and defaults it to the
+  **Node.js** runtime, so `node:crypto` would work there today. The global
+  Web-Crypto call runs identically on both runtimes and stays.)
 - The audit assumed prod needs no `'unsafe-eval'` and that
   `upgrade-insecure-requests` is a dev no-op. Both were corrected empirically (the
   two findings above). `'unsafe-eval'` is still absent from prod (Zod jitless made
