@@ -3215,8 +3215,7 @@ RPC/trigger paths production uses. That is a design call, not a mechanical one.
 **Address by**: before the next feature that needs a green e2e run as evidence.
 
 ### `--color-border` self-reference, and the control-boundary contrast it was masking (#209)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN. BLOCKED on #211 merging first.**
-GitHub issue **#209 OPEN.**
+**Status**: **RESOLVED 2026-08-05 — PR #241 (two-token split, constitution Amendment 20; the #211 blocker closed 2026-07-29).** GitHub issue **#209 CLOSED** by that merge (Principle VIII: entry and issue in the same change).
 
 > **SCOPE CORRECTED 2026-07-29.** This entry was written as a one-line deletion. It is not.
 > Deleting the self-reference is necessary and correct, but it *lands* `#D7D9DC` on control

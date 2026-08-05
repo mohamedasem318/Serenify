@@ -368,7 +368,7 @@ export function ChatShell({
           // replaces against the composer's `bg` backdrop — 4.71:1 light and 8.34:1
           // dark, against meadow's 4.22:1 and 7.43:1 — and both clear the 3:1 a focus
           // indicator needs.
-          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-border bg-bg px-3.5 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-foggy disabled:opacity-60"
+          className="max-h-32 min-h-[44px] flex-1 resize-none rounded-xl border border-control bg-bg px-3.5 py-2.5 text-[15px] text-ink outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-foggy disabled:opacity-60"
         />
         <button
           type="submit"

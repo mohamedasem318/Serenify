@@ -654,6 +654,45 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-07-30 (Amendment 19)
 - .specify/memory/constitution.md Amendment 18 (the bullet this replaces)
 - apps/web/components/chat/chat-shell.tsx, apps/web/components/chat-pill.tsx
+
+Amendment 20: 1.15.0 → 1.16.0 (2026-08-05, MINOR)
+Bump rationale: Principle V palette — register the control-boundary token
+`--color-control` (light `#7D8083`; dark deliberately the seam value
+`#23272B`), splitting boundaries into decorative seams (`--color-border`,
+values unchanged) and control boundaries. In LIGHT mode the control boundary
+MUST clear WCAG 1.4.11's 3:1 against adjacent surfaces (measured
+3.39:1/3.67:1 vs bg/surface — the value settled at the 2026-07-29 review of
+the #209 scope correction). In DARK mode the quiet boundary is a deliberate
+aesthetic adjudication made at ratification: the 3:1 dark candidate
+(`#6C7074`, per that same review) and the mathematical floor (`#64686B`,
+3.07:1) were both built, shown side-by-side against the quiet dark form, and
+rejected on looks — the grey rims broke the dark surface's calm. Dark labeled
+inputs are identified by label + fill under 1.4.11's
+component-identification reading; the residual — empty OTP digit boxes at
+~1.15:1 in dark — is recorded as an accepted cost, not an oversight, and is
+re-adjudicable by changing one token value. Closes the #209 defect class:
+in light mode the `@theme inline` self-reference had collapsed every
+`border-border` to currentColor ink, masking that the designed seam value
+sat at ~1.2:1 on control boundaries (the consent checkbox and OTP boxes are
+empty controls whose border is the whole affordance). Landed after #211
+(focus-indicator consistency) per the ordering the BACKLOG entry records.
+MINOR bump: additive token, no role change, no principle added, removed, or
+restructured (consistent with Amendment 5's amber sub-token registration).
+Hand-edited (not via /speckit-constitution) to preserve the curated Sync
+Impact Report history, per the Amendment 10 precedent.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for `border`, `control`, `1.4.11`, `boundary`, and
+`Principle V` — zero substantive matches (templates reference Principle V by
+number, not by literal palette values).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-08-05 (Amendment 20 / #209)
+- docs/CHANGELOG.md entry 2026-08-05
+- docs/BACKLOG.md #209 (scope-corrected entry; "values settled at review")
+- GitHub issues #209 (this fix), #211 (the ordering dependency, closed
+  2026-07-29)
+- apps/web/app/globals.css (the token block + the deleted self-reference)
 -->
 
 # Serenify Constitution
@@ -837,10 +876,22 @@ unchanged — only the values are deepened. Light and dark are designed in tande
 and every documented pairing meets WCAG AA:
 - Light: bg `#EAEBEC`, surface `#F4F5F6`, ink `#1C2023`, muted `#585D61`,
   meadow accent `#3E7A63`, foggy accent `#356E88`, amber `#C98637`,
-  crimson `#894A4E`, border `#D7D9DC`.
+  crimson `#894A4E`, border `#D7D9DC`, control border `#7D8083`.
 - Dark: bg `#101214`, surface `#181B1E`, text `#E2E5E8`, muted `#939A9F`,
   meadow accent `#63B292`, foggy accent `#74B6CE`, amber `#E4AE5C`,
-  crimson `#C98589`, border `#23272B`.
+  crimson `#C98589`, border `#23272B`, control border `#23272B` (deliberately
+  the seam value — see the boundary-split bullet).
+- **Boundary split (Amendment 20):** `--color-border` is the decorative seam —
+  dividers, card outlines, chrome hairlines — deliberately quiet.
+  `--color-control` is the control boundary — text inputs, textareas, the
+  consent checkbox, OTP digit boxes, and outlined controls, where the border
+  is part or all of the affordance. In LIGHT mode it MUST clear 3:1
+  (WCAG 1.4.11) against its adjacent surfaces, and a resting control never
+  wears the seam token there. In DARK mode the control boundary deliberately
+  keeps the quiet seam value: the 3:1 dark candidates were built and rejected
+  on looks at ratification (Amendment 20's bump rationale records the
+  adjudication and the accepted OTP-box residual). Every control site reads
+  through the token, so the dark call is re-adjudicable in one place.
 - **Filled-accent foregrounds (AA):** on filled meadow or foggy action surfaces
   (primary and attention CTAs) the foreground text MUST be near-white in light
   mode and the `bg` token in dark mode. The deepened accents fail AA with ink
@@ -1236,4 +1287,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.15.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-30
+**Version**: 1.16.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-05
