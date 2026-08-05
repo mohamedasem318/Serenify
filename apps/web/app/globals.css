@@ -34,6 +34,13 @@
   --color-amber:    #C98637;
   --color-crimson:  #894A4E;
   --color-border:   #D7D9DC;
+  /* Control boundary (Amendment 20, #209): the boundary of a form control — text
+     inputs, textareas, the consent checkbox, OTP digit boxes, outlined controls —
+     where the border is part or all of the affordance. MUST clear WCAG 1.4.11's
+     3:1 against adjacent surfaces (3.39:1 vs bg / 3.67:1 vs surface here;
+     3.60:1 / 3.43:1 in dark). `--color-border` above is the DECORATIVE seam and
+     stays quiet by design; a resting control never wears it. */
+  --color-control:  #7D8083;
 
   /* New role tokens (Amendment 4) */
   --color-on-accent:   #F8F9FA;                 /* filled meadow/foggy CTA fg (light); dark fg = --color-bg */
@@ -121,8 +128,17 @@
   --color-accent-foreground:  var(--color-ink);
   --color-destructive:        var(--color-crimson);
   --color-destructive-foreground: var(--color-bg);
-  --color-border:             var(--color-border);
-  --color-input:              var(--color-border);
+  /* NO `--color-border` ALIAS HERE — DELIBERATELY (#209). The shadcn name and the
+     Mist & Meadow name coincide, so re-declaring `--color-border: var(--color-border)`
+     inside @theme inline created a self-referential custom property: invalid at
+     computed-value time, so every `border-border` fell back to `currentColor` (ink)
+     in light mode. (Dark was masked by the literal re-declaration in :root.dark
+     below.) The main @theme block at the top already owns the token AND generates
+     the `border-border` utility; the only thing to do here is not to shadow it.
+     `--color-input` maps to the CONTROL boundary (Amendment 20): shadcn's `input`
+     semantic IS a form-control border, so the outline Button and any shadcn
+     primitive using `border-input` take the 3:1 control token, not the seam. */
+  --color-input:              var(--color-control);
   --color-ring:               var(--color-meadow);
 
   /* Radius ladder — anchored to Mist & Meadow's --radius-control (8px,
@@ -152,6 +168,7 @@
     --color-amber:   #E4AE5C;
     --color-crimson: #C98589;
     --color-border:  #23272B;
+    --color-control: #6C7074;
 
     /* meadow-as-text swaps to the dark meadow; on-accent + scrim do NOT swap */
     --color-meadow-text: #63B292;

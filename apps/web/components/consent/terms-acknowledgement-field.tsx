@@ -99,7 +99,7 @@ export function TermsAcknowledgementField({
             {...registration}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "accept_terms-error" : undefined}
-            className="size-5 cursor-pointer rounded-sm border border-border accent-meadow
+            className="size-5 cursor-pointer rounded-sm border border-control accent-meadow
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
               focus-visible:ring-offset-2 focus-visible:ring-offset-bg
               disabled:cursor-not-allowed disabled:opacity-60"

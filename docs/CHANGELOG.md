@@ -2942,3 +2942,42 @@ at any site.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 19; `docs/DECISIONS.md`
 2026-07-30; `docs/DECISIONS.md` 2026-07-29 (Amendment 18, superseded bullet).
+
+## 2026-08-05 — constitution Amendment 20 (1.15.0 → 1.16.0, MINOR): the boundary splits in two, and controls step forward
+
+The #209 fix, landed as the two-token split the 2026-07-29 scope correction prescribed
+rather than the one-line deletion the issue first looked like.
+
+**The defect.** `@theme inline` re-declared `--color-border` in terms of itself. A cyclic
+custom property is invalid at computed-value time, so every light-mode `border-border`
+fell back to `currentColor` — ink hairlines wherever `#D7D9DC` was designed. Dark mode was
+masked by `:root.dark`'s literal. Deleting the line was necessary but not sufficient:
+`#D7D9DC` lands at 1.2–1.3:1 on control boundaries, and the consent checkbox and OTP
+digit boxes are empty controls whose border is the whole affordance — WCAG 1.4.11 failures
+the ink accident had been hiding. Dark failed the same way independently (`#23272B` at
+1.12–1.18:1 doing control duty).
+
+**The split.** `--color-border` (values unchanged) is now the decorative seam — dividers,
+card outlines, chrome. New Graphite token `--color-control` (light `#7D8083`, dark
+`#6C7074` — the values settled at the 2026-07-29 review) is the control boundary and
+clears 3:1 in both modes: 3.39:1/3.67:1 light and 3.60:1/3.43:1 dark against bg/surface.
+shadcn's `--color-input` re-points to it, so the outline Button variant follows.
+
+**Receiving controls**: the auth/account `Field` inputs, `PasswordInput`, the OTP digit
+boxes and the OTP fallback input, the consent checkbox, the chat composer textarea, and
+the recent-chats rename input. The questionnaire option tiles stay seams — they are
+filled, text-bearing button-tiles, not empty boxes. `Card` states `border-border`
+explicitly (Tailwind v4's bare `border` defaults to `currentColor`, which left card
+outlines ink-heavy once the seams around them lightened).
+
+**Empirical**: computed-style probes on a live build confirm field + OTP at the control
+values and seams at the seam values, both modes. One honest finding recorded: Chromium
+renders the native-appearance consent checkbox (author borders compute to 0px on it), so
+its visible box is UA-drawn — the token on it is correct where engines paint author
+borders, and the Chromium-native box is itself clearly visible.
+
+Ordered after #211 (focus-indicator consistency, closed 2026-07-29) exactly as the
+BACKLOG entry required, so the split regresses no focus signal.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 20; `docs/DECISIONS.md`
+2026-08-05 (#209); `docs/BACKLOG.md` #209; GitHub #209, #211.

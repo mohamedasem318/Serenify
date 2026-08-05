@@ -9,7 +9,10 @@ const Card = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card text-card-foreground shadow-sm",
+      // border-border stated explicitly: Tailwind v4's bare `border` defaults to
+      // currentColor (ink), which left card outlines heavy once #209 restored the
+      // seams around them to the border token. Cards are decorative seams.
+      "rounded-lg border border-border bg-card text-card-foreground shadow-sm",
       className
     )}
     {...props}

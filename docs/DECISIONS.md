@@ -6989,3 +6989,50 @@ built, pre-Next-16, and was accurate when written.
 
 **Cross-references**: GitHub issue #202; `docs/BACKLOG.md` (#202 entry, resolved
 this date); Next 16 upgrade entry earlier in this file.
+
+---
+
+## 2026-08-05 — Constitution Amendment 20: the two-token boundary split lands #209 (approved by Mohamed)
+
+**Decision**: fix #209 as the two-token split its scope-corrected BACKLOG entry prescribed,
+not the bare deletion the original issue described. Mohamed approved the amendment text and
+the token values explicitly this date, after a side-by-side comparison of the review-settled
+values against the only in-palette alternative.
+
+**What was decided, and why each way**:
+
+1. **The self-reference is deleted** (`--color-border: var(--color-border)` in
+   `@theme inline`) — the original one-line diagnosis stands; it was the accident, not the
+   design.
+2. **`--color-control` enters the Graphite palette** (light `#7D8083`, dark `#6C7074`) via
+   Amendment 20 (1.15.0 → 1.16.0, MINOR — the Amendment 5 sub-token precedent). The
+   in-palette alternative (`--color-muted` doing border duty at 5.6–6.3:1) was considered
+   and shown side-by-side; the settled values won on weight — a calm hairline just above
+   the 3:1 bar rather than a text-gray at double it.
+3. **`--color-input` re-points to the control token.** shadcn's `input` semantic IS a
+   form-control border; the outline Button follows automatically.
+4. **The Card primitive states `border-border` explicitly.** Tailwind v4's bare `border`
+   defaults to `currentColor`; once the seams lightened, ink card outlines read as a
+   regression the fix itself caused, so cards join the seam system in the same change.
+   Scoped to `ui/card.tsx` only — no hunt for other bare border utilities.
+5. **The questionnaire option tiles keep the seam token** — filled, text-bearing
+   button-tiles whose affordance is fill + text, not an empty box.
+
+**Sequencing honoured**: after #211 (closed 2026-07-29), per the one-way dependency the
+BACKLOG entry recorded — the split regresses no focus signal.
+
+**One recorded surprise**: Chromium paints the consent checkbox natively — author borders
+compute to 0 px on it, so the UA box (clearly visible in both schemes) is the real
+affordance there, not our token. The control token stays on it for engines that do paint
+author borders; if the checkbox is ever restyled `appearance:none`, the token is already
+correct. This surprise does not weaken the amendment: the OTP boxes and every text input
+are CSS-painted and measurably carry the 3:1 values (live computed-style probes, both
+modes).
+
+**Out of scope, noted while here**: #208 was live-confirmed during the visual sweep — the
+Playwright globalSetup died on `42501 permission denied for table profiles` exactly as
+that issue predicts. Untouched; it remains its own decision.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 20;
+`docs/CHANGELOG.md` 2026-08-05; `docs/BACKLOG.md` #209 (resolved this date);
+GitHub #209, #211; PR #240 (pass A of the same triage).

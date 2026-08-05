@@ -277,7 +277,7 @@ export const OtpBoxes = forwardRef<OtpBoxesHandle, Props>(function OtpBoxes(
                   "transition-[transform,background-color,color,border-color,border-radius,box-shadow] duration-500 ease-[cubic-bezier(.4,0,.2,1)]",
                 // Ring is SOLID meadow, not meadow/30: at 30% alpha it composites to
                 // 1.45:1 against the page, which is not a focus indicator you can see.
-                "border-border focus:border-meadow focus:ring-[3px] focus:ring-meadow",
+                "border-control focus:border-meadow focus:ring-[3px] focus:ring-meadow",
                 visual.sway && "border-foggy",
                 i < visual.lit && !visual.merged && "border-meadow ring-[3px] ring-meadow/40",
                 visual.merged && "border-transparent bg-meadow text-transparent shadow-none ring-0",

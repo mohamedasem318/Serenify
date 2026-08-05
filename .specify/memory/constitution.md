@@ -654,6 +654,38 @@ Cross-references:
 - docs/CHANGELOG.md entry 2026-07-30 (Amendment 19)
 - .specify/memory/constitution.md Amendment 18 (the bullet this replaces)
 - apps/web/components/chat/chat-shell.tsx, apps/web/components/chat-pill.tsx
+
+Amendment 20: 1.15.0 → 1.16.0 (2026-08-05, MINOR)
+Bump rationale: Principle V palette — register the control-boundary token
+`--color-control` (light `#7D8083`, dark `#6C7074`), splitting boundaries into
+decorative seams (`--color-border`, values unchanged) and control boundaries
+that MUST clear WCAG 1.4.11's 3:1 against adjacent surfaces. Closes the #209
+defect class: the consent checkbox and the OTP digit boxes are empty controls
+whose border is the whole affordance, and both sat at ~1.2:1 — in light mode
+via the `@theme inline` self-reference collapsing `border-border` to
+currentColor (the accident that masked the design's real contrast), and in
+dark mode independently, because the seam literal `#23272B` was doing control
+duty. The registered values are the ones settled at the 2026-07-29 review of
+the #209 scope correction (measured 3.39:1/3.67:1 light and 3.60:1/3.43:1 dark
+against bg/surface), landed after #211 (focus-indicator consistency) per the
+ordering that entry records. MINOR bump: additive token, no role change, no
+principle added, removed, or restructured (consistent with Amendment 5's
+amber sub-token registration). Hand-edited (not via /speckit-constitution) to
+preserve the curated Sync Impact Report history, per the Amendment 10
+precedent.
+
+Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
+constitution}-template.md for `border`, `control`, `1.4.11`, `boundary`, and
+`Principle V` — zero substantive matches (templates reference Principle V by
+number, not by literal palette values).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-08-05 (Amendment 20 / #209)
+- docs/CHANGELOG.md entry 2026-08-05
+- docs/BACKLOG.md #209 (scope-corrected entry; "values settled at review")
+- GitHub issues #209 (this fix), #211 (the ordering dependency, closed
+  2026-07-29)
+- apps/web/app/globals.css (the token block + the deleted self-reference)
 -->
 
 # Serenify Constitution
@@ -837,10 +869,17 @@ unchanged — only the values are deepened. Light and dark are designed in tande
 and every documented pairing meets WCAG AA:
 - Light: bg `#EAEBEC`, surface `#F4F5F6`, ink `#1C2023`, muted `#585D61`,
   meadow accent `#3E7A63`, foggy accent `#356E88`, amber `#C98637`,
-  crimson `#894A4E`, border `#D7D9DC`.
+  crimson `#894A4E`, border `#D7D9DC`, control border `#7D8083`.
 - Dark: bg `#101214`, surface `#181B1E`, text `#E2E5E8`, muted `#939A9F`,
   meadow accent `#63B292`, foggy accent `#74B6CE`, amber `#E4AE5C`,
-  crimson `#C98589`, border `#23272B`.
+  crimson `#C98589`, border `#23272B`, control border `#6C7074`.
+- **Boundary split (Amendment 20):** `--color-border` is the decorative seam —
+  dividers, card outlines, chrome hairlines — deliberately quiet.
+  `--color-control` is the control boundary — text inputs, textareas, the
+  consent checkbox, OTP digit boxes, and outlined controls, where the border
+  is part or all of the affordance — and MUST clear 3:1 (WCAG 1.4.11) against
+  its adjacent surfaces in both modes. A resting control never wears the seam
+  token; a seam never wears the control token.
 - **Filled-accent foregrounds (AA):** on filled meadow or foggy action surfaces
   (primary and attention CTAs) the foreground text MUST be near-white in light
   mode and the `bg` token in dark mode. The deepened accents fail AA with ink
@@ -1236,4 +1275,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.15.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-07-30
+**Version**: 1.16.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-05

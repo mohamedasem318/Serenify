@@ -33,7 +33,7 @@ export function PasswordInput({ ref, ...rest }: Props) {
       <input
         ref={ref}
         type={visible ? "text" : "password"}
-        className="h-12 w-full rounded-control border border-border bg-surface pl-3 pr-12 text-base text-ink outline-none transition-[color,background-color,border-color] placeholder:text-muted focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
+        className="h-12 w-full rounded-control border border-control bg-surface pl-3 pr-12 text-base text-ink outline-none transition-[color,background-color,border-color] placeholder:text-muted focus-visible:border-meadow focus-visible:outline-solid focus-visible:outline-2 focus-visible:outline-offset-0 focus-visible:outline-meadow"
         {...rest}
       />
       <button
