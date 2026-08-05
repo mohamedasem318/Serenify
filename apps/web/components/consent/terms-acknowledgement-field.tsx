@@ -1,3 +1,5 @@
+import { Check } from "lucide-react";
+
 import {
   TERMS_ACK_LABEL_JOIN,
   TERMS_ACK_LABEL_LEAD,
@@ -87,6 +89,19 @@ export function TermsAcknowledgementField({
           htmlFor="accept_terms"
           className="-m-3 grid shrink-0 cursor-pointer p-3"
         >
+          {/* `appearance-none` — WE draw this box, not the browser (Mohamed,
+              2026-08-05). The UA-rendered checkbox ignored author borders entirely
+              (computed width 0 in Chromium) and painted its own browser-chosen rim,
+              outside the token system. Custom rendering puts it on
+              `border-control-strong` (Amendment 21): the EMPTY-AFFORDANCE boundary,
+              3:1 in BOTH modes — this box has no label-per-element, no content and no
+              fill, so its border is the whole affordance and stays visible even in
+              dark, where the labeled inputs beside it deliberately rest on the quiet
+              `--color-control` (Amendment 20). Checked state is a meadow fill with
+              the filled-accent foreground pair (Principle V), drawn as an inline
+              lucide glyph in the same grid cell — NOT a CSS background-image, which
+              the CSP's `img-src 'self'` would block as a data: URI. The glyph follows
+              peer-checked, so the no-JS path renders it identically. */}
           <input
             id="accept_terms"
             name="accept_terms"
@@ -99,10 +114,18 @@ export function TermsAcknowledgementField({
             {...registration}
             aria-invalid={error ? true : undefined}
             aria-describedby={error ? "accept_terms-error" : undefined}
-            className="size-5 cursor-pointer rounded-sm border border-control accent-meadow
+            className="peer col-start-1 row-start-1 size-5 cursor-pointer appearance-none
+              rounded-sm border border-control-strong bg-transparent
+              checked:border-meadow checked:bg-meadow
               focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
               focus-visible:ring-offset-2 focus-visible:ring-offset-bg
               disabled:cursor-not-allowed disabled:opacity-60"
+          />
+          <Check
+            aria-hidden
+            strokeWidth={3}
+            className="pointer-events-none col-start-1 row-start-1 size-3.5 place-self-center
+              text-on-accent opacity-0 peer-checked:opacity-100 dark:text-bg"
           />
         </label>
 

@@ -2989,3 +2989,25 @@ BACKLOG entry required, so the split regresses no focus signal.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 20; `docs/DECISIONS.md`
 2026-08-05 (#209); `docs/BACKLOG.md` #209; GitHub #209, #211.
+
+## 2026-08-05 — constitution Amendment 21 (1.16.0 → 1.17.0, MINOR): the checkbox leaves the browser's hands, and empty boxes stay findable in the dark
+
+Follow-on to Amendment 20, same date, from looking at the real dark surfaces.
+
+**The consent checkbox becomes custom-rendered** (`appearance-none` + an inline lucide
+check glyph). The UA-drawn box had ignored author borders entirely — computed border-width
+0 in Chromium — so every token ever put on it was inert and the browser painted its own
+rim outside the palette. The glyph is an inline SVG element following `peer-checked`, not
+a CSS background-image (the CSP's `img-src 'self'` would block a data: URI), so the no-JS
+path renders identically. Checked state: meadow fill + the filled-accent foreground pair.
+
+**New token `--color-control-strong`** (light `#7D8083`, dark `#6C7074`): the
+empty-affordance control boundary, 3:1 in BOTH modes. This refines Amendment 20's
+quiet-dark adjudication rather than reversing it — that permission rests on label + fill
+identifying a control, which an empty box does not have. Adjudicated by Mohamed from a
+three-way side-by-side (browser-drawn / quiet `#23272B` / 3:1 `#6C7074`); the 3:1 box won
+for dark. The OTP digit boxes remain on the recorded quiet-dark residual pending their own
+adjudication — they are the natural next consumer.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 21; `docs/DECISIONS.md`
+2026-08-05 (Amendment 21); `apps/web/components/consent/terms-acknowledgement-field.tsx`.

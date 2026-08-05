@@ -693,6 +693,38 @@ Cross-references:
 - GitHub issues #209 (this fix), #211 (the ordering dependency, closed
   2026-07-29)
 - apps/web/app/globals.css (the token block + the deleted self-reference)
+
+Amendment 21: 1.16.0 → 1.17.0 (2026-08-05, MINOR)
+Bump rationale: Principle V palette — register the empty-affordance control
+boundary `--color-control-strong` (light `#7D8083`, sharing the control value;
+dark `#6C7074`, the 2026-07-29 review's 3:1 dark candidate, registered here
+for a narrower job than the one Amendment 20 rejected it for). The token's
+contract: a control whose border is its WHOLE affordance — no
+label-per-element, no content, no fill — MUST clear WCAG 1.4.11's 3:1 in
+BOTH modes, dark included. This refines Amendment 20's dark adjudication
+rather than reversing it: labeled, filled controls keep the quiet dark
+boundary (identified by label + fill); the visible boundary is reserved for
+controls that have nothing else. First consumer: the consent checkbox, which
+also becomes custom-rendered (`appearance-none` + a drawn glyph) this date —
+the UA-drawn box had ignored author borders entirely (computed width 0 in
+Chromium) and painted a browser-chosen rim outside the token system, so no
+token could reach it until rendering was taken over. Adjudicated from a
+three-way side-by-side (browser-drawn / quiet / 3:1) by Mohamed. The OTP
+digit boxes remain on Amendment 20's recorded quiet-dark residual pending
+their own adjudication; they are the natural next consumer of this token.
+MINOR bump: additive token + one control's adoption; no principle added,
+removed, or restructured (Amendment 5/20 precedent). Hand-edited per the
+Amendment 10 precedent.
+
+Affected templates: none (templates reference Principle V by number, not by
+literal palette values — re-checked; zero matches).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-08-05 (Amendment 21 / checkbox)
+- docs/CHANGELOG.md entry 2026-08-05 (Amendment 21)
+- .specify/memory/constitution.md Amendment 20 (the adjudication this refines)
+- apps/web/components/consent/terms-acknowledgement-field.tsx
+- apps/web/app/globals.css (`--color-control-strong`)
 -->
 
 # Serenify Constitution
@@ -880,7 +912,8 @@ and every documented pairing meets WCAG AA:
 - Dark: bg `#101214`, surface `#181B1E`, text `#E2E5E8`, muted `#939A9F`,
   meadow accent `#63B292`, foggy accent `#74B6CE`, amber `#E4AE5C`,
   crimson `#C98589`, border `#23272B`, control border `#23272B` (deliberately
-  the seam value — see the boundary-split bullet).
+  the seam value — see the boundary-split bullet), empty-affordance control
+  border `#6C7074` (Amendment 21).
 - **Boundary split (Amendment 20):** `--color-border` is the decorative seam —
   dividers, card outlines, chrome hairlines — deliberately quiet.
   `--color-control` is the control boundary — text inputs, textareas, the
@@ -892,6 +925,14 @@ and every documented pairing meets WCAG AA:
   on looks at ratification (Amendment 20's bump rationale records the
   adjudication and the accepted OTP-box residual). Every control site reads
   through the token, so the dark call is re-adjudicable in one place.
+  **Empty-affordance refinement (Amendment 21):** a control whose border is
+  its WHOLE affordance — no label-per-element, no content, no fill — takes
+  `--color-control-strong` (light `#7D8083`, dark `#6C7074`) and MUST clear
+  3:1 in BOTH modes: the quiet-dark permission above rests on label + fill
+  identifying the control, which an empty box does not have. Adopted by the
+  consent checkbox (custom-rendered, since the UA-drawn box ignored author
+  tokens); the OTP digit boxes remain on the recorded quiet-dark residual
+  pending their own adjudication.
 - **Filled-accent foregrounds (AA):** on filled meadow or foggy action surfaces
   (primary and attention CTAs) the foreground text MUST be near-white in light
   mode and the `bg` token in dark mode. The deepened accents fail AA with ink
@@ -1287,4 +1328,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.16.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-05
+**Version**: 1.17.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-05
