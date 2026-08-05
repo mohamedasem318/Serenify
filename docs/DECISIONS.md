@@ -6948,3 +6948,44 @@ gets its own entry here.
 
 **Cross-references**: `video/src/greybox/character/NOTICE.md`;
 `docs/video/serenify-launch-video-beat-sheet.md` § The character rig.
+
+---
+
+## 2026-08-05 — Correction: `proxy.ts` runs on the Node.js runtime, not the Edge runtime (#202)
+
+**Status**: Correction (append-only). The 2026-05-25 security-slice-5 entry ("the
+Node `crypto.randomBytes` import is unavailable in the Edge runtime the middleware
+runs in") is **not** rewritten; this entry records that its runtime premise is now
+**stale**. Same append-only idiom as the 2026-06-25 correction to DECISION-20.
+
+**What changed since it was written**: Next 16 renamed `middleware.ts` to
+`proxy.ts` **and changed its default runtime from Edge to Node.js** (installed-package
+docs: `node_modules/next/dist/docs/.../proxy.md` — "Proxy defaults to using the
+Node.js runtime", listed under the v16.0.0 changes). `apps/web/proxy.ts` sets no
+`runtime` override, so it runs on Node.js. The Edge-runtime reasoning was accurate
+when written (pre-16 middleware) and is preserved as history.
+
+**What this does and does not change**:
+
+- The nonce code **stands unchanged**: `crypto.getRandomValues(new Uint8Array(16))`
+  is the global Web Crypto API and runs identically on both runtimes. Only its
+  *justification* ("because `node:crypto` is unavailable") is stale — `node:crypto`
+  would work in `proxy.ts` today. No code change is warranted for #202; the pick
+  also isn't revisited here (the Web-Crypto call is runtime-portable, which is a
+  property worth keeping for free).
+- The in-memory rate-limit option in `docs/security/07-rate-limits-and-parity.md`
+  keeps its verdict: a per-instance `Map` still does not survive across serverless
+  instances on the Node runtime; only the "Edge" naming was stale.
+- "Sole **edge** gate" phrasing (07 §traced-path) meant "outermost request gate",
+  which `proxy.ts` remains — reworded at the source to say so without the runtime pun.
+
+**Where the fixes landed**: `apps/web/proxy.ts:52-60` already carried an in-file
+"Correction 2026-07-28" (PR #204). This pass corrects the three remaining doc
+sites: the slice-5 entry above (via this correction), and direct dated edits in
+`docs/security/05-csp-header.md` (§Deviations) and
+`docs/security/07-rate-limits-and-parity.md` (§Implementation options, §Traced path).
+`specs/001-auth-and-roles/*` is deliberately untouched — it records feature 001 as
+built, pre-Next-16, and was accurate when written.
+
+**Cross-references**: GitHub issue #202; `docs/BACKLOG.md` (#202 entry, resolved
+this date); Next 16 upgrade entry earlier in this file.

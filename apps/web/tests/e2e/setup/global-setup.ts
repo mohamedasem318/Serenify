@@ -14,6 +14,19 @@
 // Contributors must run `npx playwright install --with-deps chromium
 // firefox webkit` once after cloning so the browser binaries are on disk
 // before the webServer block tries to launch them.
+//
+// Env prerequisites (#179) — playwright.config.ts dotenv-loads apps/web/.env.local
+// into the runner process; a fresh clone needs BOTH of these in it:
+//   - NEXT_PUBLIC_SUPABASE_URL — must point at the LOCAL stack (guarded below;
+//     anything else refuses to run rather than truncate real data).
+//   - SUPABASE_SERVICE_ROLE_KEY — the LOCAL stack's service-role key, shown by
+//     `npx supabase status`. admin-client.ts builds the seeding client from it
+//     with no fallback, so an unset value fails the whole run at startup with
+//     supabase-js's bare "supabaseKey is required".
+// This comment is the key's documented home ON PURPOSE. It is test-infrastructure
+// only: the app has no runtime service-role path (#142 deleted it, and
+// tests/unit/runtime-secret-posture.test.ts enforces the absence), so
+// .env.local.example — the runtime template — deliberately stays silent about it.
 
 import { createAdminClient } from "./admin-client";
 import { termsConsentMetadata } from "../helpers";

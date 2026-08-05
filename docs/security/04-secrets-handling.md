@@ -17,7 +17,17 @@ read, every caller, every guard); auxiliary third-party secrets; and git history
 **Headline posture: clean.** The one true server-secret —
 `SUPABASE_SERVICE_ROLE_KEY` — is read in exactly three places (one production,
 one seed script, one Playwright helper), is always sourced from `process.env`
-(never hardcoded), and is **not reachable from the client bundle**. The
+(never hardcoded), and is **not reachable from the client bundle**.
+
+> **Status update (2026-08-05, #179):** the one *production* read-site described
+> throughout this audit — `apps/web/lib/supabase/admin.ts`, whose sole importer
+> was `app/api/admin/invite/route.ts` — was **deleted in PR #142** (production
+> cutover), and `apps/web/tests/unit/runtime-secret-posture.test.ts` now
+> actively enforces its absence (forbidden-token scan over `app/` + `lib/`, plus
+> an assertion that `lib/supabase/admin.ts` does not exist). The key is
+> **test/scripts-infrastructure only** today; its documented home for e2e setup
+> is the `tests/e2e/setup/global-setup.ts` header. The findings below are the
+> audit as it stood on 2026-05-25 and are kept as written. The
 privilege-relevant controls were verified *empirically*, not just read:
 
 - A **production build** (`next build`, Turbopack, 28 chunks / 1.8 MB
@@ -83,8 +93,8 @@ client), `infrastructure` (build/deploy/test/CLI-time only — not a secret).
 |---|---|---|---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `apps/web/lib/supabase/client.ts:5`, `server.ts:8`, `admin.ts:15`, `proxy.ts:34`, `app/auth/callback/route.ts:46`, `app/(authed)/app/account/actions.ts:111`, `tests/e2e/setup/admin-client.ts:23`, `tests/e2e/setup/global-setup.ts:25`; `scripts/lib/env.ts:150` | public | yes | no (`!` at prod sites; `?? ""` only in `global-setup.ts:25`) | none in prod code; `global-setup.ts:26` does a localhost-substring guard; `scripts/lib/env.ts:107` `requireEnv` throws if empty |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `apps/web/lib/supabase/client.ts:6`, `server.ts:9`, `app/auth/callback/route.ts:47`, `app/(authed)/app/account/actions.ts:112` | public | yes | no (`!` assertion) | none |
-| `SUPABASE_SERVICE_ROLE_KEY` | `apps/web/lib/supabase/admin.ts:16`, `tests/e2e/setup/admin-client.ts:24`; `scripts/lib/supabase-admin.ts:25`, `scripts/lib/env.ts:128` | **server-secret** | yes | no in app (`!`); **yes** in scripts (`requireEnv` throws a clear error) | presence-checked in `scripts/lib/env.ts:128` (`requireEnv`); none in app code |
-| `SITE_URL` | `apps/web/app/api/admin/invite/route.ts:60,84`, `app/(auth)/forgot-password/actions.ts:19`, `app/(auth)/signup/actions.ts:34` | infrastructure (server config — a base URL, not a secret) | yes | yes (`?? "http://localhost:3000"` at every site) | none (no URL parse) |
+| `SUPABASE_SERVICE_ROLE_KEY` | ~~`apps/web/lib/supabase/admin.ts:16`~~ (deleted in #142 — see status update above), `tests/e2e/setup/admin-client.ts:24`; `scripts/lib/supabase-admin.ts:25`, `scripts/lib/env.ts:128` | **server-secret** | yes | ~~no in app (`!`)~~ (no app read-site since #142); **yes** in scripts (`requireEnv` throws a clear error) | presence-checked in `scripts/lib/env.ts:128` (`requireEnv`); none in app code |
+| `SITE_URL` | ~~`apps/web/app/api/admin/invite/route.ts:60,84`~~ (route deleted in #142), `app/(auth)/forgot-password/actions.ts:19`, `app/(auth)/signup/actions.ts:34` | infrastructure (server config — a base URL, not a secret) | yes | yes (`?? "http://localhost:3000"` at every site) | none (no URL parse) |
 | `NODE_ENV` | `apps/web/lib/supabase/server.ts:35`, `proxy.ts:57`, `app/auth/callback/route.ts:69,101`, `tests/e2e/setup/admin-client.ts:1`; `scripts/lib/env.ts:114`, `scripts/lib/supabase-admin.ts:1` | infrastructure | framework-provided | yes (compared `=== "production"`; falsy if unset) | none (string equality) |
 | `SUPABASE_PROJECT_REF` | `scripts/lib/env.ts:131` | infrastructure (project identifier for the `--remote` seed path — not a secret) | no | yes (only required when `--remote` is passed; otherwise ignored) | presence-checked when `--remote` |
 | `PLAYWRIGHT_PORT` | `apps/web/playwright.config.ts:11` | infrastructure (test-only) | no | yes (`?? 3000`, `Number()`-coerced) | coerced |

@@ -3,6 +3,11 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { signUpSchema, verifyOtpSchema } from "@/lib/auth/schemas";
+import {
+  refusalRedirectPath,
+  SIGNUP_CHECK_FIELDS_MESSAGE,
+  SIGNUP_GENERIC_ERROR_MESSAGE,
+} from "@/lib/auth/signup-refusal";
 import { currentRevision } from "@/lib/consent/evaluate";
 import { serverEnv } from "@/lib/env/server";
 
@@ -38,7 +43,7 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
     return {
       status: "validation",
       field: String(first?.path[0] ?? ""),
-      message: first?.message ?? "Please check the fields and try again.",
+      message: first?.message ?? SIGNUP_CHECK_FIELDS_MESSAGE,
     };
   }
 
@@ -80,7 +85,7 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
     // Slice 2 Finding 8: log server-side, return a fixed generic message
     // instead of the raw vendor error.message.
     console.error("[signUp] supabase error:", error);
-    return { status: "error", message: "Something went wrong — please try again." };
+    return { status: "error", message: SIGNUP_GENERIC_ERROR_MESSAGE };
   }
 
   // If Supabase returns a user with no identities, the email exists but
@@ -93,13 +98,19 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
 }
 
 // Progressive-enhancement wrapper for <form action={...}>: invoked
-// natively when JS hasn't loaded or hydration failed. Returns void so
-// the form does a POST (not GET) and credentials never appear in the
-// URL. On success, stays on /signup and signals the "check email"
-// panel via `?state=check_email&email=…` — the page renders the panel
-// under both no-JS and JS paths, and the OTP entry surface (FR-020)
-// can read the email back from the URL to pre-fill its form. On
-// failure, the page re-renders without error UI.
+// natively when JS hasn't loaded or hydration failed. Never returns a
+// value, so the form does a POST (not GET) and credentials never
+// appear in the URL. On success, stays on /signup and signals the
+// "check email" panel via `?state=check_email&email=…` — the page
+// renders the panel under both no-JS and JS paths, and the OTP entry
+// surface (FR-020) can read the email back from the URL to pre-fill
+// its form. On failure (#184, closes the ST-9 gap), it redirects to
+// `?state=refused&reason=<marker>` — a fixed enum marker, never a
+// field value, the email, or message text — and the page rebuilds the
+// same SignUpResult the JS path would have shown, rendered through the
+// form's existing branches. Fields still clear (a native POST has no
+// client state to preserve; round-tripping them is out of #184's
+// scope), but the visitor now sees WHY nothing happened.
 //
 // T043 — THE CONSENT GATE COVERS THIS PATH BY DELEGATION, NOT BY REPETITION.
 // This function adds NO validation of its own: it hands the raw FormData to signUp(),
@@ -108,13 +119,15 @@ export async function signUp(formData: FormData): Promise<SignUpResult> {
 // the gate server-side — a client-side checkbox is not a gate, because this path runs
 // when no client-side anything has loaded. Do NOT add a parallel schema call, a
 // client-only guard, or an early return here: a second path is a second thing to get
-// wrong, and the one that would be got wrong is the one nobody exercises.
+// wrong, and the one that would be got wrong is the one nobody exercises. The refusal
+// redirect below is presentation of signUp()'s verdict, not a second judgment.
 export async function signUpFromForm(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const result = await signUp(formData);
   if (result.status === "ok") {
     redirect(`/signup?state=check_email&email=${encodeURIComponent(email)}`);
   }
+  redirect(refusalRedirectPath(result));
 }
 
 // FR-020: 6-digit OTP fallback for signup confirmation. Same outcome

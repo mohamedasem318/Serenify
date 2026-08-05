@@ -361,9 +361,11 @@ Endpoints with no app-layer ceiling above GoTrue's defaults: `/api/admin/invite`
 
 ### Implementation options & trade-offs
 
-1. **In-memory `Map` on the Edge runtime** — simplest, zero deps, single-instance
-   only. **Does NOT survive across serverless/Edge instances** (each Vercel
-   invocation may hit a different isolate → per-instance counter, trivially
+1. **In-memory `Map` in the proxy** (written pre-Next-16 as "on the Edge runtime";
+   `proxy.ts` defaults to the Node.js runtime since Next 16 — corrected 2026-08-05,
+   see DECISIONS.md) — simplest, zero deps, single-instance only. **Does NOT
+   survive across serverless instances** on either runtime (each Vercel
+   invocation may hit a different instance → per-instance counter, trivially
    bypassed under distributed load). A coarse local speed bump, not a real control.
 2. **Supabase DB table + RLS** (a `rate_limit_events` table or an atomic
    `SECURITY DEFINER` increment RPC) — **durable and shared across all
@@ -474,7 +476,9 @@ promotion) is a **parallel, additive** path — the only way to mint a
 1. **`apps/web/proxy.ts`** — `/signup` is an `AUTH_PAGES` entry; the only rule
    touching it bounces an *already-authenticated* user to `/app`. There is **no**
    rule blocking an *anonymous* visitor. `PROTECTED_PREFIXES` is only `/app` +
-   `/onboarding`. No `middleware.ts` exists; `proxy.ts` is the sole edge gate.
+   `/onboarding`. No `middleware.ts` exists; `proxy.ts` is the sole request gate
+   (the Node.js runtime by default since Next 16, no longer Edge — corrected
+   2026-08-05, see DECISIONS.md).
 2. **`(auth)/signup/page.tsx` + `signup-form.tsx`** — public page, no auth check.
    Form collects `full_name`, `email`, `password` only.
 3. **`(auth)/signup/actions.ts:19-45`** (`signUp`) — Zod-validates with
