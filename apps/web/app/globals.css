@@ -36,10 +36,11 @@
   --color-border:   #D7D9DC;
   /* Control boundary (Amendment 20, #209): the boundary of a form control — text
      inputs, textareas, the consent checkbox, OTP digit boxes, outlined controls —
-     where the border is part or all of the affordance. MUST clear WCAG 1.4.11's
-     3:1 against adjacent surfaces (3.39:1 vs bg / 3.67:1 vs surface here;
-     3.60:1 / 3.43:1 in dark). `--color-border` above is the DECORATIVE seam and
-     stays quiet by design; a resting control never wears it. */
+     where the border is part or all of the affordance. In LIGHT mode it MUST
+     clear WCAG 1.4.11's 3:1 against adjacent surfaces (3.39:1 vs bg / 3.67:1 vs
+     surface here). In DARK mode it deliberately shares the seam value — see the
+     :root.dark note below. `--color-border` above is the DECORATIVE seam and
+     stays quiet by design; a resting light-mode control never wears it. */
   --color-control:  #7D8083;
 
   /* New role tokens (Amendment 4) */
@@ -168,7 +169,15 @@
     --color-amber:   #E4AE5C;
     --color-crimson: #C98589;
     --color-border:  #23272B;
-    --color-control: #6C7074;
+    /* DELIBERATELY the seam value (Mohamed, 2026-08-05 — Amendment 20 as cut).
+       The 3:1 dark candidate (#6C7074, and the floor #64686B) was built, shown
+       side-by-side against the quiet dark form, and REJECTED on looks: the grey
+       rims broke the dark surface's calm. Dark controls keep the quiet boundary
+       on the lenient 1.4.11 reading (label + fill identify a labeled input);
+       the residual — empty OTP digit boxes at ~1.15:1 in dark — is a recorded,
+       accepted cost, NOT an oversight. Light mode keeps 3:1. Re-adjudicate by
+       changing this one value; every control site reads through the token. */
+    --color-control: #23272B;
 
     /* meadow-as-text swaps to the dark meadow; on-accent + scrim do NOT swap */
     --color-meadow-text: #63B292;

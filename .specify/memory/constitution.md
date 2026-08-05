@@ -657,22 +657,29 @@ Cross-references:
 
 Amendment 20: 1.15.0 → 1.16.0 (2026-08-05, MINOR)
 Bump rationale: Principle V palette — register the control-boundary token
-`--color-control` (light `#7D8083`, dark `#6C7074`), splitting boundaries into
-decorative seams (`--color-border`, values unchanged) and control boundaries
-that MUST clear WCAG 1.4.11's 3:1 against adjacent surfaces. Closes the #209
-defect class: the consent checkbox and the OTP digit boxes are empty controls
-whose border is the whole affordance, and both sat at ~1.2:1 — in light mode
-via the `@theme inline` self-reference collapsing `border-border` to
-currentColor (the accident that masked the design's real contrast), and in
-dark mode independently, because the seam literal `#23272B` was doing control
-duty. The registered values are the ones settled at the 2026-07-29 review of
-the #209 scope correction (measured 3.39:1/3.67:1 light and 3.60:1/3.43:1 dark
-against bg/surface), landed after #211 (focus-indicator consistency) per the
-ordering that entry records. MINOR bump: additive token, no role change, no
-principle added, removed, or restructured (consistent with Amendment 5's
-amber sub-token registration). Hand-edited (not via /speckit-constitution) to
-preserve the curated Sync Impact Report history, per the Amendment 10
-precedent.
+`--color-control` (light `#7D8083`; dark deliberately the seam value
+`#23272B`), splitting boundaries into decorative seams (`--color-border`,
+values unchanged) and control boundaries. In LIGHT mode the control boundary
+MUST clear WCAG 1.4.11's 3:1 against adjacent surfaces (measured
+3.39:1/3.67:1 vs bg/surface — the value settled at the 2026-07-29 review of
+the #209 scope correction). In DARK mode the quiet boundary is a deliberate
+aesthetic adjudication made at ratification: the 3:1 dark candidate
+(`#6C7074`, per that same review) and the mathematical floor (`#64686B`,
+3.07:1) were both built, shown side-by-side against the quiet dark form, and
+rejected on looks — the grey rims broke the dark surface's calm. Dark labeled
+inputs are identified by label + fill under 1.4.11's
+component-identification reading; the residual — empty OTP digit boxes at
+~1.15:1 in dark — is recorded as an accepted cost, not an oversight, and is
+re-adjudicable by changing one token value. Closes the #209 defect class:
+in light mode the `@theme inline` self-reference had collapsed every
+`border-border` to currentColor ink, masking that the designed seam value
+sat at ~1.2:1 on control boundaries (the consent checkbox and OTP boxes are
+empty controls whose border is the whole affordance). Landed after #211
+(focus-indicator consistency) per the ordering the BACKLOG entry records.
+MINOR bump: additive token, no role change, no principle added, removed, or
+restructured (consistent with Amendment 5's amber sub-token registration).
+Hand-edited (not via /speckit-constitution) to preserve the curated Sync
+Impact Report history, per the Amendment 10 precedent.
 
 Affected templates: none. Audited .specify/templates/{plan,spec,tasks,checklist,
 constitution}-template.md for `border`, `control`, `1.4.11`, `boundary`, and
@@ -872,14 +879,19 @@ and every documented pairing meets WCAG AA:
   crimson `#894A4E`, border `#D7D9DC`, control border `#7D8083`.
 - Dark: bg `#101214`, surface `#181B1E`, text `#E2E5E8`, muted `#939A9F`,
   meadow accent `#63B292`, foggy accent `#74B6CE`, amber `#E4AE5C`,
-  crimson `#C98589`, border `#23272B`, control border `#6C7074`.
+  crimson `#C98589`, border `#23272B`, control border `#23272B` (deliberately
+  the seam value — see the boundary-split bullet).
 - **Boundary split (Amendment 20):** `--color-border` is the decorative seam —
   dividers, card outlines, chrome hairlines — deliberately quiet.
   `--color-control` is the control boundary — text inputs, textareas, the
   consent checkbox, OTP digit boxes, and outlined controls, where the border
-  is part or all of the affordance — and MUST clear 3:1 (WCAG 1.4.11) against
-  its adjacent surfaces in both modes. A resting control never wears the seam
-  token; a seam never wears the control token.
+  is part or all of the affordance. In LIGHT mode it MUST clear 3:1
+  (WCAG 1.4.11) against its adjacent surfaces, and a resting control never
+  wears the seam token there. In DARK mode the control boundary deliberately
+  keeps the quiet seam value: the 3:1 dark candidates were built and rejected
+  on looks at ratification (Amendment 20's bump rationale records the
+  adjudication and the accepted OTP-box residual). Every control site reads
+  through the token, so the dark call is re-adjudicable in one place.
 - **Filled-accent foregrounds (AA):** on filled meadow or foggy action surfaces
   (primary and attention CTAs) the foreground text MUST be near-white in light
   mode and the `bg` token in dark mode. The deepened accents fail AA with ink

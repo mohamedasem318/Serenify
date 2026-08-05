@@ -7004,11 +7004,18 @@ values against the only in-palette alternative.
 1. **The self-reference is deleted** (`--color-border: var(--color-border)` in
    `@theme inline`) — the original one-line diagnosis stands; it was the accident, not the
    design.
-2. **`--color-control` enters the Graphite palette** (light `#7D8083`, dark `#6C7074`) via
-   Amendment 20 (1.15.0 → 1.16.0, MINOR — the Amendment 5 sub-token precedent). The
+2. **`--color-control` enters the Graphite palette** via Amendment 20 (1.15.0 → 1.16.0,
+   MINOR — the Amendment 5 sub-token precedent). Light `#7D8083` (3.39–3.67:1): the
    in-palette alternative (`--color-muted` doing border duty at 5.6–6.3:1) was considered
-   and shown side-by-side; the settled values won on weight — a calm hairline just above
-   the 3:1 bar rather than a text-gray at double it.
+   and shown side-by-side; the settled value won on weight — a calm hairline just above
+   the 3:1 bar rather than a text-gray at double it. **Dark: deliberately the seam value
+   `#23272B`.** The review's dark candidate `#6C7074` shipped first; on seeing the real
+   dark login Mohamed compared it and the mathematical floor (`#64686B`, 3.07:1 — computed
+   this date; `#626669` misses at 2.98:1) side-by-side against the quiet pre-split form
+   and rejected both on looks. Dark labeled inputs rest on 1.4.11's
+   component-identification reading (label + fill identify the field); the empty OTP
+   digit boxes at ~1.15:1 in dark are the recorded, accepted residual. One token value
+   re-opens the call if it is ever revisited.
 3. **`--color-input` re-points to the control token.** shadcn's `input` semantic IS a
    form-control border; the outline Button follows automatically.
 4. **The Card primitive states `border-border` explicitly.** Tailwind v4's bare `border`
@@ -7026,8 +7033,8 @@ compute to 0 px on it, so the UA box (clearly visible in both schemes) is the re
 affordance there, not our token. The control token stays on it for engines that do paint
 author borders; if the checkbox is ever restyled `appearance:none`, the token is already
 correct. This surprise does not weaken the amendment: the OTP boxes and every text input
-are CSS-painted and measurably carry the 3:1 values (live computed-style probes, both
-modes).
+are CSS-painted and measurably carry the token values (live computed-style probes —
+3:1 in light; the deliberate quiet seam value in dark, per decision 2 above).
 
 **Out of scope, noted while here**: #208 was live-confirmed during the visual sweep — the
 Playwright globalSetup died on `42501 permission denied for table profiles` exactly as
