@@ -7043,3 +7043,33 @@ that issue predicts. Untouched; it remains its own decision.
 **Cross-references**: `.specify/memory/constitution.md` Amendment 20;
 `docs/CHANGELOG.md` 2026-08-05; `docs/BACKLOG.md` #209 (resolved this date);
 GitHub #209, #211; PR #240 (pass A of the same triage).
+
+---
+
+## 2026-08-05 — Amendment 21: custom-rendered consent checkbox on the new empty-affordance token (approved by Mohamed)
+
+**Decision**: the consent checkbox is custom-rendered (`appearance-none` + drawn glyph)
+and wears new token `--color-control-strong` (light `#7D8083`, dark `#6C7074`) — 3:1 in
+both modes. Mohamed picked this from a three-way side-by-side (browser-drawn today /
+custom quiet / custom 3:1) after first asking for the quiet look and seeing all three.
+
+**Why custom rendering at all**: the Amendment 20 pass recorded that the UA-drawn
+checkbox ignores author borders (computed width 0 in Chromium) — no token could reach it.
+Taking over rendering is the only way the box participates in the palette. The checked
+glyph is an inline SVG (lucide `Check`) driven by `peer-checked`, not a CSS
+background-image, because `img-src 'self'` blocks data: URIs; it therefore works
+identically on the no-JS signup path.
+
+**Why 3:1 here when the inputs stay quiet in dark**: the quiet-dark adjudication
+(Amendment 20, decision 2) rests on 1.4.11's component-identification reading — label +
+fill identify a labeled input. An empty checkbox beside legal text has neither, so the
+border is the whole affordance. This shrinks the recorded dark residual to the OTP digit
+boxes alone, which remain on the quiet value pending their own adjudication (natural next
+consumer of the strong token; not extended silently — Mohamed's "go" covered the checkbox).
+
+**Light ride-along**: light also goes custom (`#7D8083` — same value the control token
+already carries there) so the glyph and box are consistent across modes; a dark-only
+takeover would have shipped two different checkmarks.
+
+**Cross-references**: constitution Amendment 21 (1.17.0); `docs/CHANGELOG.md` 2026-08-05
+(Amendment 21); the two Amendment 20 entries above; PR (this branch — fix/quiet-dark-checkbox).

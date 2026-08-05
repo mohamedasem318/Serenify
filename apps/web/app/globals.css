@@ -42,6 +42,12 @@
      :root.dark note below. `--color-border` above is the DECORATIVE seam and
      stays quiet by design; a resting light-mode control never wears it. */
   --color-control:  #7D8083;
+  /* Empty-affordance control boundary (Amendment 21): for a control whose border
+     is the WHOLE affordance — no label-per-element, no content, no fill (the
+     consent checkbox today). Clears 3:1 in BOTH modes, including dark, where
+     `--color-control` above deliberately stays quiet for labeled inputs. Light
+     shares the control value; dark is the 2026-07-29 review's 3:1 candidate. */
+  --color-control-strong: #7D8083;
 
   /* New role tokens (Amendment 4) */
   --color-on-accent:   #F8F9FA;                 /* filled meadow/foggy CTA fg (light); dark fg = --color-bg */
@@ -178,6 +184,9 @@
        accepted cost, NOT an oversight. Light mode keeps 3:1. Re-adjudicate by
        changing this one value; every control site reads through the token. */
     --color-control: #23272B;
+    /* 3.60:1 vs bg / 3.43:1 vs surface — the empty checkbox stays findable in
+       dark while the labeled inputs beside it rest on the quiet value above. */
+    --color-control-strong: #6C7074;
 
     /* meadow-as-text swaps to the dark meadow; on-accent + scrim do NOT swap */
     --color-meadow-text: #63B292;
