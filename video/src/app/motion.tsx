@@ -556,6 +556,68 @@ export const useToastIn = (startFrame: number): { x: number; opacity: number } =
 };
 
 /**
+ * ══ AND THE REAL `<Notification/>`'S OWN NUMBERS, WHICH ARE NOT THOSE ═══════════════
+ *
+ * `useToastIn` above says the component's numbers are used where the video renders a real
+ * `Notification`. **They were not.** `notification.tsx:196-199` declares the desktop variant as
+ * `initial {opacity: 0, x: 24}` → `animate {opacity: 1, x: 0}` on `transition {duration: 0.2}`;
+ * `useToastIn` runs **0.42s and 28px**. One value, two sources, and the video's copy was 2.1×
+ * long.
+ *
+ * That is what "the prompt glitches on mount" is, and the mechanism is worth naming because it
+ * looks like a rendering fault and is not one — two independent renders of the whole entrance
+ * are MSE 0.00, so nothing here is the frame race `settle.tsx` documents.
+ *
+ * **A single alpha over a near-black ground does not fade a dark panel and light type at the same
+ * apparent rate.** The prompt's ground is `bg-surface`; the page under it is very nearly black.
+ * At opacity 0.17 the panel is invisible while `text-ink` at the same 0.17 is already a legible
+ * grey — so the title, the body and the three option rows materialise **unsupported, with no
+ * card, no border and no shadow under them**, and the panel then appears beneath type that is
+ * already there. At the shipped 0.2s that phase is two or three frames and reads as an entrance.
+ * At 0.42s it is six or seven and reads as a defect.
+ *
+ * So the real prompt takes the real numbers. `useToastIn` is left exactly as it is: it drives
+ * beat 8's mail toast, which is an AUTHORED surface with no component behind it, and beat 9,
+ * which is shared with the launch cut and may not move.
+ *
+ * ── AND THE EXIT IS A SHIPPED RESPONSE TO THE DISMISSAL (§6.4) ─────────────────────
+ *
+ * §6.4 read `onFalseAlarm` → `finalize()` → `setVisible(false)` and concluded that the app
+ * acknowledges a dismissal with nothing at all. It stops one call too early. `finalize` flips
+ * `open`, and `Notification` wraps its content in an **`AnimatePresence`** whose desktop `exit`
+ * is `{opacity: 0, x: 24}` on the same 0.2s — the mirror of the entrance. The prompt does not
+ * pop; it slides back out the way it came in.
+ *
+ * That is a real, shipped, visible response to the click, and depicting it is not an invention:
+ * it breaks none of §6.4's three prohibitions. It is not an acknowledgement of the ANSWER (the
+ * same exit plays for "Yes" and for a session-end expiry), nothing about it could read as
+ * adaptation, and it touches no band, no threshold and no trend. It is the prompt leaving.
+ */
+/** `notification.tsx:196-199` — the desktop variant's own slide and duration. */
+export const NOTIFICATION = { slideX: 24, frames: sec(0.2) } as const;
+
+/**
+ * The real `<Notification/>`'s entrance and exit, as one value.
+ *
+ * `outAt` is the frame the answer is clicked — `null` while the prompt has not been answered.
+ * Both legs run the component's own 0.2s over its own 24 world px, and the element must stay
+ * mounted for `NOTIFICATION.frames` past `outAt` for the exit to be drawn at all.
+ */
+export const useNotificationSlide = (
+  inAt: number,
+  outAt: number | null = null,
+): { x: number; opacity: number } => {
+  const frame = useCurrentFrame();
+  const { slideX, frames } = NOTIFICATION;
+  const tIn = interpolate(frame, [inAt, inAt + frames], [0, 1], { ...clamp, easing: EASE_OUT });
+  const tOut =
+    outAt === null
+      ? 0
+      : interpolate(frame, [outAt, outAt + frames], [0, 1], { ...clamp, easing: EASE_OUT });
+  return { x: slideX * (1 - tIn + tOut), opacity: tIn * (1 - tOut) };
+};
+
+/**
  * ── THE IN-PLACE EMPHASIS (L12) ─────────────────────────────────────────────────────
  *
  * Not a component's motion — this one is the video's own device, and the only reason it lives

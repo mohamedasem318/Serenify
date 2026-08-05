@@ -13,14 +13,17 @@ import { Beat04CameraGate } from "./greybox/beats/Beat04CameraGate";
 import { Beat05Calibration } from "./greybox/beats/Beat05Calibration";
 import { Beat06Later } from "./greybox/beats/Beat06Later";
 import { Beat07AtEase } from "./greybox/beats/Beat07AtEase";
+import { Beat07bFalseAlarm } from "./greybox/beats/Beat07bFalseAlarm";
 import { Beat08Email } from "./greybox/beats/Beat08Email";
 import { Beat09Questionnaire } from "./greybox/beats/Beat09Questionnaire";
 import { Beat10Ren } from "./greybox/beats/Beat10Ren";
 import { Beat11ReturnToEase } from "./greybox/beats/Beat11ReturnToEase";
 import { Beat12Closing } from "./greybox/beats/Beat12Closing";
 import { Beat13EndCard } from "./greybox/beats/Beat13EndCard";
+import { BeatRRoadmap } from "./greybox/beats/BeatRRoadmap";
 import { CardJoinCompare, CARD_JOIN_COMPARE_DURATION } from "./greybox/CardJoinCompare";
 import { CUT_DURATION, GreyboxVideo } from "./greybox/GreyboxVideo";
+import { PITCH_DURATION, PitchVideo } from "./pitch";
 import { Interstitial, INTERSTITIAL_FRAMES } from "./greybox/beats/Interstitial";
 import { INTERSTITIALS } from "./greybox/copy";
 import { RigSpike } from "./greybox/RigSpike";
@@ -59,6 +62,21 @@ export function RemotionRoot() {
         height={1080}
       />
 
+      {/*
+       * The Egypt IoT Challenge pitch cut — `docs/video/serenify-pitch-video-beat-sheet.md`.
+       * 5,962 frames, 3:18.7, watched with sound on. A SEPARATE composition from `Greybox`
+       * deliberately: it shares the thirteen beat components and changes nothing about the
+       * launch cut. See `pitch.tsx` for the per-beat time map.
+       */}
+      <Composition
+        id="Pitch"
+        component={PitchVideo}
+        durationInFrames={PITCH_DURATION}
+        fps={30}
+        width={1920}
+        height={1080}
+      />
+
       <Folder name="Greybox-Beats">
         <Composition id="Beat01-ColdOpen" component={Beat01ColdOpen} durationInFrames={180} fps={30} width={1920} height={1080} />
         <Composition id="Beat02-Signup" component={Beat02Signup} durationInFrames={432} fps={30} width={1920} height={1080} />
@@ -71,10 +89,14 @@ export function RemotionRoot() {
             the jump now. See the flag in Beat06Later.tsx. */}
         <Composition id="Beat06-Later" component={Beat06Later} durationInFrames={36} fps={30} width={1920} height={1080} />
         <Composition id="Beat07-AtEase" component={Beat07AtEase} durationInFrames={72} fps={30} width={1920} height={1080} />
+        {/* The pitch cut's new false-alarm sequence, 7b–7e as ONE beat. See the pitch beat
+            sheet §6 and the header in Beat07bFalseAlarm.tsx. */}
+        <Composition id="Beat07b-FalseAlarm" component={Beat07bFalseAlarm} durationInFrames={906} fps={30} width={1920} height={1080} />
         <Composition id="Beat08-Email" component={Beat08Email} durationInFrames={184} fps={30} width={1920} height={1080} />
         <Composition id="Beat09-Questionnaire" component={Beat09Questionnaire} durationInFrames={76} fps={30} width={1920} height={1080} />
         <Composition id="Beat10-Ren" component={Beat10Ren} durationInFrames={310} fps={30} width={1920} height={1080} />
         <Composition id="Beat11-ReturnToEase" component={Beat11ReturnToEase} durationInFrames={234} fps={30} width={1920} height={1080} />
+        <Composition id="BeatR-Roadmap" component={BeatRRoadmap} durationInFrames={240} fps={30} width={1920} height={1080} />
         <Composition id="Beat12-Closing" component={Beat12Closing} durationInFrames={90} fps={30} width={1920} height={1080} />
         <Composition id="Beat13-EndCard" component={Beat13EndCard} durationInFrames={172} fps={30} width={1920} height={1080} />
       </Folder>

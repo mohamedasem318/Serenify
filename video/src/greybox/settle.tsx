@@ -87,12 +87,46 @@ import { continueRender, delayRender, useCurrentFrame } from "remotion";
  */
 const SETTLE_TICKS = 6;
 
-export const Settle: React.FC = () => {
+/**
+ * ── AND THE PITCH CUT'S RATE IS FIXED BY CONCURRENCY, NOT BY MORE TICKS ─────────────
+ *
+ * *"Raise it if a diffed pair of renders ever disagrees again — that check is the acceptance
+ * test, not the eye."* It disagreed. Two full renders of the 5,962-frame pitch cut differed at
+ * **51 frames (0.86%)** against the launch cut's ~1 in 2,572, and the worst were not sub-pixel:
+ * two renders showed beat 2's signup page at scroll positions about fourteen frames apart.
+ *
+ * **Raising the budget to 20 made it exactly twice as bad** — 101 disagreeing frames in the same
+ * 900-frame region, against 51. That is the opposite of what this comment predicted, and the
+ * inversion is the finding: **more rAFs means more WALL-CLOCK per frame, and Remotion keeps one
+ * live page across the whole render.** Anything in the page still driven by real elapsed time —
+ * the thing `<StillMotion/>` exists to catch, in some site it does not cover — drifts further
+ * the longer each frame is held. Settling harder feeds the bug it was meant to starve.
+ *
+ * Three measurements pin it, and the first is what makes the other two readable:
+ *
+ *  · **the composition is deterministic.** Two `remotion still` renders of output frame 517 are
+ *    identical to **MSE 0.00**. A still renders one frame in a fresh page, so no wall-clock state
+ *    accumulates — which is also why a still is the ground truth the other two are measured
+ *    against.
+ *  · **a video-render frame can be flatly wrong.** At output f494 one render sits **4.30** from
+ *    the still (h264 noise against a lossless PNG) and the other **12,790.99**. Not a slip, a
+ *    different picture.
+ *  · **`--concurrency=2` clears it.** Six frames that had been wrong come back at 3.4–16.8 MSE
+ *    from their stills — encoding noise, brighter frames scoring higher, no outlier. Fewer tabs
+ *    is less memory pressure and less contention for the same wall clock.
+ *
+ * So **the budget stays at 6 for both cuts** and the pitch cut is rendered at `--concurrency=2`.
+ * The prop stays because it costs nothing and the next person to hit this should find the
+ * measurement rather than the guess. **Do not raise it to fix a race — it makes this one worse.**
+ */
+export const PITCH_SETTLE_TICKS = 6;
+
+export const Settle: React.FC<{ ticks?: number }> = ({ ticks = SETTLE_TICKS }) => {
   const frame = useCurrentFrame();
   React.useEffect(() => {
     const handle = delayRender(`settle f${frame}`);
     let raf = 0;
-    let left = SETTLE_TICKS;
+    let left = ticks;
     const tick = () => {
       if (left-- <= 0) {
         continueRender(handle);
@@ -105,6 +139,6 @@ export const Settle: React.FC = () => {
       cancelAnimationFrame(raf);
       continueRender(handle);
     };
-  }, [frame]);
+  }, [frame, ticks]);
   return null;
 };

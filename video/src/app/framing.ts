@@ -16,6 +16,7 @@ import {
   CLOCK,
   PHONE_PX,
   PROMPT,
+  PROMPT_OPTIONS,
   RAW,
   SUCCESS_FRAMED,
   TOAST,
@@ -184,6 +185,38 @@ export const BEAT8_WIDE: Shot = COMPOSITE;
  * is the point of pushing in on it at all.
  */
 export const BEAT9_PROMPT: Shot = frameRect(PROMPT.panel, 24);
+
+/**
+ * ══ THE PITCH CUT'S BEAT 9 — THE CHOICE, NOT THE QUESTION ═══════════════════════════
+ *
+ * The pitch cut shows the confirmatory prompt **twice**: once in the false-alarm sequence
+ * (7b–7e), where it is new and is read whole at `BEAT9_PROMPT`, and once at beat 9, where it is
+ * known. Framing it identically the second time is what would make beat 9 read as a repeat, and
+ * this is the framing half of the three answers to that (pitch sheet §7 · beat 9): it opens
+ * already landed, it is shorter, and it frames **the option group** rather than the panel.
+ *
+ * The title and the body are partly out of frame by design. The subject of the second prompt is
+ * which button the cursor goes to.
+ *
+ * **No new measurement.** `PROMPT_OPTIONS` is the union of the three option rows, each of which
+ * is derived from `PROMPT.yes` by the component's own 44px row height and 8px gap. The same
+ * `frameRect(…, 24)` margin as `BEAT9_PROMPT`, so the two shots differ only in what they are
+ * taken over.
+ *
+ * The option copy is 15px and the frame is narrower than `BEAT9_PROMPT`'s 600.9, so it reads
+ * larger than the 10.5px that landing gets — the second look at this surface is the more legible
+ * one, which is the right way round for the branch the film's closing card turns on.
+ */
+/**
+ * **The top edge is placed, not centred**, and the reason is in `geometry.ts` § PROMPT_OPTIONS:
+ * centred on the option rows alone it fell 29.5px above the first option, which is inside the
+ * body copy — the shot opened on a sliced line of type, which the framing rule calls an
+ * always-failure. `PROMPT_OPTIONS` runs from 14px above the first option (inside the component's
+ * own `gap-2`, so no glyph is crossed) down to the panel's own bottom border, and this frames
+ * that. Same `frameRect(…, 24)` margin as `BEAT9_PROMPT`, so the two differ only in what they
+ * are taken over.
+ */
+export const BEAT9_OPTIONS: Shot = frameRect(PROMPT_OPTIONS, 24);
 
 /** Beat 11's near phase — the drift and the stateline's return, both framed. */
 export const BEAT11_NEAR: Shot = COMPOSITE;

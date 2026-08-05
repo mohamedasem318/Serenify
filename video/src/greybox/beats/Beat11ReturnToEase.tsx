@@ -1,14 +1,15 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate } from "remotion";
-import { useCurrentFrame } from "../../retime";
+import { useBeatOutFrame, useCurrentFrame } from "../../retime";
 
 import { BEAT11_WIDE, PHONE } from "../../app/framing";
 import { RAW, VIEWFINDER } from "../../app/geometry";
 import { useHover } from "../../app/hover";
 import { LITTLE_AT, MonitorPage, TENSE_AT } from "../../app/monitor";
 import { useDrift, useReading } from "../../app/motion";
-import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN } from "../../app/player";
+import { MusicPlayer, PLAY_CENTRE, PLAYER_WIN, TOTAL_SECONDS } from "../../app/player";
 import { Pointer } from "../../app/pointer";
+import { usePitch } from "../../pitch-context";
 import { Camera, frameRect, union } from "../Camera";
 import { useExpression } from "../rig";
 import { H, W } from "../theme";
@@ -160,7 +161,15 @@ const BEAT11_PLAYER_LANDING = (() => {
  * it closes is recorded there. It is not re-derived here.
  */
 
+/**
+ * The track's declared compression, in track-seconds per second of film. See § THE TRACK IS A
+ * CLOCK below for why it is 10 and not 1 and not 31.
+ */
+const TRACK_RATE = 10;
+
 export const Beat11ReturnToEase: React.FC = () => {
+  // null outside the pitch composition, where each beat keeps its own constant.
+  const readout = usePitch().session?.beat11;
   const frame = useCurrentFrame();
 
   /**
@@ -179,10 +188,42 @@ export const Beat11ReturnToEase: React.FC = () => {
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
   });
-  const trackProgress = interpolate(frame, [24, 70], [0, 0.18], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
+  /**
+   * ══ THE TRACK IS A CLOCK, SO IT READS OUTPUT FRAMES, NOT AUTHORED ONES ══════════════
+   *
+   * The scrubber, its handle and the elapsed readout are one `progress` value, and it was
+   * interpolated across this beat's own f24–f70. That is right for every *animation* in the beat
+   * — a retimed move is supposed to re-render at the in-between positions — and it is wrong for
+   * this, because a position in a piece of music is a **rate**.
+   *
+   * The pitch cut runs f24–f42 at 0.90×, f42–f60 at 0.31× and f60–f98 at 0.49×, so the track ran
+   * at **31× real time, then 10.7×, then 16.8×** — and the three-fold deceleration lands on f42,
+   * the exact frame the camera stops on the window and the audience starts reading the numbers.
+   * That is the reported glitch. It is not the compositor race `player.tsx` documents and fixed:
+   * two independent renders of the whole window agree to MSE 0.00.
+   *
+   * So the position is driven from the beat's own **output** frame (`retime.tsx` §
+   * `BeatOutFrameContext`) at one constant rate. The rate is a declared compression, like every
+   * other clock in this film — **10×**, which is the slowest rate at which the handle still
+   * visibly travels during the 18-frame landing hold. At real time it would move about two pixels
+   * there and the window would read as paused under a pause glyph, which is worse than a fast
+   * clock; at the old 31× it crosses the shot.
+   *
+   * `beatOut` is the beat's output frame and the click is at output frame 24 because this beat's
+   * first two segments run at 1.000× — `pitch.tsx` `[0,18,18]` and `[18,24,6]`. If either ever
+   * stops being 1.000×, this number moves with it.
+   *
+   * **`null` is the launch cut**, which runs the beat at one rate and never had the bug, so it
+   * takes the original interpolation and does not move by a frame.
+   */
+  const beatOut = useBeatOutFrame();
+  const trackProgress =
+    beatOut === null
+      ? interpolate(frame, [24, 70], [0, 0.18], {
+          extrapolateLeft: "clamp",
+          extrapolateRight: "clamp",
+        })
+      : Math.min(0.18, (Math.max(0, beatOut - 24) / 30) * TRACK_RATE / TOTAL_SECONDS);
 
   /**
    * ── THE PLAY BUTTON LIGHTS BEFORE HE PRESSES IT (§2) ────────────────────────────────
@@ -289,7 +330,7 @@ export const Beat11ReturnToEase: React.FC = () => {
         ]}
       >
         <MonitorPage
-          clock="11:30 AM"
+          clock={readout?.clock ?? "11:30 AM"}
           level={level}
           peak={1}
           tension={tension}
@@ -299,7 +340,8 @@ export const Beat11ReturnToEase: React.FC = () => {
           headphones={frame >= 68}
           nod={frame >= 100}
           notesFrom={78}
-          sessionFrom={47 * 60 + 33}
+          // 48:36 under the pitch cut — see `pitch-context.tsx` § THE INTERNAL CLOCK.
+          sessionFrom={readout?.from ?? 47 * 60 + 33}
           overlay={
             <>
               <MusicPlayer

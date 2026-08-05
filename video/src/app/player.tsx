@@ -75,8 +75,13 @@ export const PLAY_CENTRE = {
   y: TRANSPORT.play.y + TRANSPORT.play.d / 2,
 } as const;
 
-/** Released length of the named track. See the header — a real duration on a real title. */
-const TOTAL_SECONDS = 4 * 60 + 54;
+/**
+ * Released length of the named track. See the header — a real duration on a real title.
+ *
+ * Exported because a beat has to divide by it to turn a position in SECONDS into the 0–1
+ * `progress` this component takes, and a second copy of 294 is a second source for one number.
+ */
+export const TOTAL_SECONDS = 4 * 60 + 54;
 
 const mmss = (s: number) => {
   const safe = Math.max(0, Math.floor(s));
@@ -190,6 +195,20 @@ export const MusicPlayer: React.FC<{
    * painted content in the page's own layer and cannot fall behind it. `zIndex` stays: it makes a
    * stacking context, not a composited layer, and it is what keeps the viewfinder from punching a
    * webcam feed through a window he has just opened.
+   *
+   * ── AND THE SECOND REPORT OF "THE TIMER AND SCRUBBER GLITCH" IS A DIFFERENT BUG ────
+   *
+   * **That fix held**: two independent renders of the whole window across output f4980–f5020 are
+   * MSE 0.00 on every frame but one, so the compositor is no longer serving a stale layer.
+   *
+   * What was still wrong is not in this file and is not a race. `progress` was authored across
+   * beat 11's own f24–f70, and the pitch cut retimes that span at 0.90×, then 0.31×, then 0.49× —
+   * so the elapsed readout and the fill ran at **31× real time, then 10.7×, then 16.8×**, with
+   * the three-fold deceleration landing on the exact frame the camera settles onto the window.
+   * A clock that changes speed twice while you are reading it looks broken because, as a clock,
+   * it is. See `Beat11ReturnToEase.tsx` § THE TRACK IS A CLOCK and `retime.tsx`
+   * § `BeatOutFrameContext`. This component is unchanged by that fix — it still takes one 0–1
+   * `progress` and draws it — which is the point: the position had one source and still does.
    */
   const animating = open < 1;
 

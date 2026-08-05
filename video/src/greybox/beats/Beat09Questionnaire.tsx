@@ -3,13 +3,14 @@ import { AbsoluteFill } from "remotion";
 
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
 
-import { BEAT8_WIDE, BEAT9_PROMPT, PHONE, useShotAt } from "../../app/framing";
+import { BEAT8_WIDE, BEAT9_OPTIONS, BEAT9_PROMPT, PHONE, useShotAt } from "../../app/framing";
 import { PROMPT, centre } from "../../app/geometry";
 import { Hover } from "../../app/hover";
 import { MonitorPage, WorldOverlay, WorldPrompt } from "../../app/monitor";
 import { useToastIn } from "../../app/motion";
 import { Pointer } from "../../app/pointer";
-import { Camera, CameraKey } from "../Camera";
+import { usePitch } from "../../pitch-context";
+import { Camera, CameraKey, Shot } from "../Camera";
 import { useExpression } from "../rig";
 
 /**
@@ -91,8 +92,68 @@ import { useExpression } from "../rig";
  * whatever is under it, so a prompt covering the page's own content while it is up is the
  * component's behaviour rather than a collision. Beat 9 does not need the trend in shot.
  */
+/**
+ * ── AND THE PITCH CUT FRAMES IT DIFFERENTLY, BECAUSE BY THEN IT IS THE SECOND PROMPT ─
+ *
+ * The pitch cut shows this surface twice: once in the false-alarm sequence, where it is new and
+ * is pushed in on and read whole, and once here. The launch cut's landing — hold on beat 8's
+ * wide, then ease in on the whole panel — is exactly what would make the second one read as a
+ * repeat of the first.
+ *
+ * So under `PitchContext` the beat is framed on the three option rows rather than on the panel.
+ * The title and the body are partly out of frame by design: the audience knows the question, and
+ * the subject of the second prompt is which button the cursor goes to. Nothing else about the
+ * beat changes — same prompt, same pointer, same hover, same click. See the pitch sheet §7 ·
+ * beat 9 and `framing.ts` § THE PITCH CUT'S BEAT 9.
+ *
+ * ── AND "NO PUSH AT ALL" WAS ONE STEP TOO FAR ──────────────────────────────────────
+ *
+ * The first pitch render had this open ALREADY LANDED — zero camera keys apart, straight into the
+ * tighter shot. On screen that does not read as a differentiation from 7d; it reads as **a cut
+ * error**. A hard punch-in to a tighter framing is a mistake, not an edit, and the audience has
+ * no way to tell the two apart.
+ *
+ * So it gets a push, and the whole design of it is that it cannot be confused with 7d's:
+ *
+ *   · **14 output frames against 7d's 36**, which is fast enough that the two moves are not the
+ *     same gesture at any speed of watching;
+ *   · **1.12× rather than 1.54×.** 7d travels `COMPOSITE` → `BEAT9_PROMPT`, 927 → 601 world px,
+ *     which is a push in on a surface that has just appeared. This travels 1.12 × `BEAT9_OPTIONS`
+ *     → `BEAT9_OPTIONS`, a settle onto a shot that is already essentially framed. **It does not
+ *     re-establish**: the wider end is still inside the option group, so no frame of it shows the
+ *     title or the body coming into view;
+ *   · and it opens out of beat 8's own closing move rather than out of a hold.
+ *
+ * The other two differentiations stand: framed on the choice, and 240 against 7d's 201.
+ *
+ * The push runs on a 1.000× segment in `pitch.tsx` so that "14 frames" is fourteen frames of the
+ * FILM — inside the beat's opening read segment it would have played over 32.
+ */
+/**
+ * **Its TOP EDGE is pinned, and the extra 12% goes downward.** `BEAT9_OPTIONS`' top edge is a
+ * *placed* number — 14px above the first option, inside the component's own `gap-2`, so it falls
+ * in air and crosses no glyph (§7 · beat 9). A shot centred on the same point and 12% larger
+ * would move that edge 12.5 world px UP, into the body copy, and open the beat on a line of type
+ * sliced through its letterforms. The framing rule has no exception for that.
+ *
+ * Pinning the top instead means the wider end shows *no new type at all* — it holds the same
+ * question-tail and the same three answers, with 25px more of the page below the panel's own
+ * bottom border, which is backdrop that `BEAT9_PROMPT` already accepts.
+ */
+const BEAT9_OPTIONS_IN: Shot = (() => {
+  const w = BEAT9_OPTIONS.w * 1.12;
+  const top = BEAT9_OPTIONS.cy - (BEAT9_OPTIONS.w * 9) / 32;
+  return { cx: BEAT9_OPTIONS.cx, cy: top + (w * 9) / 32, w };
+})();
+
+const PITCH_KEYS: CameraKey[] = [
+  { frame: 0, shot: BEAT9_OPTIONS_IN },
+  { frame: 14, shot: BEAT9_OPTIONS },
+  { frame: 76, shot: BEAT9_OPTIONS },
+];
+
 /** One array, used by `<Camera>` AND by the projection — they cannot disagree. */
-const KEYS: CameraKey[] = [
+const LAUNCH_KEYS: CameraKey[] = [
   // Picks up beat 8's closing framing and holds four frames past the prompt's arrival — the
   // camera reacts to it rather than anticipating it — then eases in and HOLDS. The click at f66
   // happens 24 frames after the camera has stopped, and the beat ends 10 frames after the click.
@@ -103,7 +164,30 @@ const KEYS: CameraKey[] = [
 ];
 
 export const Beat09Questionnaire: React.FC = () => {
-  const enter = useToastIn(6);
+  // null outside the pitch composition, where each beat keeps its own constant.
+  const readout = usePitch().session?.beat9;
+  // `beat9Options` is false everywhere except the pitch composition.
+  const landed = usePitch().beat9Options;
+  const KEYS = landed ? PITCH_KEYS : LAUNCH_KEYS;
+  /**
+   * ── AND UNDER THE PITCH CUT THE PROMPT IS ALREADY THERE ────────────────────────────
+   *
+   * **The tighter framing turned the entrance into nineteen frames of empty page.** The launch
+   * cut opens on `BEAT8_WIDE` — the whole composition — so a prompt that slides in at f6 arrives
+   * into a shot with a great deal else in it. The pitch cut opens framed on the option group, and
+   * for the frames before the slide finishes there is nothing in the frame at all: the beat began
+   * on a near-black rectangle. Rendered and confirmed, not derived: `out/diag/v-3816.png`.
+   *
+   * So under the pitch cut it does not slide at all. That is not a workaround, it is §7's own
+   * argument finished: the audience has seen this surface arrive once, in 7d, where it was new
+   * and was pushed in on and read whole. **Playing its entrance a second time is the repeat.**
+   * Beat 8's tail is 142 output frames of a static composite; the prompt has had every
+   * opportunity to fire, and when the camera arrives it is up.
+   *
+   * The launch cut keeps its own entrance to the frame.
+   */
+  const slide = useToastIn(6);
+  const enter = landed ? { x: 0, opacity: 1 } : slide;
   const shot = useShotAt(KEYS);
   const yes = centre(PROMPT.yes);
 
@@ -116,13 +200,14 @@ export const Beat09Questionnaire: React.FC = () => {
     <AbsoluteFill>
       <Camera keys={KEYS}>
         <MonitorPage
-          clock="11:30 AM"
+          clock={readout?.clock ?? "11:30 AM"}
           // Held where beat 8 left it — tense, and the session has peaked there.
           level={1}
           peak={1}
           tension={1}
           pose={pose}
-          sessionFrom={47 * 60 + 23}
+          // 48:06 under the pitch cut — see `pitch-context.tsx` § THE INTERNAL CLOCK.
+          sessionFrom={readout?.from ?? 47 * 60 + 23}
         />
       </Camera>
 
