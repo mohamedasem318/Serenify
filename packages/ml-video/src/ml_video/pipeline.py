@@ -428,6 +428,20 @@ def _extract_landmarks_tail(
         raise FeatureExtractionError("no frames left after downsample")
 
     if trimmed_upload or all_ts[0] > _TRIMMED_START_MS:
+        if not trimmed_upload:
+            # Self-detection fired on a file the caller did NOT declare trimmed. Every
+            # container measured so far (Chrome WebM, Safari WebM, Safari fMP4) stamps
+            # all_ts[0] == 0.0, so this should not happen for an un-trimmed upload — but
+            # "no container stamps a nonzero first packet" is three stacks measured, not
+            # proven. WARNING, not DEBUG: if the assumption is wrong somewhere we have not
+            # looked, it must leave a trace rather than silently re-route the decode.
+            logger.warning(
+                "trim self-detected without a client declaration: first packet at "
+                "%.1f ms (> %.0f ms) in %s — routing through the trimmed tail path",
+                all_ts[0],
+                _TRIMMED_START_MS,
+                Path(str(video_path)).suffix or "?",
+            )
         return _tail_from_trimmed(video_path, all_ts, global_keep, tail_seconds)
 
     seek_ms = duration_ms - (tail_seconds + _TAIL_SEEK_MARGIN_S) * 1000.0
