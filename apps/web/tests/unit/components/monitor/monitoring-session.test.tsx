@@ -843,3 +843,59 @@ describe("MonitoringSession — create-failure surfaces (camera-down mislabel)",
     expect(deps.getUserMedia).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * 2026-08-06 bounded uploads — the drop must leave a trace, and the upload kind rides to
+ * the API client. Console/counter only: no UI surface changes.
+ */
+describe("MonitoringSession — bounded-upload diagnostics (2026-08-06)", () => {
+  it("overwriting a PARKED window logs the drop with a running total", async () => {
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {});
+    try {
+      let call = 0;
+      const submitWindow = vi.fn(async (): Promise<SubmitWindowResult> => {
+        call += 1;
+        if (call === 1) return new Promise<SubmitWindowResult>(() => {}); // held open forever
+        return { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } };
+      });
+      const { deps, fireStride } = makeDeps([]);
+      deps.submitWindow = submitWindow;
+      render(<MonitoringSession deps={deps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+      });
+
+      await act(async () => {
+        fireStride(); // upload 1 starts (held open)
+      });
+      await act(async () => {
+        fireStride(); // window 2 parks — no drop yet
+      });
+      const dropLogs = () =>
+        debugSpy.mock.calls.filter((c) => String(c[0]).includes("stride window dropped"));
+      expect(dropLogs()).toHaveLength(0);
+
+      await act(async () => {
+        fireStride(); // window 3 overwrites parked window 2 — THE drop
+      });
+      expect(dropLogs()).toHaveLength(1);
+      expect(String(dropLogs()[0]![0])).toContain("dropped_total=1");
+    } finally {
+      debugSpy.mockRestore();
+    }
+  });
+
+  it("hands submitWindow the upload kind (full while no safe cut exists)", async () => {
+    const { deps, fireStride } = makeDeps([
+      { ok: true, outcome: { outcome: "warming_up", capturedAt: "t" } },
+    ]);
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    await act(async () => {
+      fireStride();
+    });
+    expect(deps.submitWindow).toHaveBeenCalledWith("sid", expect.any(Blob), "tok", "full");
+  });
+});
