@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
 import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
+import { captureVideoConstraints } from "@/lib/capture/constraints";
 import {
   accumulate,
   dominantCause,
@@ -400,9 +401,11 @@ export function AnchorRecorder({
     const preferred = deviceIdRef.current ?? readRememberedCamera();
     // Try the preferred device first (the user may have freed it), then fall back to
     // the default. With no preference, just the default.
+    // Every attempt carries the shared ideal 720p/15 caps (lib/capture/constraints.ts);
+    // only the device pin differs between the preferred attempt and the default fallback.
     const attempts: MediaStreamConstraints["video"][] = preferred
-      ? [{ deviceId: { exact: preferred } }, true]
-      : [true];
+      ? [captureVideoConstraints(preferred), captureVideoConstraints()]
+      : [captureVideoConstraints()];
 
     let stream: MediaStream | null = null;
     let lastError: unknown;
@@ -507,7 +510,7 @@ export function AnchorRecorder({
       let next: MediaStream;
       try {
         next = await deps.getUserMedia({
-          video: id ? { deviceId: { exact: id } } : true,
+          video: captureVideoConstraints(id),
           audio: false,
         });
       } catch (error) {

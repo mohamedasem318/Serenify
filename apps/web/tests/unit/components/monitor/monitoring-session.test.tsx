@@ -101,6 +101,20 @@ describe("MonitoringSession orchestrator", () => {
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "ease");
   });
 
+  it("opens the camera with the SHARED capture caps (identical to calibration — Phase 2)", async () => {
+    // Scoring is `window − anchor`: monitoring must request exactly the shared
+    // ideal 720p/15 constraints the calibration recorder uses (lib/capture/constraints.ts).
+    const { deps } = makeDeps([]);
+    render(<MonitoringSession deps={deps} />);
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+    });
+    expect(deps.getUserMedia).toHaveBeenCalledWith({
+      video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 } },
+      audio: false,
+    });
+  });
+
   it("routes a blocked camera to the foggy blocked surface", async () => {
     const { deps } = makeDeps([]);
     deps.getUserMedia = vi.fn(async () => {

@@ -27,6 +27,7 @@ import {
   type WindowOutcome,
 } from "@/lib/api/monitoring-client";
 import { getSessionTrend, type SessionTrendPoint } from "@/lib/api/monitoring-reads";
+import { captureVideoConstraints } from "@/lib/capture/constraints";
 import {
   createConfirmatoryPrompt,
   resolveConfirmatoryAnswered,
@@ -467,7 +468,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     // NotFound/Overconstrained → no-device, NotAllowed/Security/else → blocked).
     let stream: MediaStream;
     try {
-      stream = await deps.getUserMedia({ video: true, audio: false }); // mic off (audio is feature 013)
+      // The shared ideal 720p/15 caps (lib/capture/constraints.ts) — identical to the
+      // calibration recorder's, because scoring is `window − anchor`. Mic off (audio is 013).
+      stream = await deps.getUserMedia({ video: captureVideoConstraints(), audio: false });
     } catch (err) {
       if (!mountedRef.current) return false;
       const kind = cameraErrorKind(err).replace("camera-", "") as CameraErrorKind;

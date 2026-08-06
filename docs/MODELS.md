@@ -20,6 +20,13 @@ the original.
 - Dataset: StressID, 53 subjects, 525 calibrated task clips (578 minus 53
   anchors). Academic license — see Constitution Principle X.
 - Source notebook: `stress-id-video-lbp-top_motion_features__refactored_v2.ipynb`
+- Capture conditions (recorded 2026-08-05 so they are never re-derived; source:
+  the StressID paper): video was recorded on a **Logitech QuickCam Pro 9000 at
+  1280×720, 15 fps**, landscape. This is the operating point production capture
+  targets (`apps/web/lib/capture/constraints.ts` — `ideal` 1280×720@15 on both
+  the calibration and monitoring recorders); the pipeline has no full-frame
+  resize, so capture resolution reaches the 64×64 ROI resize directly
+  (`docs/triage/mobile-capture-diagnosis.md` Q1).
 
 ### Evaluation
 

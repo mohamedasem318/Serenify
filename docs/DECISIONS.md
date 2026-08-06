@@ -7073,3 +7073,37 @@ takeover would have shipped two different checkmarks.
 
 **Cross-references**: constitution Amendment 21 (1.17.0); `docs/CHANGELOG.md` 2026-08-05
 (Amendment 21); the two Amendment 20 entries above; PR (this branch — fix/quiet-dark-checkbox).
+
+---
+
+## 2026-08-05 — Capture normalises to training conditions: shared `ideal` 1280×720@15 on both recorders (Phase 2 of the mobile-capture work, constraints half)
+
+**Decision — shared `ideal` 1280×720@15 on both recorders.** Calibration and
+monitoring both request `{width:{ideal:1280}, height:{ideal:720}, frameRate:{ideal:15}}`
+(never `exact` — Safari rejects it readily), from the one module
+`apps/web/lib/capture/constraints.ts`. The number is the TRAINING operating point —
+StressID was captured on a Logitech QuickCam Pro 9000 at 1280×720/15 fps (now recorded
+in `docs/MODELS.md`) — and the 2026-08-05 five-device probe showed 4 of 5 devices
+defaulting to 480p-class under the previous unconstrained call (below training, in the
+upscaling regime at the 64×64 ROI resize) while every one grants 720p-class under the
+ideal. 15 fps is model-invisible (the server resamples to the fixed 2.5 fps grid) and
+halves encode/upload/tail-decode work vs 30. Shared because scoring is
+`window − anchor`: a cap applied to one path alone is a silent scoring error.
+
+**Decision — existing anchors: one-time forced recalibration, no cleverness.** After
+merge, null the anchor columns for current users (all known personally); the existing
+`no_anchor` → calibrate-first flow forces recalibration under the new constraints.
+Persisting capture settings alongside the anchor (future-change detection) needs a
+migration whose shape was proposed in PR #243's description and deliberately NOT
+written — per the Phase-2 stop instruction.
+
+**Split note (2026-08-06).** Phase 2 also decided an engine-aware container preference
+(fMP4-first on Apple WebKit). That half is deliberately NOT here — it is **proposed,
+not shipped**, parked in PR #243 pending a 720p wire-weight measurement (the ~5×
+lighter-on-the-wire figure behind it was measured at 480p), and its DECISIONS entry
+travels with that PR. This entry covers only what PR #246 ships.
+
+**Cross-references**: `docs/triage/mobile-capture-diagnosis.md` (Phase 1 + 2; carried
+in PR #246 with the container half marked parked); `docs/MODELS.md` capture-conditions
+line; PR #243 (the parked container preference + probe tooling; issue #89 stays with
+it); PR #246 (this change).

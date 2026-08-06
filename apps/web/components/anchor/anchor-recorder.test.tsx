@@ -339,6 +339,11 @@ describe("AnchorRecorder — switching camera re-acquires the live preview (Bug 
         await reachGreenRoom();
         // initial acquire only — the picker's echo of the ACTIVE camera is a no-op
         expect(getUserMedia).toHaveBeenCalledTimes(1);
+        // Phase 2: every acquire carries the SHARED ideal 720p/15 caps (identical to
+        // monitoring — scoring is `window − anchor`; lib/capture/constraints.ts).
+        expect(getUserMedia.mock.calls[0]?.[0]).toMatchObject({
+          video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 15 } },
+        });
 
         const select = screen.getByLabelText(/camera/i);
         await act(async () => {
