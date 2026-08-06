@@ -3492,3 +3492,9 @@ SHA-*shape*, not SHA-*value*, so it stays green across a pin bump by design.
 **Workaround**: scope the local run (e.g. `--exclude "**/ops/**"`) and rely on CI for this suite.
 Distinct from the known Windows `forks`-pool startup crash (`Error: kill EPERM`) that makes
 `--pool=threads` necessary locally — that workaround is already in effect and does not resolve this.
+
+---
+
+## Monitoring — mid-session fallback to the camera prompt (2026-08-05)
+
+- **Monitoring session fell back to the camera permission prompt at 01:20 mid-session (production, laptop Chrome, pre-Phase-2 capture code)** (#244) (`type:bug` / `area:web`, from Mohamed's 2026-08-05 production run alongside the Phase-2 latency controls): a live session ran to **01:20** and then showed the initial **camera permission surface** again, as if the stream had ended. Odd because nothing in the monitor state machine (`use-monitoring-session.ts`) routes a live op back to `permission` — a released camera goes to `paused`, lost face to `out-of-frame`, auth loss to `signed-out` — so the suspects are a `MediaStreamTrack` `ended` event the orchestrator (`monitoring-session.tsx`) may not handle, or a surface remount. Single occurrence; the same laptop later completed a clean control run (first reading 01:37), so not a hard repro. **Deliberately not chased** during the Phase-2 mobile-capture work (scope clamp) — filed as observed. Fix scope: small-to-medium — a read-only trace of what dispatches/remounts back to `permission`, then a targeted handler (likely track-`ended` → an honest surface rather than a silent reset). Address by: next monitoring-quality pass; pairs with the walk-away / "our side" vague-surface diagnostic items above (a silent fallback is the same "the surface lies about what happened" family).

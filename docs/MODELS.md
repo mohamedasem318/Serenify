@@ -25,7 +25,8 @@ the original.
   1280×720, 15 fps**, landscape. This is the operating point production capture
   targets (`apps/web/lib/capture/constraints.ts` — `ideal` 1280×720@15 on both
   the calibration and monitoring recorders); the pipeline has no full-frame
-  resize, so capture resolution reaches the 64×64 ROI resize directly.
+  resize, so capture resolution reaches the 64×64 ROI resize directly
+  (`docs/triage/mobile-capture-diagnosis.md` Q1).
 
 ### Evaluation
 
