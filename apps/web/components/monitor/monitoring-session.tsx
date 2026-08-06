@@ -58,6 +58,7 @@ import {
   DEFAULT_STRIDE_MS,
   isSecureContextOk,
   type MinimalWindowRecorder,
+  type UploadKind,
   type WindowRecorderHandle,
 } from "./window-recorder";
 
@@ -90,7 +91,12 @@ export interface MonitoringDeps {
   getUserMedia: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
   getSession: () => Promise<MonitoringSession | null>;
   createSession: (token: string) => Promise<CreateSessionResult>;
-  submitWindow: (sessionId: string, clip: Blob, token: string) => Promise<SubmitWindowResult>;
+  submitWindow: (
+    sessionId: string,
+    clip: Blob,
+    token: string,
+    uploadKind?: UploadKind,
+  ) => Promise<SubmitWindowResult>;
   endSession: (sessionId: string, reason: EndReason, token: string) => Promise<{ ok: boolean }>;
   patchStatus: (sessionId: string, status: SessionStatus, token: string) => Promise<{ ok: boolean }>;
   createRecorder?: (stream: MediaStream) => MinimalWindowRecorder;
@@ -214,7 +220,11 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // single most-recent window captured WHILE one is in flight (coalesced — older queued
   // windows are overwritten), drained when the in-flight upload completes.
   const uploadInFlightRef = useRef(false);
-  const pendingClipRef = useRef<Blob | null>(null);
+  const pendingClipRef = useRef<{ clip: Blob; kind: UploadKind } | null>(null);
+  // 2026-08-06 diagnostics: strides whose parked window was overwritten before it could be
+  // sent (the coalescing drop was previously silent by construction — no log, no counter,
+  // so "the fix worked" could only be asserted, never shown). Console/log only, no UI.
+  const droppedWindowsRef = useRef(0);
   const facePresentRef = useRef(false);
   const guideRef = useRef<"loading" | "active" | "unavailable">("loading");
   const telemetryRef = useRef<CauseTelemetry>(emptyTelemetry());
@@ -304,7 +314,7 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // skips this reading and the loop continues (FR-016); auth loss / a vanished anchor surface
   // honestly.
   const uploadWindow = useCallback(
-    async (clip: Blob) => {
+    async (clip: Blob, kind: UploadKind) => {
       const sessionId = sessionIdRef.current;
       if (!sessionId) return;
       // Only act on an auth failure while a session is live — mirrors the WINDOW_OUTCOME
@@ -324,7 +334,16 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         return;
       }
       tokenRef.current = token; // keep the cached token current for the lifecycle calls too
-      const res = await deps.submitWindow(sessionId, clip, token);
+      const uploadStarted = performance.now();
+      const res = await deps.submitWindow(sessionId, clip, token, kind);
+      // 2026-08-06 diagnostics (console only): per-stride payload size + round-trip time +
+      // the running dropped-window count — the client half of the stride-budget measurement.
+      console.debug(
+        `[monitor] upload kind=${kind} bytes=${clip.size} ` +
+          `ms=${Math.round(performance.now() - uploadStarted)} ` +
+          `outcome=${res.ok ? res.outcome.outcome : `error:${res.kind}`} ` +
+          `dropped_total=${droppedWindowsRef.current}`,
+      );
       if (!res.ok) {
         // A 401 even with a freshly-minted token is a genuine auth loss — NEVER silent (the
         // frozen-band break): stop on the honest re-auth surface (the standing release
@@ -377,17 +396,17 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // windows (matters on a cloud deploy). This is the bandwidth half; the server scoring
   // gate's drop-stale is the matching backstop for misbehaviour / a second tab.
   const pumpUploads = useCallback(
-    async (first: Blob) => {
+    async (first: { clip: Blob; kind: UploadKind }) => {
       uploadInFlightRef.current = true;
       try {
-        let clip: Blob | null = first;
-        while (clip) {
+        let next: { clip: Blob; kind: UploadKind } | null = first;
+        while (next) {
           pendingClipRef.current = null;
-          await uploadWindow(clip);
+          await uploadWindow(next.clip, next.kind);
           // The most-recent window captured during the upload (older queued ones were
           // overwritten by handleWindow). Cleared on teardown so a paused/ended session never
           // drains a stale window.
-          clip = pendingClipRef.current;
+          next = pendingClipRef.current;
         }
       } finally {
         uploadInFlightRef.current = false;
@@ -401,16 +420,27 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // a second upload — it replaces the pending window with this newer one (coalesce), so the
   // next drain always sends the freshest, never a stale queued backlog.
   const handleWindow = useCallback(
-    (clip: Blob) => {
+    (clip: Blob, kind: UploadKind) => {
       // FR-003: a no-face window is never uploaded — but only gate when the detector is
       // actually running (unavailable/loading → let the server's coverage gate decide).
       if (guideRef.current === "active" && !facePresentRef.current) return;
       if (!sessionIdRef.current) return;
       if (uploadInFlightRef.current) {
-        pendingClipRef.current = clip; // coalesce: keep only the latest while one is in flight
+        // Coalesce: keep only the latest while one is in flight. Overwriting a PARKED
+        // window is the drop — that stride's reading will never happen. It must leave a
+        // trace (2026-08-06): count it and say so, so a cycle that outruns the stride is
+        // observable instead of silent.
+        if (pendingClipRef.current !== null) {
+          droppedWindowsRef.current += 1;
+          console.debug(
+            `[monitor] stride window dropped (coalesced away) — upload cycle outran the ` +
+              `stride; dropped_total=${droppedWindowsRef.current}`,
+          );
+        }
+        pendingClipRef.current = { clip, kind };
         return;
       }
-      void pumpUploads(clip).catch(() => {});
+      void pumpUploads({ clip, kind }).catch(() => {});
     },
     [pumpUploads],
   );
