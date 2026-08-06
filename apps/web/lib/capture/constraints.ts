@@ -5,7 +5,8 @@
  * Scoring is `window − anchor` (the anchor comes from the user's own calibration
  * clip), so resolution and frame rate MUST stay identical across the two paths — a
  * cap applied to one alone is a silent scoring error, not a bug that surfaces. That
- * is why this module is the single source for both.
+ * is why this module is the single source for both. Full evidence and rationale:
+ * docs/triage/mobile-capture-diagnosis.md (Phase 2).
  *
  * The values target the TRAINING capture conditions, not "small": StressID video was
  * recorded on a Logitech QuickCam Pro 9000 at **1280×720, 15 fps** (the StressID
