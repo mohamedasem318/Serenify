@@ -27,7 +27,7 @@ jobs:
           file: apps/api/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/mohamedasem318/serenify-api:production
+          tags: ghcr.io/mohamedasem318/serenify-api:preview-247
           labels: org.opencontainers.image.source=https://github.com/mohamedasem318/Serenify
           cache-from: type=gha
           cache-to: type=gha,mode=max
