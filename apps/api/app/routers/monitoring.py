@@ -31,7 +31,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends, File, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials
@@ -110,12 +110,20 @@ async def submit_window(
     session_id: str,
     request: Request,
     clip: UploadFile = File(...),
+    upload_kind: str = Form("full"),
     user_id: str = Depends(require_employee),
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
     settings: Settings = Depends(get_settings),
 ):
-    """Score one uploaded **contiguous-recording-so-far** window. Returns the outcome union
-    (``reading`` / ``warming_up`` / ``skipped``) — **never a probability** (FR-015)."""
+    """Score one uploaded window. Returns the outcome union (``reading`` / ``warming_up`` /
+    ``skipped``) — **never a probability** (FR-015).
+
+    ``upload_kind`` (optional form field; absent = ``"full"``): ``"tail"`` declares a
+    client-side **header+tail** upload (bounded w.r.t. session length — 2026-08-06). The
+    server self-detects the trim from the media's absolute timestamps whenever ffprobe is
+    available; the declaration exists so an ffprobe-less host fails CLOSED on a trimmed
+    file instead of silently re-anchoring the sampling grid at the cut point. Unknown
+    values are treated as ``"full"`` (the always-safe-when-ffprobe-present default)."""
     base_type = (clip.content_type or "").split(";")[0].strip().lower()
     if base_type not in WINDOW_MEDIA_SUFFIX:
         return JSONResponse(
@@ -166,6 +174,7 @@ async def submit_window(
                 tense_band=request.app.state.tense_band,
                 session_id=session_id,
                 user_id=user_id,
+                upload_kind="tail" if upload_kind == "tail" else "full",
             )
     except MissingAnchorError:
         # Defensive mid-session guard (US3 / T042): the caller's anchor vanished AFTER the

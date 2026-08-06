@@ -53,7 +53,31 @@ def probe_recorded_seconds(video_path) -> float:
     return (timestamps_ms[-1] - timestamps_ms[0]) / 1000.0
 
 
-def compute_anchor(video_path, tail_seconds: float | None = None) -> np.ndarray:
+def probe_window_timestamps(video_path) -> tuple[float, list[float]]:
+    """ONE ffprobe packet read for a window request: ``(reported_fps, timestamps_ms)``.
+
+    The windows read path needs the same demux twice — once for the ``< 60 s`` warming-up
+    gate (span = ``ts[-1] - ts[0]``) and once for the tail decode's file-global grid. This
+    probes ONCE and lets the caller pass the result into ``compute_anchor(probe=...)``
+    (previously the identical ffprobe ran twice per window — O(elapsed), and measured as
+    the cheapest per-window saving in the 2026-08-06 spike).
+
+    Raises ``FFmpegUnavailable`` when the ffprobe binary is absent — the caller decides the
+    fallback: an un-trimmed upload may degrade to the OpenCV whole-file probe/decode; a
+    client-trimmed (header+tail) upload MUST fail closed instead (the OpenCV clock re-zeroes
+    on a trimmed container and would silently re-anchor the sampling grid at the cut point).
+    Raises ``FeatureExtractionError`` on an unreadable clip.
+    """
+    return probe_global_timestamps_fast(video_path)
+
+
+def compute_anchor(
+    video_path,
+    tail_seconds: float | None = None,
+    *,
+    probe: tuple[float, list[float]] | None = None,
+    trimmed_upload: bool = False,
+) -> np.ndarray:
     """Decode + extract -> (2958,) float64. Raises ``FeatureExtractionError``.
 
     Raised when the usable-face-coverage gate rejects the capture
@@ -83,8 +107,21 @@ def compute_anchor(video_path, tail_seconds: float | None = None) -> np.ndarray:
     + features — not a second copy, Principle III) and guarded by ``tests/test_tail_window.py``.
     For ``tail_seconds=None``, or a clip shorter than ``tail_seconds``, this **reduces exactly to**
     the un-bounded ``compute_anchor``.
+
+    ``probe`` / ``trimmed_upload`` (windows read path only; both are tail-path pass-throughs —
+    see ``pipeline.extract_landmarks``): ``probe`` re-uses the caller's one ffprobe packet
+    read; ``trimmed_upload`` declares a client-side header+tail upload so that an
+    ffprobe-less host fails closed instead of re-anchoring the grid at the cut point. The
+    anchor/calibration path (``tail_seconds=None``) never sets either.
     """
-    clip = extract_landmarks(video_path, tail_seconds=tail_seconds)
+    # Pass only what deviates from the defaults, so the plain anchor/calibration call
+    # (and any test double of extract_landmarks) sees the unchanged signature.
+    extra: dict = {}
+    if probe is not None:
+        extra["probe"] = probe
+    if trimmed_upload:
+        extra["trimmed_upload"] = True
+    clip = extract_landmarks(video_path, tail_seconds=tail_seconds, **extra)
     assert_usable_face_coverage(clip.landmarks)
     features = np.concatenate(
         [
