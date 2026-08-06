@@ -29,17 +29,16 @@ from pathlib import Path
 import cv2
 import numpy as np
 import pytest
-
-from ml_video import pipeline
-from ml_video.errors import FeatureExtractionError
-from ml_video.features import FEATURE_DIM, lbp_top_features, motion_features
-
 from helpers.container_cuts import (
     build_header_plus_tail,
     fmp4_moof_cuts,
     latest_cut_at_or_before,
     webm_cluster_cuts,
 )
+
+from ml_video import pipeline
+from ml_video.errors import FeatureExtractionError
+from ml_video.features import FEATURE_DIM, lbp_top_features, motion_features
 
 _FIX = Path(__file__).parent / "fixtures" / "continuous"
 _CHROME_WEBM = _FIX / "chrome" / "recording-so-far_301.webm"
@@ -260,6 +259,6 @@ def test_decode_all_anchored_anchors_last_frame_to_duration(short_clip):
     abs_ts, frames = pipeline._decode_all_anchored(short_clip, duration_ms=500_000.0)
     assert len(frames) == len(abs_ts) > 0
     assert abs_ts[-1] == pytest.approx(500_000.0)
-    assert all(b >= a for a, b in zip(abs_ts, abs_ts[1:]))
+    assert all(b >= a for a, b in zip(abs_ts, abs_ts[1:], strict=False))
     # The whole span sits in the immediate past of the anchor — never re-zeroed at 0.
     assert abs_ts[0] > 490_000.0
