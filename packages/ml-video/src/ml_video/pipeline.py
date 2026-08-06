@@ -502,6 +502,7 @@ def _tail_from_trimmed(
         # Fat tail: bound the decode with the remux path, seeking in the FILE-LOCAL clock
         # (ffmpeg -ss addresses the trimmed file's own timeline) and anchoring the result to
         # the absolute duration. _FFmpegUnavailable must fail closed here (see above).
+        branch = "remux"
         try:
             abs_ts, frames = _decode_tail_ffmpeg_remux(video_path, local_seek_ms, duration_ms)
         except _FFmpegUnavailable:
@@ -510,10 +511,29 @@ def _tail_from_trimmed(
                 "closed rather than re-anchoring the grid at the cut point"
             ) from None
     else:
+        branch = "all_anchored"
         abs_ts, frames = _decode_all_anchored(video_path, duration_ms)
 
     want_ts = [all_ts[g] for g in global_keep]
-    kept = _pick_frames_by_timestamp(abs_ts, frames, want_ts)
+    try:
+        kept = _pick_frames_by_timestamp(abs_ts, frames, want_ts)
+    except FeatureExtractionError as exc:
+        # A skip here is classified `our-side` and the coarse cause is ALL the caller keeps,
+        # so without this the failure is invisible in production — which is exactly what
+        # happened on 2026-08-06: seven consecutive skips whose cause could not be recovered
+        # from the logs. Re-raise the SAME failure with the state needed to tell the two
+        # decode branches apart and to see whether the clock anchoring or the cut is at
+        # fault. Timestamps and counts only — no frame content.
+        dec_span = (abs_ts[-1] - abs_ts[0]) / 1000.0 if len(abs_ts) >= 2 else -1.0
+        dec_last = abs_ts[-1] if abs_ts else -1.0
+        want_last = want_ts[-1] if want_ts else -1.0
+        raise FeatureExtractionError(
+            f"{exc} [branch={branch} file_start={all_ts[0]:.1f}ms "
+            f"duration={duration_ms:.1f}ms span={(duration_ms - all_ts[0]) / 1000.0:.1f}s "
+            f"local_seek={local_seek_ms:.1f}ms probe_packets={len(all_ts)} "
+            f"decoded={len(frames)} wanted={len(want_ts)} decoded_span={dec_span:.1f}s "
+            f"decoded_last={dec_last:.1f}ms want_last={want_last:.1f}ms]"
+        ) from exc
     landmarks = _landmarks_for_frames(kept)
 
     if logger.isEnabledFor(logging.DEBUG):
