@@ -217,6 +217,18 @@ def _clear_buffers():
     scoring_gate.clear()
 
 
+@pytest.fixture(autouse=True)
+def _ffprobe_less(monkeypatch):
+    """Route score_window through its ffprobe-less branch so this file's existing stubs
+    (``probe_recorded_seconds`` + ``compute_anchor`` fakes without the ``probe=``/
+    ``trimmed_upload=`` kwargs) keep working unchanged. Tests exercising the one-probe
+    path re-patch ``probe_window_timestamps`` themselves."""
+    def _unavailable(_p):
+        raise ml_video.FFmpegUnavailable("ffprobe not found (test)")
+
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", _unavailable)
+
+
 def _auth(token=None):
     return {"Authorization": f"Bearer {token or make_token()}"}
 
@@ -720,3 +732,67 @@ def test_cors_preflight_allows_the_other_methods_the_web_uses(client):
         resp = _preflight(client, method)
         assert resp.status_code == 200, f"{method} preflight: {resp.text}"
         assert method in resp.headers.get("access-control-allow-methods", "")
+
+
+# ── bounded tail uploads (2026-08-06): the upload_kind form field ─────────────
+
+
+def test_upload_kind_tail_reaches_score_window(client, monkeypatch):
+    """The optional ``upload_kind`` multipart field rides into score_window: with ffprobe
+    working, extraction receives ``trimmed_upload=True`` plus the one reused probe."""
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    ts = [i * 1000.0 for i in range(121)]  # spans 120 s
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", lambda _p: (25.0, ts))
+    seen: dict = {}
+
+    def fake_compute(_p, tail_seconds=None, **kwargs):
+        seen.update(kwargs)
+        return np.zeros(FEATURE_DIM)
+
+    monkeypatch.setattr(ml_video, "compute_anchor", fake_compute)
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=0.10))
+
+    resp = client.post(
+        f"/monitoring/sessions/{sid}/windows",
+        files={"clip": ("w.webm", b"fake-video", "video/webm")},
+        data={"upload_kind": "tail"},
+        headers=_auth(make_token(sub=SUB)),
+    )
+    assert resp.status_code == 200, resp.text
+    assert seen["trimmed_upload"] is True
+    assert seen["probe"] == (25.0, ts)
+
+
+def test_tail_upload_without_ffprobe_is_skipped_never_misscored(client, monkeypatch):
+    """Route-level fail-closed: a declared tail upload on an ffprobe-less host (the
+    autouse fixture) is a routine 200 ``skipped`` — never scored on a re-zeroed clock,
+    never a 500."""
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(
+        ml_video, "compute_anchor",
+        lambda *_a, **_k: pytest.fail("extraction must not run for a fail-closed tail"),
+    )
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor())
+
+    resp = client.post(
+        f"/monitoring/sessions/{sid}/windows",
+        files={"clip": ("w.webm", b"fake-video", "video/webm")},
+        data={"upload_kind": "tail"},
+        headers=_auth(make_token(sub=SUB)),
+    )
+    assert resp.status_code == 200, resp.text
+    assert resp.json() == {"outcome": "skipped", "cause": "our-side"}
+
+
+def test_absent_upload_kind_defaults_to_full(client, monkeypatch):
+    """Old clients omit the field entirely — the pre-existing full-upload flow holds."""
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 30.0)  # < 60 s
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor())
+
+    resp = _post_window(client, sid)
+    assert resp.status_code == 200
+    assert resp.json()["outcome"] == "warming_up"

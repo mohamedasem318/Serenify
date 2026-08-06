@@ -124,6 +124,18 @@ def _clear_buffers():
     inference.buffers.clear()
 
 
+@pytest.fixture(autouse=True)
+def _ffprobe_less(monkeypatch):
+    """Route score_window through its ffprobe-less branch so the existing stubs
+    (``probe_recorded_seconds`` + a ``compute_anchor`` fake without the ``probe=``/
+    ``trimmed_upload=`` kwargs) keep working unchanged. Tests that exercise the
+    one-probe path re-patch ``probe_window_timestamps`` themselves."""
+    def _unavailable(_p):
+        raise ml_video.FFmpegUnavailable("ffprobe not found (test)")
+
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", _unavailable)
+
+
 def _score(monkeypatch, *, proba, anchor_vec, features, content_type="video/webm",
            session_id="sess-1", user_id="user-1", duration=120.0, captured_existed=None):
     """Run score_window with stubbed probe/extract/predictor/client → (outcome, client, pred)."""
@@ -349,3 +361,106 @@ def test_temp_clip_deleted_in_finally(monkeypatch):
     )
     assert captured["existed_during"] is True       # existed during extraction
     assert not os.path.exists(captured["path"])      # deleted in finally
+
+
+# ── bounded tail uploads (2026-08-06): one probe per window + fail-closed ─────
+
+
+def test_tail_upload_fails_closed_when_ffprobe_absent(monkeypatch):
+    """``upload_kind="tail"`` with ffprobe absent (the autouse fixture) → a LOUD skipped
+    window. Neither the OpenCV probe fallback nor extraction may run — both would sit on
+    the re-zeroed clock and silently re-anchor the grid at the cut point (B2 reset)."""
+    monkeypatch.setattr(
+        ml_video, "probe_recorded_seconds",
+        lambda _p: pytest.fail("OpenCV probe fallback must not run for a tail upload"),
+    )
+    monkeypatch.setattr(
+        ml_video, "compute_anchor",
+        lambda *_a, **_k: pytest.fail("extraction must not run for a fail-closed tail"),
+    )
+    client = FakeClient(_anchor_payload(np.zeros(FEATURE_DIM)))
+    outcome = inference.score_window(
+        clip_bytes=b"v", content_type="video/webm", client=client,
+        predictor=StubPredictor([0.5, 0.5]), operating_point=OP, tense_band=TENSE,
+        session_id="s", user_id="u", upload_kind="tail",
+    )
+    assert outcome.outcome == "skipped" and outcome.cause == "our-side"
+    row = [i["row"] for i in client.inserts if i["table"] == "window_readings"][0]
+    assert row["scored"] is False and row["skip_cause"] == "our-side"
+
+
+def test_one_probe_feeds_gate_and_extraction(monkeypatch):
+    """The ffprobe packet read runs ONCE per window: its span drives the < 60 s gate and
+    the same timestamps ride into ``compute_anchor(probe=)``; a tail upload also carries
+    ``trimmed_upload=True``. The legacy per-call probe must not run at all."""
+    ts = [i * 1000.0 for i in range(121)]  # spans 120 s
+    calls = {"probe": 0}
+
+    def fake_probe(_p):
+        calls["probe"] += 1
+        return (25.0, ts)
+
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", fake_probe)
+    monkeypatch.setattr(
+        ml_video, "probe_recorded_seconds",
+        lambda _p: pytest.fail("legacy probe must not run when the ffprobe read works"),
+    )
+    anchor = np.zeros(FEATURE_DIM)
+    seen: dict = {}
+
+    def fake_compute(_path, tail_seconds=None, **kwargs):
+        assert tail_seconds == inference.WINDOW_SECONDS
+        seen.update(kwargs)
+        return _decoded(anchor)
+
+    monkeypatch.setattr(ml_video, "compute_anchor", fake_compute)
+    outcome = inference.score_window(
+        clip_bytes=b"v", content_type="video/webm",
+        client=FakeClient(_anchor_payload(anchor)), predictor=StubPredictor([0.4, 0.6]),
+        operating_point=OP, tense_band=TENSE, session_id="s", user_id="u",
+        upload_kind="tail",
+    )
+    assert calls["probe"] == 1
+    assert seen["probe"] == (25.0, ts)
+    assert seen["trimmed_upload"] is True
+    assert outcome.outcome == "warming_up"  # scored, but cold-start buffer < M
+
+
+def test_full_upload_with_working_ffprobe_passes_probe_but_not_trimmed(monkeypatch):
+    """A full upload reuses the one probe too, but never declares a trim — the stubbed
+    compute fakes elsewhere in this file rely on the kwargs staying absent by default."""
+    ts = [i * 1000.0 for i in range(121)]
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", lambda _p: (25.0, ts))
+    anchor = np.zeros(FEATURE_DIM)
+    seen: dict = {}
+
+    def fake_compute(_path, tail_seconds=None, **kwargs):
+        seen.update(kwargs)
+        return _decoded(anchor)
+
+    monkeypatch.setattr(ml_video, "compute_anchor", fake_compute)
+    inference.score_window(
+        clip_bytes=b"v", content_type="video/webm",
+        client=FakeClient(_anchor_payload(anchor)), predictor=StubPredictor([0.4, 0.6]),
+        operating_point=OP, tense_band=TENSE, session_id="s", user_id="u",
+    )
+    assert seen["probe"] == (25.0, ts)
+    assert "trimmed_upload" not in seen
+
+
+def test_probe_span_under_60s_is_warming_up_without_extraction(monkeypatch):
+    """The < 60 s gate reads the ONE probe's span — no extraction, nothing persisted."""
+    ts = [i * 1000.0 for i in range(43)]  # spans 42 s
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", lambda _p: (25.0, ts))
+    monkeypatch.setattr(
+        ml_video, "compute_anchor",
+        lambda *_a, **_k: pytest.fail("no extraction before a full 60 s window"),
+    )
+    client = FakeClient(_anchor_payload(np.zeros(FEATURE_DIM)))
+    outcome = inference.score_window(
+        clip_bytes=b"v", content_type="video/webm", client=client,
+        predictor=StubPredictor([0.5, 0.5]), operating_point=OP, tense_band=TENSE,
+        session_id="s", user_id="u", upload_kind="tail",
+    )
+    assert outcome.outcome == "warming_up"
+    assert client.inserts == []

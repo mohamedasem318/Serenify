@@ -38,6 +38,7 @@ from __future__ import annotations
 import logging
 import os
 import tempfile
+import time
 from collections import OrderedDict, deque
 from datetime import UTC, datetime
 
@@ -170,14 +171,25 @@ def score_window(
     tense_band: float,
     session_id: str,
     user_id: str,
+    upload_kind: str = "full",
 ) -> ReadingOutcome | WarmingUpOutcome | SkippedOutcome:
-    """Score one uploaded contiguous-recording-so-far window. CPU-bound + blocking I/O —
-    the router runs this in a threadpool. Returns the outcome and persists the row.
+    """Score one uploaded window. CPU-bound + blocking I/O — the router runs this in a
+    threadpool. Returns the outcome and persists the row.
+
+    ``upload_kind``: ``"full"`` (the contiguous recording-so-far — the original shape) or
+    ``"tail"`` (a client-side **header+tail** upload, bounded w.r.t. session length — the
+    2026-08-06 bounded-upload fix). The flag is advisory for one decision only: with the
+    ffprobe binary absent a trimmed file cannot be told apart from a fresh recording (the
+    OpenCV fallback clock re-zeroes), so a declared tail upload **fails closed** (skipped
+    window, loud) rather than silently re-anchoring the sampling grid at the cut point.
+    With ffprobe present the trim is self-detected from the absolute timestamps and the
+    flag is not trusted for anything else.
 
     The uploaded clip is written to a temp file and **always deleted in ``finally``**
     (Principle I). The endpoint surfaces only the outcome union — never a probability.
     """
     captured_at = datetime.now(UTC)
+    t_start = time.perf_counter()
     suffix = WINDOW_MEDIA_SUFFIX.get(content_type, ".bin")
     fd, tmp_path = tempfile.mkstemp(suffix=suffix)
     try:
@@ -186,8 +198,28 @@ def score_window(
 
         # ── extraction (skipped on any FeatureExtractionError) ───────────────
         recorded_s = -1.0  # for the DEBUG trace if the probe itself raises
+        t_probe_ms = t_extract_ms = 0.0
         try:
-            recorded_s = ml_video.probe_recorded_seconds(tmp_path)
+            # ONE ffprobe packet read per window: the < 60 s gate reads its span, and the
+            # tail decode reuses the same timestamps via ``probe=`` (previously the same
+            # demux ran twice per window — the cheapest per-window saving named by the
+            # 2026-08-06 spike).
+            t0 = time.perf_counter()
+            probe: tuple[float, list[float]] | None = None
+            try:
+                probe = ml_video.probe_window_timestamps(tmp_path)
+                ts = probe[1]
+                recorded_s = (ts[-1] - ts[0]) / 1000.0 if len(ts) >= 2 else 0.0
+            except ml_video.FFmpegUnavailable:
+                if upload_kind == "tail":
+                    raise FeatureExtractionError(
+                        "tail upload on an ffprobe-less host — failing closed (the "
+                        "OpenCV fallback would re-anchor the grid at the cut point)"
+                    ) from None
+                # Un-trimmed upload on a degraded host: the OpenCV whole-file probe is
+                # correct (span is re-zeroing-invariant), just O(elapsed).
+                recorded_s = ml_video.probe_recorded_seconds(tmp_path)
+            t_probe_ms = (time.perf_counter() - t0) * 1000.0
             if recorded_s < WINDOW_SECONDS:
                 # Gate (a): not yet a full 60 s window — no extraction, no persistence.
                 _debug_window(
@@ -198,7 +230,18 @@ def score_window(
                     scored=buffers.scored_count(session_id),
                 )
                 return WarmingUpOutcome(captured_at=captured_at)
-            features = ml_video.compute_anchor(tmp_path, tail_seconds=WINDOW_SECONDS)
+            t0 = time.perf_counter()
+            # Only what deviates from the defaults is passed: the reused probe (when the
+            # ffprobe read succeeded) and the tail declaration (when the client trimmed).
+            extra: dict = {}
+            if probe is not None:
+                extra["probe"] = probe
+            if upload_kind == "tail":
+                extra["trimmed_upload"] = True
+            features = ml_video.compute_anchor(
+                tmp_path, tail_seconds=WINDOW_SECONDS, **extra
+            )
+            t_extract_ms = (time.perf_counter() - t0) * 1000.0
         except FeatureExtractionError as exc:
             cause = _coarse_cause(exc)
             insert_reading(
@@ -246,6 +289,23 @@ def score_window(
             label=per_window_label,
             stress_probability=proba1,
         )
+
+        # DEBUG-only per-window timing (server-side only; the 2026-08-06 stride-budget
+        # measurement reads these): payload size + where the time went.
+        if logger.isEnabledFor(logging.DEBUG):
+            try:
+                logger.debug(
+                    "window-timing: session=%s kind=%s bytes=%d probe_ms=%.0f "
+                    "extract_ms=%.0f total_ms=%.0f",
+                    session_id,
+                    upload_kind,
+                    len(clip_bytes),
+                    t_probe_ms,
+                    t_extract_ms,
+                    (time.perf_counter() - t_start) * 1000.0,
+                )
+            except Exception:  # noqa: BLE001 - diagnostics must never affect scoring
+                pass
 
         if reading.warming_up:
             _debug_window(
