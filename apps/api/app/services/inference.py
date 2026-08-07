@@ -132,59 +132,6 @@ def _coarse_cause(exc: FeatureExtractionError) -> str:
     return "our-side"
 
 
-# ── PREVIEW-ONLY failed-window retention (2026-08-07, diagnostic; DELETE ME) ──────────
-# The blip that motivates this has been seen live twice and never offline, and the reason
-# it cannot be taken apart is that the uploaded clip is deleted the moment the window is
-# scored. This keeps the file the server actually failed to decode, so the failure can be
-# replayed.
-#
-# THIS MUST NEVER BE ENABLED IN PRODUCTION. The camera-and-inference consent gate every
-# user accepts says, in terms: the clip "is then deleted ... on every outcome, including
-# when the read fails", and "there is no bucket, no table, and no file path where a clip
-# lands. No human being can view or replay it." Retaining a failed clip contradicts that
-# copy exactly. Enabling this for real users would require revising the Privacy Policy,
-# the ToS and the consent copy — a material revision, which re-prompts every user.
-#
-# So it is: OFF unless RETAIN_FAILED_WINDOWS is truthy; set only on a preview revision
-# whose sole subject has consented to their own face being kept. Ephemeral container
-# filesystem only — never Supabase, never a bucket, never a log. Dies with the replica.
-_RETAIN_DIR = "/tmp/serenify-failed-windows"
-_RETAIN_CAP = 6  # oldest evicted; bounds disk on a repeating failure
-
-
-def _retention_enabled() -> bool:
-    return os.environ.get("RETAIN_FAILED_WINDOWS", "").strip().lower() in {"1", "true", "yes"}
-
-
-def _retain_failed_clip(tmp_path: str, session_id: str, cause: str) -> None:
-    """Copy the clip that failed to decode aside, capped, best-effort.
-
-    Only ``our-side`` — never the ordinary looked-away path, and never on success, so the
-    success path keeps deleting everything exactly as before. Wrapped whole: a diagnostic
-    must never turn a skipped window into a failed request."""
-    if cause != "our-side" or not _retention_enabled():
-        return
-    try:
-        import glob
-        import shutil
-
-        os.makedirs(_RETAIN_DIR, exist_ok=True)
-        existing = sorted(glob.glob(os.path.join(_RETAIN_DIR, "*")), key=os.path.getmtime)
-        for old in existing[: max(0, len(existing) - (_RETAIN_CAP - 1))]:
-            try:
-                os.unlink(old)
-            except OSError:
-                pass
-        stamp = datetime.now(UTC).strftime("%H%M%S")
-        dest = os.path.join(
-            _RETAIN_DIR, f"{stamp}-{session_id[:8]}{os.path.splitext(tmp_path)[1]}"
-        )
-        shutil.copyfile(tmp_path, dest)
-        logger.warning("RETAINED failed window for offline analysis: %s", dest)
-    except Exception:  # noqa: BLE001 - diagnostics must never affect scoring
-        logger.warning("failed-window retention did not write (ignored)", exc_info=True)
-
-
 def _debug_window(
     session_id: str, *, probe_s: float, decision: str, reason: str, scored: int
 ) -> None:
@@ -322,7 +269,6 @@ def score_window(
                     type(exc).__name__,
                     exc,
                 )
-            _retain_failed_clip(tmp_path, session_id, cause)
             insert_reading(
                 client,
                 session_id=session_id,
