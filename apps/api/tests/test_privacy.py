@@ -65,6 +65,17 @@ def _clear_buffers():
     inference.buffers.clear()
 
 
+@pytest.fixture(autouse=True)
+def _ffprobe_less(monkeypatch):
+    """Route score_window through its ffprobe-less branch so this file's existing stubs
+    (``probe_recorded_seconds`` + ``compute_anchor`` fakes without the new kwargs) keep
+    working unchanged (same fixture as test_inference_service.py)."""
+    def _unavailable(_p):
+        raise ml_video.FFmpegUnavailable("ffprobe not found (test)")
+
+    monkeypatch.setattr(ml_video, "probe_window_timestamps", _unavailable)
+
+
 def _run_capturing_tempfiles(monkeypatch, *, duration, compute, get_anchor, predictor):
     """Run ``score_window`` while spying on every temp file it creates.
 

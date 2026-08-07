@@ -48,6 +48,11 @@ _NATIVE_SEEK_TOL_MS = 2_000.0   # a real forward seek lands near the target; a w
                                 # rewinds to ~0 — used to detect the un-seekable webm case
 _TS_MATCH_TOL_MS = 10.0     # file-global grid ts ↔ decoded tail ts must align this tightly
                             # (proven 0 ms); a larger gap means a mis-seek -> skip the window
+_TRIMMED_START_MS = 1_000.0  # a fresh continuous recording's first packet sits at ~0 ms; a
+                             # header+tail upload's first packet sits at its cut point, which
+                             # is >= ~60 s in before the client ever trims (2026-08-06 spike:
+                             # both containers stamp ABSOLUTE original-timeline positions, so
+                             # ffprobe sees the cut point) — 1 s splits the two cleanly
 _FF_TIMEOUT_S = 30.0        # hard cap on any ffmpeg/ffprobe subprocess
 _FFMPEG_BIN = "ffmpeg"
 _FFPROBE_BIN = "ffprobe"
@@ -77,6 +82,127 @@ _TS_EPSILON_MS = 1e-3                            # float guard at exact grid bou
 # reported fps 1000 vs true ~24); a CFR mp4/avi sits at CoV ~0.0 with an exact fps.
 _CFR_INTERVAL_COV_MAX = 0.05
 _FPS_REL_TOL = 0.10
+
+
+# ── per-window decode probe (#247, 2026-08-07) ────────────────────────────────────────
+# The blip under investigation is a DECODE TRUNCATION: OpenCV stops producing frames
+# before the container's last packet. Because both trimmed-tail branches recover the
+# absolute clock by anchoring the LAST decoded frame to the known duration
+# (``offset = duration_ms - rel_ts[-1]``), a truncation does not lose the tail — it shifts
+# EVERY timestamp forward by however much was truncated, and ``_pick_frames_by_timestamp``
+# then rejects the window. That shift is invisible in the anchored output (the anchor is
+# self-consistent), so it cannot be recovered after the fact from ``abs_ts`` alone.
+#
+# The two quantities that name the mechanism are therefore captured BEFORE the anchor:
+#
+#   ``anchor_skew_ms``      = container_span - decoded_span. The truncation, in ms,
+#                             computed against an INDEPENDENT reference (the container's
+#                             own packet span) rather than the suspect last-frame anchor.
+#                             0 ⇒ the decode reached the last packet; > 0 ⇒ it stopped
+#                             early by exactly that much, and every abs_ts is that wrong.
+#   ``undecoded_packets``   = container_packets - decoded. The same fact in frames — the
+#                             field the observed 101-frame quantisation reads out of.
+#
+# ``container_*`` is the file OpenCV was actually handed: the original upload for
+# ``all_anchored``, the ffmpeg remux TEMP for ``remux`` (whose packets are counted with one
+# extra ffprobe). Splitting those two is what tells a decoder-side truncation apart from a
+# remux that itself dropped the tail, and what makes the remux-vs-all_anchored asymmetry
+# testable from logs alone.
+#
+# LEVEL IS ADAPTIVE, and deliberately not tied to ``LOG_LEVEL=DEBUG``. A DEBUG-only line is
+# armed only while someone remembers to leave DEBUG on; the moment production reverts to
+# INFO the instrumentation goes silent without saying so. So a window that is OFF-BASELINE
+# — any tail truncation, any undecoded packet, any unretrievable frame, or a grid offset
+# drifting off zero — emits at WARNING and survives INFO, while an ordinary healthy window
+# stays at DEBUG and keeps production quiet. In the 2026-08-07 session all 122 windows read
+# exactly 0.0 on every one of those fields, so the baseline is measured, not assumed.
+#
+# The remux ffprobe is therefore NOT gated on DEBUG either: whether a window is off-baseline
+# cannot be known until ``container_packets`` has been read, so the read has to happen first.
+# Its cost is already inside the measured budget — the 2026-08-07 session ran with it on for
+# every remux window and the per-window median was 5.24 s against a ~10 s stride.
+
+
+def _probe_packet_span(video_path) -> tuple[int, float, float]:
+    """``(packet_count, first_pts_ms, last_pts_ms)`` of what a container actually holds.
+
+    Best-effort: any failure returns ``(-1, -1.0, -1.0)``. A diagnostic must never turn a
+    decodable window into a skipped one."""
+    try:
+        _fps, ts = probe_global_timestamps_fast(video_path)
+    except Exception:  # noqa: BLE001 - diagnostics must never affect extraction
+        return -1, -1.0, -1.0
+    if not ts:
+        return 0, -1.0, -1.0
+    return len(ts), ts[0], ts[-1]
+
+
+def _decode_telemetry(rel_ts: list[float], frames: list) -> dict:
+    """The pre-anchor decode facts: how many frames came out, how many were unretrievable,
+    and WHERE on the decoder's own (container-relative, re-zeroed) clock they start and end.
+
+    ``rel_first_ms`` / ``rel_last_ms`` are kept separately rather than collapsed into a span
+    because a span cannot say at WHICH END frames went missing — and the two ends have
+    opposite consequences. OpenCV re-zeroes POS_MSEC to the container's first packet, so
+    ``rel_first_ms > 0`` means leading packets were dropped (HEAD loss: harmless, the
+    last-frame anchor absorbs it) and ``rel_last_ms < container_span`` means the decoder
+    stopped before the last packet (TAIL loss: the mis-anchor, and the only one that can
+    produce this blip). Collapsing them hides that distinction — a real ``-c copy`` mp4
+    remux was observed dropping 13 leading packets while anchoring perfectly."""
+    return {
+        "decoded": len(rel_ts),
+        "none_frames": sum(1 for f in frames if f is None),
+        "rel_first_ms": round(rel_ts[0], 1) if rel_ts else -1.0,
+        "rel_last_ms": round(rel_ts[-1], 1) if rel_ts else -1.0,
+        "decoded_span_ms": round(rel_ts[-1] - rel_ts[0], 1) if len(rel_ts) >= 2 else -1.0,
+    }
+
+
+# A healthy webm window reads exactly 0.0 on every field below (122/122 in the 2026-08-07
+# session) and the grid-match tolerance is 10 ms, so 1 ms sits well inside the noise floor
+# while still tripping long before the cliff — the drift is visible in the windows BEFORE
+# one fails, which is the whole point of keeping the match offset on success.
+_PROBE_DRIFT_TOL_MS = 1.0
+
+
+def _probe_is_off_baseline(fields: dict) -> bool:
+    """Is this window anything other than a clean decode? Unknown values are encoded as
+    ``-1`` and must NOT trip the check — only positive deviations count."""
+
+    def num(key: str) -> float:
+        try:
+            return float(fields.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return (
+        fields.get("outcome") == "miss"
+        or num("tail_gap_ms") > 0
+        or num("undecoded_packets") > 0
+        or num("none_frames") > 0
+        or num("match_max_off_ms") > _PROBE_DRIFT_TOL_MS
+    )
+
+
+def _emit_decode_probe(**fields) -> None:
+    """One flat ``key=value`` line per window (server-side only, no frame content). Flat so
+    it filters out of Log Analytics with a single ``decode-probe:`` substring match and
+    parses without a schema.
+
+    WARNING when the window is off-baseline — so the instrumentation stays armed under a
+    production ``LOG_LEVEL=INFO`` — and DEBUG otherwise, so a healthy production session
+    emits nothing. See the module note above for why the level is not simply DEBUG."""
+    off_baseline = _probe_is_off_baseline(fields)
+    if not off_baseline and not logger.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        line = "decode-probe: " + " ".join(f"{k}={v}" for k, v in fields.items())
+        if off_baseline:
+            logger.warning("%s", line)
+        else:
+            logger.debug("%s", line)
+    except Exception:  # noqa: BLE001 - logging must never affect extraction
+        pass
 
 
 @dataclass
@@ -249,7 +375,13 @@ def _select_keep_indices(
     return kept
 
 
-def extract_landmarks(video_path, tail_seconds: float | None = None) -> DecodedClip:
+def extract_landmarks(
+    video_path,
+    tail_seconds: float | None = None,
+    *,
+    probe: tuple[float, list[float]] | None = None,
+    trimmed_upload: bool = False,
+) -> DecodedClip:
     """Decode ``video_path``, downsample to ~2.5 fps, and run FaceMesh per frame.
 
     Frame selection is driven by the frames' actual timestamps (CAP_PROP_POS_MSEC), not
@@ -265,10 +397,23 @@ def extract_landmarks(video_path, tail_seconds: float | None = None) -> DecodedC
     growing clip — the file-global grid comes from a cheap ffprobe packet read and only the
     bounded trailing window is decoded. Both yield the *identical* (file-global-grid) suffix of
     frames — proven bit-identical in ``test_tail_seek_keepup.py``.
+
+    ``probe`` (tail path only): a precomputed ``(fps, timestamps_ms)`` from
+    ``probe_global_timestamps_fast`` — the caller already ran the ffprobe packet read (for the
+    ``< 60 s`` gate) and passes it through so the same demux is not run twice per window.
+
+    ``trimmed_upload`` (tail path only): the caller declares the file a client-side
+    header+tail upload. Only consulted when ffprobe is UNAVAILABLE — a trimmed file must
+    then fail closed rather than fall back to the whole-file OpenCV decode, whose re-zeroed
+    clock would re-anchor the sampling grid at the cut point (the B2 phase reset — silently
+    wrong-ish scores). With ffprobe present the trim is self-detected from the absolute
+    timestamps regardless of this flag.
     """
     if tail_seconds is None:
         return _extract_landmarks_wholefile(video_path, tail_seconds=None)
-    return _extract_landmarks_tail(video_path, tail_seconds)
+    return _extract_landmarks_tail(
+        video_path, tail_seconds, probe=probe, trimmed_upload=trimmed_upload
+    )
 
 
 def _landmarks_for_frames(frames: list[np.ndarray]) -> np.ndarray:
@@ -347,24 +492,54 @@ def _extract_landmarks_wholefile(video_path, tail_seconds: float | None = None) 
     return DecodedClip(frames=kept, landmarks=landmarks)
 
 
-def _extract_landmarks_tail(video_path, tail_seconds: float) -> DecodedClip:
+def _extract_landmarks_tail(
+    video_path,
+    tail_seconds: float,
+    *,
+    probe: tuple[float, list[float]] | None = None,
+    trimmed_upload: bool = False,
+) -> DecodedClip:
     """O(stride) tail decode — the live read path (feature-008 keep-up fix).
 
     Never walks the whole growing clip: (1) a cheap ffprobe PACKET read gives the file-global
-    per-frame timestamps + reported fps (demux only, no pixel decode); (2) the file-global
+    per-frame timestamps + reported fps (demux only, no pixel decode) — or the caller passes
+    it in via ``probe`` so the same demux never runs twice per window; (2) the file-global
     2.5 fps keep-set is computed exactly as the whole-file path would (``_select_keep_indices``
     — both samplers, faithful by construction); (3) only the bounded trailing window is decoded
     (native seek for mp4, ffmpeg ``-c copy`` remux for un-seekable webm); (4) each kept
     file-global timestamp is matched to its decoded tail frame. The result is the *identical*
     suffix of frames the whole-file path keeps (bit-identical — ``test_tail_seek_keepup.py``).
 
-    Falls back to ``_extract_landmarks_wholefile`` when the ffmpeg CLI is absent or the clip is
-    short enough that a whole-file decode is already bounded. A binary that RUNS but fails or
-    times out raises ``FeatureExtractionError`` (the caller maps it to a skipped window)."""
-    try:
-        fps, all_ts = probe_global_timestamps_fast(video_path)
-    except _FFmpegUnavailable:
-        return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
+    **Trimmed (header+tail) uploads** (2026-08-06 spike, verdict GO): both containers stamp
+    media with ABSOLUTE original-timeline positions, so the ffprobe timestamps of a trimmed
+    file sit on the original clock and the file-global grid above is already correct. What a
+    trimmed file must NEVER touch is any path that trusts OpenCV's clock from t=0 — OpenCV
+    re-zeroes POS_MSEC on a trimmed container, so ``_extract_landmarks_wholefile`` would
+    re-anchor the grid at the cut point (the B2 phase reset — silently wrong-ish scores, no
+    error). A trim is self-detected from ``timestamps[0]`` (``_TRIMMED_START_MS``) and routed
+    to ``_tail_from_trimmed``, which recovers the absolute clock by anchoring the decoded
+    frames' last timestamp to the known absolute duration (the same anchoring the webm remux
+    path already uses) and verifies every kept frame within ``_TS_MATCH_TOL_MS``.
+
+    Falls back to ``_extract_landmarks_wholefile`` ONLY for un-trimmed input, when the ffmpeg
+    CLI is absent or the clip is short enough that a whole-file decode is already bounded. A
+    trimmed upload with ffprobe unavailable (declared via ``trimmed_upload`` — without ffprobe
+    the trim cannot be self-detected) fails closed with ``FeatureExtractionError`` (skipped
+    window, loud) instead. A binary that RUNS but fails or times out raises
+    ``FeatureExtractionError`` likewise."""
+    if probe is not None:
+        fps, all_ts = probe
+    else:
+        try:
+            fps, all_ts = probe_global_timestamps_fast(video_path)
+        except _FFmpegUnavailable:
+            if trimmed_upload:
+                raise FeatureExtractionError(
+                    "trimmed (header+tail) upload with ffprobe unavailable — refusing the "
+                    "whole-file fallback (its re-zeroed OpenCV clock would re-anchor the "
+                    "sampling grid at the cut point); failing closed"
+                ) from None
+            return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
 
     if not all_ts:
         raise FeatureExtractionError("ffprobe returned no frame timestamps")
@@ -373,37 +548,235 @@ def _extract_landmarks_tail(video_path, tail_seconds: float) -> DecodedClip:
     if not global_keep:
         raise FeatureExtractionError("no frames left after downsample")
 
+    if trimmed_upload or all_ts[0] > _TRIMMED_START_MS:
+        if not trimmed_upload:
+            # Self-detection fired on a file the caller did NOT declare trimmed. Every
+            # container measured so far (Chrome WebM, Safari WebM, Safari fMP4) stamps
+            # all_ts[0] == 0.0, so this should not happen for an un-trimmed upload — but
+            # "no container stamps a nonzero first packet" is three stacks measured, not
+            # proven. WARNING, not DEBUG: if the assumption is wrong somewhere we have not
+            # looked, it must leave a trace rather than silently re-route the decode.
+            logger.warning(
+                "trim self-detected without a client declaration: first packet at "
+                "%.1f ms (> %.0f ms) in %s — routing through the trimmed tail path",
+                all_ts[0],
+                _TRIMMED_START_MS,
+                Path(str(video_path)).suffix or "?",
+            )
+        return _tail_from_trimmed(video_path, all_ts, global_keep, tail_seconds)
+
     seek_ms = duration_ms - (tail_seconds + _TAIL_SEEK_MARGIN_S) * 1000.0
     if seek_ms < _MIN_SEEK_MS:
         # The whole clip is (about) the window — a whole-file decode is already bounded, and
         # reduces EXACTLY to the tail selection (cutoff falls at/before the clip start).
         return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
 
+    tele: dict = {}
     try:
-        tail_ts, tail_frames = _decode_tail(video_path, seek_ms, duration_ms)
+        tail_ts, tail_frames = _decode_tail(video_path, seek_ms, duration_ms, telemetry=tele)
     except _FFmpegUnavailable:
         return _extract_landmarks_wholefile(video_path, tail_seconds=tail_seconds)
 
     want_ts = [all_ts[g] for g in global_keep]
-    kept = _pick_frames_by_timestamp(tail_ts, tail_frames, want_ts)
+    # Same shape of line as the trimmed path, so one Log Analytics filter covers a whole
+    # session — including the untrimmed windows at its start, before the client can cut.
+    probe = {
+        "branch": f"untrimmed/{tele.get('sub_branch', '?')}",
+        "container": Path(str(video_path)).suffix or "?",
+        "file_start_ms": f"{all_ts[0]:.1f}",
+        "file_last_ms": f"{duration_ms:.1f}",
+        "file_span_ms": f"{duration_ms - all_ts[0]:.1f}",
+        "probe_packets": len(all_ts),
+        "local_seek_ms": f"{seek_ms:.1f}",
+        "container_packets": tele.get("container_packets", -1),
+        "container_span_ms": tele.get("container_span_ms", -1.0),
+        "decoded": tele.get("decoded", len(tail_frames)),
+        "decoded_span_ms": tele.get("decoded_span_ms", -1.0),
+        "rel_first_ms": tele.get("rel_first_ms", -1.0),
+        "rel_last_ms": tele.get("rel_last_ms", -1.0),
+        "none_frames": tele.get("none_frames", -1),
+        "wanted": len(want_ts),
+        "want_first_ms": f"{want_ts[0]:.1f}" if want_ts else -1.0,
+        "want_last_ms": f"{want_ts[-1]:.1f}" if want_ts else -1.0,
+    }
+    try:
+        kept = _pick_frames_by_timestamp(tail_ts, tail_frames, want_ts, telemetry=tele)
+    except FeatureExtractionError:
+        _emit_decode_probe(outcome="miss", **probe, **_match_fields(tele))
+        raise
     landmarks = _landmarks_for_frames(kept)
-
-    if logger.isEnabledFor(logging.DEBUG):
-        try:
-            logger.debug(
-                "tail-decode: container=%s duration=%.1fs seek=%.1fs global_decoded=%d "
-                "tail_decoded=%d kept=%d",
-                Path(str(video_path)).suffix or "?",
-                duration_ms / 1000.0,
-                seek_ms / 1000.0,
-                len(all_ts),
-                len(tail_frames),
-                len(kept),
-            )
-        except Exception:  # noqa: BLE001 - logging must never affect extraction
-            pass
+    _emit_decode_probe(outcome="ok", **probe, **_match_fields(tele), kept=len(kept))
 
     return DecodedClip(frames=kept, landmarks=landmarks)
+
+
+def _tail_from_trimmed(
+    video_path, all_ts: list[float], global_keep: list[int], tail_seconds: float
+) -> DecodedClip:
+    """Decode a client-trimmed (header+tail) upload on the file-global absolute clock.
+
+    The ffprobe timestamps (``all_ts``) are absolute (both containers stamp original-timeline
+    positions), so the keep-set is already on the original grid. OpenCV, however, re-zeroes
+    POS_MSEC on a trimmed container (both webm and fMP4 — 2026-08-06 spike) while preserving
+    inter-frame deltas, so the absolute clock is recovered by anchoring the LAST decoded frame
+    to the known absolute duration (the file's last packet IS its last frame — exactly the
+    anchoring ``_decode_tail_ffmpeg_remux`` already relies on). ``_pick_frames_by_timestamp``
+    then verifies every kept frame within ``_TS_MATCH_TOL_MS`` — a mis-cut, a decode
+    truncation, or a mis-anchor all surface as a LOUD skipped window, never a wrong score.
+
+    The whole (bounded, client-cut) file is normally decoded sequentially — the client sends
+    ~``tail_seconds`` + margin, so this is O(window). Defensively, a much longer trimmed file
+    (a client that trims late) is tail-decoded via the ffmpeg remux (anchored to the absolute
+    duration, so still correct); it must never fall through to ``_extract_landmarks_wholefile``.
+    """
+    duration_ms = all_ts[-1]
+    local_seek_ms = (duration_ms - (tail_seconds + _TAIL_SEEK_MARGIN_S) * 1000.0) - all_ts[0]
+    file_span_ms = duration_ms - all_ts[0]
+    # Always collected (counts and spans the decode already has in hand); the extra ffprobe
+    # on the remux temp inside _decode_tail_ffmpeg_remux is separately DEBUG-gated.
+    tele: dict = {}
+    if local_seek_ms >= _MIN_SEEK_MS:
+        # Fat tail: bound the decode with the remux path, seeking in the FILE-LOCAL clock
+        # (ffmpeg -ss addresses the trimmed file's own timeline) and anchoring the result to
+        # the absolute duration. _FFmpegUnavailable must fail closed here (see above).
+        branch = "remux"
+        try:
+            abs_ts, frames = _decode_tail_ffmpeg_remux(
+                video_path, local_seek_ms, duration_ms, telemetry=tele
+            )
+        except _FFmpegUnavailable:
+            raise FeatureExtractionError(
+                "trimmed upload needs the ffmpeg CLI for a bounded tail decode — failing "
+                "closed rather than re-anchoring the grid at the cut point"
+            ) from None
+    else:
+        branch = "all_anchored"
+        # The container OpenCV is handed here IS the upload, whose packets the caller already
+        # probed — so container_packets/container_span come free and exactly, with no second
+        # ffprobe. This is the branch's one structural advantage over remux as a diagnostic.
+        tele.update(container_packets=len(all_ts), container_span_ms=round(file_span_ms, 1))
+        abs_ts, frames = _decode_all_anchored(video_path, duration_ms, telemetry=tele)
+
+    # The derived quantities that name a truncation. All measured against the container's
+    # own span/packet count — NOT against the anchored abs_ts, which a truncation shifts
+    # self-consistently and therefore cannot betray itself in.
+    #
+    # head_gap_ms and tail_gap_ms are reported separately and ONLY tail_gap_ms is the
+    # suspect: the clock is recovered by pinning the LAST decoded frame to the known
+    # duration, so dropped leading frames change nothing while a decoder that stops early
+    # shifts every timestamp forward by exactly tail_gap_ms.
+    container_span = tele.get("container_span_ms", -1.0)
+    container_packets = tele.get("container_packets", -1)
+    decoded_span = tele.get("decoded_span_ms", -1.0)
+    decoded_n = tele.get("decoded", len(frames))
+    rel_first = tele.get("rel_first_ms", -1.0)
+    rel_last = tele.get("rel_last_ms", -1.0)
+    head_gap_ms = round(rel_first, 1) if rel_first >= 0 else -1.0
+    tail_gap_ms = (
+        round(container_span - rel_last, 1) if container_span >= 0 and rel_last >= 0 else -1.0
+    )
+    anchor_skew_ms = (
+        round(container_span - decoded_span, 1)
+        if container_span >= 0 and decoded_span >= 0
+        else -1.0
+    )
+    undecoded_packets = container_packets - decoded_n if container_packets >= 0 else -1
+
+    want_ts = [all_ts[g] for g in global_keep]
+    probe = {
+        "branch": branch,
+        "container": Path(str(video_path)).suffix or "?",
+        "file_start_ms": f"{all_ts[0]:.1f}",
+        "file_last_ms": f"{duration_ms:.1f}",
+        "file_span_ms": f"{file_span_ms:.1f}",
+        "probe_packets": len(all_ts),
+        "local_seek_ms": f"{local_seek_ms:.1f}",
+        "container_packets": container_packets,
+        "container_span_ms": container_span,
+        "decoded": decoded_n,
+        "decoded_span_ms": decoded_span,
+        "rel_first_ms": rel_first,
+        "rel_last_ms": rel_last,
+        "none_frames": tele.get("none_frames", -1),
+        # ↓ the ones that name the mechanism; tail_gap_ms is the mis-anchor, head_gap_ms is
+        #   harmless, undecoded_packets is the same fact in frames (the 101-quantum reads here)
+        "undecoded_packets": undecoded_packets,
+        "head_gap_ms": head_gap_ms,
+        "tail_gap_ms": tail_gap_ms,
+        "anchor_skew_ms": anchor_skew_ms,
+        "wanted": len(want_ts),
+        "want_first_ms": f"{want_ts[0]:.1f}" if want_ts else -1.0,
+        "want_last_ms": f"{want_ts[-1]:.1f}" if want_ts else -1.0,
+    }
+    try:
+        kept = _pick_frames_by_timestamp(abs_ts, frames, want_ts, telemetry=tele)
+    except FeatureExtractionError as exc:
+        # A skip here is classified `our-side` and the coarse cause is ALL the caller keeps,
+        # so without this the failure is invisible in production — which is exactly what
+        # happened on 2026-08-06: seven consecutive skips whose cause could not be recovered
+        # from the logs. Re-raise the SAME failure with the state needed to tell the two
+        # decode branches apart and to see whether the clock anchoring or the cut is at
+        # fault. Timestamps and counts only — no frame content.
+        _emit_decode_probe(outcome="miss", **probe, **_match_fields(tele))
+        dec_span = (abs_ts[-1] - abs_ts[0]) / 1000.0 if len(abs_ts) >= 2 else -1.0
+        dec_last = abs_ts[-1] if abs_ts else -1.0
+        want_last = want_ts[-1] if want_ts else -1.0
+        raise FeatureExtractionError(
+            f"{exc} [branch={branch} file_start={all_ts[0]:.1f}ms "
+            f"duration={duration_ms:.1f}ms span={file_span_ms / 1000.0:.1f}s "
+            f"local_seek={local_seek_ms:.1f}ms probe_packets={len(all_ts)} "
+            f"decoded={len(frames)} wanted={len(want_ts)} decoded_span={dec_span:.1f}s "
+            f"decoded_last={dec_last:.1f}ms want_last={want_last:.1f}ms "
+            f"container_packets={container_packets} undecoded_packets={undecoded_packets} "
+            f"head_gap_ms={head_gap_ms} tail_gap_ms={tail_gap_ms} "
+            f"anchor_skew_ms={anchor_skew_ms} "
+            f"match_max_off_ms={tele.get('match_max_off_ms', -1.0)} "
+            f"matched={tele.get('matched', -1)}]"
+        ) from exc
+    landmarks = _landmarks_for_frames(kept)
+    _emit_decode_probe(outcome="ok", **probe, **_match_fields(tele), kept=len(kept))
+
+    return DecodedClip(frames=kept, landmarks=landmarks)
+
+
+def _match_fields(tele: dict) -> dict:
+    """The grid-match outcome fields, present on both the success and the miss line."""
+    return {
+        "match_max_off_ms": tele.get("match_max_off_ms", -1.0),
+        "match_worst_want_ms": tele.get("match_worst_want_ms", -1.0),
+        "matched": tele.get("matched", -1),
+    }
+
+
+def _decode_all_anchored(
+    video_path, duration_ms: float, *, telemetry: dict | None = None
+) -> tuple[list[float], list]:
+    """Sequentially decode ALL frames of a bounded trimmed file; return them on the
+    file-global absolute clock by anchoring the last frame to ``duration_ms``.
+
+    OpenCV's re-zeroed POS_MSEC is never trusted as an absolute time — only its deltas are
+    used, via the last-frame anchor. A decode truncation (OpenCV stopping before the file's
+    last packet) mis-anchors every timestamp, which ``_pick_frames_by_timestamp``'s
+    ``_TS_MATCH_TOL_MS`` check then rejects loudly (the 400 ms grid cannot hide a >10 ms
+    shift) — never a silent wrong score."""
+    cap = cv2.VideoCapture(str(video_path))
+    if not cap.isOpened():
+        raise FeatureExtractionError(f"could not open video: {video_path}")
+    rel_ts: list[float] = []
+    frames: list = []
+    try:
+        while cap.grab():
+            rel_ts.append(cap.get(cv2.CAP_PROP_POS_MSEC))
+            ok, frame = cap.retrieve()
+            frames.append(frame if ok else None)
+    finally:
+        cap.release()
+    if not rel_ts:
+        raise FeatureExtractionError("trimmed upload decoded no frames")
+    if telemetry is not None:
+        telemetry.update(_decode_telemetry(rel_ts, frames))
+    offset = duration_ms - rel_ts[-1]
+    return [offset + t for t in rel_ts], frames
 
 
 def _run_ff(cmd: list[str]) -> subprocess.CompletedProcess:
@@ -458,7 +831,9 @@ def probe_global_timestamps_fast(video_path) -> tuple[float, list[float]]:
     return fps, ts
 
 
-def _decode_tail(video_path, seek_ms: float, duration_ms: float) -> tuple[list[float], list]:
+def _decode_tail(
+    video_path, seek_ms: float, duration_ms: float, *, telemetry: dict | None = None
+) -> tuple[list[float], list]:
     """Decode only the trailing window. Return ``(abs_ts_ms, frames)`` on the file-global
     clock so the caller can match frames to the file-global keep-set.
 
@@ -467,8 +842,12 @@ def _decode_tail(video_path, seek_ms: float, duration_ms: float) -> tuple[list[f
     ffmpeg ``-c copy`` lossless tail remux + OpenCV decode, anchored to the duration."""
     native = _decode_tail_native_seek(video_path, seek_ms)
     if native is not None:
+        if telemetry is not None:
+            telemetry.update(_decode_telemetry(native[0], native[1]), sub_branch="native_seek")
         return native
-    return _decode_tail_ffmpeg_remux(video_path, seek_ms, duration_ms)
+    if telemetry is not None:
+        telemetry["sub_branch"] = "remux"
+    return _decode_tail_ffmpeg_remux(video_path, seek_ms, duration_ms, telemetry=telemetry)
 
 
 def _decode_tail_native_seek(video_path, seek_ms: float):
@@ -501,7 +880,9 @@ def _decode_tail_native_seek(video_path, seek_ms: float):
         cap.release()
 
 
-def _decode_tail_ffmpeg_remux(video_path, seek_ms: float, duration_ms: float):
+def _decode_tail_ffmpeg_remux(
+    video_path, seek_ms: float, duration_ms: float, *, telemetry: dict | None = None
+):
     """ffmpeg ``-c copy`` lossless tail remux (un-seekable webm) → OpenCV decode.
 
     ``-ss <seek> -c copy`` copies the VP8/VP9 packets unchanged from the keyframe at/before
@@ -518,6 +899,18 @@ def _decode_tail_ffmpeg_remux(video_path, seek_ms: float, duration_ms: float):
         ])
         if proc.returncode != 0 or not os.path.getsize(tmp):
             raise FeatureExtractionError("ffmpeg tail remux failed")
+        if telemetry is not None:
+            # What the REMUX contains, independently of what OpenCV manages to decode from
+            # it. Without this the two candidate mechanisms — ffmpeg dropped the tail during
+            # the copy, vs OpenCV stopped early on a complete remux — are indistinguishable.
+            # One extra ffprobe (demux only) per remux window, unconditional: the
+            # off-baseline test cannot run until this count exists (see the module note).
+            n_pk, first_pk, last_pk = _probe_packet_span(tmp)
+            telemetry.update(
+                container_packets=n_pk,
+                container_span_ms=round(last_pk - first_pk, 1) if n_pk > 1 else -1.0,
+                remux_bytes=os.path.getsize(tmp),
+            )
         cap = cv2.VideoCapture(tmp)
         if not cap.isOpened():
             raise FeatureExtractionError("could not open remuxed tail clip")
@@ -532,6 +925,8 @@ def _decode_tail_ffmpeg_remux(video_path, seek_ms: float, duration_ms: float):
             cap.release()
         if not rel_ts:
             raise FeatureExtractionError("remuxed tail clip decoded no frames")
+        if telemetry is not None:
+            telemetry.update(_decode_telemetry(rel_ts, frames))
         # Anchor to the file-global clock: the remux's last frame == the file's last frame,
         # at absolute time ``duration_ms``. POS_MSEC deltas are preserved by the lossless copy.
         offset = duration_ms - rel_ts[-1]
@@ -545,7 +940,11 @@ def _decode_tail_ffmpeg_remux(video_path, seek_ms: float, duration_ms: float):
 
 
 def _pick_frames_by_timestamp(
-    tail_ts: list[float], tail_frames: list, want_ts: list[float]
+    tail_ts: list[float],
+    tail_frames: list,
+    want_ts: list[float],
+    *,
+    telemetry: dict | None = None,
 ) -> list:
     """Pick, for each wanted file-global timestamp, the decoded tail frame at that time.
 
@@ -557,17 +956,35 @@ def _pick_frames_by_timestamp(
     if arr.size == 0:
         raise FeatureExtractionError("tail decode produced no frames")
     out: list = []
-    for wt in want_ts:
-        i = int(np.argmin(np.abs(arr - wt)))
-        if abs(arr[i] - wt) > _TS_MATCH_TOL_MS:
-            raise FeatureExtractionError(
-                f"tail frame for file-global ts {wt:.1f}ms missing (nearest off "
-                f"{abs(arr[i] - wt):.1f}ms) — seek did not cover the window"
+    # Worst grid offset over ALL wanted frames, recorded on SUCCESS too. The tolerance is a
+    # cliff — a window either matches or is skipped — so a binary outcome cannot show a
+    # failure being approached. This turns it into a continuous signal: on a healthy window
+    # it is ~0 ms (proven), and any drift toward the 10 ms tolerance is visible in the
+    # windows BEFORE one fails.
+    worst_off = 0.0
+    worst_want = -1.0
+    try:
+        for wt in want_ts:
+            i = int(np.argmin(np.abs(arr - wt)))
+            off = float(abs(arr[i] - wt))
+            if off > worst_off:
+                worst_off, worst_want = off, wt
+            if off > _TS_MATCH_TOL_MS:
+                raise FeatureExtractionError(
+                    f"tail frame for file-global ts {wt:.1f}ms missing (nearest off "
+                    f"{off:.1f}ms) — seek did not cover the window"
+                )
+            frame = tail_frames[i]
+            if frame is None:
+                raise FeatureExtractionError("tail frame retrieve failed")
+            out.append(frame)
+    finally:
+        if telemetry is not None:
+            telemetry.update(
+                match_max_off_ms=round(worst_off, 2),
+                match_worst_want_ms=round(worst_want, 1),
+                matched=len(out),
             )
-        frame = tail_frames[i]
-        if frame is None:
-            raise FeatureExtractionError("tail frame retrieve failed")
-        out.append(frame)
     return out
 
 

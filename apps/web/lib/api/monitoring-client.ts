@@ -101,18 +101,25 @@ export async function createSession(
 }
 
 /**
- * Upload one **contiguous recording-so-far** window. Multipart (`clip`), matching the
- * `/anchor` upload shape. Returns the outcome union; a `skipped` window is a routine
- * `200`, not an error — the caller continues the loop.
+ * Upload one window. Multipart (`clip`), matching the `/anchor` upload shape. Returns the
+ * outcome union; a `skipped` window is a routine `200`, not an error — the caller
+ * continues the loop.
+ *
+ * `uploadKind` (2026-08-06 bounded uploads): `"tail"` declares the clip a client-side
+ * **header+tail** file so an ffprobe-less server fails closed instead of decoding it on a
+ * re-zeroed clock; `"full"` (or omitting the field, as older clients do) keeps the
+ * original contiguous-recording-so-far contract.
  */
 export async function submitWindow(
   sessionId: string,
   clip: Blob,
   accessToken: string,
+  uploadKind?: "full" | "tail",
 ): Promise<SubmitWindowResult> {
   const ext = clip.type.includes("mp4") ? "mp4" : "webm";
   const form = new FormData();
   form.append("clip", clip, `window.${ext}`);
+  if (uploadKind) form.append("upload_kind", uploadKind);
 
   let res: Response;
   try {

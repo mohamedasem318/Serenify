@@ -2,16 +2,22 @@
  * Continuous window recorder (feature 008, US1 — T026; research R-5 / windowing D-2).
  *
  * ONE `MediaRecorder` runs in timeslice mode for the whole session — **no stop/restart**.
- * Each stride it hands the orchestrator the **contiguous recording-so-far**: the init
- * segment + every chunk in order, which is always decodable (the server tail-extracts the
- * last 60 s). Upload is **fire-and-forget / non-blocking** (FR-016) — the recorder keeps
- * capturing on its own timer regardless of how long a window takes to score, so a slow
- * window never stalls the next capture.
+ * Each stride it hands the orchestrator an upload for the trailing window: **header + a
+ * bounded contiguous tail** cut at a verified container boundary once the recording is
+ * old enough (2026-08-06 bounded-upload fix — per-stride payload flat w.r.t. session
+ * length; see `tail-cutter.ts`), and the contiguous recording-so-far before that (or
+ * whenever no safe cut exists — always-correct fallback). Upload is **fire-and-forget /
+ * non-blocking** (FR-016) — the recorder keeps capturing on its own timer regardless of
+ * how long a window takes to score, so a slow window never stalls the next capture.
  *
  * Container: **feature-detect, webm-preferred with an fMP4 fallback** (the device-gate
  * finding — both decode server-side; iOS WebM-capture support is uneven). We never
  * hard-code one container (see docs/BACKLOG.md 008 T026 note).
  */
+
+import { createTailSource, type UploadKind } from "./tail-cutter";
+
+export type { UploadKind } from "./tail-cutter";
 
 /** ~10 s stride (contracts/inference-api.md: "called ~every 10 s"). */
 export const DEFAULT_STRIDE_MS = 10_000;
@@ -56,8 +62,10 @@ export interface MinimalWindowRecorder {
 
 export interface WindowRecorderOptions {
   stream: MediaStream;
-  /** Invoked each stride with the contiguous recording-so-far. Fire-and-forget. */
-  onWindow: (clip: Blob) => void;
+  /** Invoked each stride with this stride's upload: a bounded header+tail (`"tail"`) once
+   *  a safe cut exists, the contiguous recording-so-far (`"full"`) before/without one.
+   *  Fire-and-forget. */
+  onWindow: (clip: Blob, kind: UploadKind) => void;
   strideMs?: number;
   /** Test seam: build the recorder. Production uses a real `MediaRecorder`. */
   createRecorder?: (stream: MediaStream) => MinimalWindowRecorder;
@@ -78,8 +86,14 @@ function defaultCreateRecorder(stream: MediaStream): MinimalWindowRecorder {
 
 /**
  * Build a continuous recorder. `start()` opens one timeslice recording and, on every
- * `ondataavailable`, appends the chunk and hands `onWindow` the contiguous-so-far blob.
- * `stop()` ends the single recording (no restart) and detaches handlers.
+ * `ondataavailable`, appends the chunk to the tail source and hands `onWindow` this
+ * stride's upload (header+tail once a safe cut exists — bounded payload AND bounded
+ * client memory; the whole recording is no longer retained). `stop()` ends the single
+ * recording (no restart) and detaches handlers.
+ *
+ * Chunk bytes are read asynchronously (`Blob.arrayBuffer()`), so appends+builds are
+ * serialized on one promise chain — byte order is the recorder's emit order, and a slow
+ * stride can never interleave with the next. Still fire-and-forget toward the uploader.
  */
 export function createWindowRecorder({
   stream,
@@ -88,21 +102,29 @@ export function createWindowRecorder({
   createRecorder = defaultCreateRecorder,
 }: WindowRecorderOptions): WindowRecorderHandle {
   let recorder: MinimalWindowRecorder | null = null;
-  const chunks: Blob[] = [];
 
   return {
     start() {
       if (recorder && recorder.state !== "inactive") return; // guard double-start
       recorder = createRecorder(stream);
-      chunks.length = 0;
+      const source = createTailSource();
+      let chain: Promise<void> = Promise.resolve();
       const rec = recorder;
       rec.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) chunks.push(event.data);
-        if (chunks.length === 0) return;
-        // The contiguous recording-so-far: init + all chunks in order → always decodable.
-        const type = rec.mimeType || "video/webm";
-        // Fire-and-forget: hand it off and return immediately (FR-016, non-blocking).
-        onWindow(new Blob(chunks, { type }));
+        const data = event.data && event.data.size > 0 ? event.data : null;
+        chain = chain
+          .then(async () => {
+            if (rec.ondataavailable === null) return; // stopped while queued
+            if (data) source.append(await data.arrayBuffer());
+            if (!source.hasBytes()) return;
+            const { blob, kind } = source.build(rec.mimeType || "video/webm");
+            // Fire-and-forget: hand it off and return immediately (FR-016, non-blocking).
+            onWindow(blob, kind);
+          })
+          .catch(() => {
+            // A failed chunk read skips this stride's upload; capture itself continues
+            // and the next stride retries with the next chunk. Never break the chain.
+          });
       };
       // One continuous recording; a chunk flushes every stride (no stop/restart).
       rec.start(strideMs);
