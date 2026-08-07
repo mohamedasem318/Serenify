@@ -3,10 +3,12 @@
 > **Status (2026-08-06): the Phase-2 work was split across two PRs.** The constraints half
 > — shared `ideal` 1280×720@15 on both recorders, the `docs/MODELS.md` capture-conditions
 > line, and the growing-fMP4 decode gate — ships via **PR #246**, alongside this document.
-> The **container half (fMP4-first on Apple WebKit) and the capture-probe tooling are
-> parked in PR #243**, pending a 720p wire-weight measurement that can only be taken after
-> the bounded-upload fix lands. Where Phase 2 below says the fix "lands", read: the
-> constraints landed; the container preference is proposed, not shipped.
+> The **container half and the capture-probe tooling** were parked pending a 720p
+> wire-weight measurement; that measurement was taken and **PR #243 shipped them on
+> 2026-08-07** (merged as `a5c8d3d`), with the preference narrowed from fMP4-*first* to
+> fMP4-*only* on Apple WebKit. Where Phase 2 below says the fix "lands", read: both
+> halves have now landed. The measurement did **not** support the wire-weight rationale —
+> see the correction at "A refinement of #89's mechanism" below.
 
 Decision document for the iOS-Safari / constraint-capping work. Phase 1 established the
 facts and shipped the tester probe; Phase 2 (below, same day) reads the five device
@@ -159,8 +161,16 @@ window trace.
 un-finalized-ness alone did not break ffprobe. The live failure implicates the
 *transport scale* of iOS webm: it records at ~4.8 Mbit/s (45 MB per 75 s
 recording-so-far, re-uploaded every 10 s), the size class where the June tunnel
-dropped/truncated POSTs. Safari's mp4 runs ~5× lighter (2.2 Mbit/s at the same
-settings). The container swap addresses both the decode fragility and the wire weight.
+dropped/truncated POSTs. ~~Safari's mp4 runs ~5× lighter (2.2 Mbit/s at the same
+settings). The container swap addresses both the decode fragility and the wire weight.~~
+
+> **Corrected 2026-08-07.** Both figures above were taken at **480×640** — the probe's
+> `applyConstraints({})` quirk (noted below) meant every device recorded at 480p, not at
+> the 720p the fix ships. The ratio does not scale. Re-measured at the shipped operating
+> point, iOS Safari fMP4 is **~40 MB/60 s (~5.4 Mbit/s)** — essentially the same as the
+> WebM probe's ~45 MB. **No wire-weight advantage is claimed for fMP4 at 720p**; the
+> container swap is justified by decode correctness alone. See `docs/DECISIONS.md`
+> 2026-08-07.
 
 **S25U note (out of scope, recorded for the face-gate bug).** The S25U probe is
 byte-for-byte structurally identical to the S24U's — camera opens, 720p granted,

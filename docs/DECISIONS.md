@@ -7156,3 +7156,47 @@ posture assumed a trustworthy `isTypeSupported` and that assumption is now dispr
 PR #247 (the bounded header+tail upload, whose tail-cutter already carries fMP4 as a
 first-class mode — `ftyp` detect → `moof` box-walk → `tfdt` timestamps — so this change
 needed no modification to it); the constraints-half entry above (PR #246).
+
+---
+
+## 2026-08-07 — Correction: the "fMP4 is ~5× lighter" wire-weight figure does not hold at 720p (supersedes two 2026-08-05 entries)
+
+**What is corrected.** Two statements in the 2026-08-05 Phase-2 entries above are wrong
+as written and are superseded here:
+
+1. *"Apple WebKit records fMP4 ONLY…"* (container half) closes with: **"fMP4 is ~5×
+   lighter."** That figure was derived at **480×640** and does not scale to the shipped
+   operating point.
+2. *"Capture normalises to training conditions…"* (constraints half) describes the
+   container half as **"parked in PR #243 pending a 720p wire-weight measurement."** That
+   measurement has since been taken and **#243 merged on 2026-08-07 (`a5c8d3d`)**; the
+   framing is stale.
+
+**What the measurements support.** Re-measured at the shipped 1280×720@15 operating
+point, iOS Safari fMP4 records **~40 MB per 60 s (~5.4 Mbit/s)** — **essentially the same
+as the WebM probe's ~45 MB**. The ~4.8 Mbit/s webm / 2.2 Mbit/s mp4 pair behind the ~5×
+claim was taken at 480×640, a consequence of the probe's `applyConstraints({})` quirk
+(recorded in the diagnosis doc): every probed device recorded at 480p regardless of what
+was requested. The ratio was an artefact of that resolution, not a property of the
+containers.
+
+**No replacement ratio is asserted.** The 720p numbers show the two containers are
+comparable on the wire at the shipped settings; they do not establish a new multiplier in
+either direction, and nothing here should be quoted as one. (The 0.75 Mbit/s VP9 figure in
+`docs/triage/2026-08-06-bounded-upload-measurement.md` is **Chrome on a laptop**, a
+different encoder on a different device, and cannot stand in for an iOS Safari number.)
+
+**The decision itself is unchanged.** fMP4-only on Apple WebKit stands — but on **decode
+correctness alone**: Safari's `isTypeSupported` reports WebM support it cannot honour, and
+its WebM recordings yield no readable media duration, which is what killed #89. The wire
+weight was a secondary rationale and is now withdrawn. No code change follows from this
+correction; the shipped behaviour was already right for the primary reason.
+
+**Corrected in place** (they stated the wrong number as fact, and are working documents
+rather than point-in-time records): `docs/triage/mobile-capture-diagnosis.md` ("A
+refinement of #89's mechanism" + the status header) and `docs/BACKLOG.md` #89. The 008
+specs and smoke-test records are point-in-time and are deliberately **not** retro-edited.
+
+**Cross-references**: the two 2026-08-05 Phase-2 entries above (constraints half, PR #246;
+container half, PR #243); issue #89 (still open — pending the real-device ST-08-2 re-run);
+`docs/triage/mobile-capture-diagnosis.md`; `docs/triage/2026-08-06-bounded-upload-measurement.md`.
