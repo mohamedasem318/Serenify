@@ -10,10 +10,14 @@
  * non-blocking** (FR-016) — the recorder keeps capturing on its own timer regardless of
  * how long a window takes to score, so a slow window never stalls the next capture.
  *
- * Container: **feature-detect, webm-preferred with an fMP4 fallback** (the device-gate
- * finding — both decode server-side; iOS WebM-capture support is uneven). We never
- * hard-code one container (see docs/BACKLOG.md 008 T026 note).
+ * Container: **feature-detect via the shared engine-aware negotiation** (lib/capture/
+ * constraints.ts): webm-preferred on non-Apple engines, fMP4-ONLY on Apple WebKit —
+ * Safari's webm *claim* routed iOS into the #89 un-finalized-webm decode death, while
+ * its fMP4 chunks on schedule (2026-08-05 probes). We still never hard-code one
+ * container (docs/BACKLOG.md 008 T026 note); the preference order is what changed.
  */
+
+import { pickCaptureMimeType, type CaptureMimeChoice } from "@/lib/capture/constraints";
 
 import { createTailSource, type UploadKind } from "./tail-cutter";
 
@@ -22,22 +26,12 @@ export type { UploadKind } from "./tail-cutter";
 /** ~10 s stride (contracts/inference-api.md: "called ~every 10 s"). */
 export const DEFAULT_STRIDE_MS = 10_000;
 
-/** Codec probe order: webm first (vp9 → vp8 → generic), then fragmented MP4 (Safari/iOS). */
-const MIME_CANDIDATES = [
-  "video/webm;codecs=vp9",
-  "video/webm;codecs=vp8",
-  "video/webm",
-  "video/mp4",
-] as const;
-
-/** Pick a supported recorder MIME type — webm-preferred, fMP4 fallback. `undefined` lets
- *  the browser choose its default (still always one decodable continuous file). */
-export function pickWindowMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  for (const type of MIME_CANDIDATES) {
-    if (MediaRecorder.isTypeSupported?.(type)) return type;
-  }
-  return undefined;
+/** Pick the recorder MIME type. Delegates to the SHARED capture negotiation (lib/capture/
+ *  constraints.ts) — webm-preferred on non-Apple engines, fMP4-only on Apple WebKit
+ *  (whose webm claim routes into the #89 decode death). Calibration uses the same picker;
+ *  the two recorders must never diverge on container — scoring is `window − anchor`. */
+export function pickWindowMimeType(): CaptureMimeChoice {
+  return pickCaptureMimeType();
 }
 
 /** Webcam capture requires a secure context (HTTPS or localhost). */
@@ -77,9 +71,13 @@ export interface WindowRecorderHandle {
 }
 
 function defaultCreateRecorder(stream: MediaStream): MinimalWindowRecorder {
-  const mimeType = pickWindowMimeType();
-  const recorder = mimeType
-    ? new MediaRecorder(stream, { mimeType })
+  const choice = pickWindowMimeType();
+  // Belt-and-braces: the session gates on this BEFORE opening the camera, so reaching
+  // here with an unusable engine means the guard was bypassed. Throw rather than record
+  // a container we know produces nothing (Apple WebKit + no MP4 — see constraints.ts).
+  if (!choice.ok) throw new Error("No supported recording container on this browser");
+  const recorder = choice.mimeType
+    ? new MediaRecorder(stream, { mimeType: choice.mimeType })
     : new MediaRecorder(stream);
   return recorder as unknown as MinimalWindowRecorder;
 }

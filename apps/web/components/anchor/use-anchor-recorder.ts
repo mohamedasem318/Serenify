@@ -35,6 +35,7 @@ export type RecorderStatus =
   | "camera-blocked"
   | "camera-busy"
   | "camera-no-device"
+  | "camera-unsupported-format"
   | "green-room"
   | "get-ready"
   | "recording"
@@ -44,8 +45,16 @@ export type RecorderStatus =
   | "upload-failed"
   | "extract-failed";
 
-/** The three camera-access states, named for the reducer status they map to. */
-export type CameraErrorStatus = "camera-blocked" | "camera-busy" | "camera-no-device";
+/** The camera-access states, named for the reducer status they map to. */
+export type CameraErrorStatus =
+  | "camera-blocked"
+  | "camera-busy"
+  | "camera-no-device"
+  // No container this browser can record usably — the camera is fine, the encoder is
+  // not. Apple WebKit with no MP4 type available; WebM is deliberately not a fallback
+  // there because it records "successfully" into undecodable output. Mirrors the
+  // monitoring recorder's `unsupported-format` (lib/capture/constraints.ts).
+  | "camera-unsupported-format";
 
 export type RecorderMode = "first-time" | "recalibrate";
 

@@ -100,7 +100,12 @@ function securityHeaders(permissionsPolicy: string) {
 // `isCaptureRoute` in proxy.ts for the on-device detector WASM) — feature 008
 // originally registered /app/monitor in none of them, so getUserMedia was rejected
 // by the inherited camera=() policy despite a granted permission.
-const CAPTURE_ROUTES = ["/onboarding", "/app/calibrate", "/app/monitor"];
+// /capture-probe is the flag-gated mobile capture probe (docs/triage/
+// mobile-capture-diagnosis.md) — a 404 unless NEXT_PUBLIC_CAPTURE_PROBE=1 is baked
+// into the build, but its Permissions-Policy registration must exist unconditionally
+// (headers here are static; a probe build with the inherited camera=() would repeat
+// the exact regression this list documents).
+const CAPTURE_ROUTES = ["/onboarding", "/app/calibrate", "/app/monitor", "/capture-probe"];
 
 const nextConfig: NextConfig = {
   // DEV SERVER ONLY — ignored in production builds (`next build` does not read
@@ -126,7 +131,7 @@ const nextConfig: NextConfig = {
       // Everywhere else: camera=(). The negative lookahead excludes the capture
       // routes (and any subpaths) so there is no Permissions-Policy overlap.
       {
-        source: "/((?!onboarding|app/calibrate|app/monitor).*)",
+        source: "/((?!onboarding|app/calibrate|app/monitor|capture-probe).*)",
         headers: securityHeaders(PERMISSIONS_POLICY_CAMERA_DENIED),
       },
     ];
