@@ -105,12 +105,22 @@ _FPS_REL_TOL = 0.10
 #
 # ``container_*`` is the file OpenCV was actually handed: the original upload for
 # ``all_anchored``, the ffmpeg remux TEMP for ``remux`` (whose packets are counted with one
-# extra ffprobe — DEBUG-gated, since it costs a subprocess per window). Splitting those two
-# is what tells a decoder-side truncation apart from a remux that itself dropped the tail,
-# and what makes the remux-vs-all_anchored asymmetry testable from logs alone.
+# extra ffprobe). Splitting those two is what tells a decoder-side truncation apart from a
+# remux that itself dropped the tail, and what makes the remux-vs-all_anchored asymmetry
+# testable from logs alone.
 #
-# Cheap fields are always computed and ride the failure message; the per-window success
-# line (the one that shows the countdown BEFORE a window fails) is DEBUG-only.
+# LEVEL IS ADAPTIVE, and deliberately not tied to ``LOG_LEVEL=DEBUG``. A DEBUG-only line is
+# armed only while someone remembers to leave DEBUG on; the moment production reverts to
+# INFO the instrumentation goes silent without saying so. So a window that is OFF-BASELINE
+# — any tail truncation, any undecoded packet, any unretrievable frame, or a grid offset
+# drifting off zero — emits at WARNING and survives INFO, while an ordinary healthy window
+# stays at DEBUG and keeps production quiet. In the 2026-08-07 session all 122 windows read
+# exactly 0.0 on every one of those fields, so the baseline is measured, not assumed.
+#
+# The remux ffprobe is therefore NOT gated on DEBUG either: whether a window is off-baseline
+# cannot be known until ``container_packets`` has been read, so the read has to happen first.
+# Its cost is already inside the measured budget — the 2026-08-07 session ran with it on for
+# every remux window and the per-window median was 5.24 s against a ~10 s stride.
 
 
 def _probe_packet_span(video_path) -> tuple[int, float, float]:
@@ -148,14 +158,49 @@ def _decode_telemetry(rel_ts: list[float], frames: list) -> dict:
     }
 
 
+# A healthy webm window reads exactly 0.0 on every field below (122/122 in the 2026-08-07
+# session) and the grid-match tolerance is 10 ms, so 1 ms sits well inside the noise floor
+# while still tripping long before the cliff — the drift is visible in the windows BEFORE
+# one fails, which is the whole point of keeping the match offset on success.
+_PROBE_DRIFT_TOL_MS = 1.0
+
+
+def _probe_is_off_baseline(fields: dict) -> bool:
+    """Is this window anything other than a clean decode? Unknown values are encoded as
+    ``-1`` and must NOT trip the check — only positive deviations count."""
+
+    def num(key: str) -> float:
+        try:
+            return float(fields.get(key, 0) or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return (
+        fields.get("outcome") == "miss"
+        or num("tail_gap_ms") > 0
+        or num("undecoded_packets") > 0
+        or num("none_frames") > 0
+        or num("match_max_off_ms") > _PROBE_DRIFT_TOL_MS
+    )
+
+
 def _emit_decode_probe(**fields) -> None:
-    """One flat ``key=value`` line per window (DEBUG-only, server-side only, no frame
-    content). Flat so it filters out of Log Analytics with a single ``decode-probe:``
-    substring match and parses without a schema."""
-    if not logger.isEnabledFor(logging.DEBUG):
+    """One flat ``key=value`` line per window (server-side only, no frame content). Flat so
+    it filters out of Log Analytics with a single ``decode-probe:`` substring match and
+    parses without a schema.
+
+    WARNING when the window is off-baseline — so the instrumentation stays armed under a
+    production ``LOG_LEVEL=INFO`` — and DEBUG otherwise, so a healthy production session
+    emits nothing. See the module note above for why the level is not simply DEBUG."""
+    off_baseline = _probe_is_off_baseline(fields)
+    if not off_baseline and not logger.isEnabledFor(logging.DEBUG):
         return
     try:
-        logger.debug("decode-probe: %s", " ".join(f"{k}={v}" for k, v in fields.items()))
+        line = "decode-probe: " + " ".join(f"{k}={v}" for k, v in fields.items())
+        if off_baseline:
+            logger.warning("%s", line)
+        else:
+            logger.debug("%s", line)
     except Exception:  # noqa: BLE001 - logging must never affect extraction
         pass
 
@@ -854,11 +899,12 @@ def _decode_tail_ffmpeg_remux(
         ])
         if proc.returncode != 0 or not os.path.getsize(tmp):
             raise FeatureExtractionError("ffmpeg tail remux failed")
-        if telemetry is not None and logger.isEnabledFor(logging.DEBUG):
+        if telemetry is not None:
             # What the REMUX contains, independently of what OpenCV manages to decode from
             # it. Without this the two candidate mechanisms — ffmpeg dropped the tail during
             # the copy, vs OpenCV stopped early on a complete remux — are indistinguishable.
-            # One extra ffprobe (demux only) per remux window; DEBUG-gated for that reason.
+            # One extra ffprobe (demux only) per remux window, unconditional: the
+            # off-baseline test cannot run until this count exists (see the module note).
             n_pk, first_pk, last_pk = _probe_packet_span(tmp)
             telemetry.update(
                 container_packets=n_pk,
