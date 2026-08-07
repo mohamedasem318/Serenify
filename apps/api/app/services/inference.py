@@ -201,6 +201,31 @@ def score_window(
             features = ml_video.compute_anchor(tmp_path, tail_seconds=WINDOW_SECONDS)
         except FeatureExtractionError as exc:
             cause = _coarse_cause(exc)
+            # SERVER-SIDE ONLY — the response still carries nothing but the coarse cause
+            # (FR-016, Principle I). `_coarse_cause` deliberately collapses everything that
+            # is not the face-coverage gate into `our-side`, and until now that collapsed
+            # string was the ONLY record kept: a run of skipped windows in production could
+            # not be told apart afterwards, because the exception that caused it was never
+            # written down anywhere. An `our-side` skip is OUR pipeline failing, so it is a
+            # WARNING and legible without enabling DEBUG; `insufficient-face` is the ordinary
+            # "they looked away" path and stays at DEBUG so a normal session stays quiet.
+            if cause == "our-side":
+                logger.warning(
+                    "window skipped (our-side): session=%s probe_s=%.2f %s: %s",
+                    session_id,
+                    recorded_s,
+                    type(exc).__name__,
+                    exc,
+                )
+            else:
+                logger.debug(
+                    "window skipped (%s): session=%s probe_s=%.2f %s: %s",
+                    cause,
+                    session_id,
+                    recorded_s,
+                    type(exc).__name__,
+                    exc,
+                )
             insert_reading(
                 client,
                 session_id=session_id,
