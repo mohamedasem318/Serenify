@@ -7107,3 +7107,52 @@ travels with that PR. This entry covers only what PR #246 ships.
 in PR #246 with the container half marked parked); `docs/MODELS.md` capture-conditions
 line; PR #243 (the parked container preference + probe tooling; issue #89 stays with
 it); PR #246 (this change).
+
+---
+
+## 2026-08-05 — Apple WebKit records fMP4 ONLY: engine-aware container, with no WebM fallback (Phase 2 of the mobile-capture work, container half)
+
+**Decision — engine-aware container: fMP4-only on Apple WebKit, webm-first
+elsewhere.** Safari 26 *claims* WebM support, which routed iOS into the #89 server-side
+decode death; its mp4 recorder emits timeslice chunks on schedule (avc1.42000a) with an
+exactly-realtime media clock, and the REAL iPhone growing fMP4 fixture passes probe +
+O(stride) tail decode + full feature build (`test_growing_fmp4_decode.py`). Detection is
+`navigator.vendor` ("Apple Computer, Inc." — frozen, engine-accurate; every iOS browser
+is WebKit). webm stays the path everywhere else — both probed laptops and both Galaxys
+are healthy on it (media/wall 0.996–0.999). Refinement recorded: the June growing-iOS-
+webm fixture probes fine AT REST, so #89's live failure implicates iOS webm's transport
+scale (~4.8 Mbit/s re-uploads) as much as the container; fMP4 is ~5× lighter.
+
+**Amended 2026-08-07, before this entry ever reached `main`: "fMP4-first" became
+"fMP4-only".** The original wording left WebM as a trailing fallback on Apple. A
+three-device probe (iPhone 13 / Safari 18.7.5; iPhone 15 and 15 Pro Max / Safari 26.5.2)
+established that `isTypeSupported('video/webm;codecs=vp9')` returns **true on all three**,
+after which recording runs the full duration, emits chunks on schedule, raises no error,
+and produces ~45 MB with no readable media duration (0 s / decode error 2 / metadata
+timeout — the signature differs per device, the outcome does not). `video/mp4` on the
+same device in the same session gives clean 1:1 media-to-wall duration.
+
+So `isTypeSupported` is not a usable capability gate for WebM on WebKit, and a fallback
+whose gate cannot be trusted is not a fallback — it is the failure being avoided, reached
+by a longer path. Falling back would spend a full session and tens of MB to produce
+nothing. **When no MP4 type is available the negotiation now fails** (`{ ok: false }`) and
+both capture surfaces stop *before the camera opens*, with copy saying the browser cannot
+record a usable video. Browser-default is ruled out on Apple for the same reason: the
+default container is picked by the engine whose self-report we just stopped trusting.
+
+Non-Apple engines are deliberately untouched — webm ladder, fMP4 trailing, browser-default
+still reachable — so the validated Chrome/Android path does not move. Guarded by an
+exhaustive test over all 32 support matrices asserting Apple can never yield a webm type.
+
+The constraints half of Phase 2 (shared `ideal` 1280×720@15 + the one-time forced
+recalibration) shipped separately via PR #246 — see the constraints-half entry above.
+This entry covers only the container preference, which #243 carries.
+
+**Cross-references**: `docs/triage/mobile-capture-diagnosis.md` (Phase 1 + 2); issue
+#89 (fix landed, pending real-device ST-08-2 re-run before closing); backlog #77/T026
+(the never-hard-code-a-container posture — kept on non-Apple engines, where the
+preference order is all that changed; **consciously narrowed on Apple WebKit**, where the
+posture assumed a trustworthy `isTypeSupported` and that assumption is now disproven);
+PR #247 (the bounded header+tail upload, whose tail-cutter already carries fMP4 as a
+first-class mode — `ftyp` detect → `moof` box-walk → `tfdt` timestamps — so this change
+needed no modification to it); the constraints-half entry above (PR #246).

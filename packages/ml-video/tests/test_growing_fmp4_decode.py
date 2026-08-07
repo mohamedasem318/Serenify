@@ -1,10 +1,9 @@
-"""Growing (un-finalized) fragmented-MP4 decode gate.
+"""Growing (un-finalized) fragmented-MP4 decode gate — the Phase-2 iOS container.
 
-fMP4 is the container Apple WebKit records reliably: Safari 26 *claims* WebM support
-(the claim behind the #89 server-side decode death), while its mp4 recorder emits
-timeslice chunks on schedule (avc1.42000a) with a realtime media clock (the
-2026-08-05 device probes). Whenever a client records fMP4 — today via the recorder's
-existing mp4 fallback, or under any future container preference — the server
+The 2026-08-05 device probes moved Apple WebKit capture to fMP4-first
+(`apps/web/lib/capture/constraints.ts`): Safari 26 *claims* WebM support, which routed
+iOS into the #89 server-side decode death, while its mp4 recorder emits timeslice
+chunks on schedule (avc1.42000a) with a realtime media clock. The server therefore now
 receives, every stride, a **growing fMP4 prefix** (init segment + N complete
 moof/mdat fragments — and, defensively, possibly a mid-fragment truncation). This
 suite pins that the read path handles exactly that shape:
@@ -26,7 +25,7 @@ Two layers, mirroring ``test_tail_seek_keepup.py``:
 Verified 2026-08-05 against the real fixture: probe 59.8 s, tail kept 149 frames,
 146 usable face rows, (2958,) features. (The real growing iOS *webm* sibling probes
 fine at rest, so #89's live failure implicates the transport-scale of iOS webm —
-~4.8 Mbit/s re-uploads — as much as the container.)
+~4.8 Mbit/s re-uploads — as much as the container; the fMP4 swap addresses both.)
 """
 
 import shutil

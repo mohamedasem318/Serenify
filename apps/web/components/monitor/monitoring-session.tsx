@@ -57,6 +57,7 @@ import {
   createWindowRecorder,
   DEFAULT_STRIDE_MS,
   isSecureContextOk,
+  pickWindowMimeType,
   type MinimalWindowRecorder,
   type UploadKind,
   type WindowRecorderHandle,
@@ -494,6 +495,15 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
   // (CAMERA_GRANTED vs RESUME). Returns false on a getUserMedia rejection (already routed
   // to blocked). Does NOT create a session — that is the caller's responsibility.
   const openCameraAndRecord = useCallback(async (): Promise<boolean> => {
+    // Container FIRST — before the camera light comes on. On Apple WebKit the negotiation
+    // is MP4-or-nothing (lib/capture/constraints.ts): Safari reports WebM support, records
+    // the full duration without error, and produces undecodable output. A session we
+    // cannot record usably must fail here, visibly, rather than run and yield no readings.
+    if (!pickWindowMimeType().ok) {
+      dispatch({ type: "CAMERA_ERROR", kind: "unsupported-format" });
+      return false;
+    }
+
     // A getUserMedia rejection maps by err.name to honest copy (NotReadableError → busy,
     // NotFound/Overconstrained → no-device, NotAllowed/Security/else → blocked).
     let stream: MediaStream;

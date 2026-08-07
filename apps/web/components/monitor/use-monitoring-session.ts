@@ -58,7 +58,16 @@ const LIVE_OPS: ReadonlySet<MonitorOp> = new Set(["warming-up", "active"]);
  * copy (FR-022). `"insecure"` is the non-secure-origin case (needs https), surfaced with
  * its own copy; any other non-getUserMedia block (session-create failure) stays `"blocked"`.
  */
-export type CameraErrorKind = "blocked" | "busy" | "no-device" | "insecure";
+export type CameraErrorKind =
+  | "blocked"
+  | "busy"
+  | "no-device"
+  | "insecure"
+  // No container this browser can record usably. Distinct from the four access
+  // failures above: the camera is fine, the *encoder* is the problem. Reached on Apple
+  // WebKit when no MP4 type is available, where WebM is not a fallback because it
+  // records successfully and produces undecodable output (lib/capture/constraints.ts).
+  | "unsupported-format";
 
 export interface MonitorState {
   op: MonitorOp;

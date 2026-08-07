@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
  * there). lucide has no camera-question, so the plain question reads "which camera?"
  */
 
-export type CameraAccessKind = "blocked" | "busy" | "no-device";
+export type CameraAccessKind = "blocked" | "busy" | "no-device" | "unsupported-format";
 
 const CONTENT: Record<CameraAccessKind, { Icon: LucideIcon; title: string; body: string }> = {
   blocked: {
@@ -34,6 +34,14 @@ const CONTENT: Record<CameraAccessKind, { Icon: LucideIcon; title: string; body:
     Icon: CircleHelp,
     title: "No camera found",
     body: "We couldn’t find a camera. Connect or enable one, then pick it from the selector.",
+  },
+  "unsupported-format": {
+    // Apple WebKit with no MP4 recorder. The camera works; this browser just can't
+    // write a video we can read back. Retrying on this device won't change that, so the
+    // body points somewhere that will rather than inviting another empty attempt.
+    Icon: CircleHelp,
+    title: "This browser can’t record a usable video",
+    body: "Calibration needs a readable recording, and this browser can’t make one. Try Safari on an up-to-date iOS, or use a different device.",
   },
 };
 

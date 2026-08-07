@@ -4,7 +4,11 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
 import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
-import { captureVideoConstraints } from "@/lib/capture/constraints";
+import {
+  captureVideoConstraints,
+  pickCaptureMimeType,
+  type CaptureMimeChoice,
+} from "@/lib/capture/constraints";
 import {
   accumulate,
   dominantCause,
@@ -51,13 +55,11 @@ const COPY = {
     "We can’t set your baseline just now — nothing’s lost.",
 } as const;
 
-/** Codec probe order (📌 DECISION-13); the backend accepts mp4 + webm. */
-function pickMimeType(): string | undefined {
-  if (typeof MediaRecorder === "undefined") return undefined;
-  for (const type of ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/mp4"]) {
-    if (MediaRecorder.isTypeSupported?.(type)) return type;
-  }
-  return undefined;
+/** Codec probe order (📌 DECISION-13); the backend accepts mp4 + webm. Delegates to the
+ *  SHARED engine-aware negotiation (lib/capture/constraints.ts) so calibration and
+ *  monitoring never diverge on container — scoring is `window − anchor`. */
+function pickMimeType(): CaptureMimeChoice {
+  return pickCaptureMimeType();
 }
 
 function base64ToHex(b64: string): string {
@@ -134,8 +136,14 @@ function defaultDeps(): RecorderDeps {
   return {
     getUserMedia: (constraints) => navigator.mediaDevices.getUserMedia(constraints),
     createRecorder: (stream) => {
-      const mimeType = pickMimeType();
-      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+      const choice = pickMimeType();
+      // Belt-and-braces: startCapture gates on this before the camera opens, so reaching
+      // here unsupported means the guard was bypassed. Never silently record a container
+      // known to produce undecodable output (see lib/capture/constraints.ts).
+      if (!choice.ok) throw new Error("No supported recording container on this browser");
+      const recorder = choice.mimeType
+        ? new MediaRecorder(stream, { mimeType: choice.mimeType })
+        : new MediaRecorder(stream);
       return recorder as unknown as MinimalRecorder;
     },
     postAnchor: defaultPostAnchor,
@@ -393,6 +401,14 @@ export function AnchorRecorder({
     setHealthGate("ok");
     dispatch({ type: "TURN_ON_CAMERA" });
 
+    // Container BEFORE the camera light — same gate as the monitoring recorder, and it
+    // must be the same answer: scoring is `window − anchor`, so a calibration this
+    // browser cannot record usably is worth nothing even if the minute completes.
+    if (!pickMimeType().ok) {
+      dispatch({ type: "CAMERA_ERROR", kind: "camera-unsupported-format" });
+      return;
+    }
+
     if ((await deps.probeCameraPermission()) === "denied") {
       dispatch({ type: "CAMERA_ERROR", kind: "camera-blocked" });
       return;
@@ -561,7 +577,10 @@ export function AnchorRecorder({
     <section className="space-y-6">
       {status === "intro" && <Intro mode={mode} onTurnOnCamera={startCapture} />}
 
-      {(status === "camera-blocked" || status === "camera-busy" || status === "camera-no-device") && (
+      {(status === "camera-blocked" ||
+        status === "camera-busy" ||
+        status === "camera-no-device" ||
+        status === "camera-unsupported-format") && (
         <CameraAccessState
           kind={status.replace("camera-", "") as CameraAccessKind}
           onRetry={startCapture}

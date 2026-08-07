@@ -108,6 +108,14 @@ const CAMERA_ERROR_COPY: Record<CameraErrorKind, { heading: string; body: string
     heading: "A secure connection is needed",
     body: "This page needs a secure (https) connection to use your camera.",
   },
+  "unsupported-format": {
+    // Apple WebKit with no MP4 recorder. We fail here rather than record the WebM this
+    // browser claims to support, because that path produces unreadable video — a full
+    // session that yields no readings. Honest and specific: the camera is not at fault,
+    // and "try again" on this device will not help, so the fix points elsewhere.
+    heading: "This browser can’t record a usable video",
+    body: "Serenify can’t capture a readable session here. Try Safari on an up-to-date iOS, or use a different device.",
+  },
 };
 
 function BlockedPanel({

@@ -115,6 +115,30 @@ describe("MonitoringSession orchestrator", () => {
     });
   });
 
+  it("fails visibly on an engine with no usable container, never opening the camera", async () => {
+    // The iOS shape: Apple WebKit claiming webm and nothing else. Recording that produces
+    // ~45 MB of undecodable video, so the session must not start at all — and the camera
+    // light must never come on for a session that could only ever yield nothing.
+    vi.stubGlobal("navigator", { ...navigator, vendor: "Apple Computer, Inc." });
+    vi.stubGlobal(
+      "MediaRecorder",
+      class {
+        static isTypeSupported = (t: string) => t.startsWith("video/webm");
+      },
+    );
+    try {
+      const { deps } = makeDeps([]);
+      render(<MonitoringSession deps={deps} />);
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /allow camera access/i }));
+      });
+      expect(await screen.findByText(/can’t record a usable video/i)).toBeInTheDocument();
+      expect(deps.getUserMedia).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("routes a blocked camera to the foggy blocked surface", async () => {
     const { deps } = makeDeps([]);
     deps.getUserMedia = vi.fn(async () => {

@@ -80,6 +80,11 @@ function buildCsp(nonce: string, pathname: string): string {
     pathname === "/onboarding" ||
     pathname === "/app/calibrate" ||
     pathname === "/app/monitor";
+  // The flag-gated capture probe (docs/triage/mobile-capture-diagnosis.md) measures its
+  // recorded blob's duration through a `blob:` <video> src, which `media-src`'s fallback
+  // to `default-src 'self'` would block. Scoped to the probe route only; the probe loads
+  // no detector, so it does NOT join isCaptureRoute's wasm/worker allowances.
+  const isProbeRoute = pathname === "/capture-probe";
   const directives = [
     "default-src 'self'",
     // Nonce covers the 2 app inline scripts (theme-migration IIFE, next-themes
@@ -106,6 +111,7 @@ function buildCsp(nonce: string, pathname: string): string {
   // Detector worker allowance, capture-routes only (provisional — narrowed/dropped
   // by the T004 sweep if the runtime needs no blob worker).
   if (isCaptureRoute) directives.push("worker-src 'self' blob:");
+  if (isProbeRoute) directives.push("media-src 'self' blob:");
   // `upgrade-insecure-requests` is PRODUCTION-ONLY. In dev the app is served over
   // http://localhost and WebKit honors this directive by upgrading even loopback
   // subresource requests to https (Chromium/Firefox exempt localhost) — every

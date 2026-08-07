@@ -133,3 +133,5 @@ st1-shots/
 # (Previously only cost.json was ignored, which left graph.json, GRAPH_REPORT.md,
 # cache/, transcripts/, and the dated run dirs untracked-but-unignored noise.)
 graphify-out/
+.vercel
+.env*.local
