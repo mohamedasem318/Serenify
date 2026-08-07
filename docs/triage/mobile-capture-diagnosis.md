@@ -230,3 +230,64 @@ recalibration under the new constraints with zero new code. Persisting capture
 settings alongside the anchor (so a future capture change is detectable server-side)
 needs a migration — the proposed shape is in the PR, **not written**, per the stop
 instruction.
+
+---
+
+# Phase 3 — the bitrate ladder (instrumentation added 2026-08-07)
+
+**Status: built, not yet run on a device.** This section describes the measurement; it
+records no findings.
+
+## The question
+
+iOS Safari records H.264 at ~5.4 Mbit/s at 1280×720@15, against desktop Chrome VP9 at
+~0.75 Mbit/s at the same operating point. At that weight an iOS monitoring session
+produces zero scored windows — uploads arrive carrying under 60 s of media and are gated
+`warming_up`.
+
+`videoBitsPerSecond` has **never been set anywhere in `apps/web`** — the 5.4 Mbit/s
+figure is the encoder default, and WebKit's response to an explicit target is simply
+unmeasured. If WebKit honors a target near 1–2 Mbit/s at usable quality, the fix is a
+one-line recorder option inside the current architecture and a much larger piece of work
+becomes unnecessary.
+
+## The ladder
+
+A second, independent run on the same `/capture-probe` route (`Start the quality
+check`). Seven steps × 25 s ≈ 4 minutes: **unset (encoder default), 3.0, 2.0, 1.5, 1.0,
+0.75, 0.5 Mbit/s**. 0.75 is Chrome VP9 wire parity; 0.5 is an expected-failure anchor, so
+the ladder brackets the usable floor from below as well as above. Container is
+production's own pick (fMP4 on Apple WebKit).
+
+**The ladder holds the production operating point and verifies it rather than assuming
+it.** The camera is opened with `captureVideoConstraints()` (ideal 1280×720@15) and
+`applyConstraints` is never called — the capability run's mid-probe `applyConstraints({})`
+reset is what silently recorded 480×640 once and produced a wire-weight claim that had to
+be withdrawn (#249). Granted track settings are sampled **before and after every step**;
+a step whose resolution isn't 720-class, or that drifts mid-recording, is marked
+`void: true` with a reason and its numbers must not be read as a result.
+
+## Reading the report
+
+`effectiveMbps` (totalBytes × 8 ÷ mediaSeconds) is the honoring answer.
+`reflectedVideoBitsPerSecond` — what `MediaRecorder` reports back — is recorded as a
+separate field and proves nothing: this engine's self-report is exactly what
+`isTypeSupported` already got wrong, claiming WebM support on iOS and then producing
+undecodable output. `mediaToWallRatio` and `maxChunkGapMs` are there to catch a target
+that appears to work by stalling the encoder instead. `ladderSummary` carries one
+readable line per step.
+
+## Clips
+
+The bytes half is answered on-device; the **quality** half is not — client-side detection
+is not the server's FaceMesh, so landmark usability has to be judged offline by the real
+pipeline. Three clips are retained in memory: the unset baseline, 1.50 Mbit/s (safe
+candidate) and 0.75 Mbit/s (Chrome parity). If a retention target comes back void, the
+next-higher valid step stands in and the report records the substitution. Non-retained
+recordings are released as the ladder descends, so peak memory stays ~25–35 MB.
+
+Retrieval is the tester's own OS share sheet (`navigator.share` with a file, falling back
+to a download) — same posture as the text report: **the page transmits nothing, and the
+tester chooses what to send and to whom.** The on-screen instruction is Save to Files →
+attach in WhatsApp as **Document**; sending as a video re-encodes the clip and destroys
+the measurement.
