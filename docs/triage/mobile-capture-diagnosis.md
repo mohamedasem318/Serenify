@@ -233,15 +233,21 @@ instruction.
 
 ---
 
-# Phase 3 — the bitrate ladder (instrumentation added 2026-08-07)
+# Phase 3 — the bitrate ladder (run 2026-08-07)
 
-**Status: built, not yet run on a device.** This section describes the measurement; it
-records no findings.
+**Status: run, answered, instrument retired.** The ladder ran on iPhone / iOS 18.7 /
+Safari 26.5.2 at 1280×720@15, `video/mp4;codecs=avc1.42E01E`. The fix it justified ships
+in `apps/web/lib/capture/constraints.ts`; the `/capture-probe` route and its component,
+flag and CSP/Permissions-Policy plumbing were **removed in the same change** — the probe
+had served its purpose and a camera-opening surface is not worth carrying for nothing.
+Phases 1 and 2 above are left as written: they are the evidence record behind #243/#246/
+#249, and describe an instrument that no longer exists only in the past tense.
 
 ## The question
 
-iOS Safari records H.264 at ~5.4 Mbit/s at 1280×720@15, against desktop Chrome VP9 at
-~0.75 Mbit/s at the same operating point. At that weight an iOS monitoring session
+iOS Safari records H.264 at ~5.4 Mbit/s at 1280×720@15 (**the then-current *inferred*
+figure — the ladder measured 6.72 and superseded it; see below**), against desktop Chrome
+VP9 at ~0.75 Mbit/s at the same operating point. At that weight an iOS monitoring session
 produces zero scored windows — uploads arrive carrying under 60 s of media and are gated
 `warming_up`.
 
@@ -251,43 +257,52 @@ unmeasured. If WebKit honors a target near 1–2 Mbit/s at usable quality, the f
 one-line recorder option inside the current architecture and a much larger piece of work
 becomes unnecessary.
 
-## The ladder
+## The answer
 
-A second, independent run on the same `/capture-probe` route (`Start the quality
-check`). Seven steps × 25 s ≈ 4 minutes: **unset (encoder default), 3.0, 2.0, 1.5, 1.0,
-0.75, 0.5 Mbit/s**. 0.75 is Chrome VP9 wire parity; 0.5 is an expected-failure anchor, so
-the ladder brackets the usable floor from below as well as above. Container is
-production's own pick (fMP4 on Apple WebKit).
+**WebKit honors `videoBitsPerSecond` (measured).** Across seven rungs — unset, 3.0, 2.0,
+1.5, 1.0, 0.75, 0.5 Mbit/s — effective rate (bytes × 8 ÷ media seconds) tracked the target
+**monotonically** and landed **79–92% of it**, consistently under and never over.
 
-**The ladder holds the production operating point and verifies it rather than assuming
-it.** The camera is opened with `captureVideoConstraints()` (ideal 1280×720@15) and
-`applyConstraints` is never called — the capability run's mid-probe `applyConstraints({})`
-reset is what silently recorded 480×640 once and produced a wire-weight claim that had to
-be withdrawn (#249). Granted track settings are sampled **before and after every step**;
-a step whose resolution isn't 720-class, or that drifts mid-recording, is marked
-`void: true` with a reason and its numbers must not be read as a result.
+**The reflected property is not evidence (measured).** `MediaRecorder.videoBitsPerSecond`
+echoed the target **exactly** at all seven rungs while the real figure was 79–92%. It is a
+self-report, the same class of claim as the `isTypeSupported` WebM answer that routed iOS
+into #89. Only `effectiveMbps` decides.
 
-## Reading the report
+**The unset default is 6.72 Mbit/s effective (measured).** The encoder self-reports
+10 Mbit/s — so the default is a *ceiling*, not a rate. This **supersedes the ~5.4 Mbit/s
+figure previously in use**, which was inferred rather than measured.
 
-`effectiveMbps` (totalBytes × 8 ÷ mediaSeconds) is the honoring answer.
-`reflectedVideoBitsPerSecond` — what `MediaRecorder` reports back — is recorded as a
-separate field and proves nothing: this engine's self-report is exactly what
-`isTypeSupported` already got wrong, claiming WebM support on iOS and then producing
-undecodable output. `mediaToWallRatio` and `maxChunkGapMs` are there to catch a target
-that appears to work by stalling the encoder instead. `ladderSummary` carries one
-readable line per step.
+**Compression is not the binding constraint (measured, by transcode).** Re-encoding one
+clip down a ladder to **150 kbps** — identical content, compression the only variable —
+held **62/62** face detections, passed the coverage gate at every rung, and stayed at
+**cosine ≥ 0.997** against the original. The compression effect is **12–25× smaller than
+take-to-take variation**. Note the distinction: that ladder was a *transcode*, so it
+bounds the codec's effect, not the on-device encoder's behavior at those rates.
 
-## Clips
+**Natively-captured low-bitrate clips are clean (measured, native).** Both — 1.35 and
+0.64 Mbit/s effective — ran through the real `packages/ml-video` pipeline at 100% face
+detection, gate PASS, finite (2958,) features.
 
-The bytes half is answered on-device; the **quality** half is not — client-side detection
-is not the server's FaceMesh, so landmark usability has to be judged offline by the real
-pipeline. Three clips are retained in memory: the unset baseline, 1.50 Mbit/s (safe
-candidate) and 0.75 Mbit/s (Chrome parity). If a retention target comes back void, the
-next-higher valid step stands in and the report records the substitution. Non-retained
-recordings are released as the ladder descends, so peak memory stays ~25–35 MB.
+**Orientation, previously undocumented and load-bearing (measured).** iOS reports
+1280×720 before the first record and 720×1280 after, but **every clip is natively
+1280×720 carrying a `rotation=-90` display matrix**. OpenCV honors that matrix and decodes
+to upright portrait, so FaceMesh sees an upright face. Nothing needs to compensate for the
+reported-dimension flip; something would break if the decode path stopped honoring it.
 
-Retrieval is the tester's own OS share sheet (`navigator.share` with a file, falling back
-to a download) — same posture as the text report: **the page transmits nothing, and the
-tester chooses what to send and to whom.** The on-screen instruction is Save to Files →
-attach in WhatsApp as **Document**; sending as a video re-encodes the clip and destroys
-the measurement.
+**Caveat: n=1.** One device, one person, one session.
+
+## What shipped
+
+`videoBitsPerSecond: 750_000` on the **Apple WebKit path only**, in
+`apps/web/lib/capture/constraints.ts`, inherited by both recorders through the shared
+picker so calibration and monitoring cannot diverge. 750 kbps is the lowest rate proven
+*natively* on-device (not via transcode); it yields ~0.64 Mbit/s effective — **~0.80 MB
+per 10 s stride** under #247's bounded upload, down from ~8.4 MB — and is wire parity with
+the Chrome VP9 path.
+
+**Not global, deliberately.** The parameter is a target, not a cap, and Chrome VP9 already
+sits near 0.75 Mbit/s naturally; setting it everywhere risks *raising* that path.
+
+**No forced recalibration.** Existing anchors were captured at ~6.7 Mbit/s and new windows
+arrive at ~0.64, but that delta measures at cosine 0.999 on identical content — far below
+the take-to-take noise the model already absorbs.
