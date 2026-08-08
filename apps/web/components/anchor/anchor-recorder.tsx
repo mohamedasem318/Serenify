@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { checkHealth as defaultCheckHealth, postAnchor as defaultPostAnchor, type AnchorResult } from "@/lib/api/anchor-client";
 import { broadcastAnchorCaptured as defaultBroadcast } from "@/lib/auth-broadcast";
 import {
+  captureRecorderOptions,
   captureVideoConstraints,
   pickCaptureMimeType,
   type CaptureMimeChoice,
@@ -141,8 +142,11 @@ function defaultDeps(): RecorderDeps {
       // here unsupported means the guard was bypassed. Never silently record a container
       // known to produce undecodable output (see lib/capture/constraints.ts).
       if (!choice.ok) throw new Error("No supported recording container on this browser");
-      const recorder = choice.mimeType
-        ? new MediaRecorder(stream, { mimeType: choice.mimeType })
+      // Container AND bitrate target both come from the shared picker — monitoring uses
+      // the same one, and neither may diverge (scoring is `window − anchor`).
+      const options = captureRecorderOptions(choice.mimeType);
+      const recorder = options
+        ? new MediaRecorder(stream, options)
         : new MediaRecorder(stream);
       return recorder as unknown as MinimalRecorder;
     },

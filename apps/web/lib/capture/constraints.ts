@@ -125,3 +125,53 @@ export function pickCaptureMimeType(): CaptureMimeChoice {
   }
   return apple ? UNSUPPORTED : { ok: true, mimeType: undefined };
 }
+
+/**
+ * Encoder bitrate target for the Apple WebKit path — **Apple only, deliberately.**
+ *
+ * WebKit *does* honor `videoBitsPerSecond` (measured 2026-08-07, iPhone / iOS 18.7 /
+ * Safari 26.5.2, 1280×720@15, fMP4): effective rate tracks the target monotonically and
+ * lands 79–92% of it, consistently under and never over. Left unset, the same device
+ * measures **6.72 Mbit/s effective** — the default is a ceiling, not a rate, and the
+ * encoder's own 10 Mbit/s self-report is not the delivered figure. (Nor is the reflected
+ * property: it echoed the target exactly at all seven rungs while the real number was
+ * 79–92%. Same class of self-report as the `isTypeSupported` WebM claim above.)
+ *
+ * 750 kbps is the lowest rate proven **natively on-device**, not via transcode. It yields
+ * ~0.64 Mbit/s effective — ~0.80 MB per 10 s stride under the bounded upload, down from
+ * ~8.4 MB, i.e. about a quarter of a 2–3 Mbit/s uplink instead of 2–3× over it — and it is
+ * wire parity with the Chrome VP9 path, so iOS stops being the outlier. Quality is not the
+ * binding constraint anywhere near here: re-encoding one clip down a ladder to 150 kbps
+ * held 62/62 face detections, passed the coverage gate at every rung, and stayed at cosine
+ * ≥ 0.997 against the original — compression effect 12–25× smaller than take-to-take
+ * variation. Both natively-captured low-bitrate clips ran clean through the real
+ * `packages/ml-video` pipeline (100% detection, gate PASS, finite (2958,) features).
+ *
+ * **Never set this globally.** It is a *target*, not a cap, and the Chrome VP9 path already
+ * sits near 0.75 Mbit/s naturally — applying it everywhere risks raising that path's rate.
+ *
+ * No recalibration is forced. Existing anchors were captured at ~6.7 Mbit/s and new windows
+ * arrive at ~0.64, but that delta measures at cosine 0.999 on identical content, far below
+ * the take-to-take noise the model already absorbs.
+ *
+ * Caveat on record: **n=1** — one device, one person, one session.
+ */
+export const APPLE_VIDEO_BITS_PER_SECOND = 750_000;
+
+/**
+ * The `MediaRecorder` options for THIS engine — the single place the bitrate target is
+ * applied, so calibration and monitoring cannot diverge on it any more than they can on
+ * container (scoring is `window − anchor`).
+ *
+ * Returns `undefined` when there is nothing to set, so the caller can construct the
+ * recorder with no options dictionary exactly as before — the non-Apple browser-default
+ * path is unchanged.
+ */
+export function captureRecorderOptions(
+  mimeType: string | undefined,
+): MediaRecorderOptions | undefined {
+  const options: MediaRecorderOptions = {};
+  if (mimeType) options.mimeType = mimeType;
+  if (isAppleWebKit()) options.videoBitsPerSecond = APPLE_VIDEO_BITS_PER_SECOND;
+  return Object.keys(options).length > 0 ? options : undefined;
+}

@@ -17,7 +17,11 @@
  * container (docs/BACKLOG.md 008 T026 note); the preference order is what changed.
  */
 
-import { pickCaptureMimeType, type CaptureMimeChoice } from "@/lib/capture/constraints";
+import {
+  captureRecorderOptions,
+  pickCaptureMimeType,
+  type CaptureMimeChoice,
+} from "@/lib/capture/constraints";
 
 import { createTailSource, type UploadKind } from "./tail-cutter";
 
@@ -76,8 +80,11 @@ function defaultCreateRecorder(stream: MediaStream): MinimalWindowRecorder {
   // here with an unusable engine means the guard was bypassed. Throw rather than record
   // a container we know produces nothing (Apple WebKit + no MP4 — see constraints.ts).
   if (!choice.ok) throw new Error("No supported recording container on this browser");
-  const recorder = choice.mimeType
-    ? new MediaRecorder(stream, { mimeType: choice.mimeType })
+  // Container AND bitrate target both come from the shared picker — calibration uses the
+  // same one, and neither may diverge (scoring is `window − anchor`).
+  const options = captureRecorderOptions(choice.mimeType);
+  const recorder = options
+    ? new MediaRecorder(stream, options)
     : new MediaRecorder(stream);
   return recorder as unknown as MinimalWindowRecorder;
 }

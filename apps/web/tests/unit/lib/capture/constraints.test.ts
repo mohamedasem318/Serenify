@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  APPLE_VIDEO_BITS_PER_SECOND,
   CAPTURE_VIDEO_CONSTRAINTS,
+  captureRecorderOptions,
   captureVideoConstraints,
   isAppleWebKit,
   pickCaptureMimeType,
@@ -154,5 +156,46 @@ describe("pickCaptureMimeType — Apple WebKit records fMP4 or nothing", () => {
     vi.stubGlobal("navigator", { vendor: "Apple Computer, Inc." });
     vi.stubGlobal("MediaRecorder", undefined);
     expect(pickCaptureMimeType()).toEqual({ ok: false, reason: "no-supported-container" });
+  });
+});
+
+/**
+ * The bitrate target is Apple-ONLY by design (2026-08-07 ladder; docs/DECISIONS.md).
+ * `videoBitsPerSecond` is a *target*, not a cap, and the Chrome VP9 path already sits near
+ * 0.75 Mbit/s naturally — applying it globally risks RAISING that path. These tests pin the
+ * asymmetry, because it is the kind of thing a well-meaning "simplification" would erase.
+ */
+describe("captureRecorderOptions — the bitrate target is Apple WebKit only", () => {
+  it("Apple: carries the 750 kbps target alongside the mp4 mimeType", () => {
+    vi.stubGlobal("navigator", { vendor: "Apple Computer, Inc." });
+    expect(captureRecorderOptions("video/mp4;codecs=avc1.42E01E")).toEqual({
+      mimeType: "video/mp4;codecs=avc1.42E01E",
+      videoBitsPerSecond: 750_000,
+    });
+  });
+
+  it("the shipped number is 750 kbps — the lowest rate proven natively on-device", () => {
+    expect(APPLE_VIDEO_BITS_PER_SECOND).toBe(750_000);
+  });
+
+  it("non-Apple with a container: mimeType ONLY, no bitrate key at all", () => {
+    for (const vendor of ["Google Inc.", ""]) {
+      vi.stubGlobal("navigator", { vendor });
+      const options = captureRecorderOptions("video/webm;codecs=vp9");
+      expect(options).toEqual({ mimeType: "video/webm;codecs=vp9" });
+      expect(options && "videoBitsPerSecond" in options).toBe(false);
+    }
+  });
+
+  it("non-Apple browser-default: undefined, so the caller constructs with NO options", () => {
+    // `new MediaRecorder(stream)` with no second argument is the historical non-Apple
+    // browser-default path; returning undefined keeps that call shape reachable.
+    vi.stubGlobal("navigator", { vendor: "Google Inc." });
+    expect(captureRecorderOptions(undefined)).toBeUndefined();
+  });
+
+  it("Apple with no container still targets the bitrate (the two are independent)", () => {
+    vi.stubGlobal("navigator", { vendor: "Apple Computer, Inc." });
+    expect(captureRecorderOptions(undefined)).toEqual({ videoBitsPerSecond: 750_000 });
   });
 });

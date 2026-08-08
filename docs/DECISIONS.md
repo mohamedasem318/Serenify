@@ -7200,3 +7200,28 @@ specs and smoke-test records are point-in-time and are deliberately **not** retr
 **Cross-references**: the two 2026-08-05 Phase-2 entries above (constraints half, PR #246;
 container half, PR #243); issue #89 (still open — pending the real-device ST-08-2 re-run);
 `docs/triage/mobile-capture-diagnosis.md`; `docs/triage/2026-08-06-bounded-upload-measurement.md`.
+
+---
+
+## 2026-08-07 — iOS capture targets 750 kbps (Apple-only); the capture probe is retired
+
+**Measured** on iPhone / iOS 18.7 / Safari 26.5.2, 1280×720@15, fMP4. **n=1** — one device, one person, one session — caveats every number below.
+
+- WebKit **honors** `videoBitsPerSecond` — effective rate tracks the target monotonically at
+  79–92%, always under. The **reflected** property echoed the target exactly at all seven
+  rungs: a self-report, not evidence of compliance (cf. `isTypeSupported`/#89).
+- **Unset default = 6.72 Mbit/s effective** (encoder self-reports 10 — a ceiling, not a rate).
+  **Supersedes the ~5.4 Mbit/s** figure above, which was **inferred**, not measured.
+- Quality is not a constraint down to **150 kbps** (62/62 detections, gate PASS at every rung,
+  cosine ≥ 0.997, 12–25× under take-to-take variation) — but by **transcode**, so it bounds the
+  codec, not the encoder; **natively** captured 1.35 / 0.64 Mbit/s clips also ran clean.
+- **Orientation**, undocumented and load-bearing: iOS reports 1280×720 before first record and
+  720×1280 after, yet every clip is natively 1280×720 with a `rotation=-90` display matrix —
+  OpenCV honors it and decodes upright, so FaceMesh sees an upright face.
+
+**Decision**: `videoBitsPerSecond: 750_000`, **Apple WebKit only**, set in the shared picker
+(`lib/capture/constraints.ts`) so both recorders inherit it and cannot diverge — the lowest
+rate proven **natively**; ~0.64 Mbit/s effective = **~0.80 MB per 10 s stride** under #247,
+down from ~8.4 MB, and wire parity with Chrome VP9. **Never global**: it is a target, not a
+cap, and VP9 already sits near 0.75. **No forced recalibration** — ~6.7 anchors vs ~0.64
+windows measure cosine 0.999. `/capture-probe` and its plumbing are **removed**. Refs PR #250.
