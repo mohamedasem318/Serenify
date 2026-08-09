@@ -1,42 +1,10 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-
-import { Button } from "@/components/ui/button";
 import {
-  ANCHOR_BANNER_DISMISS_KEY,
-  broadcastAnchorBannerDismissed,
-} from "@/lib/auth-broadcast";
-
-// Same-tab subscribers (sessionStorage writes don't emit a `storage` event in
-// the writing tab). The `storage` listener is what picks up the cross-tab
-// dismissal mirror that cross-tab-auth performs (sessionStorage write +
-// synthetic StorageEvent), so the banner reacts in sibling tabs even though
-// each tab has its own sessionStorage.
-const listeners = new Set<() => void>();
-
-function subscribe(onChange: () => void): () => void {
-  listeners.add(onChange);
-  window.addEventListener("storage", onChange);
-  return () => {
-    listeners.delete(onChange);
-    window.removeEventListener("storage", onChange);
-  };
-}
-
-function getSnapshot(): boolean {
-  return sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY) === "1";
-}
-
-function dismiss(): void {
-  sessionStorage.setItem(ANCHOR_BANNER_DISMISS_KEY, "1");
-  listeners.forEach((notify) => notify());
-  // ST-17 fix 2026-05-28: propagate the dismissal to sibling tabs so the
-  // banner hides everywhere this user is signed in (Mohamed: same session,
-  // same intent — see auth-broadcast.ts). Same-tab effects are still owned
-  // by the sessionStorage write above; this only adds the cross-tab signal.
-  broadcastAnchorBannerDismissed();
-}
+  dismissAnchorPrompt,
+  useAnchorPromptDismissed,
+} from "@/components/anchor/use-anchor-prompt-dismissal";
+import { Button } from "@/components/ui/button";
 
 /**
  * Calibration prompt on /app for an employee with no stored anchor (FR-021).
@@ -45,23 +13,14 @@ function dismiss(): void {
  * state (FR-043) — never amber or red; calm voice (Principle V). The render
  * site (/app) already gates this to employees, so this component is unconditional.
  *
- * The server snapshot pretends "dismissed" so SSR + initial hydration render
- * nothing (📌 ST-11 fix 2026-05-28). Without this, a dismissed user refreshing
- * the page sees the banner FLASH in (server renders it visible) and then
- * vanish once the client reads sessionStorage. A small post-hydration pop-in
- * for non-dismissed users is the accepted trade-off — the alternative is a
- * visible flash that users notice on every refresh until they calibrate.
- *
- * Sign-out clears the dismissal (via auth-broadcast.ts → broadcastSignOut +
- * cross-tab-auth's signout branch) so the next sign-in re-shows the banner —
- * sessionStorage by itself would survive sign-out/sign-in within one tab.
+ * The dismissal store — including the SSR anti-flash snapshot (📌 ST-11 fix
+ * 2026-05-28), the sign-out reset, and the cross-tab mirror — now lives in
+ * `use-anchor-prompt-dismissal.ts`, shared verbatim with the recalibration prompt.
+ * It was EXTRACTED from this file unchanged; nothing about this banner's behaviour
+ * moved with it.
  */
 export function CalibrationBanner() {
-  const dismissed = useSyncExternalStore(
-    subscribe,
-    getSnapshot,
-    () => true, // server snapshot: render nothing, reveal post-hydration
-  );
+  const dismissed = useAnchorPromptDismissed();
 
   if (dismissed) return null;
 
@@ -93,7 +52,7 @@ export function CalibrationBanner() {
           <Button asChild variant="foggy" className="h-11">
             <a href="/app/calibrate">Set baseline</a>
           </Button>
-          <Button variant="ghost" className="h-11" onClick={dismiss}>
+          <Button variant="ghost" className="h-11" onClick={dismissAnchorPrompt}>
             Dismiss
           </Button>
         </div>

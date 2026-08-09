@@ -177,6 +177,13 @@ export function broadcastAnchorCaptured(): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(ANCHOR_BROADCAST_KEY, `captured:${Date.now()}`);
+    // A capture — first-time OR recalibration — permanently retires the
+    // recalibration prompt in this browser. Written HERE rather than at a
+    // recalibration-specific call site precisely because this is the one
+    // function every successful capture already funnels through, so the latch
+    // cannot drift out of sync with the thing it claims to record. See the
+    // block at the bottom of this file for why the latch is browser-scoped.
+    localStorage.setItem(RECALIBRATION_PROMPT_DONE_KEY, "1");
   } catch {
     // see broadcastSignIn — best-effort; failure just means no sibling refresh.
   }
@@ -249,5 +256,68 @@ export function clearAnchorBannerDismissal(): void {
   } catch {
     // best-effort — failure here just means a fresh sign-in in the same tab
     // re-sees the banner-already-dismissed state until the tab closes.
+  }
+}
+
+// ── Recalibration prompt — the permanent "already redone it" latch ───────────
+//
+// The recalibration prompt (components/anchor/recalibration-prompt.tsx) recommends
+// that a user who ALREADY has an anchor records a new one, because capture changed
+// materially — resolution, container/codec and bitrate all moved — and scoring is
+// window-minus-anchor. An anchor captured under the old settings is compared against
+// windows captured under the new ones. Nothing in the API detects that; there is no
+// anchor-to-window guard. It is a silent scoring error, not a visible bug.
+//
+// DISMISSAL IS NOT A NEW MECHANISM. The prompt reuses ANCHOR_BANNER_DISMISS_KEY
+// above verbatim — the same sessionStorage key, the same sign-out clearing, the same
+// cross-tab broadcast. That is safe because the two surfaces are MUTUALLY EXCLUSIVE
+// by construction: `app/(authed)/app/page.tsx` renders the banner only on
+// `hasAnchor === false` and the prompt only on `hasAnchor === true`, so no user can
+// ever see both and no dismissal can ever be attributed to the wrong surface.
+//
+// WHAT IS NEW is only the key below — the "they have actually recalibrated, never ask
+// again" latch. It needs its own storage because it is the one part of this feature
+// the session-scoped dismissal cannot express: dismissal must come back next login,
+// this must not, ever.
+//
+// WHY localStorage AND NOT THE DATABASE (Mohamed, 2026-08-10). There is no server-side
+// signal available to answer "have they redone it since capture changed":
+// `has_anchor()` returns a bare boolean, and `anchor_captured_at` is deliberately
+// unreadable by every client role — the column-level SELECT whitelist in
+// `20260527000000_anchor_columns.sql` omits all three anchor columns, and DECISION-23 /
+// FR-041 say calibration state is whether-set and never a date. Answering it
+// server-side therefore means storing something new ABOUT the user, which is a
+// Privacy-Policy and Terms question, for what is only a UI preference. A deploy-date
+// cutoff on `anchor_captured_at` was rejected for the same reason plus a second one:
+// it collapses into cohort-targeting-by-timestamp, which this feature deliberately
+// does not do — everyone with an anchor is prompted.
+//
+// THE ACCEPTED COST, stated plainly: "permanently" means per browser profile. A user
+// who recalibrates on their laptop and later signs in on their phone is prompted once
+// more there, and dismissing does not stop it — only capturing on that device does.
+// With this user base that is a small, bounded annoyance and not worth a migration.
+//
+// NOT CLEARED ON SIGN-OUT — deliberately, and it is the whole point of the key. It
+// records a fact about the anchor ("a capture has happened in this browser since the
+// prompt shipped"), not about the session, so `clearAnchorBannerDismissal` above must
+// never learn about it.
+
+export const RECALIBRATION_PROMPT_DONE_KEY = "serenify-recalibration-prompt-done";
+
+/**
+ * True iff this browser has recorded a capture since the recalibration prompt
+ * shipped — i.e. the prompt is permanently retired here. Reads localStorage
+ * directly rather than caching, so a capture in THIS tab takes effect on the next
+ * render without any invalidation step. Returns false under SSR and treats a
+ * throwing storage (sandboxed iframe, private-browsing) as "not done": the cost of
+ * a false negative is one extra dismissible prompt, the cost of a false positive is
+ * a user who silently never gets asked.
+ */
+export function hasCompletedRecalibrationPrompt(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem(RECALIBRATION_PROMPT_DONE_KEY) === "1";
+  } catch {
+    return false;
   }
 }
