@@ -46,6 +46,29 @@ jobs:
       - name: Check speckit skills exist and .gitignore is narrow
         run: node scripts/check-speckit-skills.mjs
 
+  # --- Structural guard: docs/PROGRESS.md must not fall behind the code -------
+  #
+  # `docs/PROGRESS.md` went silently stale twice (PRs #142–#144, then #210–#256),
+  # both times while DECISIONS/BACKLOG/CHANGELOG stayed current. This measures
+  # DRIFT — commits since PROGRESS.md last changed — rather than demanding an entry
+  # per PR, because the convention is per line of work and a per-PR gate would be
+  # wrong about a third of the time. Rationale in the script header.
+  #
+  # `fetch-depth: 0` is load-bearing: the default depth-1 checkout cannot see when
+  # PROGRESS.md last changed, and the script degrades to a warning rather than
+  # failing on a checkout setting.
+  progress-freshness:
+    name: progress freshness guard
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check docs/PROGRESS.md has not fallen behind
+        run: node --test scripts/check-progress-freshness.test.mjs
+      - name: Report freshness
+        run: node scripts/check-progress-freshness.mjs
+
   # --- apps/web — the only JS/TS workspace: lint + typecheck + Vitest ---------
   web:
     name: web (lint · typecheck · vitest)

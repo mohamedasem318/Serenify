@@ -7377,3 +7377,71 @@ than free to undo.
 **Verified in a real browser** at 375px with touch: taps above and
 below the panel leave the dialog open and write nothing; Escape, the
 corner control and "Not now" each close it and record the dismissal.
+
+---
+
+## 2026-08-10 — `PROGRESS.md` freshness is enforced as *drift*, not as a per-PR gate
+
+`docs/PROGRESS.md` has now gone silently stale twice, and both times the other three
+tracking docs stayed current:
+
+- **PRs #142/#143/#144** (2026-07-12/13) shipped the entire production-deployment
+  milestone with no entry. Caught nine days later by a human recon
+  (`RECON_2026-07-21.md:304`) and backfilled on 2026-07-22.
+- **PRs #210 → #256** (2026-07-29 → 2026-08-10) — thirty-four of them — shipped with no
+  entry. Caught by a passing question, backfilled in **PR #257**.
+
+**The rule was never missing.** Constitution Principle VIII already says "Progress is
+tracked in `docs/PROGRESS.md`", and it was in force both times. What was missing is
+anything that checks. The two rules in this repository that have never drifted are the
+two with machinery behind them — the `speckit-guard` CI job and `main`'s branch
+protection — so the fix is machinery of the same shape, in the same place, rather than a
+stronger sentence.
+
+**Rejected: "read the constitution before every task."** This was the first proposal and
+it is the weakest available option. It is the layer that already failed, twice; it is
+checked by nobody; and it would load ~1,300 lines of governance on tasks that touch no
+code. More decisively, both failures were **drift accumulating over weeks**, not one PR
+forgetting — a per-task reading habit is aimed at a failure that did not occur.
+
+**Rejected: a per-PR gate** (fail any PR touching `apps/**`, `packages/**` or
+`supabase/**` without also touching `docs/PROGRESS.md`, with a `progress: n/a` escape).
+Stricter and more immediate, and wrong-shaped for this convention. `PROGRESS.md` is a
+**per-line-of-work** log, not a per-PR one: of the 34 PRs in the second gap, roughly ten
+correctly warranted no entry of their own — **#248** was a one-file logging change,
+**#251**/**#254** were BACKLOG-only syncs, and the seventeen video PRs (**#223**–**#239**)
+rightly became **one** entry. A gate that is wrong about a third of the time trains people
+to reach for its escape hatch without reading it, and a reflexively-used escape hatch is
+indistinguishable from no gate at all.
+
+**Adopted: a drift threshold.** `scripts/check-progress-freshness.mjs` + the
+`progress freshness guard` CI job count commits landed since `docs/PROGRESS.md` last
+changed. **Warn at 8, fail at 15.**
+
+The thresholds were chosen by **replaying the real gap in a detached worktree**, not
+argued for: the guard warns by `2baca4f` (2026-07-30, 10 behind) and **fails at `a7d2a11`
+on 2026-07-31 — two days in** — against a gap that actually ran twelve days and
+thirty-four commits, where it reports 34 and exits 1.
+
+**Three deliberate softenings, each because a guard that cries wolf gets disabled:**
+
+1. **A shallow clone warns, never fails.** The default `actions/checkout` depth-1 cannot
+   see when a file last changed. `fetch-depth: 0` is set on the job, but a future
+   copy-paste that drops it must not fail PRs over a checkout setting.
+2. **The quarterly-retro check warns, always.** The constitution's §Compliance review asks
+   for a brief quarterly retro entry in `PROGRESS.md`. **That obligation has never once
+   been met** — there is no retro entry in the file at all — so failing on it would block
+   every PR from the day this lands. The warning is the honest signal; making it a
+   failure is a separate decision that should be taken deliberately, not smuggled in here.
+3. **`Progress-Freshness: override (<reason>)`** as a commit trailer downgrades the
+   failure to a warning, for the production-hotfix case. A commit trailer rather than a
+   label or a workflow input **specifically so that using it leaves a permanent, greppable
+   mark in history** — a label disappears, a trailer does not.
+
+**Paired with a written contract**, since machinery without a stated rule just produces
+confused failures: a "Tracking docs — which one, and when" table now sits in **both**
+`CLAUDE.md` and `AGENTS.md`, per the mirroring contract those two files gained in **#220**.
+
+**Cross-references**: `docs/PROGRESS.md` backfill note (2026-08-10); PR **#257**;
+`scripts/check-progress-freshness.mjs`; `.github/workflows/ci.yml`. **No CHANGELOG
+entry** — no spec is amended. **No BACKLOG entry** — nothing here is deferred.

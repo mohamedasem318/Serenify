@@ -50,6 +50,28 @@ Never remap a Graphite token name to a different source value inside `@theme inl
 - Fixed-pixel SVG: 1 unit = 1px; `SVG width = nLanes × laneWidth` with a matching `viewBox`
 - **No stretched viewBox** — a stretched viewBox is the known regression that broke prior builds
 
+## Tracking docs — which one, and when
+
+Four docs, four jobs. A change usually touches more than one, and the failure mode is never
+"wrote the wrong one" — it is "wrote three and skipped the fourth".
+
+| Doc | What goes in it | When |
+|---|---|---|
+| `docs/PROGRESS.md` | What shipped, what was verified, what was **not** verified, what was knowingly left broken | When a **line of work** lands |
+| `docs/DECISIONS.md` | A judgement call and its reasoning, including rejected alternatives | Same PR as the decision. **Append-only** — reversals are new entries citing the original |
+| `docs/CHANGELOG.md` | Amendments to an approved spec, and constitution amendments | Only when a spec is actually amended |
+| `docs/BACKLOG.md` | A deferred follow-up, plus its GitHub issue | Same change as the deferral or the fix (see below) |
+
+- `PROGRESS.md` is per **line of work**, not per PR — a run of PRs building one thing gets **one**
+  entry, written when that work lands. A PR shipping no user-visible or structural change (a
+  BACKLOG-only sync, a one-file log-level fix) needs no entry of its own.
+- Enforced loosely by CI: `scripts/check-progress-freshness.mjs` (the `progress freshness guard` job)
+  warns at 8 commits behind, fails at 15. It measures **drift**, not per-PR compliance.
+- `PROGRESS.md` went silently stale twice (PRs #142–#144, then #210–#256, backfilled in #257) while
+  the other three docs stayed current. The rule existed both times; nothing checked it.
+- Escape hatch for the hotfix case: a `Progress-Freshness: override (<reason>)` trailer on a commit
+  downgrades the failure to a warning. It is a commit trailer so that using it leaves a permanent mark.
+
 ## Backlog ↔ Issues
 
 `docs/BACKLOG.md` is the source of truth and is mirrored 1:1 to GitHub Issues.
