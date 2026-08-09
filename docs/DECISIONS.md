@@ -7225,3 +7225,55 @@ rate proven **natively**; ~0.64 Mbit/s effective = **~0.80 MB per 10 s stride** 
 down from ~8.4 MB, and wire parity with Chrome VP9. **Never global**: it is a target, not a
 cap, and VP9 already sits near 0.75. **No forced recalibration** — ~6.7 anchors vs ~0.64
 windows measure cosine 0.999. `/capture-probe` and its plumbing are **removed**. Refs PR #250.
+
+---
+
+## 2026-08-09 — Tier-1 extractor prewarm: tried and ABANDONED (no-go); #112 closed by measurement
+
+**Status**: Rejected (negative result — recorded so it is not re-attempted). Built and measured on
+the branch `try-tier1-extractor-prewarm` (PR #116, **closed unmerged**, branch deleted; head commit
+`c74edf7` retained via the closed PR). `main` is byte-for-byte unchanged — no `prewarm` symbol
+exists anywhere in `apps/api` or `packages/ml-video`. This is the **T1** option of the warm-up
+latency item (#112); the **T2** option was rejected on 2026-06-26 (PR #114, entry above). With this
+entry both measured tiers are on the record and **#112 is closed** — by measurement, not by a fix.
+
+**Hypothesis**: window 1 of a session carried a ~27–29 s cold-start spike while MediaPipe and the
+model initialized, so running the real `compute_anchor` + `predict_delta` path once at FastAPI
+startup — over a fabricated 330-frame clip, result discarded — would remove that spike from the
+first genuine window and pull the first reading earlier.
+
+**Why it was abandoned — three findings**:
+1. **No measured win, on its own harness.** Fresh-process replay against the real ASGI app and the
+   continuous Chrome fixtures: first-band processing **7.19 s with prewarm disabled vs 7.42 s
+   enabled**. It bought **2.15 s of added boot** (1.584 s → 3.747 s) for nothing outside the noise.
+2. **The spike it targeted was mis-sized.** The 29–44 s cold baseline did not reproduce on the
+   replay host even with prewarm off. A later local slow-first-read investigation put the real
+   one-time cold start at **~5 s**, not 27–44 s — an order of magnitude smaller than the premise.
+   That investigation lived on a local-only branch that was never pushed and is **not recoverable
+   from the remote**, which is part of why it is being written down here.
+3. **The warm-up tail was removed by other work before this could ship.** #112 described ~2:30 to
+   first reading: a locked ~60 s recording gate plus ~80–100 s of serialized warm-up. The
+   2026-08-08 real-iPhone ST-08-2 re-run measured **first reading at 1:25 / 1:31** — at the ~90 s
+   capture floor. **The dominant cause was #247** (bounded header+tail upload per stride, absolute-
+   clock server decode): it removed the `O(elapsed)` payload growth that was starving the early
+   windows, taking a stride's upload from ~8.4 MB to ~0.80 MB. The Apple fMP4 / 750 kbps change
+   (#250) compounded it on the iOS path. Neither is a warm-up optimisation — the warm-up tail T1
+   and T2 were both aiming at stopped being the binding constraint.
+
+**Confirmed good (kept as knowledge, not as code)**: the implementation itself was sound — best-
+effort, failure-tolerant (a warm-up exception logs a warning and startup continues), behind a
+setting, and covered by tests. Nothing about it was wrong except that the problem moved.
+
+**No CHANGELOG entry** — nothing shipped.
+
+**Revisit only if**: cold-process cost becomes material again — a materially heavier model or
+extractor, or a deploy topology that scales to zero often enough that the ~5 s first-session
+penalty is paid by many users rather than the first one after a deploy. On the current Azure
+Container Apps setup neither holds.
+
+**T3 was never tried and this does not foreclose it.** The remaining tier — a provisional early
+band at M=2–3 instead of 4 — is untouched. It is the only lever left that could move time-to-first-
+reading below the ~90 s floor, and it is not a performance change: it trades smoothing quality and
+touches the locked M=N=4 contract (SC-003 drift), so it needs sign-off before anyone writes code.
+Anyone picking it up should read this entry and the 2026-06-26 T2 entry first — T1 and T2 are both
+measured dead ends, for different reasons.

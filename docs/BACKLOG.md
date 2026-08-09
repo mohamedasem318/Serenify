@@ -1617,8 +1617,27 @@ The diagnostic traces which path fires on a real walk-away, confirms whether "ab
 **Fix**: a distinct `service-unavailable` op + `ServiceUnavailablePanel` ("Can't reach Serenify right now", FOGGY attention, `CloudOff` icon, a "Try again" that re-attempts the create — the camera never opens until a session is confirmed). Honest routing: `no_anchor` → calibrate-first (unchanged); `401` / null-token → the existing **signed-out** re-auth surface (a token problem, not "the backend is down"); `network` / `5xx` / stray `403` → service-unavailable. Path A (real `getUserMedia` denial) untouched.
 **Verified**: **Stage 2 (API off):** new "Can't reach Serenify" surface confirmed; a genuine camera-permission denial still shows the camera copy. Surfaces correctly separated.
 
-### Warm-up latency — ~2:30 to first reading (parked enhancement) (#112)
-**Status**: watch (`type:tech-debt` / `area:api` + `area:web`) — **OPEN, parked future enhancement; do NOT close.**
+### ~~Warm-up latency — ~2:30 to first reading (parked enhancement)~~ — resolved (#112)
+**Status**: resolved — 2026-08-09. GitHub issue **#112 CLOSED** in the same change (Principle VIII).
+**Resolved by measurement, not by a fix.** The 2026-08-08 real-iPhone ST-08-2 re-run measured **time
+to first reading at 1:25 / 1:31**, against the ~2:30 this entry was written about — i.e. at the ~90 s
+capture floor, leaving no warm-up tail to tune. **The dominant cause was PR #247** (bounded
+header+tail upload per stride, absolute-clock server decode), which removed the `O(elapsed)` payload
+growth that was starving the early windows and took a stride's upload from ~8.4 MB to ~0.80 MB; the
+Apple fMP4 / 750 kbps change (PR #250) compounded it on the iOS path. Neither is a warm-up
+optimisation — the ~80–100 s serial warm-up described below simply stopped being the binding
+constraint. Occasional slower first readings on the dev laptop were traced to **local machine load,
+not the pipeline**.
+**The "do NOT close" marker below is lifted deliberately**, by Mohamed on 2026-08-09, on the basis of
+that measurement. **T3 was never tried and closing this does not foreclose it** — a provisional early
+band at M=2–3 remains the only lever that could go below the ~90 s floor, and it is a
+smoothing-quality/contract decision (locked M=N=4, SC-003 drift) needing sign-off, not a performance
+tweak. **T1 and T2 are both recorded as measured dead ends** — T1 (extractor prewarm) in
+`docs/DECISIONS.md` 2026-08-09 (PR #116 closed unmerged: no measured win, and the cold-start spike it
+targeted measured ~5 s rather than the assumed 27–44 s), T2 (warm-up scoring concurrency) in
+`docs/DECISIONS.md` 2026-06-26 (PR #114 closed unmerged, capture-floor bound). Anyone revisiting
+should read both entries before writing code.
+**Original entry follows, unedited, for the record.**
 **Surfaced**: 2026-06-26, while measuring the #110 fix. Steady-state lag is fixed (bounded ~18–22 s/window); the remaining slow part is the **warm-up to first reading (~2:30)** — the expected cost of concurrency = 1.
 **Breakdown** (post-fix, local laptop): first **band** (4th scored window) ≈ **~60 s recording gate** (locked, FR-002 / Constitution Principle II — the hard floor) + **~80–100 s serial warm-up** (4 cold-start windows × ~20–25 s, serialized back-to-back; window 1 carries a ~27–29 s cold-start spike). The ~12 s `getSessionTrend` poll is **not** on the bloom's critical path (the band comes from the live `submitWindow` response; the poll only feeds the "This session" trend card).
 **Tier options (ranked by safety)**: **T1** (low risk, ~10–13 s real + perceived) pre-warm the extractor to kill the first-window cold-start spike + a display-only "getting your first read — N of 4" cue → ~2:15, no inference-path change. **T2** (high risk/effort, realistically **~2:00 not ~90 s** given the 10 s window spacing) bounded warm-up burst — score the first M=4 windows concurrently then **hard-clamp to 1**; re-opens the just-fixed path, needs `_SessionBuffers` locking (#79), and must **score-all-of-the-first-M (not drop-stale)** or warm-up starves. **T3** (medium risk) provisional early band at M=2–3 — trades smoothing quality (touches the locked M=N=4 contract; SC-003 drift; needs sign-off).
