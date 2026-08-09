@@ -30,6 +30,32 @@ component + two hand-sync exceptions; manager-visibility copy discipline) and
 MUST NOT re-amend the constitution. Closes #75 and #157; **not** #62.
 <!-- SPECKIT END -->
 
+## Tracking docs — which one, and when
+
+Four docs, four jobs. A change usually touches more than one, and the failure mode is
+never "wrote the wrong one" — it is "wrote three and skipped the fourth".
+
+| Doc | What goes in it | When |
+|---|---|---|
+| `docs/PROGRESS.md` | What shipped, what was verified, what was **not** verified, what was knowingly left broken | When a **line of work** lands |
+| `docs/DECISIONS.md` | A judgement call and its reasoning, including rejected alternatives | Same PR as the decision. **Append-only** — reversals are new entries citing the original |
+| `docs/CHANGELOG.md` | Amendments to an approved spec, and constitution amendments | Only when a spec is actually amended |
+| `docs/BACKLOG.md` | A deferred follow-up, plus its GitHub issue | Same change as the deferral or the fix (see below) |
+
+**`PROGRESS.md` is per line of work, not per PR.** A run of PRs building one thing gets
+**one** entry, written when that work lands — not seventeen entries, and not "later".
+A PR that ships no user-visible or structural change (a BACKLOG-only sync, a one-file
+log-level fix) needs no entry of its own.
+
+**This is enforced, loosely.** `scripts/check-progress-freshness.mjs` and the
+`progress freshness guard` CI job warn when `PROGRESS.md` is 8 commits behind and fail
+at 15 — measuring *drift*, not per-PR compliance. `PROGRESS.md` has gone silently stale
+twice (PRs #142–#144, then #210–#256, backfilled in #257) while the other three stayed
+current; the rule existed both times and nothing checked it. For the rare case where the
+entry genuinely has to wait, a `Progress-Freshness: override (<reason>)` trailer on a
+commit downgrades the failure — it lives in the commit message so that using it leaves a
+permanent mark.
+
 ## Backlog ↔ Issues
 
 `docs/BACKLOG.md` is the source of truth and is mirrored 1:1 to GitHub Issues. When you log
