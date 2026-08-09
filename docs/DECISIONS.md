@@ -7277,3 +7277,103 @@ reading below the ~90 s floor, and it is not a performance change: it trades smo
 touches the locked M=N=4 contract (SC-003 drift), so it needs sign-off before anyone writes code.
 Anyone picking it up should read this entry and the 2026-06-26 T2 entry first — T1 and T2 are both
 measured dead ends, for different reasons.
+
+---
+
+## 2026-08-10 — Recalibration prompt: a browser-scoped latch, deliberately not a database column
+
+**Status**: Accepted.
+
+**Context**: Capture has changed materially since most anchors were
+recorded — resolution, container/codec and bitrate all moved (see the
+2026-08-05 constraints/container entries and the 2026-08-07 bitrate
+entry). Scoring is window minus anchor, so an anchor captured under the
+old settings is compared against windows captured under the new ones.
+Nothing in the API detects this; there is no anchor-to-window guard. It
+is a **silent scoring error, not a visible bug**, which is why it needs
+a user-facing surface at all.
+
+**Decision**: On `/app`, every employee who already has an anchor is
+shown a dismissible modal recommending they record a new baseline.
+
+1. **No cohort targeting and no cutoff timestamp.** Everyone with an
+   anchor is prompted. The user base is small enough that the simplest
+   version is the right one.
+2. **Dismissal reuses the calibration banner's existing key**
+   (`ANCHOR_BANNER_DISMISS_KEY`) rather than adding a parallel
+   mechanism. This is safe because the two surfaces are mutually
+   exclusive by construction: `app/(authed)/app/page.tsx` renders the
+   banner only on `hasAnchor === false` and the prompt only on
+   `hasAnchor === true`. Sharing the key inherits sign-out clearing and
+   the cross-tab mirror for free.
+3. **"Stops permanently once they recalibrate" is a `localStorage`
+   latch** (`RECALIBRATION_PROMPT_DONE_KEY`), written inside
+   `broadcastAnchorCaptured()` — the one function every successful
+   capture already funnels through, so the latch cannot drift from the
+   thing it records.
+
+**Rationale for (3), which is the load-bearing choice**: there is no
+server-side signal that can answer "have they redone it since capture
+changed". `has_anchor()` returns a bare boolean and
+`anchor_captured_at` is unreadable by every client role — the
+column-level SELECT whitelist in `20260527000000_anchor_columns.sql`
+omits all three anchor columns, and DECISION-23 / FR-041 fix
+calibration state as whether-set, never a date. Answering it
+server-side therefore means storing something new *about the user*,
+which is a Privacy Policy and Terms question, for what is only a UI
+preference. A deploy-date cutoff on `anchor_captured_at` was rejected
+for that reason plus a second: it collapses into
+cohort-targeting-by-timestamp, which (1) deliberately does not do.
+
+**Accepted cost, stated plainly**: "permanently" means *per browser
+profile*. A user who recalibrates on their laptop and later signs in on
+their phone is prompted once more there, and dismissing does not stop
+it — only capturing on that device does. With this user base that is a
+small, bounded annoyance and not worth a migration. If it proves
+otherwise, the reversal is a profiles column and a new entry here.
+
+**Privacy**: no change to what is collected, stored, or retained. The
+latch never leaves the browser, so no Privacy Policy or Terms review
+was triggered.
+
+**Scope**: the modal, its persistence, the deep link to the account
+baseline section, and copy. No change to scoring, calibration logic, or
+the anchor schema; no anchor invalidated or nulled.
+
+---
+
+## 2026-08-10 — Recalibration prompt: outside-press does not dismiss (amends the entry above, same day)
+
+**Status**: Accepted. Amends the 2026-08-10 recalibration-prompt entry.
+
+**Trigger**: Mohamed, testing the Vercel preview — "you can dismiss it
+by clicking outside which kinda defeats the purpose".
+
+**Decision**: `onPointerDownOutside` and `onInteractOutside` are
+prevented on the recalibration prompt. Escape, the corner control and
+"Not now" all still dismiss.
+
+**Rationale**: the problem is not that backdrop dismissal is easy, it
+is what a stray tap COSTS here. This dismissal is remembered for the
+whole auth session, so an accidental brush of the backdrop silently
+spends the user's one showing without them having read it, and it does
+not return until they next sign in. The risk is worst on the surface
+that matters most: below 640px `DialogContent` is edge-to-edge, so
+"outside" is a thin strip above and below the panel and is easy to
+catch with a thumb. Escape and an explicit control are deliberate acts;
+a backdrop tap is not, and should not be able to consume a decision the
+user has not made.
+
+**Not a move toward a gate.** The prompt remains advice with three real
+exits. It is deliberately still distinct from `backend-down-modal.tsx`,
+which suppresses every path including Escape because it genuinely is a
+gate. Both behaviours are pinned by tests so neither can drift into the
+other.
+
+**Deviation noted**: this departs from the usual "close on backdrop
+click" default, taken because the dismissal here is persistent rather
+than free to undo.
+
+**Verified in a real browser** at 375px with touch: taps above and
+below the panel leave the dialog open and write nothing; Escape, the
+corner control and "Not now" each close it and record the dismissal.

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { CalibrationBanner } from "@/components/anchor/calibration-banner";
+import { RecalibrationPrompt } from "@/components/anchor/recalibration-prompt";
 import { RecentChatsCard } from "@/components/home/recent-chats-card";
 import { ThingsThatMightHelpCard } from "@/components/home/things-that-might-help-card";
 import { TodaysCheckinCard } from "@/components/home/todays-checkin-card";
@@ -43,6 +44,13 @@ export default async function AppPage() {
     return (
       <div className="mx-auto w-full max-w-6xl space-y-10 pb-12">
         {hasAnchor === false && <CalibrationBanner />}
+        {/* The two anchor prompts are MUTUALLY EXCLUSIVE by construction, and this pair
+            of conditions is what makes that true: `hasAnchor` is an explicit boolean
+            from has_anchor(), so `false` and `true` cannot both hold, and a null/error
+            read renders NEITHER — the same conservative posture the banner already had.
+            That exclusivity is load-bearing, not incidental: it is why both surfaces can
+            safely share one session-dismissal key (see use-anchor-prompt-dismissal.ts). */}
+        {hasAnchor === true && <RecalibrationPrompt />}
         <WelcomeBanner fullName={profile.full_name} />
         {/* 009 / FR-012: the check-in card is its OWN full-width row so the expanded lane plot
             gets the real ~1104px desktop drawing area (DC-002) — a half-width column would

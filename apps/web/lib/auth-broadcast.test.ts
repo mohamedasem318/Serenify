@@ -6,11 +6,13 @@ import {
   ANCHOR_BROADCAST_KEY,
   AUTH_BROADCAST_KEY,
   AUTH_SIGNIN_COOKIE,
+  RECALIBRATION_PROMPT_DONE_KEY,
   broadcastAnchorBannerDismissed,
   broadcastAnchorCaptured,
   broadcastSignOut,
   clearAnchorBannerDismissal,
   consumePendingSignIn,
+  hasCompletedRecalibrationPrompt,
   destinationBroadcastsSignIn,
   parseAnchorBannerDismissBroadcast,
   parseAnchorBroadcast,
@@ -159,5 +161,56 @@ describe("calibration banner session reset (📌 ST-11 FR-023/024)", () => {
     broadcastSignOut();
     expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
     expect(parseAuthBroadcast(localStorage.getItem(AUTH_BROADCAST_KEY))).toBe("signout");
+  });
+});
+
+describe("recalibration prompt latch (2026-08-10)", () => {
+  it("is not set until a capture happens", () => {
+    expect(hasCompletedRecalibrationPrompt()).toBe(false);
+  });
+
+  it("a capture retires the prompt permanently in this browser", () => {
+    broadcastAnchorCaptured();
+    expect(localStorage.getItem(RECALIBRATION_PROMPT_DONE_KEY)).toBe("1");
+    expect(hasCompletedRecalibrationPrompt()).toBe(true);
+  });
+
+  it("rides the SAME call the sibling-tab refresh uses, so it cannot drift", () => {
+    // Both effects come out of one function. If a future change moves the latch to a
+    // recalibration-only call site, a first-time capture would stop retiring the
+    // prompt and that user would be nagged forever.
+    broadcastAnchorCaptured();
+    expect(parseAnchorBroadcast(localStorage.getItem(ANCHOR_BROADCAST_KEY))).toBe(true);
+    expect(hasCompletedRecalibrationPrompt()).toBe(true);
+  });
+
+  it("SURVIVES sign-out — it records the anchor, not the session", () => {
+    broadcastAnchorCaptured();
+    broadcastSignOut();
+    // The session dismissal is reset by sign-out; the latch must not be, or every
+    // sign-out would resurrect a prompt the user has already acted on.
+    expect(sessionStorage.getItem(ANCHOR_BANNER_DISMISS_KEY)).toBeNull();
+    expect(hasCompletedRecalibrationPrompt()).toBe(true);
+  });
+
+  it("lives in localStorage, not the per-tab sessionStorage", () => {
+    // "Permanently" has to outlive the tab. sessionStorage would silently downgrade
+    // the guarantee to "until this tab closes".
+    broadcastAnchorCaptured();
+    expect(sessionStorage.getItem(RECALIBRATION_PROMPT_DONE_KEY)).toBeNull();
+  });
+
+  it("reads false rather than throwing when storage is unavailable", () => {
+    const getItem = Storage.prototype.getItem;
+    Storage.prototype.getItem = () => {
+      throw new Error("sandboxed");
+    };
+    try {
+      // A false negative costs one extra dismissible prompt; a throw here would take
+      // down the dashboard render. Treat the honest failure as "not done".
+      expect(hasCompletedRecalibrationPrompt()).toBe(false);
+    } finally {
+      Storage.prototype.getItem = getItem;
+    }
   });
 });
