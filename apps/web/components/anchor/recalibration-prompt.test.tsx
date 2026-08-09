@@ -109,15 +109,27 @@ describe("RecalibrationPrompt — it is advice, not a gate", () => {
     expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
   });
 
-  it("never suppresses a dismiss path in source (that is the gate idiom, not this)", () => {
+  it("keeps Escape and the corner control live — it is not the backend-down gate", () => {
     const source = readFileSync(
       resolve(process.cwd(), "components/anchor/recalibration-prompt.tsx"),
       "utf8",
     );
+    // The two the blocking gate suppresses and this must not: a keypress and an
+    // explicit control are both deliberate acts, so both stay real exits.
     expect(source).not.toMatch(/onEscapeKeyDown/);
-    expect(source).not.toMatch(/onPointerDownOutside/);
-    expect(source).not.toMatch(/onInteractOutside/);
     expect(source).not.toMatch(/hideClose/);
+  });
+
+  it("outside-press does NOT dismiss — a stray tap must not spend the showing", () => {
+    // Dismissal persists for the whole auth session, so an accidental backdrop
+    // touch would silently consume the user's one prompt without them reading it.
+    // Below 640px the dialog is edge-to-edge, which makes that tap easy to catch.
+    const source = readFileSync(
+      resolve(process.cwd(), "components/anchor/recalibration-prompt.tsx"),
+      "utf8",
+    );
+    expect(source).toMatch(/onPointerDownOutside=\{\(event\) => event\.preventDefault\(\)\}/);
+    expect(source).toMatch(/onInteractOutside=\{\(event\) => event\.preventDefault\(\)\}/);
   });
 
   it("opens focus on the dialog itself, never on a control", () => {

@@ -38,10 +38,12 @@ import { hasCompletedRecalibrationPrompt } from "@/lib/auth-broadcast";
  *     — the same act as "Set a new baseline" in the account section, which is already
  *     meadow. Foggy here would read as "something is wrong", which is the one thing
  *     this must not do.
- *   - EVERY DISMISS PATH IS LIVE. Escape, outside-press and the corner control all
- *     close it, in deliberate contrast to `backend-down-modal.tsx`, which suppresses
- *     all three because it is a true gate. This is advice; holding someone in it would
- *     misrepresent how urgent it is.
+ *   - IT IS DISMISSIBLE, AND SAYS SO THREE WAYS. Escape, the corner control and
+ *     "Not now" all close it, in deliberate contrast to `backend-down-modal.tsx`,
+ *     which suppresses every path because it is a true gate. This is advice; holding
+ *     someone in it would misrepresent how urgent it is.
+ *   - BUT OUTSIDE-PRESS DOES NOT. The one exception, and the reason is the cost of a
+ *     mistake rather than any wish to detain the user — see the handlers below.
  *
  * VISIBILITY. Three conditions, all required: the caller has established the user has
  * an anchor (the `hasAnchor === true` branch in `app/(authed)/app/page.tsx`), this auth
@@ -98,6 +100,25 @@ export function RecalibrationPrompt() {
       <DialogContent
         className="max-w-sm"
         tabIndex={-1}
+        // Outside-press does NOT dismiss (Mohamed, Vercel preview 2026-08-10).
+        //
+        // This is not a step toward making the prompt a gate — Escape, the corner
+        // control and "Not now" all still close it, and the tests pin that. It is
+        // about what a stray tap COSTS here. Dismissal is remembered for the whole
+        // auth session, so an accidental brush of the backdrop silently spends the
+        // user's one showing without them ever reading the thing, and it will not
+        // come back until they next sign in.
+        //
+        // That risk is worst on exactly the surface that matters most: below 640px
+        // `DialogContent` is edge-to-edge, so "outside" is a thin strip above and
+        // below the panel and is easy to catch with a thumb. Escape and the X are
+        // deliberate acts; a backdrop tap is not, so it should not be able to
+        // consume a decision the user has not made.
+        //
+        // A deliberate deviation from the usual "close on backdrop click" default,
+        // taken because the dismissal here is persistent rather than free to undo.
+        onPointerDownOutside={(event) => event.preventDefault()}
+        onInteractOutside={(event) => event.preventDefault()}
         // Focus the dialog itself, not a control inside it.
         //
         // Radix's default lands on the first tabbable child, and measurement showed

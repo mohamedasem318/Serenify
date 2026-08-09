@@ -7339,3 +7339,41 @@ was triggered.
 **Scope**: the modal, its persistence, the deep link to the account
 baseline section, and copy. No change to scoring, calibration logic, or
 the anchor schema; no anchor invalidated or nulled.
+
+---
+
+## 2026-08-10 — Recalibration prompt: outside-press does not dismiss (amends the entry above, same day)
+
+**Status**: Accepted. Amends the 2026-08-10 recalibration-prompt entry.
+
+**Trigger**: Mohamed, testing the Vercel preview — "you can dismiss it
+by clicking outside which kinda defeats the purpose".
+
+**Decision**: `onPointerDownOutside` and `onInteractOutside` are
+prevented on the recalibration prompt. Escape, the corner control and
+"Not now" all still dismiss.
+
+**Rationale**: the problem is not that backdrop dismissal is easy, it
+is what a stray tap COSTS here. This dismissal is remembered for the
+whole auth session, so an accidental brush of the backdrop silently
+spends the user's one showing without them having read it, and it does
+not return until they next sign in. The risk is worst on the surface
+that matters most: below 640px `DialogContent` is edge-to-edge, so
+"outside" is a thin strip above and below the panel and is easy to
+catch with a thumb. Escape and an explicit control are deliberate acts;
+a backdrop tap is not, and should not be able to consume a decision the
+user has not made.
+
+**Not a move toward a gate.** The prompt remains advice with three real
+exits. It is deliberately still distinct from `backend-down-modal.tsx`,
+which suppresses every path including Escape because it genuinely is a
+gate. Both behaviours are pinned by tests so neither can drift into the
+other.
+
+**Deviation noted**: this departs from the usual "close on backdrop
+click" default, taken because the dismissal here is persistent rather
+than free to undo.
+
+**Verified in a real browser** at 375px with touch: taps above and
+below the panel leave the dialog open and write nothing; Escape, the
+corner control and "Not now" each close it and record the dismissal.
