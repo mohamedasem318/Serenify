@@ -4,12 +4,527 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Backfill note — the 2026-07-29 → 2026-08-10 window
+
+The five entries below were written **after the fact, on 2026-08-10**. Thirty-four PRs (**#210**
+through **#256**) merged in that window with **no `PROGRESS.md` entry at all** — the second break in
+the per-feature convention, after the 2026-07-12/13 deployment gap that `RECON_2026-07-21.md:304`
+caught and the 2026-07-22 backfill closed.
+
+`DECISIONS.md`, `BACKLOG.md` and `CHANGELOG.md` stayed current throughout, so no reasoning was lost.
+The implementation record is the one that fell behind — **both times**, which is why the mechanism to
+stop it recurring ships alongside this backfill rather than after it.
+
+Reconstructed from merge commits, PR descriptions, the `DECISIONS.md` entries of the same dates, and
+live Azure platform state read on 2026-08-10. **Nothing here is from memory.** Where a claim could
+not be re-verified in this pass, it says so.
+
+---
+
+## Feature — Monitoring capture: bounded uploads, the training operating point, and the Apple path
+
+**Branches**: `spike/upload-growth`, `fix/capture-training-constraints`, `fix/bounded-tail-upload`,
+`fix/mobile-capture`, `fix/ios-bitrate`, `docs/t1-prewarm`, `feat/recalibration-prompt`
+**Status**: **merged to `main`** across nine PRs and **verified on a real iPhone against production**.
+**Closes #89, #112, and (on GitHub) #78.** **Date**: 2026-08-06 → 2026-08-10. **Backfilled 2026-08-10.**
+
+The largest body of work in the window, and the one that changed what leaves the device. Two defects
+that had been open since feature 008 were closed by measurement rather than by argument.
+
+**The problem.** A monitoring session re-POSTed the **whole accumulated recording** every stride, so
+per-stride payload grew without bound — ~6 MB/min, forever — and the server re-decoded proportionally.
+On iOS it never got that far: Safari's `isTypeSupported` reports WebM support **it cannot honour**,
+its WebM recordings yield no readable media duration, and the resulting 45 MB re-uploads killed the
+session outright (**#89**, zero readings).
+
+### The PRs, in dependency order
+
+| PR | What it carried |
+|---|---|
+| **#245** | Spike findings only, no code. **Verdict GO**: both containers stamp every chunk with its absolute original-timeline position (webm cluster `Timestamp`, fMP4 `tfdt`), so a header+tail file reproduces the file-global 2.5 fps grid **bit-identical (max\|Δ\|=0)** against the production read path. |
+| **#246** | The device-independent half of #243, extracted so it was not held hostage to the container question: shared `ideal` **1280×720 @ 15 fps** on **both** recorders, single-sourced in `lib/capture/constraints.ts`. |
+| **#243** | Mobile-capture diagnosis + five-device probe + engine-aware container (**fMP4-first on Apple WebKit**, webm everywhere else). |
+| **#247** | The bounded upload itself — client header+tail cut at verified structural boundaries, server decode on the absolute clock. |
+| **#248** | Standalone, on code already live: an `our-side` skipped window now logs the exception type and message at WARNING. |
+| **#249** | Correction: the "fMP4 is ~5× lighter" figure is **withdrawn**. |
+| **#250** | `videoBitsPerSecond: 750_000` on the Apple path only; the `/capture-probe` route retired in full. |
+| **#251** | BACKLOG: **#89 resolved** on the strength of the real-device re-run. |
+| **#254**, **#255**, **#256** | Two follow-ups filed (**#252**, **#253**); the T1 prewarm rejection recorded and **#112 closed by measurement**; the recalibration prompt. |
+
+### Why `ideal`, never `exact`
+
+Scoring is **`window − anchor`**, so calibration and monitoring must never diverge on a capture
+parameter — a cap applied to one alone is a silent scoring error, not a visible bug. The constraints
+are therefore single-sourced and consumed by both recorders, and the same rule later governed the
+bitrate change. `ideal` rather than `exact` because Safari rejects `exact` capability constraints
+readily and a camera that cannot reach 720p must still open. The `deviceId` pin keeps `exact`
+deliberately — that is a device *pick* with a caller fallback, not a capability constraint.
+
+The values are the StressID training operating point (Logitech QuickCam Pro 9000, 1280×720, 15 fps),
+now recorded in `docs/MODELS.md` beside the constraints they justify. The 2026-08-05 five-device
+probe found **4 of 5 devices defaulting to 480p-class** under the previous unconstrained
+`getUserMedia` — below training, so upscaling at the 64×64 ROI resize. All five grant 720p-class
+under the ideal. 15 fps is **model-invisible** (the server resamples to a fixed 2.5 fps grid) while
+roughly halving encode, upload and tail-decode work.
+
+### Measured — a 13-minute live session, real webcam at a verified 1280×720
+
+Full report in `docs/triage/2026-08-06-bounded-upload-measurement.md`.
+
+| | Before | After |
+|---|---|---|
+| Per-stride payload | ~6 MB/min growth, unbounded | **flat** — per-minute medians 6.83–7.35 MB across 12 steady-state minutes, no slope |
+| Client JS heap | grew with the recording | **flat at 40 MB**; server-received span 73–79 s at every window regardless of session age |
+| Round-trip | O(elapsed) | median **7.27 s** against the 10 s stride (~27 % margin) |
+
+68 tail uploads, 67 readings, **0 skipped windows**.
+
+**The honest miss, stated as one**: p90 round-trip of 11.7 s crossed the stride on a contended dev
+laptop, so **exactly 1 of 75 strides coalesced away**. The target was zero. It is now *observable*
+(`dropped_total=1`) where it used to be silent by construction — which is itself part of what #247
+shipped. The deploy target must be re-measured, and the deferred rolling frame buffer
+(`DECISIONS.md` 2026-06-21) is the named next lever if it breaches there.
+
+### Fail-closed, deliberately, in three places
+
+- A trimmed upload is **self-detected** from its first ffprobe timestamp; `_pick_frames_by_timestamp`'s
+  10 ms match makes any mis-cut, mis-anchor or truncation a **loud skipped window, never a wrong score**.
+- A trimmed file can never reach `_extract_landmarks_wholefile`, whose re-zeroed clock would re-anchor
+  the grid at the cut point — the **B2 phase reset**, rejected back in feature 008.
+- **Without ffprobe the server refuses to score** a declared `upload_kind=tail` rather than falling
+  back. Untrimmed uploads keep the pre-existing fallback unchanged.
+
+On the client, webm cuts are accepted only when the full structure parses (`ID + size-vint + 0xE7
+Timestamp + non-decreasing clock`) — a bare ID scan can hit payload bytes, and **a wrong webm cut is
+silent downstream**. Unparseable input falls back to full uploads: correct, unbounded, and logged. That
+is the one remaining unbounded client path.
+
+### #89 closed on a real device, with an unusually clean control
+
+The 2026-08-08 ST-08-2 re-run (iPhone, iOS 18.7 / Safari 26.5.2, against production `a0ba6fd`) scored
+**15/15 windows, 0 skipped, 0 `our-side`**, every decode probe `outcome=ok branch=remux
+container=.mp4`. First reading at **1:25 and 1:31** — at the ~90 s capture floor, beating the pre-fix
+laptop-Chrome control of 1:37.
+
+The comparison is clean because **the same API revision served both**
+(`serenify-api--preview-cors-243`, 100 % traffic throughout), so the only variable that changed is the
+client bundle. The 2026-08-07 pre-fix control on the same account produced **0 readings in 5m17s**,
+managing only two window POSTs ~100 s apart because uploads were too heavy to ever reach the 60 s gate.
+
+**Two caveats recorded on the entry, neither affecting the resolution**: the validating session ran
+against a 21-hour-old anchor captured on `3410cb4` (WebM/VP9, ~6.7 Mbit/s) while its windows were
+fMP4/H.264 at 750 kbps — a cross-container `window − anchor` mismatch that makes **those probability
+values untrustworthy**, though not whether readings are produced; and steady-state readings arrived
+~19 s apart against the 10 s design stride, filed separately as **#253**.
+
+### #112 closed by measurement, not by a fix
+
+First reading lands at 1:25 / 1:31 against the ~2:30 the entry was written about. **The dominant cause
+was #247** — removing the O(elapsed) payload growth that was starving the early windows (~8.4 MB →
+~0.80 MB per stride); #250 compounded it on iOS. Neither is a warm-up optimisation; the ~80–100 s
+warm-up tail simply stopped being the binding constraint. The entry's "do NOT close" marker was lifted
+attributed and dated, with the original text kept unedited beneath the resolution.
+
+Both prewarm tiers are now recorded as **measured dead ends** rather than living in GitHub comments —
+T2 (2026-06-26) and T1 (PR #116, closed unmerged: first-band processing 7.19 s with prewarm *disabled*
+vs 7.42 s enabled, for 2.15 s of added boot). **T3 was never tried and this does not foreclose it**: a
+provisional early band at M=2–3 is the only remaining lever below the ~90 s floor, and it is a
+smoothing-contract decision needing sign-off, not a performance tweak.
+
+### The bitrate change, and what "measured" means on it
+
+**#250** measured a seven-rung ladder on one iPhone. WebKit **honours** `videoBitsPerSecond` — the
+effective rate tracks the target monotonically and lands **79–92 %** of it, consistently under. The
+reflected `MediaRecorder.videoBitsPerSecond` property echoed the target **exactly** at every rung while
+the real figure was 79–92 %: a self-report, the same class of claim as the `isTypeSupported` WebM
+answer that caused #89 in the first place. The unset default is **6.72 Mbit/s effective** while the
+encoder self-reports 10 — a ceiling, not a rate, and this supersedes the ~5.4 Mbit/s figure previously
+in use, which was inferred rather than measured.
+
+750 kbps is the lowest rate proven **natively** on-device rather than by transcode, giving ~0.80 MB per
+10 s stride under #247's bounded upload, down from ~8.4 MB. **Apple-only, deliberately** — the
+parameter is a target, not a cap, and Chrome VP9 already sits near 0.75 Mbit/s naturally, so a global
+setting risks *raising* it. Unit tests pin the asymmetry rather than trusting it.
+
+**Caveat on record: n=1.** One device, one person, one session.
+
+**Recorded for the first time because it is load-bearing and was undocumented**: iOS reports 1280×720
+before the first record and 720×1280 after, yet every clip is natively 1280×720 carrying a
+`rotation=-90` display matrix. **OpenCV honours that matrix and decodes to upright portrait**, so
+FaceMesh sees an upright face. Nothing compensates for the reported-dimension flip, and something
+would break if the decode path stopped honouring it.
+
+### The withdrawn number
+
+**#249** withdrew "fMP4 is ~5× lighter", which shipped with #243. At the shipped 1280×720@15 operating
+point iOS Safari fMP4 records ~40 MB per 60 s against the WebM probe's ~45 MB — essentially the same.
+The 4.8 / 2.2 Mbit/s pair behind ~5× was taken at **480×640**, a consequence of the probe's
+`applyConstraints({})` quirk. **No replacement ratio is asserted.** The decision itself is unchanged:
+fMP4-only on Apple WebKit stands on **decode correctness alone**; wire weight was a secondary rationale
+and is gone. `docs/DECISIONS.md` took a supersession entry rather than an edit; the 008 specs and
+smoke-test records are point-in-time and were **deliberately not retro-edited**.
+
+### The recalibration prompt (#256), and why it exists
+
+Capture changed materially — resolution, container/codec, bitrate. Scoring is `window − anchor` and
+**nothing in the API detects an anchor/window mismatch**; there is no guard. It is a silent scoring
+error, which is exactly why it needs a surface: the user has no other way to find out.
+
+Everyone with an anchor is prompted — no cohort targeting, no cutoff timestamp. The prompt reuses the
+calibration banner's dismissal store (the two surfaces are mutually exclusive by construction on
+`hasAnchor`), so it inherits sign-out clearing and the cross-tab mirror unchanged. Exactly **one** new
+key: a `localStorage` latch written inside `broadcastAnchorCaptured()`, the one function every
+successful capture already funnels through.
+
+**Not a database column, for a stated reason**: there is no server-side signal answering *"have they
+redone it since capture changed"* — `has_anchor()` returns a bare boolean and `anchor_captured_at` is
+unreadable by every client role. Answering it server-side means storing something new *about the user*
+for what is only a UI preference. **Accepted cost, stated plainly**: "permanently" means per browser
+profile.
+
+The real-component measurement caught a defect a screenshot review would have missed — Radix's
+first-tabbable resolution put focus on **"Not now"**, so an unrequested modal opened with a focus ring
+around its *dismiss* action, reading as though that were the expected answer.
+
+### Still open, deliberately
+
+- **#252** — opening Ren via full navigation to `/app/chat` (rather than the pill's in-place panel)
+  leaves the monitoring session **indeterminate**; it appears to hang rather than stopping or
+  continuing cleanly. Single observation, no trace captured, **not root-caused**. The design question
+  underneath — should navigating away end the session honestly, or should the session follow the user? —
+  is the more important half.
+- **#253** — the ~19 s steady-state cadence against the 10 s stride. **Measured flat, not growing**, so
+  explicitly *not* the same class of thing as the resolved #247 / #78 / #110 keep-up defect: that was
+  O(elapsed) divergence, this is a constant-factor throughput ceiling. A 6-minute session yields ~15
+  readings, not ~30.
+- **#244** — the mid-session fallback to the camera prompt, filed as observed and deliberately not
+  chased during this work.
+- **#86** — the `window_readings` purge job. Rows still grow ~1 per stride; the 90-day retention policy
+  covers them, the job does not exist.
+
+### One operational item this backfill found
+
+PR #243 temporarily widened production `ALLOWED_ORIGINS` with two Vercel preview origins and carried a
+**REMOVE AFTER MERGE** instruction. Read live on 2026-08-10: the **serving revision is clean** —
+`serenify-api--prod-3410cb4` at 100 % traffic carries exactly
+`https://serenify.tech,https://www.serenify.tech`. But the **app-level template still carries the
+branch-alias origin** (`serenify-git-fix-mobile-b695e3-….vercel.app`), so the next revision minted from
+that template would silently re-introduce it. Not a live exposure; a latent one. **Not filed as a
+BACKLOG item in this docs-only change** — flagged here for the call.
+
+---
+
+## Fix — July triage pass A, and the boundary that split in two (Amendments 20 and 21)
+
+**Branches**: `fix/july-triage-pass-a`, `fix/209-control-boundary`, `fix/consent-checkbox`
+**Status**: **merged to `main`** via **#240**, **#241**, **#242**, all 2026-08-05.
+**Closes #201, #178, #184, #203, #197, #202, #179, #209, #211.**
+**Date**: 2026-08-05. **Backfilled 2026-08-10.**
+
+Selected from the 2026-08-05 triage recon (`docs/triage/2026-08-05-july-issue-recon.md`, kept
+uncommitted). **#209 shipped alone on purpose** so it is revertible on its own; **#198** and **#213**
+were deliberately left untouched.
+
+### #240 — seven issues, one pass
+
+- **#201** — `[]` stopped doubling as "not fetched yet" on the recent-chats card. Three states now:
+  `null` unresolved (skeleton rows in the list's own shape), `[]` resolved-empty, and a **new
+  resolved-error** state with a working retry. The silent-forever `!res.ok` path is gone.
+- **#184** — the no-JS signup refusal, **the one 013 shipped knowingly broken (ST-9)**. Every non-ok
+  verdict now redirects to `/signup?state=refused&reason=<marker>`, markers a fixed enum
+  (`terms · stale_terms · exists · fields · error`) — never field values, the email, or message text.
+  The page rebuilds the result and renders it through the form's **existing** branches. **Honest loss,
+  documented in-code**: a non-terms field refusal shows the generic line, not the per-field zod
+  message, because per-field would mean message text in the URL.
+- **#203** — `global-error.tsx`, above the root layout: its own `<html>`/`<body>`, its own CSP-legal
+  `<style>` block, Mist & Meadow inlined as a private `--ge-*` token block because the next-themes
+  override lives behind the provider this page exists to survive. **Presentation-only and not exercised
+  in CI** — verified by manual smoke, and the entry says so.
+- **#202** — the stale Edge-runtime claims. `DECISIONS.md` took an append-only dated correction
+  (2026-06-25 precedent); the security docs took dated in-place edits. The nonce code itself stands —
+  `getRandomValues` is runtime-portable.
+- **#197** — the firefox anchor-egress failure, fixed only in its **trivial half**: one path-scoped
+  allowlist entry for the dev overlay's symbolication POST, deliberately **not** a same-origin pass. The
+  firefox console message that wakes the overlay remains unidentified.
+- **#178** and **#179** — header alignment to the shared 24 px inset, and the e2e service-role key
+  documented where it actually lives rather than in `.env.local.example` (test-only; #142 removed the
+  runtime path).
+
+Also folded in: the chat pill's `ok:false` bug, where a failed load **silently impersonated "no current
+chat"**; and the first production call site for `RenAvatar`'s `thinking` pose, which had been defined,
+measured, tested and previewed since #221 with nothing using it.
+
+### #241 — the two-token split (Amendment 20)
+
+`@theme inline`'s `--color-border: var(--color-border)` self-reference made light-mode `border-border`
+collapse to `currentColor` **ink**. The bare one-line deletion was rejected: it lands the seam value
+`#D7D9DC` on light control boundaries at **1.2–1.3:1**, and the consent checkbox and OTP boxes are
+**empty controls whose border is the whole affordance**.
+
+So the boundary split. `--color-border` stays the decorative seam at unchanged values; new
+`--color-control` (light `#7D8083`, **3.39:1 / 3.67:1**) carries control boundaries.
+
+**The dark value was re-adjudicated at ratification and went the other way.** Both 3:1 candidates
+(`#6C7074`; the mathematical floor `#64686B` at 3.07:1) were built and shown side-by-side on the real
+dark login, and **rejected on looks** — dark stays the seam value `#23272B`, pixel-identical to its
+pre-split appearance by construction. Dark labelled inputs rest on 1.4.11's component-identification
+reading; the **accepted, recorded residual** is the empty OTP digit boxes at ~1.15:1 in dark.
+
+Evidence: **64 full-page captures** — landing, signup, OTP, dashboard, account, chat × light/dark ×
+320/375/414/768 — plus computed-style probes against a live build with a fresh `.next` and a real login.
+
+Two side-findings worth keeping: `ui/card.tsx` had `border` bare, and **Tailwind v4's bare `border`
+defaults to `currentColor`**, so cards never consumed the token at all. And the sweep's first run died
+in Playwright `globalSetup` on `42501: permission denied for table profiles` — **live-confirming #208**,
+which is still open.
+
+### #242 — the checkbox leaves the browser's hands (Amendment 21)
+
+The honest finding from #241 was that **Chromium paints the consent checkbox natively** — author
+borders compute to **0 px** on it — so every token ever placed on it was **inert**, before that PR too.
+Custom rendering (`appearance-none` + a drawn lucide check) is the only way the box participates.
+
+New `--color-control-strong` (light `#7D8083`, dark `#6C7074`) is the **empty-affordance** boundary,
+clearing 3:1 in both modes. This **refines Amendment 20's quiet-dark adjudication rather than reversing
+it**: quiet dark rests on label + fill identifying a control, and an empty checkbox beside legal text
+has neither. Labelled inputs keep the quiet dark boundary exactly as adjudicated. **OTP digit boxes are
+deliberately untouched** and remain the recorded residual.
+
+The checked glyph is an inline `peer-checked` SVG, **not** a CSS `background-image` — the CSP's
+`img-src 'self'` would block a data: URI — so the **#184 no-JS path renders it identically**.
+
+**Test gate (all three PRs)**: `apps/web` Vitest **1554/1554**, `tsc` clean, ESLint 0 errors (2
+pre-existing warnings); `apps/api` ruff clean, pytest **186 passed / 1 skipped**. The one failing
+Vitest *file* is the known Windows-only `hosted-email-template-sync` baseline (**#218**), CI-green on
+ubuntu.
+
+---
+
+## Project — The launch video, and the pitch cut that grew out of it
+
+**Branch**: a run of feature branches under `feat/video-*` and `chore/video-*`
+**Status**: **merged to `main`** across seventeen PRs, **#223** → **#239**.
+**Date**: 2026-07-29 → 2026-08-05. **Backfilled 2026-08-10.**
+
+A Remotion project at `video/`, built greybox-first over roughly a week, ending in two rendered cuts.
+`docs/video/serenify-launch-video-beat-sheet.md` and `docs/video/serenify-pitch-video-beat-sheet.md`
+are the specs; the project is those sheets built.
+
+**The tool choice was decided by one probe, on a rendered frame rather than a clean exit code.** The
+entire reason to pick Remotion over an editor is that the product screens can be the **real `apps/web`
+components** rather than hand-redrawn mockups. `<Wordmark />` imported straight out of `apps/web`
+through the app's own `@/` alias renders with its real Tailwind v4 `@theme` tokens. It is the right
+probe because it fails **loudly** — a broken CSS pipeline gives one flat colour in the wrong face.
+
+Three pieces make it work, all recorded in `DECISIONS.md` 2026-07-29: the `@` → `apps/web` webpack
+alias (webpack knows nothing about the app's `tsconfig` paths); `react`/`react-dom` pinned to `video/`'s
+own copies (a file under `apps/web` otherwise resolves React by walking *up* to the root hoisted copy —
+two instances in one bundle, so hooks throw and context silently returns defaults); and Tailwind via
+`@remotion/tailwind-v4` with an entry that imports `apps/web/app/globals.css` **verbatim**. No palette
+is re-declared for the video, so **the video follows the app rather than drifting from it**.
+
+**`video/` sits at the repo root, outside both workspace globs, deliberately.** Under `apps/*` or
+`packages/*`, ~270 Remotion packages join the root lockfile — every `npm ci`, including CI's before it
+lints `apps/web`, would install a video toolchain to run unit tests. The root lockfile is byte-unchanged
+and **no CI change was needed or made**: all three jobs are already scoped. The cost is one extra
+`npm install` for whoever works on the video.
+
+The character base is **Avataaars, MIT** (`DECISIONS.md` 2026-07-30). The Remotion agent skills are
+installed at **project scope** in `.claude/skills/` and mirrored to `.agents/skills/`, with exactly two
+files diverging from upstream and the standing rule that a dangling link is fixed by **installing the
+target, not hand-editing the file** — which is why `remotion-interactivity` is installed despite not
+being needed on its own merits.
+
+**The pitch cut (#239) is a separate composition, not a re-edit.** 5,962 frames / **3:18.7**, for the
+Egypt IoT Challenge, watched with sound on by a judging panel. `GreyboxVideo.tsx`, its BEATS table, its
+four interstitial cards and `retime.tsx`'s Premiere segment table are **untouched and verified
+byte-identical**; the launch cut still renders its own `47:16` readout. What the two cuts share is the
+thirteen beat components — **a beat copied is a beat that drifts**. Added time is a rate change in a
+per-beat time map, never a longer `durationInFrames`, and **holds run past the authored end at 1.000×**
+so the orb still pulses and the session seconds still tick.
+
+**It retires one hard invariant, recorded as a supersession with its reason**: the launch cut showed
+only the true-positive branch. The pitch cut adds a 1,050-frame **false-alarm sequence** — he
+concentrates, the reading climbs, the prompt fires, he says he is fine, **and nothing acknowledges it,
+because the shipped handler acknowledges nothing**. The reading may not move until 45 frames after the
+click, or the film would have depicted a model that learns from being corrected.
+
+**Three things the build found that the beat sheet had asserted**: §4's baseline arithmetic
+double-counted beats 12 and 13; inserting 35 story-seconds ran the session timer **backwards** (47:20 →
+47:16, re-solved end to end, and the toolbar clock still reads 11:30 in the only shot that shows it);
+and beat 9's tighter framing **sliced the body copy through its letterforms** when centred.
+
+`apps/web` is not modified by any of it. **`video/README.md` still says "nothing is built to final
+quality yet"** — written at #223 and not revised as the greybox became two rendered cuts. Left as found;
+noted here rather than edited in a docs backfill.
+
+---
+
+## Feature — Ren gets a face, and the chat surface follows it (Amendments 18 and 19)
+
+**Branches**: `feat/ren-avatar`, `feat/chat-surface-foggy`
+**Status**: **merged to `main`** via **#221** (2026-07-29) and **#222** (2026-07-30). **Closes #155.**
+**Date**: 2026-07-29 / 07-30. **Backfilled 2026-08-10.**
+
+The framed "R" that stood in for Ren since feature 011 is replaced by the signed-off drawn mark — one
+shared SVG component (`components/chat/ren-avatar.tsx`), four states, and a 7 s blink at ~200 ms closed.
+Path data and per-state transforms are **measured design values copied verbatim**, and the test file
+**duplicates them deliberately** so an edit to the constants cannot pass unnoticed. The blink is CSS
+rather than JS because it carries no state — driving it from React would put a timer in every surface
+that renders Ren — and it is silent under `prefers-reduced-motion` **twice over**.
+
+**The `color` prop is gone — removed, not re-pointed.** It was the mechanism by which one component came
+to render two different colours (meadow in chat, foggy on the landing page): precisely the drift that
+extracting the component was meant to prevent, arriving through the escape hatch the extraction left
+open. Foggy is now structural rather than a default a call site can decline.
+
+**Amendment 18 (1.13.0 → 1.14.0)** gives Principle V two deliberately separate bullets: a mark
+identifying a persistent non-human entity MUST NOT use a band- or outcome-carrying accent (`meadow`,
+`amber`, `crimson`), and Ren's specifically MUST be `foggy`; plus one named exception permitting a
+filled-foggy primary action inside Ren's chat surface. The first **ratifies practice that already
+shipped** — the landing page's Ren has been foggy since 013 as an approved FR-022 liberty, flagged in
+ST-4 precisely because foggy's registered role is attention. The flag is resolved in the direction the
+practice already went.
+
+**#222 exists because Amendment 18 was written at the wrong level.** Recolouring one control left
+**eight** other meadow elements on the same screen, each then reading as exactly the defect the
+exception exists to prevent — a half-foggy screen is worse than either whole. **Amendment 19
+(1.14.0 → 1.15.0)** restates it at **surface** level and makes it a **consistency requirement**: where
+Ren's chat surface takes foggy, it must take it across all accent-carrying elements. It also extends to
+Ren's **entry points** — the floating pill, which after #221 was a meadow button opening a foggy panel.
+The entry-point clause reaches **the control and not its host**, written into the amendment rather than
+left to be inferred, "because it's the whole thing standing between this and a general licence."
+
+**#155 closed as a ride-along**: `--color-on-accent` and `--color-scrim` — both shipped in feature 007,
+both never registered — enter Principle V's palette here, because the identity-mark bullet cites
+`--color-on-accent` directly and leaving it out would have the constitution name a token its own palette
+denied existed. **Neither value changed.**
+
+Contrast measured, not assumed: filled foggy with `--color-on-accent` is **5.33:1** light / **8.34:1**
+dark, both better than the meadow send control it replaced (4.78:1).
+
+**Reported and deliberately not changed**: Ren has **no typing indicator** — `isSending` only disables
+the composer, and the assistant message is appended atomically after the round-trip, so the new
+`thinking` state had **nothing to drive** at merge time (it got its first call site in #240). Four
+surfaces where Ren arguably belongs but does not: assistant message rows, the pill launcher, recent-chat
+rows, landing thread bubbles.
+
+**Test gate**: **1529 unit tests pass**, 20 of them new and guarding the mark's colour, exact paths and
+transforms, the 24 px clamp, and that a warm Ren carries no blink. `typecheck` clean, lint 0 errors.
+`hosted-email-template-sync` fails to **parse** — **pre-existing**, verified identically on a stashed
+clean tree, later filed as **#218**.
+
+---
+
+## Fix — The 2026-07-29 public-surface pass: auth-awareness, focus, and two contracts written down
+
+**Branches**: `fix/navbar-auth-aware`, `fix/focus-indicators`, `fix/otp-success-hold`,
+`fix/email-template-sync`, `fix/reset-screen-honesty`, `docs/agent-instruction-mirror`
+**Status**: **all merged to `main`** on 2026-07-29 — **#210**, **#212**, **#215**, **#216**, **#217**,
+**#219**, **#220**. **Closes #211, #190, #155** (in #221), and moves **#189**.
+**Date**: 2026-07-29. **Backfilled 2026-08-10.**
+
+**This entry corrects the one below it.** The navbar-chrome entry that follows records
+`fix/navbar-chrome-and-active-state` as *"open — not yet merged"*: it merged the same day as
+**`b58cce7` (PR #210)**. Its closing paragraph is also **superseded** — *"the public navbar does not
+become auth-aware — signed-in visitors still see 'Sign in / Sign up'"* was true for a few hours and then
+undone by **#215**, below. That entry keeps **every word of its original text**; it gains only a dated
+correction block beneath its status line, pointing here — the same treatment `docs/BACKLOG.md` #89 and
+`docs/triage/mobile-capture-diagnosis.md` were given when their figures went stale.
+
+### #215 — the public navbar knows who is looking at it
+
+`/terms` and `/privacy` rendered "Sign in / Sign up" to everybody, **including signed-in users**. The
+path that matters is not cosmetic: a pre-013 user meets the Terms/Privacy re-consent gate, opens one of
+the two documents from it **in a new tab by design**, and the site greets them as a stranger. There were
+~20 production accounts and **every pre-013 one met that gate**. `/` was never affected — it already
+redirects a signed-in visitor to `/app`.
+
+`ProfileDropdown` is **reused, not reimplemented**, so sign-out behaves identically on both surfaces
+including the cross-tab broadcast a parallel implementation would have had to remember. Resolved
+**server-side via `getUser()`, never `getSession()`**, and never as a client fetch — resolving auth
+after mount would flash "Sign in / Sign up" on every load, which is worse than the bug.
+
+**It fails open and it fails silent**: `lib/public-viewer.ts` cannot throw and cannot reject; auth,
+`profiles` and client-construction failures all return `null`, log `[public-viewer] FAIL-OPEN`, and
+render the **signed-out** navbar. **The signed-out navbar is byte-for-byte unchanged**, and the guard
+was **split rather than relaxed** — the signed-out half runs across all three ways of expressing "no
+viewer" (omitted, `undefined`, `null`), because the de-duplication risk went **up** with this change,
+not down.
+
+**FR-018 is superseded for the signed-in case only, and `spec.md` is deliberately not edited** — 013 has
+shipped and been production-verified, so its spec is a point-in-time record. The precedent is exact:
+#210 changed this very component's chrome and touched no file under `specs/013/`.
+
+### #212 — a focus indicator you can actually see
+
+**Two inline rename inputs set `outline-none` and supplied no replacement at all** — keyboard-reachable,
+and once focused they looked exactly as they did unfocused. **SC 2.4.7 Focus Visible (AA) failing
+outright, in production.** Six more controls signalled focus by **border colour alone**, which is also
+SC 1.4.1: grey→meadow is a hue shift at **1.27:1 light / 1.98:1 dark**.
+
+The fix measures **4.22:1 light / 7.43:1 dark**. Three choices worth keeping:
+
+- **`outline`, not `ring`** — Tailwind's `ring-*` is a `box-shadow`, and box-shadow is clipped by
+  `overflow-hidden` ancestors; both rename inputs sit inside one.
+- **2 px is a floor, not taste** — a 1 px outline is half the area SC 2.4.13 requires.
+- **No `ring-offset-*`** — an offset paints page background between border and ring so the two read as
+  separate strokes. This **deviates from the Hallmark skill's 1–2 px default** and is recorded in
+  `DECISIONS.md` so it does not get "corrected" back later.
+
+A calmer focus **background tint** was tested and **rejected with numbers**: the first strength clearing
+3:1 drops placeholder text to 1.90:1 / 1.98:1 and dark body ink to 4.47:1 — trading an AAA nicety for an
+**AA failure**.
+
+**Two Tailwind v4 traps, both caught only in a real engine**, and both invisible to a DOM-shim unit
+test: `outline-none` sets `--tw-outline-style: none`, so `focus-visible:outline-2` alone sets a *width*
+on an outline whose style is still `none` and **nothing paints**; and v4's `transition-colors` includes
+`outline-color`, which animates the ring in.
+
+### #216 — the verification tick holds instead of dissolving
+
+**The report's diagnosis was wrong, and that changed the fix.** #190 said the tick vanishes because the
+hold is too short. It was not a timing problem: step 4 of the OTP choreography **deliberately dissolved
+the pill** across the last 700 ms. Lengthening the hold would have bought a longer fade.
+
+The fade is **deleted, not disabled**, with a unit test that strips comments and scans the file to keep
+it gone. Wall time is unchanged and `router.replace` still fires at ~2940 ms; the pill is simply opaque
+for ~1260 ms instead of dissolving through half of it. Measured at the handoff frame: **opacity 1.0,
+was 0**. A "redirecting in 3, 2, 1" countdown was considered and rejected — perky against a calm brand,
+and it implies the user could stop it.
+
+### The rest
+
+- **#217** — hosted email templates now **sync from the repo** via a template-only Management API PATCH
+  on pushes touching `supabase/templates/**`. This is the mechanism half of **#189**, which **stays
+  open**: a mechanism that has never been executed is not evidence that hosted is governed.
+- **#219** — the reset screen stops promising an email it may not have sent. The hedge was already right
+  and stays; the definite claim nine lines below it did not. The PR also records, rather than quietly
+  leaving to be rediscovered, that **signup discloses account existence outright**, which makes the
+  recovery hedge security theatre — it stays anyway on **accuracy** grounds, because
+  `requestPasswordReset` always returns `ok` and the application genuinely cannot know whether mail went
+  out. Also pins `actions/checkout` to v7.0.1 by SHA.
+- **#220** — `CLAUDE.md` and `AGENTS.md` get a **mirroring contract**. Four things in `AGENTS.md` were
+  stale, including the `graphify-out/wiki/index.md` path **that has never existed**. Branch naming is
+  written down for the first time in both files: SpecKit features are `NNN-feature-slug`, everything else
+  **must not** match `[0-9][0-9][0-9]-*`. The design-skill divergence is marked **deliberate**, not an
+  oversight — Hallmark is not installed for Codex. A single shared file with a per-agent shim was
+  considered and not taken: **the drift was never caused by the files being separate, it was caused by
+  nothing saying they had to agree.**
+
+---
+
 ## Fix — Navbar chrome: solid, sticky, and an exact active-state mirror
 
 **Branch**: `fix/navbar-chrome-and-active-state`
 **Status**: open — not yet merged.
 **Date**: 2026-07-29
 **Issues opened**: **#208**, **#209** (both pre-existing defects found while verifying; neither fixed here).
+
+> **Correction, 2026-08-10.** The status line above is kept unedited; it is wrong. This **merged the
+> same day**, as `b58cce7` (**PR #210**). The "Out of scope, deliberately" paragraph at the end of this
+> entry is also **superseded** — the public navbar became auth-aware hours later in **PR #215**. See the
+> 2026-07-29 public-surface entry above.
 
 **What it does.** Four things, all chrome, none of them auth-aware:
 
