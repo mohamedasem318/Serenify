@@ -89,7 +89,15 @@ wire via `supabase/config.toml` `[auth.email.template.*]`.
 **Address by**: feature 019 (admin-dashboard) or whichever feature first ships to a
 real environment with real email.
 
-### OTP submit button transient-stale-render flake (#34)
+### ~~OTP submit button transient-stale-render flake~~ — closed, won't do (#34)
+**Status**: closed — won't do. GitHub issue **#34 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Closed because the element no longer exists.** The entry's own bar was "monitor; act only on
+reproduction" — it never reproduced, and feature 007's OTP redesign (`0b71d4a`, PR #22) removed the
+thing that flaked: `apps/web/components/ui/auth/otp-panel.tsx:74-79` records that the six boxes
+auto-submit the moment all six digits are present, so **there is no separate submit button** to
+stay disabled. Zero `type="submit"` in the file. Nothing left to watch.
+
+**Original text, unedited:**
 **Status**: watch
 **Observed**: once during smoke test ST-1 of feature 001; not reproducible afterward
 **Description**: On first OTP entry attempt of a session, the submit button stayed
@@ -109,7 +117,15 @@ change `environment: "happy-dom"` to `"jsdom"`, run tests, remove `happy-dom` fr
 devDependencies and add `jsdom`.
 **Address by**: any time before feature 005 (the FastAPI/ML feature) starts.
 
-### postcss XSS advisory in transitive dep (#36)
+### ~~postcss XSS advisory in transitive dep~~ — resolved (#36)
+**Status**: resolved. GitHub issue **#36 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved by dependency drift, and re-triaged as the entry asked.** `GHSA-qx2v-qp2m-jg93` is
+**absent from the repository's live Dependabot alerts** (queried 2026-08-12; the open postcss
+advisories are `GHSA-6g55-p6wh-862q`, `GHSA-r28c-9q8g-f849` and `GHSA-fxqj-rqcc-2cmp`, all
+different, all tracked by **#176** — which stays open and is out of scope for this pass). Resolved
+postcss is 8.5.14, past the advisory's range. No version was changed to close this.
+
+**Original text, unedited:**
 **Status**: watch
 **Observed**: `npm audit` during feature 001
 **Description**: GHSA-qx2v-qp2m-jg93 (PostCSS XSS via CSS Stringify with `</style>`).
@@ -137,7 +153,15 @@ if you want to support both hostnames in dev.
 routes to `/login?flash=password_updated`. A focused server-action regression test now locks
 the update-before-sign-out order and proves failed updates do not end the recovery session.
 
-### Dedicated `/verify-otp` route (instead of inline panels) (#39)
+### ~~Dedicated `/verify-otp` route (instead of inline panels)~~ — closed, won't do (#39)
+**Status**: closed — won't do. GitHub issue **#39 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Closed on the entry's own terms.** "Only if a use case emerges" — none has, through feature 013.
+No help article, no deep link, no external referrer wants a standalone OTP surface; the inline
+panels on signup and forgot-password remain the only consumers. There is no `verify`/`otp` route
+under `apps/web/app/`, and nothing has asked for one in eleven features. Reopen if a linkable OTP
+surface is ever actually needed — this is a closed door, not a lost idea.
+
+**Original text, unedited:**
 **Status**: deferred-feature
 **Observed**: design discussion during feature 001
 **Description**: OTP entry is currently inline on the signup "check email" and
@@ -231,7 +255,15 @@ state" option — natural pairing with the CI integration work logged
 above against feature 008.
 
 ### Avatar disc reads "out of character" in dark mode (#44)
-**Status**: polish
+**Status**: polish — **OPEN**, and slightly worse than when filed. GitHub issue **#44 OPEN.**
+**Text refresh (2026-08-12, backlog-hygiene pass)**: the hex values below are **pre-redesign** —
+`#20231F` / `#161917` / `#2D3130` are Mist & Meadow values that feature 007's Graphite re-skin
+(`0b71d4a`, PR #22) removed. The *problem* survived the re-skin intact: under current tokens the
+disc is `#181B1E` on `#101214` (`globals.css:169-171`) = **≈1.09:1 self-vs-bg**, flatter than the
+~1.2:1 originally measured. The call sites are unchanged and still reuse the generic surface stack
+— `components/account/profile-section.tsx:107` and `components/header/profile-dropdown.tsx:53`,
+both `bg-surface text-foreground border-border`. The proposed fix (a circle-specific
+`--color-avatar-bg` tuned for identity) still applies verbatim; only the numbers moved.
 **Observed**: 2026-05-21, feature 003 Phase 5 visual review (T030)
 **Description**: After the 515984c contrast fix the AvatarFallback
 uses `bg-surface text-foreground border border-border`, which lands
@@ -269,7 +301,15 @@ adding tokens to the M&M `@theme` block.
 **Address by**: alongside the M&M token-tuning pass — typography
 and color rhythm belong in the same review.
 
-### Token tune — `--color-muted` underweight on light bg (WCAG AA) (#46)
+### ~~Token tune — `--color-muted` underweight on light bg (WCAG AA)~~ — resolved (#46)
+**Status**: resolved. GitHub issue **#46 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved 2026-06-24 by feature 007's Graphite re-skin** (`0b71d4a`, PR #22), which replaced the
+whole palette rather than patching this one token — so the fix landed without the entry being
+touched. Current `--color-muted: #585D61` (`apps/web/app/globals.css:31`) against
+`--color-bg: #EAEBEC` (`:28`) computes **≈5.58:1**, clearing the 4.5:1 AA body-text minimum with
+margin. The hex values in the original text below are pre-redesign and no longer exist anywhere.
+
+**Original text, unedited:**
 **Status**: bug
 **Observed**: 2026-05-20, feature 003 T020 visual sweep
 **Description**: M&M `--color-muted` at `#6E7572` against light bg
@@ -290,6 +330,30 @@ reads fine and WCAG AA-large threshold (3:1) is satisfied. Belongs
 in a deliberate token-tuning pass, not in active feature work.
 
 ### Button-system character pass — semantic-weight differentiation + variant cleanup (#47)
+**Status**: polish — **OPEN**, but half of it is already done. GitHub issue **#47 OPEN.**
+
+**Correction (2026-08-12, backlog-hygiene pass) — two of the bundled sub-items below are stale and
+were describing pre-007 state.** Verified against `apps/web/components/ui/button.tsx` on `main`:
+
+- **ghost / outline dark-mode hover contrast — FIXED** by feature 007 (`0b71d4a`, PR #22). Both
+  variants carry an in-file comment naming this exact bug and its fix: `outline` gained
+  `dark:hover:text-bg` (~6.3:1 light / ~8.8:1 dark), and `ghost` dropped the `bg-accent` +
+  `text-accent-foreground` pair for a `hover:bg-foggy/15` wash that never overrides the text
+  colour. The ~1.49:1 figure below no longer describes any code.
+- **"No production surface uses them yet" — FALSE for ghost and outline.** Both are now
+  load-bearing across ~20 call sites: `(onboarding)/layout.tsx:44`,
+  `consent/terms-reconsent-screen.tsx:204`, `consent/camera-consent-gate.tsx:131`, the whole
+  `components/anchor/*` capture flow, `chat-shell.tsx`, `monitor/op-surfaces.tsx`. They can no
+  longer be changed as unused variants.
+
+**What genuinely remains open** — and why the entry stays: (a) the **`Sign out` semantic weight**
+ask, unchanged — `account/sign-out-section.tsx:20` is still `variant="secondary"`, visually
+identical to `Save password`; (b) the **`link` variant's ~4.22:1** against light `bg-bg`, still
+under AA for normal text and **still genuinely unused** (0 call sites repo-wide); (c) the
+`secondary` hover-wash measurement. Sub-item (b) is the one place "unused, so deferred rather than
+patched" still holds.
+
+**Original text, unedited below.**
 **Status**: polish
 **Observed**: 2026-05-21, feature 003 Phase 6 polish re-eyeball
 **Description**: Post-Phase-6, `button.tsx` ships three production
@@ -703,7 +767,18 @@ reusing) or an upstream Next/Supabase mitigation.
 matrix run: pipe-buffering deadlock" tooling entry above — both are about
 making the local matrix run reliably.
 
-### Non-dismissible confirmation notifications (stress-detection prompts) (#56)
+### ~~Non-dismissible confirmation notifications (stress-detection prompts)~~ — resolved (#56)
+**Status**: resolved. GitHub issue **#56 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved 2026-07-02 by feature 012** (`636a7fc`, PR **#125**) — shipped, then never closed out.
+This is a fixed-but-still-open case against the Principle VIII contract, caught by the 2026-08-10
+issue-catalogue recon, not by anything automated. `apps/web/components/notification.tsx:38-40`
+documents feature 012's confirmatory prompt as *"the one documented `dismissible:false` consumer"*;
+`:122-128` swallow every Radix dismiss vector (Escape, pointer-down-outside, focus-outside,
+interact-outside) when `dismissible={false}`, and `:202` gates the Dismiss control on it. The
+consumer is `components/questionnaire/confirmatory-prompt.tsx:41`. Exactly the behaviour asked for
+below, including keeping informational notifications dismiss-anywhere.
+
+**Original text, unedited:**
 **Status**: deferred-feature
 **Observed**: 2026-05-25, feature 003 ST-2 review (Notification component)
 **Description**: A stress-detection confirmation notification — e.g.
@@ -771,7 +846,16 @@ Possible approaches:
 pass, not mid-feature work.
 **Address by**: a future security / quality hardening pass.
 
-### "Send a new confirmation" link contrast underweight in light mode (#58)
+### ~~"Send a new confirmation" link contrast underweight in light mode~~ — resolved (#58)
+**Status**: resolved. GitHub issue **#58 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved 2026-06-24 by feature 007** (`0b71d4a`, PR #22), which introduced `--color-meadow-text`
+(`globals.css:54`) specifically for small green text on light backgrounds. The link now carries
+`text-meadow-text` (`apps/web/app/(auth)/login/login-form.tsx:119-121`), computing **≈5.27:1**
+against the page background and **≈4.66:1** inside its tinted box — both clear the 4.5:1 AA
+affordance bar the entry asked for, and dark mode stayed clean. Fixed as part of the palette pass
+this entry itself pointed at, so it was never separately closed out.
+
+**Original text, unedited:**
 **Status**: polish
 **Observed**: 2026-05-25, feature 003 smoke review (sign-in screen)
 **Description**: On the sign-in screen, the "send a new confirmation"
@@ -954,7 +1038,14 @@ client and abuse becomes reachable in practice.
 ## From feature 004 (onboarding-video-anchor) — merged 2026-05-29
 
 ### Onboarding name step is redundant with signup full_name collection (#64)
-**Status**: bug
+**Status**: bug — **OPEN**, but **smaller than the text below claims**. GitHub issue **#64 OPEN.**
+**Text refresh (2026-08-12, backlog-hygiene pass)**: option **(b) — pre-fill the field — already
+shipped, and shipped before this entry was written.** `onboarding-form.tsx:52` sets
+`defaultValues: { full_name: defaultFullName ?? "" }`, fed from `page.tsx:44-47`; the pre-fill
+commit `309e78d` (2026-05-21) predates the 2026-05-27 observation. So the user is **not** asked to
+re-type their name — the residual cost is **one confirmation click on a pre-filled field**, not
+re-entry. **Only option (a)** — skipping the step entirely when a name is already present —
+remains open, and it is a small conditional. Read the framing below with that correction in mind.
 **Observed**: 2026-05-27, feature 004 planning
 **Description**: The signup form at `apps/web/app/(auth)/signup/` collects
 `full_name` and stores it via the `handle_new_user` trigger
@@ -1032,7 +1123,37 @@ into that workstream rather than standing up Realtime solely for the banner. Not
 blocking 004: the manual-refresh fallback is acceptable for the thesis/demo
 stage, and same-browser multi-tab sync already works.
 
-### Post-deploy mobile camera → upload → anchor verification (real devices, HTTPS) (#66)
+### ~~Post-deploy mobile camera → upload → anchor verification (real devices, HTTPS)~~ — resolved (#66)
+**Status**: resolved. GitHub issue **#66 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved by the 2026-08-05 → 2026-08-08 mobile-capture work, against production, on both
+platforms.** The close-criterion below asked for the calibration path on the **real production
+HTTPS deploy** (not a tunnel), on **≥1 real iOS and ≥1 real Android device**, with the produced
+codec confirmed to decode server-side and the anchor row written. Both halves are now met:
+
+- **Android — Galaxy S24 Ultra, Chrome, on production `serenify.tech`** (2026-08-05,
+  `docs/triage/mobile-capture-diagnosis.md:206-215`): measured by Mohamed on the same account with
+  a **fresh baseline** — i.e. a new calibration captured on the phone — reaching **time to first
+  reading 01:57**. A reading is unreachable without an anchor (the `no_anchor` → calibrate-first
+  gate), so the anchor row was written and the Android-produced codec decoded server-side. The
+  same pass separately probed **Galaxy S24 Ultra + S25 Ultra** (`:126-145`): both healthy on webm
+  (media/wall 0.996–0.999, 8/8 on-time chunks) and both granting 1280×720.
+- **iOS — iPhone, iOS 18.7 / Safari 26.5.2, on production** (2026-08-07 / 2026-08-08 ST-08-2,
+  `docs/PROGRESS.md:161-176`): monitoring sessions ran against a **production-captured anchor**,
+  and the 2026-06-22 Run 4 tunnel run had already proven the calibration path end-to-end on the
+  same device class (`34c951b`).
+
+**One attribution stated honestly, because it is the weaker half.** The iPhone's production anchor
+is identified as *"captured on `3410cb4`, WebM/VP9, ~6.7 Mbit/s"*. That fingerprint matches the
+iPhone exactly — `3410cb4` predates PR #243's fMP4-first routing, Safari 26 reports
+`isTypeSupported = true` for all webm types so it was routed to `webm;codecs=vp9`, and **6.72
+Mbit/s is the iPhone's own measured unset-default effective rate** from the #250 bitrate ladder.
+It is a fingerprint match rather than an explicit "anchor captured on iPhone" log line. The
+**Android** half carries no such caveat, and the original risk this entry existed for — *"does a
+mobile-browser-produced codec actually decode server-side"* — is answered on both platforms.
+
+**What this does NOT close**: Safari **desktop** (ST-21) remains untested — **#67**, still open.
+
+**Original text, unedited:**
 **Status**: deferred-feature (verification, post-deploy)
 **Observed**: 2026-05-29, feature 004 smoke matrix (ST-22 / ST-23 camera portions)
 **Description**: The full mobile capture path — camera permission prompt → 60s
@@ -1072,7 +1193,31 @@ the anchor row is written. ST-24 (iOS) pairs here once Apple hardware is availab
 **Address by**: first deploy to an HTTPS environment (staging or production), before
 relying on mobile capture in the field.
 
-### Safari desktop + iOS Safari smoke cells (ST-21 / ST-24) — pending Apple hardware (#67)
+### Safari desktop (ST-21) smoke cell — pending macOS hardware (#67)
+**Status**: deferred-tooling (hardware access) — **OPEN**, but now **half its original size**.
+GitHub issue **#67 OPEN.**
+
+**Correction (2026-08-12, backlog-hygiene pass) — the iOS half is substantially done; the entry
+and its issue both still read as if ST-21 and ST-24 were equally blocked.** They are not:
+
+- **ST-24 (iOS Safari, real iPhone) — SATISFIED.** Extensive real-device validation landed
+  2026-08-05 → 2026-08-08 on **iPhone / iOS 18.7 / Safari 26.5.2**: calibration proven end-to-end
+  (Run 4, `34c951b`), then monitoring proven **against production** — 15/15 windows scored, 0
+  skipped, 0 `our-side`, every decode probe `outcome=ok branch=remux container=.mp4`, first
+  reading at 1:25 / 1:31 (**#89 resolved**, PRs #243/#247/#250; `docs/PROGRESS.md:76-176`). The
+  FR-047 dual-codec accept this cell existed to check is confirmed on real Apple hardware.
+- **ST-21 (Safari desktop, macOS) — STILL OPEN, and it is now the whole entry.** No macOS machine
+  has ever run it. Headless WebKit on Windows remains unusable (**#177**), so there is no
+  substitute.
+- **The feature-006 addendum below — PARTLY OPEN.** The four coverage-gate flows (thin → reject;
+  half-present → reject; full minute → accept) were **not** re-run as a set on the iPhone; the
+  2026-08 work exercised the capture and decode path, not the gate's accept/reject boundary. The
+  `MIN_COVERAGE_FRACTION = 0.65` / `MIN_USABLE_FRAMES = 50` calibration stays unproven on WebKit,
+  and the pre-production gate note still stands — now on **desktop Safari plus that flow set**,
+  not on iOS access, which the team has.
+
+**Original text, unedited below** (its ST-24 assignment and "no iOS device on the team" premise
+are both superseded by the above).
 **Status**: deferred-tooling (hardware access)
 **Observed**: 2026-05-29, feature 004 smoke matrix
 **Description**: ST-21 (Safari desktop, expect MP4) and ST-24 (iOS Safari mobile,
@@ -1105,7 +1250,18 @@ gate guards is the reference every later delta-from-baseline reading is measured
 (Principle II), so a Safari-specific gate miscalibration would silently poison or wrongly
 block real baselines.
 
-### Camera device selection not always written back to localStorage (ST-05) (#68)
+### ~~Camera device selection not always written back to localStorage (ST-05)~~ — resolved (#68)
+**Status**: resolved. GitHub issue **#68 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Resolved 2026-06-08 by feature 005** (`a6a9b19`, PR **#17**) — the calibration capture-flow
+revamp rewrote this path and fixed it, without the entry being closed out. The write moved out of
+the picker entirely: `apps/web/components/anchor/device-memory.ts:1-16` documents the rule (FR-045
+/ DECISION-25 / T029) that **only a device that actually started is ever persisted**, because only
+the orchestrator — which owns `getUserMedia` — knows whether acquisition succeeded, while the
+picker fires on *selection*, before acquisition. A remembered device that later fails is repaired
+rather than sticking. Called from `anchor-recorder.tsx:454,547`. That also removes the
+inescapable-lockout failure mode the original report was circling.
+
+**Original text, unedited:**
 **Status**: bug
 **Observed**: 2026-05-29, feature 004 smoke ST-05 (remembered device + fallback)
 **Description**: The recorder remembers the last camera in
@@ -1164,6 +1320,19 @@ cosmetics, ST-15).
   - **(1) anchor read path — DONE, but by feature 008, not 005.** The self-scoped `SECURITY DEFINER` `get_my_anchor()` shipped in feature 008's migration `supabase/migrations/20260619000000_monitoring_sessions_and_readings.sql` (T010/T011); feature 005 was locked to no-backend-change, so it never owned this, and no service-role read was used.
   - **(2) calibration UX revamp — DONE in feature 005** (PR #17, `a6a9b19`, merged 2026-06-08): the full capture-flow redesign (green room, framing guide, breathing guide, calm camera-access states, recalibrate entry, success state).
   - **(3) design-system token pass — STILL OPEN.** All six feature-003 token-pass items (button-system character, mobile/tablet typography, avatar disc dark-mode tint, muted-on-bg AA contrast, card-heading typography, cursor affordance) remain open in the feature-003 section above with unchanged `polish`/`bug` status; 005 did not absorb them and they were never re-homed to a specific feature. The 004 countdown-ring (ST-15) cosmetic has no standalone entry; feature 007's Graphite recolour may have addressed it (unverified). This pointer stays open as the live tracker for that still-pending design-system pass.
+**Correction (2026-08-12, backlog-hygiene pass) — the "all six … remain open … unchanged" line
+above was already wrong when it was written.** The 2026-06-24 recon note post-dates feature 007
+(`0b71d4a`, PR #22, merged 2026-06-18) by six days but did not account for it. Sub-item (3) is
+**three of six done**, not zero:
+  - **card-heading typography (#48) — RESOLVED** by 007 (DM Serif Display → Outfit system-wide).
+  - **muted-on-bg AA contrast (#46) — RESOLVED** by 007 (`--color-muted: #585D61`, ≈5.58:1).
+  - **button-system character (#47) — HALF resolved** by 007: the ghost/outline dark-hover
+    contrast failure is fixed and both variants are now used in production; the `Sign out`
+    semantic-weight ask and the sub-AA `link` variant remain.
+  - **Genuinely still open**: avatar disc dark-mode tint (**#44**), mobile/tablet typography
+    (**#45**), cursor affordance (**#49**), and the #47 remainder.
+The **pointer itself stays open** — the residue is real and still un-homed to any 014–022 slot.
+The 004 countdown-ring (ST-15) note remains unverified either way.
 **Fix scope**: feature-sized — tracked here only as a pointer.
 **Address by**: feature 005 spec/plan (sub-items 1+2 shipped; the design-system token pass (3) remains for a dedicated design pass).
 
@@ -1200,7 +1369,41 @@ in the `authenticated` SELECT whitelist).
 `packages/ml-video` extraction code changes — whichever comes first. Pairs with
 feature 005's anchor read-path decision and feature 008's live inference.
 
-### End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 008) (#72)
+### ~~End-to-end extraction-vs-notebook fidelity check (prerequisite for feature 008)~~ — resolved (#72)
+**Status**: resolved. GitHub issue **#72 CLOSED** (2026-08-12, backlog-hygiene pass).
+
+**The check ran, on a real clip, and passed — before feature 008 shipped.** This entry has been
+untouched since 2026-05-29 and still asserts below that the full chain **"has NEVER run"**. That
+sentence has been false since 2026-06-20. It is the single worst drift the 2026-08-10 recon found:
+not a stale status line, but a live document asserting the opposite of reality about a
+load-bearing ML gate.
+
+**What actually happened.** The go/no-go gate was run exactly as the fix-scope below specifies — a
+real StressID clip with a real Relax anchor, pushed through `packages/ml-video` and through the
+notebook's own path, compared value-for-value. It matched **bit-for-bit: `max|Δ| = 0` across all
+2958 dimensions, both blocks**, with a fresh detector per clip. Recorded at
+`specs/008-stress-inference-service/spec.md:200` (*"reproduces the training notebook's 2958-d
+vector bit-for-bit for CFR mp4 input"*) and relied on downstream at `research.md:507`.
+
+**The webm/VFR residual the 008 spec noted alongside it is also closed** — real Chrome
+MediaRecorder webm reports garbage frame counts, so the decode moved to `CAP_PROP_POS_MSEC`
+timestamp sampling, and that path carries its own committed fidelity test
+(`packages/ml-video/tests/test_webm_vfr_fidelity.py`, mp4-vs-webm).
+
+**Why nothing in the repo looks like a "fidelity test" for this.** The gate was a **one-time
+validation**, not a committed re-runnable artifact: the harnesses were deliberately gitignored
+(`.gitignore:117`, `.validation_*/`) because they need the StressID dataset and a real MediaPipe
+runtime, neither of which exists in CI. That matches the entry's own framing — *"a go/no-go gate
+on feature-space fidelity"*, not a CI test. The committed fidelity tests
+(`test_lbp_interpolation_fidelity.py`, `test_webm_vfr_fidelity.py`) are the narrower guards.
+
+**Also fixed in this pass**: `docs/DECISIONS.md` cited this gate as *"PROGRESS 2026-06-20,
+MODEL_HANDOFF"*. `docs/PROGRESS.md` contains **no 2026-06-20 entry**, and `docs/MODEL_HANDOFF.md`
+does not record the run — a dangling citation on a backstop obligation. Repointed to the 008 spec
+line, which is the real record.
+
+**Original text, unedited below — including the now-false "has NEVER run" sentence, kept so the
+drift itself stays legible.**
 **Status**: tech-debt
 **Category**: testing / fidelity verification
 **Observed**: 2026-05-29, hotfix/lbp-roi-interpolation (feature 005 recon — check #4)
@@ -1539,10 +1742,10 @@ even if the actual Arabic translation + RTL pass ships later.
 
 ## From feature 008 (stress-inference-service) — merged 2026-06-22
 
-- **T026 recorder mime — feature-detect and support BOTH containers (webm-preferred, fMP4 fallback), do not hard-code one** (#77) (`watch` / pre-build, from 008 device gate): the T009 gate proved both webm and fMP4 decode to `(2958,)`, but on a single iOS device, and iOS WebM-capture support is recent/uneven — so `window-recorder.ts` (T026) must `pickMime` webm-first with an fMP4 fallback rather than assume either container.
+- **~~T026 recorder mime — feature-detect and support BOTH containers (webm-preferred, fMP4 fallback), do not hard-code one~~** (#77) — **RESOLVED 2026-08-05 (PR #243, commit `a5c8d3d`); GitHub issue #77 CLOSED 2026-08-12 (backlog-hygiene pass).** Original text: the T009 gate proved both webm and fMP4 decode to `(2958,)`, but on a single iOS device, and iOS WebM-capture support is recent/uneven — so `window-recorder.ts` (T026) must `pickMime` webm-first with an fMP4 fallback rather than assume either container. **Shipped as `pickCaptureMimeType()` in `apps/web/lib/capture/constraints.ts:83-127`**, single-sourced so the calibration and monitoring recorders cannot diverge (scoring is `window − anchor`). The negotiation went **further than this item asked**, and the five-device probe is why: non-Apple engines try WebM first with an mp4 fallback as specified, but **Apple WebKit goes straight to fMP4 with no WebM fallback at all** — Safari 26 reports `isTypeSupported = true` for every WebM type and cannot honour it, so a webm-first probe on iOS routes into the broken decode path this item was trying to avoid. That was the mechanism behind **#89**. Resolved under the #89 umbrella, which is why this line was never separately marked — a fixed-but-open case caught by the 2026-08-10 recon, not by anything automated.
 - **Keep-up — surgical O(stride) tail-decode SHIPPED (2026-06-21); the full per-session rolling buffer is now only a *conditional* upgrade, and the read loop still needs back-pressure** (#78) (`watch` / production-deploy, from 008 device gate + the 2026-06-20 supervised smoke; pairs with research R-5 / T009): the supervised smoke measured the live lag *growing* ~9 s/window to ~3 min behind, because the server **re-decoded the whole growing recording-so-far every window** (per-window decode O(elapsed)). **Fixed surgically** in `ml-video` (`pipeline._extract_landmarks_tail` + `probe_global_timestamps_fast`, wired through `compute_anchor(tail_seconds=60)` + `probe_recorded_seconds`): both the `< 60 s` gate and the tail decode now touch only the **bounded trailing 60 s** (ffprobe packet grid + native-seek/ffmpeg-`-c copy`-remux), **bit-identical** to the whole-file path (`tests/test_tail_seek_keepup.py`). Measured before→after on the chrome continuous fixtures: per-window total **18 s→13 s, 30 s→11 s, 34 s→9 s, 51 s→11 s, 55 s→9 s** — i.e. BEFORE *grew* 3.1× with elapsed (O(elapsed), lag climbs), AFTER is **flat ~9–13 s** (O(stride), independent of elapsed). The growing-lag breach is removed. **TWO things remain** (decide alongside the chosen deploy target): **(a)** the *absolute* flat cost is still ~9–13 s on the dev laptop — partly the constant MediaPipe+LBP extract (R-5's separate, decode-independent cost; lever = slower reading cadence or GPU MediaPipe) and partly the bounded tail decode — so on a slower target it may still sit near/over the 10 s stride; the **full per-session rolling decoded-frame buffer** (decode only the **new ~10 s increment** each window → ~1.5 s decode, true O(stride) not O(window)) is the upgrade to build **only if** keep-up is re-measured on the real deploy target and the surgical flat cost breaches there (Option 2 of the 2026-06-21 design choice). **(b)** the read loop must still not fire a new stride while one is in flight (or must coalesce) — the per-stride-decode fix does not prevent overlap. **[note (b) RESOLVED 2026-06-26 → formalized + fixed as #110 (per-session scoring gate, concurrency 1, + drop-stale + client coalescing back-pressure); PR #113.]** Also: the surgical fix adds an **ffmpeg/ffprobe CLI** dependency on the API host (Dockerfile + `apps/api/README.md`); absent → degrades to whole-file decode (O(elapsed)), runs-but-fails on a clip → skipped window (200), never 500. Run `test_tail_seek_keepup.py` **on the deploy image** so an ffmpeg version difference can't silently shift fidelity. **RESOLVED 2026-08-10 — both remaining items are closed, and the conditional upgrade's trigger was evaluated on the real deploy target and did NOT fire.** Item **(b)** (read-loop back-pressure) was already resolved 2026-06-26 as **#110** (PR #113), recorded inline above. Item **(a)** made the full per-session rolling decoded-frame buffer conditional on one thing: *"only if keep-up is re-measured on the real deploy target and the surgical flat cost breaches there."* That measurement now exists. On **production** (2026-08-08 real-iPhone ST-08-2 re-run, API revision `serenify-api--preview-cors-243`) **server scoring is ~4.5 s/window against the 10 s stride** — under it, not over — and PR **#247** independently removed the payload-growth half entirely (per-minute payload medians flat at 6.83–7.35 MB with no slope; server per-window total median 6.62 s on a *contended* dev laptop, also under the stride). So the rolling buffer stays what DECISIONS 2026-06-21 and #247 both call it: a **named, unbuilt lever**, not open work. **Stated precisely, because it matters if this is ever re-opened:** the production figure comes from a 6-minute, 15-window iOS session (n=1) written up under **#253**, not from a dedicated keep-up soak on the deploy target — it is an observation, not a benchmark, and should not be quoted as one. **The residual belongs to #253, not here**: readings arrive ~19 s apart against the 10 s stride because the loop serializes on the round-trip, which is a **flat constant-factor throughput ceiling**, explicitly not the O(elapsed) divergence this entry was opened about. GitHub issue **#78 was closed 2026-08-08** with no rationale recorded; this entry is the record. Found by the 2026-08-10 `PROGRESS.md` backfill (PR #257), which caught the entry and the issue out of sync.
 - **In-memory smoothing buffer needs single-worker / session affinity / a shared cache in a multi-worker deploy** (#79) (`watch` / production-deploy, from 008 US1 T020; see DECISIONS 2026-06-20): the D-3 server-side smoother reads the last N=4 scored `proba[1]` from a **per-session in-memory buffer** (`inference.py` `_SessionBuffers`), NOT from the DB — because revised D-1 removed the service-role and the `window_readings` SELECT whitelist withholds `stress_probability` from `authenticated`, so the API can't read the raw probability back. Consequences for production: (a) with **>1 worker** the per-stride windows for a session must land on the **same** worker (session affinity) or share state via an external store (e.g. Redis), else the buffer is split and the band warms up erratically; (b) an **API restart drops all buffers**, so each active session **re-warms** (~90 s) — harmless but visible. Acceptable for MVP / localhost (single worker). Same class as the deferred rolling decoded-frame buffer + the read-loop back-pressure item above — decide alongside the chosen deploy target. The explicit per-session `buffers.drop()` on End is wired in US2 / T036; an LRU cap bounds memory until then.
-- **Dev-side manifestation of the smoothing-buffer drop: running live-monitor under bare `--reload` leaves the bloom *permanently* stuck on "getting a read on things"** (#80) (`watch` / dev-diagnostic, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item above): empirically-confirmed dev fingerprint, recorded so it isn't re-debugged. **Symptom:** the live bloom is stuck on **"getting a read on things"** for an entire session, while the **recap afterward shows a normal band line**. **Cause:** running the inference service under `--reload`; a uvicorn **worker restart** — triggered by *any* watched-file change (source save, cache write, `git checkout`) — drops the per-session in-memory smoothing buffer (`_SessionBuffers` in `app/services/inference.py`), forcing a fresh **~90 s / 4-window re-warm** each time. Persisted bands survive (the `window_readings` inserts are already committed) → the **recap is fine** but the **live bloom never latches**. **Fingerprint in `window_readings`:** band→warming-up regressions + a band appearing **before** 4 scored windows + an upload gap — a combination **impossible under one stable buffer**. **Dev workaround:** `--reload --reload-dir app` (or no `--reload`) for live-monitor testing, and **don't edit `app/` source mid-session** (even under `--reload-dir app`, saving a watched source file restarts the worker) — see `apps/api/README.md` "Live-monitor testing" + the 008/004/005 quickstarts. **Relation to the buffer note above:** that item covers the **multi-worker / intentional-restart** re-warm (a one-time, visible warm-up); this is the **single-worker dev** manifestation — under `--reload` the restart is **involuntary and repeated**, so the bloom looks *permanently* stuck rather than re-warming once.
+- **Dev-side manifestation of the smoothing-buffer drop: running live-monitor under bare `--reload` leaves the bloom *permanently* stuck on "getting a read on things"** (#80) — **GitHub issue #80 CLOSED 2026-08-12 as won't-do (backlog-hygiene pass); this BACKLOG line stays as the permanent record, which is the only thing it was ever for.** Closed on its own terms: the item is explicitly *"recorded so it isn't re-debugged"*, it is **dev-only and cosmetic** (persisted bands are unaffected — the recap is correct throughout), and it ships with a documented workaround in `apps/api/README.md:56-75`. There is no fix to make that is specific to it: the real remedy is the shared/durable smoothing buffer tracked by **#79** and **#81**, both of which stay open. A GitHub issue mirroring a diagnostic fingerprint adds nothing the entry below does not already carry. Original text: empirically-confirmed dev fingerprint, recorded so it isn't re-debugged. **Symptom:** the live bloom is stuck on **"getting a read on things"** for an entire session, while the **recap afterward shows a normal band line**. **Cause:** running the inference service under `--reload`; a uvicorn **worker restart** — triggered by *any* watched-file change (source save, cache write, `git checkout`) — drops the per-session in-memory smoothing buffer (`_SessionBuffers` in `app/services/inference.py`), forcing a fresh **~90 s / 4-window re-warm** each time. Persisted bands survive (the `window_readings` inserts are already committed) → the **recap is fine** but the **live bloom never latches**. **Fingerprint in `window_readings`:** band→warming-up regressions + a band appearing **before** 4 scored windows + an upload gap — a combination **impossible under one stable buffer**. **Dev workaround:** `--reload --reload-dir app` (or no `--reload`) for live-monitor testing, and **don't edit `app/` source mid-session** (even under `--reload-dir app`, saving a watched source file restarts the worker) — see `apps/api/README.md` "Live-monitor testing" + the 008/004/005 quickstarts. **Relation to the buffer note above:** that item covers the **multi-worker / intentional-restart** re-warm (a one-time, visible warm-up); this is the **single-worker dev** manifestation — under `--reload` the restart is **involuntary and repeated**, so the bloom looks *permanently* stuck rather than re-warming once.
 - **Live-monitor readings stability (live-bloom durability)** (#81) (`watch` / production-deploy, from the 2026-06-23 dev-reload diagnosis; pairs with the in-memory smoothing-buffer item + the dev fingerprint above): make the live bloom durable so it latches whenever a band has actually been computed/persisted, independent of worker lifecycle and live-response delivery. **Scope (from the read-only diagnostic):** **(a)** make the cold-start smoothing buffer **restart/worker-resilient** — single-worker + session affinity, or a shared cache (e.g. Redis), decided with the chosen deploy target; this is the existing buffer-durability concern, now shown to bite in **dev** too (the fingerprint above). **(b) decouple the live bloom from live-response delivery** — drive it partly from the `getSessionTrend` poll (the same durable `window_readings` rows the recap + the monitor "This session" card already read via `apps/web/lib/api/monitoring-reads.ts`), so a band that reached the DB shows even if its live scoring response was lost or late; this removes the recap-vs-bloom inconsistency at its root. **(c) investigate (needs live logs):** the final **~166 s upload cessation** (face-gate vs server-side upload failure) and the **"sign in again" mid-session auth event** seen in the 2026-06-23 run — Mohamed has the backend logs; attach when this branch opens. Same `production-deploy` class as the keep-up tail-decode + multi-worker buffer-affinity + read-loop back-pressure items above — do **stability first**. Fix scope: medium, split across `area:api` (buffer durability) + `area:web` (bloom driven off the durable poll). **Suggested issue labels:** `type:bug`, `area:api` (+ `area:web` for the bloom-delivery half).
 - **Feature 017 (team-lead dashboard) must add a tightly-scoped coarse-aggregate read path with multi-range time selection — NOT reach for the service-role key** (#82) (`deferred-feature` / blocks-017, **consolidated 2026-06-24 (absorbed the feature-001 "Manager dashboard time-range insights" manager-visibility item)** + the 008-foundational read-path constraint, T010–T011): **(read-path constraint — from 008)** 008 deliberately denies any manager access to `monitoring_sessions` / `window_readings` — owner-only RLS (select/insert/update-own), **no manager policy at all**, and `apps/api` holds **no service-role key** (revised D-1). When 017 needs managers to see team stress at a glance, it MUST satisfy that with a **tightly-scoped `SECURITY DEFINER` rollup function or a manager-readable aggregate view** that exposes **coarse bands only** (e.g. counts/fractions per band over a window, or a team tenor) and **never raw individual `window_readings`, never `stress_probability`/`label`, never per-employee point data** — mirroring `get_my_anchor()`'s self-scoping but widened to a manager's direct reports under the existing `profiles` manager relationship, with its own privacy review. It must **not** introduce a service-role key into `apps/api` to bypass RLS — the whole 008 posture is that the manager layer gets *nothing* by default, and any manager visibility is an explicit, coarse, separately-reviewed addition. **(time-range UX — from the feature-001 wrap-up)** The team-lead (and, for org-wide aggregates, the admin / feature 019) dashboards must support multiple time ranges for viewing stress trends — **1 week, 1 month, 1 quarter, 6 months, 1 year** — via a time-range selector control that re-aggregates the underlying daily data into weekly/monthly bars as appropriate. This is *compatible with* the read-path posture above, and the two reinforce each other: broader windows are **more** privacy-preserving (less granular), not less. **Fix scope**: medium — the `SECURITY DEFINER` rollup / manager-readable aggregate view + RLS + privacy review (read-path half), plus the time-range UI control, query-side aggregation, and Recharts charting (UX half). Suggested issue labels: `type:feature`, `area:db` (+ `area:web` for the selector UI). **Address by**: feature 017 (team-lead-dashboard) spec — must include BOTH the coarse-aggregate read-path constraint AND the time-range selector as acceptance scenarios; feature 019 (admin-dashboard) likewise for org-wide aggregates.
 - **A new camera/capture route must be registered in EVERY camera-policy touchpoint, or `getUserMedia` silently dies under the inherited `camera=()`** (#83) (`watch` / pre-build, from 008 US1 — `/app/monitor` originally shipped registered in none of them, so a granted permission still yielded no stream): a route that calls `getUserMedia` must be added to **(1)** `CAPTURE_ROUTES` in `apps/web/next.config.ts` (the `camera=(self)` Permissions-Policy header map) **AND (2)** the negative-lookahead exclusion in that same file's site-wide `camera=()` rule (`/((?!onboarding|app/calibrate|app/monitor).*)`) — these two spots MUST move together, because a path matched by *both* PP rules emits a *combined* `camera=() ∩ camera=(self) = denied` header that breaks the camera — **AND (3)** `isCaptureRoute` in `apps/web/proxy.ts`, which scopes the on-device MediaPipe detector's CSP (`script-src 'wasm-unsafe-eval'` + `worker-src 'self' blob:`); without it the detector WASM is CSP-blocked and the capture stage renders blank. The route's API origin must also stay reachable via the proxy `connect-src` (sourced from `NEXT_PUBLIC_API_URL`), so keep that env requirement **discoverable in the relevant `.env.example`** — the same discoverability discipline as the `SUPABASE_ANON_KEY` fix in `apps/api/.env.example`. Symptom of a miss: a granted camera permission still yields no stream (PP denied) or a blank stage (CSP-blocked WASM). A lint/test guard asserting these three lists stay in lockstep would retire the regression class.
@@ -1755,7 +1958,26 @@ floor already rate-limits re-prompts per-episode. Cooldown/cap remains a potenti
 hardening idea, not currently tracked as its own backlog item — file one separately if still
 wanted.
 
-### `STRESS_TENSE_BAND` (0.70) is an uncalibrated hardcoded default (#128)
+### ~~`STRESS_TENSE_BAND` (0.70) is an uncalibrated hardcoded default~~ — closed, deliberate (#128)
+**Status**: closed — deliberate product default, not debt. GitHub issue **#128 CLOSED**
+(2026-08-12, backlog-hygiene pass). **Reasoning recorded in `docs/DECISIONS.md` 2026-08-12**
+(*"`STRESS_TENSE_BAND = 0.70` is a deliberate product split; recalibration rejected"*) — written in
+the same change as the close, precisely so a threshold closed as "deliberate" cannot be re-raised
+as an open question later.
+
+**The short version.** `0.70` cannot be calibrated the way `0.53` was, because there is nothing to
+calibrate it *against*: `packages/ml-video/models/metadata.json` carries
+`label_mapping = {0: not_stressed, 1: stressed}` — the model is **binary**, and StressID has no
+"a little tense" ground truth. `0.53` is data-derived because a labelled class exists to sweep
+against; a tense cutoff has no label, so the **Plan** below would produce an unsupervised split of
+an already-uncalibrated score (`predict_proba` is not probability-calibrated, D-3) wearing the
+appearance of empirical grounding. **The plan is rejected, not deferred.** Reversal condition: a
+model trained on graded stress labels. Same limitation as
+`CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS`, already stated at `docs/PROGRESS.md:1032`.
+
+**Unaffected and still open**: **#92** (the band's *wording* — "a little tense" as two words).
+
+**Original text, unedited:**
 **Status**: tech-debt (`type:tech-debt` / `area:api` + `area:ml-video` + `area:docs`)
 **Observed**: 2026-07-02, feature-012 pre-merge polish pass.
 **Description**: `stress_tense_band` (env `STRESS_TENSE_BAND`, default `0.70` —
@@ -2803,7 +3025,21 @@ so the file is opened once.
 
 ## From feature 013 P8 Stage 4 close-out — captured 2026-07-28
 
-### Landing `/` stays `force-dynamic` — move ONLY the signed-in redirect into `proxy.ts` if production TTFB disagrees (#193)
+### ~~Landing `/` stays `force-dynamic` — move ONLY the signed-in redirect into `proxy.ts` if production TTFB disagrees~~ — closed, won't do (#193)
+**Status**: closed — won't do. GitHub issue **#193 CLOSED** (2026-08-12, backlog-hygiene pass).
+**A self-closing watch, closed exactly as it instructed.** The issue's own text: *"Absent that,
+the correct action on this issue is to close it as not-needed."* The trigger — a **measured**
+production TTFB on `/` disagreeing with R11's reasoning — has never fired, because no such
+measurement was ever taken. The state it describes is still accurate (`app/(public)/page.tsx:42`
+still carries `force-dynamic`), and the reasoning still holds: for the anonymous visitor the
+landing page is *for*, there is no session cookie, so `getUser()` short-circuits without a network
+round-trip and the proxy runs on every request anyway. The theoretical saving is static
+generation, not a round-trip. **Reopen only with a number.** The load-bearing constraint survives
+the close and is recorded in `research.md` §11 regardless: the `?code=` forward must **never**
+move into `proxy.ts`, whose `redirectTo` clears `url.search` and would eat the auth code on a real
+Supabase email link.
+
+**Original text, unedited:**
 **Status**: tech-debt (`type:tech-debt` / `area:web` / `status:watch`) — **OPEN.** GitHub issue **#193 OPEN.**
 **Category**: feature 013 P6 landing page / R11 (`research.md` §11)
 **Observed**: not observed — **logged as a candidate by T142, deliberately not built.**
@@ -3102,7 +3338,24 @@ approved.
 **Address by**: no deadline. **Low priority** — the trigger is a root-layout failure, which is rare,
 and the consequence is the pre-#200 status quo rather than anything worse.
 
-### Onboarding flow gate no longer applies to POSTs after the proxy method guard — accepted deliberately (#205)
+### ~~Onboarding flow gate no longer applies to POSTs after the proxy method guard — accepted deliberately~~ — closed, won't do (#205)
+**Status**: closed — won't do. GitHub issue **#205 CLOSED** (2026-08-12, backlog-hygiene pass).
+**Closed on its own terms: this entry asks for no action and never did.** Its stated purpose is
+recorded plainly in the issue — *"filed so that a later reader of the `proxy.ts` diff cannot
+reasonably conclude the onboarding-gate consequence went unnoticed."* That job is done by the
+record, not by an open issue. Re-verified on `main`: the method guard is still at `proxy.ts:218-220`;
+`components/consent/actions.ts:64-66` resolves `user_id` via `getUser()` and never accepts it as a
+parameter; the chat actions return `UNAUTH` without a valid session and forward the user's own
+access token so **RLS scopes every row to that user**. Every write stays inside the acting user's
+own protected rows, and no UI can fire the path — the GET is still gated, so the pages never
+render and no button exists. **This BACKLOG entry stays as the permanent record.**
+
+**Still open and genuinely adjacent**: **#195** (the Terms/Privacy gate absent from
+`(onboarding)/layout.tsx`). If that is ever fixed, the right answer for both is likely an in-action
+onboarding check rather than more proxy redirects — which is the reason this text is kept, not
+deleted.
+
+**Original text, unedited:**
 **Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN, knowingly accepted.** GitHub issue **#205 OPEN.**
 **Category**: consequence of #200 PR A (`proxy.ts` method guard)
 **Observed**: not observed — identified while reviewing the C1 diff, before merge
@@ -3390,8 +3643,26 @@ this PR has no reason to open. **Address by**: fold into the next a11y sweep.
 ## From the auth-aware public navbar fix — captured 2026-07-29
 
 ### Signed-in users mid-onboarding cannot open `/terms` or `/privacy` — the proxy onboarding gate swallows both legal routes (#213)
-**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#213 OPEN.**
-**Category**: routing / consent access — FR-043d adjacent
+**Status**: bug (`type:bug` / `area:web` / `status:watch`) — **OPEN, and re-scoped 2026-08-12 to
+`blocks-015`.** GitHub issue **#213 OPEN.**
+
+**Re-tag (2026-08-12, backlog-hygiene pass) — dormant today, live the moment 015 lands.** The
+defect is real and the code is unchanged (`proxy.ts` exempts only `/api/`), but **it is currently
+unreachable**: signup always collects `full_name`, so `profiles.full_name IS NULL` never holds for
+a user who is actually moving through onboarding, and the gate that swallows `/terms` and
+`/privacy` never fires. That is why it was correctly *not* fixed under 013 — there is no
+population.
+
+**`015-personalization-onboarding` is what re-arms it.** The moment onboarding gains steps beyond
+the name — which is that slot's whole premise — there is a real interval during which a signed-in
+user sits mid-flow, and every legal anchor in the product opens in a new tab, straight into the
+redirect. **Fix this as part of 015, not after it**: the exemption is one condition in an existing
+`proxy.ts` predicate, and adding it while the surface is already being opened costs nothing, where
+retrofitting it afterwards means re-opening the highest-blast-radius file in the repo for a
+one-line change. **Deliberately NOT closed** — closing it would delete the only warning that 015's
+own scope re-arms a known bug.
+
+**Category**: routing / consent access — FR-043d adjacent; **blocks-015**
 **Observed**: 2026-07-29, while checking whether the auth-aware navbar's `profiles` read
 had a reachable null-`full_name` branch. Pre-existing on `main`; the navbar branch touches
 no routing.
