@@ -21,7 +21,7 @@ import { QUESTIONNAIRE_RESULT_DWELL_MS } from "@/lib/questionnaire/constants";
 
 /**
  * T052 — coordinator: confirmatory and session-end never co-occur, the prompt resolves before
- * session-end, the weekly check-in stays separate from active monitoring, and the rendering
+ * session-end, the weekly survey stays separate from active monitoring, and the rendering
  * priority is centralized in one pure decision function.
  */
 
@@ -46,13 +46,13 @@ describe("decideQuestionnaireSurface (centralized priority)", () => {
     expect(decideQuestionnaireSurface({ ...base, sessionEndEligible: true })).toBe("session_end");
   });
 
-  it("session-end takes priority over the weekly check-in", () => {
+  it("session-end takes priority over the weekly survey", () => {
     expect(
       decideQuestionnaireSurface({ ...base, sessionEndEligible: true, weeklyEligible: true }),
     ).toBe("session_end");
   });
 
-  it("the weekly check-in shows only when separate from active monitoring", () => {
+  it("the weekly survey shows only when separate from active monitoring", () => {
     expect(decideQuestionnaireSurface({ ...base, weeklyEligible: true })).toBe("weekly");
     expect(
       decideQuestionnaireSurface({ ...base, monitoringActive: true, weeklyEligible: true }),
@@ -186,7 +186,7 @@ describe("QuestionnaireCoordinator (dashboard)", () => {
     }
   });
 
-  it("shows the weekly check-in when no session just ended and the week is due", async () => {
+  it("shows the weekly survey when no session just ended and the week is due", async () => {
     render(
       <QuestionnaireCoordinator userId="u1" takeEndedSession={() => null} loadCadence={async () => null} />,
     );

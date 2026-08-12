@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 import { signUpSchema } from "@/lib/auth/schemas";
 import { TERMS_ACK_REQUIRED_MESSAGE } from "@/lib/consent/copy";
+import { CONSENT_REGISTRY } from "@/lib/consent/registry";
 
 /**
  * T053 — the signup gate, asserted at both layers it exists in: the schema shape that
@@ -14,7 +15,22 @@ import { TERMS_ACK_REQUIRED_MESSAGE } from "@/lib/consent/copy";
  * would still render a checkbox and would still be broken.
  */
 
-const VALID_VERSION = "terms_privacy@2026-07-26.1";
+/**
+ * The CURRENT terms_privacy revision, read from the registry rather than written out.
+ *
+ * It was the literal `"terms_privacy@2026-07-26.1"` until 2026-08-12, and #198 — the first
+ * PR ever to append a second revision — turned every "valid submission" case in this file
+ * red at once: the literal had silently become a STALE version, so the action correctly
+ * refused it and `signUpMock` was never called. The failure was real but it named the
+ * wrong thing; nothing about the gate had changed.
+ *
+ * Deriving it keeps the file honest across every future revision. It does NOT weaken the
+ * suite: the assertion that the action forwards the SERVER's id rather than the form's is
+ * carried by the padded-value case below, which is there precisely because comparing two
+ * equal strings cannot distinguish the two code paths.
+ */
+const revisions = CONSENT_REGISTRY.terms_privacy;
+const VALID_VERSION = revisions[revisions.length - 1]!.versionId;
 
 const credentials = {
   email: "alex@example.com",

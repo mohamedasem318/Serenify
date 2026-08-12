@@ -26,7 +26,7 @@ class FakeLLM:
         ren: Any = "Thanks for telling me. What's been the heaviest part?",
         scorer: Any = '{"band": "at_ease", "crisis": false}',
         rollup: Any = '{"band": "at_ease", "crisis": false}',
-        title: Any = "A brief check-in",
+        title: Any = "A brief conversation",
     ) -> None:
         self.ren = ren
         self.scorer = scorer

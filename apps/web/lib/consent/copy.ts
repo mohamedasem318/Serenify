@@ -26,9 +26,13 @@
  * qualified digression from the decision at hand. The Privacy Policy states visibility
  * plainly and in full; this surface links to it rather than paraphrasing it.
  *
- * TERMINOLOGY IS BINDING (`plan.md` §11): **calibration** = baseline capture ·
- * **monitoring session** = live camera inference · **weekly work-environment check-in** =
- * the text questionnaire. Bare "check-in" is never used.
+ * TERMINOLOGY IS BINDING (`plan.md` §11, amended 2026-08-12 — `docs/CHANGELOG.md`):
+ * **calibration** = baseline capture · **monitoring session** = live camera inference,
+ * and **"check-in" is the friendly name for exactly that** · **weekly work-environment
+ * survey** = the text questionnaire, never a check-in (#198). The lede names both words
+ * for the camera surface on purpose: this gate is the last thing a person reads before
+ * the button labelled "Start check-in" turns a camera on, so it is the one place where
+ * the app's word and the document's word must be visibly the same thing.
  *
  * VOICE (constitution Principle V): calm, plainspoken, no exclamation marks, never
  * alarmist. This is a permission ask, not a warning. Zero numeric quality metrics
@@ -76,8 +80,9 @@ export const TERMS_ACK_STALE_MESSAGE =
 export const CAMERA_GATE_TITLE = "Before the camera turns on";
 
 export const CAMERA_GATE_LEDE =
-  "Calibration and monitoring sessions use your webcam. This is the one thing Serenify " +
-  "asks permission for separately, because it is the one thing worth reading about first.";
+  "Calibration and monitoring sessions use your webcam. A monitoring session is what the " +
+  "rest of the app calls a check-in. This is the one thing Serenify asks permission for " +
+  "separately, because it is the one thing worth reading about first.";
 
 export const CAMERA_GATE_WHAT_HAPPENS_HEADING = "What happens to the video";
 
@@ -107,7 +112,7 @@ export const CAMERA_GATE_SCOPE_HEADING = "What declining changes";
 export const CAMERA_GATE_SCOPE: readonly string[] = [
   "Calibration and monitoring sessions become unavailable. Serenify has no other way to " +
     "read a stress signal, so without this it does not read one.",
-  "The weekly work-environment check-in keeps working. It is a text questionnaire about " +
+  "The weekly work-environment survey keeps working. It is a text questionnaire about " +
     "your working conditions and it has never involved the camera.",
   "The companion conversation keeps working, exactly as it does now.",
   "Declining records nothing and deletes nothing. Because nothing is stored, this is " +

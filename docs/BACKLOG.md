@@ -3525,3 +3525,59 @@ Distinct from the known Windows `forks`-pool startup crash (`Error: kill EPERM`)
 - **Opening Ren outside the chat pill leaves the monitoring session indeterminate — it appears to hang rather than stopping or continuing** (#252) (`bug` / suggested labels `type:bug` + `area:web`; observed on a real iPhone / Safari during the post-fix verification session that closed #89): opening Ren to chat about the readings **without going through the chat pill** — i.e. navigating to the full chat workspace at `/app/chat` instead of opening the pill's in-place panel — leaves the session in an indeterminate state. It **appears to hang**: it neither stops cleanly nor continues cleanly, and the surface does not say which. **Why the two paths differ (suspected, not confirmed):** the pill (`apps/web/components/chat-pill.tsx`) opens a compact panel *over* the current page, so the monitoring surface stays mounted and capture keeps running, whereas any route change to `/app/chat` is a **full navigation** — `monitoring-session.tsx:750-752` documents exactly that for the confirmatory Ren handoff ("Full nav (chat is not a capture route)") — which unmounts the monitor. What happens to the in-flight session across that unmount has **not** been established. **Not reproduced and not root-caused** — a single observation, no trace captured, and no claim made here about which of stop / continue / stall actually occurs server-side. **Suspected direction, a hypothesis and not a decision:** picture-in-picture inference, so the session survives the navigation rather than being abandoned by it. **Deferred** — the design question underneath it (should navigating away end the session honestly, or should the session follow the user?) is open and is the more important half. Fix scope: unknown until traced; the first step is read-only instrumentation of what the session does across an unmount-by-navigation, on both the pill path and the full-nav path. Address by: next monitoring-quality pass; pairs with #244 (mid-session fallback to the camera prompt) — same "the surface lies about, or is silent on, what actually happened" family.
 
 - **Steady-state readings arrive ~19 s apart against the 10 s design stride — server scoring appears to serialize the client loop** (#253) (`watch` / suggested labels `status:watch` + `type:tech-debt` + `area:api` + `area:web`; from the same 2026-08-08 real-iPhone ST-08-2 re-run, production, iOS 18.7 / Safari 26.5.2, API revision `serenify-api--preview-cors-243`): readings land roughly **19 s apart** where the design stride is **10 s**. Server scoring costs **~4.5 s/window** and appears to serialize the client loop — the next stride does not start until the previous window's response lands, so the effective cadence is stride + round-trip. A **6-minute session therefore yields ~15 readings, not ~30**. **Measured stable, not growing**: the gap held at ~19 s for the whole session (POSTs ~11–19 s apart) and did not climb with elapsed time. **This is an observation, not a regression, and explicitly NOT the same class of thing as the resolved #247 keep-up defect.** #247 — and the earlier #78 / #110 work — fixed a defect where per-window cost was **O(elapsed)**: payload and decode both grew with session length, so the lag *climbed* without bound and the session fell progressively further behind. That is fixed and stays fixed; the cadence here is **flat**. What this entry records is a constant-factor **throughput ceiling** — fewer readings per minute than the stride implies — not a divergence, and nothing degrades over the life of a session. Consequence worth knowing before acting: reading density is half the design intent, which affects the smoothing buffer's fill rate and time-to-signal, not the correctness of any individual reading. **Possible directions, none chosen:** overlap the client loop (start stride N+1 without awaiting N) — but #110 deliberately added a per-session scoring gate at concurrency 1 plus client coalescing back-pressure, so decoupling must not reintroduce what #110 removed; or reduce the ~4.5 s server scoring cost; or accept the cadence and make the design stride honest. **Lower priority than #252.** Address by: whenever reading density becomes a product concern, or alongside the next latency pass. Already recorded as caveat (2) on the #89 entry above — this is that caveat given its own home.
+
+---
+
+## Terminology — "check-in" meant two things (2026-08-12)
+
+### ~~The app says "Start check-in" while the Terms say "monitoring session" — one noun for two different things~~ — resolved (#198)
+**Status**: resolved
+**Resolved**: 2026-08-12 on `fix/198-check-in-terminology` (PR **#258**). In the app **and** in
+both legal documents, **"check-in" now means the camera-based monitoring session** — the friendly
+app wording stayed and the documents moved to it. The text questionnaire is the **weekly
+work-environment survey** and is never called a check-in again, in copy, comments, or docs.
+
+**This entry was created and resolved in the same change, and that is itself the point.** #198 had
+**no BACKLOG entry at all** — a live violation of the Principle VIII 1:1 contract between
+`docs/BACKLOG.md` and GitHub Issues, sitting open since the issue was filed on 2026-07-28. The
+issue existed, the backlog did not, and nothing noticed. Recording it retroactively at the moment
+of the fix is the honest close: it puts the item in the source of truth and gives the issue a
+backlink, rather than pretending the gap never happened.
+
+**Observed**: feature 013's production verification, 2026-07-28, on the live signed-in dashboard at
+`serenify.tech` — the primary action read **Start check-in** and turned a camera on, while
+`/terms` reserved "check-in" for the text questionnaire and called the camera capture a monitoring
+session. Pre-existing (the strings date to feature 008, commit `6ae3b1e`, 2026-06-22); 013 is what
+made it a visible contradiction by shipping legal text that used the same noun for the other thing.
+
+**What shipped**:
+- **Terms of Service** — "Where the application says check-in, it means exactly that: a monitoring
+  session, with the camera on"; the questionnaire renamed to the weekly work-environment survey.
+- **Privacy Policy** — the same statement in § *What happens to your camera*, the data-category
+  bullet, and the § heading, now *Weekly work-environment survey*.
+- **Camera-and-inference gate** — the lede names both words for the same surface.
+- **Two new consent revisions**, both **material**: `terms_privacy@2026-08-12.1` and
+  `camera_inference@2026-08-12.1`. Every existing holder is re-prompted; that cost was accepted
+  when the change was decided.
+- **Ren's system prompt** gained a two-sentence vocabulary lock, so the one surface nobody greps
+  cannot reintroduce the ambiguity.
+- **`_TITLE_FALLBACK`** for an auto-titled conversation was `"A brief check-in"` — a *third*
+  meaning, neither camera nor survey. Now `"A brief conversation"`.
+
+**Deliberately NOT done** (recorded so nobody "finishes the job" later without deciding to):
+- **No identifier renamed.** `weekly-check-in-card.tsx`, `WeeklyCheckInCard`,
+  `weekly_checkin_cadence`, `submit_weekly_work_environment_checkin`, `todays-checkin-card.tsx`,
+  and the `/privacy#weekly-work-environment-check-in` anchor all keep their names. Copy change only.
+- **Band labels untouched** (`At ease` / `A little tense` / `Tense`) — **#92** stays open.
+- **Two `RAISE EXCEPTION` strings** in `supabase/migrations/20260630000000_questionnaire_feedback.sql`
+  (`:283`, `:319`) still say "weekly check-in". They are inside an **already-applied** migration and
+  are never rendered to a user — `weekly-check-in-card.tsx` discards the RPC result entirely. Fixing
+  them properly needs a new `CREATE OR REPLACE FUNCTION` migration, which is a behaviour change and
+  was out of scope; editing the applied file in place would only make the repo disagree with the
+  deployed database. Left as-is, on purpose.
+- **The constitution was not amended.** Principle I still calls the survey "the weekly employee
+  check-in" (`.specify/memory/constitution.md:762`) and uses "check-in flag" for the *"I'd like to
+  talk"* button (`:774`) — a third meaning again. Both are live normative text and now contradict
+  the shipped copy. **Amending the constitution requires Mohamed's explicit approval every time**,
+  so the exact diff was proposed in the PR body and left unapplied. Until it is taken, the
+  constitution is the one place that still uses the old vocabulary.

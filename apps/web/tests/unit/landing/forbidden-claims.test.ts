@@ -270,29 +270,41 @@ describe("FR-004 / SC-005: the landing copy quotes no model performance figure",
 describe("terminology is binding across the landing copy", () => {
   const LANDING_STRINGS = collectStrings(landingCopy, "lib/landing/copy.ts");
 
-  it("never uses a bare 'check-in' for the weekly work-environment check-in", () => {
-    // "calibration" / "monitoring session" / "weekly work-environment check-in" are the
-    // three names, and the third is the one that decays: the mock used bare "check-in" in
-    // two places, both meaning the monitoring session's prompt rather than the
-    // questionnaire — the word was wrong twice over.
-    const BARE = /check[-\s]?in/i;
-    const FULL = /weekly work-environment check-in/i;
+  it("never calls the weekly work-environment survey a check-in", () => {
+    // THE RULE INVERTED ON 2026-08-12 (#198), and this is the assertion that carried the
+    // old one. It used to ban "check-in" outright unless it appeared inside the full
+    // phrase "weekly work-environment check-in". Now the opposite holds: "check-in" is
+    // the friendly name for the MONITORING SESSION and is fine on its own, while the
+    // questionnaire is a SURVEY and must never be called a check-in.
+    //
+    // So the detector is no longer "is the noun bare" — bareness was never the defect.
+    // It is "does a string put check-in and the questionnaire in the same sentence",
+    // which is the actual ambiguity a reader hits: one of these two things turns on a
+    // camera and the other is text, and they must not share a name.
+    const CHECK_IN = /check[-\s]?in/i;
+    const QUESTIONNAIRE = /survey|questionnaire|weekly work-environment/i;
     const offenders = LANDING_STRINGS.filter(
-      (entry) => BARE.test(entry.text) && !FULL.test(entry.text),
-    )
-      // The approved §10.3 hero lede contains the VERB "checks in with the person". It is
-      // fixed copy under FR-032, unrewordable, and names no questionnaire.
-      .filter((entry) => entry.text !== landingCopy.HERO_LEDE)
-      .map((entry) => `${entry.path}: "${entry.text}"`);
+      (entry) => CHECK_IN.test(entry.text) && QUESTIONNAIRE.test(entry.text),
+    ).map((entry) => `${entry.path}: "${entry.text}"`);
 
-    expect(offenders, `bare "check-in":\n  ${offenders.join("\n  ")}`).toEqual([]);
+    expect(
+      offenders,
+      `the weekly work-environment survey is called a check-in:\n  ${offenders.join("\n  ")}`,
+    ).toEqual([]);
   });
 
   it("names all three surfaces somewhere on the page", () => {
     const all = LANDING_STRINGS.map((entry) => entry.text).join(" ");
     expect(all).toMatch(/calibration/i);
     expect(all).toMatch(/monitoring session/i);
-    expect(all).toMatch(/weekly work-environment check-in/i);
+    expect(all).toMatch(/weekly work-environment survey/i);
+  });
+
+  it("the old name for the questionnaire appears nowhere in the landing copy", () => {
+    // The specific string #198 retired. Kept as its own assertion rather than folded into
+    // the one above, so a regression names itself instead of reporting a generic overlap.
+    const all = LANDING_STRINGS.map((entry) => entry.text).join(" ");
+    expect(all).not.toMatch(/weekly work-environment check-in/i);
   });
 });
 

@@ -229,7 +229,15 @@ async def _compute_rollup_band(llm: LLMClient, transcript: list[dict[str, Any]])
         raise
 
 
-_TITLE_FALLBACK = "A brief check-in"
+# Must stay byte-identical to the fallback named in `prompts/auto_title.txt`, which asks
+# the model for this exact string when there is too little to summarise.
+#
+# Was "A brief check-in" until 2026-08-12 (#198). That was a THIRD meaning of the word —
+# neither the camera-based monitoring session (which is what "check-in" means everywhere
+# else in the product) nor the weekly work-environment survey, but a conversation with
+# Ren. A conversation title is the wrong place to spend the product's most overloaded
+# noun, so it names what it actually is.
+_TITLE_FALLBACK = "A brief conversation"
 
 
 async def _compute_auto_title(llm: LLMClient, transcript: list[dict[str, Any]]) -> str:

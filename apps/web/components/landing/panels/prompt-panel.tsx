@@ -18,9 +18,12 @@ import { cn } from "@/lib/utils";
  * highlight marked via `data-highlighted`, so the only interactive elements on the whole
  * card remain the chapter markers (T108).
  *
- * The header is "Serenify asks" rather than the mock's "Checking in": bare "check-in" is
- * banned outright, and it would have named the wrong surface anyway — this is the
- * monitoring session, not the weekly work-environment check-in.
+ * The header is "Serenify asks" rather than the mock's "Checking in". That was originally
+ * a rule fix — bare "check-in" was banned outright — and since 2026-08-12 (#198) it is no
+ * longer one: "check-in" now means exactly this surface, the monitoring session. The
+ * header stays anyway, on its own merits. The beat is Serenify interrupting mid-session
+ * to put a question to the person, and naming the actor and the act says more than
+ * naming the container they are both inside.
  *
  * ── THE PANEL CARRIES ITS OWN SURFACE, AND THAT IS THE POINT (2026-07-28) ──────────────
  *

@@ -30,7 +30,13 @@ import { cn } from "@/lib/utils";
 import { QuestionnaireResultIcon } from "./questionnaire-result-icon";
 
 /**
- * Feature 012 / US3 — the weekly work-environment check-in.
+ * Feature 012 / US3 — the weekly work-environment survey.
+ *
+ * The concept is a SURVEY and is never called a check-in in copy (#198, 2026-08-12): in
+ * this product "check-in" is the friendly name for the camera-based monitoring session,
+ * and one word for both is exactly what #198 fixed. The filename, the component name, and
+ * the `weekly-check-in` test id below are IDENTIFIERS, left as they are on purpose —
+ * #198 is a copy change and renaming them buys a user nothing.
  *
  * Good → smiley success (submits `sentiment='good'`); "Could be better" → a two-step stepper
  * (roadblock → support) → Done submits one IDENTITY-STRIPPED aggregate contribution through
@@ -73,7 +79,7 @@ export interface WeeklyCheckInCardProps {
   isoWeekStart: string;
   /** Current cadence row (for the skip increment); null on the first visit of the week. */
   cadence?: WeeklyCadenceRow | null;
-  /** Called once the check-in is recorded (submitted or skipped) so the host can mark it done. */
+  /** Called once the survey is recorded (submitted or skipped) so the host can mark it done. */
   onResolved?: () => void;
   /** Injectable submit RPC (defaults to the authenticated client). */
   submit?: typeof defaultSubmit;

@@ -24,7 +24,7 @@ import { WeeklyCheckInCard } from "./weekly-check-in-card";
  * Centralises questionnaire surface priority so two surfaces never co-occur. The confirmatory
  * prompt lives on the monitor page (resolved before the end-navigation), so on the dashboard
  * this coordinator only ever shows session-end feedback (for a just-ended session) or the
- * weekly check-in, with session-end taking priority. It mounts ALONGSIDE the Today card and
+ * weekly survey, with session-end taking priority. It mounts ALONGSIDE the Today card and
  * trend without changing their rendering (T062/T064).
  */
 
@@ -35,7 +35,7 @@ export interface QuestionnaireSurfaceInputs {
   confirmatoryVisible: boolean;
   /** A just-ended session awaits product feedback. */
   sessionEndEligible: boolean;
-  /** The weekly work-environment check-in is due. */
+  /** The weekly work-environment survey is due. */
   weeklyEligible: boolean;
 }
 
@@ -46,7 +46,7 @@ export type QuestionnaireSurface = "confirmatory" | "session_end" | "weekly" | "
  *   1. A visible confirmatory prompt always wins (it is sticky/answer-only).
  *   2. Session-end feedback is eligible only once monitoring has ended AND no confirmatory
  *      prompt is open — so the two never co-occur and the prompt resolves first.
- *   3. The weekly check-in shows on a dashboard visit, separate from active monitoring, and
+ *   3. The weekly survey shows on a dashboard visit, separate from active monitoring, and
  *      yields to session-end feedback.
  */
 export function decideQuestionnaireSurface(i: QuestionnaireSurfaceInputs): QuestionnaireSurface {

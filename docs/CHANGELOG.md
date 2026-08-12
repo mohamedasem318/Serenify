@@ -3011,3 +3011,34 @@ adjudication — they are the natural next consumer.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 21; `docs/DECISIONS.md`
 2026-08-05 (Amendment 21); `apps/web/components/consent/terms-acknowledgement-field.tsx`.
+
+## 2026-08-12 — spec(013-public-surface-and-legal) amendment: the binding terminology is reversed (#198)
+
+`plan.md` §11's terminology header read: **weekly work-environment check-in** = the text
+questionnaire; *bare "check-in" is never used*. It now reads the opposite way — **"check-in" is
+the friendly name for the monitoring session**, and the questionnaire is the **weekly
+work-environment survey**, never a check-in.
+
+Rationale: the rule was binding on 013's copy but not on the code 013 was written against. The
+signed-in dashboard has said **Start check-in** on the button that starts a camera capture since
+feature 008 (`6ae3b1e`, 2026-06-22), so the Terms and Privacy Policy 013 shipped described a
+product whose primary action used their word for the *other* surface — the one that is text-only.
+013 did not introduce the contradiction; it made it visible by writing the two names down
+carefully and publishing them. The app's wording is what users read daily and the legal text is
+what they read once, so the documents moved.
+
+Consequence, and the reason this is an amendment rather than a copy tweak: two new consent
+revisions, `terms_privacy@2026-08-12.1` and `camera_inference@2026-08-12.1`, both classified
+**material**, so everyone whose recorded acceptance predates them is asked again. That cost was
+accepted when the change was decided.
+
+`plan.md`'s ST-12 still reads "check-in" and is left alone — smoke-test text records what was
+run and is not rewritten after the fact; the amendment note says so in place.
+
+**Not a constitution amendment.** Principle I (`.specify/memory/constitution.md:762`, `:774`)
+still calls the survey "the weekly employee check-in" and uses "check-in flag" for the *"I'd like
+to talk"* button, and both now contradict the shipped copy. The exact diff is proposed in PR
+**#258** and awaits explicit approval; nothing in `.specify/memory/` was touched.
+
+Cross-references: `docs/DECISIONS.md` 2026-08-12; `docs/BACKLOG.md` #198; GitHub #198; PR #258;
+`specs/013-public-surface-and-legal/plan.md` §11.

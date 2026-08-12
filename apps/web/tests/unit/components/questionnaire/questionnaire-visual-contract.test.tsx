@@ -49,7 +49,7 @@ describe("session-end card (calm/neutral surface)", () => {
   });
 });
 
-describe("weekly check-in card (manager-aggregate surface)", () => {
+describe("weekly work-environment survey card (manager-aggregate surface)", () => {
   it("uses meadow but NO amber and NO crimson", () => {
     const { container } = render(
       <WeeklyCheckInCard userId="u" isoWeekStart="2026-06-29" submit={vi.fn()} recordCadence={vi.fn()} />,

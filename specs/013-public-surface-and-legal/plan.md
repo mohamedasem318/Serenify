@@ -8,7 +8,9 @@
 
 **Branch discipline**: every PR in this feature targets `013-public-surface-and-legal`. The feature branch merges to `main` only when implementation, smoke tests, and documentation are all complete.
 
-**Terminology (binding on this document, `tasks.md`, code, comments, and copy)**: **calibration** = baseline capture; **monitoring session** = live camera inference; **weekly work-environment check-in** = the text questionnaire. Bare "check-in" is never used. Where an existing filename contains `checkin`/`checkin-card`, the filename is quoted as-is and the prose names the concept.
+**Terminology (binding on this document, `tasks.md`, code, comments, and copy)**: **calibration** = baseline capture; **monitoring session** = live camera inference, and **"check-in" is the friendly name for exactly that**; **weekly work-environment survey** = the text questionnaire, which is **never** called a check-in. Where an existing filename contains `checkin`/`checkin-card`, the filename is quoted as-is and the prose names the concept.
+
+> **AMENDED 2026-08-12 by #198** (`docs/CHANGELOG.md`, `docs/DECISIONS.md`). This paragraph originally read: *"**weekly work-environment check-in** = the text questionnaire. Bare 'check-in' is never used."* That is the reverse of the rule above, and it was reversed deliberately. The signed-in dashboard has said **Start check-in** on the button that turns a camera on since feature 008, while the Terms and Privacy Policy this feature shipped reserved "check-in" for the questionnaire and called the camera capture a monitoring session — so the product and its own legal text used the same noun for the two things a reader most needs to tell apart. The app's wording is what users actually read, so the documents moved to it. `terms_privacy@2026-08-12.1` and `camera_inference@2026-08-12.1` are the resulting revisions, both classified **material**. **ST-12 below still reads "check-in" and should be read as "survey"** — smoke-test text is a record of what was run, and is not rewritten after the fact.
 
 ---
 

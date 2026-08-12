@@ -29,7 +29,7 @@ export const CONFIRMATORY_PROMPT_MIN_DWELL_MS = 4_500;
 export const CONFIRMATORY_FALSE_ALARM_SUPPRESS_NEXT_SESSIONS = 1;
 
 /**
- * How long the weekly check-in's own "ending" screen (smiley/check/muted result + message)
+ * How long the weekly survey's own "ending" screen (smiley/check/muted result + message)
  * stays visible before the card notifies the coordinator it is resolved. Without this dwell,
  * `onResolved` fires in the same React commit as the card's local ending state, so the
  * coordinator swaps surfaces before the ending screen ever paints — the acknowledgment is

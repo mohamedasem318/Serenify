@@ -53,7 +53,7 @@ export type SessionFeedbackActionTarget = (typeof SESSION_FEEDBACK_ACTION_TARGET
 export const SESSION_FEEDBACK_SAMPLING_POLICIES = ["every_session"] as const;
 export type SessionFeedbackSamplingPolicy = (typeof SESSION_FEEDBACK_SAMPLING_POLICIES)[number];
 
-// ── Weekly work-environment check-in ──────────────────────────────────────────────────
+// ── Weekly work-environment survey ────────────────────────────────────────────────────
 
 export const WEEKLY_SENTIMENTS = ["good", "could_be_better"] as const;
 export type WeeklySentiment = (typeof WEEKLY_SENTIMENTS)[number];

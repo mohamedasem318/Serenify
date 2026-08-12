@@ -16,17 +16,18 @@ import { decideCameraGate } from "@/lib/consent/read";
  *
  * DECLINING BLOCKS THAT SCOPE AND ONLY THAT SCOPE (FR-043c, ST-12). Calibration, baseline
  * capture and monitoring sessions become unavailable; the weekly work-environment
- * check-in — the text questionnaire about working conditions — keeps working exactly as
+ * survey — the text questionnaire about working conditions — keeps working exactly as
  * it did, because it has never involved the camera.
  *
  * The user modelled here is the one the camera gate blocks: ZERO consent records, which
  * `decideCameraGate` turns into "blocked". The same user drives the card below and every
  * path through it completes.
  *
- * TERMINOLOGY (plan.md §11): the concept is the **weekly work-environment check-in**.
- * The existing component file is named `weekly-check-in-card.tsx` and the existing table
- * is `weekly_checkin_cadence`; both are quoted here as-is, as filenames and identifiers,
- * and neither is used as this feature's own naming.
+ * TERMINOLOGY (plan.md §11, amended 2026-08-12 — #198): the concept is the **weekly
+ * work-environment survey**, and it is never called a check-in — that word names the
+ * camera-based monitoring session and nothing else. The existing component file is named
+ * `weekly-check-in-card.tsx` and the existing table is `weekly_checkin_cadence`; both are
+ * quoted here as-is, as filenames and identifiers, and neither is used as prose.
  */
 
 type SubmitFn = NonNullable<WeeklyCheckInCardProps["submit"]>;
@@ -62,7 +63,7 @@ describe("the user under test really is camera-gate-blocked", () => {
   });
 });
 
-describe("the weekly work-environment check-in is unaffected by a camera decline", () => {
+describe("the weekly work-environment survey is unaffected by a camera decline", () => {
   it("renders in full for a user with no camera_inference record", () => {
     setup();
     expect(

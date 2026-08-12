@@ -78,9 +78,11 @@ export const STORY_CLOSING_BEAT = "What you said stays yours. The video was read
 //  · No numeric quality metric — no digit next to F1 / AUC / ROC / recall / accuracy /
 //    precision / % (FR-004, SC-005).
 //  · The binding terminology, by name: CALIBRATION, MONITORING SESSION, and WEEKLY
-//    WORK-ENVIRONMENT CHECK-IN. Bare "check-in" is never used for the concept.
-//    (`HERO_LEDE` contains the verb phrase "checks in with the person"; that is approved
-//    §10.3 copy, is unrewordable under FR-032, and does not name the questionnaire.)
+//    WORK-ENVIRONMENT SURVEY. "Check-in" is the friendly name for the MONITORING SESSION
+//    and for nothing else; the survey is never called a check-in (#198, 2026-08-12 —
+//    `docs/CHANGELOG.md`). (`HERO_LEDE` contains the verb phrase "checks in with the
+//    person"; that is approved §10.3 copy, unrewordable under FR-032, and it now points
+//    at the right surface rather than merely dodging the noun.)
 // ─────────────────────────────────────────────────────────────────────────────────────
 
 // ── Hero ─────────────────────────────────────────────────────────────────────────────
@@ -115,9 +117,11 @@ export const STORY_CARD_LABEL = "An illustrated walkthrough of a monitoring sess
 
 export const PANEL_QUIET_SINCE = "Since 09:04";
 
-/** ADAPTED. The mock's header read "Checking in", which is banned twice over: bare
- *  "check-in", and it mis-names the surface — this is the MONITORING SESSION asking, not
- *  the weekly work-environment check-in. */
+/** ADAPTED. The mock's header read "Checking in". Under the 2026-08-12 terminology (#198)
+ *  that would no longer be a rule violation — this panel IS the monitoring session asking,
+ *  and "check-in" now names exactly that. It stays "Serenify asks" anyway: the panel shows
+ *  Serenify interrupting mid-session to put a question to the person, and naming the actor
+ *  and the act is the more specific line. Kept for the copy, not for the rule. */
 export const PANEL_PROMPT_HEAD = "Serenify asks";
 export const PANEL_PROMPT_BODY =
   "Your signals have looked tense for a little while. Is that how you're feeling?";
@@ -216,7 +220,7 @@ export const NEVER_CARD_DECIDE_BODY =
 //
 // ADAPTED THROUGHOUT. The mock named the three stages "It notices / It asks / It helps,
 // if you want", which names none of the three surfaces this product actually has. T102
-// requires CALIBRATION, the MONITORING SESSION, and the WEEKLY WORK-ENVIRONMENT CHECK-IN
+// requires CALIBRATION, the MONITORING SESSION, and the WEEKLY WORK-ENVIRONMENT SURVEY
 // by exactly those names. The mock's closing clause "never a report to anyone else" is
 // dropped: it is unscoped, and the claim that IS permitted is already made on the second
 // "Never" card.
@@ -237,7 +241,7 @@ export const HOW_STEPS = [
   },
   {
     number: "03",
-    heading: "The weekly work-environment check-in",
+    heading: "The weekly work-environment survey",
     body: "Once a week there is a short set of questions about the work around you — workload, control, support. It is text, not camera, and it is answered in your own time.",
   },
 ] as const;
@@ -268,8 +272,11 @@ export const STATUS_MODALITIES = [
 
 /**
  * ADAPTED. The mock's closing sentence was "The check-in is not a courtesy; it is the
- * correction." — bare "check-in", and it meant the monitoring session's prompt rather
- * than the questionnaire, so the word was wrong twice. Recast to name what it means.
+ * correction." It was recast because "the check-in" named the wrong thing: the sentence
+ * is about the mid-session PROMPT, which is one moment inside a monitoring session and
+ * not the session itself. That still holds after the 2026-08-12 terminology change
+ * (#198) — "check-in" now means the whole monitoring session, so the mock's noun would
+ * still point a step too wide. "Asking" is what the sentence is about, so it stays.
  *
  * "subject-disjoint" is retained deliberately and stays free of numbers: research.md
  * §12.2 makes its number-free presence a copy invariant.

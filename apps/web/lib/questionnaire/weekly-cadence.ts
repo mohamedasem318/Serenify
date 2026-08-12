@@ -1,10 +1,13 @@
 import type { WeeklyCadenceRow, WeeklyCadenceUpsert } from "@/lib/api/questionnaire-client";
 
 /**
- * Feature 012 / US3 — weekly check-in cadence (pure).
+ * Feature 012 / US3 — weekly work-environment survey cadence (pure).
  *
  * Decides whether the weekly work-environment card is due, based on the caller's private
- * `weekly_checkin_cadence` row for the current ISO week. Rules (data-model.md):
+ * `weekly_checkin_cadence` row for the current ISO week. That table name, and the
+ * `shouldShowWeeklyCheckIn` export below, are IDENTIFIERS and are quoted as they are:
+ * #198 renamed the concept in copy only and deliberately left every identifier alone.
+ * Rules (data-model.md):
  *   • First authenticated visit of a new ISO week → show (no row yet, or an un-skipped,
  *     un-completed row).
  *   • First skip → at most ONE later same-week re-prompt.

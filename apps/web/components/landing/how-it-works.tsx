@@ -7,8 +7,9 @@ import { cn } from "@/lib/utils";
  * THE THREE STAGES ARE NAMED BY THE BINDING TERMINOLOGY, not by the mock's paraphrase.
  * The mock called them "It notices / It asks / It helps, if you want", which names none of
  * the three surfaces this product actually has. They are CALIBRATION, the MONITORING
- * SESSION, and the WEEKLY WORK-ENVIRONMENT CHECK-IN — bare "check-in" is never used for
- * the concept, here or anywhere.
+ * SESSION, and the WEEKLY WORK-ENVIRONMENT SURVEY. Since 2026-08-12 (#198) "check-in" is
+ * the friendly name for the MONITORING SESSION and for nothing else; the survey is never
+ * called a check-in, here or anywhere.
  *
  * The numbered stages are the one place on this page that carries ordinal labels, and
  * they are genuinely ordinal — this is a sequence a person moves through over time, which

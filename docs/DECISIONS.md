@@ -7445,3 +7445,37 @@ confused failures: a "Tracking docs — which one, and when" table now sits in *
 **Cross-references**: `docs/PROGRESS.md` backfill note (2026-08-10); PR **#257**;
 `scripts/check-progress-freshness.mjs`; `.github/workflows/ci.yml`. **No CHANGELOG
 entry** — no spec is amended. **No BACKLOG entry** — nothing here is deferred.
+
+## 2026-08-12 — "check-in" means the camera session; the questionnaire becomes a survey (#198)
+
+One noun named two things: the dashboard's primary action read **Start check-in** and turned a
+camera on, while `/terms` reserved "check-in" for the text questionnaire and called the camera
+capture a "monitoring session". A user could not tell from the wording which one they were
+starting, and one of them turns on a camera.
+
+**Adopted: the documents move to the app, not the reverse.** "Check-in" is the friendly name for
+the **monitoring session**; the questionnaire is the **weekly work-environment survey** and is
+never a check-in again — copy, comments, docs, or Ren's prompt.
+
+**Rejected: renaming the app's copy instead**, which is what #198 itself proposed (`Today's
+check-in` → `Today's monitoring`). It is the smaller diff and the worse product. "Check-in" is
+the warmer word and it is the one already on the button people press; the legal text is read
+once and the button is read daily, so the document is the cheaper thing to move. Reversing
+013's binding terminology rule is the honest cost of that, and it is recorded in `CHANGELOG.md`.
+
+**Rejected: classifying the legal edit cosmetic** to avoid re-prompting. Nothing changed about
+what is collected, who sees it, or for how long — a tempting read. But the words that tell a
+reader which of two things a consent covers *did* change, and someone who accepted the earlier
+Terms accepted a document where "check-in" meant the questionnaire. Both revisions
+(`terms_privacy@2026-08-12.1`, `camera_inference@2026-08-12.1`) are **material**; every existing
+holder is re-prompted, and that cost was accepted when the change was decided. This is exactly
+the call FR-043a puts in a human's hands — a text-diff heuristic would have said "noun swap".
+
+**Not done, deliberately**: no identifier renamed (copy change only); band labels untouched (#92
+stays open); the **constitution was not amended** — Principle I `:762`/`:774` still carries the
+old vocabulary and now contradicts the shipped copy. The diff is proposed in PR #258 and awaits
+Mohamed's explicit approval, per the standing rule that no agent amends it unasked.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-08-12; `docs/BACKLOG.md` #198; PR **#258**;
+`apps/web/lib/consent/registry.ts`. **BACKLOG entry created in the same change** — #198 had none,
+a live Principle VIII violation.

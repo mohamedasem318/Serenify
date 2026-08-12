@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
  * T016 — the static half of SC-013 (`research.md` §12.2).
  *
  * A user who declines the camera-and-inference consent can still complete the weekly
- * work-environment check-in. This test proves the strongest half of that: the two are
+ * work-environment survey. This test proves the strongest half of that: the two are
  * structurally unable to interact, because nothing under the questionnaire feature can
  * reach the consent modules at all. Not "does not today" — cannot, by import graph.
  *
@@ -17,7 +17,8 @@ import { describe, expect, it } from "vitest";
  *
  * (Existing names are quoted as they are: the `weekly_checkin_cadence` table and
  * `lib/questionnaire/weekly-cadence.ts` predate this feature and are referenced verbatim.
- * This feature's own prose says "weekly work-environment check-in".)
+ * Prose says "weekly work-environment survey" — #198 renamed the concept in copy only,
+ * on 2026-08-12, and left every identifier deliberately untouched.)
  */
 
 const ROOT = process.cwd(); // apps/web
@@ -153,7 +154,7 @@ describe("the questionnaire feature cannot reach consent state", () => {
       .map(([, trail]) => trail.join(" → "));
     expect(
       offenders,
-      `the weekly work-environment check-in must not be able to reach consent state:\n${offenders.join("\n")}`,
+      `the weekly work-environment survey must not be able to reach consent state:\n${offenders.join("\n")}`,
     ).toEqual([]);
   });
 
