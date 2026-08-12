@@ -4,6 +4,30 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Backlog hygiene — 14 issues closed, nine BACKLOG drifts corrected
+
+**Branch**: `chore/backlog-hygiene-2026-08-12` · **Date**: 2026-08-12 · **Status**: PR open, not merged.
+**Closes #34 #36 #39 #46 #56 #58 #66 #68 #72 #77 #80 #128 #193 #205.** Open issues 74 → 60.
+
+**No code changed, no dependency changed** — every action closed an issue or corrected a document
+that disagreed with reality. Verdicts came from `docs/triage/2026-08-10-issue-catalogue-recon.md`,
+each re-verified against `main` first. **Seven were fixed months ago and never closed out** (#36 #46
+#56 #58 #68 #72 #77) — absorbed into feature 007's re-skin or the August mobile-capture work, where
+the fix landed under another umbrella and the paired entry went untouched. **Five closed on their
+own terms** (#34 #39 #80 #193 #205). **#66** met its criterion on production on both platforms.
+**#128** closed as deliberate, reasoning written to `DECISIONS.md` in the same change.
+
+**The worst drift was #72**: the entry asserted a load-bearing ML fidelity gate **"has NEVER run"**
+when it had run and passed bit-for-bit, and `DECISIONS.md` cited that gate at a PROGRESS entry and a
+handoff record that **do not exist** — a backstop obligation nobody could have acted on. Both fixed.
+
+**#67 and #213 deliberately NOT closed.** #67 shrank to its Safari-desktop half (iOS is done); #213
+re-arms the moment `015-personalization-onboarding` adds onboarding steps — re-tagged `blocks-015`.
+
+**NOT verified**: nothing was run — no tests, no build, no browser. Only four docs changed.
+
+---
+
 ## Terminology — "check-in" is the camera session; the questionnaire is a survey
 
 **Branch**: `fix/198-check-in-terminology` · **PR #258** · **Closes #198** · **Date**: 2026-08-12

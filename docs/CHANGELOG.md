@@ -3086,3 +3086,20 @@ unasked, and the approval is the thing that makes this entry legitimate.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 22; `docs/DECISIONS.md` 2026-08-12;
 `docs/BACKLOG.md` #198; GitHub #198, #259; PR #258.
+
+## 2026-08-12 — no spec amended; two spec-record citations corrected
+
+The backlog-hygiene pass (14 issues closed, nine BACKLOG drifts corrected) **amends no spec and
+changes no code**. It is recorded here only because two documents were pointing at the wrong place
+for a spec-recorded ML gate, and a reader following either would have found nothing.
+
+- `docs/BACKLOG.md` **#72** asserted the extraction-vs-notebook fidelity chain **"has NEVER run"**.
+  It ran on 2026-06-20 and passed bit-for-bit (`max|Δ| = 0` across all 2958 dims). The record is
+  `specs/008-stress-inference-service/spec.md:200`, relied on at that feature's `research.md:507`.
+  The entry now cites it; the false sentence is kept beneath, unedited, so the drift stays legible.
+- `docs/DECISIONS.md` (2026-06-25, protobuf-CVE accept-and-document) cited the same gate as
+  *"PROGRESS 2026-06-20, MODEL_HANDOFF"*. **Neither record exists.** That citation carries a live
+  obligation — any deliberate ML-stack upgrade must re-run the gate — so a dangling pointer there
+  is a backstop nobody could act on. Repointed to the 008 spec line; the obligation is unchanged.
+
+Both were found by the 2026-08-10 issue-catalogue recon, not by anything automated.

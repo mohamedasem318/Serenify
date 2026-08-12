@@ -4281,7 +4281,8 @@ being re-proposed (`.github/dependabot.yml`, same pass).
   vulnerable code path is not exercised by any input an attacker can shape.
 
 **Backstop on revisit**: the model already carries a confirmatory **served-path-vs-notebook**
-check (the bit-for-bit extraction/proba fidelity gate; PROGRESS 2026-06-20, MODEL_HANDOFF). Any
+check (the bit-for-bit extraction/proba fidelity gate; `specs/008-stress-inference-service/spec.md:200`,
+relied on at that feature's `research.md:507` — citation corrected 2026-08-12, see below). Any
 future deliberate ML-stack/Tasks-API upgrade that takes the protobuf fix MUST re-run that gate
 (re-extract → re-fit → re-LOSO) before trusting production vectors. Until such an upgrade is
 scheduled as a unit, the accept-and-document stands.
@@ -7511,3 +7512,48 @@ puts it out of scope), so no identifier moved.
 **Cross-references**: `.specify/memory/constitution.md` Amendment 22; `docs/CHANGELOG.md` 2026-08-12
 (Amendment 22); the entry above; PR **#258**. The two migration `RAISE EXCEPTION` strings stay
 deferred and now have **#259** and a BACKLOG entry, so they are not silently forgotten.
+
+---
+
+## 2026-08-12 — `STRESS_TENSE_BAND = 0.70` is a deliberate product split; recalibration rejected
+
+**Decision**: keep `0.70` as the a-little-tense/tense boundary, and **stop tracking its
+"uncalibration" as debt**. Recorded because a threshold closed as *"deliberate"* with no written
+reasoning gets re-raised in four months. Closes **#128**.
+
+**Why it cannot be calibrated the way `0.53` was.** `packages/ml-video/models/metadata.json`
+carries `label_mapping = {0: not_stressed, 1: stressed}` — the model is **binary**, and StressID
+has no "a little tense" ground truth. `0.53` is data-derived because a labelled class exists to
+sweep against (`loso_metrics_60s_calibrated.threshold_sweep_recommended.threshold`). For a tense
+band there is no label, so a "calibrated" cutoff would be an **unsupervised split of an
+uncalibrated score** — `predict_proba` is not probability-calibrated (D-3) — which would carry the
+appearance of empirical grounding without any. That is worse than an honest product default.
+
+**Rejected: the BACKLOG plan to re-run LOSO folds and set the cutoff from the distribution.** It
+produces a percentile, not a validated boundary; it would need re-deriving on every model refit;
+and the smoothing length N=4 is a coupled lever, so the number would encode a UI constant.
+
+**Consistent with existing practice, not an exception.** `CONFIRMATORY_LITTLE_TENSE_SUSTAINED_MS
+= 60_000` is a designed default for the *same* reason, stated at `docs/PROGRESS.md:1032` and there
+already attributed to "the same limitation as the 0.70 tense band, #128".
+
+**Reversal condition**: a model trained on graded stress labels. Then `0.70` becomes calibratable
+and this should be revisited — reopen as new work, not as this issue.
+
+**Cross-references**: `apps/api/app/config.py` (`stress_tense_band`); D-3 above (`0.70` as
+display-only, FR-015 — no numeric value is ever shown); `docs/MODELS.md`; **#92** (the band's
+*wording*) stays open and is unaffected.
+
+---
+
+## 2026-08-12 — Correction: the fidelity-gate citation in the protobuf-CVE entry pointed at nothing
+
+**In-place fix, recorded here because DECISIONS is append-only.** The 2026-06-25 protobuf-CVE
+accept-and-document entry rests on a backstop obligation: any deliberate ML-stack upgrade must
+re-run the served-path-vs-notebook fidelity gate. It cited that gate as *"PROGRESS 2026-06-20,
+MODEL_HANDOFF"*. **`docs/PROGRESS.md` has no 2026-06-20 entry, and `docs/MODEL_HANDOFF.md` does
+not record the run.** A future reader taking that upgrade would have found no gate to re-run.
+
+The gate did run and passed. Repointed to `specs/008-stress-inference-service/spec.md:200`, with
+the downstream reliance at that feature's `research.md:507`. The obligation is unchanged — only
+its pointer. Found by the 2026-08-10 issue-catalogue recon while verifying **#72**.
