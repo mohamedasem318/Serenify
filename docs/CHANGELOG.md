@@ -3042,3 +3042,47 @@ to talk"* button, and both now contradict the shipped copy. The exact diff is pr
 
 Cross-references: `docs/DECISIONS.md` 2026-08-12; `docs/BACKLOG.md` #198; GitHub #198; PR #258;
 `specs/013-public-surface-and-legal/plan.md` §11.
+
+## 2026-08-12 — constitution Amendment 22 (1.17.0 → 1.17.1, PATCH): Principle I stops calling two other things a "check-in"
+
+Same date and same PR (**#258**) as the #198 terminology change above. Principle I was the **last**
+place in the project still using the old vocabulary — the app, both legal documents, the consent
+gates, Ren's system prompt and `specs/013` §11 had all moved, leaving the rulebook contradicting the
+surfaces it governs.
+
+**(a) "the weekly employee check-in" → "the weekly work-environment survey"** (`:762`). The renamed
+concept, matching the shipped copy. The invariant the bullet carries is unchanged: still a distinct
+employee-submitted class, still reaching the manager-facing layer ONLY as an anonymized team-level
+aggregate, with minimum-headcount suppression still required before real employee data.
+
+**(b) "a discreet check-in flag" → "a discreet talk request"** (`:774`), plus one disambiguating
+sentence. **Not a find-and-replace.** "Check-in flag" named a *third* thing — neither the camera
+session nor the survey, but an employee-initiated, content-free signal to a manager — so it needed a
+real name rather than a substitution.
+
+**"Talk request"** was chosen because it mirrors the control's own label, *"I'd like to talk"*: the
+thing and the button that produces it now share a vocabulary, which is the tightest mapping
+available. **"Conversation request" was rejected** — "conversation" is already the companion's word
+in the Privacy Policy ("Companion conversation"), and a manager-directed request must not read as a
+request to talk to Ren. **"Flag" was rejected outright**: it reads as something recorded *about* an
+employee, when this is something the employee *asked for*, and that inversion is the surveillance
+framing Principle I exists to refuse. The added sentence — "A talk request is neither a check-in nor
+a survey response: it carries no reading, no answer, and no reason — only that the employee asked" —
+makes the distinction normative rather than leaving it to a reader.
+
+**Nothing to rename in code.** `check-in flag` appears nowhere outside the constitution, and the
+*"I'd like to talk"* button is unbuilt — a reserved layout slot (`specs/003` FR-006) and explicitly
+out of scope in `specs/011`. Prose only; no identifier, column, component, or route.
+
+**PATCH, not MINOR**: terminology clarification. No principle added, removed, or restructured, and
+no requirement changed in force or scope (Amendment 6 / 7 / 11 precedent). Amendment 13's historical
+rationale text (`:337`, `:348`) is deliberately **not** edited — amendment history records what was
+decided at the time. Templates re-audited for the touched literals: zero matches, consistent with the
+Amendment 8–13 and 21 audits.
+
+**Approved explicitly by Mohamed on 2026-08-12**, who asked for it folded into the open PR rather
+than a second one. Recorded because the standing rule is that no agent amends the constitution
+unasked, and the approval is the thing that makes this entry legitimate.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 22; `docs/DECISIONS.md` 2026-08-12;
+`docs/BACKLOG.md` #198; GitHub #198, #259; PR #258.

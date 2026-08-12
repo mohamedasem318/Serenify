@@ -3569,15 +3569,37 @@ made it a visible contradiction by shipping legal text that used the same noun f
   `weekly_checkin_cadence`, `submit_weekly_work_environment_checkin`, `todays-checkin-card.tsx`,
   and the `/privacy#weekly-work-environment-check-in` anchor all keep their names. Copy change only.
 - **Band labels untouched** (`At ease` / `A little tense` / `Tense`) — **#92** stays open.
-- **Two `RAISE EXCEPTION` strings** in `supabase/migrations/20260630000000_questionnaire_feedback.sql`
-  (`:283`, `:319`) still say "weekly check-in". They are inside an **already-applied** migration and
-  are never rendered to a user — `weekly-check-in-card.tsx` discards the RPC result entirely. Fixing
-  them properly needs a new `CREATE OR REPLACE FUNCTION` migration, which is a behaviour change and
-  was out of scope; editing the applied file in place would only make the repo disagree with the
-  deployed database. Left as-is, on purpose.
-- **The constitution was not amended.** Principle I still calls the survey "the weekly employee
-  check-in" (`.specify/memory/constitution.md:762`) and uses "check-in flag" for the *"I'd like to
-  talk"* button (`:774`) — a third meaning again. Both are live normative text and now contradict
-  the shipped copy. **Amending the constitution requires Mohamed's explicit approval every time**,
-  so the exact diff was proposed in the PR body and left unapplied. Until it is taken, the
-  constitution is the one place that still uses the old vocabulary.
+- **Two `RAISE EXCEPTION` strings** — deferred with its own entry below (**#259**).
+- **No identifier renamed**, including the constitution's — see the amendment note below.
+
+**The constitution WAS amended, on approval, in this same PR** — Amendment 22, **1.17.0 → 1.17.1
+(PATCH)**. Principle I had been the last place in the project still using the old vocabulary:
+`:762` called the survey "the weekly employee check-in", and `:774` used "check-in flag" for the
+*"I'd like to talk"* button — a third meaning again, neither the camera session nor the survey.
+The first is now "the weekly work-environment survey". The second is now **"a discreet talk
+request"**, plus a sentence stating that a talk request is neither a check-in nor a survey
+response and carries no reading, no answer, and no reason. Mohamed approved explicitly on
+2026-08-12 and asked for it folded into this PR rather than a second one. Amendment 13's
+historical rationale (`:337`, `:348`) is untouched — amendment history records what was decided
+at the time and is not rewritten. Reasoning: `docs/CHANGELOG.md` 2026-08-12 (Amendment 22).
+
+### Two `RAISE EXCEPTION` strings still call the weekly survey a "check-in" (#259)
+**Status**: tech-debt (`type:tech-debt` / `area:db`) — **OPEN.** GitHub issue **#259 OPEN.**
+Deferred from this change, not missed.
+
+`supabase/migrations/20260630000000_questionnaire_feedback.sql:283` (`'only employees submit weekly
+check-ins'`) and `:319` (`'weekly check-in already completed for this week'`), inside
+`submit_weekly_work_environment_checkin`.
+
+**Never rendered to a user** — `weekly-check-in-card.tsx` calls the RPC as `void submit({...})` and
+discards the result entirely. **The migration is already applied**, so editing the file in place
+would change nothing in the deployed database and would leave the repo disagreeing with production —
+strictly worse than leaving it. A correct fix needs a new migration carrying `CREATE OR REPLACE
+FUNCTION`, which redefines a live SECURITY DEFINER function: a behaviour change, and #198 was scoped
+to copy only.
+
+**Address by**: whenever `submit_weekly_work_environment_checkin` is next revised for its own
+reasons — most likely the minimum-headcount suppression work Principle I marks as required before
+real employee data is collected. Two strings are free to correct once that function is being
+replaced anyway; they do not justify a migration of their own. The function and table **names** stay
+as they are regardless. Fix scope: trivial, as a rider.

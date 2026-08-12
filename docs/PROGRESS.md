@@ -42,12 +42,19 @@ these two revisions trigger is covered by existing unit tests only — **no live
 exercised**, so the first real proof will be production after merge. The `/privacy` and `/terms`
 pages were not rendered or read on screen.
 
+**Constitution Amendment 22 — 1.17.0 → 1.17.1 (PATCH)**, approved explicitly by Mohamed on
+2026-08-12 and folded into this same PR at his instruction. Principle I was the last place still
+using the old vocabulary: the survey is renamed, and the *"I'd like to talk"* button's output stops
+being a "check-in flag" — a third meaning of the word — and becomes a **talk request**, named after
+the button's own label. Amendment 13's historical rationale is untouched. Templates re-audited for
+the touched literals: zero matches, same as Amendments 8–13 and 21.
+
 **Knowingly left**: two `RAISE EXCEPTION` strings in the already-applied questionnaire migration
-(`:283`, `:319`) still say "weekly check-in" — never rendered to a user, and correcting them needs a
-new `CREATE OR REPLACE FUNCTION` migration, which is a behaviour change and was out of scope. The
-**constitution still carries the old vocabulary** in live normative text (Principle I `:762`, `:774`)
-and now contradicts the shipped copy; the diff is proposed in the PR and awaits explicit approval.
-Band labels (`At ease` / `A little tense` / `Tense`) untouched — **#92 stays open**.
+(`:283`, `:319`) still say "weekly check-in" — never rendered to a user (the card discards the RPC
+result), and correcting them needs a new `CREATE OR REPLACE FUNCTION` migration, which is a
+behaviour change and was out of scope. Logged as **#259** with a BACKLOG entry, deferred to whenever
+that function is next revised for other reasons. Band labels (`At ease` / `A little tense` /
+`Tense`) untouched — **#92 stays open**.
 
 ---
 

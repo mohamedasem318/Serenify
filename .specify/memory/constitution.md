@@ -725,6 +725,61 @@ Cross-references:
 - .specify/memory/constitution.md Amendment 20 (the adjudication this refines)
 - apps/web/components/consent/terms-acknowledgement-field.tsx
 - apps/web/app/globals.css (`--color-control-strong`)
+
+Amendment 22: 1.17.0 → 1.17.1 (2026-08-12, PATCH)
+Bump rationale: Principle I terminology, following #198. Two bullets used
+"check-in" for things that are not the camera session, and Principle I was
+the LAST place in the project still doing so — the app, both legal
+documents, the consent gates, Ren's prompt and feature 013's spec all moved
+on 2026-08-12, leaving the rulebook contradicting the surfaces it governs.
+
+(a) "the weekly employee check-in" → "the weekly work-environment survey".
+The renamed concept, matching the shipped copy. No change to the invariant
+the bullet carries: it is still a distinct employee-submitted class, still
+reaches the manager-facing layer ONLY as an anonymized team-level
+aggregate, and minimum-headcount suppression is still a pre-real-data
+requirement.
+
+(b) "a discreet check-in flag" → "a discreet talk request", plus one
+sentence disambiguating it. This was NOT a find-and-replace: "check-in
+flag" named a THIRD thing — neither the camera session nor the survey, but
+an employee-initiated, content-free signal to a manager. It needed a real
+name, so it got the one its own button already says. "Talk request" mirrors
+the control's label ("I'd like to talk") so the thing and the button that
+makes it share a vocabulary. "Conversation request" was rejected:
+"conversation" is already the companion's word in the Privacy Policy
+("Companion conversation"), and a manager-directed request must not read as
+a request to talk to Ren. "Flag" was rejected outright — it reads as
+something recorded ABOUT an employee, when this is something the employee
+asked for, and that inversion is exactly the surveillance framing Principle
+I exists to refuse.
+
+Nothing to rename in code. "check-in flag" appears nowhere outside this
+file, and the "I'd like to talk" button is unbuilt — a reserved layout slot
+(spec 003 FR-006) and explicitly out of scope in spec 011. This amendment
+touches normative prose only; no identifier, column, component, or route.
+
+PATCH bump: terminology clarification. No principle added, removed, or
+restructured; no requirement changed in force or scope (Amendment 6/7/11
+precedent). Hand-edited per the Amendment 10 precedent. Approved explicitly
+by Mohamed on 2026-08-12, and folded into the open PR #258 rather than a
+second one, at his instruction.
+
+Affected templates: none. Re-ran the Amendment 13 audit over
+.specify/templates/{plan,spec,tasks,checklist,constitution}-template.md for
+the touched literals (`check-in`, `weekly employee check-in`, `check-in
+flag`, `work-environment`, `survey`, `talk request`) — zero matches; the
+templates reference principles by number, not by these literals, so no
+template edit is required (consistent with the Amendment 8–13 and 21
+audits).
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-08-12 (#198, and the Amendment 22 follow-up)
+- docs/CHANGELOG.md entry 2026-08-12 (Amendment 22)
+- docs/BACKLOG.md — "Terminology" section, #198
+- specs/013-public-surface-and-legal/plan.md §11 (the amended spec rule)
+- apps/web/lib/legal/copy.ts, apps/web/lib/consent/copy.ts (the shipped copy)
+- GitHub #198, PR #258
 -->
 
 # Serenify Constitution
@@ -759,7 +814,7 @@ following invariants MUST hold at all times:
   philosophy — not a surveillance tool. Employees control granularity via a
   three-position privacy slider: `full detail` / `summary only` (DEFAULT) /
   `off during specified hours`.
-- Voluntary work-environment feedback — the weekly employee check-in (an
+- Voluntary work-environment feedback — the weekly work-environment survey (an
   overall sentiment and, when negative, a roadblock selection plus a
   desired-support selection) — is a distinct employee-submitted class, separate
   from stress signals. It reaches the manager-facing layer ONLY as an
@@ -771,8 +826,10 @@ following invariants MUST hold at all times:
 - Every employee MUST have access to a "this is what your manager sees right
   now" transparency view from their settings page, rendering the exact data
   visible to their direct manager.
-- An opt-in "I'd like to talk" button MUST surface a discreet check-in flag
-  to the direct manager. It MUST NOT reveal what triggered the request.
+- An opt-in "I'd like to talk" button MUST surface a discreet talk request
+  to the direct manager. It MUST NOT reveal what triggered the request. A
+  talk request is neither a check-in nor a survey response: it carries no
+  reading, no answer, and no reason — only that the employee asked.
 - Conversations with the in-app companion (chat text, titles, and any
   derived stress band) are employee-private content. They MUST NEVER reach
   the manager-facing or admin-facing layer — the same boundary as raw
@@ -1328,4 +1385,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.17.0 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-05
+**Version**: 1.17.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-12

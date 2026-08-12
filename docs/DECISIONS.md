@@ -7479,3 +7479,35 @@ Mohamed's explicit approval, per the standing rule that no agent amends it unask
 **Cross-references**: `docs/CHANGELOG.md` 2026-08-12; `docs/BACKLOG.md` #198; PR **#258**;
 `apps/web/lib/consent/registry.ts`. **BACKLOG entry created in the same change** — #198 had none,
 a live Principle VIII violation.
+
+## 2026-08-12 — follow-up: the constitution WAS amended, and "check-in flag" got a real name
+
+Supersedes the closing paragraph of the entry directly above, which recorded the constitution as
+left unamended pending approval. Mohamed approved explicitly the same day and asked for it folded
+into PR #258 rather than a second PR. **Amendment 22, 1.17.0 → 1.17.1 (PATCH).**
+
+Principle I `:762` — "the weekly employee check-in" → "the weekly work-environment survey". No
+invariant changed; the bullet's anonymized-aggregate rule and its pre-real-data suppression
+requirement stand exactly as they were.
+
+**Principle I `:774` needed a decision, not a substitution.** "A discreet check-in flag" named a
+*third* thing: neither the camera session nor the survey, but an employee-initiated, content-free
+signal to a manager. **Adopted: "a discreet talk request"**, because it mirrors the control's own
+label — *"I'd like to talk"* — so the button and the thing it produces finally share a vocabulary.
+
+**Rejected: "conversation request."** "Conversation" is already the companion's word in the Privacy
+Policy ("Companion conversation"), and a manager-directed request that reads as a request to talk to
+Ren would trade one collision for another.
+
+**Rejected: "flag."** It reads as something recorded *about* an employee, when this is something the
+employee *asked for*. That inversion is precisely the surveillance framing Principle I exists to
+refuse, so keeping the noun while fixing only its adjective would have missed the actual defect.
+
+A disambiguating sentence was added rather than left implicit: a talk request carries no reading, no
+answer, and no reason — only that the employee asked. **Prose only**: `check-in flag` appears nowhere
+outside the constitution, and the button is unbuilt (`specs/003` FR-006 reserves a slot; `specs/011`
+puts it out of scope), so no identifier moved.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 22; `docs/CHANGELOG.md` 2026-08-12
+(Amendment 22); the entry above; PR **#258**. The two migration `RAISE EXCEPTION` strings stay
+deferred and now have **#259** and a BACKLOG entry, so they are not silently forgotten.
