@@ -3011,3 +3011,78 @@ adjudication — they are the natural next consumer.
 
 Cross-references: `.specify/memory/constitution.md` Amendment 21; `docs/DECISIONS.md`
 2026-08-05 (Amendment 21); `apps/web/components/consent/terms-acknowledgement-field.tsx`.
+
+## 2026-08-12 — spec(013-public-surface-and-legal) amendment: the binding terminology is reversed (#198)
+
+`plan.md` §11's terminology header read: **weekly work-environment check-in** = the text
+questionnaire; *bare "check-in" is never used*. It now reads the opposite way — **"check-in" is
+the friendly name for the monitoring session**, and the questionnaire is the **weekly
+work-environment survey**, never a check-in.
+
+Rationale: the rule was binding on 013's copy but not on the code 013 was written against. The
+signed-in dashboard has said **Start check-in** on the button that starts a camera capture since
+feature 008 (`6ae3b1e`, 2026-06-22), so the Terms and Privacy Policy 013 shipped described a
+product whose primary action used their word for the *other* surface — the one that is text-only.
+013 did not introduce the contradiction; it made it visible by writing the two names down
+carefully and publishing them. The app's wording is what users read daily and the legal text is
+what they read once, so the documents moved.
+
+Consequence, and the reason this is an amendment rather than a copy tweak: two new consent
+revisions, `terms_privacy@2026-08-12.1` and `camera_inference@2026-08-12.1`, both classified
+**material**, so everyone whose recorded acceptance predates them is asked again. That cost was
+accepted when the change was decided.
+
+`plan.md`'s ST-12 still reads "check-in" and is left alone — smoke-test text records what was
+run and is not rewritten after the fact; the amendment note says so in place.
+
+**Not a constitution amendment.** Principle I (`.specify/memory/constitution.md:762`, `:774`)
+still calls the survey "the weekly employee check-in" and uses "check-in flag" for the *"I'd like
+to talk"* button, and both now contradict the shipped copy. The exact diff is proposed in PR
+**#258** and awaits explicit approval; nothing in `.specify/memory/` was touched.
+
+Cross-references: `docs/DECISIONS.md` 2026-08-12; `docs/BACKLOG.md` #198; GitHub #198; PR #258;
+`specs/013-public-surface-and-legal/plan.md` §11.
+
+## 2026-08-12 — constitution Amendment 22 (1.17.0 → 1.17.1, PATCH): Principle I stops calling two other things a "check-in"
+
+Same date and same PR (**#258**) as the #198 terminology change above. Principle I was the **last**
+place in the project still using the old vocabulary — the app, both legal documents, the consent
+gates, Ren's system prompt and `specs/013` §11 had all moved, leaving the rulebook contradicting the
+surfaces it governs.
+
+**(a) "the weekly employee check-in" → "the weekly work-environment survey"** (`:762`). The renamed
+concept, matching the shipped copy. The invariant the bullet carries is unchanged: still a distinct
+employee-submitted class, still reaching the manager-facing layer ONLY as an anonymized team-level
+aggregate, with minimum-headcount suppression still required before real employee data.
+
+**(b) "a discreet check-in flag" → "a discreet talk request"** (`:774`), plus one disambiguating
+sentence. **Not a find-and-replace.** "Check-in flag" named a *third* thing — neither the camera
+session nor the survey, but an employee-initiated, content-free signal to a manager — so it needed a
+real name rather than a substitution.
+
+**"Talk request"** was chosen because it mirrors the control's own label, *"I'd like to talk"*: the
+thing and the button that produces it now share a vocabulary, which is the tightest mapping
+available. **"Conversation request" was rejected** — "conversation" is already the companion's word
+in the Privacy Policy ("Companion conversation"), and a manager-directed request must not read as a
+request to talk to Ren. **"Flag" was rejected outright**: it reads as something recorded *about* an
+employee, when this is something the employee *asked for*, and that inversion is the surveillance
+framing Principle I exists to refuse. The added sentence — "A talk request is neither a check-in nor
+a survey response: it carries no reading, no answer, and no reason — only that the employee asked" —
+makes the distinction normative rather than leaving it to a reader.
+
+**Nothing to rename in code.** `check-in flag` appears nowhere outside the constitution, and the
+*"I'd like to talk"* button is unbuilt — a reserved layout slot (`specs/003` FR-006) and explicitly
+out of scope in `specs/011`. Prose only; no identifier, column, component, or route.
+
+**PATCH, not MINOR**: terminology clarification. No principle added, removed, or restructured, and
+no requirement changed in force or scope (Amendment 6 / 7 / 11 precedent). Amendment 13's historical
+rationale text (`:337`, `:348`) is deliberately **not** edited — amendment history records what was
+decided at the time. Templates re-audited for the touched literals: zero matches, consistent with the
+Amendment 8–13 and 21 audits.
+
+**Approved explicitly by Mohamed on 2026-08-12**, who asked for it folded into the open PR rather
+than a second one. Recorded because the standing rule is that no agent amends the constitution
+unasked, and the approval is the thing that makes this entry legitimate.
+
+Cross-references: `.specify/memory/constitution.md` Amendment 22; `docs/DECISIONS.md` 2026-08-12;
+`docs/BACKLOG.md` #198; GitHub #198, #259; PR #258.

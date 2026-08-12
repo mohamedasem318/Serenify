@@ -50,6 +50,27 @@ Never remap a Graphite token name to a different source value inside `@theme inl
 - Fixed-pixel SVG: 1 unit = 1px; `SVG width = nLanes × laneWidth` with a matching `viewBox`
 - **No stretched viewBox** — a stretched viewBox is the known regression that broke prior builds
 
+### Product terminology — binding on copy, comments, and docs
+
+Three surfaces, three names. Two of them are easy to confuse and one of them turns on a camera,
+so the names are not negotiable:
+
+| Name | What it is |
+|---|---|
+| **calibration** | The one-off baseline capture of the person's ordinary face |
+| **monitoring session** | Live camera inference. **"Check-in" is the friendly name for exactly this**, and the app's primary action says `Start check-in` |
+| **weekly work-environment survey** | The text questionnaire about working conditions. **Never** called a check-in |
+
+Set by **#198** on 2026-08-12, reversing an earlier rule that banned a bare "check-in" and
+reserved the word for the questionnaire. The app had always said `Start check-in` on the button
+that turns a camera on, so the legal documents moved to the app's word rather than the reverse.
+Full reasoning: `docs/DECISIONS.md` 2026-08-12; the spec amendment is in `docs/CHANGELOG.md`.
+
+Identifiers are **not** in scope and were deliberately left alone: `weekly-check-in-card.tsx`,
+`WeeklyCheckInCard`, `weekly_checkin_cadence`, `submit_weekly_work_environment_checkin`,
+`todays-checkin-card.tsx` and the `/privacy#weekly-work-environment-check-in` anchor all keep
+their names. Quote them as-is; write the concept in prose.
+
 ## Tracking docs — which one, and when
 
 Four docs, four jobs. A change usually touches more than one, and the failure mode is never

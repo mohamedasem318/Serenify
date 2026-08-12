@@ -37,7 +37,7 @@ import { CAMERA_GATE_DECLINE_LABEL, CAMERA_GATE_TITLE } from "@/lib/consent/copy
  * Gating the whole route removes the NAME step, which is the only thing that ever writes
  * `profiles.full_name`. Declining then navigates to `/app`, where `proxy.ts:203` bounces
  * a null-`full_name` user straight back to `/onboarding` — and round again, forever, with
- * no way to set a name, reach `/app`, or reach the weekly work-environment check-in.
+ * no way to set a name, reach `/app`, or reach the weekly work-environment survey.
  *
  * FR-043c is the resolution, not a workaround: declining blocks calibration, baseline
  * capture and monitoring sessions, "and nothing else". A text field is not camera

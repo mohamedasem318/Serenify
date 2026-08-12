@@ -176,13 +176,18 @@ describe("RecalibrationPrompt — voice and colour discipline", () => {
     }
   });
 
-  it("uses the binding terminology and never a bare “check-in”", () => {
+  it("uses the binding terminology and never names the questionnaire", () => {
     render(<RecalibrationPrompt />);
     const text = screen.getByRole("dialog").textContent ?? "";
     expect(text).toMatch(/calibration/i);
     expect(text).toMatch(/monitoring sessions/i);
-    // "check-in" is only ever permitted as "weekly work-environment check-in".
-    expect(text).not.toMatch(/check-?in/i);
+    // This assertion used to be `not.toMatch(/check-?in/i)`, enforcing the pre-#198 rule
+    // that banned a bare "check-in" outright. That rule inverted on 2026-08-12: check-in
+    // now MEANS the monitoring session, so the word would be correct here if the prompt
+    // used it. What is still wrong is naming the OTHER surface — this dialog is about
+    // calibration and the camera sessions it feeds, and the weekly work-environment
+    // survey has nothing to do with either.
+    expect(text).not.toMatch(/survey|questionnaire/i);
   });
 
   it("uses typographic punctuation, not ASCII stand-ins", () => {

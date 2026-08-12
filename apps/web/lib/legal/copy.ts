@@ -21,9 +21,18 @@
  * it. A marker in a distant forward-looking section does not satisfy that requirement and
  * does not satisfy the test.
  *
- * Terminology is binding (`plan.md` §11 header): **calibration** = baseline capture ·
- * **monitoring session** = live camera inference · **weekly work-environment check-in** =
- * the text questionnaire. Bare "check-in" is never used.
+ * Terminology is binding (`plan.md` §11 header, amended 2026-08-12 — `docs/CHANGELOG.md`):
+ * **calibration** = baseline capture · **monitoring session** = live camera inference,
+ * and **"check-in" is the friendly name for exactly that** · **weekly work-environment
+ * survey** = the text questionnaire. The questionnaire is NEVER called a check-in.
+ *
+ * That is the reverse of the rule this file shipped with, and it was reversed on purpose
+ * (#198). The application's primary action has always read **Start check-in** and routes
+ * to the camera; the documents said "monitoring session" and reserved "check-in" for the
+ * questionnaire, so the product and its own legal text named the same button differently
+ * and used the same noun for the one thing a reader most needs to tell apart — the one
+ * that turns a camera on. The app wording is what users actually read, so the documents
+ * moved to it rather than the other way round.
  */
 
 /** One rendered block inside a legal section. The chrome renders these in order. */
@@ -75,9 +84,11 @@ const TERMS_WHAT_HEADING = "What Serenify is";
 export const TERMS_WHAT_P1 =
   "Serenify is a workplace wellbeing tool. It reads signs of stress from a webcam during " +
   "a monitoring session you start yourself, shows you what it noticed, and offers a " +
-  "conversation with an in-app companion called Ren if you want one. It also collects a " +
-  "short weekly work-environment check-in, which is a text questionnaire about your " +
-  "working conditions rather than about you.";
+  "conversation with an in-app companion called Ren if you want one. Where the " +
+  "application says check-in, it means exactly that: a monitoring session, with the " +
+  "camera on. It also collects a short weekly work-environment survey, which is a text " +
+  "questionnaire about your working conditions rather than about you, and which never " +
+  "uses the camera.";
 
 export const TERMS_WHAT_P2 =
   "Before your first monitoring session, Serenify records a short calibration — a brief " +
@@ -220,7 +231,7 @@ export const TERMS_CONSENT_P1 =
 
 export const TERMS_CONSENT_ITEMS: readonly string[] = [
   "Terms and Privacy — accepting this document and the Privacy Policy. This is the basis on which Serenify is used at all, so declining it means the application is not available to you.",
-  "Camera and inference — permission to capture webcam video for calibration and monitoring sessions and to run inference on it. Declining this blocks calibration and monitoring sessions, and nothing else. The weekly work-environment check-in and the companion conversation both keep working.",
+  "Camera and inference — permission to capture webcam video for calibration and monitoring sessions and to run inference on it. Declining this blocks calibration and monitoring sessions, and nothing else. The weekly work-environment survey and the companion conversation both keep working.",
 ];
 
 export const TERMS_CONSENT_P2 =
@@ -356,8 +367,8 @@ export const PRIVACY_CATEGORIES_P1 = "Six kinds of data, and nothing else.";
 export const PRIVACY_CATEGORIES_ITEMS: readonly string[] = [
   "Account — your name, your email address, and your role. This is what signing up creates.",
   "Calibration — a numeric vector derived from a short webcam capture, describing what your ordinary, unstressed face looks like, plus when it was taken and which model version read it. The video itself is not part of it.",
-  "Monitoring session readings — for each scored window of a session, the time it was captured and a graded band: at ease, a little tense, or tense. Where a window could not be scored, the reason is kept instead, such as low light or being out of frame.",
-  "Weekly work-environment check-in — your answers to a short questionnaire about your working conditions: an overall sentiment and, when it is negative, a roadblock and the kind of support you would want.",
+  "Monitoring session readings — a monitoring session is what the application calls a check-in. For each scored window of one, the time it was captured and a graded band: at ease, a little tense, or tense. Where a window could not be scored, the reason is kept instead, such as low light or being out of frame.",
+  "Weekly work-environment survey — your answers to a short questionnaire about your working conditions: an overall sentiment and, when it is negative, a roadblock and the kind of support you would want.",
   "Companion conversation — the messages you and Ren exchange, and the titles of those conversations.",
   "Consent records — for each consent you have accepted, which document it was, which published revision of it you were shown, and when. One entry per acceptance; accepting a later revision adds an entry rather than replacing the earlier one.",
 ];
@@ -398,6 +409,16 @@ export const PRIVACY_CAMERA_P4 =
 export const PRIVACY_CAMERA_P5 =
   "Your camera is only ever active while you are on a calibration or monitoring session " +
   "screen and have started one. Serenify never captures audio.";
+
+/**
+ * The word the application actually uses, defined in the section a reader opens when they
+ * want to know what the camera does. It is stated here rather than left to the Terms
+ * because this is the document someone reads to answer "which button turns the camera on".
+ */
+export const PRIVACY_CAMERA_P6 =
+  "One word, so nothing here is ambiguous: where the application says check-in, it means " +
+  "a monitoring session — the camera one. The weekly work-environment survey is text, and " +
+  "is never called a check-in anywhere.";
 
 // § What is kept
 
@@ -478,14 +499,15 @@ export const PRIVACY_CRISIS_P3 =
   "third party in the ordinary course of you being answered, and a policy that stayed " +
   "quiet about that would be hiding the part that matters most.";
 
-// § Weekly work-environment check-in
+// § Weekly work-environment survey
 
-const PRIVACY_WEEKLY_HEADING = "Weekly work-environment check-in";
+const PRIVACY_WEEKLY_HEADING = "Weekly work-environment survey";
 
 export const PRIVACY_WEEKLY_P1 =
-  "The weekly work-environment check-in asks about your working conditions, not about " +
-  "you. It is treated as a separate class of data from stress signals, and it is the one " +
-  "thing in Serenify designed to reach a manager — but only ever as a count.";
+  "The weekly work-environment survey asks about your working conditions, not about " +
+  "you. It is a text questionnaire and it never uses the camera. It is treated as a " +
+  "separate class of data from stress signals, and it is the one thing in Serenify " +
+  "designed to reach a manager — but only ever as a count.";
 
 export const PRIVACY_WEEKLY_P2 =
   "Answers are separated from identity before they are grouped, so what a manager would " +
@@ -684,7 +706,7 @@ export const PRIVACY_FORWARD_ITEMS: readonly string[] = [
   "Audio and physiological signals — the design anticipates reading tone of voice and heart-rate-derived signals alongside video. Neither is captured today. Serenify never accesses a microphone or any sensor.",
   "Manager dashboards — the views described under what a manager can see. No manager-facing surface is live today.",
   "The three-position privacy slider and the transparency view — the controls described under what a manager can see. Neither is live yet.",
-  "Suppression of small-team tallies in the weekly work-environment check-in — required before real employee data is collected, and not built.",
+  "Suppression of small-team tallies in the weekly work-environment survey — required before real employee data is collected, and not built.",
   "Self-service export, deletion, and consent withdrawal — described under your rights, and handled by hand today.",
 ];
 
@@ -769,6 +791,7 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
       p(PRIVACY_CAMERA_P3),
       p(PRIVACY_CAMERA_P4),
       p(PRIVACY_CAMERA_P5),
+      p(PRIVACY_CAMERA_P6),
     ],
   },
   {
@@ -792,6 +815,9 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
     blocks: [p(PRIVACY_CRISIS_P1), p(PRIVACY_CRISIS_P2), p(PRIVACY_CRISIS_P3)],
   },
   {
+    // Anchor id deliberately NOT renamed alongside the heading (#198). Anchor ids are
+    // stable, citable links — `/privacy#weekly-work-environment-check-in` may already be
+    // written down somewhere — and #198 is a copy change, not an identifier change.
     id: "weekly-work-environment-check-in",
     heading: PRIVACY_WEEKLY_HEADING,
     blocks: [p(PRIVACY_WEEKLY_P1), p(PRIVACY_WEEKLY_P2)],

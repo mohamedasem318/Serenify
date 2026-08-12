@@ -19,8 +19,13 @@ Version identity — not timestamp comparison — decides re-consent, against an
 **in-repo registry** (`apps/web/lib/consent/registry.ts`); one migration
 (`user_consents`, owner-only RLS, immutability trigger, no UPDATE/DELETE grant).
 Declining writes nothing, deletes nothing, and writes no withdrawal state.
-Terminology is binding: **calibration** / **monitoring session** / **weekly
-work-environment check-in** — never bare "check-in". The signed-off landing mock
+Terminology is binding: **calibration** = the baseline capture; **monitoring session**
+= live camera inference, and **"check-in" is the friendly name for exactly that**;
+**weekly work-environment survey** = the text questionnaire, which is **never** called a
+check-in. (Amended 2026-08-12 by #198, reversing the original rule that banned a bare
+"check-in" and reserved the word for the questionnaire — the app's primary action has
+always read "Start check-in" and turned a camera on, so the documents moved to the app
+rather than the other way round. `docs/CHANGELOG.md`.) The signed-off landing mock
 (`docs/mockups/serenify-landing-mock.html`, gitignored — grep it with
 `--no-ignore`) carries **three forbidden lines** (`:442`, `:550`, `:772`) that
 Amendment 17 bans; replacement copy is **APPROVED and fixed verbatim in plan §10.3**

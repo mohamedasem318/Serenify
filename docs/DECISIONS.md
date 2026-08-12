@@ -7445,3 +7445,69 @@ confused failures: a "Tracking docs — which one, and when" table now sits in *
 **Cross-references**: `docs/PROGRESS.md` backfill note (2026-08-10); PR **#257**;
 `scripts/check-progress-freshness.mjs`; `.github/workflows/ci.yml`. **No CHANGELOG
 entry** — no spec is amended. **No BACKLOG entry** — nothing here is deferred.
+
+## 2026-08-12 — "check-in" means the camera session; the questionnaire becomes a survey (#198)
+
+One noun named two things: the dashboard's primary action read **Start check-in** and turned a
+camera on, while `/terms` reserved "check-in" for the text questionnaire and called the camera
+capture a "monitoring session". A user could not tell from the wording which one they were
+starting, and one of them turns on a camera.
+
+**Adopted: the documents move to the app, not the reverse.** "Check-in" is the friendly name for
+the **monitoring session**; the questionnaire is the **weekly work-environment survey** and is
+never a check-in again — copy, comments, docs, or Ren's prompt.
+
+**Rejected: renaming the app's copy instead**, which is what #198 itself proposed (`Today's
+check-in` → `Today's monitoring`). It is the smaller diff and the worse product. "Check-in" is
+the warmer word and it is the one already on the button people press; the legal text is read
+once and the button is read daily, so the document is the cheaper thing to move. Reversing
+013's binding terminology rule is the honest cost of that, and it is recorded in `CHANGELOG.md`.
+
+**Rejected: classifying the legal edit cosmetic** to avoid re-prompting. Nothing changed about
+what is collected, who sees it, or for how long — a tempting read. But the words that tell a
+reader which of two things a consent covers *did* change, and someone who accepted the earlier
+Terms accepted a document where "check-in" meant the questionnaire. Both revisions
+(`terms_privacy@2026-08-12.1`, `camera_inference@2026-08-12.1`) are **material**; every existing
+holder is re-prompted, and that cost was accepted when the change was decided. This is exactly
+the call FR-043a puts in a human's hands — a text-diff heuristic would have said "noun swap".
+
+**Not done, deliberately**: no identifier renamed (copy change only); band labels untouched (#92
+stays open); the **constitution was not amended** — Principle I `:762`/`:774` still carries the
+old vocabulary and now contradicts the shipped copy. The diff is proposed in PR #258 and awaits
+Mohamed's explicit approval, per the standing rule that no agent amends it unasked.
+
+**Cross-references**: `docs/CHANGELOG.md` 2026-08-12; `docs/BACKLOG.md` #198; PR **#258**;
+`apps/web/lib/consent/registry.ts`. **BACKLOG entry created in the same change** — #198 had none,
+a live Principle VIII violation.
+
+## 2026-08-12 — follow-up: the constitution WAS amended, and "check-in flag" got a real name
+
+Supersedes the closing paragraph of the entry directly above, which recorded the constitution as
+left unamended pending approval. Mohamed approved explicitly the same day and asked for it folded
+into PR #258 rather than a second PR. **Amendment 22, 1.17.0 → 1.17.1 (PATCH).**
+
+Principle I `:762` — "the weekly employee check-in" → "the weekly work-environment survey". No
+invariant changed; the bullet's anonymized-aggregate rule and its pre-real-data suppression
+requirement stand exactly as they were.
+
+**Principle I `:774` needed a decision, not a substitution.** "A discreet check-in flag" named a
+*third* thing: neither the camera session nor the survey, but an employee-initiated, content-free
+signal to a manager. **Adopted: "a discreet talk request"**, because it mirrors the control's own
+label — *"I'd like to talk"* — so the button and the thing it produces finally share a vocabulary.
+
+**Rejected: "conversation request."** "Conversation" is already the companion's word in the Privacy
+Policy ("Companion conversation"), and a manager-directed request that reads as a request to talk to
+Ren would trade one collision for another.
+
+**Rejected: "flag."** It reads as something recorded *about* an employee, when this is something the
+employee *asked for*. That inversion is precisely the surveillance framing Principle I exists to
+refuse, so keeping the noun while fixing only its adjective would have missed the actual defect.
+
+A disambiguating sentence was added rather than left implicit: a talk request carries no reading, no
+answer, and no reason — only that the employee asked. **Prose only**: `check-in flag` appears nowhere
+outside the constitution, and the button is unbuilt (`specs/003` FR-006 reserves a slot; `specs/011`
+puts it out of scope), so no identifier moved.
+
+**Cross-references**: `.specify/memory/constitution.md` Amendment 22; `docs/CHANGELOG.md` 2026-08-12
+(Amendment 22); the entry above; PR **#258**. The two migration `RAISE EXCEPTION` strings stay
+deferred and now have **#259** and a BACKLOG entry, so they are not silently forgotten.

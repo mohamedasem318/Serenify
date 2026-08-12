@@ -4,6 +4,60 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Terminology — "check-in" is the camera session; the questionnaire is a survey
+
+**Branch**: `fix/198-check-in-terminology` · **PR #258** · **Closes #198** · **Date**: 2026-08-12
+**Status**: PR open, not merged.
+
+One noun named two different things, and one of them turns on a camera. The signed-in dashboard's
+primary action read **Start check-in** and routed to `/app/monitor`; the Terms and Privacy Policy
+shipped by feature 013 reserved "check-in" for the text questionnaire and called the camera capture
+a "monitoring session". Pre-existing since feature 008 (`6ae3b1e`, 2026-06-22) — 013 made it visible
+rather than causing it.
+
+**Resolved by moving the documents to the app**, not the app to the documents: "check-in" now means
+the camera-based monitoring session everywhere, and the questionnaire is the **weekly
+work-environment survey**. Copy change only — no identifier, route, column, or behaviour touched.
+Full reasoning and the rejected alternatives: `docs/DECISIONS.md` 2026-08-12.
+
+**What shipped**: Terms + Privacy state the equivalence plainly and rename the survey throughout;
+the camera-and-inference gate names both words for the same surface; Ren's system prompt gained a
+vocabulary lock; the auto-title fallback `"A brief check-in"` — a *third* meaning of the word —
+became `"A brief conversation"`; `plan.md` §11's binding terminology was amended in place
+(`docs/CHANGELOG.md` 2026-08-12).
+
+**Two consent revisions, both material**: `terms_privacy@2026-08-12.1` and
+`camera_inference@2026-08-12.1`, appended to `lib/consent/registry.ts` and to the frozen snapshot in
+the same change, per the publishing rule. **Every existing holder will be re-prompted** — accepted
+when the change was decided, not a side effect anyone missed.
+
+**Verified**: `apps/web` Vitest **1614/1615** and `apps/api` pytest **194 passed / 1 skipped**, both
+local; `tsc --noEmit` clean; `npm run lint -w apps/web` **0 errors** (2 known pre-existing unused-
+import warnings). The single Vitest failure is `tail-cutter.fixture.test.ts`, a 5 s-timeout fixture
+test that **passes in isolation on this branch and on a stashed clean tree** and fails only under
+full-suite parallel load — load-sensitive, and it touches nothing this change went near.
+
+**NOT verified**: nothing was run against a browser or a deployed environment. The re-consent flow
+these two revisions trigger is covered by existing unit tests only — **no live re-prompt was
+exercised**, so the first real proof will be production after merge. The `/privacy` and `/terms`
+pages were not rendered or read on screen.
+
+**Constitution Amendment 22 — 1.17.0 → 1.17.1 (PATCH)**, approved explicitly by Mohamed on
+2026-08-12 and folded into this same PR at his instruction. Principle I was the last place still
+using the old vocabulary: the survey is renamed, and the *"I'd like to talk"* button's output stops
+being a "check-in flag" — a third meaning of the word — and becomes a **talk request**, named after
+the button's own label. Amendment 13's historical rationale is untouched. Templates re-audited for
+the touched literals: zero matches, same as Amendments 8–13 and 21.
+
+**Knowingly left**: two `RAISE EXCEPTION` strings in the already-applied questionnaire migration
+(`:283`, `:319`) still say "weekly check-in" — never rendered to a user (the card discards the RPC
+result), and correcting them needs a new `CREATE OR REPLACE FUNCTION` migration, which is a
+behaviour change and was out of scope. Logged as **#259** with a BACKLOG entry, deferred to whenever
+that function is next revised for other reasons. Band labels (`At ease` / `A little tense` /
+`Tense`) untouched — **#92 stays open**.
+
+---
+
 ## Backfill note — the 2026-07-29 → 2026-08-10 window
 
 The five entries below were written **after the fact, on 2026-08-10**. Thirty-four PRs (**#210**

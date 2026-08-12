@@ -69,7 +69,7 @@ export default async function AppPage() {
           <RecentChatsCard />
         </div>
         {/* Feature 012 / US4: the questionnaire coordinator — session-end product feedback
-            (for a just-ended session) and the weekly work-environment check-in. It mounts
+            (for a just-ended session) and the weekly work-environment survey. It mounts
             ALONGSIDE the Today card and trend without changing their rendering (T062/T064),
             and renders nothing when no surface is due. */}
         <QuestionnaireCoordinator userId={user.id} />

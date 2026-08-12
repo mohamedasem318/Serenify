@@ -13,7 +13,12 @@
     "",
     "terms_privacy@2026-07-26.1 is the first entry this snapshot has ever locked (P3,",
     "T023). camera_inference@2026-07-26.1 was locked next (P4, T040), alongside the camera",
-    "wording in lib/consent/copy.ts. From here neither can ever be edited."
+    "wording in lib/consent/copy.ts. From here neither can ever be edited.",
+    "",
+    "2026-08-12 (#198): both texts gained a second revision in one PR — the terminology",
+    "change that makes \"check-in\" mean the camera-based monitoring session in the",
+    "documents as well as the app, and renames the text questionnaire to the weekly",
+    "work-environment survey. Both classified material; both now locked here too."
   ],
   "terms_privacy": [
     {
@@ -21,6 +26,12 @@
       "publishedOn": "2026-07-26",
       "materiality": "material",
       "rationale": "Initial publication of the Terms of Service and the Privacy Policy. The first revision of a text is material by definition — there is no earlier wording anyone could already hold, so every user must be asked. Published together with the documents themselves in lib/legal/copy.ts (feature 013, P3)."
+    },
+    {
+      "versionId": "terms_privacy@2026-08-12.1",
+      "publishedOn": "2026-08-12",
+      "materiality": "material",
+      "rationale": "Terminology (#198). The documents previously reserved \"check-in\" for the text questionnaire and called the camera capture a \"monitoring session\", while the application's primary action read \"Start check-in\" and turned a camera on. Both documents now say plainly that a check-in IS the camera-based monitoring session, and the questionnaire is renamed throughout to the weekly work-environment survey. Judged MATERIAL, not cosmetic. Nothing about what is collected, where it goes, who can see it, or how long it is kept has changed — but the words that tell a reader which of two things a consent covers have, and one of those two things turns on a camera. A person who accepted the earlier wording accepted a document in which \"check-in\" meant the text questionnaire; under this revision the same word means the webcam capture. Asking again is the only honest reading of that, and it is what FR-043a's \"judgement made by a person\" is for — a text-diff heuristic would plausibly have called a noun swap cosmetic. Re-prompting every existing holder was accepted as the cost of the change when it was decided. Published together with the wording itself in lib/legal/copy.ts."
     }
   ],
   "camera_inference": [
@@ -29,6 +40,12 @@
       "publishedOn": "2026-07-26",
       "materiality": "material",
       "rationale": "Initial publication of the camera-and-inference consent. The first revision of a text is material by definition — there is no earlier wording anyone could already hold, so every user must be asked before a calibration or a monitoring session captures anything. Published together with the wording itself in lib/consent/copy.ts (feature 013, P4)."
+    },
+    {
+      "versionId": "camera_inference@2026-08-12.1",
+      "publishedOn": "2026-08-12",
+      "materiality": "material",
+      "rationale": "Terminology (#198), the camera-gate half of the same change. The lede now names both words for the same surface — \"A monitoring session is what the rest of the app calls a check-in\" — and the declining-scope list renames the questionnaire to the weekly work-environment survey. Judged MATERIAL for the same reason as terms_privacy@2026-08-12.1, and more sharply here: this gate is the last text a person reads before the camera turns on, and the sentence that tells them what declining costs them is one of the sentences that changed. Nothing the gate permits or blocks has changed. Published together with the wording itself in lib/consent/copy.ts."
     }
   ]
 }

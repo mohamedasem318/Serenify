@@ -5,7 +5,7 @@ import { createCalibratedEmployee, signInToApp } from "./anchor-helpers";
 /**
  * T059 — Feature 012 questionnaire layout gate (Principle VII).
  *
- * Renders the weekly check-in (the always-reachable coordinator surface on a fresh ISO week)
+ * Renders the weekly work-environment survey (the always-reachable coordinator surface on a fresh ISO week)
  * at 360px and desktop, in light and dark themes, and asserts: no horizontal overflow, every
  * interactive target ≥44px, and the stepper controls remain usable. Lives under tests/e2e (not
  * tests/layout) and runs through the DEFAULT e2e config (`npm run test:e2e`, chromium project)

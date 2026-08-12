@@ -7,7 +7,7 @@ import { seedRetrospectiveSession } from "./monitoring-helpers";
  * T058 — Feature 012 questionnaire flows (Principle VII e2e gate).
  *
  * Covers, on the real authenticated employee dashboard:
- *   • the weekly work-environment check-in (fresh ISO week) — stepper, Back, Done;
+ *   • the weekly work-environment survey (fresh ISO week) — stepper, Back, Done;
  *   • the session-end product feedback card via the just-ended-session handoff —
  *     Good / Skip / negative reasons, and the tailored account route targets;
  *   • confirmatory and session-end never co-occur (only ONE coordinator surface mounts);
@@ -20,7 +20,7 @@ import { seedRetrospectiveSession } from "./monitoring-helpers";
 
 const HANDOFF_KEY = "serenify.questionnaire.last_ended_session";
 
-test("weekly check-in: Could be better → two-step stepper → Done", async ({ page }) => {
+test("weekly work-environment survey: Could be better → two-step stepper → Done", async ({ page }) => {
   const emp = await createCalibratedEmployee("Weekly Tester");
   await signInToApp(page, emp);
 
