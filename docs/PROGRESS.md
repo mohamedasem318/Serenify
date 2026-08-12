@@ -4,6 +4,27 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Dependabot batches 1 and 3 — 10 alerts closed, 2 deferred on purpose
+
+**Branch**: `chore/dependabot-batches-1-and-3` · **Date**: 2026-08-13 · **Status**: PR open, not merged.
+**Batch 1**: `next` 16.2.11 -> 16.3.0, the only manifest edit — the cascade carried `postcss` -> 8.5.23,
+`nanoid` -> 3.3.18, `sharp` -> 0.35.3 and deduped next's vendored `postcss@8.4.31`, the pin no 16.2.x patch
+could move; `js-yaml` -> 4.3.1 needed a separate in-range nudge. **Batch 3**: `video/` lockfile — `nanoid`,
+`js-yaml`, `fast-uri`. All 43 lockfile changes trace to those bumps. **Deferred**: `h2` (rides the next API
+deploy) and `cryptography` 48->50 (two majors under JWT verify, vulnerable PKCS#7 path never called) — BACKLOG #176.
+**Verified**: typecheck; lint (0 errors, 2 known warnings); 1615 Vitest pass (1 failed *file* = the known
+Windows-only `hosted-email-template-sync`); production build. **Headers checked against the built server** —
+`camera=(self)` on the three capture routes and `camera=()` elsewhere, one rule per path; CSP nonce
+per-request; unauthenticated `/app` still 307s to `/login` (the `@supabase/ssr` cookie read).
+**NOT verified**: the full e2e suite never completed. **8 chromium specs fail identically on `main`'s
+lockfile** — a stashed-deps baseline gave a byte-identical failure set (`questionnaire-layout` x4,
+`questionnaire` x3, dashboard today-recap), all needing an anchored employee. Pre-existing; not diagnosed.
+**Two local traps**: `reuseExistingServer` is true outside CI, so one `ECONNRESET` poisons every later run
+(9 -> 27 failures; symptom `page.goto: net::ERR_ABORTED`) — kill port 3000 between suites; and `npm ci`
+EPERMs on a locked `lightningcss` `.node` until leftover Serenify node processes die.
+
+---
+
 ## Backlog hygiene — 14 issues closed, nine BACKLOG drifts corrected
 
 **Branch**: `chore/backlog-hygiene-2026-08-12` · **Date**: 2026-08-12 · **Status**: PR open, not merged.
