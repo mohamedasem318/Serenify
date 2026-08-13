@@ -35,7 +35,7 @@ const rs = (
 });
 
 const SESSIONS: RecapSession[] = [
-  rs("m", 1, "Morning check-in", "at_ease", "at ease", "meadow", "8:40 – 9:30 am"),
+  rs("m", 1, "Morning check-in", "at_ease", "calm", "meadow", "8:40 – 9:30 am"),
   rs("a", 2, "Afternoon check-in", "tense", "ended tense", "amber", "1:30 – 1:52 pm"),
   rs("late", 3, "Late check-in", "no_read", "no clear read", "muted", "2:45 – 2:47 pm"),
 ];

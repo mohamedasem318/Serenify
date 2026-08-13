@@ -3121,3 +3121,17 @@ entry as written would have acted on a state that no longer existed.
   vulnerable function never called).
 
 No constitution amendment. Cross-references: `docs/BACKLOG.md` #176; GitHub #176.
+
+## 2026-08-13 — constitution Amendment 23 (1.17.1 → 1.17.2, PATCH); band display rename
+
+The display bands renamed **At ease / A little tense / Tense → Calm / Uneasy / Tense**
+across the app, Ren's opener context, the Privacy Policy, and the pitch-video sources of
+truth. No feature spec is amended: specs 008–013 keep the old labels as historical record
+(same rationale as the signed-off mocks). The constitution's one live use — the
+`--amber-soft-line` gloss, "the mid 'a little tense' graph line" — is Amendment 23, a
+PATCH bump; full log entry in `.specify/memory/constitution.md`. The Privacy Policy's one
+band-bearing line was judged **non-material** (a value renamed inside a category, not the
+category itself), so no consent revision and no re-prompt. Enum keys and CHECK constraints
+unchanged; no migration. Supersedes #92. The submitted pitch render keeps the old labels —
+recorded in `docs/video/serenify-pitch-video-beat-sheet.md`, which itself moves to the new
+vocabulary. Reasoning: `docs/DECISIONS.md` 2026-08-13.

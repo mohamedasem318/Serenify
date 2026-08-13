@@ -61,7 +61,7 @@
      graph lines/markers ONLY — never small text (it fails small-text AA at 2.77:1). */
   --color-amber-text:  #8A580F;                 /* chip + axis tension TEXT (light); ~4.78:1 on the tint */
   --amber-tint:        #F4E3C6;                 /* tension chip background (light) */
-  --amber-soft-line:   #D49A4A;                 /* "a little tense" graph line (light) */
+  --amber-soft-line:   #D49A4A;                 /* "uneasy" graph line (light) */
   --amber-head:        #BC7A2A;                 /* headline keyword, weight 700, large text (light) */
 
   --radius-card:    12px;

@@ -164,28 +164,26 @@ describe("monitoring-reads — templated headline is band + time only (no probab
 
   // 009 FR-002 / SC-010 — honest THREE-LEVEL headline (supersedes 008's FR-022
   // "any stress reads as tense at a glance"). "tense" wording ONLY when the tense band
-  // is reached. NOTE: "a little tense" contains the substring "tense", so we assert the
-  // EXACT level phrase — never a bare `.toContain("tense")`.
-  it("a day peaking only at 'a little tense' uses that exact phrase, never the standalone 'tense'", () => {
+  // is reached.
+  it("a day peaking only at 'uneasy' uses that word, never the standalone 'tense'", () => {
     const sessions = [sess("a", 13, 30, "ended", iso(14, 18))];
     const rows = [wr("a", "at_ease", 13, 35), wr("a", "a_little_tense", 14, 10)];
     const { headline } = deriveRecap(sessions, rows, NOW);
     expect(headline.hot).toBeTruthy();
     const full = `${headline.pre}${headline.hot}${headline.post}`.toLowerCase();
-    expect(full).toContain("a little tense");
-    // the only occurrence of "tense" must be the one inside "a little tense"
-    expect(full.replace(/a little tense/g, "")).not.toContain("tense");
+    expect(full).toContain("uneasy");
+    expect(full).not.toContain("tense");
     expect(full).not.toMatch(/[0-9]/);
   });
 
-  it("a day reaching 'tense' uses the standalone 'tense' descriptor (not 'a little tense')", () => {
+  it("a day reaching 'tense' uses the standalone 'tense' descriptor (not 'uneasy')", () => {
     const sessions = [sess("a", 13, 30, "ended", iso(14, 18))];
     const rows = [wr("a", "at_ease", 13, 35), wr("a", "tense", 14, 10)];
     const { headline } = deriveRecap(sessions, rows, NOW);
     expect(headline.hot).toBeTruthy();
     const full = `${headline.pre}${headline.hot}${headline.post}`.toLowerCase();
     expect(full).toContain("tense");
-    expect(full).not.toContain("a little tense");
+    expect(full).not.toContain("uneasy");
   });
 });
 
@@ -216,19 +214,19 @@ describe("monitoring-reads — headline rework: recovery + voice/copy (FR-002 / 
     expect(s).toContain("eased"); // recovery surfaced, not the peak alone
   });
 
-  it("recovery — an a-little-tense peak that eased never upgrades to the standalone 'tense'", () => {
+  it("recovery — an uneasy peak that eased never upgrades to the standalone 'tense'", () => {
     const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
     const rows = [wr("a", "a_little_tense", 13, 30), wr("e", "at_ease", 18, 10)];
     const { headline } = deriveRecap(sessions, rows, NOW);
     const s = full(headline).toLowerCase();
-    expect(s).toContain("a little tense");
+    expect(s).toContain("uneasy");
     expect(s).toContain("eased");
-    // the only "tense" is the one inside "a little tense" — recovery never overstates
-    expect(s.replace(/a little tense/g, "")).not.toContain("tense");
+    // recovery never overstates the peak into the standalone "tense" word
+    expect(s).not.toContain("tense");
   });
 
   // HONESTY (009 follow-up §3): PARTIAL easing must not borrow the full-relief word. A day that
-  // peaked TENSE and stepped down only to A LITTLE TENSE (never reached calm) must NOT claim a bare
+  // peaked TENSE and stepped down only to UNEASY (never reached calm) must NOT claim a bare
   // "…eased" — a reader takes that as "back to fine". Bare "eased" is reserved for reaching at_ease.
   it("PARTIAL easing — tense peak that only steps down to a-little-tense does NOT claim bare 'eased'", () => {
     const sessions = [sess("a", 13, 0, "ended", iso(13, 40)), sess("e", 18, 0, "ended", iso(18, 40))];
@@ -274,7 +272,7 @@ describe("monitoring-reads — headline rework: recovery + voice/copy (FR-002 / 
     const rows = [wr("m", "at_ease", 9, 0), wr("a", "tense", 13, 30)];
     const { headline } = deriveRecap(sessions, rows, NOW);
     expect(headline.hot).toBeTruthy();
-    expect(["tense", "a little tense"]).toContain(headline.hot!.trim().toLowerCase());
+    expect(["tense", "uneasy"]).toContain(headline.hot!.trim().toLowerCase());
     expect(headline.hot!).not.toMatch(/morning|afternoon|evening|night/i);
   });
 
@@ -373,7 +371,7 @@ describe("monitoring-reads — deriveRecap integration (mock parity + read-rules
     expect(late.readLess).toBe(true);
     expect(late.tenor).toBe("no_read");
     expect(late.chipTone).toBe("muted");
-    expect(late.chipLabel.toLowerCase()).not.toContain("at ease");
+    expect(late.chipLabel.toLowerCase()).not.toContain("calm");
 
     // chronological numbering for the plot badges
     expect(m.number).toBe(1);

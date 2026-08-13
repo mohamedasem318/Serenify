@@ -35,7 +35,7 @@ describe("chat history sidebar (US4)", () => {
     const ended = conv("c1", "A heavy week at work", { state: "ended", rollupBand: "a_little_tense" });
     render(<ChatShell variant="page" initialConversations={[ended]} initialDetail={{ conversation: ended, messages: [] }} />);
     expect(screen.getByText("A heavy week at work")).toBeInTheDocument();
-    expect(screen.getByText("a little tense")).toBeInTheDocument();
+    expect(screen.getByText("uneasy")).toBeInTheDocument();
   });
 
   it("renames a conversation consistently", async () => {

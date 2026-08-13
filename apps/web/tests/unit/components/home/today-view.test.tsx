@@ -74,13 +74,13 @@ describe("TodayView — collapsed glance (US1)", () => {
 });
 
 describe("TodayView — honest three-level headline render (FR-002)", () => {
-  it("an a-little-tense-only day shows the amber keyword with the exact 'a little tense' phrase", () => {
+  it("an uneasy-only day shows the amber keyword with the exact 'uneasy' word", () => {
     const sessions = [sess("a", 13, 30, iso(14, 18))];
     const rows = [wr("a", "at_ease", 13, 35), wr("a", "a_little_tense", 14, 10)];
     const recap = deriveRecap(sessions, rows, NOW);
     render(<TodayView recap={recap} trendRows={rows} expanded={false} onToggle={vi.fn()} />);
     const hot = screen.getByTestId("headline-hot");
-    expect(hot.textContent?.toLowerCase()).toContain("a little tense");
+    expect(hot.textContent?.toLowerCase()).toContain("uneasy");
     expect(hot.getAttribute("style")).toContain("--amber-head");
   });
 

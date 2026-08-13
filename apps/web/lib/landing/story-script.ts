@@ -192,7 +192,7 @@ export const STORY_BEATS: readonly StoryBeat[] = Object.freeze([
     durationMs: 3400,
     panel: "quiet",
     band: "at_ease",
-    narrationKey: "backToAtEase",
+    narrationKey: "backToCalm",
     threadOp: { kind: "clear" },
   },
   // The closing beat sets no panel, band or thread state of its own in the mock — it is

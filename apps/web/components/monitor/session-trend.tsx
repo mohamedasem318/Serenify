@@ -446,10 +446,10 @@ export function SessionTrend({
               "stepped out of frame" key appears only when the gate is on) */}
           <ul className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted" aria-hidden>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full" style={{ background: "var(--color-meadow)" }} /> at ease
+              <span className="size-2.5 rounded-full" style={{ background: "var(--color-meadow)" }} /> calm
             </li>
             <li className="flex items-center gap-1.5">
-              <span className="size-2.5 rounded-full" style={{ background: "var(--amber-soft-line)" }} /> a little tense
+              <span className="size-2.5 rounded-full" style={{ background: "var(--amber-soft-line)" }} /> uneasy
             </li>
             <li className="flex items-center gap-1.5">
               <span className="size-2.5 rounded-full" style={{ background: "var(--color-amber)" }} /> tense

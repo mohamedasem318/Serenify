@@ -367,7 +367,7 @@ export const PRIVACY_CATEGORIES_P1 = "Six kinds of data, and nothing else.";
 export const PRIVACY_CATEGORIES_ITEMS: readonly string[] = [
   "Account — your name, your email address, and your role. This is what signing up creates.",
   "Calibration — a numeric vector derived from a short webcam capture, describing what your ordinary, unstressed face looks like, plus when it was taken and which model version read it. The video itself is not part of it.",
-  "Monitoring session readings — a monitoring session is what the application calls a check-in. For each scored window of one, the time it was captured and a graded band: at ease, a little tense, or tense. Where a window could not be scored, the reason is kept instead, such as low light or being out of frame.",
+  "Monitoring session readings — a monitoring session is what the application calls a check-in. For each scored window of one, the time it was captured and a graded band: calm, uneasy, or tense. Where a window could not be scored, the reason is kept instead, such as low light or being out of frame.",
   "Weekly work-environment survey — your answers to a short questionnaire about your working conditions: an overall sentiment and, when it is negative, a roadblock and the kind of support you would want.",
   "Companion conversation — the messages you and Ren exchange, and the titles of those conversations.",
   "Consent records — for each consent you have accepted, which document it was, which published revision of it you were shown, and when. One entry per acceptance; accepting a later revision adds an entry rather than replacing the earlier one.",

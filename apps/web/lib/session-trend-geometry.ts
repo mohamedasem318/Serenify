@@ -84,7 +84,7 @@ export const LABEL_GUTTER = 48;
 // viewport (crammed; the foggy label overflowed). Below GUTTER_FULL_W the gutter, right margin,
 // and label offset interpolate DOWN to their MINs at GUTTER_MIN_W, so the plot keeps enough
 // width for legible no-read labels at the floor. The left axis labels STAY — the min gutter
-// (84px) still fits "A little tense" at 11px. Wide widths are unchanged (full mock gutters).
+// (84px) still fits "Uneasy" at 11px. Wide widths are unchanged (full mock gutters).
 export const AXIS_GUTTER_MIN = 84;
 export const RIGHT_MARGIN_MIN = 24;
 export const LABEL_GUTTER_MIN = 8;

@@ -97,7 +97,7 @@ describe("MonitoringSession orchestrator", () => {
     await act(async () => {
       fireStride(); // the first real reading
     });
-    expect(await screen.findByText(/at ease right now/i)).toBeInTheDocument();
+    expect(await screen.findByText(/looking calm/i)).toBeInTheDocument();
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "ease");
   });
 
@@ -732,7 +732,7 @@ describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", 
     await act(async () => {
       fireStride(); // first reading → a healthy-looking band
     });
-    expect(await screen.findByText(/at ease right now/i)).toBeInTheDocument();
+    expect(await screen.findByText(/looking calm/i)).toBeInTheDocument();
 
     await act(async () => {
       fireStride(); // the 401 — must NOT be swallowed into a frozen band
@@ -741,7 +741,7 @@ describe("MonitoringSession — token freshness + honest auth failure (Fix 2)", 
     expect(await screen.findByText(/your sign-in expired/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /sign in again/i })).toHaveAttribute("href", "/login");
     // the healthy-looking band is gone — the illusion is broken, the state is truthful.
-    expect(screen.queryByText(/at ease right now/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/looking calm/i)).not.toBeInTheDocument();
   });
 
   it("when the browser session can't be refreshed (getSession → null), scoring stops honestly, not silently", async () => {

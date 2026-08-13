@@ -33,7 +33,7 @@ N = 4
 # contract, so the first band lands with the 4th scored reading (~90-105 s; SC-001).
 M = N
 
-# Stable enum keys for the three bands. The user-facing WORDING ("You're at ease", …)
+# Stable enum keys for the three bands. The user-facing WORDING ("Looking calm", …)
 # is a later frontend/copy decision (T028/T030) governed by the mock — NOT set here.
 # These keys match window_readings.band's CHECK constraint and schemas.Band.
 BAND_AT_EASE = "at_ease"

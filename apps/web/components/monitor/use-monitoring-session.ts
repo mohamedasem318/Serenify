@@ -194,24 +194,27 @@ export interface BandDisplay {
   sub: string;
 }
 
-/** Copy traces verbatim to the mock STATES map (serenify-008-monitoring-mock.html). */
+/** Copy traced to the mock STATES map (serenify-008-monitoring-mock.html); band heads
+ * renamed 2026-08-13 (Calm / Uneasy / Tense) and moved to observational wording 2026-08-14
+ * ("Looking …" — the model reads a face, so the head says what it sees, not what the person
+ * feels; each head now matches its chip label). The mock keeps the signed-off wording. */
 export const BAND_DISPLAY: Record<Band, BandDisplay> = {
   at_ease: {
     tone: "ease",
     statelineTone: "meadow",
-    head: "You're at ease right now",
+    head: "Looking calm",
     sub: "Steady and settled — nothing to do.",
   },
   a_little_tense: {
     tone: "little",
     statelineTone: "amber",
-    head: "You're a little tense",
+    head: "Looking uneasy",
     sub: "A bit of an edge lately. Maybe a slow breath.",
   },
   tense: {
     tone: "tense",
     statelineTone: "amber",
-    head: "You're feeling tense",
+    head: "Looking tense",
     sub: "This has held a while. Serenify can check in when you're ready.",
   },
 };

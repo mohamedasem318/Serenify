@@ -97,7 +97,7 @@ describe("TodaysCheckinCard — recap that expands in place (FR-028)", () => {
     expect(screen.getByTestId("today-plot")).toBeInTheDocument();
     expect(
       screen.getAllByTestId("axis-label").map((n) => n.textContent?.trim().toLowerCase()),
-    ).toEqual(["tense", "a little tense", "at ease", "no read"]);
+    ).toEqual(["tense", "uneasy", "calm", "no read"]);
     expect(screen.queryByTestId("plot-legend")).toBeNull();
   });
 });

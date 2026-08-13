@@ -23,7 +23,7 @@ _READINGS_TABLE = "window_readings"
 
 # Calm, hedged opener notes by recent band. at_ease / unknown → no opener (empty).
 _RECENT_READ_NOTES: dict[str, str] = {
-    "a_little_tense": "Earlier, a quiet check-in hinted things may have felt a little tense.",
+    "a_little_tense": "Earlier, a quiet check-in hinted things may have felt a little uneasy.",
     "tense": "Earlier, a quiet check-in hinted earlier in the day may have felt like a lot.",
 }
 

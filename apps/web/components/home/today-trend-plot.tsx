@@ -45,16 +45,16 @@ const LANE_BG_H = 172;
 
 const AXIS_LABELS: { key: Tenor; text: string; className: string }[] = [
   { key: "tense", text: "tense", className: "text-amber-text" },
-  { key: "a_little_tense", text: "a little tense", className: "text-amber-text opacity-90" },
-  { key: "at_ease", text: "at ease", className: "text-meadow-text" },
+  { key: "a_little_tense", text: "uneasy", className: "text-amber-text opacity-90" },
+  { key: "at_ease", text: "calm", className: "text-meadow-text" },
   { key: "no_read", text: "no read", className: "text-muted" },
 ];
 
 /** Spoken tenor for the per-session keyboard target's aria-label (FR-011). */
 const TENOR_PHRASE: Record<Tenor, string> = {
   tense: "tense",
-  a_little_tense: "a little tense",
-  at_ease: "at ease",
+  a_little_tense: "uneasy",
+  at_ease: "calm",
   no_read: "no clear read",
 };
 

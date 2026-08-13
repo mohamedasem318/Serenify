@@ -5,7 +5,7 @@ import { BAND_LINE, MINI_H, MINI_W, buildMini, type SessionSeq } from "@/lib/tre
 /**
  * Feature 009 — the collapsed today card's mini-trend: a wide-short CONNECTED step-line
  * carrying each session's peak band over the day (SC-003 / FR-003). Colour echoes the
- * headline via the band family (at ease = meadow, a little tense = soft amber, tense = amber).
+ * headline via the band family (calm = meadow, uneasy = soft amber, tense = amber).
  * A no-read session is a hollow muted marker on its own low lane — never on the calm line.
  *
  * This strip is a thin 1-D line, so the horizontal stretch of a `preserveAspectRatio="none"`

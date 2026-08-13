@@ -15,7 +15,7 @@ import { BAND_LINE, BAND_Y, LANE_MIN, STROKE, type SessionSeq } from "@/lib/tren
  */
 
 // A day that exercises every branch: warm-up + 3 runs + 2 transitions (tense),
-// an interior lost read (a little tense), a fully read-less session, and a single dot (calm).
+// an interior lost read (uneasy), a fully read-less session, and a single dot (calm).
 const DAY: SessionSeq[] = [
   { sessionId: "tense", tenor: "tense", bands: [null, "at_ease", "at_ease", "a_little_tense", "tense", "tense"] },
   { sessionId: "little", tenor: "a_little_tense", bands: ["a_little_tense", null, "a_little_tense"] },
@@ -60,7 +60,7 @@ describe("TodayTrendPlot — axis, not legend (SC-001)", () => {
   it("renders exactly four left-axis level labels and zero legend swatches", () => {
     render(<TodayTrendPlot seqs={DAY} availableWidth={1000} />);
     const labels = screen.getAllByTestId("axis-label").map((n) => n.textContent?.trim().toLowerCase());
-    expect(labels).toEqual(["tense", "a little tense", "at ease", "no read"]);
+    expect(labels).toEqual(["tense", "uneasy", "calm", "no read"]);
     expect(screen.queryByTestId("plot-legend")).toBeNull();
   });
 });
