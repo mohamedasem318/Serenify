@@ -3843,9 +3843,9 @@ the other: the camera gate is only reachable after `full_name` is set.
 
 ### ~~Windows: `hosted-email-template-sync.test.ts` fails to load with a SyntaxError — CI unaffected~~ — resolved (#218)
 **Status**: tooling (`type:tooling` / `area:web`) — **RESOLVED 2026-08-14** (`.gitattributes`,
-commit `eef6307`). GitHub issue **#218 CLOSED**, and its body **rewritten** first: the original
+commit `eef6307`). GitHub issue **#218**: body and title **rewritten** on 2026-08-14 — the original
 diagnosis below was wrong, and left as-filed it would have sent the next reader down the same
-dead end.
+dead end — and it closes with **PR #265** (`Closes #218`), which is the change that fixes it.
 
 **Category**: dev tooling / test harness
 **Observed**: 2026-07-29, running the full `apps/web` unit suite on Windows while bumping the

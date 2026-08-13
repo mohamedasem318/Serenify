@@ -3157,4 +3157,4 @@ following either as written would have led a reader somewhere false.
   measurement is against a known stack.
 
 No constitution amendment. Reasoning: `docs/DECISIONS.md` 2026-08-14. Cross-references:
-`docs/BACKLOG.md` #208, #218, #263, #264; GitHub #218 (closed), #208 (open).
+`docs/BACKLOG.md` #208, #218, #263, #264; GitHub #218 (closes with this PR), #208 (open).
