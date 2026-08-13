@@ -1,0 +1,36 @@
+# Line endings — the repository is LF, in the working tree as well as in the object store.
+#
+# WHY THIS FILE EXISTS (2026-08-14, fixes #218). Without it, line endings are decided by
+# each developer's `core.autocrlf`, which on Windows defaults to `true`: the object store
+# keeps LF but the checkout is CRLF. That is invisible almost everywhere — editors, tsc,
+# eslint and Next all cope — until it reaches a tool whose parser assumes LF. Vite's
+# shebang strip is one: the regex it uses to remove a leading `#!...` line is `\n`-only,
+# so on a CRLF checkout the `\r` survives the strip and the file reaches the JS parser as
+# a bare carriage return where a statement should start. The result is
+# `SyntaxError: Invalid or unexpected token` with NO stack and no filename — which reads
+# as anything but a line-ending problem, and cost #218 a wrong diagnosis (an
+# outside-the-root import from a repo path containing a space; both halves were refuted
+# by isolated repro on 2026-08-14, see docs/triage/2026-08-14-test-suite-recon.md).
+#
+# The concrete casualty was `scripts/sync-hosted-email-templates.mjs`, imported by
+# `apps/web/tests/unit/ops/hosted-email-template-sync.test.ts`, which failed on every
+# Windows checkout and passed in CI, where Linux checks out LF regardless.
+#
+# Deleting the shebang from that one file would also have fixed it — the workflow invokes
+# it as `node scripts/sync-hosted-email-templates.mjs` (sync-email-templates.yml), so the
+# shebang is decorative. It was not the fix chosen: it repairs exactly one file and leaves
+# the next shebanged `.mjs` to rediscover this from scratch.
+#
+# AFTER PULLING THIS FILE, refresh the working tree once so existing CRLF checkouts are
+# rewritten:  git rm --cached -r . && git reset --hard
+* text=auto eol=lf
+
+# Binaries — never touched by eol conversion. `text=auto` already detects most of these,
+# but stating them removes the guess: a false "this is text" would corrupt the file on
+# checkout, and these are model artefacts and fixtures where corruption is silent.
+*.png   binary
+*.jpg   binary
+*.ico   binary
+*.npy   binary
+*.joblib binary
+*.tflite binary
