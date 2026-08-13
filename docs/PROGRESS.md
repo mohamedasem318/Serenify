@@ -4,6 +4,30 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Test suite — four independent causes, from the 2026-08-14 recon
+
+**Branch**: `fix/test-suite-four-causes` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
+**Shipped**: (1) `.gitattributes` (`* text=auto eol=lf` + explicit binaries) — #218's filed diagnosis
+(outside-root import, space in the repo path) was **refuted**; the cause is shebang + CRLF, since
+Vite's shebang strip is `\n`-only. Issue body rewritten, then closed. (2) One seam in
+`signInToApp` pre-setting the recalibration latch, unblocking the specs #256's modal had been
+blocking since 2026-08-10 — plus `recalibration-prompt.spec.ts`, the e2e coverage #256 shipped
+without. (3) `reuseExistingServer: false` outside CI, with `tests/port-guard.ts` replacing
+Playwright's "set reuseExistingServer:true" advice. (4) Explicit 60 s timeout on the two
+`tail-cutter.fixture` tests. Supabase CLI pinned at 2.114.0.
+**Verified**: Windows Vitest **145 files / 1635 tests, all passing** (was 144 + 1 failed file);
+`tsc` clean; lint 0 errors / 2 known warnings; full chromium e2e **51 passed / 2 failed / 6 skipped
+(9.9 min)** — **6 of the 8** recovered, the new prompt spec **7/7**, and the only failures the known
+session-end pair; the port guard fires against a real `npm run dev` and is silent across the run.
+**NOT verified / knowingly left**: the **two session-end specs still fail** — a second, unrelated
+cause (#264): the coordinator renders the weekly survey because `takeEndedSession()` is
+read-and-clear and Strict Mode double-invokes the mount effect. Evidenced, not instrumented, not
+chased. **#208 re-verified and stays OPEN** — it reproduces byte-for-byte on a fresh
+`supabase db reset --local`; the recon's "upstream fixed it" reading came from a stale volume. Every
+e2e result above therefore depends on a **manual local grant** (recorded in BACKLOG), not on a fix.
+
+---
+
 ## Band rename — Calm / Uneasy / Tense
 
 **Branch**: `fix/band-rename-calm-uneasy-tense` · **Date**: 2026-08-13 · **Status**: PR open, not merged.

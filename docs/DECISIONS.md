@@ -7583,3 +7583,80 @@ than the problem. Registry untouched (revision identity is versioned, never a te
 affected mock), the submitted pitch render (noted in the beat sheet; beat 8's hand-tuned
 timing untouched), the launch-video beat sheet, historical specs and earlier log entries.
 Constitution Amendment 23 (PATCH → 1.17.2) fixed the one live rule line.
+
+---
+
+## 2026-08-14 — Playwright never reuses a dev server locally, and the port error explains itself
+
+**Status**: Accepted.
+
+**Context**: `reuseExistingServer: !process.env.CI` was in both Playwright configs.
+In #261 a `next dev` took an ECONNRESET and kept LISTENING while serving nothing
+usable. Playwright's readiness probe only checks that the URL answers, so it
+adopted the dead server, and every later run adopted it too: failures snowballed
+9 → 27 and swept in specs that had passed in 600 ms. Two runs were garbage before
+the server was suspected at all.
+
+**Decision**: `reuseExistingServer: false` unconditionally, in
+`playwright.config.ts` and `playwright.layout.config.ts`.
+
+**Cost, measured**: ~12 s cold start on a warm `.next` (9.1 s to Ready + 2.5 s to
+compile `/`) — about 2.5% of a 7.9-minute run.
+
+**The rejected alternative is the status quo**, and its argument is real: with
+reuse off, Playwright errors when port 3000 is occupied, so a developer running
+`npm run dev` in another terminal must stop it first. That is almost certainly why
+the flag was `true`. It is rejected because it trades a loud immediate error for a
+silent expensive one, and the silent one costs whole runs.
+
+**What makes the trade acceptable is the message, not the flag.** Playwright's own
+port error recommends `reuseExistingServer:true` — the exact setting this entry
+disables — so left alone it would talk the next developer into re-introducing the
+bug. `apps/web/tests/port-guard.ts` runs first and says what to do instead.
+
+**One non-obvious constraint, learned by shipping it wrong**: the guard must run
+ONLY in the runner process. Playwright re-evaluates the config inside every worker,
+by which point its own server holds the port, so an unguarded probe fails the run
+it exists to protect (measured: 3 failed / 9 did not run, one per worker).
+`TEST_WORKER_INDEX` is set in the worker environment before config load and is the
+signal used.
+
+**Scope**: test harness only. No product code, no CI change — CI already ran with
+reuse off.
+
+---
+
+## 2026-08-14 — a grant that returns without a repo change is a stale volume until a reset says otherwise
+
+**Status**: Accepted. Corrects a reading in `docs/triage/2026-08-14-test-suite-recon.md`.
+
+**Context**: #208 records that `service_role` holds no DML on any `public` table, so
+`globalSetup` dies at `42501` and no e2e spec runs. The 2026-08-14 recon measured the
+opposite — full `arwdDxtm`, `globalSetup` completing, 4 of 12 specs passing — and, since
+no migration had changed, inferred an upstream Supabase CLI fix. It flagged that it had
+**not** run `supabase db reset`.
+
+**Decision**: treat that inference as wrong, and #208 as open. Against a fresh
+`supabase db reset --local` on CLI 2.114.0 / PostgreSQL 17.6.1.121, #208 reproduces
+byte-for-byte: `pg_default_acl` for `postgres`/`public`/`r` reads
+`service_role=Dxtm/postgres`, `has_table_privilege` is false for SELECT/INSERT/UPDATE/
+DELETE on all ten public tables, and a `SET LOCAL ROLE service_role` write returns the
+same `permission denied for table profiles` with the same hint.
+
+**Rationale**: the earlier reading came from a **stale local volume** that had been granted
+out-of-band at some earlier point. `supabase db reset` is what makes a local stack
+correspond to the repo; without it, local grants are an accumulated history, not a
+measurement of what the migrations produce. The generalisation worth keeping: **a
+privilege that reappears with no repo change is evidence about the volume, not about the
+schema.**
+
+**Two consequences.** The Supabase CLI is pinned at 2.114.0 — it was fully unpinned, which
+is what let a version difference stand as a plausible explanation at all. And the manual
+`GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role` used to run e2e is recorded in
+BACKLOG as an unblock and explicitly **not** a fix: every e2e result in PR #265 depends on
+it.
+
+**Deliberately not fixed here**: #208's own framing is that the fix is a design call —
+a migration granting DML, versus seeders and test setup dropping service-role DML for the
+RPC/trigger paths production uses. Choosing it inside a test-suite repair, and shipping a
+migration that would reach the cloud database, is out of scope.

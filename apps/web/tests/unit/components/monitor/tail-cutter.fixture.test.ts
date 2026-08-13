@@ -17,7 +17,20 @@ import { createTailSource } from "@/components/monitor/tail-cutter";
  * of the full file's packets, on the original absolute clock. The server-side fidelity
  * gate (`packages/ml-video/tests/test_trimmed_tail_upload.py`) then proves bit-identical
  * features for files cut the same way.
+ *
+ * WHY THE EXPLICIT TIMEOUTS BELOW. These two are by far the heaviest tests in the unit
+ * suite: between them they read 163 MB of fixtures (93 MB webm + 70 MB fMP4) and spawn
+ * three SYNCHRONOUS ffprobe processes. In isolation they take ~1.7 s and ~0.8 s against
+ * Vitest's default 5000 ms, so the margin is ~3× — comfortable until the machine is busy.
+ * Both were seen timing out during a run that had a Playwright dev server and chromium
+ * alongside (#261/#262), and neither reproduced on demand afterwards (2026-08-14 recon),
+ * so contention is the leaning explanation rather than a settled one. The generous
+ * timeout is correct under either reading: it costs nothing when they pass in under two
+ * seconds, and a heavy-I/O test measuring correctness of a cut has no business being
+ * scored on wall-clock. If these ever approach 60 s, that is a real regression in the
+ * cutter and should be read as one.
  */
+const HEAVY_IO_TIMEOUT_MS = 60_000;
 
 const FIXTURES = resolve(
   __dirname,
@@ -81,7 +94,7 @@ describe.skipIf(!canRun || !existsSync(CHROME_WEBM))("tail-cutter on the real Ch
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, HEAVY_IO_TIMEOUT_MS);
 });
 
 describe.skipIf(!canRun || !existsSync(SAFARI_FMP4))("tail-cutter on the real iPhone fMP4", () => {
@@ -96,5 +109,5 @@ describe.skipIf(!canRun || !existsSync(SAFARI_FMP4))("tail-cutter on the real iP
     expect(built.blob.size).toBe(total);
     // …and nothing was trimmed away (retained = whole recording + the header copy).
     expect(source.retainedBytes()).toBeGreaterThanOrEqual(total);
-  });
+  }, HEAVY_IO_TIMEOUT_MS);
 });

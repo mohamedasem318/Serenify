@@ -3447,6 +3447,48 @@ oversight.
 `fix/navbar-chrome-and-active-state`. Not caused by that branch — the branch touches
 four component files and one stylesheet.
 
+**RE-VERIFIED 2026-08-14 — still reproduces, exactly as filed.** Worth recording because
+the 2026-08-14 test-suite recon briefly concluded the opposite. It measured
+`service_role` holding full `arwdDxtm`, `globalSetup` running to completion and 4 of 12
+specs passing, and inferred an upstream Supabase CLI change had fixed it — while
+explicitly flagging that it had **not** run `supabase db reset`. That caveat was the
+whole answer: the measurement came from a **stale local volume** that had been granted
+out-of-band at some earlier point. Against a **fresh `supabase db reset --local`** on
+CLI **2.114.0** / PostgreSQL **17.6.1.121**:
+
+```
+pg_default_acl → postgres | public | r |
+  {postgres=arwdDxtm/postgres, anon=Dxtm/postgres,
+   authenticated=Dxtm/postgres, service_role=Dxtm/postgres}
+
+has_table_privilege('service_role', …, 'SELECT'|'INSERT'|'UPDATE'|'DELETE')
+  → false on all 10 public tables
+
+BEGIN; SET LOCAL ROLE service_role; UPDATE public.profiles SET role='admin' WHERE false;
+  → ERROR:  permission denied for table profiles
+    HINT:   Grant the required privileges to the current role with:
+            GRANT UPDATE ON public.profiles TO service_role;
+```
+
+Byte-identical to the 2026-07-29 report. Nothing upstream fixed this, the migration count
+is still 16, and there is still no `GRANT … TO service_role` anywhere in the repo. **The
+lesson is about method, not about Postgres**: a grant that "came back" without a repo
+change is a stale-volume reading until a reset says otherwise.
+
+**Local unblock — NOT a fix and deliberately not committed.** To run e2e on a freshly
+reset stack, grant by hand on the local container; the design question below is untouched
+by it:
+
+```
+docker exec supabase_db_Serenify psql -U postgres -d postgres -c \
+  "GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role; \
+   GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO service_role;"
+```
+
+This is what made the 2026-08-14 e2e evidence in PR #265 possible; **every e2e result in
+that PR is conditional on it**, and a developer who resets without it sees the failure
+above rather than a working suite.
+
 **Symptom**: any service-role write to `public.profiles` fails with
 `42501 permission denied for table profiles`. Playwright's `globalSetup` dies on it, so
 **zero e2e specs run**:
@@ -3474,7 +3516,11 @@ pg_default_acl → postgres | public | r |
 `Dxtm` = TRUNCATE, REFERENCES, TRIGGER, MAINTAIN. **No `arwd`** — no SELECT/INSERT/
 UPDATE/DELETE. (The `supabase_admin` default ACL for the same schema *is* full
 `arwdDxtm` for all three roles; objects created by migrations do not land under it.)
-Local stack: Supabase CLI 2.110.0, PostgreSQL 17.6.
+Local stack as filed: Supabase CLI 2.110.0, PostgreSQL 17.6 — and unchanged on
+2.114.0 / 17.6.1.121, see the re-verification above. The CLI was **unpinned** (`npx
+supabase` resolved whatever was latest that day), which is what let a version difference
+look like a candidate explanation; it is pinned as of 2026-08-14 so the next measurement
+is against a known stack.
 
 **The grant is absent from all 16 migrations.** No `GRANT … TO service_role` on any
 table exists in `supabase/migrations/`. The only statement naming the role is
@@ -3514,7 +3560,8 @@ decisive test**: if either seeder has ever succeeded against the hosted project,
 must have the grant and the repo never issued it — meaning something granted it outside
 version control, which is worth recording explicitly if confirmed.
 
-**THE SUITE IS UNRUNNABLE IN EVERY ENVIRONMENT.** Not in CI — and never has been, by
+**THE SUITE IS UNRUNNABLE IN EVERY ENVIRONMENT** (still true on 2026-08-14, on a fresh
+reset and without the manual grant above). Not in CI — and never has been, by
 design: `.github/workflows/ci.yml:4` reads "No secrets, no Supabase, no Playwright, no
 `next build`", and the last eight runs on `main` (all `success`) show only
 `speckit-skills guard`, `web (lint · typecheck · vitest)` and `python (ruff · pytest)`.
@@ -3794,9 +3841,11 @@ the other: the camera gate is only reachable after `full_name` is set.
 
 ## From the reset-copy and checkout-pin fix — captured 2026-07-29
 
-### Windows: `hosted-email-template-sync.test.ts` fails to load with a SyntaxError — CI unaffected (#218)
-**Status**: tooling (`type:tooling` / `area:web`) — **OPEN.** GitHub issue **#218 OPEN.**
-Filed, not fixed — parked. Local-developer-experience only; nothing user-facing and nothing in CI.
+### ~~Windows: `hosted-email-template-sync.test.ts` fails to load with a SyntaxError — CI unaffected~~ — resolved (#218)
+**Status**: tooling (`type:tooling` / `area:web`) — **RESOLVED 2026-08-14** (`.gitattributes`,
+commit `eef6307`). GitHub issue **#218**: body and title **rewritten** on 2026-08-14 — the original
+diagnosis below was wrong, and left as-filed it would have sent the next reader down the same
+dead end — and it closes with **PR #265** (`Closes #218`), which is the change that fixes it.
 
 **Category**: dev tooling / test harness
 **Observed**: 2026-07-29, running the full `apps/web` unit suite on Windows while bumping the
@@ -3810,13 +3859,34 @@ token` at module load — `(0 test)`, before anything runs. The rest of the suit
 on `main` (commit `fb622c8`, the #217 merge). It also reproduces on a **stashed clean `main`**, so it
 is not caused by any in-flight branch — a red local suite here is not your diff.
 
-**Diagnosis.** The file is valid: `npx esbuild` parses it, `node --check` passes on
-`scripts/sync-hosted-email-templates.mjs`, and plain `node -e "import(...)"` imports that module and
-lists its exports. No BOM; UTF-8 with CRLF like its neighbours. The read is that **Vitest cannot
-resolve the outside-root import** at `hosted-email-template-sync.test.ts:13` —
-`"../../../../../scripts/sync-hosted-email-templates.mjs"` escapes the `apps/web` Vitest root into
-repo-level `scripts/`, and the repository path contains a space (`D:\Graduation Project\Serenify`).
-**A read, not a proven root cause — nobody has bisected it.**
+**~~Diagnosis~~ — REFUTED 2026-08-14.** The filed read was that Vitest cannot resolve the
+outside-root import at `hosted-email-template-sync.test.ts:13`, because the path escapes the
+`apps/web` Vitest root and the repository path contains a space (`D:\Graduation Project\Serenify`).
+It was flagged at the time as "a read, not a proven root cause", and an isolated repro built
+outside the repo disproved **both halves**:
+
+| `.mjs` content (imported from outside the Vitest root) | result |
+|---|---|
+| trivial, in a path **with** a space — and in one without | **passes** both |
+| real `sync-hosted-email-templates.mjs` byte-for-byte, no space in path | **fails** |
+| real file, CRLF → LF only | **passes** |
+| real file, shebang stripped, CRLF kept | **passes** |
+| `#!/usr/bin/env node\r\nexport const A = 1;\r\n` / same with `\n` | **fails** / **passes** |
+
+**Actual root cause: shebang + CRLF.** Vite's shebang strip is `\n`-only, so on a CRLF checkout the
+`\r` survives it and the parser meets a bare carriage return where a statement should start —
+hence a `SyntaxError` with no stack and no filename. `core.autocrlf` defaults to `true` on Windows
+and the repository had **no `.gitattributes`**, so Windows checked the file out CRLF while Linux CI
+kept LF. That is the entire Windows-only story; the file's 31 non-ASCII characters are irrelevant
+too (stripping them changes nothing).
+
+**Fix**: `.gitattributes` with `* text=auto eol=lf` (plus explicit `binary` for `.png/.jpg/.ico/
+.npy/.joblib/.tflite`), and a one-time working-tree refresh — `git rm --cached -r . && git reset
+--hard`. Dropping the shebang would also have worked and was smaller, since the workflow invokes
+the script as `node scripts/sync-hosted-email-templates.mjs`, but it repairs one file and leaves
+the next shebanged `.mjs` to rediscover this. **Verified**: the file went from `(0 test)` /
+`SyntaxError` to `20 passed`, and the full Windows suite from `144 files, 1 failed` to
+**145 files / 1635 tests, all passing**.
 
 **Why it is worth fixing eventually.** This suite is the guard on the hosted-template sync contract
 (#189): it pins the payload to exactly four fields, pins the project ref, and asserts the workflow's
@@ -3923,3 +3993,75 @@ reasons — most likely the minimum-headcount suppression work Principle I marks
 real employee data is collected. Two strings are free to correct once that function is being
 replaced anyway; they do not justify a migration of their own. The function and table **names** stay
 as they are regardless. Fix scope: trivial, as a rider.
+
+---
+
+## From the test-suite fix — captured 2026-08-14
+
+### The two `tail-cutter.fixture` tests timed out once and the cause was never established
+**Status**: watch (`status:watch` / `type:tooling` / `area:web`) — **OPEN.** GitHub issue **#263 OPEN.**
+**Category**: dev tooling / test harness
+**Observed**: during the #261 and #262 runs, both tests in
+`apps/web/tests/unit/components/monitor/tail-cutter.fixture.test.ts` exceeded Vitest's
+default 5000 ms timeout.
+
+**Did not reproduce.** On 2026-08-14 the full suite passed them under load, and in
+isolation they take **1662 ms** and **810 ms** — roughly 3× headroom against the default.
+Reaching a timeout therefore needs a ~3× slowdown, which is plausible under real
+contention: both original runs had a Playwright dev server and chromium alongside, and
+these are the heaviest tests in the unit suite (163 MB of fixtures — 93 MB webm + 70 MB
+fMP4 — and three **synchronous** `ffprobe` spawns). **Contention vs. genuine flake is
+unknown**, and no attempt was made to settle it.
+
+**Mitigated, not fixed**: an explicit `60_000` ms timeout on both `it()`s. Correct under
+either reading — it costs nothing while they pass in under two seconds, and a heavy-I/O
+test that measures the correctness of a byte cut has no business being scored on
+wall-clock. If they ever approach 60 s, that is a real regression in the cutter and
+should be read as one, not re-mitigated.
+
+**Deliberately not investigated further** — no budget on this until it recurs. If it does,
+the first cheap step is recording wall-clock for both tests across a run that has
+Playwright running alongside, rather than in isolation.
+**Address by**: only if it recurs. Fix scope: unknown until then.
+
+### The just-ended-session handoff is consumed before the card renders — both session-end e2e specs fail
+**Status**: bug (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#264 OPEN.**
+**Category**: questionnaire coordinator / session-end feedback
+**Observed**: 2026-08-14, after the recalibration-modal seam unblocked the eight e2e specs.
+Six of the eight went green; these two did not, and they are a **separate cause** — the
+2026-08-14 recon predicted exactly this ("the modal does not obviously explain" the two
+that report the card *absent*, "treat those two as possibly a second cause").
+
+**Symptom**: `questionnaire.spec.ts:49` and `:77` both time out waiting for
+`getByTestId('session-end-feedback')`. The page snapshot shows the dashboard fully
+rendered, **no modal**, and the **weekly work-environment survey** mounted in the
+coordinator slot instead ("How has the work environment felt lately?"). So the coordinator
+ran and chose the wrong surface — this is not a rendering or timing failure of the card.
+
+**Mechanism — evidenced, NOT verified.** `takeEndedSession()`
+(`lib/questionnaire/session-end-handoff.ts:23`) is a deliberate **read-and-clear**: it
+returns the id and `removeItem`s the key in the same call. `QuestionnaireCoordinator`
+calls it inside a mount `useEffect` (`questionnaire-coordinator.tsx:91`). Under React
+Strict Mode — which Next runs in dev, i.e. exactly how Playwright drives this — mount
+effects are invoked **twice**: the first call consumes the token and sets state, the second
+finds the key already gone, returns `null`, and overwrites the state back to `null`.
+`decideQuestionnaireSurface` then falls through `sessionEndEligible` to `weekly`, which is
+precisely the observed surface. **Not confirmed by instrumentation** — no double-invocation
+trace was captured, and no fix was attempted.
+
+**Why it is new**: `PROGRESS.md:1281` records both specs green on 2026-07-02. The React /
+Next bump in **#261** (next 16.3.0 + lockfile refresh) is the obvious thing to look at
+first, since it can change effect double-invocation behaviour, but nothing was bisected.
+
+**Production is very likely unaffected** and this is why it is not a blocker: Strict Mode
+double-invocation is **development-only**, so the consuming read is called once in a
+production build. That should be confirmed rather than assumed before closing.
+
+**Deliberately not chased** — out of scope for the test-suite fix that surfaced it (PR
+#265), which was scoped to four known causes. Fix scope: small if the diagnosis holds —
+make the read idempotent for a mount cycle (take once into a ref, or separate "peek" from
+"consume" so the clear happens when the card is actually shown rather than when the
+coordinator mounts). The one-shot-per-ended-session guarantee and its
+`UNIQUE(monitoring_session_id)` backstop must survive whatever shape it takes.
+**Address by**: before the next release that relies on session-end feedback, or the next
+time the questionnaire coordinator is opened for any reason.
