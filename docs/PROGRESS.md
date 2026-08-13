@@ -16,8 +16,9 @@ without. (3) `reuseExistingServer: false` outside CI, with `tests/port-guard.ts`
 Playwright's "set reuseExistingServer:true" advice. (4) Explicit 60 s timeout on the two
 `tail-cutter.fixture` tests. Supabase CLI pinned at 2.114.0.
 **Verified**: Windows Vitest **145 files / 1635 tests, all passing** (was 144 + 1 failed file);
-`tsc` clean; lint 0 errors / 2 known warnings; **6 of the 8** chromium specs green; the new prompt
-spec **7/7**; the port guard fires against a real `npm run dev` and is silent across a clean run.
+`tsc` clean; lint 0 errors / 2 known warnings; full chromium e2e **51 passed / 2 failed / 6 skipped
+(9.9 min)** — **6 of the 8** recovered, the new prompt spec **7/7**, and the only failures the known
+session-end pair; the port guard fires against a real `npm run dev` and is silent across the run.
 **NOT verified / knowingly left**: the **two session-end specs still fail** — a second, unrelated
 cause (#264): the coordinator renders the weekly survey because `takeEndedSession()` is
 read-and-clear and Strict Mode double-invokes the mount effect. Evidenced, not instrumented, not
