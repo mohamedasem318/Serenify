@@ -19,6 +19,6 @@ import type { Band } from "@/lib/api/monitoring-client";
  */
 export const BAND_LABEL: Record<Band, string> = {
   tense: "Tense",
-  a_little_tense: "A little tense",
-  at_ease: "At ease",
+  a_little_tense: "Uneasy",
+  at_ease: "Calm",
 };

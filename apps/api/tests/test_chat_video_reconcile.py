@@ -34,7 +34,7 @@ async def test_opener_uses_a_recent_video_read():
     llm = FakeLLM()
     await _send(client, llm)
     ren_system = llm.messages_for("ren")[0].content
-    assert "a little tense" in ren_system  # the calm, hedged recent-read note
+    assert "a little uneasy" in ren_system  # the calm, hedged recent-read note
 
 
 async def test_no_recent_read_means_no_opener_note():

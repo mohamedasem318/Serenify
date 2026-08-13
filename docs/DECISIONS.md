@@ -7557,3 +7557,26 @@ not record the run.** A future reader taking that upgrade would have found no ga
 The gate did run and passed. Repointed to `specs/008-stress-inference-service/spec.md:200`, with
 the downstream reliance at that feature's `research.md:507`. The obligation is unchanged — only
 its pointer. Found by the 2026-08-10 issue-catalogue recon while verifying **#72**.
+
+---
+
+## 2026-08-13 — Band display rename: Calm / Uneasy / Tense
+
+**Decision**: The three display bands rename `At ease` / `A little tense` / `Tense` →
+**`Calm` / `Uneasy` / `Tense`** everywhere a person reads them — app, Ren's opener context,
+Privacy Policy, pitch-video sources of truth. Enum keys (`at_ease` / `a_little_tense` /
+`tense`) are untouched behind their CHECK constraints: no migration, no backfill; history
+re-renders under the new labels. Supersedes **#92** ("uneasy" is the single word it wanted).
+Prose sites were rewritten, not substituted: "You're calm right now" / "You're a little
+uneasy"; the flat-mid session phrase is "uneasy throughout" (parallel to calm/tense
+throughout); the headline descriptor is "uneasy" with its article moved into `pre`.
+
+**Materiality (Privacy Policy)**: the one band-bearing line renames a value *inside* a
+category, not the category itself — judged **non-material**: no consent revision, no
+re-prompt. Users were re-prompted days ago for #198; a second prompt for a synonym is worse
+than the problem. Registry untouched (revision identity is versioned, never a text hash).
+
+**Preserved with old labels on purpose**: `docs/mockups/` (dated header note added to each
+affected mock), the submitted pitch render (noted in the beat sheet; beat 8's hand-tuned
+timing untouched), the launch-video beat sheet, historical specs and earlier log entries.
+Constitution Amendment 23 (PATCH → 1.17.2) fixed the one live rule line.

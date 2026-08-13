@@ -22,7 +22,7 @@ import { STORY_BEATS } from "@/lib/landing/story-script";
  * what keeps the dot legible where it sits on top of the band. The data is unchanged.
  *
  * COLOUR COMES FROM EXISTING GRAPHITE TOKENS ONLY. `--amber-soft-line` is the repo's
- * documented "a little tense" graph-line value, so the three states reuse exactly what the
+ * documented "uneasy" graph-line value, so the three states reuse exactly what the
  * live monitor's graph already uses rather than inventing a landing-only palette (FR-057,
  * `plan.md` §0.7 — no new token). The band tints are `color-mix` over those same tokens at
  * the mock's percentages, which introduces no new named colour.
@@ -89,7 +89,7 @@ export function StoryTrend({ beatIndex }: { beatIndex: number }) {
    *
    * The history is therefore left-padded with the band the story OPENS on, and the newest
    * reading always sits at the right edge under the dot. The padding is not invented data —
-   * beat 0 is "at ease", so a flat at-ease run before the story starts is the same claim the
+   * beat 0 is "calm", so a flat calm run before the story starts is the same claim the
    * readout is making in words next to it — and it is what lets the line read as a reading
    * over time rather than as a chart being drawn.
    */

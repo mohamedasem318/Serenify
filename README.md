@@ -19,7 +19,7 @@ Most workplace-wellbeing tools are either surveys nobody fills in or monitoring 
 
 ## How it works
 
-1. **Detect** — a one-time calibration anchors the model to *your* baseline; sessions then score 60-second windows server-side into a smoothed three-band read (calm / a little tense / tense). No probability or raw signal reaches the browser.
+1. **Detect** — a one-time calibration anchors the model to *your* baseline; sessions then score 60-second windows server-side into a smoothed three-band read (calm / uneasy / tense). No probability or raw signal reaches the browser.
 2. **Confirm** — when a tense pattern sustains, a short, calm prompt asks you to confirm. The model never has the last word alone.
 3. **Talk** — "Ren," a supportive LLM companion for reflection, with live-only crisis-resource escalation. Private to the employee.
 4. **Reflect** — your own session trend and history, in a fixed-pixel SVG chart built to read honestly at a glance.

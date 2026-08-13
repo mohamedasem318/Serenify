@@ -89,7 +89,7 @@ describe("responsive axis gutter (FR-002 narrow-width clarification)", () => {
   it("shrinks the gutter + right margin at the 360px floor so the plot keeps width for labels", () => {
     const v = build([pt(0, "at_ease")], 360);
     expect(v.plot.left).toBeLessThan(AXIS_GUTTER); // gutter shrank below 140
-    expect(v.plot.left).toBeGreaterThanOrEqual(AXIS_GUTTER_MIN); // but still fits "A little tense"
+    expect(v.plot.left).toBeGreaterThanOrEqual(AXIS_GUTTER_MIN); // but still fits "Uneasy"
     expect(360 - v.plot.right).toBeLessThan(RIGHT_MARGIN); // right margin shrank below 60
     // materially wider than the legacy fixed 140/60 plot (160px) — the launch no-read label
     // ("no clear read", ≈81px) fits at the floor

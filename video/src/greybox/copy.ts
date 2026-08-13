@@ -142,8 +142,8 @@ export const LATER = "later that morning";
 
 // ── Beats 7, 8, 11 · statelines (SHEET) ─────────────────────────────────────
 export const STATELINE = {
-  ease: { title: "You're at ease right now", body: "Steady and settled — nothing to do." },
-  little: { title: "You're a little tense", body: "A bit of an edge lately. Maybe a slow breath." },
+  ease: { title: "You're calm right now", body: "Steady and settled — nothing to do." },
+  little: { title: "You're a little uneasy", body: "A bit of an edge lately. Maybe a slow breath." },
   tense: { title: "You're feeling tense", body: "This has held a while. Serenify can check in when you're ready." },
 } as const;
 
@@ -269,7 +269,7 @@ export const PLAYER = {
  *    never shows. Not a substitute.
  *  · **"Until something changes."** — `NARRATION.climbing` is "Signals climb, and keep climbing",
  *    a different claim about a different thing.
- *  · **"Then it helps you come back down."** — `NARRATION.backToAtEase` is "Back to at ease —
+ *  · **"Then it helps you come back down."** — `NARRATION.backToCalm` is "Back to calm —
  *    because they were asked, not told", which is both a different claim and an **"X, not Y."**
  *    construction. That construction is beat 12's and is reserved: reusing it here would make the
  *    closing card the repeat of a device rather than the film's one claim.
@@ -279,7 +279,7 @@ export const INTERSTITIALS = {
   calm: "First it learns what calm looks like.",
   /** Between beat 5 (calibration) and beat 6 (later) — the film's one unexplained time jump. */
   quiet: "Then it stays quiet.",
-  /** Between beat 7 (at ease) and beat 8 (the email) — the inciting incident. */
+  /** Between beat 7 (calm) and beat 8 (the email) — the inciting incident. */
   changes: "Until something changes.",
   /** Between beat 9 (questionnaire) and beat 10 (Ren) — it stops measuring and starts talking. */
   down: "Then it helps you come back down.",

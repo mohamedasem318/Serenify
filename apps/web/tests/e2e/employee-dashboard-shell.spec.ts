@@ -264,7 +264,7 @@ test("employee dashboard: today recap expands in place to the axis-labelled plot
 
   const axisLabels = page.getByTestId("axis-label");
   await expect(axisLabels).toHaveCount(4);
-  await expect(axisLabels).toHaveText(["tense", "a little tense", "at ease", "no read"]);
+  await expect(axisLabels).toHaveText(["tense", "uneasy", "calm", "no read"]);
   await expect(page.getByTestId("plot-legend")).toHaveCount(0);
 
   // expanded in place — still on the dashboard, not a separate today page.

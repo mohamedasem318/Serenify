@@ -195,7 +195,7 @@ export const NARRATION = {
   wantToTalk: "This time, they want to talk.",
   renPicksUp: "Ren picks up. Private, always.",
   laterThatAfternoon: "Later that afternoon.",
-  backToAtEase: "Back to at ease — because they were asked, not told.",
+  backToCalm: "Back to calm — because they were asked, not told.",
   closing: STORY_CLOSING_BEAT,
 } as const;
 

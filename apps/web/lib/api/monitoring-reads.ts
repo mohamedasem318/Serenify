@@ -264,8 +264,8 @@ const dominantSkipCause = (rows: TodayTrendRow[]): SkipCause | null => {
 
 function chipFor(rows: TodayTrendRow[], tenor: SessionTenor): { label: string; tone: ChipTone } {
   if (tenor === "no_read") return { label: "no clear read", tone: "muted" };
-  if (tenor === "at_ease") return { label: "at ease", tone: "meadow" };
-  if (tenor === "a_little_tense") return { label: "a little tense", tone: "amber" };
+  if (tenor === "at_ease") return { label: "calm", tone: "meadow" };
+  if (tenor === "a_little_tense") return { label: "uneasy", tone: "amber" };
   // peaked at tense — distinguish "ended tense" from "eased after a tense stretch"
   const bands = confidentBands(rows);
   const endedTense = bands[bands.length - 1] === "tense";
@@ -291,7 +291,7 @@ function phraseFor(rows: TodayTrendRow[], tenor: SessionTenor): string {
   if (last < first) return "eased off";
   if (tenor === "at_ease") return "calm throughout";
   if (tenor === "tense") return "tense throughout";
-  return "held a little tense";
+  return "uneasy throughout";
 }
 
 // ── headline (band + time only) ──────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ function phraseFor(rows: TodayTrendRow[], tenor: SessionTenor): string {
  *
  * Copy contract (009 Phase 8 — FR-002 / SC-010 + DECISIONS 2026-06-23 "headline rework"):
  *   • Honesty (T010, kept): the standalone "tense" word appears ONLY when the tense band was
- *     reached; an a-little-tense peak says exactly "a little tense"; a calm day carries no amber.
+ *     reached; an a-little-tense peak says exactly "uneasy"; a calm day carries no amber.
  *   • Recovery (FR-002 / SC-010 extension): when the day reached a tension peak but the most
  *     recent CONFIDENT session sits below it (the user eased), surface that recovery rather than
  *     the peak alone. HONESTY (009 follow-up §3): bare "…then eased" reads as "back to fine", so
@@ -339,7 +339,7 @@ function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
       : a,
   );
   const isTense = peak.tenor === "tense";
-  const level = isTense ? "tense" : "a little tense"; // bare descriptor → amber `hot`
+  const level = isTense ? "tense" : "uneasy"; // bare descriptor → amber `hot`
   const peakPod = partOfDay(peak.startedAt);
 
   // recovery — the most recent CONFIDENT session is below the peak (readable excludes read-less,
@@ -361,9 +361,8 @@ function deriveHeadline(sessions: RecapSession[]): TemplatedHeadline {
       // same part of day → collapse the second clause (no repeated part-of-day word)
       return { pre: `Your ${calmPod} started calm, then turned `, hot: level, post: "" };
     }
-    // different parts of day → name both. Article rides in `pre` for "tense"; "a little tense"
-    // already carries its own article.
-    const article = isTense ? "a " : "";
+    // different parts of day → name both. The article rides in `pre` ("a tense" / "an uneasy").
+    const article = isTense ? "a " : "an ";
     return { pre: `Your ${calmPod} started calm, then you had ${article}`, hot: level, post: ` ${peakPod}` };
   }
 

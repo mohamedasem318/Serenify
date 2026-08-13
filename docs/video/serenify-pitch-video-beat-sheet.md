@@ -14,6 +14,13 @@ the character rig's construction, the assets pass, the five bad rects, the frame
 investigation, the Premiere round trip and the deferred register. **None of that is reproduced
 here.** Where this sheet needs a number from it, it cites it.
 
+> **Label note (2026-08-13).** The display bands were renamed after this video was submitted:
+> "At ease" → "Calm" and "A little tense" → "Uneasy" ("Tense" unchanged). The submitted render
+> (`video/out/serenify-pitch-2026-08-05.mp4`) carries the old labels on every monitoring surface —
+> beats 7, 7b–7e, 8, and 11 — and is not being re-rendered or re-timed. This sheet now uses the
+> new vocabulary; beat 8's step timing was hand-tuned to the length of the old "a little tense"
+> stateline and is deliberately untouched.
+
 ---
 
 ## §1 · What is different about this cut
@@ -163,12 +170,12 @@ and it is stated here because it governs every number in §7 too:
 | 4 | Camera consent gate | 120 | 270 | **270** | +150 | 0 |
 | 5 | Calibration | 422 | 900 | **900** | +478 | 0 |
 | 6 | "Later" | 36 | 60 | **60** | +24 | 0 |
-| 7 | Working, at ease | 72 | 240 | **240** | +168 | 0 |
+| 7 | Working, calm | 72 | 240 | **240** | +168 | 0 |
 | **7b–7e** | **False alarm — NEW** | — | 1,050 | **906** | +906 | −144 |
 | 8 | The email | 184 | 330 | **330** | +146 | 0 |
 | 9 | Confirmatory questionnaire | 76 | 240 | **240** | +164 | 0 |
 | 10 | Ren | 310 | 660 | **598** | +288 | −62 |
-| 11 | Return to ease | 234 | 450 | **368** | +134 | −82 |
+| 11 | Return to calm | 234 | 450 | **368** | +134 | −82 |
 | **R** | **Roadmap timeline — NEW** | — | 240 | **240** | +240 | 0 |
 | 12 | Closing subtitle card | 90 | 90 | **90** | 0 | 0 |
 | 13 | End card | 172 | 172 | **172** | 0 | 0 |
@@ -345,7 +352,7 @@ Placed between beat 7 and beat 8, on the same surface and the same shot beat 7 l
 
 **The story:** he is concentrating hard on a difficult problem. He frowns at the screen. The
 reading climbs. The confirmatory prompt fires. He answers that he is fine. It is dismissed and he
-goes back to work at ease. Then beat 8 happens and it is real.
+goes back to work calm. Then beat 8 happens and it is real.
 
 **The point:** the false alarm and the true positive are **identical up to the answer.** Same
 amber, same climb, same prompt, same three options, same push-in. The only difference is which
@@ -409,7 +416,7 @@ brows are considered.
 
 | | frames | seconds | shot | content |
 |---|---|---|---|---|
-| **7b** | 210 | 7.0 | `COMPOSITE`, static | he settles into `focused`. The reading is still at ease. |
+| **7b** | 210 | 7.0 | `COMPOSITE`, static | he settles into `focused`. The reading is still calm. |
 | **7c** | 300 | 10.0 | `COMPOSITE`, static | the climb: bloom drifts, stateline steps twice, trend walks up |
 | **7d** | 201 | 6.7 | push to `BEAT9_PROMPT`, land, hold | the prompt fires and is read whole; the cursor goes to **"No, I'm okay"** |
 | **7e** | 195 | 6.5 | pull back to `COMPOSITE`, hold | the prompt is gone. He works. The reading comes down on its own. |
@@ -420,14 +427,14 @@ would otherwise have gained for free once its descent moved earlier (6.4). 7b an
 change length at all — what changed inside 7c is *where* its two copy steps fall.
 
 **7b · 210 frames.** Opens on the frame beat 7 ended on — same `COMPOSITE`, same static camera,
-nothing cuts. He is at ease and typing. Over f0–f60 the rig travels from beat 7's contented pose
+nothing cuts. He is calm and typing. Over f0–f60 the rig travels from beat 7's contented pose
 into `focused`: brows drawing together and their inner ends dropping, mouth width narrowing, gaze
 locking down. **This is the only thing that moves in 7b**, and it is deliberately a slow travel
 rather than a snap, because a face arriving at concentration over two seconds reads as somebody
 getting stuck on a problem, and a face snapping into it reads as a reaction to something. Nothing
 has happened to him. The reading is unchanged at `at_ease` throughout — that is the point of
 7b's length: the audience registers that he looks strained *and* the app is still saying
-**"You're at ease right now"**, so the climb in 7c is caused by his face rather than announced
+**"You're calm right now"**, so the climb in 7c is caused by his face rather than announced
 before it.
 
 **7c · 300 frames.** Identical to beat 8's third act in every respect except that there is no
@@ -436,16 +443,16 @@ right-hand end.
 
 - f0–f39 — the bloom drifts meadow → mixed → amber on the component's own 1.3s ease. Let it
   drift, never snap.
-- **f40** — stateline steps to **"You're a little tense"** · "A bit of an edge lately. Maybe a
-  slow breath." The trend's drawn ten walk to `at ease ×5 + a little ×5` **on the same frame**,
+- **f40** — stateline steps to **"You're a little uneasy"** · "A bit of an edge lately. Maybe a
+  slow breath." The trend's drawn ten walk to `calm ×5 + a little ×5` **on the same frame**,
   per L18.
 - **f67** — stateline steps to **"You're feeling tense"** · "This has held a while. Serenify can
-  check in when you're ready." Trend to `at ease + a little ×4 + tense ×5`.
+  check in when you're ready." Trend to `calm + a little ×4 + tense ×5`.
 - f67–f300 — trend continues to `a little ×3 + tense ×7`. Amber holds.
 
 **THE TWO STEPS WERE AT f120 AND f200 AND THE FIRST RENDER SHOWED WHY THAT IS A DEFECT.** The
 bloom finishes drifting to amber at f39. With the copy not stepping until f120, **the film ran
-81 frames — 2.7 seconds — of an amber orb under a stateline still reading "You're at ease right
+81 frames — 2.7 seconds — of an amber orb under a stateline still reading "You're calm right
 now"**, and 7e did the same in reverse (bloom from f45, copy at f120). That is not slow pacing,
 it is the surface asserting two states at once, and it reads as a glitch because it is an
 inconsistency.
@@ -493,7 +500,7 @@ defect. See 6.4a.
   6.4. The floor is expressed in 7e's own frames and always was; 7e begins earlier now, so its
   absolute frame moves and the rule does not.
 - f45–f135 — the bloom drifts amber → meadow on its own 1.3s ease; the `level` scalar walks down
-  and the trend's tail walks with it; the stateline returns to **"You're at ease right now"** ·
+  and the trend's tail walks with it; the stateline returns to **"You're calm right now"** ·
   "Steady and settled — nothing to do." at **f75**, the same frame the trend crosses, and inside
   the bloom's drift for the reason 7c's steps moved.
 - f135–f195 — settled. Nothing moves but his breath and the typing. The film's picture at 7e's
@@ -769,7 +776,7 @@ does not respond to that click and the camera does not move, so they were empty 
 empty now. What the beat gains is time for the absence to register and for the narrated line this
 seam owes (§5.2) to land inside the beat. It holds 14 frames after the click, unchanged.
 
-### 7 · Working, at ease · 72 → 240 (+168)
+### 7 · Working, calm · 72 → 240 (+168)
 
 Structure unchanged: the push to `COMPOSITE`, and the four things it holds — the bloom, the
 stateline, the trend and the viewfinder.
@@ -826,7 +833,7 @@ fall, the drift, the two stateline steps, the trend's two crossings.
   the film is slower is not that dead dwell is now acceptable.
 - **+92 to the wide phase.** The escalation — the drift, then the head changes, then it changes
   again — runs on a static camera with nothing else moving, and the launch sheet flags this as
-  *the one thing to watch in the whole pass*: whether "a little tense" → "tense" reads as easy to
+  *the one thing to watch in the whole pass*: whether "uneasy" → "tense" reads as easy to
   miss. The extra 92 frames put ~50 frames between the two copy changes instead of 22, which is
   the cheapest available answer to that risk. **The in-place emphasis still does not come back**
   — L15 removed it and the room it needs is the room the trend occupies.
@@ -958,7 +965,7 @@ writing:
 **Untouched, and listed so the next pass does not reach for them:** turn 1's 60, the typing's 156
 (15 c/s — *never sped to fit*), and turn 3's protected 170.
 
-### 11 · Return to ease · 234 → 368 (+134, trimmed from 450)
+### 11 · Return to calm · 234 → 368 (+134, trimmed from 450)
 
 Structure unchanged: the player established over the composition, the punch onto it at 640, the
 play click, headphones, notes, the nod, the pull-out, the closing composite at 884.
@@ -982,7 +989,7 @@ play click, headphones, notes, the nod, the pull-out, the closing composite at 8
   of a settled frame than out of a settling one. **The 31 frames Mohamed deleted from beat 11's
   tail in Premiere are not restored as a tail**; the linger here is in front of the roadmap card.
 
-**The recovery still skips `a little tense` because the stateline does** — the reading crosses
+**The recovery still skips `uneasy` because the stateline does** — the reading crosses
 both thresholds inside one frame, so the graph is never in a band the copy is not showing.
 
 #### The trim pass takes 82, from the move and from the tail

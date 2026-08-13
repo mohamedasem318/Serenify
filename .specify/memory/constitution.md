@@ -780,6 +780,37 @@ Cross-references:
 - specs/013-public-surface-and-legal/plan.md §11 (the amended spec rule)
 - apps/web/lib/legal/copy.ts, apps/web/lib/consent/copy.ts (the shipped copy)
 - GitHub #198, PR #258
+
+Amendment 23: 1.17.1 → 1.17.2 (2026-08-13, PATCH)
+Bump rationale: Band display vocabulary. The three display bands were renamed
+"At ease" / "A little tense" / "Tense" → "Calm" / "Uneasy" / "Tense" across
+the app, Ren's opener context, the Privacy Policy, and the pitch-video
+sources of truth (supersedes #92, which asked for a one-word mid band). One
+line here named a token by the old band: the Amber stress signal bullet's
+`--amber-soft-line` gloss, "the mid \"a little tense\" graph line" — now
+"the mid \"uneasy\" graph line". Token names, hex values, and the enum keys
+(`at_ease` / `a_little_tense` / `tense`, CHECK-constrained in
+`window_readings.band` and `chat_conversations.rollup_band`) are unchanged;
+display text only, no migration. The Privacy Policy's one band-bearing line
+was judged non-material (renames a value inside a category, not the
+category) — no consent revision, no re-prompt.
+
+PATCH bump: terminology only — no principle added, removed, or restructured;
+no requirement changed in force or scope (Amendment 6/7/11/22 precedent).
+Hand-edited per the Amendment 10 precedent. Approved explicitly by Mohamed
+on 2026-08-13.
+
+Affected templates: none. Re-ran the Amendment 13 audit over
+.specify/templates/{plan,spec,tasks,checklist,constitution}-template.md for
+the touched literals (`at ease`, `a little tense`, `calm`, `uneasy`) — zero
+matches.
+
+Cross-references:
+- docs/DECISIONS.md entry 2026-08-13 (band rename)
+- docs/CHANGELOG.md entry 2026-08-13 (Amendment 23)
+- docs/BACKLOG.md — #92 resolved-note
+- apps/web/lib/bands.ts (BAND_LABEL, the shipped labels)
+- GitHub #92
 -->
 
 # Serenify Constitution
@@ -1046,7 +1077,7 @@ and every documented pairing meets WCAG AA:
   stress-signal role (Amendment 5): `--color-amber-text` (chip + label text;
   light `#8A580F` / dark `#E6C386`; AA-safe small text on the tint and the card
   surface), `--amber-tint` (chip background; `#F4E3C6` / `#3B2F19`),
-  `--amber-soft-line` (the mid "a little tense" graph line; `#D49A4A` /
+  `--amber-soft-line` (the mid "uneasy" graph line; `#D49A4A` /
   `#E8BC7A`), and `--amber-head` (headline keyword at weight 700 — large text;
   `#BC7A2A` / `#E4AE5C`). The bright graphic `--color-amber` is for graph
   lines/markers ONLY, never small text (it fails small-text AA at 2.77:1).
@@ -1385,4 +1416,4 @@ wins.
   NON-NEGOTIABLE, even a unanimous team override requires a logged
   amendment first — the rule must change in writing before behavior may.
 
-**Version**: 1.17.1 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-12
+**Version**: 1.17.2 | **Ratified**: 2026-05-16 | **Last Amended**: 2026-08-13

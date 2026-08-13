@@ -4,6 +4,27 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Band rename — Calm / Uneasy / Tense
+
+**Branch**: `fix/band-rename-calm-uneasy-tense` · **Date**: 2026-08-13 · **Status**: PR open, not merged.
+**Shipped**: display labels renamed (`At ease` → `Calm`, `A little tense` → `Uneasy`) across all nine
+string sites + README; the three prose sites rewritten rather than substituted ("You're calm right now" /
+"You're a little uneasy"; "held a little tense" → "uneasy throughout"; headline descriptor "uneasy" with
+the article moved into `pre`); Ren's opener context; the Privacy Policy line (**non-material** — no
+consent revision, no re-prompt; DECISIONS 2026-08-13); constitution Amendment 23 (PATCH → 1.17.2);
+pitch beat sheet + `video/src/greybox/copy.ts` moved to the new vocabulary with a note that the
+submitted render keeps the old labels (no re-render, beat 8 timing untouched). Landing narration key
+`backToAtEase` → `backToCalm`. Enum keys and CHECK constraints untouched — no migration. **Closed #92**
+(superseded — "uneasy" is the single word it asked for); its substring-guard test is retired.
+**Preserved with old labels on purpose**: `docs/mockups/` (dated header notes added), the launch-video
+beat sheet, historical specs and log entries.
+**Verified**: `tsc` clean; lint 0 errors / 2 known warnings; Vitest 1615 passed (threads pool; 1 failed
+*file* = the known Windows-only `hosted-email-template-sync`; a `tail-cutter.fixture` 5 s timeout under
+suite load passed clean in isolation); apps/api pytest 193 passed / 1 skipped.
+**NOT verified**: e2e suite not run (the two e2e edits are literal string swaps); no visual pass.
+
+---
+
 ## Dependabot batches 1 and 3 — 10 alerts closed, 2 deferred on purpose
 
 **Branch**: `chore/dependabot-batches-1-and-3` · **Date**: 2026-08-13 · **Status**: PR open, not merged.

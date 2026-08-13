@@ -9,9 +9,9 @@ import { cn } from "@/lib/utils";
  */
 
 const BANDS: Record<Band, { label: string; text: string; dot: string }> = {
-  at_ease: { label: "at ease", text: "text-meadow-text", dot: "bg-meadow" },
+  at_ease: { label: "calm", text: "text-meadow-text", dot: "bg-meadow" },
   a_little_tense: {
-    label: "a little tense",
+    label: "uneasy",
     text: "text-amber-text",
     dot: "bg-[var(--amber-soft-line)]",
   },
