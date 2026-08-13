@@ -20,6 +20,12 @@ here.** Where this sheet needs a number from it, it cites it.
 > beats 7, 7b–7e, 8, and 11 — and is not being re-rendered or re-timed. This sheet now uses the
 > new vocabulary; beat 8's step timing was hand-tuned to the length of the old "a little tense"
 > stateline and is deliberately untouched.
+>
+> **Stateline note (2026-08-14).** The stateline heads then moved to observational wording:
+> "Looking calm" / "Looking uneasy" / "Looking tense" (subs unchanged). The submitted render
+> still carries the statelines it was rendered with — "You're at ease right now" /
+> "You're a little tense" / "You're feeling tense" — on beats 7, 7b–7e, 8, and 11. Still no
+> re-render, still no re-timing; this sheet quotes the new heads.
 
 ---
 
@@ -434,7 +440,7 @@ rather than a snap, because a face arriving at concentration over two seconds re
 getting stuck on a problem, and a face snapping into it reads as a reaction to something. Nothing
 has happened to him. The reading is unchanged at `at_ease` throughout — that is the point of
 7b's length: the audience registers that he looks strained *and* the app is still saying
-**"You're calm right now"**, so the climb in 7c is caused by his face rather than announced
+**"Looking calm"**, so the climb in 7c is caused by his face rather than announced
 before it.
 
 **7c · 300 frames.** Identical to beat 8's third act in every respect except that there is no
@@ -443,10 +449,10 @@ right-hand end.
 
 - f0–f39 — the bloom drifts meadow → mixed → amber on the component's own 1.3s ease. Let it
   drift, never snap.
-- **f40** — stateline steps to **"You're a little uneasy"** · "A bit of an edge lately. Maybe a
+- **f40** — stateline steps to **"Looking uneasy"** · "A bit of an edge lately. Maybe a
   slow breath." The trend's drawn ten walk to `calm ×5 + a little ×5` **on the same frame**,
   per L18.
-- **f67** — stateline steps to **"You're feeling tense"** · "This has held a while. Serenify can
+- **f67** — stateline steps to **"Looking tense"** · "This has held a while. Serenify can
   check in when you're ready." Trend to `calm + a little ×4 + tense ×5`.
 - f67–f300 — trend continues to `a little ×3 + tense ×7`. Amber holds.
 
@@ -500,7 +506,7 @@ defect. See 6.4a.
   6.4. The floor is expressed in 7e's own frames and always was; 7e begins earlier now, so its
   absolute frame moves and the rule does not.
 - f45–f135 — the bloom drifts amber → meadow on its own 1.3s ease; the `level` scalar walks down
-  and the trend's tail walks with it; the stateline returns to **"You're calm right now"** ·
+  and the trend's tail walks with it; the stateline returns to **"Looking calm"** ·
   "Steady and settled — nothing to do." at **f75**, the same frame the trend crosses, and inside
   the bloom's drift for the reason 7c's steps moved.
 - f135–f195 — settled. Nothing moves but his breath and the typing. The film's picture at 7e's

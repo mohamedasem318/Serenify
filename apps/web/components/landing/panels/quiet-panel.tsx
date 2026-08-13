@@ -15,7 +15,7 @@ import type { StoryBeat } from "@/lib/landing/story-script";
  *
  * THE BARS FOLLOW THE BAND (2026-07-28), which is the one thing texture still has to get
  * right. They were fixed at meadow, so the panel stayed green while the reading beside it
- * said "You're a little uneasy" and the sparkline had already gone amber — three parts of one
+ * said "Looking uneasy" and the sparkline had already gone amber — three parts of one
  * readout disagreeing about the same moment. Same three tokens and the same mapping the
  * trend uses (`story-trend.tsx`), so a band change moves the whole card at once. Following
  * the band is not the same as encoding a value: the bars still carry no number, and their

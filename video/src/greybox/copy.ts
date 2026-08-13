@@ -142,9 +142,9 @@ export const LATER = "later that morning";
 
 // ── Beats 7, 8, 11 · statelines (SHEET) ─────────────────────────────────────
 export const STATELINE = {
-  ease: { title: "You're calm right now", body: "Steady and settled — nothing to do." },
-  little: { title: "You're a little uneasy", body: "A bit of an edge lately. Maybe a slow breath." },
-  tense: { title: "You're feeling tense", body: "This has held a while. Serenify can check in when you're ready." },
+  ease: { title: "Looking calm", body: "Steady and settled — nothing to do." },
+  little: { title: "Looking uneasy", body: "A bit of an edge lately. Maybe a slow breath." },
+  tense: { title: "Looking tense", body: "This has held a while. Serenify can check in when you're ready." },
 } as const;
 
 // ── Beat 8 · the toast (SHEET) ──────────────────────────────────────────────

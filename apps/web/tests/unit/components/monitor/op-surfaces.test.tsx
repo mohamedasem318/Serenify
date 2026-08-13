@@ -17,8 +17,8 @@ describe("OpSurfaces — warming-up gating", () => {
   it("shows the warming copy and NO band before the first reading", () => {
     const { container } = render0({ op: "warming-up", band: null, skipCause: null });
     expect(screen.getByText(/getting a read on things/i)).toBeInTheDocument();
-    expect(screen.queryByText(/calm right now/i)).toBeNull();
-    expect(screen.queryByText(/feeling tense/i)).toBeNull();
+    expect(screen.queryByText(/looking calm/i)).toBeNull();
+    expect(screen.queryByText(/looking tense/i)).toBeNull();
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "warming");
     expect(container.textContent ?? "").not.toMatch(NO_DIGIT);
   });
@@ -28,19 +28,19 @@ describe("OpSurfaces — band → colour + copy (active)", () => {
   it("at-ease → meadow bloom + meadow stateline", () => {
     render0({ op: "active", band: "at_ease", skipCause: null });
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "ease");
-    expect(screen.getByText(/calm right now/i).className).toContain("text-meadow-text");
+    expect(screen.getByText(/looking calm/i).className).toContain("text-meadow-text");
   });
 
   it("a-little-tense → mid-gold bloom + amber stateline (a stress band)", () => {
     render0({ op: "active", band: "a_little_tense", skipCause: null });
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "little");
-    expect(screen.getByText(/a little uneasy/i).className).toContain("text-amber");
+    expect(screen.getByText(/looking uneasy/i).className).toContain("text-amber");
   });
 
   it("tense → amber bloom + amber stateline", () => {
     render0({ op: "active", band: "tense", skipCause: null });
     expect(screen.getByTestId("bloom")).toHaveAttribute("data-tone", "tense");
-    expect(screen.getByText(/feeling tense/i).className).toContain("text-amber");
+    expect(screen.getByText(/looking tense/i).className).toContain("text-amber");
   });
 
   it("renders NO number / gauge on any band (FR-015)", () => {
@@ -172,7 +172,7 @@ describe("OpSurfaces — skipped read (foggy note, keeps the last band)", () => 
   it("keeps the band and names a likely cause + fix via CauseChip", () => {
     const { container } = render0({ op: "active", band: "at_ease", skipCause: "low-light" });
     // last band still shown (bloom holds)
-    expect(screen.getByText(/calm right now/i)).toBeInTheDocument();
+    expect(screen.getByText(/looking calm/i)).toBeInTheDocument();
     // the foggy skip note + the shared cause line
     expect(screen.getByText(/couldn.t get a clear read/i)).toBeInTheDocument();
     expect(screen.getByText(/facing a little more light usually helps/i)).toBeInTheDocument();
@@ -229,9 +229,9 @@ describe("OpSurfaces — calibrate-first (no-anchor): foggy attention + meadow '
     // No bloom (the band's only visual), and none of the band statelines, ever render here.
     render0({ op: "calibrate-first", band: null, skipCause: null });
     expect(screen.queryByTestId("bloom")).toBeNull();
-    expect(screen.queryByText(/calm right now/i)).toBeNull();
-    expect(screen.queryByText(/a little uneasy/i)).toBeNull();
-    expect(screen.queryByText(/feeling tense/i)).toBeNull();
+    expect(screen.queryByText(/looking calm/i)).toBeNull();
+    expect(screen.queryByText(/looking uneasy/i)).toBeNull();
+    expect(screen.queryByText(/looking tense/i)).toBeNull();
   });
 });
 

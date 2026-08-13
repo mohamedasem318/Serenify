@@ -7567,9 +7567,12 @@ its pointer. Found by the 2026-08-10 issue-catalogue recon while verifying **#72
 Privacy Policy, pitch-video sources of truth. Enum keys (`at_ease` / `a_little_tense` /
 `tense`) are untouched behind their CHECK constraints: no migration, no backfill; history
 re-renders under the new labels. Supersedes **#92** ("uneasy" is the single word it wanted).
-Prose sites were rewritten, not substituted: "You're calm right now" / "You're a little
-uneasy"; the flat-mid session phrase is "uneasy throughout" (parallel to calm/tense
-throughout); the headline descriptor is "uneasy" with its article moved into `pre`.
+Prose sites were rewritten, not substituted. Statelines went observational (folded in
+2026-08-14, same PR): "Looking calm" / "Looking uneasy" / "Looking tense" — the model reads
+a face, so the head says what it sees, never what the person feels; each head matches its
+chip label exactly, with no softener on the middle band. Subs (advice) unchanged. The recap
+keeps its own past-tense register — "uneasy throughout" (parallel to calm/tense throughout),
+headline descriptor "uneasy" with its article in `pre` — deliberately unlike the live surface.
 
 **Materiality (Privacy Policy)**: the one band-bearing line renames a value *inside* a
 category, not the category itself — judged **non-material**: no consent revision, no

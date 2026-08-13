@@ -8,8 +8,9 @@ Per-feature implementation log. Append-only, newest first.
 
 **Branch**: `fix/band-rename-calm-uneasy-tense` · **Date**: 2026-08-13 · **Status**: PR open, not merged.
 **Shipped**: display labels renamed (`At ease` → `Calm`, `A little tense` → `Uneasy`) across all nine
-string sites + README; the three prose sites rewritten rather than substituted ("You're calm right now" /
-"You're a little uneasy"; "held a little tense" → "uneasy throughout"; headline descriptor "uneasy" with
+string sites + README; the three prose sites rewritten rather than substituted (statelines observational
+per the 2026-08-14 fold-in — "Looking calm" / "Looking uneasy" / "Looking tense", subs and warming-up
+unchanged; "held a little tense" → "uneasy throughout"; headline descriptor "uneasy" with
 the article moved into `pre`); Ren's opener context; the Privacy Policy line (**non-material** — no
 consent revision, no re-prompt; DECISIONS 2026-08-13); constitution Amendment 23 (PATCH → 1.17.2);
 pitch beat sheet + `video/src/greybox/copy.ts` moved to the new vocabulary with a note that the

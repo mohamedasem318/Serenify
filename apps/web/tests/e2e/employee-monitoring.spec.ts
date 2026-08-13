@@ -76,7 +76,7 @@ test("employee happy path: start → permission → warming-up → reading → e
   }).toPass({ timeout: 30_000 });
 
   // ── a smoothed band lands (the first "reading") ─────────────────────────────────────────
-  await expect(page.getByText("You're calm right now")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText("Looking calm")).toBeVisible({ timeout: 30_000 });
   await expect(page.getByTestId("bloom")).toHaveAttribute("data-tone", "ease");
   // No number/gauge is ever rendered (FR-015) — the page shows no percent sign.
   await expect(page.locator("body")).not.toContainText("%");
