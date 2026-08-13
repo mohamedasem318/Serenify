@@ -10,7 +10,7 @@
 # `SyntaxError: Invalid or unexpected token` with NO stack and no filename — which reads
 # as anything but a line-ending problem, and cost #218 a wrong diagnosis (an
 # outside-the-root import from a repo path containing a space; both halves were refuted
-# by isolated repro on 2026-08-14, see docs/triage/2026-08-14-test-suite-recon.md).
+# by isolated repro on 2026-08-14).
 #
 # The concrete casualty was `scripts/sync-hosted-email-templates.mjs`, imported by
 # `apps/web/tests/unit/ops/hosted-email-template-sync.test.ts`, which failed on every

@@ -93,6 +93,23 @@ Four docs, four jobs. A change usually touches more than one, and the failure mo
 - Escape hatch for the hotfix case: a `Progress-Freshness: override (<reason>)` trailer on a commit
   downgrades the failure to a warning. It is a commit trailer so that using it leaves a permanent mark.
 
+## Records are self-contained
+
+**`docs/DECISIONS.md` and `docs/PROGRESS.md` must be understandable on their own.** An entry states
+its own conclusion, its own evidence and its own date. It never delegates any of that to a working
+document a reader may not have.
+
+- **Triage docs are scratch.** `docs/triage/` is gitignored. A recon, spike or diagnosis note exists
+  to work a problem out; it is not a record, and a fresh clone will not have it.
+- **Nothing permanent may depend on one.** Before citing a triage file from DECISIONS, PROGRESS,
+  BACKLOG, MODELS or a source comment, fold what you need into the citing text. Keeping the filename
+  afterwards as a provenance note is fine — the entry just has to stand without it.
+- **Preserve measured vs inferred.** Absorbing evidence must not flatten it. If a number was measured
+  at n=1 on a contended laptop, the entry says so; "we measured X" in place of "one run on one
+  machine showed X" is a downgrade, not a summary.
+- **One grandfathered exception**: `docs/triage/mobile-capture-diagnosis.md` stays tracked because
+  source comments in `apps/web/lib/capture/constraints.ts` cite it. Do not add a second.
+
 ## Backlog ↔ Issues
 
 `docs/BACKLOG.md` is the source of truth and is mirrored 1:1 to GitHub Issues.

@@ -7183,9 +7183,10 @@ containers.
 
 **No replacement ratio is asserted.** The 720p numbers show the two containers are
 comparable on the wire at the shipped settings; they do not establish a new multiplier in
-either direction, and nothing here should be quoted as one. (The 0.75 Mbit/s VP9 figure in
-`docs/triage/2026-08-06-bounded-upload-measurement.md` is **Chrome on a laptop**, a
-different encoder on a different device, and cannot stand in for an iOS Safari number.)
+either direction, and nothing here should be quoted as one. (The one other 720p figure on record —
+**~0.75 Mbit/s VP9**, measured 2026-08-06 during the bounded-upload work — is **Chrome on the dev
+laptop**: a different encoder on a different device, and it cannot stand in for an iOS Safari
+number.)
 
 **The decision itself is unchanged.** fMP4-only on Apple WebKit stands — but on **decode
 correctness alone**: Safari's `isTypeSupported` reports WebM support it cannot honour, and
@@ -7200,7 +7201,8 @@ specs and smoke-test records are point-in-time and are deliberately **not** retr
 
 **Cross-references**: the two 2026-08-05 Phase-2 entries above (constraints half, PR #246;
 container half, PR #243); issue #89 (still open — pending the real-device ST-08-2 re-run);
-`docs/triage/mobile-capture-diagnosis.md`; `docs/triage/2026-08-06-bounded-upload-measurement.md`.
+`docs/triage/mobile-capture-diagnosis.md`; the 2026-08-06 bounded-upload measurement, whose method
+and results are recorded in `docs/PROGRESS.md` (#247 entry).
 
 ---
 
@@ -7628,7 +7630,8 @@ reuse off.
 
 ## 2026-08-14 — a grant that returns without a repo change is a stale volume until a reset says otherwise
 
-**Status**: Accepted. Corrects a reading in `docs/triage/2026-08-14-test-suite-recon.md`.
+**Status**: Accepted. Corrects a reading taken during a 2026-08-14 test-suite recon (read-only
+working notes, deliberately uncommitted).
 
 **Context**: #208 records that `service_role` holds no DML on any `public` table, so
 `globalSetup` dies at `42501` and no e2e spec runs. The 2026-08-14 recon measured the
