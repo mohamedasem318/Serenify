@@ -2323,12 +2323,61 @@ and `docs/DECISIONS.md` 2026-07-24 (Amendment 17).
 Four items surfaced while implementing feature 013 that are **not** 013's work. They are logged
 here so the feature ships without absorbing them, and each is mirrored to its own GitHub issue.
 
-### Dependabot: 21–22 open vulnerability alerts on `main` — pre-existing, unrelated to 013, and `serenify.tech` is live (#176)
-**Status**: tech-debt (`type:tech-debt` / `area:web` / `area:infra`) — **OPEN.** GitHub issue **#176 OPEN**.
+### Dependabot: 2 open alerts on `main`, both deliberately deferred — `h2` and `cryptography` in `apps/api/uv.lock` (#176)
+**Status**: tech-debt (`type:tech-debt` / `area:infra`) — **OPEN**, deliberately. GitHub issue **#176 OPEN**.
 **Category**: dependencies / security posture
-**Observed**: 2026-07-27. Surfaced by GitHub during a `git push` in the feature-013 window; the
-counts below were then verified directly against the Dependabot API.
-**Description**: **Two GitHub surfaces disagree, concurrently, and both were read on 2026-07-27.**
+**Observed**: 2026-07-27. **Rewritten 2026-08-12** — everything below the horizontal rule is the
+superseded 2026-07-27/07-28 record, kept because its reasoning was sound when written and the way
+it was overtaken is the useful part.
+
+**Current state, verified against the Dependabot API on 2026-08-12: 2 open** (was 12 that morning,
+21–22 on 2026-07-27). Lifetime total is 66 — `48 fixed + 4 auto_dismissed + 12 open` was the
+2026-08-12 reading, and a query without `state=open` returns the lifetime figure, which is how a
+"64 total" once got mistaken for an open count. **Re-count from the API before acting on this
+entry. That instruction has now paid off three separate times.**
+
+**Closed 2026-08-12 by PR (batches 1 and 3), 10 alerts:**
+- **Batch 1 — `next` 16.2.11 → 16.3.0 + root lockfile refresh** closed 7: `postcss` ×3
+  (GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849, GHSA-fxqj-rqcc-2cmp), `nanoid` ×2
+  (GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8), `js-yaml` ×1 (GHSA-5p4m-2wfm-xmqj), `sharp` ×1
+  (GHSA-f88m-g3jw-g9cj). **The 2026-07-28 note below predicted this needed "a `next` release that
+  itself moves its vendored `postcss`, or a deliberate lockfile override". The first of those
+  happened**: `next@16.3.0` pins `postcss@8.5.23` (was a hard `8.4.31` pin through all of 16.2.x)
+  and widens `sharp` to `^0.35.3`. The nested `node_modules/next/node_modules/postcss` deduped away
+  entirely. No override was needed.
+- **Batch 3 — `video/package-lock.json`** closed 3: `nanoid` → 3.3.18, `js-yaml` → 4.3.1,
+  `fast-uri` → 3.1.5. Pure lockfile regeneration; `video/` is outside the workspaces and outside CI.
+
+**Still open, and staying open on purpose:**
+- **`h2` 4.3.0 → 4.4.1, medium** (GHSA-6hr6-w5qg-qmwg, `apps/api/uv.lock`). Transitive under
+  `httpx`. **Not deferred on risk — deferred on cost:** it is a one-line `uv lock` change, but it
+  rebuilds the API image and burns an ACA revision, so it should ride along with the next API
+  deploy rather than trigger one. **Not exercised**: `httpx` only loads `h2` when constructed with
+  `http2=True`, and `packages/llm-client/src/llm_client/_openai_compat.py:77` constructs
+  `httpx.AsyncClient(timeout=…)` without it; the advisory also targets servers accepting duplicate
+  `Host` headers, and we are a client.
+- **`cryptography` 48.0.1 → 50.0.0, high** (GHSA-g6cj-pr64-35w5, `apps/api/uv.lock`). **Deliberately
+  not done, and this is not an oversight.** Two major versions of a compiled crypto library sitting
+  directly under the API's JWT verification — the one control keeping `/anchor` from accepting
+  unauthenticated requests. The vulnerable function is **PKCS#7 `EnvelopedData` decryption**, which
+  PyJWT never calls and `apps/api` never imports; `cryptography` is present only because
+  `pyjwt[crypto]` needs it for ES256 verification of Supabase tokens. So the bump buys a green badge
+  and nothing else, while its failure mode is auth changing behaviour quietly. `pyjwt` constrains
+  only `cryptography>=3.4.0`, so it *will* resolve — resolving is not verifying. **If it is ever
+  done it gets its own branch, alone, with the API's JWT tests as the gate.**
+
+**Carried forward, still true:**
+- The two `postcss` `sourceMappingURL` advisories were **distinct from #36** (GHSA-qx2v-qp2m-jg93).
+  They are now closed on their own merits by Batch 1 — **#36 never covered them**, and nothing here
+  should be read as #36 having done so.
+- `brace-expansion` (GHSA-mh99-v99m-4gvg, GHSA-rgw5-rvv9-x895) still shows in `npm audit` but is
+  **auto-dismissed** in Dependabot, not open. Out of scope; not touched by these batches.
+
+---
+
+**Superseded record (2026-07-27 → 2026-07-28), left in place deliberately:**
+
+**Two GitHub surfaces disagree, concurrently, and both were read on 2026-07-27.**
 The push-time banner (`remote:` output on `git push`) says **22 open (11 high, 11 moderate)**. The
 Dependabot REST API, queried the same day, says **21 open (11 high, 10 moderate)**, spanning **12
 distinct advisories** across **three packages**. This is not drift between two dates — it is the

@@ -3103,3 +3103,21 @@ for a spec-recorded ML gate, and a reader following either would have found noth
   is a backstop nobody could act on. Repointed to the 008 spec line; the obligation is unchanged.
 
 Both were found by the 2026-08-10 issue-catalogue recon, not by anything automated.
+
+## 2026-08-12 — no spec amended; the Dependabot record in BACKLOG #176 rewritten
+
+Dependabot batches 1 and 3 (10 alerts closed) **amend no spec**. Recorded here only because
+`docs/BACKLOG.md` **#176** was rewritten rather than updated: its count, package list, fix path and
+its "do not upgrade while 013 is unmerged" caveat were all overtaken, and a reader following the
+entry as written would have acted on a state that no longer existed.
+
+- The 2026-07-28 note said clearing the `postcss` pair needed "a `next` release that itself moves
+  its vendored `postcss`, or a deliberate lockfile override". **The first happened**: `next@16.3.0`
+  pins `postcss@8.5.23`, replacing the hard `8.4.31` pin carried through all of 16.2.x. No override.
+- The superseded 2026-07-27/07-28 text is **kept in place beneath a rule**, unedited, so the drift
+  and the reasoning that was overtaken both stay legible.
+- Two alerts stay open **deliberately**, with reasoning in the entry — `h2` (deferred to the next
+  API deploy, on cost not risk) and `cryptography` 48 → 50 (two majors under JWT verification,
+  vulnerable function never called).
+
+No constitution amendment. Cross-references: `docs/BACKLOG.md` #176; GitHub #176.
