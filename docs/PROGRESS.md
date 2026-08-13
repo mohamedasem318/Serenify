@@ -4,6 +4,35 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Records stand on their own — triage docs untracked, rule written down
+
+**Branch**: `docs/self-contained-records` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
+
+**Shipped**: a standing rule in `CLAUDE.md` and `AGENTS.md` — DECISIONS and PROGRESS entries carry
+their own conclusion, evidence and date, and never delegate them to a working document a reader may
+not have. `docs/triage/` is now gitignored, and the six citations that pointed into it from permanent
+records were rewritten to absorb what they were borrowing: the bounded-upload measurement's **method
+and n=1 rig caveat** into the #247 PROGRESS entry, the 2026-08-10 catalogue recon's **scope and
+classification scheme** into the backlog-hygiene entry, and the 0.75 Mbit/s VP9 figure's **"Chrome on
+the dev laptop"** provenance into the 2026-08-07 wire-weight correction. Measured-vs-inferred was
+preserved in each, not flattened. Three orphaned triage docs untracked
+(`2026-08-06-bounded-upload-measurement`, `2026-08-06-upload-growth-spike`,
+`2026-08-10-issue-catalogue-recon`); all three remain on disk locally.
+
+**Two dangling pointers fixed**, both live on `main`: `DECISIONS.md` and `.gitattributes` each cited
+`2026-08-14-test-suite-recon.md`, which was never committed.
+
+**Knowingly left**: `docs/triage/mobile-capture-diagnosis.md` **stays tracked** and is
+gitignore-exempt. It is cited by two source files (`apps/web/lib/capture/constraints.ts` and its
+test) as well as `MODELS.md` and `BACKLOG.md` — untracking it would need code-comment edits, which
+this docs-only change deliberately did not make. Recorded as the one grandfathered exception in both
+instruction files.
+
+**NOT verified**: nothing was run — no tests, no build, no browser. Docs, `.gitignore` and
+`.gitattributes` only; `.gitattributes` changed by one comment line with no rule touched.
+
+---
+
 ## Test suite — four independent causes, from the 2026-08-14 recon
 
 **Branch**: `fix/test-suite-four-causes` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
@@ -77,8 +106,10 @@ EPERMs on a locked `lightningcss` `.node` until leftover Serenify node processes
 **Closes #34 #36 #39 #46 #56 #58 #66 #68 #72 #77 #80 #128 #193 #205.** Open issues 74 → 60.
 
 **No code changed, no dependency changed** — every action closed an issue or corrected a document
-that disagreed with reality. Verdicts came from `docs/triage/2026-08-10-issue-catalogue-recon.md`,
-each re-verified against `main` first. **Seven were fixed months ago and never closed out** (#36 #46
+that disagreed with reality. Verdicts came from a read-only catalogue recon on 2026-08-10 covering
+all **74 issues then open** — each checked against `main`, BACKLOG, DECISIONS, PROGRESS and the
+Principle VIII roadmap, and classified `already fixed` / `still real` / `stale as written` /
+`unclear` — and each was re-verified against `main` again before it was acted on here. **Seven were fixed months ago and never closed out** (#36 #46
 #56 #58 #68 #72 #77) — absorbed into feature 007's re-skin or the August mobile-capture work, where
 the fix landed under another umbrella and the paired entry went untouched. **Five closed on their
 own terms** (#34 #39 #80 #193 #205). **#66** met its criterion on production on both platforms.
@@ -214,7 +245,14 @@ roughly halving encode, upload and tail-decode work.
 
 ### Measured — a 13-minute live session, real webcam at a verified 1280×720
 
-Full report in `docs/triage/2026-08-06-bounded-upload-measurement.md`.
+**Method** (2026-08-06, n=1): one 13-minute session, real Chrome driving the real app against the
+real FastAPI + ml-video stack and a local Supabase reset to current migrations — no mocks anywhere on
+the measured path, real RLS-as-user writes, real model predict. 75 uploads: 7 `full` during warm-up
+(growing 0.74 → 5.93 MB), then 68 `tail` across ~12 minutes of steady state. Chrome's fake-camera
+flags were attempted and did **not** engage in this environment, so the accepted run used the
+physical webcam with a real face in frame throughout. Measured **on the dev laptop**, which also runs
+the encoder, dev server and uvicorn, so the absolute server numbers carry rig contention a
+deployment does not; the deploy target must be re-measured before they are trusted.
 
 | | Before | After |
 |---|---|---|
@@ -366,7 +404,7 @@ BACKLOG item in this docs-only change** — flagged here for the call.
 **Closes #201, #178, #184, #203, #197, #202, #179, #209, #211.**
 **Date**: 2026-08-05. **Backfilled 2026-08-10.**
 
-Selected from the 2026-08-05 triage recon (`docs/triage/2026-08-05-july-issue-recon.md`, kept
+Selected from a read-only triage pass over the July issue backlog on 2026-08-05 (working notes kept
 uncommitted). **#209 shipped alone on purpose** so it is revertible on its own; **#198** and **#213**
 were deliberately left untouched.
 

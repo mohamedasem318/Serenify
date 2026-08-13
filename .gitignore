@@ -135,3 +135,11 @@ st1-shots/
 graphify-out/
 .vercel
 .env*.local
+
+# Triage docs are scratch: written to work a problem out, not to be a record.
+# DECISIONS.md and PROGRESS.md must stand on their own (see CLAUDE.md / AGENTS.md
+# "Records are self-contained"), so nothing permanent may depend on one of these.
+# The one exception below predates that rule and is cited by SOURCE COMMENTS
+# (apps/web/lib/capture/constraints.ts) as well as MODELS.md and BACKLOG.md.
+docs/triage/*
+!docs/triage/mobile-capture-diagnosis.md
