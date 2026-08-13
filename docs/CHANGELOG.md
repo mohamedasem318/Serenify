@@ -3135,3 +3135,26 @@ category itself), so no consent revision and no re-prompt. Enum keys and CHECK c
 unchanged; no migration. Supersedes #92. The submitted pitch render keeps the old labels —
 recorded in `docs/video/serenify-pitch-video-beat-sheet.md`, which itself moves to the new
 vocabulary. Reasoning: `docs/DECISIONS.md` 2026-08-13.
+
+## 2026-08-14 — two BACKLOG entries rewritten, not updated: #218's diagnosis and #208's status
+
+The test-suite fix **amends no spec**. Recorded here for the same reason as the Dependabot
+entry above: two `docs/BACKLOG.md` entries were **rewritten rather than updated**, because
+following either as written would have led a reader somewhere false.
+
+- **#218** — the filed diagnosis (Vitest failing on an outside-root import, from a repo path
+  containing a space) was **refuted** by isolated repro: a trivial `.mjs` imported the same way
+  from a path with a space passes. The cause is **shebang + CRLF** — Vite's shebang strip is
+  `\n`-only, so on a Windows CRLF checkout the surviving `\r` reaches the parser. The entry now
+  carries the repro table and the real cause; the GitHub issue body was rewritten **before**
+  closing, so the wrong read is not left as the record. Fixed by `.gitattributes`.
+- **#208** — the 2026-08-14 recon read it as no longer reproducing and inferred an upstream
+  Supabase CLI fix, while flagging that it had **not** run `supabase db reset`. That caveat was
+  the answer: against a fresh `supabase db reset --local` on CLI 2.114.0 it reproduces
+  **byte-for-byte**. The measurement had come from a stale local volume granted out-of-band.
+  The entry now records the re-verification, the manual local grant that unblocks e2e, and the
+  fact that the grant is **not** a fix. **#208 stays open**; the CLI is pinned so the next
+  measurement is against a known stack.
+
+No constitution amendment. Reasoning: `docs/DECISIONS.md` 2026-08-14. Cross-references:
+`docs/BACKLOG.md` #208, #218, #263, #264; GitHub #218 (closed), #208 (open).
