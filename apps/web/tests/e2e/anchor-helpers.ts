@@ -377,11 +377,58 @@ export async function createCalibratedEmployee(fullName = "Recalibrate Test") {
   return emp;
 }
 
-/** Sign in and land directly on /app (caller's user must have full_name set). */
+/**
+ * Pre-set the recalibration prompt's permanent latch so the modal never opens.
+ *
+ * THE PROBLEM IT SOLVES. `components/anchor/recalibration-prompt.tsx` (#256) opens a
+ * modal on `/app` for EVERY employee with an anchor — deliberately, with no cohort
+ * targeting and no cutoff timestamp (docs/DECISIONS.md, 2026-08-10: every anchor
+ * recorded before the capture settings moved is genuinely stale, so everyone is the
+ * cohort). It suppresses itself only through a session dismissal or the localStorage
+ * latch `broadcastAnchorCaptured()` writes on a real capture. Playwright hands every
+ * test a fresh context, so both are always empty and the modal is open on every `/app`
+ * load. Radix's overlay makes everything behind it non-actionable, so specs that never
+ * mention the prompt fail on `boundingBox()`/`click()` timeouts against elements that
+ * are present in the DOM and simply unreachable — 8 chromium specs, from 2026-08-10
+ * until this seam landed.
+ *
+ * WHY THE LATCH AND NOT THE DISMISSAL KEY. This is the same state a user reaches by
+ * recalibrating, which is the state nearly every spec means to be in: an anchored
+ * employee getting on with the app. The session-dismissal key would work equally well
+ * here but it is SHARED with the calibration banner (one key, two mutually-exclusive
+ * surfaces), so writing it from a helper would quietly pre-dismiss the banner too and
+ * `anchor-banner.spec.ts` would be asserting against a seam rather than the product.
+ *
+ * NOT a blanket suppression: `recalibration-prompt.spec.ts` opts out via
+ * `signInToApp(page, creds, { showRecalibrationPrompt: true })` and drives the real
+ * modal, and the component's own unit tests are untouched.
+ */
+export async function suppressRecalibrationPrompt(page: Page) {
+  await page.addInitScript(() => {
+    // try/catch because init scripts also run on documents where storage is
+    // unavailable (about:blank, opaque origins) — throwing there would fail the
+    // navigation rather than the assertion the spec cares about.
+    try {
+      localStorage.setItem("serenify-recalibration-prompt-done", "1");
+    } catch {
+      /* no storage on this document — the prompt cannot render there either */
+    }
+  });
+}
+
+/**
+ * Sign in and land directly on /app (caller's user must have full_name set).
+ *
+ * Suppresses the recalibration modal by default — see `suppressRecalibrationPrompt`.
+ * Pass `{ showRecalibrationPrompt: true }` to exercise the prompt itself.
+ */
 export async function signInToApp(
   page: Page,
   creds: { email: string; password: string },
+  { showRecalibrationPrompt = false }: { showRecalibrationPrompt?: boolean } = {},
 ) {
+  // BEFORE the first goto: `addInitScript` only applies to navigations that follow it.
+  if (!showRecalibrationPrompt) await suppressRecalibrationPrompt(page);
   await page.goto("/login");
   await page.getByLabel("Email").fill(creds.email);
   await page.getByLabel("Password", { exact: true }).fill(creds.password);
