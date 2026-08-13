@@ -1,5 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
+import { assertPortFree } from "./tests/port-guard";
+
 /**
  * Layout-only Playwright config (feature 009) — pure rendered-geometry guards that need a real
  * browser with real layout but NO database. Deliberately separate from `playwright.config.ts`:
@@ -15,6 +17,10 @@ import { defineConfig, devices } from "@playwright/test";
 
 const PORT = Number(process.env.PLAYWRIGHT_PORT ?? 3000);
 
+// See tests/port-guard.ts — runs before Playwright's own port error, whose suggested
+// remedy is the reuse this config deliberately disables.
+assertPortFree(PORT, "playwright.layout.config.ts");
+
 export default defineConfig({
   testDir: "./tests/layout",
   fullyParallel: true,
@@ -29,7 +35,9 @@ export default defineConfig({
   webServer: {
     command: `npm run dev -- --port ${PORT}`,
     url: `http://localhost:${PORT}`,
-    reuseExistingServer: !process.env.CI,
+    // Never reuse — same reasoning as playwright.config.ts (#261): an ECONNRESET dev
+    // server keeps listening and poisons every later run. tests/port-guard.ts.
+    reuseExistingServer: false,
     timeout: 120_000,
     env: {
       NEXT_PUBLIC_SUPABASE_URL:
