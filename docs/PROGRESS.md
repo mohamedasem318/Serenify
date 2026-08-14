@@ -4,6 +4,28 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Unauthorized SpecKit directories removed — 022, 023, 024; the approval rule written down
+
+**Branch**: `chore/remove-unauthorized-specs` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
+
+**Shipped**: `specs/022-cold-start-readiness/` and `specs/023-brand-email-social-preview/` (created
+unprompted by a Codex session with hand-picked numbers) and `specs/024-test-data-seeding/` (a
+bounded task, not a feature) are deleted, along with the never-pushed local `024-test-data-seeding`
+branch. SpecKit is now reserved, in `CLAUDE.md` + `AGENTS.md`, for features Mohamed explicitly
+approves; numbers are workflow-assigned; the next feature is `014-recommendations`. The one piece
+of evidence unique to the deleted files — the 2026-07-13 production smoke sign-off — was absorbed
+into the existing PROGRESS/CHANGELOG entries and, self-contained, into open issue #139 (BACKLOG +
+GitHub). The 024 seeding decision (Option B, a purpose-made seeding identity) is recorded in
+`docs/DECISIONS.md` 2026-08-14. #187 recategorised (its test file shipped with PR #143, not
+feature 009) and its issue resynced. Shipped code from PRs #143/#144 untouched.
+
+**Verified**: repo-wide search for the three directory paths and feature slugs returns zero hits
+outside published GitHub history and untracked scratch (`RECON_2026-07-21.md`, left deliberately).
+
+**NOT verified / not run**: no tests, no build — docs, instruction files, and deletions only.
+
+---
+
 ## Records stand on their own — triage docs untracked, rule written down
 
 **Branch**: `docs/self-contained-records` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
@@ -992,11 +1014,13 @@ MINOR), replacing the planned DigitalOcean Droplet.
 
 ### Verification
 
-**Production smoke test — PASS, 2026-07-13** (`specs/022-cold-start-readiness/smoke-tests.md`), run
-against the real production Azure API and cloud Supabase project from a protected branch preview:
-calibration woke the API in under one minute, check-in completed normally, the first reading arrived
-at **≈1:36** and updated again within about 10 seconds. Approval recorded: *"it worked flawlessly."*
-The temporary preview CORS origin was removed after the test.
+**Production smoke test — PASS, 2026-07-13**, run against the real production Azure API and cloud
+Supabase project from a protected branch preview: calibration woke the API in under one minute
+(one measured cold wake from zero replicas: **46.68 s**, n=1; warm **0.34 s**), check-in completed
+normally, the first reading arrived at **≈1:36** and updated again within about 10 seconds.
+Approval recorded: *"it worked flawlessly."* The temporary preview CORS origin was removed after
+the test. (Sign-off originally lived in the 022 spec folder's smoke-tests file, removed 2026-08-14
+— `docs/DECISIONS.md` 2026-08-14; this entry is the surviving record.)
 
 ### Three things a future reader needs to know
 
@@ -1061,6 +1085,9 @@ long since fixed in code, never reconciled.
 **Deviation from Principle VIII, recorded not excused**: no `specs/0NN-…` folder was produced;
 `specs/` jumps `012 → 022`. This shipped against ad-hoc `docs/superpowers/` plan + design docs
 instead of the standard SpecKit artifact set. The two PRs that followed both got proper folders.
+*[2026-08-14: those two folders (022, 023) were themselves removed — the numbers were hand-picked
+by an unprompted Codex session, not assigned by the SpecKit workflow. The deviation record above
+stands as written; see `docs/DECISIONS.md` 2026-08-14.]*
 
 25 files changed, 930 insertions, 331 deletions. Co-authored by all three teammates.
 
@@ -1070,8 +1097,9 @@ instead of the standard SpecKit artifact set. The two PRs that followed both got
 
 **Branch**: `fix/cold-start-readiness` → merged to `main` via **PR #143** (squash `90171c3`,
 2026-07-13).
-**Status**: **done — closes BACKLOG #50 / GitHub issue #50.** SpecKit folder:
-`specs/022-cold-start-readiness/`.
+**Status**: **done — closes BACKLOG #50 / GitHub issue #50.** (Its SpecKit folder, numbered 022,
+was removed 2026-08-14 as unauthorized — `docs/DECISIONS.md` 2026-08-14; this entry is the
+surviving record of what shipped.)
 **Date**: 2026-07-13. **Backfilled 2026-07-22.**
 
 **The problem `minReplicas=0` created**: scale-to-zero controls credit but makes the first request
@@ -1112,8 +1140,9 @@ blanket rule, recorded here because the omission is now permanent in history.
 
 **Branch**: `fix/brand-email-social-preview` → merged to `main` via **PR #144** (squash `81b4775`,
 2026-07-13).
-**Status**: **done — closes BACKLOG #38 / GitHub issue #38.** SpecKit folder:
-`specs/023-brand-email-social-preview/`.
+**Status**: **done — closes BACKLOG #38 / GitHub issue #38.** (Its SpecKit folder, numbered 023,
+was removed 2026-08-14 as unauthorized — `docs/DECISIONS.md` 2026-08-14; this entry is the
+surviving record of what shipped.)
 **Date**: 2026-07-13. **Backfilled 2026-07-22.**
 
 **What shipped**:
