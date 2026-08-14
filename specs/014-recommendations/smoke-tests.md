@@ -1,6 +1,6 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: OPEN — no results recorded yet.** Authored at the tasks stage (plan
+**Status: 1 of 6 recorded (ST-1); remainder open.** Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -21,15 +21,280 @@ the file.
 
 **Check**: the owner reads their own rows; a second employee, a team-lead, and an admin
 each read **zero** rows; `anon` errors; an UPDATE on an identity column (`item_id`)
-fails on grant; DELETE is impossible for every role (SC-003, FR-025,
-contracts/recommendation-storage-rls.md §Verification).
+fails on grant; **no DELETE path is reachable by any client role** (`authenticated` or
+`anon`) (SC-003, FR-025, contracts/recommendation-storage-rls.md §Verification).
 
 **Method**: local Supabase, psql per-transaction impersonation — `SET LOCAL ROLE` +
 `set_config('request.jwt.claims', …, true)` (the feature-012 validated method). Seed one
 pick row as user A; probe as A, as user B, as a team-lead, as an admin, as `anon`;
 attempt `UPDATE … SET item_id` and `DELETE` as A. Transcript pasted below.
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS — every sub-check.** Run **by agent** (not a Mohamed
+attestation) on 2026-08-15, T003.
+
+_Method as actually run._ Local stack only — `supabase status` → `DB_URL
+postgresql://postgres:postgres@127.0.0.1:54322/postgres`. No cloud project was touched.
+`npx supabase db reset --local` re-applied all eighteen migrations, ending with
+`Applying migration 20260815090000_recommendation_picks.sql...` (clean, no errors). The
+host has no `psql`, so every statement ran inside the DB container:
+`docker exec -i supabase_db_Serenify psql -U postgres -d postgres -f …`.
+
+_Fixtures._ Four users inserted into `auth.users` as `postgres` (the
+`on_auth_user_created` trigger seeds `public.profiles`), then `profiles.role` /
+`manager_id` set so the hierarchy is real:
+
+```
+                  id                  |  full_name  |   role    |              manager_id
+--------------------------------------+-------------+-----------+--------------------------------------
+ aaaaaaaa-0000-4000-8000-000000000001 | Probe A     | employee  | cccccccc-0000-4000-8000-000000000003
+ dddddddd-0000-4000-8000-000000000004 | Probe Admin | admin     |
+ bbbbbbbb-0000-4000-8000-000000000002 | Probe B     | employee  | cccccccc-0000-4000-8000-000000000003
+ cccccccc-0000-4000-8000-000000000003 | Probe Lead  | team_lead | dddddddd-0000-4000-8000-000000000004
+```
+
+A and B both report to the Lead, who reports to the Admin — the manager layer has every
+hierarchy edge it would need if any cross-user path existed.
+
+**Every probe prints `current_user` and `auth.uid()` alongside its result**, so the
+transcript itself proves which identity each zero-count ran under rather than asking the
+reader to trust the surrounding `\echo`. Output below is genuine psql output; only the
+`BEGIN` / `SET` / `ROLLBACK` echo lines and blank rows are trimmed.
+
+_Seed — the pick row is inserted by A herself_, not by `postgres`, so the probe also
+proves the `rp_insert_self` policy and the INSERT grant, not just the read side:
+
+```
+BEGIN;
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claims',
+  '{"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}', true);
+SELECT current_user AS db_role, auth.uid() AS acting_as;
+    db_role    |              acting_as
+---------------+--------------------------------------
+ authenticated | aaaaaaaa-0000-4000-8000-000000000001
+
+INSERT INTO public.recommendation_picks (user_id, local_day, episode_id, item_id, category, source)
+VALUES ('aaaaaaaa-0000-4000-8000-000000000001', current_date,
+        'eeeeeeee-0000-4000-8000-00000000000e','box-breathing','breathing_grounding','reading')
+RETURNING id, user_id, item_id;
+                  id                  |               user_id                |    item_id
+--------------------------------------+--------------------------------------+---------------
+ 08ed3281-c9bd-48ae-a429-e55ed25a9714 | aaaaaaaa-0000-4000-8000-000000000001 | box-breathing
+INSERT 0 1
+COMMIT
+```
+
+_Probe transcript_ (each probe is its own `BEGIN; SET LOCAL ROLE …; set_config(…); …;
+ROLLBACK;`):
+
+```
+=== P1 owner (user A) SELECT -> expect her row ===
+ claims_set: {"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}
+    db_role    |              acting_as               | rows_visible
+---------------+--------------------------------------+--------------
+ authenticated | aaaaaaaa-0000-4000-8000-000000000001 |            1
+
+=== P2 second employee (user B) SELECT -> expect 0 ===
+ claims_set: {"sub":"bbbbbbbb-0000-4000-8000-000000000002","role":"authenticated"}
+    db_role    |              acting_as               | profile_role | rows_visible
+---------------+--------------------------------------+--------------+--------------
+ authenticated | bbbbbbbb-0000-4000-8000-000000000002 | employee     |            0
+
+=== P3 team lead (A's manager) SELECT -> expect 0 ===
+ claims_set: {"sub":"cccccccc-0000-4000-8000-000000000003","role":"authenticated"}
+    db_role    |              acting_as               | profile_role | rows_visible
+---------------+--------------------------------------+--------------+--------------
+ authenticated | cccccccc-0000-4000-8000-000000000003 | team_lead    |            0
+
+=== P4 admin SELECT -> expect 0 ===
+ claims_set: {"sub":"dddddddd-0000-4000-8000-000000000004","role":"authenticated"}
+    db_role    |              acting_as               | profile_role | rows_visible
+---------------+--------------------------------------+--------------+--------------
+ authenticated | dddddddd-0000-4000-8000-000000000004 | admin        |            0
+
+=== P5 anon SELECT -> expect permission denied ===
+ db_role
+---------
+ anon
+ERROR:  permission denied for table recommendation_picks
+HINT:  Grant the required privileges to the current role with: GRANT SELECT ON public.recommendation_picks TO anon;
+
+=== P5b serenify_seeder SELECT -> expect permission denied ===
+     db_role
+-----------------
+ serenify_seeder
+ERROR:  permission denied for table recommendation_picks
+
+=== P8 user B UPDATES A's row on a GRANTED column -> expect UPDATE 0 (RLS, not grant) ===
+ claims_set: {"sub":"bbbbbbbb-0000-4000-8000-000000000002","role":"authenticated"}
+    db_role    |              acting_as
+---------------+--------------------------------------
+ authenticated | bbbbbbbb-0000-4000-8000-000000000002
+UPDATE 0
+
+=== P7 POSITIVE CONTROL: user A UPDATEs the same granted column -> expect UPDATE 1 ===
+ claims_set: {"sub":"aaaaaaaa-0000-4000-8000-000000000001","role":"authenticated"}
+    db_role    |              acting_as
+---------------+--------------------------------------
+ authenticated | aaaaaaaa-0000-4000-8000-000000000001
+UPDATE 1
+```
+
+The grant-refusal and DELETE probes, run as user A under the same impersonation shape
+(`SET LOCAL ROLE authenticated` + A's claims). These fail at the **grant** layer, before
+RLS is consulted, so `current_user` is the whole identity that matters:
+
+```
+=== P6 user A UPDATE item_id (identity column) -> expect permission denied ===
+ERROR:  permission denied for table recommendation_picks
+HINT:  Grant the required privileges to the current role with: GRANT UPDATE ON public.recommendation_picks TO authenticated;
+
+=== P6b user A UPDATE each remaining identity/provenance column ===
+ERROR:  permission denied for table recommendation_picks     -- SET user_id = <B>
+ERROR:  permission denied for table recommendation_picks     -- SET local_day = current_date - 1
+ERROR:  permission denied for table recommendation_picks     -- SET episode_id = gen_random_uuid()
+ERROR:  permission denied for table recommendation_picks     -- SET category = 'movement'
+ERROR:  permission denied for table recommendation_picks     -- SET source = 'confirmed'
+ERROR:  permission denied for table recommendation_picks     -- SET suggested_at = now()
+
+=== P9 DELETE as user A -> expect permission denied ===
+ERROR:  permission denied for table recommendation_picks
+HINT:  Grant the required privileges to the current role with: GRANT DELETE ON public.recommendation_picks TO authenticated;
+
+=== P9b DELETE repeated under the team-lead and admin profile identities, then as anon ===
+ERROR:  permission denied for table recommendation_picks     -- claims sub = Lead
+ERROR:  permission denied for table recommendation_picks     -- claims sub = Admin
+ERROR:  permission denied for table recommendation_picks     -- SET LOCAL ROLE anon
+
+=== P10 user A INSERT a row owned by user B -> expect RLS policy violation ===
+ERROR:  new row violates row-level security policy for table "recommendation_picks"
+
+=== P11 anon INSERT -> expect permission denied ===
+ERROR:  permission denied for table recommendation_picks
+HINT:  Grant the required privileges to the current role with: GRANT INSERT ON public.recommendation_picks TO anon;
+```
+
+_Live catalogue read-back_ — the posture as the database actually holds it, not as the
+migration text claims it. Genuine output of `pg_policy`, `pg_class`, `relacl` and
+`information_schema.column_privileges`:
+
+```
+--- 1. pg_policy: every policy on the table ---
+    polname     | polcmd | permissive |     roles     |               using_expr                |             with_check_expr
+----------------+--------+------------+---------------+-----------------------------------------+-----------------------------------------
+ rp_insert_self | a      | t          | authenticated |                                         | (( SELECT auth.uid() AS uid) = user_id)
+ rp_select_self | r      | t          | authenticated | (( SELECT auth.uid() AS uid) = user_id) |
+ rp_update_self | w      | t          | authenticated | (( SELECT auth.uid() AS uid) = user_id) | (( SELECT auth.uid() AS uid) = user_id)
+
+--- 2. pg_class: RLS enabled + forced ---
+       relname        | relrowsecurity | relforcerowsecurity
+----------------------+----------------+---------------------
+ recommendation_picks | t              | t
+
+--- 3. relacl: the raw table ACL ---
+         acl_entry
+----------------------------
+ postgres=arwdDxtm/postgres
+ service_role=Dxtm/postgres
+ authenticated=ar/postgres
+
+--- 4. column count on the table ---
+ total_columns
+---------------
+            15
+
+--- 5. information_schema.column_privileges, non-owner grantees ---
+    grantee    | privilege_type | n_columns | columns
+---------------+----------------+-----------+-------------------------------------------------------
+ authenticated | INSERT         |        15 | (all 15 columns)
+ authenticated | SELECT         |        15 | (all 15 columns)
+ authenticated | UPDATE         |         6 | confirmed_at, opened_at, outcome, outcome_at,
+               |                |           | swapped_away_at, updated_at
+ service_role  | REFERENCES     |        15 | (all 15 columns)
+
+--- 6. anon / PUBLIC anywhere in the ACL? ---
+ anon_or_public_acl_entries
+----------------------------
+                          0
+```
+
+(The two `(all 15 columns)` cells and the wrapped UPDATE list are the only edits to
+block 5 — the query returned each column name in full. The verbatim list is
+`category, confirmed_at, created_at, episode_id, id, item_id, local_day, opened_at,
+outcome, outcome_at, source, suggested_at, swapped_away_at, updated_at, user_id`.)
+
+Reading the ACL: three policies exactly, all `TO authenticated`, all permissive, and every
+predicate is the bare owner comparison — no `OR`, no second branch. `relrowsecurity` and
+`relforcerowsecurity` are both `t`. `authenticated=ar` is INSERT+SELECT only; the
+column-scoped UPDATE lives in `pg_attribute.attacl`, which is why it shows in block 5 and
+not in `relacl`. Neither `anon` nor a PUBLIC (`=…`) entry appears anywhere (block 6 = 0).
+
+`service_role=Dxtm` is the project's `pg_default_acl` baseline for public tables —
+`D`=TRUNCATE, `x`=REFERENCES, `t`=TRIGGER, `m`=MAINTAIN — i.e. no DML. `MAINTAIN` shows in
+`relacl` as `m` but has no `information_schema` row, which is why block 5 lists only
+`REFERENCES` for that grantee; that asymmetry is expected, not a discrepancy. This
+migration grants that role nothing. Factual note only — the wider posture question is not
+settled here.
+
+_Verdict per sub-check_:
+
+| # | Sub-check | Expected | Observed | Verdict |
+|---|---|---|---|---|
+| P1 | owner A SELECT | her row | 1 row, `acting_as` = A | **PASS** |
+| P2 | second employee B SELECT | 0 rows | 0, `acting_as` = B (`employee`) | **PASS** |
+| P3 | team-lead (A's manager) SELECT | 0 rows | 0, `acting_as` = Lead (`team_lead`) | **PASS** |
+| P4 | admin SELECT | 0 rows | 0, `acting_as` = Admin (`admin`) | **PASS** |
+| P5 | `anon` SELECT | error | permission denied | **PASS** |
+| P5b | `serenify_seeder` SELECT | error | permission denied | **PASS** |
+| P6 | A UPDATE `item_id` | fails on grant | permission denied | **PASS** |
+| P6b | A UPDATE the other six identity/provenance columns | fails on grant | permission denied ×6 | **PASS** |
+| P7 | A UPDATE `opened_at` (positive control) | succeeds | UPDATE 1 | **PASS** |
+| P8 | B UPDATE A's row, granted column | 0 rows (RLS) | UPDATE 0, `acting_as` = B | **PASS** |
+| P9 | DELETE as `authenticated` (user A) | fails | permission denied | **PASS** |
+| P9b | **P9 repeated under the team-lead and admin profile identities**, plus once as `anon` | fails each time | permission denied ×3 | **PASS** |
+| P10 | A INSERT a row owned by B | RLS violation | new row violates RLS policy | **PASS** |
+| P11 | `anon` INSERT | error | permission denied | **PASS** |
+
+**P9b is not three independent proofs.** `team_lead` and `admin` are `profiles.role`
+values, not database roles: all three attempts run under the same DB role as P9
+(`authenticated`, differing only in the `sub` claim). Since no DELETE grant exists for
+`authenticated` at all, the refusal is identical by construction. The row is kept because
+it rules out a policy or grant keyed on the profile identity, not because it adds a
+second mechanism.
+
+_Supplementary — constraints and indexes, same session_ (not part of ST-1's check, but
+run while the stack was live because the migration's correctness is cheap to prove here):
+
+| # | Attempt | Observed | Verdict |
+|---|---|---|---|
+| C1 | `outcome` with no `opened_at` | violates `rp_outcome_requires_opened` | **PASS** |
+| C2 | `outcome` with no `outcome_at` | violates `rp_outcome_iff_at` | **PASS** |
+| C3 | `outcome` **and** `swapped_away_at` | violates `rp_outcome_xor_swap` | **PASS** |
+| C4 | `item_id = 'Box Breathing'` | violates `recommendation_picks_item_id_check` | **PASS** |
+| C5 | second **active** pick, same user + day | duplicate key on `rp_one_active_per_user_day` | **PASS** |
+| C6 | same, after the first is swapped away | `INSERT 0 1` — the index is correctly partial | **PASS** |
+| C7 | UPDATE bumps `updated_at` | `updated_at > created_at` → `t` | **PASS** |
+
+_Caveats, recorded rather than smoothed over_:
+
+- **Locally, `postgres` is a superuser and bypasses RLS regardless of FORCE.** On the
+  hosted project `postgres` is a non-superuser table owner, where FORCE is what binds it.
+  So a `postgres` probe returning rows on this local stack is expected and is **not** a
+  posture break — which is exactly why every posture probe above runs under `SET LOCAL
+  ROLE authenticated` / `anon` / `serenify_seeder`, never as `postgres`.
+- `local_day` was written from the container's **UTC** `current_date` (2026-08-14) while
+  the host's local date was 2026-08-15. Immaterial — in production `local_day` is
+  client-supplied from the today-card boundary, never `current_date`.
+- psql interleaves stdout and stderr, so a few `ROLLBACK` lines printed before their
+  `ERROR` in the raw capture. Statement-to-outcome mapping above follows the `\echo`
+  markers and is unaffected.
+- Impersonation is `SET LOCAL ROLE` + `request.jwt.claims`, not a real PostgREST request
+  with a signed JWT. That is the feature-012 validated method and exercises the same RLS
+  and grant machinery, but it does not cover PostgREST's own request handling.
+- Fixtures were removed afterwards (`DELETE FROM auth.users WHERE email LIKE
+  'probe-%@example.test'` → `DELETE 4`); the pick row disappeared with them, which
+  incidentally confirms the `ON DELETE CASCADE` from `auth.users`. The local DB is back to
+  a clean post-reset state — `picks_left 0 | profiles_left 0 | users_left 0`.
 
 ---
 
