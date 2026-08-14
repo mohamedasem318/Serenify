@@ -36,9 +36,11 @@
   pick/swap budget, retention period for the new data class) be recorded as clarification
   items rather than decided, to be answered in `/speckit-clarify`. They are cross-listed in
   the spec's "Open items" section.
-- One missing input (not a decision): the approved state mock's path. No recommendations mock
-  exists in `docs/mockups/`; the spec is written from the brief's ten-state description and
-  flags the mock in Assumptions.
+- The approved state mock has been supplied and reconciled (2026-08-14): it now lives at
+  `docs/mockups/serenify-014-things-that-might-help-mock.html` (gitignored, local-only, per
+  mock convention). Its states match the spec; its behavioural additions are folded in as
+  FR-029–FR-031. Its one open question (in-session reachability of the confirmed pick) was
+  already answered by the brief and is covered by FR-011.
 - The spec deliberately references feature 012 semantics (dwell D-6, budget D-8) by behaviour,
   not by module or storage shape; the preferences seam is stated as a requirement without a
   designed shape, per the brief.

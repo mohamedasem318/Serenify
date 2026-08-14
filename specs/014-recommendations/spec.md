@@ -158,9 +158,15 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 - **FR-027**: The Privacy Policy MUST state retention for this data class explicitly. [NEEDS CLARIFICATION: the retention period for recommendation records has not been decided — the existing policy keeps monitoring readings ninety days and other classes for the account's life; to be answered in /speckit-clarify.]
 - **FR-028**: All card and item copy MUST follow the calm-first voice rules (Principle V): no exclamation marks, never alarmist or clinical, suggest rather than prescribe.
 
+**From the approved state mock** (behavioural facts the mock carries beyond the brief; `docs/mockups/serenify-014-things-that-might-help-mock.html`)
+
+- **FR-029**: The recorded end-states (states 7 and 8) MUST render and dwell before the card moves to state 9, following the feature 012 D-6 precedent for questionnaire end-states: an end-state that resolves synchronously with the surface swap can be dropped entirely.
+- **FR-030**: The card MUST have no error state. A failed swap or a failed outcome write MUST NOT surface as an error on this card — the whole surface is optional — and MUST degrade silently to the previous pick or previous state.
+- **FR-031**: The outcome prompt MUST NOT render over the open instructions; it becomes eligible only once the instructions are closed (refines FR-016).
+
 ### Key Entities
 
-- **Library item**: A human-authored, human-reviewed suggestion — title, instructions, category. Rendered verbatim; never generated.
+- **Library item**: A human-authored, human-reviewed suggestion — title, instructions, category, and a brief expected duration. Rendered verbatim; never generated.
 - **Recommendation record**: Per person, per local day — what was suggested, what was opened (the engagement record), the outcome answer if given (helped / didn't help), and what was swapped away. Owner-private, never manager-, admin-, team-lead-, or aggregate-visible.
 - **Reflective copy facts**: The precomputed bundle of counts, times, bands, and what-was-tried handed to the generator; the only material generated copy may phrase.
 - **Preference source**: The seam feature 015 will replace — returns a neutral default in v1.
@@ -191,7 +197,7 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 
 ## Assumptions
 
-- **The approved state mock was not found.** The feature brief references an approved state mock in the mocks directory as the behavioural reference, with the path to be supplied; no recommendations mock exists in `docs/mockups/` (or anywhere else searched) as of this writing. This spec is written from the brief's state descriptions alone. When the path is supplied, the mock is the approved reference for behaviour and states only — not visual spec — and its item titles and instruction text are placeholders.
+- **The approved state mock** lives at `docs/mockups/serenify-014-things-that-might-help-mock.html` (gitignored and local-only, like every signed-off mock; grep with `--no-ignore`). It is the approved reference for **behaviour and states**, not visual spec, and its item titles and instruction text are placeholders. Reconciliation: the mock's ten states match this spec's; its behavioural additions are folded in as FR-029–FR-031 and the item duration attribute. The mock's state-4 note left "does the confirmed pick also render in-session?" open as a routing decision — the feature brief has since answered it (it must, FR-011), and the brief's answer governs.
 - "Confirmed detection" is exactly a "Yes, that's me" answer on 012's confirmatory prompt; no other signal confirms.
 - "Day" means the local day used by the today card; this feature adopts those semantics rather than defining its own.
 - Making Ren "aware of the current pick" is contextual awareness only (he can refer to it); his conversational behaviour is otherwise untouched.
@@ -205,5 +211,3 @@ Recorded here rather than decided, at Mohamed's direction; the three [NEEDS CLAR
 1. **Library size and category set** (FR-004): how many items ship in v1, and which categories exist.
 2. **Per-day pick/swap budget** (FR-018): how many picks a day holds before the swap action retires.
 3. **Retention period for recommendation records** (FR-027): the Privacy Policy must state one explicitly; which one is a decision not yet given.
-
-Additionally awaiting an input, not a decision: the path to the approved state mock (see Assumptions).
