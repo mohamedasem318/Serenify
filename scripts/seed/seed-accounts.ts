@@ -7,6 +7,11 @@ import { realpathSync } from "node:fs";
 import { config as loadDotenv } from "dotenv";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import {
+  assertLocalSupabaseUrl,
+  createSeederClient,
+} from "../../apps/web/tests/e2e/setup/seeder-client.js";
+
 /**
  * Idempotent account seed for the REAL team roster (admins, one team lead,
  * their direct reports) — distinct from `scripts/seed-demo.ts`, which
@@ -19,9 +24,14 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
  * leaves GoTrue's token columns NULL and crashes `auth.admin.listUsers()`
  * (see specs/012-questionnaire-feedback/smoke-tests.md, Problem 1).
  *
- * Safe to run repeatedly and safe against a deployed/production project:
- * an account whose email already exists is skipped entirely (no update, no
- * duplicate), and nothing is ever deleted.
+ * LOCAL STACKS ONLY since #208 (DECISIONS 2026-08-14): profile writes run as
+ * the purpose-made `serenify_seeder` identity, which only local resets enable,
+ * so a deployed SUPABASE_URL is refused at startup — before any auth user is
+ * created. (The service-role key is still required, but only for the GoTrue
+ * admin API; it holds no table DML on this project.)
+ *
+ * Safe to run repeatedly: an account whose email already exists is skipped
+ * entirely (no update, no duplicate), and nothing is ever deleted.
  */
 
 type Role = "admin" | "team_lead" | "employee";
@@ -180,7 +190,18 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
     process.stdout.write(`Targeting Supabase at ${env.url}\n`);
   }
 
+  // Fail fast on a non-local target, BEFORE any auth user is created — the
+  // seeding identity that performs the profile upsert exists only on local
+  // stacks, and dying mid-run would leave accounts without hierarchy rows.
+  try {
+    assertLocalSupabaseUrl(env.url, "seed-accounts");
+  } catch (err) {
+    process.stderr.write(`${(err as Error).message}\n`);
+    return { exitCode: 1 };
+  }
+
   const admin = createAdminClient(env);
+  const seeder = createSeederClient(env.url);
   const rosterEmailsLower = new Set(roster.map((a) => a.email.toLowerCase()));
 
   let existingByEmail: Map<string, string>;
@@ -228,7 +249,7 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
     }));
 
   if (profileRows.length > 0) {
-    const { error: upsertErr } = await admin.from("profiles").upsert(profileRows, { onConflict: "id" });
+    const { error: upsertErr } = await seeder.from("profiles").upsert(profileRows, { onConflict: "id" });
     if (upsertErr) {
       process.stderr.write(`profiles upsert failed: ${upsertErr.message}\n`);
       return { exitCode: 4 };

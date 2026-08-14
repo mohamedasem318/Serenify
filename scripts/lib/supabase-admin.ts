@@ -7,12 +7,15 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Target } from "./env.js";
 
 /**
- * Service-role Supabase client for the seed script ONLY.
+ * Service-role Supabase client for the seed script ONLY — and for GoTrue
+ * AUTH ADMIN calls only (createUser / listUsers / deleteUser).
  *
- * The script is the only consumer that needs to bypass RLS to write
- * role/manager_id on public.profiles (FR-018 — the SECURITY DEFINER
- * RPCs admin_update_role / admin_update_manager re-verify auth.uid()
- * which is NULL under a service-role context).
+ * It cannot write tables: service_role holds no DML on any public table on
+ * this project (#208), so role/manager_id/anchor writes on public.profiles
+ * run as the purpose-made `serenify_seeder` identity instead
+ * (lib/seeder-client.ts). The SECURITY DEFINER RPCs admin_update_role /
+ * admin_update_manager are no help to a script either way — they re-verify
+ * auth.uid(), which is NULL outside a user session.
  *
  * Defense in depth:
  *   1. The module-load guard above throws if NODE_ENV is production,

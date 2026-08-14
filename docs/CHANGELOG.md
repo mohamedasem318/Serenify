@@ -3180,3 +3180,22 @@ cross-reference lists in this file's 2026-07-12/13 entries were edited to note t
 the two Principle VIII deviation records stand as written with a dated bracketed note. BACKLOG
 #187 was recategorised (its test file shipped with PR #143, not feature 009) and its GitHub issue
 resynced. Shipped code from PRs #143 and #144 is untouched.
+
+## 2026-08-14 — spec(002-demo-seed-data · 004-onboarding-video-anchor) — seeding writes as the purpose-made identity (#208)
+
+Both seed scripts and the e2e harness now perform table writes as `serenify_seeder`
+(DECISIONS 2026-08-14, both entries) instead of `service_role`, which never held table
+DML on this project. Three observable amendments to spec-002/004 behaviour:
+
+- `npm run seed -- --remote` REFUSES outright (exit 1) instead of prompting y/N: the
+  seeding identity is only assumable on local stacks, so no remote target can be
+  seeded. The FR-012 prompt and its exit 4 are retired; `scripts/lib/confirm.ts` is
+  deleted with them. `seed:accounts` refuses a deployed SUPABASE_URL the same way,
+  at startup, before any auth user is created.
+- FR-018's "single bulk profile update statement" becomes upsert (identity columns)
+  + ONE bulk anchor UPDATE for the whole cohort: a PostgREST upsert reads every
+  payload column back via EXCLUDED (requiring SELECT on it), and anchor_vector is
+  deliberately SELECTable by no client role. The DECISION-17 synthetic-anchor write
+  itself is preserved verbatim — only the statement shape changed.
+- The seed-demo integration suite asserts anchor presence via anchor_captured_at +
+  anchor_model_version, no longer by reading anchor_vector.

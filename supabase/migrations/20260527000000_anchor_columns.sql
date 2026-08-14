@@ -32,7 +32,13 @@ ALTER TABLE public.profiles
 -- columns. The whitelist enumerates every column any existing query reads
 -- (blast-radius audit T023: proxy.ts, (authed) layout/page, account page,
 -- admin/invite — all select explicit columns; no select("*")).
--- service_role (seed, future 005 server-side read) is untouched.
+-- service_role is untouched by this REVOKE/GRANT — but note that "untouched"
+-- means it holds NO table privileges here: this project's default ACLs never
+-- granted it DML on any public table (#208). Seeding writes the anchor
+-- columns as the purpose-made serenify_seeder identity instead
+-- (20260814000000_seeding_identity.sql), whose SELECT whitelist also
+-- excludes anchor_vector — the anchor bytes stay unreadable to every
+-- client role.
 REVOKE SELECT ON public.profiles FROM authenticated;
 GRANT  SELECT (id, full_name, role, manager_id, created_at, updated_at)
   ON public.profiles TO authenticated;

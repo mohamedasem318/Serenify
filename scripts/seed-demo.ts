@@ -5,7 +5,7 @@ import { argv } from "node:process";
 import { buildHierarchy, type DemoUser } from "./lib/hierarchy.js";
 import { ConfigError, loadConfig, type SeedConfig } from "./lib/env.js";
 import { createAdminClient } from "./lib/supabase-admin.js";
-import { confirmProceed } from "./lib/confirm.js";
+import { createSeederClientFor } from "./lib/seeder-client.js";
 import { environmentBanner, passwordBanner, summaryTable } from "./lib/banner.js";
 import {
   SYNTHETIC_ANCHOR_MODEL_VERSION,
@@ -22,7 +22,6 @@ const DEMO_EMAIL_SUFFIX = "@demo.serenify.local";
 
 type MainOptions = {
   readonly argv?: readonly string[];
-  readonly skipPrompt?: boolean;
 };
 
 type ExitResult = { readonly exitCode: number };
@@ -37,15 +36,24 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
 
   process.stdout.write(environmentBanner(config.target) + "\n");
 
+  // #208 (DECISIONS 2026-08-14): profile writes run as the purpose-made
+  // seeding identity, which exists only on local stacks — so a remote target
+  // can no longer be seeded by this script at all. Refuse up front, before a
+  // single auth user is created, rather than dying mid-run. (This supersedes
+  // the old remote y/N confirmation: there is nothing left to confirm.)
   if (config.target.kind === "remote") {
-    process.stdout.write("Proceed? (y/N) ");
-    const proceed = opts.skipPrompt === true ? true : await confirmProceed();
-    if (!proceed) {
-      process.stderr.write("Aborted by user.\n");
-      return { exitCode: 4 };
-    }
+    process.stderr.write(
+      "Remote seeding is not supported: table writes run as the local-only " +
+        "seeding identity (#208, docs/DECISIONS.md 2026-08-14). Enabling the " +
+        "identity on a deployed project is a separate deliberate act.\n",
+    );
+    return { exitCode: 1 };
   }
 
+  // Two identities on purpose: service_role for GoTrue auth-admin calls only
+  // (it holds no table DML on this project), serenify_seeder for table writes.
+  // Constructing the seeder first also re-asserts the local-only guard.
+  const seeder = createSeederClientFor(config.target);
   const admin = createAdminClient(config.target);
 
   // Step: enumerate the demo cohort in the project.
@@ -78,7 +86,8 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
     }
   }
 
-  // Create path: 30 sequential admin.createUser calls + one bulk upsert.
+  // Create path: 30 sequential admin.createUser calls + one bulk profile
+  // upsert + one bulk anchor update (as the seeder — see below).
   const users = buildHierarchy(SEED);
   process.stdout.write(`Creating ${users.length} demo users…\n`);
 
@@ -112,29 +121,44 @@ export async function main(opts: MainOptions = {}): Promise<ExitResult> {
   // a single round-trip per FR-018 + plan.md "single bulk profile
   // update statement".
   //
-  // Feature 004 (📌 DECISION-17): write the one shared deterministic synthetic
-  // anchor to EVERY demo profile so the cohort bypasses the calibration banner
-  // (has_anchor → true). service_role bypasses RLS + the authenticated column
-  // whitelist, so it can write the anchor columns. Non-demo profiles are never
-  // in this row set (FR-033 — only the 30 demo ids are upserted).
-  const anchorVector = syntheticAnchorHex();
-  const anchorCapturedAt = new Date().toISOString();
   const profileRows = users.map((u) => ({
     id: slotToId.get(u.slot)!,
     full_name: u.full_name,
     role: u.role,
     manager_id: u.manager_slot === null ? null : (slotToId.get(u.manager_slot) ?? null),
-    anchor_vector: anchorVector,
-    anchor_captured_at: anchorCapturedAt,
-    anchor_model_version: SYNTHETIC_ANCHOR_MODEL_VERSION,
   }));
 
-  const { error: upsertErr } = await admin
+  const { error: upsertErr } = await seeder
     .from("profiles")
     .upsert(profileRows, { onConflict: "id" });
 
   if (upsertErr) {
     process.stderr.write(`profiles upsert failed: ${upsertErr.message}\n`);
+    return { exitCode: 5 };
+  }
+
+  // Feature 004 (📌 DECISION-17): write the one shared deterministic synthetic
+  // anchor to EVERY demo profile so the cohort bypasses the calibration banner
+  // (has_anchor → true). This is a separate plain UPDATE — not part of the
+  // upsert above — because a PostgREST upsert reads every payload column back
+  // through EXCLUDED, which requires SELECT on it, and anchor_vector is
+  // deliberately SELECTable by NO client role (the 004 whitelist, which the
+  // seeder identity honours; #208). A plain UPDATE reads nothing back, so the
+  // seeder's UPDATE grant on the anchor columns suffices. The anchor is one
+  // shared constant, so one statement covers the whole cohort. service_role
+  // could never do any of this: it holds no table DML here at all (#208).
+  // Non-demo profiles are never touched (FR-033 — only the 30 demo ids).
+  const { error: anchorErr } = await seeder
+    .from("profiles")
+    .update({
+      anchor_vector: syntheticAnchorHex(),
+      anchor_captured_at: new Date().toISOString(),
+      anchor_model_version: SYNTHETIC_ANCHOR_MODEL_VERSION,
+    })
+    .in("id", Array.from(slotToId.values()));
+
+  if (anchorErr) {
+    process.stderr.write(`anchor update failed: ${anchorErr.message}\n`);
     return { exitCode: 5 };
   }
 

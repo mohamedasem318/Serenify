@@ -7741,3 +7741,26 @@ keeps elevated credentials off serving paths must cover the new identity.
 **Provenance**: the option analysis was drafted in `specs/024-test-data-seeding/`, a directory
 that should not have existed (see the entry above) and was removed the same day. This entry is the
 surviving record of the decision.
+
+---
+
+## 2026-08-14 — What `serenify_seeder` was actually granted (#208 implementation)
+
+**Status**: Accepted — implements Option B above (branch `fix/seeding-identity-208`).
+
+**Granted** (migration `20260814000000_seeding_identity.sql`; NOLOGIN role, plus a matching
+`TO serenify_seeder` RLS policy per table since all four are FORCE RLS): **profiles** SELECT
+(id, full_name, role, manager_id, anchor_captured_at, anchor_model_version) + INSERT/UPDATE
+(those minus the timestamps, plus all three anchor columns) — globalSetup's admin promotion,
+the anchor/role fixtures, both seeders' roster upserts; **user_consents** SELECT + INSERT
+(user_id, consent_key, document_version) — consent fixtures and gate assertions, append-only
+invariants untouched; **monitoring_sessions** SELECT (id) + INSERT (lifecycle columns);
+**window_readings** INSERT excluding label + stress_probability — the raw signal stays
+unwritable and unreadable to the seeder, and anchor_vector stays SELECTable by no client role
+(seed-demo writes the anchor by plain UPDATE because a PostgREST upsert reads every payload
+column back via EXCLUDED, which requires SELECT). No DELETE anywhere, no other table, no
+BYPASSRLS. `GRANT serenify_seeder TO authenticator` lives ONLY in `supabase/seed.sql` (local
+resets), so on any database where only migrations ran — the cloud included — the role is inert.
+The identity carries no secret: its JWT is derived at runtime from the CLI's public local dev
+secret and validates nowhere else. **Rejected**: granting SELECT (anchor_vector) to make the
+old single-statement anchor upsert work — a convenience against a structural privacy invariant.

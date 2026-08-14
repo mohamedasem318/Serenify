@@ -1,7 +1,7 @@
 import { type Page } from "@playwright/test";
 
 import { MODEL_VERSION } from "./anchor-helpers";
-import { createAdminClient } from "./setup/admin-client";
+import { createSeederClient } from "./setup/seeder-client";
 
 /**
  * Feature 008 / US1–US4 — T051 e2e seams. Boundary mocks only (📌 DECISION-26): getUserMedia
@@ -194,7 +194,7 @@ export async function interceptMonitoringApi(
  * (mocked) live session ends. Bands chosen to give a real trend + a peak marker.
  */
 export async function seedRetrospectiveSession(userId: string) {
-  const admin = createAdminClient();
+  const seeder = createSeederClient();
   const now = Date.now();
   const midnight = new Date();
   midnight.setHours(0, 0, 0, 0);
@@ -203,7 +203,7 @@ export async function seedRetrospectiveSession(userId: string) {
   let endedMs = Math.min(startedMs + 30 * 60_000, now - 6 * 60_000);
   if (endedMs <= startedMs) endedMs = startedMs + 60_000;
 
-  const { data: sess, error: sErr } = await admin
+  const { data: sess, error: sErr } = await seeder
     .from("monitoring_sessions")
     .insert({
       user_id: userId,
@@ -226,7 +226,7 @@ export async function seedRetrospectiveSession(userId: string) {
     scored: true,
     band,
   }));
-  const { error: rErr } = await admin.from("window_readings").insert(rows);
+  const { error: rErr } = await seeder.from("window_readings").insert(rows);
   if (rErr) throw rErr;
   return sess.id as string;
 }
@@ -245,10 +245,10 @@ export async function seedRetrospectiveSession(userId: string) {
  * confident row is ever persisted for it — the trend honestly stays in the no-read treatment.
  */
 export async function seedLiveNoReadSession(userId: string) {
-  const admin = createAdminClient();
+  const seeder = createSeederClient();
   const now = Date.now();
 
-  const { data: sess, error: sErr } = await admin
+  const { data: sess, error: sErr } = await seeder
     .from("monitoring_sessions")
     .insert({
       user_id: userId,
@@ -268,7 +268,7 @@ export async function seedLiveNoReadSession(userId: string) {
     band: null,
     skip_cause: null,
   }));
-  const { error: rErr } = await admin.from("window_readings").insert(rows);
+  const { error: rErr } = await seeder.from("window_readings").insert(rows);
   if (rErr) throw rErr;
   return sess.id as string;
 }

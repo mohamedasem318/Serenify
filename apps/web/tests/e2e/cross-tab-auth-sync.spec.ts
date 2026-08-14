@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createAdminClient } from "./setup/admin-client";
+import { suppressRecalibrationPrompt } from "./anchor-helpers";
 import { acceptTermsOnSignup, fetchLatestOtp, randomEmail } from "./helpers";
 
 /**
@@ -87,6 +88,15 @@ test("cross-tab: sign-out on tab A propagates tab B from /app to /login", async 
   try {
     const pageA = await context.newPage();
     const pageB = await context.newPage();
+
+    // The demo employee is anchored, so /app opens #256's recalibration
+    // modal, whose overlay would swallow the profile-dropdown clicks below.
+    // Pre-set the permanent latch (the #265 seam) — this spec is about the
+    // sign-out broadcast, not the prompt. Latent until 2026-08-14: the spec
+    // skips without a demo cohort, and every post-#256 verification ran on a
+    // stack where seeding was broken (#208), so it had never met the modal.
+    await suppressRecalibrationPrompt(pageA);
+    await suppressRecalibrationPrompt(pageB);
 
     // Sign in tab A first through the real form. The shared
     // cookies + the broadcast both reach tab B; we navigate tab B

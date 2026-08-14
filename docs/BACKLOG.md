@@ -3450,8 +3450,22 @@ oversight.
 
 ## From the navbar chrome fix — captured 2026-07-29
 
-### `service_role` has no DML on any `public` table — the e2e suite cannot start and both seeders are dead (#208)
-**Status**: tech-debt (`type:tooling` / `area:db`) — **OPEN.** GitHub issue **#208 OPEN.**
+### ~~`service_role` has no DML on any `public` table — the e2e suite cannot start and both seeders are dead~~ (#208)
+**Status**: **RESOLVED 2026-08-14 — branch `fix/seeding-identity-208` (Option B implemented).** GitHub
+issue **#208 closes with that PR's merge** (Principle VIII: entry and issue in the same change).
+**Resolution**: a purpose-made seeding identity, exactly as decided — `service_role` was NOT widened
+and still holds zero table DML. Migration `20260814000000_seeding_identity.sql` creates NOLOGIN role
+`serenify_seeder` with per-table, per-column grants + RLS policies traced to what seeding
+demonstrably writes (enumerated in DECISIONS 2026-08-14, second entry); `supabase/seed.sql` (runs on
+local resets only, never shipped by `db push`) grants it to `authenticator`, so it is assumable
+locally and INERT on any deployed database. Its JWT is derived at runtime from the CLI's public
+local dev secret — no env var, no manual step, no secret. globalSetup, the spec helpers, and both
+seed scripts write as the seeder; both scripts now refuse remote targets at startup. Verified from a
+fresh `supabase db reset --local` with NO manual grant: seed-demo + security-hardening integration
+suites 37/37, and the e2e evidence in the PR. The manual `docker exec … GRANT ALL` unblock below is
+**dead — do not run it**; a plain reset now yields a working suite. The CI half (no environment
+*enforces* the suite) was always separable and stays open under **#41**; the two session-end spec
+failures stay open under **#264**. The two misleading in-tree comments named below are corrected.
 **Category**: dev-tooling / local-stack grants
 **Observed**: 2026-07-29, while running a throwaway Playwright probe on
 `fix/navbar-chrome-and-active-state`. Not caused by that branch — the branch touches
@@ -3485,9 +3499,10 @@ is still 16, and there is still no `GRANT … TO service_role` anywhere in the r
 lesson is about method, not about Postgres**: a grant that "came back" without a repo
 change is a stale-volume reading until a reset says otherwise.
 
-**Local unblock — NOT a fix and deliberately not committed.** To run e2e on a freshly
-reset stack, grant by hand on the local container; the design question below is untouched
-by it:
+**Local unblock — SUPERSEDED 2026-08-14, do not run.** This hand grant is exactly what the
+resolution removes the need for (a reset wipes it anyway, since grants live in the dropped
+database); it would silently re-widen `service_role` on your local stack. Kept only as the
+historical record of what propped up the PR #265 evidence:
 
 ```
 docker exec supabase_db_Serenify psql -U postgres -d postgres -c \
