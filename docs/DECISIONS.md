@@ -7663,3 +7663,81 @@ it.
 a migration granting DML, versus seeders and test setup dropping service-role DML for the
 RPC/trigger paths production uses. Choosing it inside a test-suite repair, and shipping a
 migration that would reach the cloud database, is out of scope.
+
+---
+
+## 2026-08-14 — SpecKit is reserved for explicitly approved features; three unauthorized spec directories removed (022, 023, 024)
+
+**Status**: Accepted.
+
+**Decision**: `specs/` loses its three unauthorized directories — `022-cold-start-readiness`,
+`023-brand-email-social-preview`, and `024-test-data-seeding` — along with the local
+`024-test-data-seeding` branch (never pushed; no PR ever existed from it). The rule, now written
+into `CLAUDE.md` and `AGENTS.md`: **SpecKit runs only on features Mohamed has explicitly
+approved.** No agent creates a spec directory unprompted, and feature numbers are never
+hand-assigned. The next feature is `014-recommendations`; the 014–021 gap is a Codex artifact and
+carries no meaning.
+
+**Why**: 022 and 023 were created by an unprompted Codex session during the July deployment work —
+not authorized, and not features. They hand-picked their own numbers, which is why the sequence
+jumped 013 → 022 with 014–021 never existing. 024 was created at Mohamed's direction on 2026-08-14,
+but the work it described (closing #208) is a bounded task, not a feature, so it should not have
+been a spec either.
+
+**What survives, and where**: the shipped code from PRs #143 and #144 is untouched
+(`opengraph-image.tsx`, the cold-start handling, `cold-start-readiness.spec.tsx`, the
+`/cold-start-harness` route, the SpecKit CI guard). The records were already canonical in
+`docs/PROGRESS.md` and `docs/CHANGELOG.md` (backfilled 2026-07-22); the one piece of evidence that
+lived only in the 022 folder — the production smoke-test sign-off of 2026-07-13 — is absorbed into
+those entries and, because issue **#139 is still open** and cited it as evidence, stated
+self-contained inside #139's BACKLOG entry and GitHub body. 024's only lasting content is the
+seeding-identity decision, recorded as the next entry. #187's BACKLOG entry was recategorised in
+the same change (it misattributed a PR #143 test file to feature 009 and sat under the feature-013
+section) and its GitHub issue resynced.
+
+**Rejected alternative**: keeping the directories as historical record. Rejected because their
+presence misrepresents the workflow — unapproved directories with hand-picked numbers read as
+approved features — and PR #266 had just established that permanent records live self-contained in
+the tracking docs, not in pointers to working artifacts.
+
+**Deliberately not touched this pass**: the `docs/superpowers/` 2026-07-13 design docs from the
+same Codex episode (reported to Mohamed separately; removal, if any, is a later call), PR #143's
+GitHub body citing the old spec path (published history, same posture as the grandfathered commit
+trailers), and the untracked scratch file `RECON_2026-07-21.md` (scratch may dangle, per the #266
+triage-docs rule).
+
+---
+
+## 2026-08-14 — Test seeding gets a purpose-made seeding identity, not a widened elevated one (#208, Option B)
+
+**Status**: Accepted — decision only. Implementation is #208's fix, tracked there.
+
+**Decision**: test setup and the seed scripts will write as a **purpose-made seeding identity**
+that exists only for local and CI seeding — not by granting table DML to the existing elevated
+identity (`service_role`) that the tooling currently references. The same-day entry above
+("a grant that returns without a repo change…") deferred this as a design call; this resolves it.
+Mohamed chose Option B of the two options laid out during the 024 spec work.
+
+**Rationale**: widening the existing elevated identity's reach for a test convenience puts more
+tables permanently within reach of a key whose job is to have no limits. A purpose-made identity
+starts with nothing, so its reach is exactly what is deliberately granted, its worst-case
+credential leak is bounded by what seeding needs, and the seeding path stays visibly separate from
+the serving path. The choice travels: whatever is granted lands as a migration that eventually
+reaches the cloud database, so it was decided on that basis and not as a local convenience.
+
+**Rejected alternative — Option A, widen `service_role`**: the smaller change (calling code
+untouched), and the smallest honest edit in one sense — two in-tree comments already claim the
+elevated identity can write, and Option A would make them true. Rejected because it widens the
+identity an attacker would most want, permanently and in production's database. Those two
+comments must instead be corrected when #208's fix lands; a reassuring comment that is wrong is
+worse than no comment.
+
+**Out of scope, stated then and kept**: redesigning the test tooling to seed through the same
+paths production uses (RPC/trigger paths, no direct writes). Materially larger, and not what #208
+needs. Per-user, identity-scoped authorisation remains the production architecture; no
+request-serving path may acquire the seeding capability, and the existing automated check that
+keeps elevated credentials off serving paths must cover the new identity.
+
+**Provenance**: the option analysis was drafted in `specs/024-test-data-seeding/`, a directory
+that should not have existed (see the entry above) and was removed the same day. This entry is the
+surviving record of the decision.

@@ -2570,7 +2570,10 @@ feature 007 / PR #22). Both were already fixed in code and never reconciled.
 **Deviation from Principle VIII, recorded not excused**: this PR produced **no `specs/0NN-…`
 folder** — `specs/` jumps `012 → 022`. It shipped against ad-hoc `docs/superpowers/` plan and
 design documents instead of the standard SpecKit artifact set. #143 and #144 immediately below both
-got proper spec/plan/tasks/smoke-tests folders.
+got proper spec/plan/tasks/smoke-tests folders. *[2026-08-14: those two folders (022, 023) were
+themselves removed — the numbers were hand-picked by an unprompted Codex session, not assigned by
+the SpecKit workflow. The deviation record above stands as written; see the 2026-08-14 entry and
+`docs/DECISIONS.md` 2026-08-14.]*
 
 25 files changed, 930 insertions, 331 deletions. Co-authored by all three teammates.
 
@@ -2613,7 +2616,8 @@ plus a context reset each time it recurred.
 Also adds a non-production `/cold-start-harness` route with a committed Playwright layout contract
 (the harness returns 404 from a production build).
 
-**Production smoke test — PASS, 2026-07-13** (`specs/022-cold-start-readiness/smoke-tests.md`):
+**Production smoke test — PASS, 2026-07-13** (sign-off recorded at merge; the spec folder that
+held it was removed 2026-08-14 — its evidence is stated in full here and in `docs/PROGRESS.md`):
 *"calibration woke the production Azure API in under one minute; check-in completed normally; the
 first reading arrived at approximately 1:36 and updated again within about 10 seconds."* Run against
 the **production** Azure API and Supabase project from a protected branch preview; the temporary
@@ -2624,9 +2628,9 @@ production build, 8 guard fixtures, 4 Playwright checks at 360px/desktop in ligh
 25 files changed, 1068 insertions, 42 deletions. **No co-author trailers** — a break from the
 blanket rule, noted here since the omission is now permanent in history.
 
-Cross-references: `docs/PROGRESS.md` 2026-07-13; `specs/022-cold-start-readiness/`;
+Cross-references: `docs/PROGRESS.md` 2026-07-13;
 `docs/superpowers/specs/2026-07-13-cold-start-readiness-design.md`; `docs/BACKLOG.md` #50
-(resolved).
+(resolved). *(The 022 SpecKit folder formerly listed here was removed 2026-08-14.)*
 
 ## 2026-07-13 — fix(brand): auth email polish, social share preview, password-reset sign-out lock (PR #144)
 
@@ -2656,8 +2660,8 @@ commit** — they will fail otherwise, by design.
 
 13 files changed, 429 insertions, 12 deletions. **No co-author trailers** — same omission as #143.
 
-Cross-references: `docs/PROGRESS.md` 2026-07-13; `specs/023-brand-email-social-preview/`;
-`docs/BACKLOG.md` #38 (resolved).
+Cross-references: `docs/PROGRESS.md` 2026-07-13; `docs/BACKLOG.md` #38 (resolved). *(The 023
+SpecKit folder formerly listed here was removed 2026-08-14.)*
 
 ## 2026-07-13 — Serenify is live in production at https://serenify.tech (verified)
 
@@ -2694,8 +2698,8 @@ re-provision from the GHCR image tag or a Container Apps revision rollback — n
 warm standby, and not instantaneous. Corrected in `docs/DECISIONS.md` 2026-07-22.
 
 Cross-references: `docs/PROGRESS.md` 2026-07-13; `docs/DECISIONS.md` 2026-07-22 (both entries);
-`.specify/memory/constitution.md` Amendments 14 and 15;
-`specs/022-cold-start-readiness/smoke-tests.md`.
+`.specify/memory/constitution.md` Amendments 14 and 15. *(The 022 smoke-tests file formerly listed
+here was removed 2026-08-14; its evidence is quoted in the PR #143 entry above.)*
 
 ## 2026-07-24 — Constitution Amendment 16 (MINOR, 1.11.1 → 1.12.0): feature-ordering reorder + Privacy-Policy/ToS-per-PR rule
 
@@ -3158,3 +3162,21 @@ following either as written would have led a reader somewhere false.
 
 No constitution amendment. Reasoning: `docs/DECISIONS.md` 2026-08-14. Cross-references:
 `docs/BACKLOG.md` #208, #218, #263, #264; GitHub #218 (closes with this PR), #208 (open).
+
+## 2026-08-14 — Three unauthorized SpecKit directories removed (022, 023, 024)
+
+`specs/022-cold-start-readiness/` and `specs/023-brand-email-social-preview/` (created unprompted
+by a Codex session during the July deployment work, numbers hand-picked — the origin of the
+013 → 022 jump) and `specs/024-test-data-seeding/` (a bounded task that should never have been a
+spec) are removed, along with the never-pushed local `024-test-data-seeding` branch. SpecKit is
+reserved for explicitly approved features — the rule is now in `CLAUDE.md`/`AGENTS.md`; the next
+feature is `014-recommendations`, and the 014–021 gap carries no meaning.
+
+Records were absorbed before deletion: the 2026-07-13 production smoke sign-off (the only evidence
+that lived solely in the 022 folder) is now stated in full in the 2026-07-13 entries above, in
+`docs/PROGRESS.md`, and self-contained in open issue #139; the 024 seeding-identity decision
+(Option B, a purpose-made seeding identity) is recorded in `docs/DECISIONS.md` 2026-08-14. The
+cross-reference lists in this file's 2026-07-12/13 entries were edited to note the removal, and
+the two Principle VIII deviation records stand as written with a dated bracketed note. BACKLOG
+#187 was recategorised (its test file shipped with PR #143, not feature 009) and its GitHub issue
+resynced. Shipped code from PRs #143 and #144 is untouched.

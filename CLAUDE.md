@@ -35,6 +35,16 @@ component + two hand-sync exceptions; manager-visibility copy discipline) and
 MUST NOT re-amend the constitution. Closes #75 and #157; **not** #62.
 <!-- SPECKIT END -->
 
+## SpecKit — reserved for approved features
+
+- SpecKit runs **only on features Mohamed has explicitly approved.** No agent creates a spec
+  directory unprompted — a bounded task (fix, chore, tooling debt) gets a typed branch and the
+  tracking docs, never a `specs/NNN-…` directory.
+- Feature numbers are **never hand-assigned**; the SpecKit workflow assigns them.
+- The next feature is **014-recommendations**. The 014–021 numbering gap exists because an
+  unprompted Codex session hand-picked `022`/`023` for its own directories (removed 2026-08-14,
+  `docs/DECISIONS.md`); the gap is a Codex artifact and carries no meaning.
+
 ## Tracking docs — which one, and when
 
 Four docs, four jobs. A change usually touches more than one, and the failure mode is
@@ -168,7 +178,7 @@ This file (Claude Code) and `AGENTS.md` (Codex) both bind agents working in this
 to a **shared** rule in one MUST land the matching change in the other, in the same PR.
 
 Shared — keep in sync: commit and PR conventions, git workflow, branch naming, security and privacy
-invariants, the backlog ↔ issues contract.
+invariants, the backlog ↔ issues contract, the SpecKit approval rule.
 
 Agent-specific — free to differ: harness and tool config, skill names and invocation syntax, which
 SpecKit surface the agent drives, and the design-skill split (Claude routes UI work through

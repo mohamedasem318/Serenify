@@ -548,7 +548,8 @@ phase.
 **Resolution**: `scripts/check-speckit-skills.mjs` + its `check-speckit-skills.test.mjs` fixtures + the
 `speckit-guard` CI job (`.github/workflows/ci.yml`) added — the guard verifies the required
 `.claude/skills/speckit-*/SKILL.md` files are present and rejects a broad `.claude/` ignore rule
-(FR-010 of `specs/022-cold-start-readiness/`). Covers Mode A; Mode B is mitigated by the same job
+(shipped with the cold-start work in PR #143; the spec folder that numbered this requirement FR-010
+was removed 2026-08-14 — `docs/DECISIONS.md` 2026-08-14). Covers Mode A; Mode B is mitigated by the same job
 failing on any branch whose tree is missing the blobs.
 **Observed**: 2026-05-22, feature 003 — second regression of
 `.claude/skills/speckit-*/SKILL.md` going missing on disk,
@@ -2051,8 +2052,11 @@ lockout more gracefully than reopening the budget.
 **Status**: deferred-feature (`type:tech-debt` / `area:api`) — **OPEN, local-workstation only. Does NOT block production; production shipped and passed smoke on 2026-07-13.** GitHub issue **#139 OPEN** (rescoped 2026-07-22; `priority:blocker` + `area:infra` + `area:web` dropped).
 **Reconciled 2026-07-22**: this entry was written 2026-07-04 as a pre-deploy blocker and was never
 revisited after the cutover shipped. Production went live at `https://serenify.tech` on 2026-07-12
-(PR #142) and passed a production smoke test on 2026-07-13 (`specs/022-cold-start-readiness/smoke-tests.md`:
-PASS, Mohamed approval "it worked flawlessly"). Items (a) and (b) are closed out and item (c) is
+(PR #142) and passed a production smoke test on 2026-07-13: run against the production Azure API
+and cloud Supabase from a protected branch preview — calibration woke the API in under one minute
+(one measured cold wake from zero replicas: 46.68 s, n=1; warm 0.34 s), check-in completed
+normally, the first reading arrived ≈1:36, and Mohamed approved ("it worked flawlessly").
+Items (a) and (b) are closed out and item (c) is
 resolved *for production*; only the local-workstation half of (c) genuinely remains.
 **Observed**: 2026-07-04, execution of `docs/runbooks/supabase-local-to-cloud-migration.md` — local → cloud project `excukdzjudslbqmkysrc` (EU / Frankfurt). 14 real accounts + profiles + ~300 rows across 9 tables migrated (UUIDs / `email_confirmed_at` / `anchor_vector` bytea preserved; 6/6 anchors byte-identical to the §5a dump; RLS + grants verified on cloud; passwords reset; `apps/web/.env.local` repointed).
 **(a) Runbook junk-delete reorder — DONE (provenance)**: the §4 `DELETE ... WHERE email LIKE '%@t.local'` was moved to a new §5c after the §5b child-row load — deleting fixtures in §4 FK-fails §5b's load of their own child rows (`pg_dump` can't filter). One deferred cascade drops fixtures + identities + skeleton profiles + child rows together. Patched in commit `d74864d`. No further action.
@@ -2125,6 +2129,54 @@ against a throwaway resource group so it is known to work rather than assumed to
 **Address by**: before the thesis defense, not before any feature. Production is live, healthy, and
 smoke-verified (2026-07-13) — nothing is broken and nothing is blocked. This is insurance against a
 low-probability, high-cost event whose cost peaks exactly when it is least affordable.
+
+### `cold-start-readiness.spec.tsx` fights next-themes for the `dark` class — intermittent under load (#187)
+**Status**: test defect (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#187 OPEN.**
+**Category**: layout test suite / cold-start layout contract (added by PR #143, 2026-07-13)
+**Observed**: 2026-07-28, while verifying `fix-landing-fidelity` (PR #186).
+**Corrected 2026-08-14**: this entry originally sat under the feature-013 section with
+`Category: … / feature 009` and said "the race is in the 009 spec". Both were wrong:
+`cold-start-readiness.spec.tsx` (and the `/cold-start-harness` route it exercises) was **added by
+PR #143**, the cold-start work — the manual-toggle authoring pattern may echo the 009-era layout
+suite, but the racing spec itself shipped with PR #143. Recategorised and moved here; GitHub issue
+resynced the same day.
+
+**Description**: the two **dark** variants of `apps/web/tests/layout/cold-start-readiness.spec.tsx`
+fail intermittently in a full `playwright.layout.config.ts` run, and pass every time in isolation.
+The failure is a contrast assertion — `Expected: >= 4.5`, `Received: 4.336…` — which looks like a
+colour regression and is not one. No token value changed.
+
+**Root cause**: the spec sets the theme by hand, immediately after `page.goto`:
+
+```ts
+await page.evaluate((dark) => {
+  document.documentElement.classList.toggle("dark", dark);
+}, theme === "dark");
+```
+
+`/cold-start-harness` lives under `app/`, so it is wrapped by `Providers` →
+`ThemeProvider attribute="class" defaultTheme="system"`. **next-themes owns that class.** When its
+hydration effect runs *after* the test's toggle — which is what happens once the machine is busy —
+it resolves the system preference (light, Playwright's default) and reverts the class. The dark
+test then measures a light or partially-reverted palette, and 4.336 is that torn state rather than
+either theme's real value.
+
+**Why it surfaced now, and why it is not PR #186's defect**: that PR adds a fifth viewport (1280 px)
+to `landing-hero-stability.spec.ts` — a 17-beat test that adds ~40 s of wall clock and CPU to the
+same four-worker pool. That extra contention is what makes the pre-existing race land on the losing
+side. Measured: **3/3 clean full-suite runs on `013-public-surface-and-legal`** vs **3 intermittent
+failures across ~8 full-suite runs on `fix-landing-fidelity`**, with **6/6 clean** on the branch once
+the machine was otherwise idle. The race is in the PR #143 cold-start spec; the new width only
+changes how often it loses. Every landing-owned assertion passed in every run.
+
+**Fix scope**: small. Drive the theme the way the browser actually does rather than by racing the
+provider — `await page.emulateMedia({ colorScheme: theme })` before `goto`, which is what the
+feature-013 walks use and what next-themes then resolves *to* rather than away from. Alternatively
+await a settled signal (`html.dark` present AND hydration complete) before measuring. Either removes
+the race; the manual `classList.toggle` cannot be made reliable while the provider owns the class.
+
+**Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
+than a missed regression, and it never passes when it should fail.
 
 ---
 
@@ -2790,48 +2842,6 @@ shift, which is the worse outcome.
 
 **Address by**: any landing-page polish pass after 013 merges. Low priority — it appears only when
 the image fails, and the section stays fully functional when it does.
-
-### `cold-start-readiness.spec.tsx` fights next-themes for the `dark` class — intermittent under load (#187)
-**Status**: test defect (`type:bug` / `area:web`) — **OPEN.** GitHub issue **#187 OPEN.**
-**Category**: layout test suite / feature 009
-**Observed**: 2026-07-28, while verifying `fix-landing-fidelity` (PR #186).
-
-**Description**: the two **dark** variants of `apps/web/tests/layout/cold-start-readiness.spec.tsx`
-fail intermittently in a full `playwright.layout.config.ts` run, and pass every time in isolation.
-The failure is a contrast assertion — `Expected: >= 4.5`, `Received: 4.336…` — which looks like a
-colour regression and is not one. No token value changed.
-
-**Root cause**: the spec sets the theme by hand, immediately after `page.goto`:
-
-```ts
-await page.evaluate((dark) => {
-  document.documentElement.classList.toggle("dark", dark);
-}, theme === "dark");
-```
-
-`/cold-start-harness` lives under `app/`, so it is wrapped by `Providers` →
-`ThemeProvider attribute="class" defaultTheme="system"`. **next-themes owns that class.** When its
-hydration effect runs *after* the test's toggle — which is what happens once the machine is busy —
-it resolves the system preference (light, Playwright's default) and reverts the class. The dark
-test then measures a light or partially-reverted palette, and 4.336 is that torn state rather than
-either theme's real value.
-
-**Why it surfaced now, and why it is not PR #186's defect**: that PR adds a fifth viewport (1280 px)
-to `landing-hero-stability.spec.ts` — a 17-beat test that adds ~40 s of wall clock and CPU to the
-same four-worker pool. That extra contention is what makes the pre-existing race land on the losing
-side. Measured: **3/3 clean full-suite runs on `013-public-surface-and-legal`** vs **3 intermittent
-failures across ~8 full-suite runs on `fix-landing-fidelity`**, with **6/6 clean** on the branch once
-the machine was otherwise idle. The race is in the 009 spec; the new width only changes how often it
-loses. Every landing-owned assertion passed in every run.
-
-**Fix scope**: small. Drive the theme the way the browser actually does rather than by racing the
-provider — `await page.emulateMedia({ colorScheme: theme })` before `goto`, which is what the
-feature-013 walks use and what next-themes then resolves *to* rather than away from. Alternatively
-await a settled signal (`html.dark` present AND hydration complete) before measuring. Either removes
-the race; the manual `classList.toggle` cannot be made reliable while the provider owns the class.
-
-**Address by**: any pass that touches the layout suite. Not urgent — it is a false negative rather
-than a missed regression, and it never passes when it should fail.
 
 ## From feature 013 P8 Stage 3 review — captured 2026-07-28
 
