@@ -43,7 +43,7 @@ spec FR-029–FR-031) governs.
 **Purpose**: `recommendation_picks` exists and its owner-only posture is *proven*, not
 assumed (spec SC-003, contracts/recommendation-storage-rls.md).
 
-- [ ] T001 Migration `supabase/migrations/<timestamp>_recommendation_picks.sql`: full
+- [X] T001 Migration `supabase/migrations/20260815090000_recommendation_picks.sql`: full
       data-model §2 shape — columns, the three CHECKs (`rp_outcome_iff_at`,
       `rp_outcome_requires_opened`, `rp_outcome_xor_swap`), `rp_user_day_idx`, partial
       unique `rp_one_active_per_user_day`, `touch_updated_at` trigger, ENABLE+FORCE RLS,
@@ -54,13 +54,13 @@ assumed (spec SC-003, contracts/recommendation-storage-rls.md).
       manager/admin/team-lead/aggregate/`service_role`/`serenify_seeder` grant or policy
       of any kind (contract §5–6). **Acceptance**: `supabase db reset --local` applies
       cleanly; the existing migration-audit pytest suite stays green.
-- [ ] T002 Static RLS gate `apps/api/tests/test_recommendation_storage_rls.py` (the
+- [X] T002 Static RLS gate `apps/api/tests/test_recommendation_storage_rls.py` (the
       `test_chat_storage_rls.py` pattern): pins every contract invariant — FORCE RLS,
       exactly three owner policies, no DELETE/service-role/seeder path, no SECURITY
       DEFINER touching the table, the column-scoped UPDATE grant list verbatim.
       **Acceptance**: `uv run pytest` green; deleting any posture line from the migration
       makes a named assertion fail.
-- [ ] T003 [LIVE] Live RLS probe against local Supabase (the feature-012 `SET LOCAL ROLE`
+- [X] T003 [LIVE] Live RLS probe against local Supabase (the feature-012 `SET LOCAL ROLE`
       + `request.jwt.claims` psql method): owner reads own rows; a second user, a
       team-lead, and an admin each read **zero** rows; `anon` errors; UPDATE on an
       identity column (`item_id`) fails on grant. **Acceptance**: probe transcript
