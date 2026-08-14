@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { randomEmail, signInAs, termsConsentMetadata } from "./helpers";
 import { createAdminClient } from "./setup/admin-client";
+import { createSeederClient } from "./setup/seeder-client";
 
 /**
  * The app-shell Terms/Privacy entry gate, end to end (feature 013, §7.3, FR-043d).
@@ -47,7 +48,7 @@ async function createUnconsentedEmployee(): Promise<{ email: string }> {
   // trigger's condition still works. If a future migration started writing a consent row
   // unconditionally, every assertion below would pass vacuously against a user who was
   // never actually blocked — and this spec would quietly stop testing the gate.
-  const { data: rows, error: readErr } = await admin
+  const { data: rows, error: readErr } = await createSeederClient()
     .from("user_consents")
     .select("document_version")
     .eq("user_id", data.user.id)
@@ -164,7 +165,7 @@ test("entry gate: accepting records the consent and unblocks the app", async ({ 
   const created = user.users.find((u) => u.email === email);
   expect(created, "the fixture user should exist").toBeTruthy();
 
-  const { data: rows, error } = await admin
+  const { data: rows, error } = await createSeederClient()
     .from("user_consents")
     .select("document_version")
     .eq("user_id", created!.id)

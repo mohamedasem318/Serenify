@@ -4,6 +4,30 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## #208 — the purpose-made seeding identity (Option B implemented)
+
+**Branch**: `fix/seeding-identity-208` · **Date**: 2026-08-14 · **Status**: PR open, not merged.
+**Shipped**: NOLOGIN role `serenify_seeder` (migration `20260814000000`) with per-table, per-column
+grants + RLS policies traced to what seeding demonstrably writes (enumerated in DECISIONS
+2026-08-14, second entry); `supabase/seed.sql` grants it to `authenticator` on **local resets
+only**, so the role is inert on any deployed database, and its JWT derives at runtime from the
+CLI's public dev secret — no env var, no manual step, no secret. globalSetup, the spec helpers and
+both seed scripts repointed; `service_role` kept for auth-admin calls only and **not widened**;
+both scripts refuse remote targets at startup (CHANGELOG); the two misleading comments corrected;
+posture test extended to the new identity + a seeder-identity unit test. `cross-tab-auth-sync` got
+the #265 suppress seam — a latent #256 modal blocker unexercisable while seeding was broken.
+**Verified — all from a fresh `supabase db reset --local` with NO manual grant** (probe:
+`service_role` has zero DML on every public table): live PostgREST probes incl. negatives (anchor
+bytes unreadable, raw-signal columns unwritable, DELETE denied everywhere); Vitest 146 files /
+1638 tests passing; `SUPABASE_INTEGRATION=1` 37/37; `seed:accounts` 9/9 with hierarchy; e2e
+chromium **55 passed / 2 failed / 2 skipped** (9.4 min) and firefox **55 / 2 / 2** (10.4 min) —
+the only failures the known #264 session-end pair.
+**NOT verified / knowingly left**: WebKit reproduced the #177 runner hang (18 specs green, then
+silence — stopped; still off the sign-off bar); #264 and #41 untouched; **cloud application of the
+migration deliberately not done** — requirements stated in the PR.
+
+---
+
 ## Unauthorized SpecKit directories removed — 022, 023, 024; the approval rule written down
 
 **Branch**: `chore/remove-unauthorized-specs` · **Date**: 2026-08-14 · **Status**: PR open, not merged.

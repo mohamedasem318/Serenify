@@ -17,6 +17,14 @@ const forbiddenRuntimeTokens = [
   "createAdminClient",
   "supabaseServiceRoleKey",
   "/auth/v1/admin/",
+  // The purpose-made seeding identity (#208, DECISIONS 2026-08-14). Its token
+  // is not a secret (derived from the CLI's public local dev secret), but the
+  // IDENTITY is elevated: no request-serving code path may acquire it, same
+  // rule as service_role. Role name, factory, module path, and signer.
+  "serenify_seeder",
+  "createSeederClient",
+  "seeder-client",
+  "signLocalDevJwt",
 ];
 
 function stripNonExecutableText(source: string, file: string): string {

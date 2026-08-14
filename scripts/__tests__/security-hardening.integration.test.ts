@@ -4,6 +4,8 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
+import { createSeederClient } from "../../apps/web/tests/e2e/setup/seeder-client.js";
+
 // Behavioral coverage for the two functional changes in migration
 // 20260525000000_security_hardening_slice_1.sql:
 //   F1  admin_update_manager rejects a multi-node manager cycle (23514)
@@ -27,12 +29,19 @@ function loadEnv(): void {
   loadDotenv({ path: resolve(here, "../../apps/web/.env.local") });
 }
 
+// Auth-admin API only (create/list/delete users); it has no table DML (#208).
 function makeAdmin(): SupabaseClient {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
+}
+
+// Fixture table writes/reads (role promotion, hierarchy checks) run as the
+// purpose-made seeding identity.
+function makeSeeder(): SupabaseClient {
+  return createSeederClient(process.env.NEXT_PUBLIC_SUPABASE_URL!);
 }
 
 /** A fresh anon client signed in as the given user — carries that user's
@@ -61,19 +70,19 @@ async function createUser(admin: SupabaseClient, localpart: string): Promise<str
   return data.user.id;
 }
 
-async function setRole(admin: SupabaseClient, id: string, role: string): Promise<void> {
-  const { error } = await admin.from("profiles").update({ role }).eq("id", id);
+async function setRole(seeder: SupabaseClient, id: string, role: string): Promise<void> {
+  const { error } = await seeder.from("profiles").update({ role }).eq("id", id);
   if (error) throw error;
 }
 
-async function getRole(admin: SupabaseClient, id: string): Promise<string> {
-  const { data, error } = await admin.from("profiles").select("role").eq("id", id).single();
+async function getRole(seeder: SupabaseClient, id: string): Promise<string> {
+  const { data, error } = await seeder.from("profiles").select("role").eq("id", id).single();
   if (error) throw error;
   return data.role as string;
 }
 
-async function getManager(admin: SupabaseClient, id: string): Promise<string | null> {
-  const { data, error } = await admin.from("profiles").select("manager_id").eq("id", id).single();
+async function getManager(seeder: SupabaseClient, id: string): Promise<string | null> {
+  const { data, error } = await seeder.from("profiles").select("manager_id").eq("id", id).single();
   if (error) throw error;
   return data.manager_id as string | null;
 }
@@ -98,6 +107,7 @@ async function cleanupSecTestUsers(admin: SupabaseClient): Promise<void> {
 
 describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real local Supabase)", () => {
   let admin: SupabaseClient;
+  let seeder: SupabaseClient;
 
   beforeAll(async () => {
     loadEnv();
@@ -108,6 +118,7 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
       );
     }
     admin = makeAdmin();
+    seeder = makeSeeder();
   }, 10_000);
 
   beforeEach(async () => {
@@ -120,7 +131,7 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
 
   it("F1: admin_update_manager rejects a multi-node cycle (23514)", async () => {
     const adm = await createUser(admin, "f1-adm");
-    await setRole(admin, adm, "admin");
+    await setRole(seeder, adm, "admin");
     const a = await createUser(admin, "f1-a");
     const b = await createUser(admin, "f1-b");
 
@@ -132,7 +143,7 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
       new_manager_id: b,
     });
     expect(ok.error).toBeNull();
-    expect(await getManager(admin, a)).toBe(b);
+    expect(await getManager(seeder, a)).toBe(b);
 
     // B reports to A — would close A→B→A; rejected with CHECK-violation code.
     const cycle = await admClient.rpc("admin_update_manager", {
@@ -141,12 +152,12 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
     });
     expect(cycle.error?.code).toBe("23514");
     // B's manager is unchanged (the guard fires before the UPDATE).
-    expect(await getManager(admin, b)).toBeNull();
+    expect(await getManager(seeder, b)).toBeNull();
   }, 60_000);
 
   it("F1: a cycle-free re-parent still succeeds", async () => {
     const adm = await createUser(admin, "f1b-adm");
-    await setRole(admin, adm, "admin");
+    await setRole(seeder, adm, "admin");
     const a = await createUser(admin, "f1b-a");
     const b = await createUser(admin, "f1b-b");
     const c = await createUser(admin, "f1b-c");
@@ -157,13 +168,13 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
     expect((await admClient.rpc("admin_update_manager", { target_user_id: a, new_manager_id: b })).error).toBeNull();
     const reparent = await admClient.rpc("admin_update_manager", { target_user_id: b, new_manager_id: c });
     expect(reparent.error).toBeNull();
-    expect(await getManager(admin, b)).toBe(c);
+    expect(await getManager(seeder, b)).toBe(c);
   }, 60_000);
 
   it("F2: admin_update_role rejects the demotion that would empty the admin set (23514)", async () => {
     // The guard counts ALL admins globally, so make the test admin the only
     // one: snapshot + temporarily demote any pre-existing admins, restore after.
-    const { data: existing, error: exErr } = await admin
+    const { data: existing, error: exErr } = await seeder
       .from("profiles")
       .select("id")
       .eq("role", "admin");
@@ -171,10 +182,10 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
     const foreignAdminIds = (existing ?? []).map((r) => r.id as string);
 
     try {
-      for (const id of foreignAdminIds) await setRole(admin, id, "employee");
+      for (const id of foreignAdminIds) await setRole(seeder, id, "employee");
 
       const solo = await createUser(admin, "f2-solo");
-      await setRole(admin, solo, "admin"); // now the only admin globally
+      await setRole(seeder, solo, "admin"); // now the only admin globally
 
       const soloClient = await signInAs(`f2-solo${SECTEST_SUFFIX}`);
       const res = await soloClient.rpc("admin_update_role", {
@@ -183,17 +194,17 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
       });
       expect(res.error?.code).toBe("23514");
       // Rolled back: the sole admin is still admin.
-      expect(await getRole(admin, solo)).toBe("admin");
+      expect(await getRole(seeder, solo)).toBe("admin");
     } finally {
-      for (const id of foreignAdminIds) await setRole(admin, id, "admin");
+      for (const id of foreignAdminIds) await setRole(seeder, id, "admin");
     }
   }, 60_000);
 
   it("F2: self-demotion succeeds when a second admin remains", async () => {
     const admA = await createUser(admin, "f2b-a");
     const admB = await createUser(admin, "f2b-b");
-    await setRole(admin, admA, "admin");
-    await setRole(admin, admB, "admin");
+    await setRole(seeder, admA, "admin");
+    await setRole(seeder, admB, "admin");
 
     const aClient = await signInAs(`f2b-a${SECTEST_SUFFIX}`);
     const res = await aClient.rpc("admin_update_role", {
@@ -201,7 +212,7 @@ describe.skipIf(!ENABLED)("security slice 1 — SECURITY DEFINER behavior (real 
       new_role: "employee",
     });
     expect(res.error).toBeNull();
-    expect(await getRole(admin, admA)).toBe("employee");
-    expect(await getRole(admin, admB)).toBe("admin"); // the other admin survives
+    expect(await getRole(seeder, admA)).toBe("employee");
+    expect(await getRole(seeder, admB)).toBe("admin"); // the other admin survives
   }, 60_000);
 });

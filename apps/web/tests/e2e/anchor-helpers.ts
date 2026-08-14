@@ -7,6 +7,7 @@ import { randomEmail, termsConsentMetadata } from "./helpers";
 import { bindingRevision } from "../../lib/consent/evaluate";
 
 import { createAdminClient } from "./setup/admin-client";
+import { createSeederClient } from "./setup/seeder-client";
 
 export const MODEL_VERSION = "serenify-video-lbptop-motion-rf-calibrated@2.0.0";
 
@@ -293,12 +294,12 @@ export const RECORD_AND_LAND_TIMEOUT = 80_000;
  * these fixtures follow it automatically instead of going silently stale and re-breaking
  * the same five specs.
  *
- * Written with the service role deliberately: this is fixture setup, not a code path
+ * Written as the seeding identity deliberately: this is fixture setup, not a code path
  * under test. The gate's own read still runs under the user's session and its RLS.
  */
 export async function seedCameraConsent(userId: string) {
-  const admin = createAdminClient();
-  const { error } = await admin.from("user_consents").insert({
+  const seeder = createSeederClient();
+  const { error } = await seeder.from("user_consents").insert({
     user_id: userId,
     consent_key: "camera_inference",
     document_version: bindingRevision("camera_inference").versionId,
@@ -345,8 +346,8 @@ export async function createCalibratableEmployee(fullName = "Calibrate Test") {
   // Inherits the camera consent from createOnboardingEmployee, so /app/calibrate and
   // /app/monitor render their recorders rather than the consent gate.
   const emp = await createOnboardingEmployee();
-  const admin = createAdminClient();
-  const { error } = await admin
+  const seeder = createSeederClient();
+  const { error } = await seeder
     .from("profiles")
     .update({ full_name: fullName })
     .eq("id", emp.id);
@@ -356,16 +357,16 @@ export async function createCalibratableEmployee(fullName = "Calibrate Test") {
 
 /**
  * Confirmed employee WITH a stored baseline — the anchor columns are written via the
- * service role (the same canned all-zero (2958,) vector the /anchor mock returns), so
+ * seeding identity (the same canned all-zero (2958,) vector the /anchor mock returns), so
  * has_anchor is true: /app shows no banner, and /app/calibrate?mode=recalibrate enters
  * recalibrate mode (copy "update", exit /app/account). Used by the recalibrate path
  * without paying a second real 60s recording to seed the prior baseline.
  */
 export async function createCalibratedEmployee(fullName = "Recalibrate Test") {
   const emp = await createCalibratableEmployee(fullName);
-  const admin = createAdminClient();
+  const seeder = createSeederClient();
   const hex = Buffer.alloc(2958 * 4).toString("hex"); // bytea of zeros → non-null anchor
-  const { error } = await admin
+  const { error } = await seeder
     .from("profiles")
     .update({
       anchor_vector: `\\x${hex}`,
@@ -444,7 +445,8 @@ export const DEMO_PASSWORD = "DemoUser123!";
  * cohort is absent OR was seeded before feature 004 (so it has no anchor yet).
  * Either way the demo-clean-dashboard check is N/A until `npm run seed` runs
  * with the 004 seed. Reads anchor_captured_at (a timestamp, not the 11832-byte
- * vector) via the service role to keep the probe cheap.
+ * vector — which no client role, the seeder included, can read) to keep the
+ * probe cheap.
  */
 export async function findDemoEmployee(): Promise<{ email: string } | null> {
   const admin = createAdminClient();
@@ -462,7 +464,7 @@ export async function findDemoEmployee(): Promise<{ email: string } | null> {
   }
   if (demo.length === 0) return null;
 
-  const { data: profiles, error } = await admin
+  const { data: profiles, error } = await createSeederClient()
     .from("profiles")
     .select("id, role, anchor_captured_at")
     .in("id", demo.map((d) => d.id));
@@ -489,7 +491,7 @@ export async function createManager(role: "team_lead" | "admin") {
     user_metadata: termsConsentMetadata(),
   });
   if (error || !data.user) throw error ?? new Error("createUser failed");
-  const { error: roleErr } = await admin
+  const { error: roleErr } = await createSeederClient()
     .from("profiles")
     .update({ role })
     .eq("id", data.user.id);

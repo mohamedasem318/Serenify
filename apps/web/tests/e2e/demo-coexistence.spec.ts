@@ -1,5 +1,6 @@
 import { test, expect } from "@playwright/test";
 import { createAdminClient } from "./setup/admin-client";
+import { createSeederClient } from "./setup/seeder-client";
 
 // Asserts FR-019 / Story 4: the demo cohort created by `npm run seed`
 // (feature 002) survives a Playwright e2e run unchanged.
@@ -50,7 +51,8 @@ test.describe("demo cohort coexistence (FR-019)", () => {
     // Snapshot the profile rows for the demo cohort. Sort by email so
     // the comparison is order-independent.
     const demoIds = demoAuthUsers.map((u) => u.id);
-    const { data: profiles, error: profErr } = await admin
+    const seeder = createSeederClient();
+    const { data: profiles, error: profErr } = await seeder
       .from("profiles")
       .select("id, role, manager_id")
       .in("id", demoIds);
@@ -74,7 +76,7 @@ test.describe("demo cohort coexistence (FR-019)", () => {
     await page.goto("/login");
 
     // Re-query and compare byte-for-byte.
-    const { data: post, error: postErr } = await admin
+    const { data: post, error: postErr } = await seeder
       .from("profiles")
       .select("id, role, manager_id")
       .in("id", demoIds);

@@ -7,6 +7,7 @@ import { createClient } from "@supabase/supabase-js";
 import { main } from "../seed-demo.js";
 import { buildHierarchy } from "../lib/hierarchy.js";
 import { SYNTHETIC_ANCHOR_MODEL_VERSION } from "../lib/synthetic-anchor.js";
+import { createSeederClient } from "../../apps/web/tests/e2e/setup/seeder-client.js";
 
 const SEED = 1729;
 const DEMO_SUFFIX = "@demo.serenify.local";
@@ -23,12 +24,19 @@ function loadEnv(): void {
   loadDotenv({ path: resolve(here, "../../apps/web/.env.local") });
 }
 
+// Auth-admin API only (list/delete users); it has no table DML (#208).
 function makeAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } },
   );
+}
+
+// Table reads for post-condition queries run as the seeding identity —
+// the same identity the script under test writes with.
+function makeSeeder() {
+  return createSeederClient(process.env.NEXT_PUBLIC_SUPABASE_URL!);
 }
 
 function makeAnon() {
@@ -95,7 +103,8 @@ describe.skipIf(!ENABLED)("seed-demo integration (real local Supabase)", () => {
     expect(demoUsers).toHaveLength(30);
 
     const ids = demoUsers.map((u) => u.id);
-    const { data: profiles, error } = await admin
+    const seeder = makeSeeder();
+    const { data: profiles, error } = await seeder
       .from("profiles")
       .select("role")
       .in("id", ids);
@@ -106,17 +115,21 @@ describe.skipIf(!ENABLED)("seed-demo integration (real local Supabase)", () => {
     expect(counts).toEqual({ admin: 2, team_lead: 5, employee: 23 });
 
     // FR-031/033 (📌 DECISION-17): every demo profile carries the synthetic
-    // anchor (service_role bypasses the authenticated column whitelist, so it
-    // can read anchor_vector here). Only the 30 demo ids are ever upserted, so
-    // non-demo profiles are untouched.
-    const { data: anchorRows, error: anchorErr } = await admin
+    // anchor. Presence is asserted via anchor_captured_at + the model version:
+    // anchor_vector itself is UNREADABLE to every client role — the seeder
+    // included (its SELECT whitelist excludes it on purpose, mirroring the
+    // 004 whitelist) — and the upsert writes all three anchor columns in one
+    // row-write, so these two being set proves the vector landed with them.
+    // Only the 30 demo ids are ever upserted, so non-demo profiles are
+    // untouched.
+    const { data: anchorRows, error: anchorErr } = await seeder
       .from("profiles")
-      .select("anchor_vector, anchor_model_version")
+      .select("anchor_captured_at, anchor_model_version")
       .in("id", ids);
     if (anchorErr) throw anchorErr;
     expect(anchorRows).toHaveLength(30);
     for (const row of anchorRows ?? []) {
-      expect(row.anchor_vector).not.toBeNull();
+      expect(row.anchor_captured_at).not.toBeNull();
       expect(row.anchor_model_version).toBe(SYNTHETIC_ANCHOR_MODEL_VERSION);
     }
   }, 60_000);
@@ -126,7 +139,7 @@ describe.skipIf(!ENABLED)("seed-demo integration (real local Supabase)", () => {
     const demoUsers = await listDemoUsers(admin);
     const idToEmail = new Map(demoUsers.map((u) => [u.id, u.email]));
 
-    const { data: profiles, error } = await admin
+    const { data: profiles, error } = await makeSeeder()
       .from("profiles")
       .select("id, role, manager_id")
       .in("id", Array.from(idToEmail.keys()));

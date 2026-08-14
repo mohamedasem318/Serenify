@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { createAdminClient } from "./setup/admin-client";
+import { createSeederClient } from "./setup/seeder-client";
 import { randomEmail, signInAs, signOut, termsConsentMetadata } from "./helpers";
 
 const TEST_PASSWORD = "SeededAdmin123!";
@@ -26,8 +27,8 @@ test.skip("seeded admin can invite another admin; employee invite caller is 403"
   expect(inviteResponse.status()).toBe(201);
   const { user_id } = (await inviteResponse.json()) as { user_id: string };
 
-  // Verify the row landed with role='admin' via the admin client.
-  const { data: profile } = await admin
+  // Verify the row landed with role='admin' via the seeder client.
+  const { data: profile } = await createSeederClient()
     .from("profiles")
     .select("role")
     .eq("id", user_id)
