@@ -3586,10 +3586,23 @@ though it too is not invoked by CI.
 problem: #179 is about where the value is written down, this is about what the role can
 do once it authenticates. Fixing #179 does not fix this.
 
-**Fix scope**: small if the answer is a migration (`GRANT SELECT, UPDATE ON
-public.profiles TO service_role`, or a broader per-table sweep); larger if the answer is
-that seeders and test setup should stop using service-role DML and go through the same
-RPC/trigger paths production uses. That is a design call, not a mechanical one.
+**DECIDED 2026-08-14 — Option B, a purpose-made seeding identity.** Mohamed resolved the design
+call: test setup and both seeders will write as a **purpose-made seeding identity** that exists
+only for local and CI seeding — **not** by granting table DML to `service_role`. Reason: widening
+the existing elevated identity's reach for a test convenience puts more tables permanently within
+reach of a key whose job is to have no limits; a purpose-made identity starts with nothing, so its
+reach is exactly what is deliberately granted and its worst-case credential leak is bounded by
+what seeding needs. Whatever is granted lands as a migration that eventually reaches the cloud
+database, so it was decided on that basis. Redesigning the tooling to seed through production's
+RPC/trigger paths is explicitly **out of scope**; the two misleading comments above are corrected
+when the fix lands; the runtime-secret-posture checks must cover the new identity. Full record,
+including the rejected Option A: `docs/DECISIONS.md` 2026-08-14.
+
+**Fix scope** *(written before the decision above; its two options are superseded — the answer is
+a third: a new scoped identity plus repointing the three consumers)*: small if the answer is a
+migration (`GRANT SELECT, UPDATE ON public.profiles TO service_role`, or a broader per-table
+sweep); larger if the answer is that seeders and test setup should stop using service-role DML and
+go through the same RPC/trigger paths production uses. That is a design call, not a mechanical one.
 **Address by**: before the next feature that needs a green e2e run as evidence.
 
 ### `--color-border` self-reference, and the control-boundary contrast it was masking (#209)
