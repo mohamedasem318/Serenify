@@ -73,6 +73,27 @@ export const CONSENT_REGISTRY: Readonly<Record<ConsentTextKey, readonly ConsentR
         "accepted as the cost of the change when it was decided. Published together with the " +
         "wording itself in lib/legal/copy.ts.",
     },
+    {
+      versionId: "terms_privacy@2026-08-15.1",
+      publishedOn: "2026-08-15",
+      materiality: "material",
+      rationale:
+        "Feature 014 (recommendations). The Privacy Policy gains a wholly new recorded data " +
+        "class — suggestion records: what was suggested, what was opened, whether it helped, " +
+        "and what was swapped away — plus a ninety-day retention statement for that class in " +
+        "the same policy-not-a-mechanism framing as monitoring readings. Judged MATERIAL. The " +
+        "published criterion is that a material revision changes what you are agreeing to, and " +
+        "an acceptance recorded before this revision covered a policy that did not disclose " +
+        "this recording at all; a new class of recorded behavioural data sits above the bar " +
+        "#198 set with a terminology re-mapping. The counter-reading — additive disclosure of " +
+        "owner-private records derived from readings already consented to, closer in " +
+        "consequence to the 2026-08-13 band rename that was judged non-material — was " +
+        "considered and rejected: the band rename reworded an existing value inside an " +
+        "already-disclosed category, while this revision discloses recording that no accepted " +
+        "text mentioned, and its prompt-fatigue half rested on proximity to the 2026-08-12/13 " +
+        "re-prompts, which this feature's merge will not have. Published together with the " +
+        "wording itself in lib/legal/copy.ts (feature 014).",
+    },
   ],
   camera_inference: [
     {

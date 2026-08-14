@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — **three remain by design** (see Notes)
+- [x] No [NEEDS CLARIFICATION] markers remain (all resolved in the 2026-08-14 `/speckit-clarify` session; see Notes)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,11 +31,12 @@
 
 ## Notes
 
-- Three [NEEDS CLARIFICATION] markers remain **at Mohamed's explicit direction** — the feature
-  brief instructed that decisions he has not given (library size and category set, per-day
-  pick/swap budget, retention period for the new data class) be recorded as clarification
-  items rather than decided, to be answered in `/speckit-clarify`. They are cross-listed in
-  the spec's "Open items" section.
+- The three [NEEDS CLARIFICATION] markers the brief deliberately left open (library size and
+  category set, pick/swap budget, retention period) were all answered in the 2026-08-14
+  `/speckit-clarify` session, along with the episode-boundaries question that surfaced while
+  applying the budget answer. The spec's Clarifications section records the answers; its
+  "Open items" section now reads "None". This checklist item was stale between the clarify
+  session and the plan pass and was corrected during `/speckit-plan`.
 - The approved state mock has been supplied and reconciled (2026-08-14): it now lives at
   `docs/mockups/serenify-014-things-that-might-help-mock.html` (gitignored, local-only, per
   mock convention). Its states match the spec; its behavioural additions are folded in as

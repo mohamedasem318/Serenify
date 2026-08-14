@@ -7764,3 +7764,42 @@ resets), so on any database where only migrations ran — the cloud included —
 The identity carries no secret: its JWT is derived at runtime from the CLI's public local dev
 secret and validates nowhere else. **Rejected**: granting SELECT (anchor_vector) to make the
 old single-statement anchor upsert work — a convenience against a structural privacy invariant.
+
+---
+
+## 2026-08-15 — 014 recommendations data class is a MATERIAL terms_privacy revision (`terms_privacy@2026-08-15.1`)
+
+**Status**: Accepted — Mohamed's decision on the plan's materiality judgment
+(`specs/014-recommendations/plan.md` §Legal), applied during the 014 plan amendment. Registry
+entry appended and snapshot-locked in the same change; `camera_inference` untouched.
+
+**Decision**: feature 014's Privacy Policy change — a wholly new recorded data class
+(suggestion records: what was suggested, what was opened, whether it helped, what was swapped
+away) plus a ninety-day retention statement for it in the existing "a policy, not a mechanism"
+framing — is classified **material**. Everyone whose recorded `terms_privacy` acceptance
+predates `terms_privacy@2026-08-15.1` is re-prompted once the wording ships. The wording edit
+to `apps/web/lib/legal/copy.ts` lands in the same PR as the registry entry, per the feature-013
+publishing rule (research.md §6.1: text diff beside its classification).
+
+**Reasoning**: the published criterion (`TERMS_CHANGES_P2`) is that a material revision changes
+what you are agreeing to. An acceptance recorded before this revision covered a policy that did
+not disclose this recording at all; recording a person's behavioural response to stress
+suggestions is new processing, not a rewording. The #198 precedent set the materiality bar at a
+terminology re-mapping — no change to what was collected — and a new data class sits above
+that bar in substance.
+
+**Counter-reading, considered and rejected**: the class is derived from readings the person
+already consented to, is owner-private with no manager/admin/aggregate visibility (FR-025),
+and the change is purely additive disclosure — in consequence closer to the 2026-08-13 band
+rename (Amendment 23), which was judged non-material with no registry entry. Rejected on two
+grounds. First, the band rename reworded an existing value inside an already-disclosed
+category, while this revision discloses recording that no accepted text mentioned — different
+in kind, not degree. Second, the prompt-fatigue argument (users were re-prompted for #198 on
+2026-08-12/13; a third prompt soon after would train click-through) rests entirely on
+proximity to those re-prompts, and this feature will not merge close enough to them for that
+cost to be real.
+
+**Cross-references**: `apps/web/lib/consent/registry.ts` (`terms_privacy@2026-08-15.1`);
+`apps/web/tests/unit/lib/consent/published-revisions.snapshot.json` (locked);
+`specs/014-recommendations/plan.md` §Legal; this file 2026-08-12 (#198) and 2026-08-13 (band
+rename) — the two precedents weighed.

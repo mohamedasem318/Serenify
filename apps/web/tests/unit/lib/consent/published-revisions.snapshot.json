@@ -18,7 +18,12 @@
     "2026-08-12 (#198): both texts gained a second revision in one PR — the terminology",
     "change that makes \"check-in\" mean the camera-based monitoring session in the",
     "documents as well as the app, and renames the text questionnaire to the weekly",
-    "work-environment survey. Both classified material; both now locked here too."
+    "work-environment survey. Both classified material; both now locked here too.",
+    "",
+    "2026-08-15 (feature 014): terms_privacy gained a third revision — the Privacy",
+    "Policy's new suggestion-records data class and its ninety-day retention statement.",
+    "Classified material (Mohamed's decision, docs/DECISIONS.md 2026-08-15);",
+    "camera_inference untouched. Locked here in the same PR as the wording."
   ],
   "terms_privacy": [
     {
@@ -32,6 +37,12 @@
       "publishedOn": "2026-08-12",
       "materiality": "material",
       "rationale": "Terminology (#198). The documents previously reserved \"check-in\" for the text questionnaire and called the camera capture a \"monitoring session\", while the application's primary action read \"Start check-in\" and turned a camera on. Both documents now say plainly that a check-in IS the camera-based monitoring session, and the questionnaire is renamed throughout to the weekly work-environment survey. Judged MATERIAL, not cosmetic. Nothing about what is collected, where it goes, who can see it, or how long it is kept has changed — but the words that tell a reader which of two things a consent covers have, and one of those two things turns on a camera. A person who accepted the earlier wording accepted a document in which \"check-in\" meant the text questionnaire; under this revision the same word means the webcam capture. Asking again is the only honest reading of that, and it is what FR-043a's \"judgement made by a person\" is for — a text-diff heuristic would plausibly have called a noun swap cosmetic. Re-prompting every existing holder was accepted as the cost of the change when it was decided. Published together with the wording itself in lib/legal/copy.ts."
+    },
+    {
+      "versionId": "terms_privacy@2026-08-15.1",
+      "publishedOn": "2026-08-15",
+      "materiality": "material",
+      "rationale": "Feature 014 (recommendations). The Privacy Policy gains a wholly new recorded data class — suggestion records: what was suggested, what was opened, whether it helped, and what was swapped away — plus a ninety-day retention statement for that class in the same policy-not-a-mechanism framing as monitoring readings. Judged MATERIAL. The published criterion is that a material revision changes what you are agreeing to, and an acceptance recorded before this revision covered a policy that did not disclose this recording at all; a new class of recorded behavioural data sits above the bar #198 set with a terminology re-mapping. The counter-reading — additive disclosure of owner-private records derived from readings already consented to, closer in consequence to the 2026-08-13 band rename that was judged non-material — was considered and rejected: the band rename reworded an existing value inside an already-disclosed category, while this revision discloses recording that no accepted text mentioned, and its prompt-fatigue half rested on proximity to the 2026-08-12/13 re-prompts, which this feature's merge will not have. Published together with the wording itself in lib/legal/copy.ts (feature 014)."
     }
   ],
   "camera_inference": [
