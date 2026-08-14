@@ -77,7 +77,7 @@ assumed (spec SC-003, contracts/recommendation-storage-rls.md).
 **before** any surface is built against them (plan §Library authoring; spec FR-004,
 SC-008). No placeholder copy may survive to the PR.
 
-- [ ] T004 Author the library and the deterministic strings in
+- [X] T004 Author the library and the deterministic strings in
       `apps/web/lib/recommendations/library.ts`: the `RecommendationCategory` /
       `LibraryItem` types (data-model §1), then **fifteen real items** — three per
       category across `breathing_grounding`, `movement`, `sensory_reset`,
@@ -100,7 +100,7 @@ SC-008). No placeholder copy may survive to the PR.
       checkbox** — the implementer cannot tick it; an unreviewed library is treated as
       placeholder and the PR cannot merge with it. **Acceptance**: Mohamed's approval
       recorded on the PR/branch (SC-008: zero shipped items in violation).
-- [ ] T006 [P] Structural library guard
+- [X] T006 [P] Structural library guard
       `apps/web/tests/unit/lib/recommendations/library.test.ts`: exactly the five fixed
       categories, ≥3 items each (15 in v1), unique slugs matching
       `^[a-z0-9-]{1,64}$`, non-empty title/whyLine/durationLabel/steps, **no placeholder
