@@ -16,6 +16,9 @@ both seed scripts repointed; `service_role` kept for auth-admin calls only and *
 both scripts refuse remote targets at startup (CHANGELOG); the two misleading comments corrected;
 posture test extended to the new identity + a seeder-identity unit test. `cross-tab-auth-sync` got
 the #265 suppress seam — a latent #256 modal blocker unexercisable while seeding was broken.
+`test_privacy.py`'s monitoring-policy guard (which rightly failed CI on the first push) now pins
+the three seeder policies as the one sanctioned exception: each must be `TO serenify_seeder`, the
+manager-token ban stays universal, and any new seeder policy fails the exact-set assertion.
 **Verified — all from a fresh `supabase db reset --local` with NO manual grant** (probe:
 `service_role` has zero DML on every public table): live PostgREST probes incl. negatives (anchor
 bytes unreadable, raw-signal columns unwritable, DELETE denied everywhere); Vitest 146 files /

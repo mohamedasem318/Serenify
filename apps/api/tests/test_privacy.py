@@ -238,9 +238,21 @@ def test_no_manager_policy_on_monitoring_tables():
     assert policies, "expected RLS policies on the monitoring tables — found none"
     for name, table, body in policies:
         lowered = body.lower()
-        # Every policy is self-scoped to the owner …
-        assert "auth.uid() = user_id" in lowered, f"{name} on {table} is not owner-self-scoped"
-        # … and none reaches for a manager / cross-user relationship.
+        if "_seeder_" in name:
+            # The ONE sanctioned exception (#208, DECISIONS 2026-08-14): the
+            # purpose-made seeding identity's fixture policies. They must be
+            # scoped to that role explicitly — never a blanket policy that
+            # widens what anon/authenticated can evaluate — and the role is
+            # not assumable in production (NOLOGIN; `GRANT … TO authenticator`
+            # exists only in supabase/seed.sql, which db push never ships).
+            assert "to serenify_seeder" in lowered, (
+                f"{name} on {table} must be scoped TO serenify_seeder"
+            )
+        else:
+            # Every client-facing policy is self-scoped to the owner …
+            assert "auth.uid() = user_id" in lowered, f"{name} on {table} is not owner-self-scoped"
+        # … and NO policy, the seeder's included, reaches for a manager /
+        # cross-user relationship.
         for token in _MANAGER_TOKENS:
             assert token not in lowered, f"{name} on {table} references a manager token: {token!r}"
 
@@ -253,6 +265,12 @@ def test_only_owner_self_policies_exist_on_monitoring_tables():
         "ms_update_self",
         "wr_select_self",
         "wr_insert_self",
+        # The seeding identity's fixture policies (#208) — the exact set, so a
+        # new seeder policy (e.g. a DELETE, or one on window_readings SELECT)
+        # fails this test and forces a deliberate decision.
+        "ms_seeder_select",
+        "ms_seeder_insert",
+        "wr_seeder_insert",
     }
 
 
