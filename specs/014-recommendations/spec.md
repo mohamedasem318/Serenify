@@ -10,6 +10,16 @@
 
 **Terminology** (binding, per `CLAUDE.md` and Amendment 22): the display bands are **Calm / Uneasy / Tense** (internal enum `at_ease` / `a_little_tense` / `tense`). A **check-in** is a monitoring session — the camera one. A **confirmed detection** means the employee answered "Yes, that's me" on feature 012's confirmatory prompt during an active monitoring session. **Reflective copy** is the card's own first-person-adjacent text in states 2 and 9; **item copy** is a library item's title and instructions.
 
+## Clarifications
+
+### Session 2026-08-14
+
+- Q: Library size and category set (FR-004)? → A: Five categories, three items each — fifteen items. Categories: breathing and grounding; movement; sensory reset; taking a break; connection. The category set is load-bearing and fixed; the count is a starting point and may grow without a spec change. Item contents are a separate authoring pass Mohamed reviews line by line, not written in this spec.
+- Q: Pick and swap budget (FR-018)? → A: Three picks per episode — the initial pick plus two swaps — after which the swap action retires for that episode with an honest line. Per episode, not per day; a later confirmed detection on the same day gets its own budget. No item repeats within a day once opened or swapped away; when that rule and the budget conflict, the non-repeat rule wins and the swap retires early.
+- Q: Retention for recommendation records (FR-027)? → A: Ninety days, matching the monitoring-readings period the Privacy Policy already states, in its existing "a policy, not a mechanism" framing (verified: no scheduled purge job exists today). The record is derived from a reading and must not outlive its parent.
+- Requirement change (FR-030): the card stays silent, but a failed outcome write MUST retry once before giving up — the outcome answer is the only signal feature 015 consumes. A failed swap still degrades silently with no retry.
+- Q: Episode boundaries, and whether the state-8 replacement has its own budget (FR-018)? → A: An episode is one stress event and its response. It starts at the first reading that warrants a pick — Uneasy or Tense, confirmed or not. Confirmation mid-episode does not start a new episode: same pick, same remaining budget, only prominence changes (state 3 → state 4, which the mock renders as the same pick and the same words) — so the earlier "a later confirmed detection gets its own budget" applies when the detection arrives after an outcome closed the prior episode. It ends when an outcome is recorded — helped, or didn't help with no replacement taken; the state-8 replacement draws on the same budget and continues the episode — or at the local day boundary, whichever comes first. A continuously elevated stretch is one episode, not a series. The state-9 re-arm is a new stress event: a new episode with a fresh budget. One shared budget of three picks per episode — the state-8 immediate replacement consumes a pick from that budget, not a separate allowance, because three items surfaced during a single stress episode is the ceiling regardless of whether the earlier ones were swapped away or tried and found unhelpful, and two budgets would let a person cycle through the library while tense — the behaviour the one-item-at-a-time design exists to prevent. Consequence the mock does not cover: state 8's replacement can be unavailable (budget spent, or the day's non-repeat rule leaves nothing eligible); a no-replacement variant of state 8 keeps the neutral treatment and the acknowledgement word, drops the replacement action, and says honestly that there is nothing further for now before settling to state 9 — no consolation action fills the gap.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A pick when the day turns tense (Priority: P1)
@@ -68,16 +78,16 @@ An employee with no reading yet today sees the card name that cause — not a va
 
 ### User Story 4 - Swapping away (Priority: P3)
 
-An employee who doesn't want the current pick swaps it for something else. Swapping is a preference, not an outcome: no acknowledgement, no ceremony — the next pick simply appears. Swaps are finite; when the day's picks are exhausted, the swap action retires for the day with an honest line rather than repeating.
+An employee who doesn't want the current pick swaps it for something else. Swapping is a preference, not an outcome: no acknowledgement, no ceremony — the next pick simply appears. Swaps are finite; when the episode's picks are exhausted — or the day's non-repeat rule leaves nothing eligible — the swap action retires for that episode with an honest line rather than repeating.
 
 **Why this priority**: Swapping makes the single-pick model livable, and its signal (distinct from "didn't help") is what feature 015 will learn from — but the card is useful without it.
 
-**Independent Test**: Swap repeatedly until the day's picks are exhausted; verify each swap is recorded as a swap (not an outcome), the item changes without ceremony, and the final state is an honest retirement, not a repeat.
+**Independent Test**: Swap repeatedly until the episode's three picks are exhausted; verify each swap is recorded as a swap (not an outcome), the item changes without ceremony, the final state is an honest retirement, not a repeat, and no item opened or swapped away earlier in the day reappears.
 
 **Acceptance Scenarios**:
 
 1. **Given** a pick is shown, **When** the employee swaps it away, **Then** a different item appears with no acknowledgement and no ceremony (state 10), and the swap is recorded as its own signal, distinct from "didn't help".
-2. **Given** the day's picks are exhausted, **When** the employee would swap again, **Then** the swap action retires for the day with an honest line rather than repeating items.
+2. **Given** the episode's three picks are exhausted — or the day's non-repeat rule has left no eligible item — **When** the employee would swap again, **Then** the swap action retires for that episode with an honest line rather than repeating items.
 3. **Given** an item is expanded (state 5), **Then** the swap and Ren actions are withdrawn while the instructions are open.
 
 ---
@@ -87,7 +97,8 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 - A new confirmed detection arrives while an outcome prompt is pending → the new detection wins; the stale prompt disappears without recording an answer (US2 scenario 4).
 - The generation provider is down, slow, or returns copy that fails validation → deterministic fallback renders; the card never blocks on generation.
 - A Calm day whose data cannot yield a true specific line → state 1's shape, never a generic affirmation.
-- The day's picks are exhausted → swap retires honestly for the day.
+- The episode's picks are exhausted, or the day's non-repeat rule leaves no eligible item → swap retires honestly for that episode (early, if the non-repeat rule bit first).
+- "Didn't help" arrives with no pick left (the episode's shared budget is spent, or the non-repeat rule leaves no eligible item) → state 8's no-replacement variant: the same neutral treatment and acknowledgement word, no replacement action, an honest line that there is nothing further for now, then state 9.
 - The local day boundary passes → everything resets (pick history, swap budget, outcome prompts, reflective copy), consistent with today-card day semantics.
 - Readings shift back to Uneasy/Tense after an outcome was recorded → the at-rest card re-arms.
 - The card must never interrupt: Uneasy/Tense updates are quiet; only a confirmed detection makes it prominent.
@@ -109,7 +120,7 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
   | 5 | Item expanded | Instructions visible, library text verbatim; swap and Ren actions withdrawn. |
   | 6 | Outcome prompt | Appears only after the item was opened and its instructions closed. Asked once. Ignoring it is a valid answer and costs nothing. |
   | 7 | Recorded, helped | Acknowledgement, no grading. |
-  | 8 | Recorded, didn't help | The same acknowledgement word as state 7, and the only path that offers an immediate replacement. |
+  | 8 | Recorded, didn't help | The same acknowledgement word as state 7, and the only path that offers an immediate replacement; the replacement draws on the episode's shared three-pick budget (FR-018). When no pick remains — budget spent, or the day's non-repeat rule leaves nothing eligible — a **no-replacement variant** keeps the same neutral treatment and acknowledgement word, drops the replacement action, and says honestly that there is nothing further for now before settling to state 9. No consolation action fills the gap. |
   | 9 | At rest after an outcome | Does not immediately push another pick; re-arms if the day shifts again; copy does not claim the day is over. |
   | 10 | Swapped away | No acknowledgement, no ceremony; the next pick appears. |
 
@@ -117,7 +128,7 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 
 - **FR-002**: Selection MUST be deterministic — rules over the day's band readings, time of day, and what has already been shown, opened, or swapped away today. Identical inputs MUST produce an identical pick. No model chooses the item.
 - **FR-003**: The engine MUST surface exactly one item at a time.
-- **FR-004**: Items MUST come from a small library authored and reviewed by Mohamed. Titles and instructions render verbatim; item copy is never generated. [NEEDS CLARIFICATION: library size and the category set have not been decided — to be answered in /speckit-clarify.]
+- **FR-004**: Items MUST come from a small library authored and reviewed by Mohamed. Titles and instructions render verbatim; item copy is never generated. The v1 library holds fifteen items: five categories with three items each. The categories are **breathing and grounding, movement, sensory reset, taking a break, and connection**. The category set is load-bearing — feature 015 generates instances within a category this feature has already reviewed — and MUST NOT change without a spec change; the per-category count is a starting point and may grow without one. The items themselves are not written in this spec: the library's contents are a separate authoring pass that Mohamed reviews line by line.
 - **FR-005**: Every library item MUST carry a category, and selection MUST be expressible over categories, so that feature 015 can generate specific instances within a category this feature has already reviewed.
 - **FR-006**: The engine MUST read preferences from a source that returns a neutral default in v1, so that 015 replaces the source rather than the engine. This spec states the requirement only; the seam's shape is a plan decision.
 
@@ -140,8 +151,8 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 - **FR-015**: Opening an item is the engagement record. The system MUST record what was suggested, what was opened, and the outcome answer when one is given.
 - **FR-016**: The outcome prompt MUST appear only after the item was opened and its instructions closed, MUST be asked once per engagement, and ignoring it MUST record nothing and cost nothing.
 - **FR-017**: "Didn't help" (an outcome) and swapping away (a preference) are two different signals and MUST be recorded distinctly. Feature 015 will read both.
-- **FR-018**: Swapping is finite. Once the day's picks are exhausted, the swap action MUST retire for the day with an honest line rather than repeating. [NEEDS CLARIFICATION: the per-day pick/swap budget has not been decided — to be answered in /speckit-clarify.]
-- **FR-019**: Everything — pick history, swap budget, outcome prompts, reflective copy — MUST reset at the local day boundary, consistent with today-card day semantics.
+- **FR-018**: Swapping is finite: each episode carries **one shared budget of three picks**. The initial pick, each swap (state 10), and the state-8 immediate replacement all draw on that same budget — the replacement is not a separate allowance, because three items surfaced during a single stress episode is the ceiling regardless of whether the earlier ones were swapped away or tried and found unhelpful, and a second budget would let a person cycle through the library while tense — the behaviour the one-item-at-a-time design exists to prevent. When no pick remains, the swap action MUST retire for that episode with an honest line rather than repeating, and state 8 MUST render its no-replacement variant (FR-001). An **episode** is one stress event and its response. It starts at the first reading that warrants a pick — Uneasy or Tense, confirmed or not. A confirmation mid-episode does not start a new episode: the pick and the remaining budget carry over and only prominence changes (state 3 → state 4). A continuously elevated stretch is one episode, not a series. It ends when an outcome is recorded — helped, or didn't help with no replacement taken; taking the state-8 replacement continues the episode — or at the local day boundary, whichever comes first. The state-9 re-arm — a qualifying reading arriving after an outcome was recorded — is a new stress event and starts a new episode with a fresh budget; likewise a confirmed detection arriving after an outcome closed the prior episode gets its own budget. Independently, no item may repeat within a day once it has been opened or swapped away; when the non-repeat rule leaves too few eligible items to honour the budget, the non-repeat rule wins and the swap retires early.
+- **FR-019**: Everything — pick history (including the day's non-repeat exclusions), any in-flight episode budget, outcome prompts, reflective copy — MUST reset at the local day boundary, consistent with today-card day semantics.
 
 **Reflective copy generation (states 2 and 9)**
 
@@ -155,13 +166,13 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 
 - **FR-025**: Recommendations and their outcomes are private to the individual. They MUST NEVER be visible to a manager, an admin, a team lead, or any aggregate. This is a requirement of this feature, not an omission to be filled by feature 017.
 - **FR-026**: This feature creates a new data class — what was suggested, what was opened, whether it helped, what was swapped away. Per the Principle VIII standing rule, the Privacy Policy and Terms of Service MUST be reviewed and updated in the same PR.
-- **FR-027**: The Privacy Policy MUST state retention for this data class explicitly. [NEEDS CLARIFICATION: the retention period for recommendation records has not been decided — the existing policy keeps monitoring readings ninety days and other classes for the account's life; to be answered in /speckit-clarify.]
+- **FR-027**: The Privacy Policy MUST state retention for this data class explicitly: recommendation records are kept for ninety days, matching the stated period for monitoring readings — the record is derived from a reading and is meaningless without it, so it must not outlive its parent. The statement MUST use the policy's existing framing: a policy, not a mechanism — no purge job runs on a schedule today (verified: none exists) and none is promised.
 - **FR-028**: All card and item copy MUST follow the calm-first voice rules (Principle V): no exclamation marks, never alarmist or clinical, suggest rather than prescribe.
 
 **From the approved state mock** (behavioural facts the mock carries beyond the brief; `docs/mockups/serenify-014-things-that-might-help-mock.html`)
 
 - **FR-029**: The recorded end-states (states 7 and 8) MUST render and dwell before the card moves to state 9, following the feature 012 D-6 precedent for questionnaire end-states: an end-state that resolves synchronously with the surface swap can be dropped entirely.
-- **FR-030**: The card MUST have no error state. A failed swap or a failed outcome write MUST NOT surface as an error on this card — the whole surface is optional — and MUST degrade silently to the previous pick or previous state.
+- **FR-030**: The card MUST have no error state — nothing on this surface renders as an error; the whole surface is optional. A failed swap MUST degrade silently to the previous pick, with no retry. A failed outcome write MUST retry once before giving up, and only then degrade silently to the previous state: the outcome answer is the only signal feature 015 consumes, so losing it to a single transient failure is data loss with a downstream cost, not a cosmetic degradation.
 - **FR-031**: The outcome prompt MUST NOT render over the open instructions; it becomes eligible only once the instructions are closed (refines FR-016).
 
 ### Key Entities
@@ -204,10 +215,6 @@ An employee who doesn't want the current pick swaps it for something else. Swapp
 - The library review is an editorial review by Mohamed before the library ships; the review checklist is the content-safety invariants (FR-007–FR-009) plus the calm-first voice rules.
 - Feature 012's data and instruments are otherwise untouched; this feature changes only the resolution of the "Yes, that's me" path.
 
-## Open items — deferred to /speckit-clarify
+## Open items
 
-Recorded here rather than decided, at Mohamed's direction; the three [NEEDS CLARIFICATION] markers above correspond 1:1.
-
-1. **Library size and category set** (FR-004): how many items ship in v1, and which categories exist.
-2. **Per-day pick/swap budget** (FR-018): how many picks a day holds before the swap action retires.
-3. **Retention period for recommendation records** (FR-027): the Privacy Policy must state one explicitly; which one is a decision not yet given.
+None. The three original open items and the episode-boundaries item that surfaced while applying the per-episode budget were all resolved in the 2026-08-14 clarification session (see Clarifications). No [NEEDS CLARIFICATION] markers remain.
