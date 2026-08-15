@@ -459,6 +459,16 @@ day-repeat.
       `terms_privacy@2026-08-15.1`. **And** the new suggestion-records sentence in (3)
       above must take the **manager/admin/employer shape, NOT the "no way in exists"
       shape** — the latter is precisely what broke here.
+      **PLUS (added 2026-08-16, US3 adversarial-review finding — plan §Legal item 5): the
+      Groq processor bullet in `PRIVACY_PROCESSORS_ITEMS` must disclose the
+      reflective-copy flow.** Once 014 ships, the reflective facts bundle — check-in
+      count, times, band labels (health-related sensitive data under the policy's own
+      PDPL framing), tried-item title/time, the fallback sentence — goes to Groq in the
+      US on every state-2/9 cache miss, on a plain home render, with no chat opened. The
+      published "a companion conversation leaves the European Union in a way nothing else
+      in Serenify does" sentence becomes false. The bullet must name the flow, fix or
+      qualify that sentence, and say it happens without opening a conversation. T031
+      cannot be marked done without this either.
       **Acceptance**: `apps/web/tests/unit/lib/legal/copy-invariants.test.ts`
       green; the registry/snapshot guard suites stay green unchanged; no remaining
       absolute no-one-else claim in the Privacy Policy that infrastructure credentials
