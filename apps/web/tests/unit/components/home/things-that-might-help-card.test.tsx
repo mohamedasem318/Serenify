@@ -5,6 +5,7 @@ import {
   ThingsThatMightHelpCard,
   type ThingsThatMightHelpDeps,
 } from "@/components/home/things-that-might-help-card";
+import { ConfirmedPickCard } from "@/components/recommendations/confirmed-pick-card";
 import type { Band } from "@/lib/api/monitoring-client";
 import type { PickInsertRow, SurfacePickResult } from "@/lib/api/recommendations-client";
 import {
@@ -12,6 +13,7 @@ import {
   CARD_DESC_NOTHING_TO_SUGGEST,
   CARD_DESC_NO_READING,
   CARD_DESC_PICKED,
+  CARD_TITLE,
   DURATION_OPENED_LABEL,
   OUTCOME_QUESTION,
 } from "@/lib/recommendations/card-strings";
@@ -692,6 +694,268 @@ describe("ThingsThatMightHelpCard — quiet by construction", () => {
     await mount(h);
     await click("talk-to-ren");
     expect(h.calls.ren).toBe(1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T019 / US2 — state 4 is the mock's five small moves, and the monitor's own words
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The four user-visible strings the pick contributes, wherever it is rendered. Read through
+ * the SHARED `PickItem` testids, so the same helper works against the home card and against
+ * the monitor's `ConfirmedPickCard` without knowing which one is mounted.
+ */
+function pickStrings() {
+  return {
+    title: screen.getByTestId("pick-item-title").textContent,
+    why: screen.getByTestId("pick-item-why").textContent,
+    duration: screen.getByTestId("pick-item-duration").textContent,
+    steps: Array.from(screen.getByTestId("pick-item-steps").querySelectorAll("li")).map(
+      (li) => li.textContent,
+    ),
+    footNote: screen.queryByTestId("pick-item-footnote")?.textContent ?? null,
+  };
+}
+
+/** Every className on and under the card — the only place jsdom lets us see a visual claim. */
+function classNamesUnder(testId: string): string {
+  const root = screen.getByTestId(testId);
+  return [root, ...Array.from(root.querySelectorAll("*"))]
+    .map((el) => el.getAttribute("class") ?? "")
+    .join(" ");
+}
+
+const CONFIRMED_ROW = () => pickRow({ id: "pick-c", confirmedAtMs: AT(14, 10) });
+
+async function mountState4() {
+  const h = harness({ bands: UNEASY_DAY, picks: [CONFIRMED_ROW()] });
+  const view = await mount(h);
+  expectState(4);
+  return { h, view };
+}
+
+async function mountState3() {
+  const h = harness({ bands: UNEASY_DAY });
+  const view = await mount(h);
+  expectState(3);
+  return { h, view };
+}
+
+describe("ThingsThatMightHelpCard — state 4 is the mock's FIVE small moves, and no sixth", () => {
+  /**
+   * Prominence is the one place this card is allowed to raise its voice, and the mock is
+   * explicit that it does so through five small moves rather than one loud one. Each move is
+   * pinned separately below so a future "let's make it stand out more" edit fails a named
+   * test instead of quietly landing. happy-dom carries no stylesheet, so every claim is
+   * asserted on `className` — never with `toBeVisible()`.
+   */
+
+  it("move 1 — the amber rail, and ONLY when confirmed", async () => {
+    const { view } = await mountState4();
+    const rail = screen.getByTestId("pick-item-rail");
+    expect(rail.className).toContain("w-[3px]");
+    expect(rail.className).toContain("bg-[var(--amber-soft-line)]");
+    view.unmount();
+
+    await mountState3();
+    expect(screen.queryByTestId("pick-item-rail")).toBeNull();
+  });
+
+  it("move 2 — the tint wash, the warm line and the 17px inset the rail sits in", async () => {
+    const { view } = await mountState4();
+    const item = screen.getByTestId("pick-item");
+    // The mock's own values: 42% amber tint over surface, amber-soft-line border, pl 17px.
+    expect(item.className).toContain("bg-[color-mix(in_srgb,var(--amber-tint)_42%,var(--color-surface))]");
+    expect(item.className).toContain("border-[var(--amber-soft-line)]");
+    expect(item.className).toContain("pl-[17px]");
+    view.unmount();
+
+    await mountState3();
+    const quiet = screen.getByTestId("pick-item");
+    expect(quiet.className).toContain("border-border");
+    expect(quiet.className).toContain("bg-bg");
+    expect(quiet.className).not.toContain("amber");
+  });
+
+  it("move 3 — the warm tile", async () => {
+    const { view } = await mountState4();
+    const tile = screen.getByTestId("pick-item-tile");
+    expect(tile.className).toContain("bg-[color-mix(in_srgb,var(--amber-tint)_70%,var(--color-surface))]");
+    expect(tile.className).toContain("text-amber-text");
+    view.unmount();
+
+    await mountState3();
+    expect(screen.getByTestId("pick-item-tile").className).toContain("text-muted");
+    expect(screen.getByTestId("pick-item-tile").className).not.toContain("amber");
+  });
+
+  it("move 4 — the title steps 17 → 19 px, and the why-line firms to ink", async () => {
+    const { view } = await mountState4();
+    expect(screen.getByTestId("pick-item-title").className).toContain("text-[19px]");
+    expect(screen.getByTestId("pick-item-why").className).toContain("text-[14.5px]");
+    expect(screen.getByTestId("pick-item-why").className).toContain("text-ink");
+    view.unmount();
+
+    await mountState3();
+    expect(screen.getByTestId("pick-item-title").className).toContain("text-[17px]");
+    expect(screen.getByTestId("pick-item-why").className).toContain("text-muted");
+  });
+
+  it("move 5 — the primary fills to meadow in state 4, and is outlined in state 3", async () => {
+    const { view } = await mountState4();
+    expect(screen.getByTestId("show-me").className).toContain("bg-meadow");
+    view.unmount();
+
+    await mountState3();
+    const outlined = screen.getByTestId("show-me");
+    expect(outlined.className).toContain("border-meadow");
+    expect(outlined.className).not.toContain("bg-meadow");
+  });
+
+  it("the filled CTA is state 4's alone — no other state on this card ever fills one", async () => {
+    // The check-in card above owns the page's filled primary; two identical primaries on one
+    // screen read as a bug. States 5/6/7/8/9/10 are walked here, not argued about.
+    const { view } = await mountState3();
+    expect(screen.getByTestId("show-me").className).not.toContain("bg-meadow");
+    await click("show-me"); // state 5
+    expectState(5);
+    expect(screen.getByTestId("close-instructions").className).not.toContain("bg-meadow");
+    await click("close-instructions"); // state 6
+    expectState(6);
+    expect(screen.getByTestId("outcome-helped").className).not.toContain("bg-meadow");
+    await click("outcome-helped"); // state 7
+    expectState(7);
+    expect(classNamesUnder("things-that-might-help")).not.toContain("bg-meadow");
+    await advance(DWELL_MS + 10); // state 9
+    expectState(9);
+    expect(classNamesUnder("things-that-might-help")).not.toContain("bg-meadow");
+    view.unmount();
+  });
+
+  it("there is no SIXTH move — state 4 renders the same shape as state 3, only dressed", async () => {
+    const shapeOf = () =>
+      Array.from(
+        screen.getByTestId("things-that-might-help").querySelectorAll("[data-testid]"),
+      )
+        .map((el) => el.getAttribute("data-testid"))
+        // The rail IS move 1; every other element must match, one for one.
+        .filter((id) => id !== "pick-item-rail");
+
+    const { view } = await mountState4();
+    const prominent = shapeOf();
+    // Not vacuous: there is a real item on screen to compare.
+    expect(prominent).toContain("pick-item-title");
+    view.unmount();
+
+    await mountState3();
+    expect(prominent).toEqual(shapeOf());
+  });
+
+  it("raises its voice with no crimson and no exclamation mark", async () => {
+    const { view } = await mountState4();
+    const classes = classNamesUnder("things-that-might-help");
+    // Not vacuous: prominence really is on screen, and it is amber, not crimson.
+    expect(classes).toContain("amber");
+    expect(classes).not.toContain("crimson");
+    expect(classes).not.toContain("destructive");
+    expectNoErrorSurface();
+    view.unmount();
+  });
+});
+
+describe("ThingsThatMightHelpCard — same pick, same words as the monitor (US2 scenario 2)", () => {
+  /**
+   * The acceptance scenario, asserted rather than asserted-about: the home card and the
+   * in-session `ConfirmedPickCard` are given the SAME pick row and the SAME library entry,
+   * and every word the person reads about the pick comes back identical. It holds by
+   * construction — both surfaces render the shared `PickItem` from the same `LibraryItem`,
+   * and both take their card-level words from `card-strings.ts` — and this test is what
+   * keeps that construction from being quietly dismantled later.
+   *
+   * The two surfaces are mounted one at a time, because they share `PickItem`'s testids.
+   */
+  it("renders identical pick strings on both surfaces, expanded", async () => {
+    const item = RECOMMENDATION_LIBRARY.find((i) => i.id === FIRST_PICK_ID)!;
+
+    const { view: home } = await mountState4();
+    expect(screen.getByTestId("card-description")).toHaveTextContent(CARD_DESC_CONFIRMED);
+    await click("show-me");
+    const fromHome = pickStrings();
+    home.unmount();
+
+    const monitor = render(
+      <ConfirmedPickCard
+        open
+        item={item}
+        paused={false}
+        onDismiss={() => {}}
+        onOpen={() => {}}
+        onOutcome={() => {}}
+        onPause={() => {}}
+        onResume={() => {}}
+      />,
+    );
+    await act(async () => {
+      screen.getByTestId("show-me").click();
+    });
+    const fromMonitor = pickStrings();
+
+    expect(fromMonitor).toEqual(fromHome);
+    // And they are the library's own words, not a coincidence of two empty strings.
+    expect(fromHome.title).toBe(item.title);
+    expect(fromHome.why).toBe(item.whyLine);
+    expect(fromHome.duration).toBe(item.durationLabel);
+    expect(fromHome.steps).toHaveLength(item.steps.length);
+    monitor.unmount();
+  });
+
+  it("carries the same card-level words on both surfaces", async () => {
+    const item = RECOMMENDATION_LIBRARY.find((i) => i.id === FIRST_PICK_ID)!;
+
+    const { view: home } = await mountState4();
+    expect(screen.getByTestId("things-that-might-help")).toHaveTextContent(CARD_TITLE);
+    expect(screen.getByTestId("card-description")).toHaveTextContent(CARD_DESC_CONFIRMED);
+    home.unmount();
+
+    const monitor = render(
+      <ConfirmedPickCard
+        open
+        item={item}
+        paused={false}
+        onDismiss={() => {}}
+        onOpen={() => {}}
+        onOutcome={() => {}}
+        onPause={() => {}}
+        onResume={() => {}}
+      />,
+    );
+    expect(document.body).toHaveTextContent(CARD_TITLE);
+    expect(document.body).toHaveTextContent(CARD_DESC_CONFIRMED);
+    monitor.unmount();
+  });
+
+  it("both surfaces render the pick prominently — state 4 is state 4 wherever it appears", async () => {
+    const item = RECOMMENDATION_LIBRARY.find((i) => i.id === FIRST_PICK_ID)!;
+
+    const { view: home } = await mountState4();
+    expect(screen.getByTestId("pick-item")).toHaveAttribute("data-prominent", "true");
+    home.unmount();
+
+    const monitor = render(
+      <ConfirmedPickCard
+        open
+        item={item}
+        paused={false}
+        onDismiss={() => {}}
+        onOpen={() => {}}
+        onOutcome={() => {}}
+        onPause={() => {}}
+        onResume={() => {}}
+      />,
+    );
+    expect(screen.getByTestId("pick-item")).toHaveAttribute("data-prominent", "true");
+    monitor.unmount();
   });
 });
 
