@@ -7924,3 +7924,35 @@ available in state 4.
 (§3 ConfirmedPickCard, §Interruption rule); this file 2026-08-15 (the `service_role` correction,
 which supplies the infrastructure-credential facts behind the T031 legal corrections);
 `docs/BACKLOG.md` (#270).
+
+---
+
+## 2026-08-16 — REVERSAL: a failed swap no longer consumes a budget slot (revises 2026-08-15 ruling batch, point b)
+
+**Status**: Accepted — Mohamed's Amendment 2, 2026-08-16. Reverses ONE point of Ruling B as
+recorded in this file's 2026-08-15 "014 ruling batch" entry: the accepted budget-slot loss on
+a failed swap. Every other point of Ruling B stands unchanged — stamp `swapped_away_at` first,
+then INSERT the replacement; on INSERT failure re-run the engine once; if that also fails keep
+the previous pick and stop; no retry loop; the stamp is never reversed.
+
+**The reversal**: a swap whose replacement INSERT fails must NOT consume a pick from the
+episode's budget of three.
+
+**Reason**: a person should not lose a suggestion because a write failed on our side. The
+prior position protected the accounting; this one protects the person. The stamp itself still
+stands — it is a true preference signal and a non-repeat exclusion, and reversing it was
+rejected then and stays rejected now — but a stamp with no successor row charges nothing.
+
+**Consequence, recorded so no reducer gets it wrong**: budget accounting can no longer be
+derived from stamp count alone. Consumption counts replacement rows that actually landed —
+the episode's surfaced picks — which is exactly the `3 − count(rows WHERE episode_id =
+current)` derivation in data-model §3. A stamped pick with no successor row appears in the
+non-repeat exclusions and in the preference record, and in nothing that charges the budget.
+
+**Documents amended in this change**: `specs/014-recommendations/contracts/
+recommendation-storage-rls.md` §Swap write ordering point 5; `specs/014-recommendations/
+plan.md` §Failed writes point 5; `specs/014-recommendations/tasks.md` T010 and T028.
+
+**Cross-references**: this file 2026-08-15 ("014 ruling batch", point b — the reversed
+position, unedited); `specs/014-recommendations/data-model.md` §3 (the row-count derivation
+that now carries the accounting).
