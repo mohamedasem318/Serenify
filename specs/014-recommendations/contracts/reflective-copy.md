@@ -92,8 +92,11 @@ never sees one text replaced by another. Rules, in order:
 
 - Skeleton budget 800 ms (reader-facing, above); background generation budget ≈ 3.5 s
   (request timeout below it); both expiries resolve to the deterministic string.
-- Cache (FR-022): `sessionStorage`, key = SHA-fingerprint of `(state, facts minus
-  fallbackText, local_day)`. Same fingerprint → reuse without a network call; changed
+- Cache (FR-022): `sessionStorage`, key = a deterministic canonical-JSON fingerprint of
+  `(state, facts minus fallbackText, local_day)` (amended 2026-08-16 from "SHA-fingerprint":
+  a browser SHA is `crypto.subtle.digest`, which is async — an async key would put the
+  cache-hit path a microtask behind first paint, breaking §First paint rule 1; canonical
+  serialisation is synchronous, deterministic, and injective). Same fingerprint → reuse without a network call; changed
   fingerprint (a state change by definition) → one regeneration. Day boundary changes the
   fingerprint (FR-019). Only **validated** text is ever cached.
 - The generated text is never persisted to the database.
