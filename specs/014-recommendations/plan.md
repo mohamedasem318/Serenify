@@ -141,9 +141,21 @@ packages/llm-client/
   (locked mark, foggy — Amendment 18/19 permits it only on Ren entry points), `BAND_LABEL`
   for any band vocabulary. The pick item block is one shared component rendered by both
   the home card and `ConfirmedPickCard` — "same pick, same words" is by construction.
-- **Failed writes** (FR-030): outcome UPDATE retries once then degrades silently; swap
-  failure degrades silently to the previous pick, no retry; nothing on the surface ever
-  renders as an error.
+- **Failed writes** (FR-030): outcome UPDATE retries once then degrades silently; nothing
+  on the surface ever renders as an error. **Swap ordering is RULED (Mohamed, 2026-08-15,
+  "Ruling B")** and is forced by the schema, not chosen: `rp_one_active_per_user_day` is a
+  partial unique index and the two writes are separate PostgREST requests with no
+  transaction, so insert-first would collide with the still-active outgoing row. Therefore
+  — (1) stamp the outgoing pick's `swapped_away_at` **first**, then INSERT the
+  replacement; (2) if the INSERT fails, **re-run the engine once** to refresh the card,
+  which now sees the declined pick and produces a new one (indistinguishable from a
+  successful swap, since swap has no ceremony); (3) if that also fails, keep the previous
+  pick on screen and stop — no retry loop, no error surface; (4) the stamp is **never
+  reversed**; (5) **a failed swap still consumes a budget slot — ACCEPTED design, not a
+  defect**: the expressed preference is the signal worth keeping, and refunding the slot
+  would discard it to protect a counter. Full text:
+  [contracts/recommendation-storage-rls.md](contracts/recommendation-storage-rls.md)
+  §Swap write ordering.
 
 ## The 012 coordinator change (highest-regression area)
 
@@ -186,10 +198,29 @@ Full shape: [data-model.md](data-model.md) +
 [contracts/recommendation-storage-rls.md](contracts/recommendation-storage-rls.md). One
 table, `recommendation_picks`, in the 011 owner-only posture: ENABLE+FORCE RLS, owner
 SELECT/INSERT/UPDATE, **no** DELETE/manager/admin/service-role policy; column-scoped
-UPDATE grants make identity columns immutable. Note for design and review:
-**`service_role` holds no SELECT or UPDATE (no DML at all) on any public table in this
-project** — `pg_default_acl`, recorded in the seeding-identity migration header — so no
-server-role read/write path exists to lean on, and none may be added. Dismissal
+UPDATE grants make identity columns immutable, and the migration carries an explicit
+`REVOKE ALL … FROM service_role`.
+
+**Standing invariant — no admin-key path, ever.** 014's table is unreachable by
+`service_role`. Every read and every write goes through the end user's own authenticated
+session under RLS (forwarded JWT + publishable anon key). No future task, fixture,
+endpoint, script, or migration may introduce an admin-key or service-key path to this
+data — not for convenience, not for a test, not for an admin screen. Widening it is a
+spec change, not an implementation-time judgement call.
+
+This replaces an earlier note in this section claiming service_role "holds no SELECT or
+UPDATE (no DML at all) on any public table in this project", so nothing needed closing.
+That was a local observation over-generalised to the deploy target. Read live on
+2026-08-15 against the linked cloud project: `pg_default_acl` there grants `service_role`
+full `arwdDxtm` on new public tables, every existing public table's `relacl` already
+carries it, and `rolbypassrls = true` for the role. **BYPASSRLS defeats RLS but not
+grants** — so on cloud the owner-only policies constrain that role not at all, and the
+explicit revoke is the only boundary that holds. It ships in
+`20260815090000_recommendation_picks.sql` and is pinned by
+`test_service_role_is_explicitly_revoked`. Reasoning and the deferred repo-wide sweep:
+`docs/DECISIONS.md` 2026-08-15.
+
+Dismissal
 (`swapped_away_at`) and "didn't help" (`outcome`) are separate columns and can never
 merge. `category` is denormalised onto each row so 015 can read category-level signals
 without joining the in-repo library; selection is category-first
@@ -226,6 +257,44 @@ skipped by rule; no `frontend-design`, no `design:*` plugins. The binding contra
   `QuestionnaireResultIcon`) and the state-10 fade; all under
   `prefers-reduced-motion`; swap has deliberately **no** ceremony.
 
+## Pause from the in-session card (scope addition — Mohamed, 2026-08-15)
+
+Several library items ask the person to leave the desk. Today the only in-session choices
+are ignore it or end the session, so acting on the suggestion costs them the session.
+`ConfirmedPickCard` therefore gains a pause action.
+
+**This adds a second entry point to shipped machinery, not new machinery.** Verified in
+the code: `handlePause` / `handleResume` in
+`components/monitor/monitoring-session.tsx` stop and reacquire the camera and PATCH
+`status='paused'` / `'active'` on the **same** session row; a neutral `PausedStage`
+already renders; **no migration is needed** — the `status` CHECK already accepts
+`'paused'`.
+
+Rules:
+
+- **Not per-item.** No logic decides which items "need" a pause. Every card exposes it.
+- **One control, not two.** The single control becomes a **resume** action while the
+  session is paused. There is never a second competing pause affordance. The card renders
+  outside the op-surface switch, so it stays visible on the paused surface beside the
+  existing Resume/End controls.
+- **Pausing is not an answer to the confirmatory prompt** — no budget spend, no confirm,
+  no dismiss, no false-alarm suppression. This is structurally true rather than carefully
+  maintained: the 012 budget is only ever spent via `finalize`, called from the three
+  answer handlers, and pause never calls `finalize`. The confirmatory machinery and its
+  pinned suites are untouched by pausing.
+- **Selection stays unaware of session state.** The engine has no input for "is a session
+  live" and none may be added without a spec change. Pause is the answer to
+  leave-the-desk items; it is not a selection rule.
+- The control is Hallmark-governed. The **home card is unaffected**.
+
+*Accepted, not fixed here*: resuming can auto-expire a still-visible confirmatory prompt —
+post-resume warm-up readings are non-sustaining, which expires a shown prompt as
+`signal_drop` at no budget cost and re-arms it. A pre-existing quirk of the shipped pause
+button, and moot for this card, which only exists after the prompt already resolved.
+
+Tasks: **T036** (the control) and **T037** (the server-side smoothing-buffer drop on
+pause, feature-008 code with a gate inside the task).
+
 ## Legal documents (same PR — Principle VIII standing rule)
 
 **Privacy Policy** (`apps/web/lib/legal/copy.ts`):
@@ -241,6 +310,32 @@ skipped by rule; no `frontend-design`, no `design:*` plugins. The binding contra
 3. `what-a-manager-can-see` — one sentence adding suggestion records to the
    never-visible class, in the `PRIVACY_CHAT_P1` "permanent and unconditional"
    register (FR-025).
+
+4. **Correct four published passages that are false against infrastructure credentials
+   — RULED (Mohamed, 2026-08-15), MERGE-BLOCKING within 014, folded into T031.** The
+   evidence is the same cloud verification recorded above: on the deploy target
+   `service_role` holds full `arwdDxtm` on public tables and both `service_role` and
+   `postgres` have `rolbypassrls = true`. Against that, three passages currently overclaim
+   and one is literally-true-but-misleading:
+   - `PRIVACY_SECURITY_P1` — claims database rules bind the database's own owner (cloud
+     `postgres` has BYPASSRLS, so they do not); claims consent records are "read by their
+     owner and by no one else" and "cannot be deleted at all, by anyone" (cloud
+     `service_role` / `postgres` can read and delete them). The UPDATE-blocking trigger is
+     real, so **"cannot be edited" stays**.
+   - `PRIVACY_MANAGER_DEFAULT` — "visible to you and to nobody else", stated absolutely;
+     false against infrastructure credentials.
+   - `PRIVACY_CHAT_P1` — "no second rule granting anyone else a way in" is literally true
+     and still misleading: a role exists that needs no rule.
+
+   **Manner of correction — do not simply delete the false sentences.** State plainly that
+   infrastructure credentials exist and what they can reach, in the register the policy
+   already uses for the Groq disclosure and for the missing purge job: name the thing, say
+   what it means, do not dress it up. **Claims about managers, admins, and the employer
+   stay absolute** — those are true, and weakening them would be its own inaccuracy. The
+   corrections ride the already-material `terms_privacy@2026-08-15.1` revision; no new
+   registry entry. And the new suggestion-records sentence (item 3 above) must take the
+   **manager/admin/employer shape**, never the "no way in exists" shape — the latter is
+   exactly what broke here.
 
 New copy must pass `copy-invariants.test.ts` (no numeric quality metrics, no `%`, no
 placeholder tokens, marker rules). **Terms of Service**: reviewed against the change; no
