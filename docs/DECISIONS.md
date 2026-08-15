@@ -7991,3 +7991,39 @@ in-repo). CI sets nothing; no test may require a real key.
 **Documents amended in this change**: plan §Constitution IX + §Generation with fallback;
 contracts/reflective-copy.md §Provider path; tasks T024 (credential-isolation test added) and
 T027; quickstart; smoke-tests ST-5.
+
+---
+
+## 2026-08-16 — the 014 legal list missed a new processor flow: reflective facts go to Groq passively
+
+**Status**: Recorded during implementation — found by the US3 adversarial review checkpoint,
+not by the plan. Scope added to T031 (plan §Legal item 5) the same day. The copy itself is
+still unwritten (T031); this entry records why the list grew.
+
+**The finding**: `POST /recommendations/reflective-copy` sends the reflective facts bundle —
+check-in count, preformatted times, band labels, tried-item title and time, the fallback
+sentence — to the LLM provider (Groq, United States) whenever home states 2/9 render with a
+cold cache. Band labels are exactly what the published Privacy Policy classes as
+health-related sensitive data under PDPL Law 151/2020. The published Groq bullet says "the
+conversation content described above is sent there" and that a companion conversation leaves
+the EU "in a way nothing else in Serenify does" — true when written, false once 014 ships:
+Ren's flow requires the person to open a conversation; this one fires on a plain home-page
+render with no user action.
+
+**Why the plan missed it**: the §Legal list was drawn up around the new data CLASS
+(suggestion records — storage, retention, visibility). The generation feature moved data to
+an existing processor through a new, passive path — a flow change, not a class change — and
+the list had no row for that shape. The standing Principle VIII rule ("whenever a feature
+changes what data is collected, WHERE IT GOES, who can see it…") covers it; the enumeration
+under it was incomplete.
+
+**Resolution**: T031 now additionally requires the Groq processor bullet to name the
+reflective-copy flow, fix or qualify the "nothing else" sentence, and state that it happens
+without opening a conversation. Merge-blocking like the rest of T031. Open question left for
+Mohamed (flagged for the next stop, not decided here): whether the
+`terms_privacy@2026-08-15.1` registry rationale — which names only "suggestion records" —
+needs a wording amendment, which would touch the locked snapshot.
+
+**Cross-references**: plan §Legal item 5; tasks.md T031; contracts/reflective-copy.md
+(the facts bundle); this file 2026-08-16 (Amendment 3 — the second credential the flow
+rides on).
