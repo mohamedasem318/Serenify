@@ -101,11 +101,10 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
     steps: [
       "Sit back and let your shoulders drop away from your ears.",
       "Breathe in through your nose for a count of four.",
-      "Hold for four, then out through your mouth for four.",
+      "Hold for four, then out through your mouth for four. If the holds feel awkward, drop them and just let the out-breath run a little longer.",
       "Hold for four, and go round again. Four rounds is plenty.",
     ],
-    footNote:
-      "The counting is most of the point, and it does not need to be neat. If the holds feel awkward, drop them and just let the out-breath run a little longer.",
+    footNote: "The counting is most of the point, and it does not need to be neat.",
   },
   {
     id: "feet-on-the-floor",
@@ -126,7 +125,7 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
     category: "breathing_grounding",
     title: "Three, two, one around you",
     whyLine: "Three things you can see, two you can hear, one you can feel.",
-    durationLabel: "2 min",
+    durationLabel: "45 sec",
     steps: [
       "Without moving much, find three things you can see and name them to yourself.",
       "Then two things you can hear — a fan, a door, traffic outside.",
@@ -186,7 +185,7 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
     category: "sensory_reset",
     title: "Look out a window",
     whyLine: "Twenty seconds on something far away, after hours of things at arm's length.",
-    durationLabel: "1 min",
+    durationLabel: "45 sec",
     steps: [
       "Find the furthest thing you can see from where you are.",
       "Rest your eyes on it for about twenty seconds, without staring.",
@@ -257,7 +256,7 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
     category: "taking_a_break",
     title: "Park the rest of the list",
     whyLine: "Everything open at once carries its own weight. This puts most of it down for a while.",
-    durationLabel: "3 min",
+    durationLabel: "2 min",
     steps: [
       "Write down everything currently competing for your attention.",
       "Mark the one thing that genuinely has to happen next.",
@@ -286,7 +285,7 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
     category: "connection",
     title: "Two minutes with someone nearby",
     whyLine: "A short, ordinary conversation with whoever is closest.",
-    durationLabel: "2 min",
+    durationLabel: "3 min",
     steps: [
       "Find someone nearby who is not deep in something.",
       "Ask them something ordinary — their weekend, what they are working on, the weather.",
