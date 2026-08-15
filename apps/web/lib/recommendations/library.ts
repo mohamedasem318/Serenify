@@ -283,7 +283,7 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
   {
     id: "two-minutes-with-someone-nearby",
     category: "connection",
-    title: "Two minutes with someone nearby",
+    title: "A few minutes with someone nearby",
     whyLine: "A short, ordinary conversation with whoever is closest.",
     durationLabel: "3 min",
     steps: [
