@@ -152,11 +152,20 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       UPDATE `confirmed_at` on attach; UPDATE `opened_at` set-once (client guards
       re-set); UPDATE `outcome`+`outcome_at` with **retry exactly once** then silent
       degrade; UPDATE `swapped_away_at` with **no retry**, silent degrade; ignored
-      prompt writes nothing. Tests
+      prompt writes nothing. **Swap ordering is RULED (Ruling B, 2026-08-15) and forced
+      by the schema**: `rp_one_active_per_user_day` is a partial unique index and the two
+      writes are separate PostgREST requests with no transaction, so insert-first would
+      collide with the still-active outgoing row. Stamp `swapped_away_at` **first**, then
+      INSERT the replacement; if the INSERT fails, re-run the engine **once** to refresh
+      the card; if that also fails, keep the previous pick and stop — no retry loop, no
+      error surface; the stamp is **never reversed**; a failed swap **still consumes a
+      budget slot — ACCEPTED design, not a defect** (do not file it as a bug). Tests
       `apps/web/tests/unit/lib/recommendations-client.test.ts` (the
       `monitoring-client.test.ts` pattern) with an injected failing writer.
-      **Acceptance**: exactly one retry observed for outcome, zero for swap; no code
-      path surfaces an error (FR-030); requires Phase 1 complete.
+      **Acceptance**: exactly one retry observed for outcome, zero for swap; the stamp is
+      observed to precede the INSERT and is never reversed; a failed replacement INSERT
+      triggers exactly one engine re-run and no further write; no code path surfaces an
+      error (FR-030); requires Phase 1 complete.
 
 **Checkpoint**: the whole decision core is proven pure and deterministic. UI wiring may
 begin.
@@ -359,14 +368,25 @@ retirement.
 recorded as a swap, item changes without ceremony, final state is honest retirement, no
 day-repeat.
 
-- [ ] T028 [US4] Swap wiring in the T013 card: swap action inserts the next engine pick
-      and stamps `swapped_away_at` on the old row (state 10 — no acknowledgement, no
-      ceremony, only the mock's state-10 fade); failed swap degrades **silently to the
-      previous pick, no retry** (FR-030); swap + Ren actions withdrawn while
+- [ ] T028 [US4] Swap wiring in the T013 card: swap action **stamps `swapped_away_at` on
+      the old row FIRST, then inserts** the next engine pick (state 10 — no
+      acknowledgement, no ceremony, only the mock's state-10 fade). **Ordering is RULED
+      (Ruling B, 2026-08-15) and forced by `rp_one_active_per_user_day`** — two
+      untransacted PostgREST requests, so insert-first collides with the still-active row.
+      If the INSERT fails, **re-run the engine once** to refresh the card (it now sees the
+      declined pick and produces a new one — indistinguishable from a successful swap,
+      since swap has no ceremony); if that also fails, keep the previous pick on screen
+      and stop — **no retry loop**, nothing renders as an error (FR-030). The stamp is
+      **never reversed**, and a failed swap **still consumes a budget slot: ACCEPTED
+      design, not a defect** — do not add a refund path and do not file it as a bug.
+      Swap + Ren actions withdrawn while
       instructions are open (state 5); when budget or non-repeat exhausts eligibility
       the swap action retires with the reviewed honest line (T004) instead of
       repeating. Hallmark-governed; mock binding. **Acceptance**: RTL tests for US4
-      scenarios 1–3 green, including retire-early-when-non-repeat-bites-first.
+      scenarios 1–3 green, including retire-early-when-non-repeat-bites-first; plus a
+      test proving the stamp precedes the INSERT, one that a failed INSERT produces
+      exactly one engine re-run and then stops, and one that a twice-failed swap leaves
+      the previous pick on screen with no error UI.
 - [ ] T029 [US4] Signal-distinctness suite (SC-007, cross-surface): swaps and
       didn't-help answers stored as **distinct** signals in 100% of cases (different
       columns, never conflated — the `rp_outcome_xor_swap` CHECK is exercised), ignored
@@ -399,8 +419,31 @@ day-repeat.
       in the `PRIVACY_CHAT_P1` "permanent and unconditional" register (FR-025).
       `terms_privacy@2026-08-15.1` is **already on the branch** — until this wording
       lands the registry describes text that does not exist and the branch MUST NOT
-      merge. **Acceptance**: `apps/web/tests/unit/lib/legal/copy-invariants.test.ts`
-      green; the registry/snapshot guard suites stay green unchanged.
+      merge.
+      **PLUS — four published passages are false against infrastructure credentials and
+      MUST be corrected in this same task (RULED, Mohamed 2026-08-15). T031 cannot be
+      marked done without them.** Evidence: on the cloud project `service_role` holds
+      full `arwdDxtm` on public tables and both `service_role` and `postgres` have
+      `rolbypassrls = true` (read live 2026-08-15; DECISIONS 2026-08-15). Against that —
+      (a) `PRIVACY_SECURITY_P1` falsely claims database rules bind the database's own
+      owner, and falsely claims consent records are "read by their owner and by no one
+      else" and "cannot be deleted at all, by anyone"; the UPDATE-blocking trigger is
+      real so **"cannot be edited" stays**; (b) `PRIVACY_MANAGER_DEFAULT`'s "visible to
+      you and to nobody else" is stated absolutely and is false against infrastructure
+      credentials; (c) `PRIVACY_CHAT_P1`'s "no second rule granting anyone else a way in"
+      is literally true and misleading — a role exists that needs no rule; revise it too.
+      **Manner of correction**: do **not** simply delete the false sentences. State
+      plainly that infrastructure credentials exist and what they can reach, in the
+      register the policy already uses for the Groq disclosure and the missing purge job.
+      **Claims about managers, admins, and the employer stay absolute** — those are true.
+      No new registry entry: these ride the already-material
+      `terms_privacy@2026-08-15.1`. **And** the new suggestion-records sentence in (3)
+      above must take the **manager/admin/employer shape, NOT the "no way in exists"
+      shape** — the latter is precisely what broke here.
+      **Acceptance**: `apps/web/tests/unit/lib/legal/copy-invariants.test.ts`
+      green; the registry/snapshot guard suites stay green unchanged; no remaining
+      absolute no-one-else claim in the Privacy Policy that infrastructure credentials
+      contradict; the four passages read as a reviewer-checkable diff.
 - [ ] T032 [P] Terms of Service review, recorded: review the ToS against the new data
       class; **no text change expected** (disclosure changed, not agreement mechanics).
       Record the outcome in the PR description and `docs/DECISIONS.md` either way.
@@ -428,6 +471,46 @@ day-repeat.
 
 ---
 
+## Phase 9: Pause from the in-session card (scope addition — Mohamed, 2026-08-15)
+
+**Goal**: acting on a suggestion that sends the person away from the desk must not cost
+them the session. Belongs with the US2 surface work (`ConfirmedPickCard`, built in
+T017) — sequence it after that card exists. Full rationale: plan §Pause from the
+in-session card; contracts/confirmatory-resolution.md §3.
+
+- [ ] T036 [US2] Pause/resume control on `ConfirmedPickCard`
+      (`apps/web/components/recommendations/`), wired to the **existing** feature-008
+      handlers — this adds a second entry point, not new machinery. Ground truth:
+      `handlePause` / `handleResume` in `components/monitor/monitoring-session.tsx`
+      stop and reacquire the camera and PATCH `status='paused'` / `'active'` on the same
+      session row; a neutral `PausedStage` already renders; **no migration** — the
+      `status` CHECK already accepts `'paused'`. **ONE** control that becomes a **resume**
+      action while the session is paused — never two competing pause affordances. Not
+      per-item: no logic decides which items "need" a pause. The card renders outside the
+      op-surface switch so it stays visible on the paused surface beside the existing
+      Resume/End controls. Hallmark-governed (plan §UI design contract). Home card
+      unaffected. **Acceptance** (RTL): pausing from the card calls **no** `finalize`, no
+      `openRen`, and no outcome/swap write — no budget spend, no confirm/dismiss, no
+      false-alarm suppression (structurally true: the 012 budget is only spent via
+      `finalize` from the three answer handlers, which pause never calls); the control
+      swaps to resume while paused and back on resume; no second pause affordance exists
+      in the rendered tree; the 012 reducers and the pinned #127/#130/#132/#134 suites are
+      **byte-unchanged** and green.
+- [ ] T037 Drop the session's smoothing buffer when a PATCH sets `status='paused'`
+      (`apps/api` — feature-008 server code, **not** 012). Evidence for why: the buffer
+      currently survives a pause, so with a deque of 4 and only `end_session` dropping it,
+      the first post-resume band is largely derived from **pre-pause** video and can drive
+      a confirmatory prompt about an episode that already ended. **GATE INSIDE THIS TASK**:
+      first establish that the cold-start / warm-up path handles a partial buffer after
+      the drop. If it does not, **report back rather than shipping an unsmoothed window** —
+      do not improvise a smoothing change. **Acceptance**: pytest showing the buffer is
+      dropped on the paused transition and retained on every other transition; the
+      warm-up-path finding recorded either way; existing apps/api suites green.
+
+**Checkpoint**: acting on a suggestion no longer costs the session.
+
+---
+
 ## Dependencies
 
 - **Phase 1 → everything that touches the table** (T010, T013+, T015, T017, T018,
@@ -443,6 +526,9 @@ day-repeat.
   and shippable (T021–T027 also depend on T023 for the prompt id).
 - **T016 → T017/T018** (the dep exists before hosts wire it); **T011 → T017/T019**
   (shared pick-item); **T031 blocks merge** independently of story order.
+- **T017 → T036**: the pause control lives on `ConfirmedPickCard`, so that card must
+  exist first. **T037 is independent of every web task** (apps/api only) and may run any
+  time; it carries its own internal gate and may report back instead of shipping.
 - Story order: US1 → US2 share the card built in Phase 4; US3/US4 extend it. US3
   (T021–T024) can proceed in parallel with Phases 4–5 except T025/T026 which touch the
   card.
@@ -459,14 +545,16 @@ day-repeat.
 
 MVP = Phases 1–4 (US1): the loop works end to end with real reviewed strings before the
 012 surface is touched. Then US2 (the regression-sensitive change) as its own reviewable
-increment, then US3, then US4, then the wrap. One PR per coherent increment into the
+increment, then US3, then US4, then the wrap, then Phase 9's pause addition (T036 after
+the card exists; T037 any time). One PR per coherent increment into the
 feature branch if splitting helps review; the feature branch merges to `main` only when
 T005, T031, and T035 are all satisfied. While the PR is open, fold small surfacing items
 into it rather than opening a second one.
 
 ## Task counts
 
-35 tasks: Phase 1 = 3 · Phase 2 = 3 · Phase 3 = 4 · US1 = 5 · US2 = 5 · US3 = 7 ·
-US4 = 2 · Wrap = 6. LIVE: T003, T015 (CI-capable, live locally), T020, T027, T035.
+37 tasks: Phase 1 = 3 · Phase 2 = 3 · Phase 3 = 4 · US1 = 5 · US2 = 5 · US3 = 7 ·
+US4 = 2 · Wrap = 6 · Phase 9 (pause scope addition, 2026-08-15) = 2 (T036 [US2],
+T037 apps/api). LIVE: T003, T015 (CI-capable, live locally), T020, T027, T035.
 Gates requiring Mohamed: **T005** (library line-by-line review), **T035** (smoke
 sign-off); **T032** escalates to him only if the ToS review finds a needed change.
