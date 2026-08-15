@@ -345,7 +345,9 @@ was written for the abandoned prompt's pick row (owner query).
 
 ## ST-5 — Reflective copy against the real provider, and its collapse
 
-**Check**: with apps/api up and a real `GROQ_API_KEY`, a state-2 (or state-9) reflective
+**Check**: with apps/api up and a real `GROQ_API_KEY_REFLECTIVE_COPY` (the second Groq
+credential — Amendment 3, 2026-08-16; Ren's `GROQ_API_KEY` alone must NOT make copy
+generate), a state-2 (or state-9) reflective
 line generates, passes validation, and **paints exactly once** — cache hit on re-render,
 no flip under the reader; every fact in it (counts, times, bands) appears in the
 precomputed facts. Then with the provider down (kill apps/api or unset the key), the
