@@ -7803,3 +7803,72 @@ cost to be real.
 `apps/web/tests/unit/lib/consent/published-revisions.snapshot.json` (locked);
 `specs/014-recommendations/plan.md` §Legal; this file 2026-08-12 (#198) and 2026-08-13 (band
 rename) — the two precedents weighed.
+
+---
+
+## 2026-08-15 — CORRECTION: `service_role` DOES hold full DML on the cloud project (revises 2026-08-14)
+
+**Status**: Accepted — Mohamed's Ruling A (scope clamp). Corrects the factual premise recorded
+in this file's **2026-08-14** entry ("What `serenify_seeder` was actually granted"). That entry's
+*decision* stands unchanged: `serenify_seeder` remains the right shape, and nothing about its
+grants is revised here. Only the claim it leaned on is wrong.
+
+**What 2026-08-14 claimed**: that "on this project's default privileges, service_role holds no
+DML on any public table (only TRUNCATE/REFERENCES/TRIGGER/MAINTAIN)" — recorded in that entry
+and in `20260814000000_seeding_identity.sql`'s header, and repeated as settled fact in
+`specs/014-recommendations/data-model.md` §2 and
+`specs/014-recommendations/contracts/recommendation-storage-rls.md` §6 ("service_role needs no
+thought experiment here… there is no service-role path to close and none may be added").
+
+**Verified evidence** — read **live** on 2026-08-15 by read-only queries against the **linked
+cloud project** via `supabase db query --linked` (not inferred, not reasoned from the local
+stack):
+
+1. Cloud `pg_default_acl` for tables grants `postgres`, `anon`, `authenticated` **and**
+   `service_role` full `arwdDxtm` on new public tables (grantors `postgres` and
+   `supabase_admin`).
+2. Every existing public table's `relacl` already carries `service_role=arwdDxtm`.
+3. `rolbypassrls = true` for both `service_role` and `postgres` on cloud.
+
+Locally, service_role genuinely has no DML (`Dxtm` only) — the original observation was
+accurate about the stack it was made on, and was over-generalised to "this project".
+
+**Consequence**: on `db push`, and absent an explicit revoke, `service_role` holds a full-DML
+path on **every** public table — including the tables whose contracts state there is no
+service-role path (011 chat storage, 012 questionnaire storage, 014 recommendation picks).
+BYPASSRLS makes this worse and also points at the fix: it bypasses **RLS** but **not grants**,
+so owner-only policies and FORCE RLS do not constrain that role on cloud at all. The grant, not
+the policy, is the boundary that actually holds. Nothing was exploited and nothing leaked — the
+step-0 recon for this ruling confirmed no code path anywhere uses the service key for table DML
+(Auth-Admin only, in two prod-guarded dev/test clients) and nothing relies on service_role
+holding grants — but the posture those contracts describe was not the posture the deploy target
+had.
+
+**Resolution**: two parts, deliberately split.
+
+- **Now, in 014**: `20260815090000_recommendation_picks.sql` carries an explicit
+  `REVOKE ALL ON public.recommendation_picks FROM service_role;` beside the existing
+  anon/authenticated revoke, pinned by a named gate test
+  (`test_service_role_is_explicitly_revoked` in `apps/api/tests/test_recommendation_storage_rls.py`,
+  mutation-verified). The new table therefore ships correct on cloud from its first push. Locally
+  the revoke also drops the non-DML `Dxtm` baseline, which nothing uses.
+- **Deferred**: the repo-wide `REVOKE ALL … FROM service_role` across the **pre-existing** public
+  tables is `docs/BACKLOG.md` (#269). It is explicitly **not to be executed** before three
+  questions are answered — what currently uses the service key, whether `pg_default_acl` must
+  also be altered so new tables stop re-acquiring the grant, and whether `rolbypassrls` is
+  revocable at all on managed Supabase. Doing the sweep blind risks breaking Supabase-managed
+  internals for a gap that is currently unreached.
+
+**Rejected**: (a) silently editing the 2026-08-14 entry — this file is append-only and a
+disproved claim is more useful visible than erased; (b) folding the repo-wide revoke into the
+014 PR — it touches every feature's tables and needs its own blast-radius answer, and 014 must
+not become the vehicle for it; (c) leaving 014 to inherit the gap on the grounds that nothing
+uses the service key today — the contract says "no service-role path", and an unenforced
+contract is the thing that made this correction necessary.
+
+**Cross-references**: this file 2026-08-14 (the corrected entry, unedited);
+`supabase/migrations/20260814000000_seeding_identity.sql` header (comment-only correction, no SQL
+change); `supabase/migrations/20260815090000_recommendation_picks.sql`;
+`specs/014-recommendations/contracts/recommendation-storage-rls.md` §6 and
+`specs/014-recommendations/data-model.md` §2 (both still carry the old claim — corrected when
+those documents are next amended); `docs/BACKLOG.md` (#269).
