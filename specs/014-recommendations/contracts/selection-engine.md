@@ -13,8 +13,18 @@ selectPick(input: {
   todayHistory: PickHistoryEntry[];           // today's pick rows: item_id, category,
                                               // opened/swapped/outcome flags
   episode: { id: string; picksUsed: number } | null;  // current open episode, if any
+                                              // (picksUsed = SURFACED rows in the
+                                              // episode — Amendment 2026-08-16: a
+                                              // stamp with no successor row charges
+                                              // nothing)
+  newEpisodeId?: string;                      // injected like nowMs (amended 2026-08-16:
+                                              // a pure function cannot mint a uuid);
+                                              // used only when episode is null AND a
+                                              // new episode is warranted — absent, the
+                                              // engine returns null rather than emit an
+                                              // unattributable pick
   preferences: PreferenceSource;              // neutral in v1 (R-8)
-  library: LibraryItem[];                     // the reviewed in-repo library
+  library: readonly LibraryItem[];            // the reviewed in-repo library
 }): { item: LibraryItem; episodeId: string } | null   // null = no pick warranted/available
 ```
 
