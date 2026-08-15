@@ -328,12 +328,21 @@ renders the required shape with zero fabricated facts.
       `apps/api/app/routers/recommendations.py` — `POST
       /recommendations/reflective-copy`, forwarded-JWT auth (`/chat/*` pattern), body =
       the `ReflectiveFacts` bundle and nothing else, **no DB reads of any kind**
-      (FR-020/FR-023); `get_llm_client()` → existing registry (FR-024, no new provider);
-      `response_format="json_object"` parsed with `extract_json_object`; missing or
-      non-string `text` → non-200 + validation telemetry; the endpoint never falls back
-      itself. Tests `apps/api/tests/test_recommendations_reflective_copy.py`: auth
-      required, facts-only input surface, parse-failure → non-200, provider error →
-      non-200. **Acceptance**: pytest green.
+      (FR-020/FR-023). **Second credential (Amendment 3, 2026-08-16)**: the endpoint
+      calls a NEW additive accessor `get_reflective_copy_llm_client()` in
+      `apps/api/app/services/llm_client.py` — same provider (FR-024 stands), primary key
+      rebuilt from `GROQ_API_KEY_REFLECTIVE_COPY` (`os.environ.get(...) or None`, never
+      `GROQ_API_KEY`, no default-key parameter), **no fallback provider** on this path;
+      Ren's `get_llm_client()` and `packages/llm-client` are byte-untouched; add the
+      documented block to `apps/api/.env.example`. Absent/invalid key → provider raises
+      at request time → non-200; `response_format="json_object"` parsed with
+      `extract_json_object`; missing or non-string `text` → non-200 + validation
+      telemetry; the endpoint never falls back itself. Tests
+      `apps/api/tests/test_recommendations_reflective_copy.py`: auth required,
+      facts-only input surface, parse-failure → non-200, provider error → non-200,
+      **credential isolation** — with `GROQ_API_KEY` set and the reflective key absent,
+      the endpoint returns non-200 and Ren's key is never read by this path.
+      **Acceptance**: pytest green; no test requires a real key.
 - [ ] T025 [US3] Client fetch (extend `apps/web/lib/api/recommendations-client.ts`) +
       first-paint orchestration in the home card per contracts/reflective-copy.md
       §First paint: cache hit paints immediately; cache miss shows the **800 ms**
@@ -357,9 +366,11 @@ renders the required shape with zero fabricated facts.
       scenarios (a)–(d) — provider disabled renders the fallback in 100% of cases and
       the card never blocks (SC-004).
 - [ ] T027 [US3] [LIVE] Real-provider generation check — **not CI-verifiable** (needs
-      apps/api up with a real `GROQ_API_KEY`): a generated line validates and paints
-      once; killing the provider mid-day degrades to fallback with no error surface.
-      **Acceptance**: recorded in [smoke-tests.md](./smoke-tests.md) **ST-5**.
+      apps/api up with a real `GROQ_API_KEY_REFLECTIVE_COPY` — the second credential,
+      Amendment 3; Ren's `GROQ_API_KEY` alone must NOT make copy generate): a generated
+      line validates and paints once; killing the provider mid-day degrades to fallback
+      with no error surface. **Acceptance**: recorded in
+      [smoke-tests.md](./smoke-tests.md) **ST-5**.
 
 **Checkpoint**: the card's most common states are honest, specific, and provider-proof.
 
