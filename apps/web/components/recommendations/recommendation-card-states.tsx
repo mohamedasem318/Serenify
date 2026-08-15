@@ -67,7 +67,7 @@ import { cn } from "@/lib/utils";
 // Control classes — the mock's three tiers, expressed once
 // ─────────────────────────────────────────────────────────────────────────────
 
-const BTN_BASE =
+export const BTN_BASE =
   "inline-flex min-h-11 flex-none cursor-pointer items-center justify-center gap-1.5 rounded-control border border-transparent px-3 text-sm font-semibold leading-none whitespace-nowrap transition-[background-color,opacity] duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-meadow active:opacity-85 disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Forward action, quiet — outlined meadow. The default everywhere except state 4. */
@@ -84,8 +84,16 @@ const BTN_MEADOW = "bg-meadow text-on-accent hover:opacity-90 dark:text-bg";
 const BTN_QUIET =
   "border-border bg-transparent text-muted hover:bg-surface hover:text-ink";
 
-/** On the state-4 amber wash the neutral seam floats; borrow the item's own warm line. */
-const BTN_QUIET_ON_AMBER =
+/**
+ * On the state-4 amber wash the neutral seam floats; borrow the item's own warm line.
+ *
+ * Exported (with `BTN_BASE`) for `ConfirmedPickCard`'s session control — the in-session card
+ * is permanently state-4 prominent, so its one lateral control has to sit on this wash. The
+ * two constants leave this module rather than being re-typed there so the three control
+ * tiers stay defined in exactly one place; a copied class string is how two surfaces start
+ * drifting apart.
+ */
+export const BTN_QUIET_ON_AMBER =
   "border-[color-mix(in_srgb,var(--amber-soft-line)_55%,transparent)] bg-transparent text-muted hover:bg-[color-mix(in_srgb,var(--color-surface)_70%,transparent)] hover:text-ink";
 
 const ICON_PROPS = {
