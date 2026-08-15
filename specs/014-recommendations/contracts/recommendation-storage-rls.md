@@ -70,12 +70,14 @@ ordering is not a preference, it is the only order the index permits.
    Nothing renders as an error (FR-030).
 4. The stamp is **never reversed.** A swap-away that was recorded stays recorded; the
    preference signal is real regardless of what happened to the replacement.
-5. **A failed swap still consumes a budget slot. This is ACCEPTED design, not a known
-   defect** — do not "fix" it, and do not file it as a bug. The person expressed a
-   preference against that item and the record of it is the thing worth keeping; the
-   alternative (reversing the stamp to refund the slot) would discard a true signal to
-   protect a counter, and would reopen the unique-index collision it was stamped to
-   avoid.
+5. **A failed swap does NOT consume a budget slot** (Amendment 2026-08-16, REVERSING the
+   position accepted 2026-08-15 — see DECISIONS 2026-08-16). A person must not lose one
+   of the episode's three suggestions because a write failed on our side. The stamp still
+   stands (points 1 and 4 are unchanged — it is a true preference signal and a non-repeat
+   exclusion), but budget consumption counts **replacement rows that actually landed**
+   (picks surfaced), never stamps. Consequence for implementers: budget accounting can no
+   longer be derived from stamp count alone — the reducer counts the episode's surfaced
+   rows, and a stamped pick with no successor row charges nothing.
 
 ## Verification
 
