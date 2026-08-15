@@ -30,10 +30,16 @@
 --   * The purpose-made seeding identity (`serenify_seeder`, #208) gets NOTHING here:
 --     no seed script and no Playwright fixture writes picks, and the #208/#268 rule
 --     is that every seeder grant traces to a write a fixture demonstrably performs.
---   * `service_role` needs no thought experiment: on this project's default
---     privileges it holds no DML on any public table (pg_default_acl; recorded in
---     20260814000000_seeding_identity.sql's header and DECISIONS 2026-08-14). There
---     is no path to close here, and none may be added.
+--   * `service_role` IS revoked explicitly below, and the reason matters. The
+--     2026-08-14 claim that "on this project's default privileges service_role
+--     holds no DML on any public table" was true of the LOCAL stack only and was
+--     over-generalised; read-only queries against the linked CLOUD project on
+--     2026-08-15 disproved it there. On cloud, `pg_default_acl` grants
+--     service_role full `arwdDxtm` on new public tables, every existing public
+--     table's relacl already carries it, and `rolbypassrls` is true for
+--     service_role. BYPASSRLS defeats RLS but NOT grants — so on the deploy
+--     target the REVOKE, not the owner-only policies, is the boundary that
+--     actually holds. See DECISIONS 2026-08-15 (correction to 2026-08-14).
 --
 -- IMMUTABILITY: this migration touches no existing table, function, policy or grant.
 
@@ -129,6 +135,15 @@ CREATE POLICY rp_update_self ON public.recommendation_picks
 
 -- ── Per-role grants (explicit; PUBLIC/table-level revoke alone is a no-op) ──
 REVOKE ALL ON public.recommendation_picks FROM anon, authenticated;
+-- And from service_role. On the CLOUD project (verified 2026-08-15) pg_default_acl
+-- would otherwise hand it full arwdDxtm on this new table, and cloud service_role has
+-- rolbypassrls — which bypasses RLS but NOT grants, so this revoke is the only thing
+-- that closes the path. Locally it drops only the non-DML `Dxtm` baseline
+-- (TRUNCATE/REFERENCES/TRIGGER/MAINTAIN) that the default ACL hands out and that no
+-- code path here uses. Verified after `db reset`: the table's relacl ends as
+-- `postgres=arwdDxtm/postgres` + `authenticated=ar/postgres`, nothing else.
+-- DECISIONS 2026-08-15.
+REVOKE ALL ON public.recommendation_picks FROM service_role;
 
 -- No server-only columns here, so SELECT is a plain table grant: the owner reads
 -- every column of their own rows. INSERT is table-wide because the whole row is
