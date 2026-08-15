@@ -302,7 +302,7 @@ something correct and shippable on its own).
 specifics, (c) an all-Calm day with no true specific line, (d) the provider down — each
 renders the required shape with zero fabricated facts.
 
-- [ ] T021 [P] [US3] `apps/web/lib/recommendations/reflective-copy-validation.ts` —
+- [X] T021 [P] [US3] `apps/web/lib/recommendations/reflective-copy-validation.ts` —
       pure `validateReflectiveCopy(text, facts)` per contracts/reflective-copy.md
       §Validation: every maximal digit run, every time-shaped token, every band word
       must appear in the facts; no exclamation marks; no forbidden vocabulary (`alert`,
@@ -311,12 +311,12 @@ renders the required shape with zero fabricated facts.
       against fabricated-number / fabricated-time / fabricated-band / exclamation /
       oversized / empty outputs. **Acceptance**: SC-004's zero-fabrication clause —
       every fabrication fixture is rejected, valid rephrasings pass.
-- [ ] T022 [P] [US3] `apps/web/lib/recommendations/reflective-copy-cache.ts` —
+- [X] T022 [P] [US3] `apps/web/lib/recommendations/reflective-copy-cache.ts` —
       sessionStorage keyed by a fingerprint of `(state, facts minus fallbackText,
       local_day)`; only **validated** text is ever cached; nothing persists to the DB.
       Tests: same fingerprint → reuse without regeneration (FR-022); day change →
       new key (FR-019 for free). **Acceptance**: suite green.
-- [ ] T023 [P] [US3] Prompt registration:
+- [X] T023 [P] [US3] Prompt registration:
       `packages/llm-client/prompts/reflective_copy.txt` (versioned; variables = the
       `ReflectiveFacts` fields, rendered by `render_prompt` literal replacement;
       instructs JSON `{"text": string}` re-phrasing of the fallback, nothing added) +
@@ -324,7 +324,7 @@ renders the required shape with zero fabricated facts.
       `packages/llm-client/src/llm_client/prompts.py`. **Acceptance**:
       `packages/llm-client/tests/test_prompts.py` extensions green — the id renders, the
       closed-set check passes, unregistered ids still fail.
-- [ ] T024 [US3] apps/api endpoint: `apps/api/app/services/reflective_copy.py` +
+- [X] T024 [US3] apps/api endpoint: `apps/api/app/services/reflective_copy.py` +
       `apps/api/app/routers/recommendations.py` — `POST
       /recommendations/reflective-copy`, forwarded-JWT auth (`/chat/*` pattern), body =
       the `ReflectiveFacts` bundle and nothing else, **no DB reads of any kind**
