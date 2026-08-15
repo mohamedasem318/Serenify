@@ -18,20 +18,64 @@ owner-only, structural.
 5. `serenify_seeder` gets grants/policies **only if** a seed script or e2e fixture
    demonstrably writes picks; each grant enumerated in its own migration (the #208/#268
    rule). Not anticipated for v1 — omit unless a fixture proves the need.
-6. `service_role`: no grant of any kind. Note for reviewers: on this project's
-   `pg_default_acl`, service_role already holds no DML on any public table — this contract
-   forbids adding any.
+6. `service_role`: an **explicit `REVOKE ALL ON public.recommendation_picks FROM
+   service_role`** is REQUIRED, and no grant or policy of any kind may be added.
+   **This corrects a disproved claim.** Earlier drafts of this contract said service_role
+   "already holds no DML on any public table", so there was nothing to close. That was
+   true of the local stack and false of the deploy target. Read live on 2026-08-15 by
+   read-only queries against the linked cloud project: `pg_default_acl` there grants
+   `postgres`, `anon`, `authenticated` **and** `service_role` full `arwdDxtm` on new
+   public tables; every existing public table's `relacl` already carries
+   `service_role=arwdDxtm`; and `rolbypassrls = true` for `service_role`. BYPASSRLS
+   defeats **RLS** but **not grants** — so invariants 1–3 above constrain that role not at
+   all on cloud, and the revoke is the only thing that does. The shipped migration
+   (`20260815090000_recommendation_picks.sql`) carries it;
+   `test_service_role_is_explicitly_revoked` pins it and
+   `test_service_role_is_never_granted_or_given_a_policy` pins the prohibition.
+   Full reasoning: `docs/DECISIONS.md` 2026-08-15.
+7. **Standing invariant — no admin-key path, ever.** This feature's table is unreachable
+   by `service_role`. Every read and every write goes through the end user's own
+   authenticated session under RLS (forwarded JWT + publishable anon key). No task,
+   fixture, endpoint, script, or migration may introduce an admin-key, service-key, or
+   other privileged path to this data — not for convenience, not for a test, not for an
+   admin screen. Widening this requires a spec change, not a judgement call at
+   implementation time.
 
 ## Write paths (all as the signed-in user, forwarded JWT + anon key)
 
 | action | write |
 |---|---|
-| pick surfaced (initial / swap replacement / state-8 replacement) | INSERT full row |
+| pick surfaced (initial / swap replacement / state-8 replacement) | INSERT full row — on a swap this INSERT runs **second**, see the ordering below |
 | confirmed detection attaches | UPDATE `confirmed_at` |
 | item expanded first time | UPDATE `opened_at` (set once; client guards re-set) |
 | outcome answered | UPDATE `outcome`, `outcome_at` — **retry once** on failure, then degrade silently (FR-030) |
-| swapped away | UPDATE `swapped_away_at` — **no retry**, degrade silently to the previous pick (FR-030) |
+| swapped away | UPDATE `swapped_away_at` — **stamped first**, **no retry**; see the ordering below (FR-030) |
 | ignored outcome prompt | **no write** (FR-016) |
+
+### Swap write ordering — RULED (Mohamed, 2026-08-15, "Ruling B")
+
+`rp_one_active_per_user_day` is a partial unique index over `(user_id, local_day) WHERE
+outcome IS NULL AND swapped_away_at IS NULL`, and the two writes are two separate
+PostgREST requests with no transaction spanning them. **Insert-first is therefore
+impossible**: the replacement row would collide with the still-active outgoing row. The
+ordering is not a preference, it is the only order the index permits.
+
+1. On a swap, stamp the outgoing pick's `swapped_away_at` **first**, then INSERT the
+   replacement.
+2. If the INSERT fails, **re-run the selection engine once** to refresh the card. The
+   engine now sees the declined pick and produces a new one. This is visually
+   indistinguishable from a successful swap, because swap has no ceremony — nothing on
+   screen announces which of the two paths ran.
+3. If that also fails, keep the previous pick on screen and stop. **No retry loop.**
+   Nothing renders as an error (FR-030).
+4. The stamp is **never reversed.** A swap-away that was recorded stays recorded; the
+   preference signal is real regardless of what happened to the replacement.
+5. **A failed swap still consumes a budget slot. This is ACCEPTED design, not a known
+   defect** — do not "fix" it, and do not file it as a bug. The person expressed a
+   preference against that item and the record of it is the thing worth keeping; the
+   alternative (reversing the stamp to refund the slot) would discard a true signal to
+   protect a counter, and would reopen the unique-index collision it was stamped to
+   avoid.
 
 ## Verification
 
@@ -39,3 +83,13 @@ owner-only, structural.
   `SET LOCAL ROLE` / `request.jwt.claims` impersonation (the feature-012 validated
   method): owner sees own rows; a second user, a team-lead, and an admin each read zero
   rows; anon errors; UPDATE on an identity column (e.g. `item_id`) fails on grant.
+- **The `service_role` revoke (invariant 6) is a pinned invariant, not a review note.**
+  The static gate requires the `REVOKE ALL … FROM service_role` statement, requires it to
+  precede every GRANT, and allows `service_role` to appear in the migration exactly once —
+  in that revoke. Deleting the line, moving it after the grants, re-granting the role, or
+  giving it a policy each fail a named test; all four were mutation-verified on
+  2026-08-15. Note the live probe cannot cover this: locally `service_role` never had DML
+  to begin with, so the revoke's effect is only observable against the cloud ACL.
+- The standing no-admin-key invariant (7) is structural rather than test-pinned: there is
+  no privileged path to assert the absence of, because none is ever built. A reviewer
+  enforces it by rejecting any change that introduces one.
