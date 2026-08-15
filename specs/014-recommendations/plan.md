@@ -360,6 +360,22 @@ pause, feature-008 code with a gate inside the task).
    **manager/admin/employer shape**, never the "no way in exists" shape — the latter is
    exactly what broke here.
 
+5. **`where-your-data-lives` — the Groq processor bullet must disclose the reflective-copy
+   flow** (added 2026-08-16; found by the US3 adversarial review — the plan's original
+   list missed it). The published bullet says "the conversation content described above is
+   sent there" and that a companion conversation leaves the EU "**in a way nothing else in
+   Serenify does**". Once 014 ships, that sentence is false: on every state-2/9 cache miss
+   the reflective facts bundle — check-in count, preformatted times, **band labels (which
+   this policy itself classes as health-related sensitive data under PDPL)**, the tried
+   item's title and time, and the fallback sentence — is sent to Groq in the United
+   States **on a plain home-page render, with no chat opened and no user action**. The
+   bullet must (a) name the reflective-copy flow, (b) fix or qualify the
+   "nothing else" sentence, and (c) say it happens without the person opening a
+   conversation. Same register as the rest of the bullet; rides the same material
+   revision. Open question flagged for Mohamed at the next stop: the registry rationale
+   for `terms_privacy@2026-08-15.1` names only "suggestion records" — whether its wording
+   needs amending (touching the locked snapshot) is his call, not an agent's.
+
 New copy must pass `copy-invariants.test.ts` (no numeric quality metrics, no `%`, no
 placeholder tokens, marker rules). **Terms of Service**: reviewed against the change; no
 text change expected — the new class alters disclosure (a Privacy Policy concern), not
