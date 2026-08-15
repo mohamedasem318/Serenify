@@ -151,9 +151,11 @@ packages/llm-client/
   which now sees the declined pick and produces a new one (indistinguishable from a
   successful swap, since swap has no ceremony); (3) if that also fails, keep the previous
   pick on screen and stop — no retry loop, no error surface; (4) the stamp is **never
-  reversed**; (5) **a failed swap still consumes a budget slot — ACCEPTED design, not a
-  defect**: the expressed preference is the signal worth keeping, and refunding the slot
-  would discard it to protect a counter. Full text:
+  reversed**; (5) **a failed swap does NOT consume a budget slot** (Amendment 2026-08-16,
+  reversing the position accepted 2026-08-15 — a person must not lose a suggestion
+  because a write failed on our side; the stamp stands as signal and non-repeat
+  exclusion, but budget consumption counts replacement rows that actually landed, so it
+  can no longer be derived from stamp count alone). Full text:
   [contracts/recommendation-storage-rls.md](contracts/recommendation-storage-rls.md)
   §Swap write ordering.
 
