@@ -4103,3 +4103,27 @@ coordinator mounts). The one-shot-per-ended-session guarantee and its
 `UNIQUE(monitoring_session_id)` backstop must survive whatever shape it takes.
 **Address by**: before the next release that relies on session-end feedback, or the next
 time the questionnaire coordinator is opened for any reason.
+
+---
+
+## From feature 014 (recommendations) — captured 2026-08-15
+
+### Repo-wide `REVOKE ALL … FROM service_role` on the pre-existing public tables
+**Status**: tech-debt (`type:tech-debt` / `area:db`) — **OPEN.** GitHub issue **#269 OPEN.**
+**Category**: database posture / grants
+**Observed**: 2026-08-15, during 014's schema phase. Read live by read-only
+`supabase db query --linked` against the linked cloud project — not inferred from local:
+(1) cloud `pg_default_acl` grants `service_role` full `arwdDxtm` on new public tables;
+(2) every existing public table's `relacl` already carries `service_role=arwdDxtm`;
+(3) `rolbypassrls = true` for `service_role`. Locally it holds no DML (`Dxtm` only) — the
+2026-08-14 claim was a local observation over-generalised. BYPASSRLS defeats RLS but **not**
+grants, so the revoke, not the policy, is the control. See DECISIONS 2026-08-15.
+
+**Scope**: every public table created before 014. 014's own table already revokes explicitly.
+
+**DO NOT EXECUTE** before three answers: **(a)** what uses the service key — known today
+(2026-08-15): Auth-Admin only, in two prod-guarded dev/test clients, no table DML;
+**(b)** whether `pg_default_acl` must also change so NEW tables stop re-acquiring the grant;
+**(c)** whether `rolbypassrls` is revocable at all on managed Supabase. Sweeping blind risks
+breaking Supabase-managed internals for a gap that is currently unreached.
+**Address by**: before the next production deploy adding an owner-only table.
