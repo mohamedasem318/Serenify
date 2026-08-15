@@ -249,7 +249,7 @@ regression-tested.
       **byte-for-byte unmodified** (SC-006); new wiring tests added beside them prove
       confirm → `resolveToRecommendation`, maybe → `openRen`, false-alarm path +
       suppression untouched.
-- [ ] T017 [US2] `apps/web/components/recommendations/confirmed-pick-card.tsx` through
+- [X] T017 [US2] `apps/web/components/recommendations/confirmed-pick-card.tsx` through
       the shared `Notification` primitive in the confirmatory prompt's slot (desktop
       `w-80` corner card, mobile bottom sheet, `--chat-pill-offset` stacking) —
       dismissible, non-modal; renders the pick via T011's `pick-item.tsx`; expanding
@@ -272,7 +272,7 @@ regression-tested.
       seam tolerance; existing monitor suites stay green (the file is large — plan
       Risk 1 names host-wiring races; the FR-014 fixtures from T009 are re-exercised
       here at host level).
-- [ ] T019 [US2] Home state 4 in the T013 card: a confirmed active pick renders
+- [X] T019 [US2] Home state 4 in the T013 card: a confirmed active pick renders
       prominently with exactly the mock's five moves (amber rail, tint wash, warm tile,
       17→19 px title, meadow-filled primary — the only filled CTA outside state 4's
       absence elsewhere), same pick, same words as the monitor surface. Hallmark
