@@ -13,8 +13,10 @@ No reading yet today → state 1. Drive states 3–10 by running a monitoring se
 seeding `window_readings` with Uneasy/Tense rows for today). "Yes, that's me" on the
 confirmatory prompt → in-session ConfirmedPickCard + home state 4.
 
-Reflective copy (states 2/9): with apps/api down or `GROQ_API_KEY` unset the deterministic
-fallback renders — that path must always work; generation is the enhancement.
+Reflective copy (states 2/9): with apps/api down or `GROQ_API_KEY_REFLECTIVE_COPY` unset
+(the second Groq credential, separate from Ren's `GROQ_API_KEY` — Amendment 3, 2026-08-16)
+the deterministic fallback renders — that path must always work; generation is the
+enhancement. The copy path never uses Ren's key.
 
 ## Test it
 
