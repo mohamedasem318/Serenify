@@ -78,10 +78,16 @@ Owner-private. Migration `supabase/migrations/<ts>_recommendation_picks.sql`.
   outcome_at, swapped_away_at, updated_at)` — identity and provenance columns (`user_id`,
   `local_day`, `episode_id`, `item_id`, `category`, `source`, `suggested_at`) are
   immutable after insert by grant, not just by convention.
-- `service_role` needs no thought experiment here: on this project's default privileges it
-  holds **no DML on any public table** (`pg_default_acl`; recorded in
-  `20260814000000_seeding_identity.sql`'s header and DECISIONS 2026-08-14), so there is no
-  service-role path to close and none may be added.
+- `service_role` is **explicitly revoked**: `REVOKE ALL ON public.recommendation_picks
+  FROM service_role`, required by the contract and pinned by a named test. An earlier
+  draft said this needed no thought experiment because service_role "holds no DML on any
+  public table" — true locally, **false on the cloud project**, where (verified live
+  2026-08-15) `pg_default_acl` grants it full `arwdDxtm` on new public tables and
+  `rolbypassrls` is true for it. BYPASSRLS defeats RLS but not grants, so the revoke — not
+  the owner-only policies — is what closes the path on the deploy target. No grant or
+  policy for that role may be added. See
+  [contracts/recommendation-storage-rls.md](contracts/recommendation-storage-rls.md) §6–7
+  and `docs/DECISIONS.md` 2026-08-15.
 
 **Retention**: ninety days, as **policy not mechanism** (FR-027) — no purge job exists or
 is promised; the Privacy Policy states it (plan §Legal). The record is derived from a
