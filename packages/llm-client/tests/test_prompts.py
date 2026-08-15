@@ -19,13 +19,17 @@ from llm_client.prompts import (
 )
 
 
-def test_exactly_the_five_wired_seams():
+def test_exactly_the_wired_seams():
+    # Five from 011 plus feature 014's `reflective_copy`. This set is CLOSED: a prompt
+    # file appearing on disk is not enough to make it loadable, which is the whole point
+    # of the registry (see the reference-only seam below).
     assert set(PROMPT_IDS) == {
         "ren",
         "ren_preference_block",
         "scorer_per_message",
         "scorer_rollup",
         "auto_title",
+        "reflective_copy",
     }
 
 
@@ -66,6 +70,61 @@ def test_render_substitutes_declared_variables_in_ren():
     assert "{user_first_name}" not in rendered
     assert "{recent_read_line}" not in rendered
     assert "{preferences}" not in rendered
+
+
+_REFLECTIVE_COPY_VARIABLES = {
+    "state",
+    "checkin_count",
+    "times",
+    "band_labels",
+    "tried_item_title",
+    "tried_at_label",
+    "fallback_text",
+}
+
+
+def test_reflective_copy_is_wired_and_loads():
+    assert "reflective_copy" in PROMPT_IDS
+    assert load_prompt("reflective_copy").strip()
+
+
+def test_reflective_copy_renders_every_declared_variable():
+    # Feature 014 (T023). The facts bundle is the ONLY material the seam may phrase
+    # (data-model §4), so every field has to be a real, substituted placeholder — a
+    # typo'd one would silently ship `{tried_at_label}` to the provider.
+    rendered = render_prompt(
+        "reflective_copy",
+        state="2",
+        checkin_count="3",
+        times="9:40, 11:15",
+        band_labels="Calm",
+        tried_item_title="",
+        tried_at_label="",
+        fallback_text="Calm at all 3 check-ins today, at 9:40 and 11:15.",
+    )
+    for name in _REFLECTIVE_COPY_VARIABLES:
+        assert "{" + name + "}" not in rendered, f"{name} left unsubstituted"
+    assert "Calm at all 3 check-ins today, at 9:40 and 11:15." in rendered
+
+
+def test_reflective_copy_declares_no_undocumented_variable():
+    # Anything `{like_this}` still standing after every documented variable is
+    # substituted is either a new variable nobody is passing or a stray brace. The
+    # literal JSON example `{"text": …}` is excluded by requiring an identifier.
+    import re
+
+    rendered = render_prompt(
+        "reflective_copy", **dict.fromkeys(_REFLECTIVE_COPY_VARIABLES, "x")
+    )
+    leftover = re.findall(r"\{[a-z_][a-z0-9_]*\}", rendered)
+    assert leftover == []
+
+
+def test_reflective_copy_literal_json_braces_survive_render():
+    # Same hazard as the scorer prompts: the response-shape example contains literal
+    # JSON braces, and literal replacement (not str.format) must leave them alone.
+    text = render_prompt("reflective_copy", **dict.fromkeys(_REFLECTIVE_COPY_VARIABLES, "x"))
+    assert '{"text":' in text
 
 
 def test_scorer_prompt_literal_braces_survive_render():
