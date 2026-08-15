@@ -55,7 +55,7 @@ semantics = today-card local day; 360 px minimum viewport.
 | **VI — Responsive & Accessible** | Mock is drawn at 390 px and specifies the 360 px wrap; 44 px targets; both modes designed in tandem (mock carries both palettes); `prefers-reduced-motion` collapses the result-ring animation; D-6 dwell states are non-interactive so no focus traps. |
 | **VII — Testing** | Vitest (engine, states, validator, hook wiring), pytest (endpoint, prompt contract), Playwright e2e (SC-005 loop), RLS static gate + live probe, untouched 012 suites as the SC-006 regression net. `smoke-tests.md` follows at tasks stage. |
 | **VIII — Spec-Driven** | This plan; DECISIONS/PROGRESS/CHANGELOG/BACKLOG entries with the PR; **Privacy Policy + ToS reviewed and updated in the same PR** (§Legal). No constitution amendment needed or made. |
-| **IX — Secrets** | No new secret. Endpoint uses existing `GROQ_API_KEY` env binding in apps/api. |
+| **IX — Secrets** | **One new secret** (Amendment 3, 2026-08-16, reversing this row's original "no new secret / existing `GROQ_API_KEY`" position): `GROQ_API_KEY_REFLECTIVE_COPY` — a second credential to the SAME provider, so reflective-copy generation cannot consume Ren's rate limits. Ren's path, key, and limits unchanged. The secret is placed by Mohamed at deploy time; the code ships tolerating its absence (request-time provider error → non-200 → the deterministic fallback renders; the card never breaks and the code never resolves Ren's key). |
 | **X — Dataset stewardship** | Not touched. |
 
 **Gate result**: PASS — no violations, Complexity Tracking not needed.
@@ -178,7 +178,26 @@ detection removes a pending outcome prompt without writing.
 Full contract: [contracts/reflective-copy.md](contracts/reflective-copy.md). The
 deterministic strings (authored with the library, reviewed the same way) are the source of
 truth; the generator — the existing 011 client via one new apps/api endpoint and one new
-versioned prompt — receives only the precomputed facts bundle (counts, formatted times,
+versioned prompt — receives only the precomputed facts bundle.
+
+**Second credential (Amendment 3, 2026-08-16)**: reflective-copy generation calls the same
+provider (Groq — FR-024 stands, no new provider) through a **separate credential from
+Ren's**, `GROQ_API_KEY_REFLECTIVE_COPY`, so copy generation does not consume Ren's rate
+limits. Verified shape (read-only recon of the 011 path): `load_config()` reads
+`GROQ_API_KEY` from the environment into a frozen `ProviderEndpoint`, and apps/api's
+`get_llm_client()` is an `@lru_cache` singleton — so the change is purely **additive in
+`apps/api/app/services/llm_client.py`**: a second cached accessor
+(`get_reflective_copy_llm_client()`) that rebuilds the config with
+`primary.api_key = GROQ_API_KEY_REFLECTIVE_COPY or None` and **no fallback provider** for
+this path. Zero edits to `packages/llm-client`; Ren's accessor, construction, retries, and
+limits are untouched. The resolver must never read `GROQ_API_KEY` — absent or invalid, the
+provider raises at request time, the endpoint returns non-200, and the client renders the
+deterministic string (FR-030). Configuration sites: `apps/api/.env` (local),
+`apps/api/.env.example` (documented block), and the `serenify-api` Container App
+env/secret set by CLI (no IaC exists in-repo). CI needs nothing — tests must not require a
+real key.
+
+The generator receives only the precomputed facts bundle (counts, formatted times,
 band labels, tried-item title, the fallback string itself) and may only re-phrase it. A
 pure client-side validator rejects any output containing a number, time-token, or band
 word not present in the facts (plus voice-rule violations), falling back deterministically;
