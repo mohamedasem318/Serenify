@@ -274,9 +274,11 @@ skipped by rule; no `frontend-design`, no `design:*` plugins. The binding contra
   mark. No band chip on the card (the band is stated once, above).
 - `ConfirmedPickCard` inherits the `Notification` surface's existing geometry and modes;
   it introduces no new positioning or panel vocabulary.
-- Motion: only the mock's `qri-pop`/`qri-draw`/`qri-fade` (reused from
-  `QuestionnaireResultIcon`) and the state-10 fade; all under
-  `prefers-reduced-motion`; swap has deliberately **no** ceremony.
+- Motion: only the mock's `qri-pop`/`qri-draw` plus the shipped fade class — which is
+  `qri-fadeup` in `globals.css`; the mock's local CSS calls it `qri-fade`, and the
+  "reused from `QuestionnaireResultIcon`" clause governs over the mock's local name
+  (correction 2026-08-16, found at T012 implementation) — and the state-10 fade; all
+  under `prefers-reduced-motion`; swap has deliberately **no** ceremony.
 
 ## Pause from the in-session card (scope addition — Mohamed, 2026-08-15)
 
