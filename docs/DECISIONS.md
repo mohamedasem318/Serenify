@@ -7956,3 +7956,38 @@ plan.md` §Failed writes point 5; `specs/014-recommendations/tasks.md` T010 and 
 **Cross-references**: this file 2026-08-15 ("014 ruling batch", point b — the reversed
 position, unedited); `specs/014-recommendations/data-model.md` §3 (the row-count derivation
 that now carries the accounting).
+
+---
+
+## 2026-08-16 — REVERSAL: reflective copy gets its own Groq credential (revises the plan's "no new secret" position)
+
+**Status**: Accepted — Mohamed's Amendment 3, 2026-08-16. Reverses the 014 plan's original
+Constitution-IX row ("No new secret. Endpoint uses existing `GROQ_API_KEY`"). FR-024 is NOT
+amended: the provider is still the one Ren uses (Groq) — this is a second credential to the
+same provider, not a new provider, so no spec change and no CHANGELOG entry.
+
+**The decision**: 014's reflective-copy generation calls Groq with
+`GROQ_API_KEY_REFLECTIVE_COPY`, a credential separate from Ren's, so copy generation cannot
+consume Ren's rate limits. Ren's path, key, retries, and limits are unchanged.
+
+**Shape** (from a read-only recon of the 011 path, 2026-08-16): `load_config()` reads
+`GROQ_API_KEY` from the environment into a frozen `ProviderEndpoint`; apps/api's
+`get_llm_client()` is an `@lru_cache` singleton. The change is purely additive in
+`apps/api/app/services/llm_client.py`: a second cached accessor,
+`get_reflective_copy_llm_client()`, rebuilding the config with
+`primary.api_key = os.environ.get("GROQ_API_KEY_REFLECTIVE_COPY") or None` and no fallback
+provider on this path. Zero edits to `packages/llm-client`.
+
+**Failure semantics, binding**: the resolver never reads `GROQ_API_KEY`, takes no default-key
+parameter, and never falls back to Ren's client. Absent or invalid, nothing raises at import
+or construction; the provider raises at request time; the endpoint returns non-200; the web
+client renders the deterministic fallback. The card never breaks. The secret is placed by
+Mohamed at deploy time; the code ships tolerating its absence.
+
+**Configuration sites**: `apps/api/.env` (local), a documented block in
+`apps/api/.env.example`, the `serenify-api` Azure Container App env/secret (CLI-set; no IaC
+in-repo). CI sets nothing; no test may require a real key.
+
+**Documents amended in this change**: plan §Constitution IX + §Generation with fallback;
+contracts/reflective-copy.md §Provider path; tasks T024 (credential-isolation test added) and
+T027; quickstart; smoke-tests ST-5.
