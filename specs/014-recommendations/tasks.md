@@ -122,11 +122,11 @@ placeholders.
 **Purpose**: engine, episode/budget reducer, preference seam, and the write client —
 pure, table-driven-tested **before** any component consumes them (plan Risk 3).
 
-- [ ] T007 [P] `apps/web/lib/recommendations/preference-source.ts`: `PreferenceSource`
+- [X] T007 [P] `apps/web/lib/recommendations/preference-source.ts`: `PreferenceSource`
       type + `neutralPreferenceSource` (constant affinity, R-8). **Acceptance**: consumed
       by T008; the seam test there proves a fake non-neutral source changes ranking with
       zero engine edits (FR-006).
-- [ ] T008 `apps/web/lib/recommendations/engine.ts` per contracts/selection-engine.md —
+- [X] T008 `apps/web/lib/recommendations/engine.ts` per contracts/selection-engine.md —
       pure `selectPick`, injected `nowMs`, no randomness, rules in contract order
       (warrant → budget → non-repeat → category ranking with the data-table of band
       tenor × time-of-day × affinity, stable tiebreak by declared order → first eligible
@@ -136,7 +136,7 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       shapes (SC-001, SC-002 reachability); budget/non-repeat interaction; the
       preference-seam proof. **Acceptance**: suite green; the determinism property holds
       in 100% of runs.
-- [ ] T009 `apps/web/lib/recommendations/episode.ts` — episode/budget/non-repeat reducer
+- [X] T009 `apps/web/lib/recommendations/episode.ts` — episode/budget/non-repeat reducer
       + `local_day` filtering, driving all ten states from `(today's picks, today's
       bands, in-flight UI events)`. Table-driven tests
       `apps/web/tests/unit/lib/recommendations/episode.test.ts` whose fixture list is
@@ -150,7 +150,7 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       stretch is one episode; state-9 re-arm = new episode with fresh budget; ignored
       outcome prompt records nothing. **Acceptance**: every named fixture is present and
       green; no eleventh state and no error state is derivable (SC-002, FR-030).
-- [ ] T010 `apps/web/lib/api/recommendations-client.ts` (pick-write half): typed
+- [X] T010 `apps/web/lib/api/recommendations-client.ts` (pick-write half): typed
       owner-RLS writes per the contract's write-path table — INSERT full row on surface;
       UPDATE `confirmed_at` on attach; UPDATE `opened_at` set-once (client guards
       re-set); UPDATE `outcome`+`outcome_at` with **retry exactly once** then silent
