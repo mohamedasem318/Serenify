@@ -186,13 +186,13 @@ no-replacement variant, 9).
 **Independent test**: seed a day with Uneasy/Tense readings, render home, open the pick,
 close, answer each way — complete cycle, records owner-only.
 
-- [ ] T011 [US1] `apps/web/components/recommendations/pick-item.tsx` — the one shared
+- [X] T011 [US1] `apps/web/components/recommendations/pick-item.tsx` — the one shared
       item block (tile, title, duration pill, why-line, steps, foot-note) rendered from
       a pick row + its library entry; used by both the home card and
       `ConfirmedPickCard` so "same pick, same words" holds by construction (plan Risk 4).
       Hallmark-governed; mock binding. **Acceptance**: RTL test renders a real T004 item
       with title/steps **verbatim** (FR-004) and no band chip.
-- [ ] T012 [US1] `apps/web/components/recommendations/recommendation-card-states.tsx` —
+- [X] T012 [US1] `apps/web/components/recommendations/recommendation-card-states.tsx` —
       presentational shells for the ten states exactly as the mock draws them, including
       the state-8 no-replacement variant; states 7/8 reuse `QuestionnaireResultIcon` and
       its D-6 dwell timing (FR-029); result-ring motion collapses under
@@ -200,7 +200,7 @@ close, answer each way — complete cycle, records owner-only.
       -governed; mock binding. **Acceptance**: T014's coverage suite reaches all ten
       states + the variant; no error/success control states exist (documented
       deviation-by-design).
-- [ ] T013 [US1] Wire `apps/web/components/home/things-that-might-help-card.tsx`
+- [X] T013 [US1] Wire `apps/web/components/home/things-that-might-help-card.tsx`
       (placeholder → stateful): reads today's picks + bands through the existing
       owner-RLS reads (`monitoring-reads.ts` pattern, `localDayWindow` day semantics),
       T009 reducer drives state, T008 engine picks, T010 client writes; deps injectable
@@ -209,13 +209,13 @@ close, answer each way — complete cycle, records owner-only.
       (FR-016/FR-031); ignoring it writes nothing and costs nothing. Hallmark-governed;
       mock binding. **Acceptance**: T014 green; day-boundary reset falls out of
       query-time `local_day` filtering with nothing stored to clear (FR-019).
-- [ ] T014 [US1] State-coverage + signal suite
+- [X] T014 [US1] State-coverage + signal suite
       `apps/web/tests/unit/components/home/things-that-might-help-card.test.tsx`: all
       ten states reachable, no eleventh (SC-002); US1 acceptance scenarios 1–6; helped /
       didn't-help stored distinctly and ignore stores nothing (SC-007, card level);
       failed writes render no error and degrade per FR-030. **Acceptance**: suite green
       with `--pool=threads` on Windows.
-- [ ] T015 [US1] [LIVE] e2e `apps/web/tests/e2e/recommendations-loop.spec.ts`: seed
+- [X] T015 [US1] [LIVE] e2e `apps/web/tests/e2e/recommendations-loop.spec.ts`: seed
       Uneasy/Tense `window_readings` for today via the existing e2e seeding path
       (`serenify_seeder`), then home shows exactly one quiet pick → open → instructions
       verbatim → close → outcome each way → state 9. No camera needed, so this **does**
