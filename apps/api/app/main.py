@@ -12,7 +12,7 @@ from fastapi.responses import JSONResponse
 from .auth import ForbiddenRoleError
 from .config import get_settings
 from .logging_config import configure_logging
-from .routers import anchor, chat, health, monitoring
+from .routers import anchor, chat, health, monitoring, recommendations
 
 
 @asynccontextmanager
@@ -67,6 +67,10 @@ def create_app() -> FastAPI:
     # Feature 011: employee-only Ren chat. Conversation CRUD + orchestrated
     # send/retry/end. RLS-as-user; no service-role; crisis is live-only.
     app.include_router(chat.router)
+    # Feature 014: reflective copy for the "Things that might help" card. One stateless
+    # POST — facts in, a re-phrasing out. No database access of any kind, and its own
+    # provider credential so card copy can never eat Ren's rate limit (Amendment 3).
+    app.include_router(recommendations.router)
     return app
 
 
