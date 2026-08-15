@@ -19,6 +19,9 @@ which line it was:
     → test_no_manager_admin_aggregate_or_team_lead_path
   * no seeder path
     → test_no_seeder_path
+  * service_role explicitly revoked, and granted nothing anywhere
+    → test_service_role_is_explicitly_revoked,
+      test_service_role_is_never_granted_or_given_a_policy
   * no SECURITY DEFINER reaches the table
     → test_no_security_definer_in_this_migration,
       test_no_security_definer_function_anywhere_touches_the_table
@@ -307,8 +310,39 @@ def test_no_manager_admin_aggregate_or_team_lead_path():
         assert token not in sql, f"manager-layer token {token!r} present in the migration"
 
 
-def test_no_service_role_path():
-    assert "service_role" not in _strip_comments(_sql()).lower()
+def test_service_role_is_explicitly_revoked():
+    """On the CLOUD project (verified 2026-08-15, read-only queries against the linked
+    project) `pg_default_acl` grants service_role full `arwdDxtm` on new public tables
+    and `rolbypassrls` is true for it. BYPASSRLS defeats RLS but NOT grants, so on the
+    deploy target this REVOKE — not the owner-only policies — is the boundary that
+    holds. Locally it drops only the non-DML `Dxtm` baseline the default ACL hands out.
+    DECISIONS 2026-08-15 (correction to 2026-08-14)."""
+    sql = _strip_comments(_sql())
+    revoke = re.search(
+        rf"REVOKE\s+ALL\s+ON\s+public\.{_TABLE}\s+FROM\s+service_role\s*;",
+        sql,
+        re.IGNORECASE,
+    )
+    assert revoke, "missing REVOKE ALL ON public.recommendation_picks FROM service_role"
+    # A revoke placed after a grant would undo nothing that mattered; keep it before.
+    first_grant = re.search(rf"GRANT\b[^;]*{_TABLE}", sql, re.IGNORECASE | re.DOTALL)
+    assert first_grant and revoke.start() < first_grant.start(), (
+        "the service_role REVOKE must precede every GRANT"
+    )
+
+
+def test_service_role_is_never_granted_or_given_a_policy():
+    """The revoke above is the ONLY place service_role may appear: no grant of any kind,
+    no policy, and no other mention that could re-open the path."""
+    stripped = _strip_comments(_sql())
+    for grant in _grants_on_table(stripped):
+        assert "service_role" not in grant, f"service_role granted: {grant}"
+    for name, _table, body in _policies(stripped):
+        assert "service_role" not in body.lower(), f"{name} references service_role"
+    occurrences = len(re.findall(r"service_role", stripped, re.IGNORECASE))
+    assert occurrences == 1, (
+        f"service_role appears {occurrences}× in the SQL; exactly one (the REVOKE) is allowed"
+    )
 
 
 def test_no_seeder_path():
