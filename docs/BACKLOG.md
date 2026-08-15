@@ -4127,3 +4127,16 @@ grants, so the revoke, not the policy, is the control. See DECISIONS 2026-08-15.
 **(c)** whether `rolbypassrls` is revocable at all on managed Supabase. Sweeping blind risks
 breaking Supabase-managed internals for a gap that is currently unreached.
 **Address by**: before the next production deploy adding an owner-only table.
+
+### Sessions left paused and un-ended when the user navigates away
+**Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#270 OPEN.**
+**Category**: monitoring session lifecycle (feature 008)
+**Observed**: 2026-08-15, while adding the in-session pause affordance (T036).
+The unmount cleanup in `monitoring-session.tsx` releases the camera but never ends the
+session row, so an abandoned paused session sits at `status='paused'`, `ended_at IS NULL`
+until the next session-create force-abandons it. **Pre-existing** — not introduced by 014,
+but made likelier by it, since pausing becomes a normal encouraged action rather than a
+rare one. **Not this PR**: the fix means deciding what an abandoned paused session should
+become (ended with an `end_reason`, or left to force-abandon), which is a feature-008
+lifecycle question.
+**Address by**: next time session lifecycle is opened for any reason.
