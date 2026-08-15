@@ -16,13 +16,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import asdict
+import os
+from dataclasses import asdict, replace
 from functools import lru_cache
 
+import httpx
 from llm_client import (
+    GroqProvider,
     LLMCallTelemetry,
     LLMClientConfig,
     LLMProviderError,
+    LLMProviderName,
     LLMRequest,
     LLMResponse,
     ProviderRegistry,
@@ -115,3 +119,96 @@ def get_llm_client() -> LLMClient:
     """Process-wide LLM client (config read once). Providers create a per-call httpx
     client — fine at graduation scale; no lifespan wiring needed."""
     return LLMClient()
+
+
+# ── Feature 014: the reflective-copy client, on its own credential ────────────
+#
+# Amendment 3 (2026-08-16, plan.md §Principle IX): the "Things that might help" card may
+# have its deterministic sentence re-phrased by the SAME provider Ren uses (FR-024 — no
+# new provider), but never on Ren's key. A card that quietly ate Ren's rate limit would
+# take the conversation down with it, and the conversation is the thing that matters.
+#
+# Everything below is ADDITIVE. `get_llm_client()` above, `packages/llm-client`, Ren's
+# retries and Ren's limits are untouched — this is a second `@lru_cache` accessor that
+# rebuilds the primary endpoint's key from a second environment variable and hands the
+# registry a fallback that cannot run.
+
+#: The reflective-copy credential. Placed by Mohamed at deploy time; absent in CI and in
+#: every test. Absence is tolerated at import and construction and surfaces as a
+#: non-retryable provider error at request time (the endpoint then returns non-200 and the
+#: web client paints the deterministic string).
+REFLECTIVE_COPY_API_KEY_ENV = "GROQ_API_KEY_REFLECTIVE_COPY"
+
+#: Ren's credential — named here ONLY so it can be excluded. This path must never resolve
+#: it, so it is filtered out of the environment before the config loader ever sees it,
+#: rather than loaded and then overwritten.
+_RENS_API_KEY_ENV = "GROQ_API_KEY"
+
+
+class _NoFallbackProvider:
+    """The absence of a fallback, made explicit.
+
+    `ProviderRegistry` takes a primary AND a fallback, and this path is specified to have
+    no fallback at all. Passing the real LM Studio adapter and trusting
+    `silent_fallback=False` to never reach it would leave a live second provider one
+    config flag away from answering card copy; passing this instead makes the reflective
+    path's shape true by construction. It conforms to the `LLMProvider` protocol and
+    raises non-retryably if anything ever calls it.
+    """
+
+    name: LLMProviderName = "groq"
+
+    async def complete(self, _request: LLMRequest) -> LLMResponse:
+        raise LLMProviderError(
+            "reflective-copy path has no fallback provider",
+            provider=self.name,
+            retryable=False,
+        )
+
+
+def reflective_copy_config() -> LLMClientConfig:
+    """Ren's config with the primary key swapped for the reflective-copy credential and
+    silent fallback forced off.
+
+    The environment handed to `load_config` has `GROQ_API_KEY` **removed by key**, so
+    Ren's secret is never read on this path — not read-then-discarded, not read-then-
+    overwritten. Everything else (base URL, model, timeout, `LLM_MAX_RETRIES`) is
+    deliberately shared: same provider, same operational behaviour, different credential.
+    """
+    env = {name: os.environ[name] for name in os.environ if name != _RENS_API_KEY_ENV}
+    base = load_config(env=env)
+    return replace(
+        base,
+        primary=replace(
+            base.primary,
+            api_key=os.environ.get(REFLECTIVE_COPY_API_KEY_ENV) or None,
+        ),
+        silent_fallback=False,
+    )
+
+
+def build_reflective_copy_registry(
+    config: LLMClientConfig, *, client: httpx.AsyncClient | None = None
+) -> ProviderRegistry:
+    """The reflective-copy registry: the Groq adapter on the reflective credential, and a
+    fallback that raises. `client` is an injection seam for tests that assert what
+    actually goes on the wire."""
+    return ProviderRegistry(
+        GroqProvider(
+            config.primary, request_timeout_ms=config.request_timeout_ms, client=client
+        ),
+        _NoFallbackProvider(),
+        silent_fallback=False,
+    )
+
+
+@lru_cache
+def get_reflective_copy_llm_client() -> LLMClient:
+    """Process-wide reflective-copy client (config read once), on its own credential.
+
+    Constructing this never raises, whether or not the credential exists — the failure is
+    a request-time provider error, which is what lets the card ship before the secret is
+    placed.
+    """
+    config = reflective_copy_config()
+    return LLMClient(config=config, registry=build_reflective_copy_registry(config))
