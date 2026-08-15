@@ -7872,3 +7872,55 @@ change); `supabase/migrations/20260815090000_recommendation_picks.sql`;
 `specs/014-recommendations/contracts/recommendation-storage-rls.md` §6 and
 `specs/014-recommendations/data-model.md` §2 (both still carry the old claim — corrected when
 those documents are next amended); `docs/BACKLOG.md` (#269).
+
+---
+
+## 2026-08-15 — 014 ruling batch: selection stays session-unaware, swap ordering, FR-014 attach-only
+
+**Status**: Accepted — Mohamed's rulings during the 014 plan-amendment pass, recorded together
+because they were decided together and two of them constrain the same write path. Documents
+amended in the same change: `specs/014-recommendations/plan.md`,
+`specs/014-recommendations/contracts/recommendation-storage-rls.md`,
+`specs/014-recommendations/contracts/confirmatory-resolution.md`,
+`specs/014-recommendations/tasks.md` (T010, T028, T031, new T036/T037). No feature code and no
+legal copy changed here — the Privacy Policy corrections are written in T031.
+
+**(a) Selection remains UNAWARE of whether a session is live.** The in-session
+`ConfirmedPickCard` gains a pause control (scope addition, same date) because several library
+items send the person away from the desk and the in-session choice today is ignore-or-end. That
+is the answer to leave-the-desk items — **not** a selection rule. The engine has no input for
+session state and none may be added without a spec change: no "prefer short items while a
+session is live", no per-item "this one needs a pause" flag. Determinism (FR-006, R-10) is the
+reason — an engine that reads live session state stops being a pure function of
+`(reading, day history, preference source)` and its table-driven proofs stop meaning anything.
+The pause control is therefore uniform across every card. Contract:
+`contracts/confirmatory-resolution.md` §3; plan §Pause from the in-session card.
+
+**(b) Swap write ordering, and the accepted budget-slot loss ("Ruling B").**
+`rp_one_active_per_user_day` is a partial unique index over `(user_id, local_day)` where the row
+is still active, and the two writes are separate PostgREST requests with **no transaction
+spanning them** — so insert-first is not a style preference that lost, it is impossible: the
+replacement collides with the still-active outgoing row. Ruled: stamp `swapped_away_at` first,
+then INSERT; if the INSERT fails, re-run the engine **once** (it now sees the declined pick, and
+because swap has no ceremony the result is indistinguishable from a successful swap); if that
+also fails, keep the previous pick and stop, with no retry loop and nothing rendered as an error
+(FR-030); the stamp is **never reversed**. Consequence, **accepted as design and not to be filed
+as a defect**: a failed swap still consumes one of the episode's three budget slots. Rejected:
+reversing the stamp to refund the slot — it would discard a true preference signal to protect a
+counter, and would re-open the unique-index collision the stamp exists to avoid.
+
+**(c) FR-014 attach-only is intended design, not an index side effect ("Ruling C").** While an
+outcome prompt is pending the pick is still active, so a new confirmed detection **attaches** to
+it (UPDATE `confirmed_at`, prominence only) and never inserts a second row. This is FR-018's
+episode rule applied unchanged — a confirmation mid-episode changes prominence, not the pick.
+Recorded explicitly because `rp_one_active_per_user_day` would *also* have blocked the insert,
+and a future reader could mistake intent for a constraint being worked around; the causation runs
+the other way, as everywhere else in this feature (the browser reducer is the rule, the index is
+the backstop that mirrors the slice an index can state). The person is not trapped: swap remains
+available in state 4.
+
+**Cross-references**: `specs/014-recommendations/contracts/recommendation-storage-rls.md`
+(§Swap write ordering, invariants 6–7); `specs/014-recommendations/contracts/confirmatory-resolution.md`
+(§3 ConfirmedPickCard, §Interruption rule); this file 2026-08-15 (the `service_role` correction,
+which supplies the infrastructure-credential facts behind the T031 legal corrections);
+`docs/BACKLOG.md` (#270).
