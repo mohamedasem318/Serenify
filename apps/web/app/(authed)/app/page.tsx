@@ -65,7 +65,10 @@ export default async function AppPage() {
         {/* items-start so each card sizes to its own content — the recent-chats card is
             height-capped independently and must not be stretched to match its neighbour. */}
         <div className="grid grid-cols-1 items-start gap-6 min-[880px]:grid-cols-2">
-          <ThingsThatMightHelpCard />
+          {/* 014 / T013: the card reads today's picks + bands browser-side AS THE USER
+              (owner RLS), so it needs the id — same posture and same reason as the
+              check-in card above. Without it the card rests in state 1 and reads nothing. */}
+          <ThingsThatMightHelpCard userId={user.id} />
           <RecentChatsCard />
         </div>
         {/* Feature 012 / US4: the questionnaire coordinator — session-end product feedback
