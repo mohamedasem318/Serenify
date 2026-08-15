@@ -91,7 +91,10 @@ SC-008). No placeholder copy may survive to the PR.
       deterministic contract (R-10) — order deliberately, not alphabetically.
       **Acceptance**: module typechecks; T006's structural guard passes; content itself
       is accepted only by T005.
-- [ ] T005 [GATE: Mohamed] **Line-by-line review of every item and string from T004.**
+- [X] T005 [GATE: Mohamed] **Line-by-line review of every item and string from T004.**
+      APPROVED by Mohamed 2026-08-16, after the T005 follow-up amendments he directed
+      (honest duration pills, breath-hold opt-out into step 3, one title rename —
+      commits `3ee3315`, `b5faee6`).
       Checklist per item, each point checked explicitly: no physical discomfort as a
       coping technique (no ice, no cold shock, no snapping, no pain — FR-008); no
       substances including caffeine (FR-008); nothing clinical, outcome-claiming, or
@@ -158,8 +161,11 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       collide with the still-active outgoing row. Stamp `swapped_away_at` **first**, then
       INSERT the replacement; if the INSERT fails, re-run the engine **once** to refresh
       the card; if that also fails, keep the previous pick and stop — no retry loop, no
-      error surface; the stamp is **never reversed**; a failed swap **still consumes a
-      budget slot — ACCEPTED design, not a defect** (do not file it as a bug). Tests
+      error surface; the stamp is **never reversed**; a failed swap **does NOT consume a
+      budget slot** (Amendment 2026-08-16, reversing the 2026-08-15 position — a person
+      must not lose a suggestion because a write failed on our side). Consequence for the
+      reducer: budget consumption counts **replacement rows that actually landed**
+      (surfaced picks), never stamps — stamp count alone can no longer derive it. Tests
       `apps/web/tests/unit/lib/recommendations-client.test.ts` (the
       `monitoring-client.test.ts` pattern) with an injected failing writer.
       **Acceptance**: exactly one retry observed for outcome, zero for swap; the stamp is
@@ -377,8 +383,10 @@ day-repeat.
       declined pick and produces a new one — indistinguishable from a successful swap,
       since swap has no ceremony); if that also fails, keep the previous pick on screen
       and stop — **no retry loop**, nothing renders as an error (FR-030). The stamp is
-      **never reversed**, and a failed swap **still consumes a budget slot: ACCEPTED
-      design, not a defect** — do not add a refund path and do not file it as a bug.
+      **never reversed**, and a failed swap **does NOT consume a budget slot**
+      (Amendment 2026-08-16, reversing the 2026-08-15 position): budget consumption
+      counts replacement rows that actually landed, so a stamp with no successor row
+      costs nothing — no refund path needed, because nothing was charged.
       Swap + Ren actions withdrawn while
       instructions are open (state 5); when budget or non-repeat exhausts eligibility
       the swap action retires with the reviewed honest line (T004) instead of
