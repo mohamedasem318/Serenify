@@ -5,9 +5,10 @@ and is loaded verbatim. Code may only interpolate documented variables at the ca
 boundary (`render_prompt`) — it never authors or rewrites wording, and inline prompt
 strings in app code are a constitutional violation.
 
-Only the five 011 seams are wired. `scorer_crisis_only` exists on disk as
-reference-only and is intentionally absent from `PROMPT_IDS` so it cannot be loaded
-into any call site (per the 011 prompt-tuning lock).
+The five 011 seams are wired, plus `reflective_copy` (feature 014).
+`scorer_crisis_only` exists on disk as reference-only and is intentionally absent
+from `PROMPT_IDS` so it cannot be loaded into any call site (per the 011
+prompt-tuning lock).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ PromptId = Literal[
     "scorer_per_message",
     "scorer_rollup",
     "auto_title",
+    "reflective_copy",
 ]
 
 # The exact wired seams (FR-007). Order is stable for deterministic validation.
@@ -31,6 +33,11 @@ PROMPT_IDS: tuple[PromptId, ...] = (
     "scorer_per_message",
     "scorer_rollup",
     "auto_title",
+    # Feature 014 (T023): re-phrases ONE already-approved deterministic sentence for the
+    # "Things that might help" card. It authors nothing — the fallback string it is handed
+    # is the source of truth, and the web client validates the result against the same
+    # facts before painting it (contracts/reflective-copy.md).
+    "reflective_copy",
 )
 
 # Present on disk but deliberately NOT wired (reference-only). Never loaded.
