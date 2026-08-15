@@ -72,6 +72,22 @@ export const ACTION_TRY_SOMETHING_ELSE = "Try something else";
 /** The Ren row. A presence, not a text link — it opens the chat pill in place. */
 export const ACTION_TALK_TO_REN = "Talk to Ren about this";
 
+/**
+ * The in-session card's ONE session control (T017/T036; plan §"Pause from the in-session
+ * card"). Both words are the labels feature 008 already ships on the monitor's own controls
+ * (`components/monitor/op-surfaces.tsx` — `Pause` on the live stage, `Resume` on the paused
+ * stage), reproduced here verbatim rather than reworded: the card is a SECOND entry point to
+ * the same handler, and giving the same action a second name is how two competing pause
+ * affordances start. Nothing new enters the product's voice.
+ *
+ * **These two are the only strings in this module that the approved mock does not draw** —
+ * the pause control is the 2026-08-15 scope addition, made after the mock was signed off, so
+ * there is no panel to transcribe from. They want Mohamed's eye on that basis specifically,
+ * not only on the same footing as the rest of this file.
+ */
+export const ACTION_PAUSE_SESSION = "Pause";
+export const ACTION_RESUME_SESSION = "Resume";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // The outcome question
 // ─────────────────────────────────────────────────────────────────────────────
