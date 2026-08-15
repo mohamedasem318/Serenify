@@ -16,10 +16,25 @@ Response: `{ "text": string }` (the generated phrasing) or a non-200 on any prov
 failure. The endpoint does **not** fall back itself — the fallback decision is
 client-side, next to the deterministic string.
 
-## Provider path (FR-024 — no new provider)
+## Provider path (FR-024 — no new provider; second credential per Amendment 3, 2026-08-16)
 
-- `get_llm_client()` → existing `ProviderRegistry` (Groq `openai/gpt-oss-120b` primary,
-  LM Studio fallback, transient retry per `LLM_MAX_RETRIES`).
+- **Separate credential from Ren's** (Amendment 3): the endpoint calls
+  `get_reflective_copy_llm_client()` — a new, additive `@lru_cache` accessor in
+  `apps/api/app/services/llm_client.py` beside Ren's untouched `get_llm_client()`. Same
+  provider (Groq `openai/gpt-oss-120b`), transient retry per `LLM_MAX_RETRIES` unchanged,
+  but the primary endpoint's key is rebuilt from **`GROQ_API_KEY_REFLECTIVE_COPY`** and
+  this path has **no fallback provider**. The resolver is
+  `os.environ.get("GROQ_API_KEY_REFLECTIVE_COPY") or None` — it MUST NOT read
+  `GROQ_API_KEY`, take a default-key parameter, or fall back to Ren's client under any
+  condition. Zero edits to `packages/llm-client`.
+- **Absent or invalid key**: nothing raises at import or construction; the provider raises
+  a non-retryable error at request time; the endpoint returns non-200; the web client
+  renders the deterministic fallback. The card never breaks and never borrows Ren's
+  credential or rate limits (the point of the second key).
+- **Configuration sites**: `apps/api/.env` (local), a documented block in
+  `apps/api/.env.example`, and the `serenify-api` Azure Container App env/secret (set by
+  CLI — no IaC in-repo). CI sets nothing; tests must not require a real key. The secret
+  itself is placed by Mohamed; the code ships tolerating its absence.
 - New versioned prompt `packages/llm-client/prompts/reflective_copy.txt`, registered in
   the `PromptId` literal + `PROMPT_IDS` (`prompts.py` is a closed set — a file on disk is
   not enough). Variables: the facts fields, rendered via `render_prompt` literal
