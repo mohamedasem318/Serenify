@@ -703,42 +703,86 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
   }
 
   /**
-   * The swap (state 10). Ordering is RULED and forced by the schema: `swapped_away_at` is
-   * stamped on the outgoing row FIRST, then the replacement is inserted — insert-first would
-   * collide with the still-active outgoing row under `rp_one_active_per_user_day`, since the
-   * two writes are separate PostgREST requests with no transaction. The stamp is never
-   * reversed, and a failed swap costs no budget slot: consumption counts replacement rows
-   * that actually landed (Amendment 2026-08-16).
+   * The swap — state 10, and the whole of US4's write path (T028).
    *
-   * If the replacement INSERT fails, the reload below re-derives the card — the engine's ONE
-   * permitted re-run — and the auto-surface effect makes exactly one further attempt before
-   * `attemptedRef` stops it for good. No retry loop, and nothing renders as an error.
+   * ── Ordering is RULED and forced by the schema (Ruling B) ───────────────────────────
+   * `swapped_away_at` is stamped on the outgoing row FIRST, then the replacement is
+   * inserted. Insert-first would collide with the still-active outgoing row under
+   * `rp_one_active_per_user_day`, since the two writes are separate PostgREST requests with
+   * no transaction. The stamp is NEVER reversed — a swap-away that was recorded stays
+   * recorded, because the preference signal is real regardless of what became of the
+   * replacement (contract points 1 and 4).
    *
-   * Full US4 behaviour (including the retirement line's edge cases) is T028's; this is the
-   * minimum the mock's states 3/4/10 need to exist at all.
+   * ── Exactly one re-run, then stop (contract points 2 and 3) ─────────────────────────
+   * `onReplacementInsertFailed` is the engine's ONE permitted re-run, and it is armed as a
+   * callback rather than inferred from the result so that it fires at exactly the moment the
+   * contract names — the replacement INSERT failing — and at no other. Its pick gets ONE
+   * write attempt, through the same `attemptedRef` gate every other surfacing goes through,
+   * which is what stops the auto-surface effect from picking the thread back up on the next
+   * render. Two attempts total, then silence: no retry loop, and nothing renders as an error
+   * (FR-030). A swap has no ceremony, so the re-run path is indistinguishable on screen from
+   * a swap that landed first time — which is the point.
+   *
+   * ── A failed swap costs NO budget slot (Amendment 2026-08-16) ───────────────────────
+   * That is structural, not enforced here: the reducer derives `picksUsed` from the
+   * episode's SURFACED ROWS, so a stamped row with no successor charges its own slot and
+   * nothing more. The person keeps the suggestion a write on our side lost. The stamped item
+   * still enters the day's non-repeat exclusions — it was genuinely declined.
    */
   async function swap() {
     const pick = model.activePick;
     if (!pick || !userId || !model.swapAvailable || ui.swapInFlight) return;
     const next = nextAfterSwap();
+    // Belt to `swapAvailable`'s braces: with nothing eligible left the action has already
+    // retired to `SWAP_RETIRED_LINE`, and no branch here may repeat an item instead.
     if (!next) return;
 
     setUi((u) => ({ ...u, swapInFlight: true }));
+
+    // Held in an object rather than two `let`s: the assignment happens inside a callback,
+    // and TypeScript's narrowing does not follow a closure back to the enclosing binding.
+    const rerun: { count: number; pick: SelectedPick | null } = { count: 0, pick: null };
+
     try {
-      await d.swapPick({
-        outgoingPickId: pick.id,
-        atIso: nowIso(),
-        replacement: {
-          userId,
-          localDay,
-          episodeId: next.episodeId,
-          itemId: next.item.id,
-          source: "reading",
+      await d.swapPick(
+        {
+          outgoingPickId: pick.id,
+          atIso: nowIso(),
+          replacement: {
+            userId,
+            localDay,
+            episodeId: next.episodeId,
+            itemId: next.item.id,
+            source: "reading",
+          },
         },
-      });
+        {
+          onReplacementInsertFailed: () => {
+            rerun.count += 1;
+            // The engine, asked again with the declined pick marked away — exactly the
+            // history the stamp has just written.
+            rerun.pick = nextAfterSwap();
+          },
+        },
+      );
     } catch {
       // Silence (FR-030).
     }
+
+    if (rerun.pick) {
+      await surfacePending(
+        {
+          item: rerun.pick.item,
+          episodeId: rerun.pick.episodeId,
+          source: "reading",
+          // The replacement continues the episode it replaces within — a swap is never a
+          // new stress event, so it never mints a new episode id (FR-018).
+          startsNewEpisode: false,
+        },
+        localDay,
+      );
+    }
+
     // Reload BEFORE dropping the in-flight flag so the replacing item is the one that
     // carries the state-10 fade — the new item appears where the old one was, with no
     // acknowledgement and no ceremony.
