@@ -365,7 +365,21 @@ export const SWAP_RETIRED_LINE =
 // the generator is validated against the same facts before its text is ever painted.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** Length cap shared with the generated-copy validator (contracts/reflective-copy.md §5). */
+/**
+ * Length cap on a reflective string (contracts/reflective-copy.md §5). It bounds **what a
+ * person reads**, which is the lead and the forward line together — the builders below
+ * produce exactly that pair and cap the pair.
+ *
+ * Generation is scoped to the LEAD alone, so the validator sees only half of what will be
+ * painted; the card therefore re-checks `lead + " " + forwardLine` against this same cap
+ * before painting a generated line, and falls back if the pair overflows. Without that
+ * second check a 220-character lead would paint at 267 and the cap would silently mean
+ * something different on the generated path than on the deterministic one.
+ *
+ * `prompts/reflective_copy.txt` asks the model for "under 200 characters". The gap is
+ * deliberate headroom: a model that drifts slightly past its own instruction still lands
+ * inside the cap and is shown, rather than being discarded for a handful of characters.
+ */
 export const REFLECTIVE_COPY_MAX_LENGTH = 220;
 
 /** The forward-looking second line of state 2. No action attached — the state has none. */
