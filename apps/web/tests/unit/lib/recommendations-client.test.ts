@@ -379,6 +379,200 @@ describe("swapPick — the stamp precedes the INSERT, and is never reversed (Rul
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// T029 — signal distinctness (SC-007, FR-017), at the client layer
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * "Didn't help" is an OUTCOME; swapping away is a PREFERENCE. Feature 015 will read both,
+ * and it can only read them apart if this layer keeps them apart — different columns, on
+ * different rows, never in one patch. The schema says the same thing with
+ * `rp_outcome_xor_swap`; this block proves the client never asks the schema to refuse.
+ *
+ * The distinctness is asserted three ways, because any one of them alone is weak:
+ *
+ *   1. **By column** — each function's patch key set is pinned exactly.
+ *   2. **Structurally** — a sweep over every exported write path asserts no patch anywhere
+ *      carries an outcome key and the swap key together.
+ *   3. **Against the CHECK** — a writer that enforces `rp_outcome_xor_swap` on the row a
+ *      patch would produce runs the full lifecycle and is never tripped, and the same writer
+ *      is then shown rejecting a hypothetical conflated write, so its silence means
+ *      something.
+ */
+
+/** Postgres check-violation SQLSTATE — what a real `rp_outcome_xor_swap` breach returns. */
+const CHECK_VIOLATION = "23514";
+
+/** The two columns that carry the outcome signal, and the one that carries the swap. */
+const OUTCOME_COLUMNS = ["outcome", "outcome_at"];
+const SWAP_COLUMN = "swapped_away_at";
+
+interface StoredRow {
+  outcome: string | null;
+  outcome_at: string | null;
+  opened_at: string | null;
+  swapped_away_at: string | null;
+}
+
+/**
+ * A writer that keeps one row's state and applies the migration's row CHECKs to the row a
+ * patch WOULD produce, exactly as Postgres does. `rp_outcome_xor_swap` is the one under
+ * test; the other two ride along, because a harness enforcing only the constraint being
+ * tested proves less than one enforcing the table.
+ */
+function checkEnforcingWriter(initial: Partial<StoredRow> = {}) {
+  const row: StoredRow = {
+    outcome: null,
+    outcome_at: null,
+    opened_at: null,
+    swapped_away_at: null,
+    ...initial,
+  };
+  const calls: Call[] = [];
+  const rejected: Call[] = [];
+
+  const writer: RecommendationWriter = {
+    async insertPick(inserted) {
+      calls.push({ op: "insert", row: inserted });
+      return { ok: true };
+    },
+    async updatePick(pickId, patch) {
+      const call: Call = { op: "update", pickId, patch };
+      calls.push(call);
+      const next: StoredRow = { ...row, ...patch } as StoredRow;
+      const violates =
+        (next.outcome === null) !== (next.outcome_at === null) || // rp_outcome_iff_at
+        (next.outcome !== null && next.opened_at === null) || // rp_outcome_requires_opened
+        (next.outcome !== null && next.swapped_away_at !== null); // rp_outcome_xor_swap
+      if (violates) {
+        rejected.push(call);
+        return { ok: false, code: CHECK_VIOLATION };
+      }
+      Object.assign(row, next);
+      return { ok: true };
+    },
+  };
+
+  return { writer, row, calls, rejected };
+}
+
+describe("SC-007 — swaps and outcomes are stored as DISTINCT signals", () => {
+  it("recordOutcome touches the outcome columns and only those", async () => {
+    for (const outcome of ["helped", "didnt_help"] as const) {
+      const writer = recordingWriter();
+      await recordOutcome("pick-1", outcome, "t0", { writer });
+      const call = writer.calls[0];
+      expect(call?.op).toBe("update");
+      expect(Object.keys(call?.op === "update" ? call.patch : {})).toEqual(OUTCOME_COLUMNS);
+    }
+  });
+
+  it("stampSwappedAway touches the swap column and only that", async () => {
+    const writer = recordingWriter();
+    await stampSwappedAway("pick-1", "t0", { writer });
+    const call = writer.calls[0];
+    expect(Object.keys(call?.op === "update" ? call.patch : {})).toEqual([SWAP_COLUMN]);
+  });
+
+  it("no exported write path composes a patch carrying both signals — 100% of writes", async () => {
+    // Every write this module can make, driven once each, then swept. There is no parameter
+    // by which a caller could ask for a conflated patch, which is the property: the
+    // impossibility is structural, not a rule someone remembers to follow.
+    const writer = recordingWriter();
+    const deps = { writer };
+    await surfacePick(SURFACE, deps);
+    await attachConfirmation("pick-1", "t", deps);
+    await recordOpened({ id: "pick-1", openedAtMs: null }, "t", deps);
+    await recordOutcome("pick-1", "helped", "t", deps);
+    await recordOutcome("pick-1", "didnt_help", "t", deps);
+    await stampSwappedAway("pick-1", "t", deps);
+    await swapPick(
+      { outgoingPickId: "pick-1", atIso: "t", replacement: { ...SURFACE, itemId: "feet-on-the-floor" } },
+      deps,
+    );
+    recordIgnoredOutcomePrompt();
+
+    // Not vacuous: both signals really were written during the sweep.
+    const patches = writer.calls.flatMap((call) => (call.op === "update" ? [call.patch] : []));
+    expect(patches.some((patch) => "outcome" in patch)).toBe(true);
+    expect(patches.some((patch) => SWAP_COLUMN in patch)).toBe(true);
+
+    for (const patch of patches) {
+      const keys = Object.keys(patch);
+      const outcomeSide = keys.some((key) => OUTCOME_COLUMNS.includes(key));
+      const swapSide = keys.includes(SWAP_COLUMN);
+      expect(outcomeSide && swapSide).toBe(false);
+    }
+  });
+
+  it("runs the full lifecycle against an enforcing rp_outcome_xor_swap without tripping it", async () => {
+    const { writer, row, rejected } = checkEnforcingWriter();
+    await surfacePick(SURFACE, { writer });
+    await recordOpened({ id: "pick-1", openedAtMs: null }, "t-open", { writer });
+    await recordOutcome("pick-1", "didnt_help", "t-answer", { writer });
+
+    expect(rejected).toEqual([]);
+    expect(row).toEqual({
+      opened_at: "t-open",
+      outcome: "didnt_help",
+      outcome_at: "t-answer",
+      swapped_away_at: null,
+    });
+  });
+
+  it("swaps a row away against the same CHECK without tripping it either", async () => {
+    const { writer, row, rejected } = checkEnforcingWriter();
+    await swapPick(
+      { outgoingPickId: "pick-1", atIso: "t-swap", replacement: { ...SURFACE, itemId: "feet-on-the-floor" } },
+      { writer },
+    );
+
+    expect(rejected).toEqual([]);
+    expect(row).toEqual({
+      opened_at: null,
+      outcome: null,
+      outcome_at: null,
+      swapped_away_at: "t-swap",
+    });
+  });
+
+  it("a hypothetical write of BOTH signals to one row is rejected — in both directions", async () => {
+    // The non-vacuity of the two tests above. Neither direction is reachable through the
+    // client — there is no function that writes both, and no parameter that would make one —
+    // so the conflated write is composed here, directly against the storage seam.
+    const answered = checkEnforcingWriter({ opened_at: "t-open" });
+    await recordOutcome("pick-1", "helped", "t-answer", { writer: answered.writer });
+    expect(answered.row.outcome).toBe("helped");
+
+    const ontoAnswered = await answered.writer.updatePick("pick-1", { swapped_away_at: "t-swap" });
+    expect(ontoAnswered).toEqual({ ok: false, code: CHECK_VIOLATION });
+    expect(answered.rejected).toHaveLength(1);
+    expect(answered.row.swapped_away_at).toBeNull(); // the refusal changed nothing
+
+    const swapped = checkEnforcingWriter({ opened_at: "t-open" });
+    await stampSwappedAway("pick-1", "t-swap", { writer: swapped.writer });
+    const ontoSwapped = await swapped.writer.updatePick("pick-1", {
+      outcome: "didnt_help",
+      outcome_at: "t-answer",
+    });
+    expect(ontoSwapped).toEqual({ ok: false, code: CHECK_VIOLATION });
+    expect(swapped.row.outcome).toBeNull();
+  });
+
+  it("an ignored outcome prompt stores nothing — there is no writer it could reach", async () => {
+    const { writer, row, calls } = checkEnforcingWriter();
+    await surfacePick(SURFACE, { writer });
+    const before = calls.length;
+
+    expect(recordIgnoredOutcomePrompt()).toEqual({ wrote: false });
+
+    expect(calls).toHaveLength(before);
+    expect(row.outcome).toBeNull();
+    expect(row.outcome_at).toBeNull();
+    expect(row.swapped_away_at).toBeNull();
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FR-030 as a property of the whole module
 // ─────────────────────────────────────────────────────────────────────────────
 
