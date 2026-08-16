@@ -419,7 +419,7 @@ day-repeat.
 
 ## Phase 8: Cross-cutting wrap — Ren awareness, legal, docs, verification
 
-- [ ] T030 [P] Ren pick-awareness (R-7):
+- [X] T030 [P] Ren pick-awareness (R-7):
       `apps/api/app/services/chat_pick_context.py` — `current_pick_line` reads the
       owner's active pick title for today via the forwarded-JWT client, fail-soft to
       `""`, one fixed hedged sentence; `apps/api/app/services/chat_orchestrator.py`
@@ -429,7 +429,7 @@ day-repeat.
       (`CONFIRMATORY_HANDOFF_SHOWS_RECOMMENDATIONS` stays `false`). **Acceptance**:
       pytest — line present with an active pick, empty string on any failure, ren
       prompt renders with and without the variable; existing chat suites green.
-- [ ] T031 [P] **Privacy Policy copy — MERGE-BLOCKING** (plan Risk 6):
+- [X] T031 [P] **Privacy Policy copy — MERGE-BLOCKING** (plan Risk 6):
       `apps/web/lib/legal/copy.ts` — the three §Legal additions: (1) the suggestion
       -records data-class bullet in `PRIVACY_CATEGORIES_ITEMS`; (2) the ninety-day
       retention passage beside `PRIVACY_RETENTION_P2` in the existing "a policy, not a
@@ -473,7 +473,7 @@ day-repeat.
       green; the registry/snapshot guard suites stay green unchanged; no remaining
       absolute no-one-else claim in the Privacy Policy that infrastructure credentials
       contradict; the four passages read as a reviewer-checkable diff.
-- [ ] T032 [P] Terms of Service review, recorded: review the ToS against the new data
+- [X] T032 [P] Terms of Service review, recorded: review the ToS against the new data
       class; **no text change expected** (disclosure changed, not agreement mechanics).
       Record the outcome in the PR description and `docs/DECISIONS.md` either way.
       If the review concludes a text change IS needed, stop — that becomes a decision
