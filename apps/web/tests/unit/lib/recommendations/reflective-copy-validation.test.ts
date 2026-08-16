@@ -101,15 +101,80 @@ describe("validateReflectiveCopy — valid re-phrasings pass", () => {
     expect(validateReflectiveCopy(text, facts)).toEqual({ ok: true });
   });
 
-  it("accepts words that merely CONTAIN a band word ('intense', 'calmly')", () => {
-    // A substring scan would reject both and push good copy to the fallback for no
-    // reason — the rule is about band CLAIMS, not about the letters.
+  it("accepts a word that merely CONTAINS a band word ('intense')", () => {
+    // A substring scan would reject this and push good copy to the fallback for no
+    // reason — the rule is about band CLAIMS, not about the letters. The boundary never
+    // fires mid-word, so a band word with something glued in FRONT of it is not a claim.
     const facts = { ...calmFacts(), bandLabels: [] };
+    expect(validateReflectiveCopy("Nothing intense stood out today.", facts)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("accepts a SUPPLIED band word inflected ('calmly' with Calm supplied)", () => {
+    const facts = calmFacts(); // bandLabels: ["Calm"]
     expect(validateReflectiveCopy("The morning passed calmly enough.", facts)).toEqual({
       ok: true,
     });
-    expect(validateReflectiveCopy("Nothing intense stood out today.", facts)).toEqual({
+    expect(validateReflectiveCopy("Today read calmer than yesterday.", facts)).toEqual({
       ok: true,
+    });
+  });
+
+  it("accepts a non-ASCII clock that was supplied verbatim (ar-EG toLocaleTimeString)", () => {
+    // `٩:٤٠` is what an ar-EG locale hands the card. It must validate against itself, and
+    // it does: the digit-run rule reads Arabic-Indic digits AS digits.
+    const base = { checkinCount: 1, times: ["٩:٤٠"], bandLabels: ["Calm"] };
+    const facts: ReflectiveFacts = {
+      state: 2,
+      ...base,
+      fallbackText: buildCalmFallbackText(base),
+    };
+    expect(validateReflectiveCopy("Calm at ٩:٤٠ today.", facts)).toEqual({ ok: true });
+  });
+
+  it.each([
+    ["3 amid", "Calm amid 3 things today."],
+    ["5 amber", "Calm at 9:40, 11:15 and 2:30."],
+  ])("accepts ordinary prose that only LOOKS meridiem-shaped: %s", (_label, text) => {
+    // "3 amid" used to be read as the time "3 am" and rejected. It is prose.
+    const base = { checkinCount: 3, times: ["9:40", "11:15", "2:30"], bandLabels: ["Calm"] };
+    const facts: ReflectiveFacts = {
+      state: 2,
+      ...base,
+      fallbackText: buildCalmFallbackText(base),
+    };
+    expect(validateReflectiveCopy(text, facts)).toEqual({ ok: true });
+  });
+});
+
+describe("validateReflectiveCopy — accepted holes, pinned so closing one is deliberate", () => {
+  it("KNOWN LIMIT: a spelled-out number passes (the contract's rule is about digits)", () => {
+    const facts = calmFacts(); // the real count is 3
+    expect(validateReflectiveCopy("Calm at all seven check-ins today.", facts)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("KNOWN LIMIT: a y→i inflection passes ('uneasier'), the suffix list has no stem rewriting", () => {
+    // The allow-list appends suffixes to the band word as spelled; "uneasy" → "uneasier"
+    // mutates the stem, so the boundary rule never sees a band word there. Rewriting stems
+    // means a morphology table in a validator. Accepted, and pinned so it stays a choice.
+    const facts = calmFacts(); // only Calm supplied
+    expect(validateReflectiveCopy("Today read uneasier than usual.", facts)).toEqual({
+      ok: true,
+    });
+  });
+
+  it("KNOWN LIMIT: a GLUED time passes (no word boundary, so the contract's rule misses it)", () => {
+    // Re-punctuated AND glued: `\b` never fires before the digit, so rule 2 sees no time.
+    // Rule 1 still holds — both digit runs were supplied.
+    const facts = calmFacts();
+    expect(validateReflectiveCopy("Calm since9.40 today.", facts)).toEqual({ ok: true });
+    // The same re-punctuation with a boundary in front of it is still caught.
+    expect(validateReflectiveCopy("Calm since 9.40 today.", facts)).toEqual({
+      ok: false,
+      reason: "fabricated_time",
     });
   });
 });
@@ -234,6 +299,42 @@ describe("validateReflectiveCopy — fabricated bands", () => {
     expect(validateReflectiveCopy("Today read a_little_tense.", facts)).toEqual({
       ok: false,
       reason: "fabricated_band",
+    });
+  });
+
+  it.each([
+    ["tensely", "Today read tensely."],
+    ["tensed", "Today tensed up."],
+    ["tenser", "Today read tenser."],
+    ["tensest", "Today read tensest."],
+    ["uneasy", "Today read uneasy."],
+  ])("rejects an UNSUPPLIED band word inflected: %s", (_label, text) => {
+    // An inflected band claim is still a band claim. Only Calm was supplied.
+    const facts = calmFacts();
+    expect(validateReflectiveCopy(text, facts)).toEqual({
+      ok: false,
+      reason: "fabricated_band",
+    });
+  });
+
+  it("rejects an inflection of a band word the day did not have", () => {
+    const facts = { ...calmFacts(), bandLabels: [] };
+    expect(validateReflectiveCopy("The morning passed calmly enough.", facts)).toEqual({
+      ok: false,
+      reason: "fabricated_band",
+    });
+  });
+
+  it("rejects a fabricated non-ASCII digit", () => {
+    const base = { checkinCount: 1, times: ["٩:٤٠"], bandLabels: ["Calm"] };
+    const facts: ReflectiveFacts = {
+      state: 2,
+      ...base,
+      fallbackText: buildCalmFallbackText(base),
+    };
+    expect(validateReflectiveCopy("Calm at ٧ check-ins today.", facts)).toEqual({
+      ok: false,
+      reason: "fabricated_number",
     });
   });
 
