@@ -31,7 +31,11 @@ async def test_ren_system_message_is_the_rendered_locked_prompt():
     ren_system = llm.messages_for("ren")[0].content
     # Behavior comes from the file, not inlined app strings.
     assert ren_system == render_prompt(
-        "ren", user_first_name="Sam", recent_read_line="", preferences=""
+        "ren",
+        user_first_name="Sam",
+        recent_read_line="",
+        current_pick_line="",
+        preferences="",
     )
 
 
