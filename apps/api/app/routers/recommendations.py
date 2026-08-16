@@ -22,7 +22,7 @@ on the client next to the facts, so the fallback decision is made there
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import JSONResponse
@@ -42,6 +42,13 @@ class ReflectiveCopyRequest(BaseModel):
     `extra="forbid"` is load-bearing, not tidiness: it is what makes "facts-only" an
     enforced input surface rather than a convention. A client that starts sending a
     reading, a probability or a name gets a 422 instead of quietly handing it to a model.
+
+    **Every field is also bounded in SIZE.** `extra="forbid"` stops unknown fields; it says
+    nothing about a known field carrying a megabyte. Since the body is forwarded to a paid
+    provider, an unbounded field is an unbounded bill and an unbounded prompt, so each
+    bound below is the real surface's shape with headroom, and a body outside it is
+    rejected before any provider is touched. Rate limiting is a separate concern and
+    deliberately out of scope here.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -49,12 +56,21 @@ class ReflectiveCopyRequest(BaseModel):
     # Only the two reflective states generate; anything else is a client bug, rejected
     # at the door rather than phrased.
     state: Literal[2, 9]
-    checkin_count: int = Field(ge=0)
-    times: list[str] = Field(default_factory=list)
-    band_labels: list[str] = Field(default_factory=list)
-    fallback_text: str = Field(min_length=1)
-    tried_item_title: str | None = None
-    tried_at_label: str | None = None
+    # A check-in is a monitoring session. 288 is a five-minute session every five minutes
+    # for 24 hours — far past anything real, and still a number rather than no number.
+    checkin_count: int = Field(ge=0, le=288)
+    # One preformatted clock string per check-in, e.g. "9:40" (longer in other locales).
+    times: list[Annotated[str, Field(max_length=16)]] = Field(default_factory=list, max_length=24)
+    # At most the three display labels; 32 chars each leaves room for a translation.
+    band_labels: list[Annotated[str, Field(max_length=32)]] = Field(
+        default_factory=list, max_length=8
+    )
+    # The deterministic line being re-phrased. Bounded by the same cap the web validator
+    # enforces on what it gets back (`REFLECTIVE_COPY_MAX_LENGTH`).
+    fallback_text: str = Field(min_length=1, max_length=220)
+    # A library title, verbatim. The longest shipped title is well under this.
+    tried_item_title: str | None = Field(default=None, max_length=120)
+    tried_at_label: str | None = Field(default=None, max_length=32)
 
 
 class ReflectiveCopyResponse(BaseModel):
