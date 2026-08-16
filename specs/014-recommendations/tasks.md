@@ -385,7 +385,7 @@ retirement.
 recorded as a swap, item changes without ceremony, final state is honest retirement, no
 day-repeat.
 
-- [ ] T028 [US4] Swap wiring in the T013 card: swap action **stamps `swapped_away_at` on
+- [X] T028 [US4] Swap wiring in the T013 card: swap action **stamps `swapped_away_at` on
       the old row FIRST, then inserts** the next engine pick (state 10 — no
       acknowledgement, no ceremony, only the mock's state-10 fade). **Ordering is RULED
       (Ruling B, 2026-08-15) and forced by `rp_one_active_per_user_day`** — two
@@ -406,7 +406,7 @@ day-repeat.
       test proving the stamp precedes the INSERT, one that a failed INSERT produces
       exactly one engine re-run and then stops, and one that a twice-failed swap leaves
       the previous pick on screen with no error UI.
-- [ ] T029 [US4] Signal-distinctness suite (SC-007, cross-surface): swaps and
+- [X] T029 [US4] Signal-distinctness suite (SC-007, cross-surface): swaps and
       didn't-help answers stored as **distinct** signals in 100% of cases (different
       columns, never conflated — the `rp_outcome_xor_swap` CHECK is exercised), ignored
       outcome prompt stores nothing; asserted at client level
