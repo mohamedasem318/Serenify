@@ -70,6 +70,18 @@ ordering is not a preference, it is the only order the index permits.
    Nothing renders as an error (FR-030).
 4. The stamp is **never reversed.** A swap-away that was recorded stays recorded; the
    preference signal is real regardless of what happened to the replacement.
+Point-3 clarification (2026-08-16, found at T028 implementation; flagged for Mohamed):
+points 3 and 4 cannot both hold literally on the stamp-landed-but-both-INSERTs-failed
+path — once the stamp lands, the outgoing row is retired, and "keep the previous pick on
+screen" as the active pick would require reversing the stamp, which point 4 forbids.
+Point 4 is the stronger, data-integrity clause and governs. What actually holds, and is
+test-pinned: "previous pick stays on screen" applies on the twice-failed-STAMP path
+(where the outgoing row is still active and no INSERT is attempted); on the
+stamp-landed path there are exactly two insert attempts then silence, the stamp stands,
+the card shows the re-run's pick unpersisted (visually indistinguishable from a
+successful swap, per point 2's own rationale), and a later mount retries the surface
+once through the normal auto-surface path. Nothing renders as an error on either path.
+
 5. **A failed swap does NOT consume a budget slot** (Amendment 2026-08-16, REVERSING the
    position accepted 2026-08-15 — see DECISIONS 2026-08-16). A person must not lose one
    of the episode's three suggestions because a write failed on our side. The stamp still
