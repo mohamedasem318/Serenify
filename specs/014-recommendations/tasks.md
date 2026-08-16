@@ -343,7 +343,7 @@ renders the required shape with zero fabricated facts.
       **credential isolation** — with `GROQ_API_KEY` set and the reflective key absent,
       the endpoint returns non-200 and Ren's key is never read by this path.
       **Acceptance**: pytest green; no test requires a real key.
-- [ ] T025 [US3] Client fetch (extend `apps/web/lib/api/recommendations-client.ts`) +
+- [X] T025 [US3] Client fetch (extend `apps/web/lib/api/recommendations-client.ts`) +
       first-paint orchestration in the home card per contracts/reflective-copy.md
       §First paint: cache hit paints immediately; cache miss shows the **800 ms**
       skeleton line (shimmer in the line's slot only, static under
@@ -355,7 +355,7 @@ renders the required shape with zero fabricated facts.
       RTL `waitFor` deadlocks on Vitest fake timers). **Acceptance**: the three
       first-paint tests green: cache-hit-skips-skeleton, in-budget-paints-once,
       late-result-never-replaces-painted-fallback.
-- [ ] T026 [US3] States 1/2/9 in the T013 card: state 1 names the cause (no check-in
+- [X] T026 [US3] States 1/2/9 in the T013 card: state 1 names the cause (no check-in
       yet) and offers a check-in; state 2 = specific true line (real counts, real
       times) + one forward-looking line, **no action**, and when no true specific line
       is derivable it falls back to state 1's **shape**, never a generic affirmation;
