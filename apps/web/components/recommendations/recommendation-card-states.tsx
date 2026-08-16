@@ -172,8 +172,46 @@ export interface RestingBlockProps {
   lead: string;
   /** The forward-looking second line. Omitted when the lead already carries it. */
   line?: string;
+  /**
+   * States 2/9 only: the lead is being generated and has not been painted yet, so its slot
+   * holds a skeleton for at most the reader-facing budget
+   * (`contracts/reflective-copy.md` §First paint rule 2). Everything else on the card —
+   * title, description, tile, and the forward line — paints immediately as usual.
+   */
+  leadPending?: boolean;
   /** State 1's check-in action, and nothing else — states 2 and 9 have NO action. */
   children?: ReactNode;
+}
+
+/**
+ * The lead's placeholder while a re-phrasing is in flight.
+ *
+ * Sized in `em` off the lead's own type, so it occupies ONE line of the lead's slot. Be
+ * honest about what that does and does not buy: a sentence that wraps to two lines will
+ * still grow the card by a line when it lands. Reserving two lines up front would trade
+ * that for the opposite jump on every one-line sentence, which is the more common case —
+ * so the card may resize slightly on settle, and that is the accepted cost. What the
+ * skeleton does buy is the thing the contract actually asks for: the reader never sees one
+ * sentence replaced by another.
+ *
+ * `animate-pulse` is the shipped skeleton vocabulary on this surface
+ * (`recent-chats-card.tsx`) rather than a new keyframe; it is dropped outright under
+ * `prefers-reduced-motion` (belt) and the global rule pins any survivor to one iteration
+ * (braces).
+ */
+function ReflectiveLeadSkeleton() {
+  const reduce = useMediaQuery("(prefers-reduced-motion: reduce)");
+  return (
+    <span
+      aria-hidden
+      data-testid="reflective-skeleton"
+      data-motion={reduce ? "reduced" : "full"}
+      className={cn(
+        "block h-[1.15em] w-[85%] max-w-[22rem] rounded-[6px] bg-border",
+        reduce ? "" : "animate-pulse",
+      )}
+    />
+  );
 }
 
 /**
@@ -181,7 +219,14 @@ export interface RestingBlockProps {
  * nothing-yet, and done-for-now must read as the same kind of quiet, so none of them
  * reads as a failure or a hole (mock panels 1, 2, 9).
  */
-export function RestingBlock({ tone, glyph, lead, line, children }: RestingBlockProps) {
+export function RestingBlock({
+  tone,
+  glyph,
+  lead,
+  line,
+  leadPending = false,
+  children,
+}: RestingBlockProps) {
   return (
     <>
       <div className="flex items-start gap-3">
@@ -199,8 +244,12 @@ export function RestingBlock({ tone, glyph, lead, line, children }: RestingBlock
           <RestingSvg glyph={glyph} />
         </span>
         <div className="min-w-0 flex-1">
-          <p data-testid="resting-lead" className="text-base leading-normal text-ink">
-            {lead}
+          <p
+            data-testid="resting-lead"
+            aria-busy={leadPending || undefined}
+            className="text-base leading-normal text-ink"
+          >
+            {leadPending ? <ReflectiveLeadSkeleton /> : lead}
           </p>
           {line && (
             <p data-testid="resting-line" className="mt-1.5 text-sm leading-relaxed text-muted">
