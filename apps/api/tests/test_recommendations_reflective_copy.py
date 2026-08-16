@@ -194,6 +194,42 @@ def test_rejects_a_malformed_facts_bundle(client, valid_token, monkeypatch, body
     assert registry.calls == 0
 
 
+@pytest.mark.parametrize(
+    "label,body",
+    [
+        ("fallback_text over 220 chars", {**CALM_FACTS, "fallback_text": "x" * 221}),
+        ("too many times", {**CALM_FACTS, "times": [f"9:{i:02d}" for i in range(25)]}),
+        ("a single over-long time", {**CALM_FACTS, "times": ["9" * 17]}),
+        ("too many band labels", {**CALM_FACTS, "band_labels": ["Calm"] * 9}),
+        ("a single over-long band label", {**CALM_FACTS, "band_labels": ["C" * 33]}),
+        ("checkin_count beyond a day of sessions", {**CALM_FACTS, "checkin_count": 289}),
+        ("tried_item_title over 120 chars", {**AT_REST_FACTS, "tried_item_title": "t" * 121}),
+        ("tried_at_label over 32 chars", {**AT_REST_FACTS, "tried_at_label": "t" * 33}),
+    ],
+)
+def test_rejects_an_oversized_facts_bundle(client, valid_token, monkeypatch, label, body):
+    """Bounded in SIZE, not just in shape. The body is forwarded to a paid provider, so an
+    unbounded known field is an unbounded prompt — rejected before the provider is touched."""
+    registry = _ScriptedRegistry(content='{"text": "x"}')
+    _install_client(monkeypatch, registry)
+
+    assert _post(client, valid_token, body).status_code == 422, label
+    assert registry.calls == 0, label
+
+
+@pytest.mark.parametrize(
+    "label,body",
+    [
+        ("fallback_text exactly at the cap", {**CALM_FACTS, "fallback_text": "x" * 220}),
+        ("the maximum number of times", {**CALM_FACTS, "times": [f"9:{i:02d}" for i in range(24)]}),
+        ("checkin_count at the ceiling", {**CALM_FACTS, "checkin_count": 288}),
+    ],
+)
+def test_accepts_a_bundle_exactly_at_the_limits(client, valid_token, monkeypatch, label, body):
+    _install_client(monkeypatch, _ScriptedRegistry(content='{"text": "ok"}'))
+    assert _post(client, valid_token, body).status_code == 200, label
+
+
 # ── 3. Failure answers non-200, and the endpoint never falls back ─────────────
 
 
