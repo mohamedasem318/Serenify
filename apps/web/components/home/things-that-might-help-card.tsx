@@ -15,10 +15,12 @@ import {
 } from "@/components/recommendations/recommendation-card-states";
 import { PickItem } from "@/components/recommendations/pick-item";
 import {
+  fetchReflectiveCopy as defaultFetchReflectiveCopy,
   recordOpened as defaultRecordOpened,
   recordOutcome as defaultRecordOutcome,
   surfacePick as defaultSurfacePick,
   swapPick as defaultSwapPick,
+  type ReflectiveCopyResult,
 } from "@/lib/api/recommendations-client";
 import { openChatPillFresh } from "@/lib/chat/pill-launcher";
 import { BAND_LABEL } from "@/lib/bands";
@@ -46,11 +48,21 @@ import {
   NO_READING_YET_LEAD,
   NO_READING_YET_LINE,
   RECOMMENDATION_LIBRARY,
+  REFLECTIVE_COPY_MAX_LENGTH,
   buildAtRestFallbackText,
   buildCalmFallbackText,
   type LibraryItem,
 } from "@/lib/recommendations/library";
 import { neutralPreferenceSource, type PreferenceSource } from "@/lib/recommendations/preference-source";
+import {
+  readCachedReflectiveCopy,
+  reflectiveCopyCacheKey,
+  writeCachedReflectiveCopy,
+} from "@/lib/recommendations/reflective-copy-cache";
+import {
+  validateReflectiveCopy,
+  type ReflectiveFacts,
+} from "@/lib/recommendations/reflective-copy-validation";
 import {
   getTodayBandReadings,
   getTodayPicks,
@@ -117,7 +129,35 @@ export interface ThingsThatMightHelpDeps {
   library: readonly LibraryItem[];
   /** The D-6 acknowledgement dwell (FR-029) — feature 012's constant, reused not restated. */
   dwellMs: number;
+  /**
+   * Ask the service to re-phrase a state-2/9 line. Injected like every other network call
+   * here; it may fail freely, because the deterministic string is already correct.
+   */
+  generateReflectiveCopy: (facts: ReflectiveFacts) => Promise<ReflectiveCopyResult>;
+  /** Reader-facing skeleton budget (contract §First paint rule 2). */
+  reflectiveSkeletonMs: number;
+  /** Background generation budget (contract §Timing). Bounds work, not the reader's wait. */
+  reflectiveGenerationMs: number;
 }
+
+/**
+ * How long the line's slot may sit empty while a re-phrasing is fetched.
+ *
+ * 800 ms, from `contracts/reflective-copy.md`: the sibling today card paints a stable
+ * shell and upgrades exactly once after a single local round trip, with no skeleton
+ * anywhere, so a generated line that lags materially behind that reads as a broken card —
+ * and painting the deterministic string early just to swap it later is the flip the
+ * contract forbids. The slot waits, briefly, on the same visual clock as that sibling.
+ */
+export const REFLECTIVE_SKELETON_BUDGET_MS = 800;
+
+/**
+ * How long generation may keep running after the reader has stopped waiting. Roughly 4×
+ * the skeleton budget: this bounds BACKGROUND work, and a result that lands inside it is
+ * still worth having — for the *next* first paint, via the cache, never for the paint
+ * already on screen. `REFLECTIVE_COPY_REQUEST_TIMEOUT_MS` sits below it deliberately.
+ */
+export const REFLECTIVE_GENERATION_BUDGET_MS = 3_500;
 
 const DEFAULT_DEPS: ThingsThatMightHelpDeps = {
   loadPicks: (userId, now) => getTodayPicks(userId, { now }),
@@ -132,6 +172,9 @@ const DEFAULT_DEPS: ThingsThatMightHelpDeps = {
   preferences: neutralPreferenceSource,
   library: RECOMMENDATION_LIBRARY,
   dwellMs: QUESTIONNAIRE_RESULT_DWELL_MS,
+  generateReflectiveCopy: (facts) => defaultFetchReflectiveCopy(facts),
+  reflectiveSkeletonMs: REFLECTIVE_SKELETON_BUDGET_MS,
+  reflectiveGenerationMs: REFLECTIVE_GENERATION_BUDGET_MS,
 };
 
 export interface ThingsThatMightHelpCardProps {
@@ -200,6 +243,225 @@ function splitReflective(text: string, forwardLine: string): { lead: string; lin
     return lead ? { lead, line: forwardLine } : { lead: "" };
   }
   return { lead: text };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Generation over the deterministic line (states 2 and 9)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What states 2 and 9 render, plus the material a re-phrasing would need.
+ *
+ * **Generation is scoped to the LEAD**, and that is a deliberate reading of
+ * `contracts/reflective-copy.md` against this card's two-line shape. The forward line
+ * (`CALM_FORWARD_LINE` / `AT_REST_FORWARD_LINE`) is a fixed reviewed constant carrying no
+ * count, no time and no band — there is nothing in it for a generator to phrase better,
+ * and a model rewriting it could only weaken or over-promise it. The lead is the line
+ * built from the person's own facts, so the lead is "the reflective line": it is what
+ * `fallbackText` carries, what the skeleton stands in for, and what a validated result
+ * replaces. The forward line paints with the shell, immediately, on both paths.
+ *
+ * `null` means this state generates nothing: either it is not 2/9, or the builder could
+ * not produce a true specific line (`lead` empty) — in which case the card owes state 1's
+ * SHAPE, never a generic affirmation (FR-001 state 2), and there is nothing to re-phrase.
+ */
+export function reflectiveInputFor(
+  state: number,
+  facts: { checkinCount: number; times: string[]; bandLabels: string[] },
+  tried: { title?: string; atLabel?: string },
+): ReflectiveFacts | null {
+  if (state === 2) {
+    const { lead } = splitReflective(buildCalmFallbackText(facts), CALM_FORWARD_LINE);
+    return lead ? { state: 2, ...facts, fallbackText: lead } : null;
+  }
+  if (state === 9) {
+    const full = buildAtRestFallbackText({
+      ...facts,
+      triedItemTitle: tried.title,
+      triedAtLabel: tried.atLabel,
+    });
+    const { lead } = splitReflective(full, AT_REST_FORWARD_LINE);
+    // The bundle is NARROWED to what state 9's line actually says: what was tried, and
+    // when. The day's counts, times and bands are deliberately NOT carried — the state-9
+    // lead makes no claim about any of them, so handing them over would let a generated
+    // sentence bolt on "…after a Tense stretch across your 3 check-ins" and pass
+    // validation against facts the fallback never asserted. The validator's corpus is
+    // this bundle, so narrowing the bundle IS the guarantee (FR-021).
+    return lead
+      ? {
+          state: 9,
+          checkinCount: 0,
+          times: [],
+          bandLabels: [],
+          triedItemTitle: tried.title,
+          triedAtLabel: tried.atLabel,
+          fallbackText: lead,
+        }
+      : null;
+  }
+  return null;
+}
+
+/** The fixed reviewed line that paints under the generated one, per state. */
+function forwardLineFor(state: 2 | 9): string {
+  return state === 9 ? AT_REST_FORWARD_LINE : CALM_FORWARD_LINE;
+}
+
+/** What the lead slot shows right now. `pending` = the skeleton is standing in for it. */
+interface ReflectivePaint {
+  pending: boolean;
+  text: string;
+}
+
+/**
+ * The first-paint rules of `contracts/reflective-copy.md`, in order. The invariant they
+ * exist for: **the reflective line is painted once per mounted state and never flips under
+ * the reader.**
+ *
+ *   1. Cache hit → paint the cached (already-validated) text immediately. No skeleton and
+ *      NO network call. This is why the cache is read during render rather than in an
+ *      effect: reading it in an effect would paint a skeleton first and swap — the exact
+ *      flip the contract forbids.
+ *   2. Cache miss → the shell paints as usual and only the lead's slot holds a skeleton,
+ *      for at most `reflectiveSkeletonMs`.
+ *   3. A validated result inside that budget IS the first and only paint of the line.
+ *   4. Budget expires → the deterministic string paints and **stands for this mounted
+ *      state**. Generation continues to `reflectiveGenerationMs`; a late validated result
+ *      goes to the cache ONLY, serving the next first paint, never the one on screen.
+ *
+ * One deliberate refinement of rule 4: a *definitive failure* (non-200, timeout, or text
+ * that fails validation) settles the line to the deterministic string immediately rather
+ * than holding the skeleton for the rest of the budget. Nothing can arrive afterwards to
+ * make that wait worthwhile, and a skeleton held past the point of hope is just a card
+ * that looks stuck. It flips nothing: the fallback is where this state was going to end.
+ *
+ * `key` is the cache fingerprint, so "a new mounted state" and "a new cache entry" are the
+ * same event by construction — a state change, a fact change or the day boundary all
+ * re-arm this hook exactly once (FR-019/FR-022).
+ */
+function useReflectiveLine(
+  facts: ReflectiveFacts | null,
+  localDay: string,
+  d: ThingsThatMightHelpDeps,
+): ReflectivePaint {
+  const key = facts ? reflectiveCopyCacheKey(facts, localDay) : "";
+
+  const resolve = (): ReflectivePaint => {
+    if (!facts) return { pending: false, text: "" };
+    const cached = readCachedReflectiveCopy(facts, localDay);
+    return cached === null
+      ? { pending: true, text: facts.fallbackText } // rule 2 — skeleton, fallback held ready
+      : { pending: false, text: cached }; // rule 1 — instant, no network
+  };
+
+  const [paint, setPaint] = useState<ReflectivePaint>(resolve);
+  const [paintedKey, setPaintedKey] = useState(key);
+
+  // Re-arm on a state change DURING render (React's adjust-state-on-prop-change pattern):
+  // React re-runs this component before committing, so the new state's first commit is
+  // already correct. Doing it in an effect would paint the previous state's line for one
+  // frame — a flip, and a visible one.
+  if (key !== paintedKey) {
+    setPaintedKey(key);
+    setPaint(resolve());
+  }
+
+  /**
+   * The run in progress, or the finished one, for a fingerprint.
+   *
+   * `settled` is the load-bearing half. A guard that only remembered "started this key"
+   * strands the skeleton forever the moment the effect re-runs at the SAME key: the
+   * cleanup cancels the timers and neuters the promise, and the guard then refuses to arm
+   * a replacement — permanent shimmer, permanent `aria-busy`, deterministic string never
+   * painted. React StrictMode does exactly that on every mount (mount → cleanup → mount),
+   * and so does any dependency identity change while a request is in flight. So the run's
+   * OUTCOME is tracked, not just its start, and an unsettled run releases the guard when
+   * it dies.
+   */
+  const runRef = useRef<{ key: string; settled: boolean } | null>(null);
+
+  // Deliberately keyed on the FINGERPRINT alone. `facts`, `localDay` and `d` are all
+  // recomputed upstream — a background reload hands down a fresh `facts` object with
+  // identical content — and re-running on identity would tear down an in-flight request
+  // and fire a second one for the same state. The fingerprint IS the content (it is built
+  // from the facts, and `fallbackText` is derived from those same facts), so a closure
+  // captured under one key stays correct for the whole life of that key.
+  useEffect(() => {
+    if (!facts || !key) return;
+    // Already resolved for this exact state — nothing to re-request and nothing to re-arm.
+    if (runRef.current?.key === key && runRef.current.settled) return;
+
+    const run = { key, settled: false };
+    runRef.current = run;
+
+    // Rule 1 again, authoritatively: a hit means no request is made at all.
+    if (readCachedReflectiveCopy(facts, localDay) !== null) {
+      run.settled = true;
+      return;
+    }
+
+    let live = true;
+    const forwardLine = forwardLineFor(facts.state);
+
+    /** Paint once. After this the line STANDS for this mounted state (rule 4). */
+    const settleTo = (text: string) => {
+      if (run.settled) return;
+      run.settled = true;
+      setPaint({ pending: false, text });
+    };
+    const settleToFallback = () => settleTo(facts.fallbackText);
+
+    const skeletonTimer = setTimeout(settleToFallback, d.reflectiveSkeletonMs);
+    const budgetTimer = setTimeout(() => {
+      live = false;
+    }, d.reflectiveGenerationMs);
+
+    void d
+      .generateReflectiveCopy(facts)
+      .then((result) => {
+        clearTimeout(skeletonTimer);
+        if (!result.ok || !validateReflectiveCopy(result.text, facts).ok) {
+          if (live) settleToFallback();
+          return;
+        }
+        // The cap bounds what a person READS, and what they read is the generated lead
+        // plus the forward line beneath it. The validator only saw the lead, so the pair
+        // is re-checked here — otherwise a 220-character lead paints at 267.
+        if (`${result.text} ${forwardLine}`.length > REFLECTIVE_COPY_MAX_LENGTH) {
+          if (live) settleToFallback();
+          return;
+        }
+        // Cached BEFORE the liveness check, on purpose: rule 4 says a late validated
+        // result serves the next first paint. "Next" outlives this component, so a result
+        // that arrives after unmount is still worth keeping — it is the same text this
+        // mount would have shown. Only the PAINT is gated on being alive.
+        writeCachedReflectiveCopy(result.text, facts, localDay);
+        if (!live || run.settled) return; // rule 4 — cache yes, painted line no
+        settleTo(result.text); // rule 3 — first and only paint
+      })
+      .catch(() => {
+        // The seam threw rather than returning a result. Same silence as everywhere else.
+        clearTimeout(skeletonTimer);
+        if (live) settleToFallback();
+      });
+
+    return () => {
+      live = false;
+      clearTimeout(skeletonTimer);
+      clearTimeout(budgetTimer);
+      // Belt to the `settled` check's braces: a dead run leaves no trace behind. This is
+      // REDUNDANT as the guard is written today — the check above only skips a run that
+      // settled, so an unsettled one is re-armed whether or not it was cleared here — and
+      // it is kept because it makes the invariant local. `runRef` holding a run that can
+      // never settle is the state the stranded-skeleton bug WAS, and the cheapest way to
+      // keep it unrepresentable is to not represent it.
+      if (!run.settled && runRef.current === run) runRef.current = null;
+    };
+    // `facts`, `localDay` and `d` are deliberately absent — see the note above the effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
+
+  return paint;
 }
 
 /**
@@ -488,7 +750,32 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
 
   const item = model.item;
   const prominent = model.state === 4;
-  const facts = reflectiveFacts(bands);
+  // Day-filtered with the SAME rule the reducer uses. The reads are already day-scoped, so
+  // this is belt to their braces — but a count is the one fact the card states outright,
+  // and "today" has to mean the same thing to the sentence as it does to the state.
+  const facts = useMemo(() => {
+    const day = toLocalDayString(new Date(nowMs));
+    return reflectiveFacts(
+      bands.filter((reading) => toLocalDayString(new Date(reading.atMs)) === day),
+    );
+  }, [bands, nowMs]);
+
+  // States 2/9's reflective material, computed BEFORE any early return — the hook below
+  // has to run on every render, in the same order, whatever state the card is in. Memoised
+  // on primitives so a re-render with unchanged data does not hand the hook a new object
+  // and tear down its in-flight timers.
+  const triedPick = model.openedToday.at(-1) ?? null;
+  const triedTitle = triedPick
+    ? d.library.find((entry) => entry.id === triedPick.itemId)?.title
+    : undefined;
+  const triedAtLabel =
+    triedPick?.openedAtMs != null ? clockLabel(triedPick.openedAtMs) : undefined;
+  const reflectiveState = loaded && userId ? model.state : 0;
+  const reflectiveInput = useMemo(
+    () => reflectiveInputFor(reflectiveState, facts, { title: triedTitle, atLabel: triedAtLabel }),
+    [reflectiveState, facts, triedTitle, triedAtLabel],
+  );
+  const reflective = useReflectiveLine(reflectiveInput, localDay, d);
 
   // Before the first read resolves the card rests in state 1's shape. That is not an
   // eleventh state and not a spinner: "nothing from today yet" is exactly what is known.
@@ -514,15 +801,28 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
   }
 
   // ── State 2 — calm. Specific and true first, then one forward line. No action. ──────
+  //
+  // `reflectiveInput` is non-null exactly when the builder produced a true specific line;
+  // `reflective.text` is that line, a validated re-phrasing of it, or the skeleton's
+  // stand-in — never anything else, and never a second paint (see `useReflectiveLine`).
   if (model.state === 2) {
-    const calm = splitReflective(buildCalmFallbackText(facts), CALM_FORWARD_LINE);
     return (
       <RecommendationCardShell state={2} description={CARD_DESC_NOTHING_TO_SUGGEST}>
-        {calm.lead ? (
-          <RestingBlock tone="meadow" glyph="wave" lead={calm.lead} line={calm.line} />
+        {reflectiveInput ? (
+          <RestingBlock
+            tone="meadow"
+            glyph="wave"
+            lead={reflective.text}
+            leadPending={reflective.pending}
+            line={CALM_FORWARD_LINE}
+          />
         ) : (
-          // No true specific line is derivable — state 1's SHAPE, never a generic
-          // affirmation (FR-001 state 2).
+          // DEFENSIVELY UNREACHABLE today: `deriveCardModel` only reaches state 2 when the
+          // day has at least one reading, and one reading is at least one check-in, so the
+          // builder always has a specific to state. The branch stays because the rule it
+          // encodes is FR-001's, not the reducer's — state 1's SHAPE, never a generic
+          // affirmation. Nothing is generated here either: there is no fact to phrase, and
+          // phrasing the forward line alone would invent the specificity the data lacked.
           <RestingBlock tone="neutral" glyph="clock" lead={CALM_FORWARD_LINE} />
         )}
       </RecommendationCardShell>
@@ -532,21 +832,19 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
   // ── State 9 — at rest after an outcome. Does not push another pick, does not claim ──
   //    the day is over, and re-arms on its own when a qualifying reading arrives.
   if (model.state === 9) {
-    const tried = model.openedToday.at(-1) ?? null;
-    const triedItem = tried ? d.library.find((entry) => entry.id === tried.itemId) : undefined;
-    const atRest = splitReflective(
-      buildAtRestFallbackText({
-        ...facts,
-        triedItemTitle: triedItem?.title,
-        triedAtLabel: tried?.openedAtMs != null ? clockLabel(tried.openedAtMs) : undefined,
-      }),
-      AT_REST_FORWARD_LINE,
-    );
     return (
       <RecommendationCardShell state={9} description={CARD_DESC_NOTHING_TO_SUGGEST}>
-        {atRest.lead ? (
-          <RestingBlock tone="meadow" glyph="check" lead={atRest.lead} line={atRest.line} />
+        {reflectiveInput ? (
+          <RestingBlock
+            tone="meadow"
+            glyph="check"
+            lead={reflective.text}
+            leadPending={reflective.pending}
+            line={AT_REST_FORWARD_LINE}
+          />
         ) : (
+          // Nothing was opened today (or the title is gone) — the forward line stands
+          // alone. It claims nothing about the day being over, and re-arms on its own.
           <RestingBlock tone="meadow" glyph="check" lead={AT_REST_FORWARD_LINE} />
         )}
       </RecommendationCardShell>
