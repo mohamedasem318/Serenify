@@ -8027,3 +8027,35 @@ needs a wording amendment, which would touch the locked snapshot.
 **Cross-references**: plan §Legal item 5; tasks.md T031; contracts/reflective-copy.md
 (the facts bundle); this file 2026-08-16 (Amendment 3 — the second credential the flow
 rides on).
+
+---
+
+## 2026-08-16 — Terms of Service review for feature 014: no text change
+
+**Status**: Recorded — T032's required review outcome (tasks.md T032: "record the outcome …
+either way"). Reviewer: the 014 wrap implementer; conclusion accepted by the orchestrating
+session. The Terms are byte-identical after the review.
+
+The Terms were read in full against the new suggestion-records data class, the
+reflective-copy flow that sends a facts bundle to Groq on a home render, and the second Groq
+credential. Five passages were checked closely: `TERMS_WHAT_P1` enumerates functions without
+claiming exhaustiveness (unlike the Privacy Policy's closed "kinds of data" list), so the
+suggestion card falsifies nothing; `TERMS_NOT_MEDICAL_P3` already reaches a suggested
+activity ("anything Serenify showed you"); the camera-and-inference consent's "declining
+this blocks calibration and monitoring sessions, and nothing else" stays true — reflective
+copy runs on derived facts and needs no camera, and a decliner simply has no readings for a
+readings-derived surface to act on; the acceptable-use list is behavioural, not a data
+inventory, and its extract-what-is-not-offered item covers the new class; the availability
+passage's uncertainty framing gains no new certainty claim, since generated copy is
+deny-by-default validated and the deterministic string is the source of truth. The Terms
+name no processors and no credentials, so neither the Groq disclosure nor the second key
+touches them. The change is one of disclosure — a Privacy Policy concern — not of agreement
+mechanics, consent scope, eligibility, or liability posture.
+
+One improvement identified and deliberately not made: `TERMS_NOT_MEDICAL_P1` names Ren but
+not the suggestion card, which stays covered by the general P3 sentence. A clarity
+improvement, not a correction — nothing published is false — and making it would put a
+cosmetic Terms revision in the same PR as a material Privacy one. Recorded here instead.
+
+**Cross-references**: tasks.md T032; plan §Legal; this file 2026-08-16 (the legal-list
+correction and Amendment 3 entries).
