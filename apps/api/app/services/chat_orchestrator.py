@@ -30,7 +30,7 @@ from ..schemas import (
     EndConversationResponse,
     SendMessageResponse,
 )
-from . import chat_store, chat_video_context, crisis_resources
+from . import chat_pick_context, chat_store, chat_video_context, crisis_resources
 from .llm_client import LLMClient
 
 # ── tuning constants ────────────────────────────────────────────────────
@@ -164,13 +164,18 @@ def _country(client: Client, user_id: str) -> str | None:
 
 
 def _ren_messages(
-    *, first_name: str, recent_read_line: str, transcript: list[dict[str, Any]]
+    *,
+    first_name: str,
+    recent_read_line: str,
+    current_pick_line: str,
+    transcript: list[dict[str, Any]],
 ) -> list[LLMMessage]:
     # 011: preferences seam is empty (FR-009) → {preferences} renders to "".
     system = render_prompt(
         "ren",
         user_first_name=first_name,
         recent_read_line=recent_read_line,
+        current_pick_line=current_pick_line,
         preferences="",
     )
     history = _to_llm_messages(_window(transcript, _MODEL_INPUT_MAX_MESSAGES))
@@ -294,12 +299,27 @@ async def send_message(
             )
             recent_line = chat_video_context.recent_read_line(band)
 
+        # active-suggestion context (R-7): what Serenify currently has open on the home
+        # card, so Ren is not blind to its own suggestion. Read on EVERY turn, unlike the
+        # opener note above — a recent read is a stale observation that the conversation
+        # supersedes, while an active pick is live state the person may raise at any point
+        # ("did that help?"). Fail-soft: any failure renders as "".
+        pick_item_id = await asyncio.to_thread(
+            chat_pick_context.active_pick_item_id,
+            client,
+            since_local_day=chat_pick_context.pick_lookback_day(),
+        )
+        pick_line = chat_pick_context.current_pick_line(pick_item_id)
+
         first_name = await asyncio.to_thread(_first_name, client, user_id)
         transcript = await asyncio.to_thread(chat_store.get_messages, client, conversation_id)
 
         # 3+4+5. Ren and the scorer run in PARALLEL; the scorer never steers Ren (FR-024).
         ren_msgs = _ren_messages(
-            first_name=first_name, recent_read_line=recent_line, transcript=transcript
+            first_name=first_name,
+            recent_read_line=recent_line,
+            current_pick_line=pick_line,
+            transcript=transcript,
         )
         scorer_msgs = _scorer_messages(transcript)
         ren_out, scorer_out = await asyncio.gather(
@@ -411,8 +431,15 @@ async def retry_assistant(
             )
 
         first_name = await asyncio.to_thread(_first_name, client, user_id)
+        # Both derived-context notes are empty on a retry: this re-runs one turn that
+        # already happened, and re-deriving context for it would let a retried reply
+        # differ from the one being replaced for reasons that have nothing to do with the
+        # failure. Same convention `recent_read_line` has always used here.
         ren_msgs = _ren_messages(
-            first_name=first_name, recent_read_line="", transcript=transcript
+            first_name=first_name,
+            recent_read_line="",
+            current_pick_line="",
+            transcript=transcript,
         )
         scorer_msgs = _scorer_messages(transcript)
         ren_out, scorer_out = await asyncio.gather(
