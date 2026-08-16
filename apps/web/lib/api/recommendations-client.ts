@@ -34,11 +34,13 @@
  * happened to the replacement (contract points 1 and 4).
  */
 
+import { clientEnv } from "@/lib/env/client";
 import { createClient } from "@/lib/supabase/client";
 import type { PickOutcome } from "@/lib/recommendations/engine";
 import type { LibraryItem, RecommendationCategory } from "@/lib/recommendations/library";
 import { RECOMMENDATION_LIBRARY } from "@/lib/recommendations/library";
 import type { PickSource } from "@/lib/recommendations/episode";
+import type { ReflectiveFacts } from "@/lib/recommendations/reflective-copy-validation";
 
 /** The one table this module touches. */
 export const RECOMMENDATION_PICKS_TABLE = "recommendation_picks";
@@ -321,4 +323,130 @@ export async function swapPick(
     // pick simply stays. Swallowed here so the swallow is deliberate rather than incidental.
   }
   return { stamped: true, replacementSurfaced: false, reselected: true };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Reflective copy (states 2 and 9) — the ONE call in this module that is not a write
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * `POST /recommendations/reflective-copy` on the FastAPI service (T024), not Supabase.
+ * It lives here rather than in a module of its own because it is the recommendation
+ * card's only other network dependency and it obeys the same silence rule as everything
+ * above: it returns a result, never throws, and nothing it returns is renderable as an
+ * error (FR-030).
+ *
+ * Nothing generated is ever persisted — not by this call, not by the card. The response
+ * is validated client-side and cached in `sessionStorage` for the session, and that is
+ * the whole of its life (`contracts/reflective-copy.md`).
+ */
+export const REFLECTIVE_COPY_ENDPOINT = `${clientEnv.apiUrl}/recommendations/reflective-copy`;
+
+/**
+ * The request timeout, deliberately BELOW the card's ≈3.5 s background generation budget
+ * (`REFLECTIVE_GENERATION_BUDGET_MS`). The two bounds must not race: if the socket could
+ * outlive the budget, the budget would be the thing that cancels the request, and a
+ * cancelled-by-budget request cannot distinguish "slow provider" from "gone". Half a
+ * second of headroom keeps the timeout the inner bound and the budget the outer one.
+ */
+export const REFLECTIVE_COPY_REQUEST_TIMEOUT_MS = 3_000;
+
+/** Why a generation attempt produced nothing. Operational only — never shown to anyone. */
+export type ReflectiveCopyFailure =
+  | "unauthenticated" // no session token; the card is signed-out or mid-refresh
+  | "unavailable" // any non-200, including the endpoint's 502 (provider down / no key)
+  | "timeout" // the request outlived REFLECTIVE_COPY_REQUEST_TIMEOUT_MS
+  | "network" // fetch threw
+  | "malformed"; // 200 with a body that is not `{ text: string }`
+
+export type ReflectiveCopyResult =
+  | { ok: true; text: string }
+  | { ok: false; reason: ReflectiveCopyFailure };
+
+export interface ReflectiveCopyDeps {
+  fetchImpl?: typeof fetch;
+  /** Resolves the caller's access token. Injectable so tests never touch Supabase. */
+  getAccessToken?: () => Promise<string | null>;
+  timeoutMs?: number;
+}
+
+/**
+ * The wire shape is **snake_case** and the endpoint rejects unknown fields
+ * (`extra="forbid"`), so this mapping is a contract, not a formatting preference. Absent
+ * optionals are omitted rather than sent as `null` — `JSON.stringify` drops `undefined`,
+ * and an omitted field is the same thing to the endpoint as an explicit null.
+ */
+function toWireFacts(facts: ReflectiveFacts): Record<string, unknown> {
+  return {
+    state: facts.state,
+    checkin_count: facts.checkinCount,
+    times: facts.times,
+    band_labels: facts.bandLabels,
+    fallback_text: facts.fallbackText,
+    tried_item_title: facts.triedItemTitle,
+    tried_at_label: facts.triedAtLabel,
+  };
+}
+
+async function defaultAccessToken(): Promise<string | null> {
+  try {
+    const {
+      data: { session },
+    } = await createClient().auth.getSession();
+    return session?.access_token ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ask the service to re-phrase `facts.fallbackText`. The caller MUST still validate the
+ * returned text against the same facts before painting it — this function checks the
+ * transport and the response shape, not the content (`reflective-copy-validation.ts` owns
+ * that, and owning it in one place is what makes SC-004 checkable).
+ */
+export async function fetchReflectiveCopy(
+  facts: ReflectiveFacts,
+  deps: ReflectiveCopyDeps = {},
+): Promise<ReflectiveCopyResult> {
+  const token = await (deps.getAccessToken ?? defaultAccessToken)();
+  if (!token) return { ok: false, reason: "unauthenticated" };
+
+  const doFetch = deps.fetchImpl ?? fetch;
+  const controller = new AbortController();
+  let timedOut = false;
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, deps.timeoutMs ?? REFLECTIVE_COPY_REQUEST_TIMEOUT_MS);
+
+  try {
+    const res = await doFetch(REFLECTIVE_COPY_ENDPOINT, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(toWireFacts(facts)),
+      signal: controller.signal,
+    });
+    if (!res.ok) return { ok: false, reason: "unavailable" };
+
+    // Parsed in its own try: a 200 whose body is not JSON is a broken CONTRACT, not a
+    // broken connection, and reporting it as `network` would point a future debugger at
+    // the wrong half of the system.
+    let body: unknown;
+    try {
+      body = await res.json();
+    } catch {
+      return { ok: false, reason: "malformed" };
+    }
+
+    const text = (body as { text?: unknown } | null)?.text;
+    if (typeof text !== "string" || text.trim().length === 0) {
+      return { ok: false, reason: "malformed" };
+    }
+    return { ok: true, text: text.trim() };
+  } catch {
+    return { ok: false, reason: timedOut ? "timeout" : "network" };
+  } finally {
+    clearTimeout(timer);
+  }
 }
