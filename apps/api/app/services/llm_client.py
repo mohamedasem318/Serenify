@@ -156,6 +156,14 @@ class _NoFallbackProvider:
     raises non-retryably if anything ever calls it.
     """
 
+    # `LLMProviderName` is a CLOSED literal in `packages/llm-client` ("groq" | "lm_studio")
+    # and that package is byte-untouched here, so there is no honest label for "nothing".
+    # "groq" is chosen over "lm_studio" because it is the only provider this path has any
+    # relationship with, and because the value is unobservable in practice: `complete` is
+    # never reached (`silent_fallback` is forced off, so the registry raises the primary's
+    # error rather than consulting a fallback). If it ever IS reached, the raised error
+    # carries this name into telemetry — pointing at the right provider, wrong slot, which
+    # is the least misleading of the two available answers.
     name: LLMProviderName = "groq"
 
     async def complete(self, _request: LLMRequest) -> LLMResponse:
