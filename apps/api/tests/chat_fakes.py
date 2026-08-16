@@ -113,6 +113,10 @@ class _Q:
         self._filters[f"{col}__gte"] = val
         return self
 
+    def is_(self, col, val):
+        self._filters[f"{col}__is"] = val
+        return self
+
     def order(self, *_a, **_k):
         return self
 
@@ -125,7 +129,8 @@ class _Q:
 
 class FakeChatClient:
     def __init__(self, *, conversation=None, profile=None, recent_band=None,
-                 country_column_exists: bool = True):
+                 country_column_exists: bool = True, active_pick_item_id=None,
+                 picks_table_raises: bool = False):
         self.conversation: dict[str, Any] = conversation or {
             "id": "conv1",
             "user_id": "u1",
@@ -141,6 +146,10 @@ class FakeChatClient:
         self.profile = profile or {"full_name": "Sam Lee", "country": None}
         self.recent_band = recent_band
         self.country_column_exists = country_column_exists
+        # 014 (R-7): the owner's currently-active recommendation pick, as a library slug.
+        # `picks_table_raises` stands in for the table being unreachable for this caller.
+        self.active_pick_item_id = active_pick_item_id
+        self.picks_table_raises = picks_table_raises
         self._seq = 0
 
     def _ts(self) -> str:
@@ -189,6 +198,20 @@ class FakeChatClient:
                     raise RuntimeError("column profiles.country does not exist")
                 return _Resp([{"country": self.profile.get("country")}])
             return _Resp([{"full_name": self.profile.get("full_name")}])
+
+        if q._table == "recommendation_picks":
+            if self.picks_table_raises:
+                raise RuntimeError("relation public.recommendation_picks does not exist")
+            if self.active_pick_item_id:
+                return _Resp(
+                    [
+                        {
+                            "item_id": self.active_pick_item_id,
+                            "suggested_at": "2026-06-28T09:00:00+00:00",
+                        }
+                    ]
+                )
+            return _Resp([])
 
         if q._table == "window_readings":
             if self.recent_band:
