@@ -63,12 +63,14 @@ def test_render_substitutes_declared_variables_in_ren():
         "ren",
         user_first_name="Sam",
         recent_read_line="",
+        current_pick_line="",
         preferences="",
     )
     assert "Sam" in rendered
     # the placeholders are gone after substitution
     assert "{user_first_name}" not in rendered
     assert "{recent_read_line}" not in rendered
+    assert "{current_pick_line}" not in rendered
     assert "{preferences}" not in rendered
 
 
