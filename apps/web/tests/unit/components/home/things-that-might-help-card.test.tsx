@@ -188,6 +188,12 @@ function harness(options: {
   const deps: Partial<ThingsThatMightHelpDeps> = {
     library,
     dwellMs: DWELL_MS,
+    // Generation is OFF for this suite. It has nothing to do with the ten states, and
+    // leaving the default seam in place would let a unit test reach for a session token.
+    // The states-2/9 first-paint behaviour is its own file
+    // (`things-that-might-help-card.us3.test.tsx`); here the deterministic string is what
+    // every assertion below expects to see, which is also SC-004's provider-down case.
+    generateReflectiveCopy: async () => ({ ok: false, reason: "unavailable" }),
     now: () => NOW,
     newId: () => `episode-${(episodeSeq += 1)}`,
     openRen: () => {
