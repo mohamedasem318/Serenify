@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   RECOMMENDATION_PICKS_TABLE,
+  REFLECTIVE_COPY_ENDPOINT,
+  REFLECTIVE_COPY_REQUEST_TIMEOUT_MS,
   UNIQUE_VIOLATION,
   attachConfirmation,
+  fetchReflectiveCopy,
   recordIgnoredOutcomePrompt,
   recordOpened,
   recordOutcome,
@@ -16,6 +19,7 @@ import {
   type WriteResult,
 } from "@/lib/api/recommendations-client";
 import { RECOMMENDATION_LIBRARY } from "@/lib/recommendations/library";
+import type { ReflectiveFacts } from "@/lib/recommendations/reflective-copy-validation";
 
 /**
  * T010 — the owner-RLS pick-write client (`contracts/recommendation-storage-rls.md`
@@ -412,5 +416,209 @@ describe("FR-030 — no exported write path throws or surfaces an error", () => 
       expect(keys).not.toContain("message");
       expect(JSON.stringify(result)).not.toMatch(/boom/);
     }
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// T025 — the reflective-copy fetch half
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The one call in this module that is not a write. Its properties are the same in spirit:
+ * every outcome is a value, nothing throws, and nothing it returns is renderable as an
+ * error. On top of that it owns the WIRE CONTRACT — snake_case keys against an endpoint
+ * that rejects unknown fields — so the mapping is asserted key by key rather than trusted.
+ */
+const FACTS: ReflectiveFacts = {
+  state: 2,
+  checkinCount: 3,
+  times: ["9:40", "11:15"],
+  bandLabels: ["Calm"],
+  fallbackText: "Calm at all 3 check-ins today, at 9:40 and 11:15.",
+};
+
+const AT_REST_FACTS: ReflectiveFacts = {
+  state: 9,
+  checkinCount: 1,
+  times: ["9:40"],
+  bandLabels: ["Uneasy"],
+  triedItemTitle: "Box breathing",
+  triedAtLabel: "2:20",
+  fallbackText: "You tried Box breathing at 2:20.",
+};
+
+const token = async () => "test-token";
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    json: async () => body,
+  } as unknown as Response;
+}
+
+describe("fetchReflectiveCopy — the wire contract", () => {
+  it("POSTs snake_case facts to the service endpoint with the bearer token", async () => {
+    let seen: { url: string; init: RequestInit } | null = null;
+    const fetchImpl = (async (url: string, init: RequestInit) => {
+      seen = { url, init };
+      return jsonResponse({ text: "A quiet day so far." });
+    }) as unknown as typeof fetch;
+
+    const result = await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token });
+
+    expect(result).toEqual({ ok: true, text: "A quiet day so far." });
+    expect(seen!.url).toBe(REFLECTIVE_COPY_ENDPOINT);
+    expect(seen!.init.method).toBe("POST");
+    expect((seen!.init.headers as Record<string, string>).Authorization).toBe("Bearer test-token");
+    expect(JSON.parse(seen!.init.body as string)).toEqual({
+      state: 2,
+      checkin_count: 3,
+      times: ["9:40", "11:15"],
+      band_labels: ["Calm"],
+      fallback_text: FACTS.fallbackText,
+    });
+  });
+
+  it("sends the state-9 optionals, and omits them entirely when absent", async () => {
+    const bodies: string[] = [];
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      bodies.push(init.body as string);
+      return jsonResponse({ text: "ok" });
+    }) as unknown as typeof fetch;
+
+    await fetchReflectiveCopy(AT_REST_FACTS, { fetchImpl, getAccessToken: token });
+    await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token });
+
+    expect(JSON.parse(bodies[0]!)).toMatchObject({
+      state: 9,
+      tried_item_title: "Box breathing",
+      tried_at_label: "2:20",
+    });
+    // Absent, not null: the endpoint forbids unknown fields, and an omitted optional is
+    // the same thing to it as an explicit null.
+    expect(Object.keys(JSON.parse(bodies[1]!))).not.toContain("tried_item_title");
+    expect(Object.keys(JSON.parse(bodies[1]!))).not.toContain("tried_at_label");
+  });
+
+  it("sends nothing beyond the facts bundle", async () => {
+    let body: Record<string, unknown> = {};
+    const fetchImpl = (async (_url: string, init: RequestInit) => {
+      body = JSON.parse(init.body as string);
+      return jsonResponse({ text: "ok" });
+    }) as unknown as typeof fetch;
+
+    await fetchReflectiveCopy(AT_REST_FACTS, { fetchImpl, getAccessToken: token });
+
+    expect(new Set(Object.keys(body))).toEqual(
+      new Set([
+        "state",
+        "checkin_count",
+        "times",
+        "band_labels",
+        "fallback_text",
+        "tried_item_title",
+        "tried_at_label",
+      ]),
+    );
+  });
+});
+
+describe("fetchReflectiveCopy — every failure is a value", () => {
+  it("reports a missing session without calling the service at all", async () => {
+    const fetchImpl = vi.fn();
+    const result = await fetchReflectiveCopy(FACTS, {
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      getAccessToken: async () => null,
+    });
+
+    expect(result).toEqual({ ok: false, reason: "unauthenticated" });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403, 422, 500, 502])("maps %s to `unavailable`", async (status) => {
+    const fetchImpl = (async () => jsonResponse({ error: "x" }, status)) as unknown as typeof fetch;
+    expect(await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token })).toEqual({
+      ok: false,
+      reason: "unavailable",
+    });
+  });
+
+  it("maps a thrown fetch to `network`", async () => {
+    const fetchImpl = (async () => {
+      throw new Error("offline");
+    }) as unknown as typeof fetch;
+    expect(await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token })).toEqual({
+      ok: false,
+      reason: "network",
+    });
+  });
+
+  it.each([
+    ["a missing key", {}],
+    ["a non-string text", { text: 42 }],
+    ["a null text", { text: null }],
+    ["a blank text", { text: "   " }],
+    ["a null body", null],
+  ])("maps %s to `malformed`", async (_label, body) => {
+    const fetchImpl = (async () => jsonResponse(body)) as unknown as typeof fetch;
+    expect(await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token })).toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+  });
+
+  it("maps a 200 whose body is not JSON to `malformed`, not `network`", async () => {
+    // A broken CONTRACT, not a broken connection — reporting it as `network` would point
+    // a future debugger at the wrong half of the system.
+    const fetchImpl = (async () =>
+      ({
+        ok: true,
+        status: 200,
+        json: async () => {
+          throw new SyntaxError("Unexpected token < in JSON at position 0");
+        },
+      }) as unknown as Response) as unknown as typeof fetch;
+
+    expect(await fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token })).toEqual({
+      ok: false,
+      reason: "malformed",
+    });
+  });
+
+  it("aborts and reports `timeout` once the request outlives its budget", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetchImpl = ((_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener("abort", () => reject(new Error("aborted")));
+        })) as unknown as typeof fetch;
+
+      const pending = fetchReflectiveCopy(FACTS, { fetchImpl, getAccessToken: token, timeoutMs: 50 });
+      await vi.advanceTimersByTimeAsync(51);
+
+      expect(await pending).toEqual({ ok: false, reason: "timeout" });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("keeps its request timeout inside the card's background budget", () => {
+    // The socket must not outlive the budget that is supposed to bound it — otherwise the
+    // budget, not the timeout, is what cancels the request.
+    expect(REFLECTIVE_COPY_REQUEST_TIMEOUT_MS).toBeLessThan(3_500);
+  });
+
+  it("never throws, and no result carries anything renderable as an error", async () => {
+    const hostileFetch = (async () => {
+      throw new Error("boom");
+    }) as unknown as typeof fetch;
+    const result = await fetchReflectiveCopy(FACTS, {
+      fetchImpl: hostileFetch,
+      getAccessToken: token,
+    });
+
+    expect(Object.keys(result)).not.toContain("message");
+    expect(JSON.stringify(result)).not.toMatch(/boom/);
   });
 });
