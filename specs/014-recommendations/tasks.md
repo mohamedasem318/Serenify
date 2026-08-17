@@ -236,7 +236,7 @@ state 4 — with 012 behaviour otherwise untouched (highest-regression area, pla
 without navigation → home shows the identical pick prominently; other two answers
 regression-tested.
 
-- [ ] T016 [US2] **The 012 coordinator change — its own task, this file only**:
+- [X] T016 [US2] **The 012 coordinator change — its own task, this file only**:
       `apps/web/lib/questionnaire/confirmatory-trigger.ts` dep swap per
       contracts/confirmatory-resolution.md — `onConfirm` still calls
       `finalize({answered, confirmed})` first, then a new `resolveToRecommendation()`
@@ -267,11 +267,21 @@ regression-tested.
       navigation (FR-011); FR-014 — a new confirmed detection removes a pending outcome
       prompt **without writing**; the monitor stops producing `confirmatory_yes` while
       the handoff seam stays tolerant of stale URLs
-      (`CONFIRMATORY_HANDOFF_SHOWS_RECOMMENDATIONS` remains `false`). **Acceptance**:
-      host-level tests cover attach-vs-insert, the FR-014 interruption, and
-      seam tolerance; existing monitor suites stay green (the file is large — plan
-      Risk 1 names host-wiring races; the FR-014 fixtures from T009 are re-exercised
-      here at host level).
+      (`CONFIRMATORY_HANDOFF_SHOWS_RECOMMENDATIONS` remains `false`).
+      **Idempotence (added 2026-08-18, T016 review)**: the trigger can invoke
+      `resolveToRecommendation` twice on a double-press, in the SAME microtask flush —
+      the host must be concurrency-safe idempotent (two concurrent no-active-pick paths
+      must not surface two picks; the `rp_one_active_per_user_day` backstop + the
+      client's silent 23505 handling are the last line, not the mechanism). Also stated
+      as design, not accident: the dep's `() => void` signature means the host's
+      resolution errors are swallowed — FR-030 requires exactly that (no error surface);
+      an async implementation must catch internally. Known race to handle or explicitly
+      accept in a comment: confirm + immediate session End can land the pick write after
+      the monitor unmounts (the row is still correct — home shows it). **Acceptance**:
+      host-level tests cover attach-vs-insert, the FR-014 interruption,
+      double-invoke idempotence, and seam tolerance; existing monitor suites stay green
+      (the file is large — plan Risk 1 names host-wiring races; the FR-014 fixtures
+      from T009 are re-exercised here at host level).
 - [X] T019 [US2] Home state 4 in the T013 card: a confirmed active pick renders
       prominently with exactly the mock's five moves (amber rail, tint wash, warm tile,
       17→19 px title, meadow-filled primary — the only filled CTA outside state 4's
