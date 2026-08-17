@@ -525,7 +525,7 @@ in-session card; contracts/confirmatory-resolution.md §3.
       swaps to resume while paused and back on resume; no second pause affordance exists
       in the rendered tree; the 012 reducers and the pinned #127/#130/#132/#134 suites are
       **byte-unchanged** and green.
-- [ ] T037 Drop the session's smoothing buffer when a PATCH sets `status='paused'`
+- [X] T037 Drop the session's smoothing buffer when a PATCH sets `status='paused'`
       (`apps/api` — feature-008 server code, **not** 012). Evidence for why: the buffer
       currently survives a pause, so with a deque of 4 and only `end_session` dropping it,
       the first post-resume band is largely derived from **pre-pause** video and can drive
