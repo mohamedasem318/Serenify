@@ -279,6 +279,16 @@ export interface ConfirmatoryTriggerDeps {
   armFalseAlarmNextSessionSuppression: () => void;
   /** Open Ren with the confirmatory handoff seam (no recommendation cards). */
   openRen: (handoff: "confirmatory_yes" | "confirmatory_maybe") => void;
+  /**
+   * Feature 014 / FR-010 — where "Yes, that's me" now goes. The host resolves the confirmed
+   * detection to a recommendation IN PLACE (no navigation) and shows it in the same slot this
+   * prompt occupied. Supersedes the 012 interim `openRen("confirmatory_yes")` handoff for the
+   * CONFIRM path only; `openRen` above is unchanged and still carries `confirmatory_maybe`.
+   *
+   * Required, not optional, deliberately: an optional dep would let a host silently drop the
+   * answer's destination with no type error, which is the failure this seam exists to prevent.
+   */
+  resolveToRecommendation: () => void;
   config?: TriggerConfig;
 }
 
@@ -359,6 +369,19 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
     depsRef.current.openRen(handoff);
   }
 
+  /**
+   * "Yes, that's me" (014 / FR-010). `finalize` runs FIRST and unchanged — same single-
+   * resolution guard, same `markResolvedConsumingBudget`, same tense-senior budget spend, same
+   * persisted `answered/confirmed` row as before — and only then does the answer resolve to a
+   * recommendation. The ordering is kept for a second reason now: this path no longer
+   * navigates, so what it protects is the invariant that the prompt row is answered before any
+   * downstream surface reacts to the confirmation.
+   */
+  async function answerThenResolve() {
+    await finalize({ type: "answered", outcome: "confirmed" });
+    depsRef.current.resolveToRecommendation();
+  }
+
   async function handleShow(capturedAt: string, kind: ConfirmatoryKind) {
     const d = depsRef.current;
     const sid = d.sessionId;
@@ -419,7 +442,7 @@ export function useConfirmatoryTrigger(deps: ConfirmatoryTriggerDeps): Confirmat
 
   return {
     visible,
-    onConfirm: () => void answerThenOpen("confirmed", "confirmatory_yes"),
+    onConfirm: () => void answerThenResolve(),
     onOpenChat: () => void answerThenOpen("opened_chat", "confirmatory_maybe"),
     onFalseAlarm: () => {
       void finalize({ type: "answered", outcome: "false_alarm" });
