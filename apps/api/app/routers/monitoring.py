@@ -205,7 +205,11 @@ async def patch_session(
 
     Camera control is client-side; this only moves ``status`` on the **owned** row under
     RLS update-own. An unknown or another user's session resolves to ``None`` → 404 (SC-004);
-    a terminal (``ended``) session can't transition → 409 (a clean 4xx, never a 500)."""
+    a terminal (``ended``) session can't transition → 409 (a clean 4xx, never a 500).
+
+    A ``paused`` transition additionally **drops the session's in-memory smoothing buffer**
+    (feature 014 / T037) so the first band after a resume is not derived from pre-pause
+    video; see the comment on that branch below."""
     client = user_client(settings, credentials.credentials)
     # RLS select-own: only an owned session is visible; an unknown OR foreign id → None → 404.
     session = get_session(client, session_id)
@@ -222,6 +226,27 @@ async def patch_session(
     )
     if updated is None:  # defensive: RLS update-own denied after a select-own pass
         return JSONResponse(status_code=404, content={"error": "unknown_session"})
+
+    if payload.status == "paused":
+        # A pause makes the buffered history STALE, so drop it (feature 014 / T037). The
+        # smoothing deque holds the last N=4 scored proba[1] and nothing but ``…/end`` used
+        # to clear it, so it survived a pause: the first window scored after a resume would
+        # be banded from a mean that is 3/4 PRE-pause video. Across a 10-minute coffee break
+        # that mean describes a moment that is over — and a wrongly-Tense band there feeds
+        # the 012 confirmatory clock, prompting about an episode that already ended.
+        # Dropping restarts cold-start, so the first post-resume band waits for 4 fresh
+        # scored windows (~90-105 s) exactly as a new session does — never an unsmoothed
+        # single window (``smoothing.smooth`` returns warming-up below M; smoothing.py).
+        # Retained on every OTHER transition: ``active`` (the resume itself — the buffer was
+        # already dropped on the pause that preceded it) and ``out_of_frame``, which is a
+        # brief in-run absence whose windows simply skip and never enter the buffer.
+        #
+        # The scoring-gate state is deliberately NOT dropped here (unlike on End): a paused
+        # session can still score again, and replacing its lock mid-flight would let a
+        # pre-pause window and a post-resume one mutate the same session's buffer at once —
+        # the single-writer invariant ``services.scoring_gate`` documents. On End no further
+        # window can score (409), so dropping it there is safe.
+        buffers.drop(session_id)
     return PatchSessionResponse(session_id=session_id, status=payload.status)
 
 
