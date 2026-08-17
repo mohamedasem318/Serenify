@@ -102,7 +102,9 @@ decision is made — and a pure TS module is directly unit-testable against SC-0
 `reduceDwellElapsed`, `markResolvedConsumingBudget`, `markResolvedRearm`) are untouched —
 the #127/#130/#132/#134 guarantee tests stay byte-for-byte green. The only changes: the
 hook's `onConfirm` calls `finalize({answered, confirmed})` exactly as today, then a new dep
-`resolveToRecommendation(pick)` instead of `openRen("confirmatory_yes")`; `openRen` remains
+`resolveToRecommendation()` (no argument — the hook has no pick to pass; the host resolves it;
+corrected 2026-08-18 to match the contract, tasks, and implementation) instead of
+`openRen("confirmatory_yes")`; `openRen` remains
 for `confirmatory_maybe`. Details: [contracts/confirmatory-resolution.md](contracts/confirmatory-resolution.md).
 
 **Rationale**: D-6 dwell, D-8/D-11 budget semantics, false-alarm next-session suppression,
