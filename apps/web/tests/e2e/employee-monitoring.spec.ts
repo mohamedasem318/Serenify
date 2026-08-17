@@ -56,7 +56,15 @@ test("employee happy path: start → permission → warming-up → reading → e
   await signInToApp(page, emp);
 
   // ── start the check-in (a full-document nav into the camera route) ──────────────────────
-  await page.getByRole("link", { name: "Start check-in" }).click();
+  // Scoped since 014: the "Things that might help" card renders its own "Start check-in"
+  // link (data-testid="start-checkin") in state 1 — including transiently while its reads
+  // are in flight — so the bare role+name locator can resolve to two elements and fail
+  // strict mode. This click means the check-in card's link, which is the one WITHOUT the
+  // recommendations testid; excluding by testid is order- and race-independent.
+  await page
+    .getByRole("link", { name: "Start check-in" })
+    .and(page.locator(':not([data-testid="start-checkin"])'))
+    .click();
   await expect(page).toHaveURL(/\/app\/monitor$/, { timeout: 30_000 });
 
   // ── permission → warming-up ─────────────────────────────────────────────────────────────
