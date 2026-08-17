@@ -750,6 +750,8 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     // Open Ren through the existing chat entry with the confirmatory handoff seam. Full nav
     // (chat is not a capture route); the prompt is already resolved before this fires.
     openRen: (handoff) => deps.navigate(`/app/chat?handoff=${handoff}`),
+    // T018 wires this — resolve the pick and show ConfirmedPickCard in place (FR-010/FR-011).
+    resolveToRecommendation: () => {},
   });
   // Keep the latest session-end resolver in a ref (updated in an effect, never during render)
   // so endAndLeave can await it before navigating.
