@@ -110,7 +110,13 @@ class _SessionBuffers:
         return len(buf) if buf is not None else 0
 
     def drop(self, session_id: str) -> None:
-        """Forget a session's buffer (call on End — US2 / T036)."""
+        """Forget a session's buffer.
+
+        Called on End (US2 / T036 — the session can never score again) and on a **pause**
+        (feature 014 / T037 — the buffered history is stale across a pause, so the first
+        post-resume band must not be 3/4 pre-pause video). Both callers are in
+        ``routers.monitoring``; the pause case restarts cold-start rather than freeing
+        memory."""
         self._store.pop(session_id, None)
 
     def clear(self) -> None:
