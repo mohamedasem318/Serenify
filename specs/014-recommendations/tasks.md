@@ -489,14 +489,14 @@ day-repeat.
       If the review concludes a text change IS needed, stop — that becomes a decision
       for Mohamed before proceeding. **Acceptance**: the recorded review statement
       exists.
-- [ ] T033 Tracking docs (CLAUDE.md table — write all that apply, skip none): one
+- [X] T033 Tracking docs (CLAUDE.md table — write all that apply, skip none): one
       `docs/PROGRESS.md` entry when this line of work lands (what shipped, what was
       verified, what was **not** — name the LIVE checks explicitly);
       `docs/BACKLOG.md` — add `recommendation_picks` to the existing 90-day-purge
       -mechanism entry (#86) and update its GitHub issue **in the same change**;
       `docs/CHANGELOG.md` only if the spec was actually amended (none expected).
       **Acceptance**: docs and issue updated together; progress-freshness guard green.
-- [ ] T034 Full local verification per quickstart.md: `npm run -w apps/web test --
+- [X] T034 Full local verification per quickstart.md: `npm run -w apps/web test --
       --pool=threads`, lint, `tsc --noEmit`, Playwright e2e (kill port 3000 between
       suites), `uv run pytest` in apps/api and packages/llm-client; `graphify update .`
       after the code lands. **Acceptance**: all green except the known pre-existing
