@@ -259,7 +259,7 @@ regression-tested.
       **Acceptance**: RTL tests in
       `apps/web/tests/unit/components/monitor/confirmed-pick-card.test.tsx` pin the
       open-write, the outcome-write rules, and dismiss-writes-nothing.
-- [ ] T018 [US2] Host wiring in `apps/web/components/monitor/monitoring-session.tsx`:
+- [X] T018 [US2] Host wiring in `apps/web/components/monitor/monitoring-session.tsx`:
       implement `resolveToRecommendation` — active pick today → UPDATE `confirmed_at`
       (same episode, same budget, prominence only); none → run the engine, INSERT with
       `source='confirmed'` (+`confirmed_at`), new episode with fresh budget iff the
