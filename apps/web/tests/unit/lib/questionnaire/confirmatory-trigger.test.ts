@@ -382,6 +382,7 @@ describe("useConfirmatoryTrigger hook", () => {
       consumeFalseAlarmNextSessionSuppression: vi.fn(),
       armFalseAlarmNextSessionSuppression: vi.fn(),
       openRen: vi.fn(),
+      resolveToRecommendation: vi.fn(),
       config: CONFIG,
       ...overrides,
     };
@@ -409,9 +410,22 @@ describe("useConfirmatoryTrigger hook", () => {
     expect(result.current.visible).toBe(true);
   });
 
-  it("confirm resolves answered=confirmed and opens Ren without recommendations", async () => {
+  // Feature 014 / FR-010 amended this test's DESTINATION, not its guarantee: confirm still
+  // persists `answered/confirmed` first and still spends the budget, but it now resolves to a
+  // recommendation in place instead of handing off to Ren. The old assertion
+  // (`openRen("confirmatory_yes")`) pinned behaviour that has been deliberately replaced.
+  it("confirm resolves answered=confirmed and then resolves to the recommendation, without Ren", async () => {
     vi.setSystemTime(0);
-    const deps = makeDeps();
+    // Recording implementations, so the ORDER — answer persisted first — is asserted directly.
+    const order: string[] = [];
+    const deps = makeDeps({
+      resolvePrompt: vi.fn(async () => {
+        order.push("resolvePrompt");
+      }),
+      resolveToRecommendation: vi.fn(() => {
+        order.push("resolveToRecommendation");
+      }),
+    });
     const { result, rerender } = renderHook((p) => useConfirmatoryTrigger(p), { initialProps: deps });
     await act(async () => rerender({ ...deps, latestOutcome: tense("c0") }));
     await act(async () => {
@@ -427,7 +441,9 @@ describe("useConfirmatoryTrigger hook", () => {
       type: "answered",
       outcome: "confirmed",
     });
-    expect(deps.openRen).toHaveBeenCalledWith("confirmatory_yes");
+    expect(deps.resolveToRecommendation).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["resolvePrompt", "resolveToRecommendation"]);
+    expect(deps.openRen).not.toHaveBeenCalled();
     expect(result.current.visible).toBe(false);
   });
 
