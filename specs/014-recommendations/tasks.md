@@ -517,7 +517,7 @@ them the session. Belongs with the US2 surface work (`ConfirmedPickCard`, built 
 T017) — sequence it after that card exists. Full rationale: plan §Pause from the
 in-session card; contracts/confirmatory-resolution.md §3.
 
-- [ ] T036 [US2] Pause/resume control on `ConfirmedPickCard`
+- [X] T036 [US2] Pause/resume control on `ConfirmedPickCard`
       (`apps/web/components/recommendations/`), wired to the **existing** feature-008
       handlers — this adds a second entry point, not new machinery. Ground truth:
       `handlePause` / `handleResume` in `components/monitor/monitoring-session.tsx`
