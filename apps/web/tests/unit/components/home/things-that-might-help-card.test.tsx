@@ -457,6 +457,9 @@ describe("ThingsThatMightHelpCard — all ten states are reachable (SC-002)", ()
     expect(screen.getByTestId("card-description")).toHaveTextContent(CARD_DESC_NOTHING_TO_SUGGEST);
     // It names what was tried — that is what keeps state 9 distinct from state 2.
     expect(screen.getByTestId("resting-lead")).toHaveTextContent("Look out a window");
+    // …and the title reads as a title, not as words in the sentence: it is marked in the
+    // lead, verbatim, so "You tried Look out a window at 9:40." does not read as a run-on.
+    expect(screen.getByTestId("lead-emphasis")).toHaveTextContent("Look out a window");
   });
 
   it("state 10 — swapped away: the replacement appears with no acknowledgement at all", async () => {
