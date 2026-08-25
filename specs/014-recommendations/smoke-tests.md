@@ -1,6 +1,6 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: 1 of 6 recorded (ST-1); remainder open.** Authored at the tasks stage (plan
+**Status: 3 of 6 recorded (ST-1, ST-2, ST-5); remainder open.** Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -310,7 +310,33 @@ scenarios 1–2).
 **Method**: real device, real camera, local stack (or the deployed stack). Compare the
 in-session card's title/why-line/duration against the home card's, word for word.
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS** — run 2026-08-25, Mohamed on the laptop (Acer
+built-in camera, Chrome, local stack, throwaway local account), agent driving the page
+through Claude-in-Chrome and reading the DB as `postgres` for the record checks.
+Mohamed's attestation covers what he saw on screen; the agent's method covers the rows.
+- Sustained Tense landed at 05:38 into the session; the 012 prompt showed 12:46:48 UTC;
+  Mohamed answered "Yes, that's me" at 12:46:51 (prompt row `lifecycle=answered`,
+  `outcome=confirmed`). URL stayed `/app/monitor` — no navigation, no Ren handoff.
+- The `ConfirmedPickCard` appeared in the `Notification` slot the prompt had occupied:
+  header "Things that might help", line "You said that's how it feels. Here's one small
+  thing.", item **Box breathing · 2 min** with its why-line, Show me / Pause / Dismiss.
+- One `recommendation_picks` row, inserted at 12:46:51 with `source=confirmed`,
+  `confirmed_at` = the answer time, `item_id=box-breathing`, `local_day=2026-08-25`;
+  Show me stamped `opened_at` (12:46:56); closing the steps showed "Did that help?"
+  (left unanswered on purpose — ST-4's precondition). Budget 1/3 for the episode.
+- Card **Pause** → page "Paused — taking a break", one `PATCH` 200, the card's control
+  flipped to Resume; **Resume** → "Getting a read on things" (the T037 warm-up).
+- **End session** → home: state 4, prominent — identical header line, item title,
+  why-line and *opened* chip, plus Show me / Something else / Talk to Ren about this.
+  (No "Did that help?" on the fresh mount: state 6 is mount-local by FR-016 — asked
+  once after the steps close; the home card re-offers the steps. By design.)
+- Observation, not a failure (logged as a follow-up, see PROGRESS): with the steps
+  expanded, the in-session card is taller than a 726 px-tall viewport and the header
+  clips at the top; Mohamed asked for a wider card so the steps wrap less. The title
+  "Box breathing" also wraps to two lines beside the *opened* chip at `w-80`.
+- Not a 014 finding: getting a *sustained* Tense read on demand is hard — only the
+  first ~90 s of the session scored ≥ 0.67; later attempts sat at 0.30–0.62. That is
+  the 008 model, not the resolution path.
 
 ---
 
@@ -358,7 +384,37 @@ an error** (FR-021, FR-030, SC-004's live half).
 cache, then reload (cache hit — instant), then kill the provider and force a state
 change.
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS** — run 2026-08-25 on the local stack, agent-run
+through Claude-in-Chrome (page text, `sessionStorage`, resource timing, the API log)
+on a second throwaway local account seeded with one ended session and three Calm
+readings today (card state 2; fallback "Calm at your one check-in today, at 2:35.").
+Mohamed placed `GROQ_API_KEY_REFLECTIVE_COPY` in `apps/api/.env`.
+- **Ren's key alone does not generate**: the API process launched before the second key
+  existed (it had `GROQ_API_KEY` only) answered `POST /recommendations/reflective-copy`
+  **502**; the card painted the deterministic line, nothing on the surface read as an
+  error, and the failure was not cached (`sessionStorage` empty).
+- **Generates with the second key**: after a restart, the first request 502'd once
+  (transient — the surface again showed the fallback cleanly; the reason is in the
+  telemetry `extra`, which the default log formatter does not print, so it was not
+  captured), every request after that was **200**. Three generated lines were seen
+  across loads: "One check-in today was Calm, at 2:35." / "Your single check-in today
+  at 2:35 was Calm." / "Your single check-in today was Calm, at 2:35." — each contains
+  only the supplied facts (1 check-in, 2:35, Calm), no exclamation, and passed the
+  client validator. A direct in-process call to `generate_reflective_copy` returned in
+  0.9–1.9 s over three tries.
+- **Cache hit paints with no request**: reload with the fingerprint cached
+  (`serenify.014.reflective-copy.v1:[2,1,["2:35"],["Calm"],null,null,"2026-08-25"]`)
+  made **no** reflective-copy request; the cached line painted.
+- **Cold miss, no flip**: cache cleared, reload → the request took **744 ms** (resource
+  timing), inside the 800 ms skeleton window, so the generated line was the first
+  paint. The `settled` guard (`things-that-might-help-card.tsx` ≈ lines 408–439) is what
+  forbids a later flip; the visible sub-second window is beyond what the scripting hook
+  can observe, so that part rests on the unit tests plus Mohamed's attestation below.
+- **Provider down**: API process stopped, cache cleared, reload → request failed
+  (≈2.0 s), the card painted the deterministic line; the only error text on the page was
+  the Recent-chats card's "Your chats didn't load just now… Try again" — 011's chat
+  list, not this card.
+- Mohamed's attestation (watching a cold-miss reload): _pending — to be filled in._
 
 ---
 
