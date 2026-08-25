@@ -821,14 +821,19 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
   );
   const reflective = useReflectiveLine(reflectiveInput, localDay, d);
 
-  // Before the first read resolves the card rests in state 1's shape. That is not an
-  // eleventh state and not a spinner: "nothing from today yet" is exactly what is known.
+  // Before the first read resolves the card wears state 1's SHAPE — the shell, the
+  // neutral tile, one lead line — but claims nothing: the lead slot holds the same
+  // skeleton the reflective line uses, and there is no forward line and no action. This
+  // is not an eleventh state and not a spinner. It used to paint state 1 itself here
+  // ("Nothing from today yet." + Start check-in), which is a definitive empty state
+  // asserted before the data is known — the shape #201 ruled a bug on the Recent chats
+  // card (2026-07-28) — and it offered a check-in to someone who may already have
+  // readings. Live check 2026-08-26 (smoke-tests ST-5 attestation); Mohamed chose the
+  // neutral shape. The skeleton drops its pulse under `prefers-reduced-motion`.
   if (!userId || !loaded) {
     return (
       <RecommendationCardShell state={1} description={CARD_DESC_NO_READING}>
-        <RestingBlock tone="neutral" glyph="clock" lead={NO_READING_YET_LEAD} line={NO_READING_YET_LINE}>
-          <StartCheckinAction />
-        </RestingBlock>
+        <RestingBlock tone="neutral" glyph="clock" lead="" leadPending />
       </RecommendationCardShell>
     );
   }
