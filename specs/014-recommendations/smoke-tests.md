@@ -414,7 +414,17 @@ Mohamed placed `GROQ_API_KEY_REFLECTIVE_COPY` in `apps/api/.env`.
   (≈2.0 s), the card painted the deterministic line; the only error text on the page was
   the Recent-chats card's "Your chats didn't load just now… Try again" — 011's chat
   list, not this card.
-- Mohamed's attestation (watching a cold-miss reload): _pending — to be filled in._
+- Mohamed's attestation (watching a cold-miss reload, re-run 2026-08-26 local, request
+  **505 ms**): he did not see a placeholder line — what he saw before the state-2 content
+  was the card's **state 1** ("Nothing from today yet… Start check-in"), i.e. the
+  pre-first-read shape at `things-that-might-help-card.tsx:824–834`, and then state 2
+  with its line already in place; no rewording after that. So the reflective skeleton
+  was never the first thing on screen: the reads-in-flight state 1 covered that window.
+  **Observation, referred to Mohamed (queue item 8, not decided here)**: that state 1 is
+  a definitive empty state painted before the read resolves — the same shape as #201
+  (Recent chats, ruled a bug 2026-07-28, fixed PR #240) — and it also offers "Start
+  check-in" to someone who already has readings today. Deliberate in the code comment;
+  contradicts the #201 precedent.
 
 ---
 
