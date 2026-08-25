@@ -57,9 +57,9 @@ test("employee happy path: start → permission → warming-up → reading → e
 
   // ── start the check-in (a full-document nav into the camera route) ──────────────────────
   // Scoped since 014: the "Things that might help" card renders its own "Start check-in"
-  // link (data-testid="start-checkin") in state 1 — including transiently while its reads
-  // are in flight — so the bare role+name locator can resolve to two elements and fail
-  // strict mode. This click means the check-in card's link, which is the one WITHOUT the
+  // link (data-testid="start-checkin") in state 1 (it no longer paints state 1 while its
+  // reads are in flight — 2026-08-26 — but a genuinely read-less day still does), so the
+  // bare role+name locator can resolve to two elements and fail strict mode. This click means the check-in card's link, which is the one WITHOUT the
   // recommendations testid; excluding by testid is order- and race-independent.
   await page
     .getByRole("link", { name: "Start check-in" })
