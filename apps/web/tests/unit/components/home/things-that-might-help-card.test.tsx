@@ -338,12 +338,14 @@ describe("ThingsThatMightHelpCard — all ten states are reachable (SC-002)", ()
     expect(screen.queryByTestId("reflective-skeleton")).toBeNull();
   });
 
-  it("state 1 — no reading yet today: names the cause and offers a check-in", async () => {
+  it("state 1 — no reading yet today: names the cause, and offers NO action of its own", async () => {
+    // The today's-check-in card above owns the only Start check-in; the things card no
+    // longer duplicates it (Mohamed, 2026-08-26, option B). It names the cause and stops.
     await mount(harness({ bands: [], picks: [] }));
     expectState(1);
     expect(screen.getByTestId("card-description")).toHaveTextContent(CARD_DESC_NO_READING);
     expect(screen.getByTestId("resting-lead")).toHaveTextContent(NO_READING_YET_LEAD);
-    expect(screen.getByTestId("start-checkin")).toHaveAttribute("href", "/app/monitor");
+    expect(screen.queryByTestId("start-checkin")).toBeNull();
     expectNoErrorSurface();
   });
 

@@ -669,7 +669,7 @@ describe("the skeleton", () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("US3 (a) — no readings today: the cause is named, a check-in is offered", () => {
-  it("renders state 1 with the cause and the action, and generates nothing", async () => {
+  it("renders state 1 with the cause and no action, and generates nothing", async () => {
     const h = harness({ bands: [], picks: [] });
     await mount(h.deps);
 
@@ -677,7 +677,8 @@ describe("US3 (a) — no readings today: the cause is named, a check-in is offer
     expect(screen.getByTestId("card-description")).toHaveTextContent(CARD_DESC_NO_READING);
     expect(screen.getByTestId("resting-lead")).toHaveTextContent(NO_READING_YET_LEAD);
     expect(screen.getByTestId("resting-line")).toHaveTextContent(NO_READING_YET_LINE);
-    expect(screen.getByTestId("start-checkin")).toHaveAttribute("href", "/app/monitor");
+    // No action of its own — the today's-check-in card owns Start check-in (2026-08-26).
+    expect(screen.queryByTestId("start-checkin")).toBeNull();
     // State 1 has no facts of its own — there is nothing to phrase and nothing is asked for.
     expect(h.gen.calls).toBe(0);
     expect(skeleton()).toBeNull();
