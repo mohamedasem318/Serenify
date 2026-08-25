@@ -179,8 +179,34 @@ export interface RestingBlockProps {
    * title, description, tile, and the forward line — paints immediately as usual.
    */
   leadPending?: boolean;
+  /**
+   * State 9 only: the tried item's title, VERBATIM. Wherever it occurs in the lead — the
+   * deterministic string or a validated re-phrasing — it is set in the pick title's weight
+   * so it reads as a title, not as words in the sentence ("You tried Three, two, one around
+   * you at 1:56." read as a run-on; Mohamed, ST-6 live check 2026-08-26). A render-time
+   * mark, not quotation marks in the string: it survives the generator and the validator
+   * untouched, and a re-phrasing that drops the title simply gets no mark.
+   */
+  leadEmphasis?: string;
   /** State 1's check-in action, and nothing else — states 2 and 9 have NO action. */
   children?: ReactNode;
+}
+
+/** The lead with `emphasis` (first occurrence, exact) set in the title weight. */
+function emphasise(lead: string, emphasis: string | undefined): ReactNode {
+  const term = emphasis?.trim();
+  if (!term) return lead;
+  const at = lead.indexOf(term);
+  if (at < 0) return lead;
+  return (
+    <>
+      {lead.slice(0, at)}
+      <span data-testid="lead-emphasis" className="font-semibold text-ink">
+        {term}
+      </span>
+      {lead.slice(at + term.length)}
+    </>
+  );
 }
 
 /**
@@ -225,6 +251,7 @@ export function RestingBlock({
   lead,
   line,
   leadPending = false,
+  leadEmphasis,
   children,
 }: RestingBlockProps) {
   return (
@@ -249,7 +276,7 @@ export function RestingBlock({
             aria-busy={leadPending || undefined}
             className="text-base leading-normal text-ink"
           >
-            {leadPending ? <ReflectiveLeadSkeleton /> : lead}
+            {leadPending ? <ReflectiveLeadSkeleton /> : emphasise(lead, leadEmphasis)}
           </p>
           {line && (
             <p data-testid="resting-line" className="mt-1.5 text-sm leading-relaxed text-muted">
