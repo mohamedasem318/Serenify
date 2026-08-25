@@ -12,7 +12,6 @@ import {
   ACTION_CLOSE,
   ACTION_SHOW_ME,
   ACTION_SOMETHING_ELSE,
-  ACTION_START_CHECKIN,
   ACTION_TALK_TO_REN,
   ACTION_TRY_SOMETHING_ELSE,
   CARD_TITLE,
@@ -290,24 +289,6 @@ export function RestingBlock({
   );
 }
 
-/** State 1's action. A FULL-document nav, never `<Link>` — `/app/monitor` is a camera route. */
-export function StartCheckinAction() {
-  return (
-    <div className="mt-4 flex flex-wrap items-center gap-2">
-      <a
-        data-testid="start-checkin"
-        href="/app/monitor"
-        className={cn(BTN_BASE, BTN_OUTLINE)}
-      >
-        <svg {...ICON_PROPS} strokeWidth={2} aria-hidden className="size-[15px] flex-none">
-          <path d="m22 8-6 4 6 4V8Z" />
-          <rect width="14" height="12" x="2" y="6" rx="2" />
-        </svg>
-        {ACTION_START_CHECKIN}
-      </a>
-    </div>
-  );
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // States 3 / 4 / 5 — the item's own actions
