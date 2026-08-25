@@ -56,15 +56,12 @@ test("employee happy path: start → permission → warming-up → reading → e
   await signInToApp(page, emp);
 
   // ── start the check-in (a full-document nav into the camera route) ──────────────────────
-  // Scoped since 014: the "Things that might help" card renders its own "Start check-in"
-  // link (data-testid="start-checkin") in state 1 (it no longer paints state 1 while its
-  // reads are in flight — 2026-08-26 — but a genuinely read-less day still does), so the
-  // bare role+name locator can resolve to two elements and fail strict mode. This click means the check-in card's link, which is the one WITHOUT the
-  // recommendations testid; excluding by testid is order- and race-independent.
-  await page
-    .getByRole("link", { name: "Start check-in" })
-    .and(page.locator(':not([data-testid="start-checkin"])'))
-    .click();
+  // The check-in card's "Start check-in" is now the ONLY one on the page: since
+  // 2026-08-26 (option B) the "Things that might help" card renders no Start check-in
+  // link in any state — state 1 names the cause and offers no action, and the pre-read
+  // shape is a skeleton. So the bare role+name locator is unambiguous again; the earlier
+  // testid-exclusion scoping (T034) is no longer needed.
+  await page.getByRole("link", { name: "Start check-in" }).click();
   await expect(page).toHaveURL(/\/app\/monitor$/, { timeout: 30_000 });
 
   // ── permission → warming-up ─────────────────────────────────────────────────────────────
