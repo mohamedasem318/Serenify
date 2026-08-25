@@ -9,7 +9,6 @@ import {
   RecommendationCardShell,
   RenRow,
   RestingBlock,
-  StartCheckinAction,
   SwapFade,
   SwapRetiredNote,
 } from "@/components/recommendations/recommendation-card-states";
@@ -838,13 +837,12 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
     );
   }
 
-  // ── State 1 — no reading yet today. Names the cause, offers a check-in. ─────────────
+  // ── State 1 — no reading yet today. Names the cause; NO action of its own (the
+  //    today's-check-in card above owns the only Start check-in — Mohamed 2026-08-26). ──
   if (model.state === 1) {
     return (
       <RecommendationCardShell state={1} description={CARD_DESC_NO_READING}>
-        <RestingBlock tone="neutral" glyph="clock" lead={NO_READING_YET_LEAD} line={NO_READING_YET_LINE}>
-          <StartCheckinAction />
-        </RestingBlock>
+        <RestingBlock tone="neutral" glyph="clock" lead={NO_READING_YET_LEAD} line={NO_READING_YET_LINE} />
       </RecommendationCardShell>
     );
   }
