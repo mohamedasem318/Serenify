@@ -8059,3 +8059,37 @@ cosmetic Terms revision in the same PR as a material Privacy one. Recorded here 
 
 **Cross-references**: tasks.md T032; plan §Legal; this file 2026-08-16 (the legal-list
 correction and Amendment 3 entries).
+
+## 2026-08-26 — the things card paints nothing definitive before its first read resolves (applies the #201 ruling)
+
+**Status**: Decided by Mohamed during the 014 live check (2026-08-26, local stack); implemented
+the same session in `apps/web/components/home/things-that-might-help-card.tsx` and pinned by a
+unit test. Branch `014-recommendations`, not yet merged.
+
+**What was there**: while the card's two reads (today's picks, today's bands) were in flight,
+it rendered **state 1** in full — "Nothing from today yet." with its forward line and a
+**Start check-in** link — on the reasoning, in the code comment, that "nothing from today yet
+is exactly what is known". Mohamed saw it during the ST-5 cold-miss reload: for the beat before
+the read landed, an account with readings today was told it had none and offered a check-in.
+
+**Ruling**: option (a) — the card keeps state 1's *shape* (shell, description, neutral tile, one
+lead line) but the lead slot holds the same skeleton the reflective line already uses, with no
+forward line and no action, until `loaded`. Rejected: (b) keep the paint and record the
+rationale. The rationale did not survive the precedent: **#201** (Recent chats, 2026-07-28,
+fixed PR #240) ruled that a definitive empty state is a claim about the data, and until the
+query returns the true answer is "not known yet". This surface's version was worse than #201's —
+it also offered an action premised on the claim. "What is known" was the wrong frame: what is
+known before the read is nothing about the day.
+
+**Cost accepted**: a genuinely read-less day now shows a skeleton for the read's duration
+before "Nothing from today yet." paints — a beat of neutral placeholder in exchange for never
+asserting a false empty state. `prefers-reduced-motion` drops the pulse (the skeleton primitive
+already honoured it). The 800 ms reflective-copy skeleton is unchanged; this is the read gate in
+front of it.
+
+**Not a new state**: `data-card-state` stays `1` for the pre-read shape, as before; SC-002's ten
+states are untouched. The e2e `Start check-in` locator scoping (T034) stays — it still guards a
+genuinely read-less day.
+
+**Cross-references**: `docs/BACKLOG.md` #201; smoke-tests ST-5 attestation (2026-08-26);
+`things-that-might-help-card.test.tsx` "before the first read resolves".
