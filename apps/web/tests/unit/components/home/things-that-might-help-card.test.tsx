@@ -321,6 +321,23 @@ afterEach(() => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe("ThingsThatMightHelpCard — all ten states are reachable (SC-002)", () => {
+  it("before the first read resolves: state 1's SHAPE, but no claim and no action", async () => {
+    // A calm day is on the way. Until it lands the card must not assert "nothing from
+    // today yet" (a definitive empty state — the #201 shape) nor offer a check-in to
+    // someone who already has readings: the lead slot holds the skeleton, nothing else.
+    render(<ThingsThatMightHelpCard userId="user-1" deps={harness({ bands: CALM_DAY }).deps} />);
+    expect(screen.getByTestId("reflective-skeleton")).toBeInTheDocument();
+    expect(screen.getByTestId("resting-lead")).toHaveAttribute("aria-busy", "true");
+    expect(screen.getByTestId("things-that-might-help").textContent).not.toContain(NO_READING_YET_LEAD);
+    expect(screen.queryByTestId("start-checkin")).toBeNull();
+    expect(screen.queryByTestId("resting-line")).toBeNull();
+    expectNoErrorSurface();
+    // …and once the read resolves, the real state paints — with no state-1 detour.
+    await settle();
+    expectState(2);
+    expect(screen.queryByTestId("reflective-skeleton")).toBeNull();
+  });
+
   it("state 1 — no reading yet today: names the cause and offers a check-in", async () => {
     await mount(harness({ bands: [], picks: [] }));
     expectState(1);
