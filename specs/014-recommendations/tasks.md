@@ -375,7 +375,7 @@ renders the required shape with zero fabricated facts.
       readings. Hallmark-governed; mock binding. **Acceptance**: RTL tests for US3
       scenarios (a)–(d) — provider disabled renders the fallback in 100% of cases and
       the card never blocks (SC-004).
-- [ ] T027 [US3] [LIVE] Real-provider generation check — **not CI-verifiable** (needs
+- [x] T027 [US3] [LIVE] Real-provider generation check — **not CI-verifiable** (needs
       apps/api up with a real `GROQ_API_KEY_REFLECTIVE_COPY` — the second credential,
       Amendment 3; Ren's `GROQ_API_KEY` alone must NOT make copy generate): a generated
       line validates and paints once; killing the provider mid-day degrades to fallback
