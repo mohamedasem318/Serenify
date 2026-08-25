@@ -889,6 +889,7 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
             glyph="check"
             lead={reflective.text}
             leadPending={reflective.pending}
+            leadEmphasis={triedTitle}
             line={AT_REST_FORWARD_LINE}
           />
         ) : (
