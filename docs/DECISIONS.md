@@ -8093,3 +8093,42 @@ genuinely read-less day.
 
 **Cross-references**: `docs/BACKLOG.md` #201; smoke-tests ST-5 attestation (2026-08-26);
 `things-that-might-help-card.test.tsx` "before the first read resolves".
+
+## 2026-08-26 — the things card's state 1 loses its own Start check-in button (overrides the state-1 mock)
+
+**Status**: Decided by Mohamed during the 014 live check (2026-08-26), from a three-option
+scratchpad mock; option **B** chosen. Implemented the same session on branch
+`014-recommendations` (not yet merged): the `StartCheckinAction` component is removed, state 1
+renders no action of its own, and `NO_READING_YET_LINE` changes from "Start a check-in and
+anything worth suggesting shows up here." to **"Anything worth suggesting shows up here after a
+check-in."**
+
+**What changed and why**: the approved state mock
+(`docs/mockups/serenify-014-things-that-might-help-mock.html`, panel 1) shipped an *outlined*
+Start check-in on the things card, with a note arguing an outline (not a fill) was enough to
+avoid "two identical primaries on one screen". Seeing it live at 360 px, Mohamed judged even the
+outlined button redundant: the **today's-check-in card sits directly above** the things card and
+already carries the sole, filled Start check-in. Two buttons that do the same thing, one under
+the other, is the redundancy. So the button goes entirely, and the second line stops instructing
+the reader to "start a check-in" (an action this card no longer offers) — it now *describes*
+where suggestions come from.
+
+**Copy-review gate**: `NO_READING_YET_LINE` is a gated library string, and gated strings need
+Mohamed's line-by-line review. He approved this exact wording by choosing option B from the mock,
+which rendered it — the gate is met, recorded here.
+
+**Consequences**:
+- `StartCheckinAction` and the `data-testid="start-checkin"` it carried are gone. The things
+  card now renders **no** Start check-in link in any state.
+- That removes the strict-mode locator collision the e2e was scoped around (**T034**,
+  2026-08-24): the page again has exactly one "Start check-in" link (the check-in card's), so
+  `employee-monitoring.spec.ts` drops the testid-exclusion and uses the bare role+name locator.
+  T034's finding stands in history; its scoping is simply no longer needed.
+- `ACTION_START_CHECKIN` ("Start check-in") stays defined in `card-strings.ts`, now unused. It
+  is part of the not-yet-ruled verbatim-strings set (open queue item) and was left untouched
+  rather than pulled in this change.
+- The gitignored state mock still shows the old panel 1; it is a reference, not a record, and is
+  superseded here.
+
+**Cross-references**: `docs/DECISIONS.md` 2026-08-24 (T034 locator scoping); this file
+2026-08-26 (pre-first-read paint); smoke-tests ST-6.
