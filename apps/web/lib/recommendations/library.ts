@@ -319,12 +319,15 @@ export const RECOMMENDATION_LIBRARY: readonly LibraryItem[] = [
 /**
  * State 1 — no reading yet today. Two lines: the first NAMES THE CAUSE rather than
  * describing an absence (that is what stops the card reading as a failed fetch), the
- * second invites a check-in (FR-001 state 1). The card renders a "Start check-in" action
- * beside them; the action label belongs to the component, not to this copy module.
+ * second says where suggestions come from. The card renders NO action of its own —
+ * the today's-check-in card directly above owns the sole "Start check-in" button, and a
+ * second one here duplicated it (Mohamed, 2026-08-26; option B of the state-1 mock).
+ * The line therefore describes, and no longer instructs the reader to press a button that
+ * is not on this card.
  */
 export const NO_READING_YET_LEAD = "Nothing from today yet.";
 export const NO_READING_YET_LINE =
-  "Start a check-in and anything worth suggesting shows up here.";
+  "Anything worth suggesting shows up here after a check-in.";
 
 /**
  * The outcome acknowledgement — ONE word, used identically by state 7 ("it helped") and
