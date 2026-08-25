@@ -424,7 +424,11 @@ Mohamed placed `GROQ_API_KEY_REFLECTIVE_COPY` in `apps/api/.env`.
   a definitive empty state painted before the read resolves — the same shape as #201
   (Recent chats, ruled a bug 2026-07-28, fixed PR #240) — and it also offers "Start
   check-in" to someone who already has readings today. Deliberate in the code comment;
-  contradicts the #201 precedent.
+  contradicts the #201 precedent. **Ruled the same session (option a) and fixed**: the
+  pre-read shape now holds the lead skeleton with no claim and no action
+  (`docs/DECISIONS.md` 2026-08-26). Re-run with the fix, cache cleared, request 775 ms:
+  Mohamed attested "a skeleton, then the text showed about the reading" — no state-1
+  detour, one paint, no rewording.
 
 ---
 
