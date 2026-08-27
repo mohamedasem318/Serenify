@@ -68,28 +68,52 @@ ordering is not a preference, it is the only order the index permits.
    screen announces which of the two paths ran.
 3. If that also fails, keep the previous pick on screen and stop. **No retry loop.**
    Nothing renders as an error (FR-030).
-4. The stamp is **never reversed.** A swap-away that was recorded stays recorded; the
-   preference signal is real regardless of what happened to the replacement.
+4. The stamp is **never reversed — with ONE scoped exception** (Ruling 2026-08-28, below).
+   A swap-away that was recorded stays recorded; the preference signal is real regardless of
+   what happened to the replacement. The sole exception is the both-INSERTs-failed path,
+   where no replacement row ever landed and the swap therefore did not happen.
+
 Point-3 clarification (2026-08-16, found at T028 implementation; flagged for Mohamed):
 points 3 and 4 cannot both hold literally on the stamp-landed-but-both-INSERTs-failed
 path — once the stamp lands, the outgoing row is retired, and "keep the previous pick on
-screen" as the active pick would require reversing the stamp, which point 4 forbids.
-Point 4 is the stronger, data-integrity clause and governs. What actually holds, and is
-test-pinned: "previous pick stays on screen" applies on the twice-failed-STAMP path
-(where the outgoing row is still active and no INSERT is attempted); on the
-stamp-landed path there are exactly two insert attempts then silence, the stamp stands,
-the card shows the re-run's pick unpersisted (visually indistinguishable from a
-successful swap, per point 2's own rationale), and a later mount retries the surface
-once through the normal auto-surface path. Nothing renders as an error on either path.
+screen" as the active pick would require reversing the stamp. In 2026-08-16 this was
+resolved in favour of point 4 (stamp stands; the card shows the re-run's pick unpersisted).
+
+**Ruling 2026-08-28 (Mohamed) — SUPERSEDES the 2026-08-16 resolution of the stamp-landed
+path, and ONLY that path.** Stamp-first ordering is not revisited and stands. Point 4's
+"never reversed" gains one scoped exception: when the replacement INSERT fails, the engine
+re-runs **once**, and that second INSERT **also** fails, the `swapped_away_at` stamp on the
+original pick is **reversed** (set back to NULL) and the card settles back to the original
+pick. Rationale: no replacement row landed, so the record must not assert a swap that did not
+happen; leaving the stamp stranded loses the person **both** picks on reload (the original
+reads swapped-away, and no replacement exists). Accepted cost: a brief visual flip to the
+replacement and back, which swap's lack of ceremony already tolerates. Safe under
+`rp_one_active_per_user_day` — with no replacement row, re-activating the original collides
+with nothing; the owner RLS UPDATE policy (`auth.uid() = user_id`) and the column-scoped
+UPDATE grant (`swapped_away_at` is grantable) already permit clearing the stamp, so **no
+policy is widened.** This exception applies to the both-INSERTs-failed path ONLY. Every other
+path is unchanged and test-pinned:
+- **twice-failed STAMP** — the outgoing row is still active, no INSERT is attempted, the
+  previous pick stays on screen, and the stamp was never written to reverse;
+- **single INSERT failure then a landed re-run** — the stamp stands, the replacement is the
+  active pick, indistinguishable from a first-try swap;
+- **re-run finds nothing to insert** — the stamp stands (only one INSERT was ever attempted;
+  this is not the both-INSERTs-failed path).
+Nothing renders as an error on any path (FR-030). The reversal is host-orchestrated
+(`clearSwappedAway`, `apps/web/lib/api/recommendations-client.ts`); `swapPick` itself still
+never reverses, so the client-layer "never reverses" test stays literally true.
 
 5. **A failed swap does NOT consume a budget slot** (Amendment 2026-08-16, REVERSING the
    position accepted 2026-08-15 — see DECISIONS 2026-08-16). A person must not lose one
-   of the episode's three suggestions because a write failed on our side. The stamp still
-   stands (points 1 and 4 are unchanged — it is a true preference signal and a non-repeat
-   exclusion), but budget consumption counts **replacement rows that actually landed**
-   (picks surfaced), never stamps. Consequence for implementers: budget accounting can no
-   longer be derived from stamp count alone — the reducer counts the episode's surfaced
-   rows, and a stamped pick with no successor row charges nothing.
+   of the episode's three suggestions because a write failed on our side. Budget consumption
+   counts **replacement rows that actually landed** (picks surfaced), never stamps.
+   Consequence for implementers: budget accounting can no longer be derived from stamp count
+   alone — the reducer counts the episode's surfaced rows, and a stamped pick with no
+   successor row charges nothing. This holds on both failure shapes: on the single-failure
+   path the stamp stands (a true preference signal and non-repeat exclusion) and no row was
+   added; on the both-INSERTs-failed path the stamp is reversed (point 4, Ruling 2026-08-28)
+   and again no row was added — so the original is active with the episode exactly where it
+   started.
 
 ## Verification
 
