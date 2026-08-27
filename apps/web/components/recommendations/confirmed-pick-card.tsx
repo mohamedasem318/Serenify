@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 
 import { Notification } from "@/components/notification";
+import { QuestionnaireResultIcon } from "@/components/questionnaire/questionnaire-result-icon";
 import { PickItem } from "@/components/recommendations/pick-item";
 import {
   BTN_BASE,
@@ -158,7 +159,7 @@ export function ConfirmedPickCard({
 }: ConfirmedPickCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [closedAfterOpening, setClosedAfterOpening] = useState(false);
-  const [answered, setAnswered] = useState(false);
+  const [answeredOutcome, setAnsweredOutcome] = useState<PickOutcome | null>(null);
   /** Opened during THIS mount — render state, so the duration pill can read it. */
   const [openedHere, setOpenedHere] = useState(false);
 
@@ -187,17 +188,17 @@ export function ConfirmedPickCard({
   }
 
   async function answerOutcome(outcome: PickOutcome) {
-    if (answered) return;
+    if (answeredOutcome !== null) return;
     // Marked answered BEFORE the write is awaited, so a failed write degrades to the
     // acknowledgement rather than re-asking a question the person already answered (FR-030).
-    setAnswered(true);
+    setAnsweredOutcome(outcome);
     await onOutcome(outcome);
   }
 
   // Asked once, only after the item was opened AND its instructions closed (FR-016/FR-031).
   // There is deliberately no dismiss control on it: ignoring it IS the third answer, it
   // writes nothing, and it costs nothing.
-  const askingOutcome = !expanded && closedAfterOpening && !answered;
+  const askingOutcome = !expanded && closedAfterOpening && answeredOutcome === null;
 
   return (
     <Notification
@@ -221,13 +222,20 @@ export function ConfirmedPickCard({
           // on screen, where the duration is still the useful fact (mock panels 5/6).
           opened={(openedAtMs != null || openedHere) && !expanded}
         >
-          {answered ? (
-            <p
+          {answeredOutcome !== null ? (
+            // Same ring the home end-states use (states 7/8) — one visual language for
+            // "recorded". The in-session card keeps its narrower scope: the ring and the
+            // word, but NO replacement affordance (the swap lives on the home card).
+            <div
               data-testid="outcome-acknowledgement"
-              className="mt-4 border-t border-[var(--amber-soft-line)] pt-4 text-[14.5px] text-muted"
+              data-outcome={answeredOutcome}
+              className="mt-4 border-t border-[var(--amber-soft-line)]"
             >
-              {OUTCOME_ACKNOWLEDGEMENT}
-            </p>
+              <QuestionnaireResultIcon
+                kind={answeredOutcome === "helped" ? "check" : "muted"}
+                message={OUTCOME_ACKNOWLEDGEMENT}
+              />
+            </div>
           ) : askingOutcome ? (
             <OutcomePrompt prominent onAnswer={(outcome) => void answerOutcome(outcome)} />
           ) : (

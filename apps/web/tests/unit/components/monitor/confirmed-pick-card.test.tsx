@@ -216,9 +216,16 @@ describe("ConfirmedPickCard — the outcome question (FR-016 / FR-031)", () => {
     expect(h.onOutcome).toHaveBeenCalledTimes(1);
     expect(h.onOutcome).toHaveBeenCalledWith("helped");
     expect(screen.queryByTestId("outcome-prompt")).toBeNull();
-    expect(screen.getByTestId("outcome-acknowledgement")).toHaveTextContent(
-      OUTCOME_ACKNOWLEDGEMENT,
+    // The acknowledgement is the SHARED end-state ring (FR-029 language), not a bare line:
+    // `helped` shows the meadow check, and it still carries the "Noted." word.
+    const ack = screen.getByTestId("outcome-acknowledgement");
+    expect(ack).toHaveTextContent(OUTCOME_ACKNOWLEDGEMENT);
+    expect(ack.querySelector('[data-testid="questionnaire-result"]')).toHaveAttribute(
+      "data-kind",
+      "check",
     );
+    // In-session scope: the ring, but NO replacement affordance (that lives on the home card).
+    expect(screen.queryByTestId("take-replacement")).toBeNull();
   });
 
   it("records `didnt_help` exactly once — and it is not a swap", async () => {
@@ -232,6 +239,14 @@ describe("ConfirmedPickCard — the outcome question (FR-016 / FR-031)", () => {
     expect(h.onOutcome).toHaveBeenCalledTimes(1);
     expect(h.onOutcome).toHaveBeenCalledWith("didnt_help");
     expect(screen.queryByTestId("swap")).toBeNull();
+    // `didnt_help` shows the muted ring — same language as the home card, no grading.
+    const ack = screen.getByTestId("outcome-acknowledgement");
+    expect(ack).toHaveTextContent(OUTCOME_ACKNOWLEDGEMENT);
+    expect(ack.querySelector('[data-testid="questionnaire-result"]')).toHaveAttribute(
+      "data-kind",
+      "muted",
+    );
+    expect(screen.queryByTestId("take-replacement")).toBeNull();
   });
 
   it("ignoring the question writes NOTHING — dismissing instead is a valid third answer", async () => {
