@@ -7,6 +7,7 @@ import {
 } from "@/components/home/things-that-might-help-card";
 import type { Band } from "@/lib/api/monitoring-client";
 import {
+  clearSwappedAway as clientClearSwappedAway,
   recordOpened as clientRecordOpened,
   recordOutcome as clientRecordOutcome,
   surfacePick as clientSurfacePick,
@@ -233,6 +234,8 @@ function harness(options: {
     surfacePick: (input) => clientSurfacePick(input, { writer, library }),
     recordOpened: (pick, atIso) => clientRecordOpened(pick, atIso, { writer }),
     recordOutcome: (pickId, outcome, atIso) => clientRecordOutcome(pickId, outcome, atIso, { writer }),
+    // The both-inserts-failed reversal, over the same writer as every other write.
+    clearSwappedAway: (pickId) => clientClearSwappedAway(pickId, { writer }),
     swapPick: async (input, swapDeps) => {
       if (gate) await gate;
       // The one re-run of contract point 2 is counted THROUGH the seam it is delivered on,
@@ -546,9 +549,11 @@ describe("ThingsThatMightHelpCard — a failed swap degrades in silence (FR-030)
     expect(inserts(h)).toEqual([PICK_1, PICK_2, PICK_2]);
   });
 
-  it("a twice-failed replacement stops dead: two attempts, then silence and no error", async () => {
+  it("a twice-failed replacement REVERSES the stamp and restores the original pick (Ruling 2026-08-28)", async () => {
     const h = harness();
     await mount(h);
+    // Every replacement INSERT of PICK_2 fails — insert 1 inside `swapPick`, insert 2 from the
+    // one engine re-run. That is the both-inserts-failed path: no replacement row ever lands.
     h.control.failInserts.set(PICK_2, Number.POSITIVE_INFINITY);
 
     await click("swap");
@@ -561,20 +566,32 @@ describe("ThingsThatMightHelpCard — a failed swap degrades in silence (FR-030)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
+    // Still only the two failed replacement attempts — the reversal is an UPDATE, not a third
+    // insert, and no retry loop restarts.
     expect(inserts(h)).toEqual([PICK_1, PICK_2, PICK_2]);
     expect(h.rerun().fired).toBe(1);
 
-    // Nothing rendered as an error, and the card is still one of the ten states.
-    expectNoErrorSurface();
-    expect(TEN_STATES.has(cardState())).toBe(true);
+    // The SCOPED exception to point 4: the swap did not happen, so the stamp is reversed. The
+    // stamp landed FIRST (ordering unchanged), then a second update cleared it back to NULL.
+    expect(updates(h)).toEqual([
+      { op: "update", pickId: "pick-1", patch: { swapped_away_at: NOW_ISO } },
+      { op: "update", pickId: "pick-1", patch: { swapped_away_at: null } },
+    ]);
 
-    // The stamp landed and stands (point 4): the declined item is a real preference signal
-    // and a real non-repeat exclusion, whatever became of its replacement.
+    // The original pick is active again — on screen and in the row — and nothing was
+    // conflated or rendered as an error.
     expect(h.rows).toHaveLength(1);
     expect(h.rows[0]!.itemId).toBe(PICK_1);
-    expect(h.rows[0]!.swappedAwayAtMs).toBe(NOW);
-    expectStampNeverReversed(h);
+    expect(h.rows[0]!.swappedAwayAtMs).toBeNull();
+    expectState(3);
+    expect(shownItem()).toBe(PICK_1);
+    expectNoErrorSurface();
+    expect(TEN_STATES.has(cardState())).toBe(true);
     expectSignalsNeverConflated(h);
+
+    // No budget was mis-charged: the one active row is the person's single pick, so the
+    // episode is exactly where it started (FR-018) — the failed swap cost nothing.
+    expect(budgetRemainingFor(h)).toBe(MAX_PICKS_PER_EPISODE - 1);
   });
 
   it("a twice-failed STAMP leaves the previous pick on screen, untouched and unannounced", async () => {
@@ -611,26 +628,30 @@ describe("ThingsThatMightHelpCard — a failed swap degrades in silence (FR-030)
     h.control.failInserts.set(PICK_2, Number.POSITIVE_INFINITY);
     await click("swap");
 
-    // Budget counts replacement rows that LANDED, never stamps — so a stamp with no
-    // successor row leaves the episode exactly where it was. A person must not lose one of
-    // the episode's three suggestions because a write failed on our side.
+    // Budget counts replacement rows that LANDED, never stamps — so with no successor row and
+    // the stamp reversed (Ruling 2026-08-28) the episode is exactly where it was. A person
+    // must not lose one of the episode's three suggestions because a write failed on our side.
     expect(h.rows.filter((r) => r.episodeId === h.rows[0]!.episodeId)).toHaveLength(1);
     expect(budgetRemainingFor(h)).toBe(before);
     expect(budgetRemainingFor(h)).toBe(MAX_PICKS_PER_EPISODE - 1);
 
-    // …and a DIFFERENT item is offered rather than the one just declined.
-    expect(shownItem()).toBe(PICK_2);
-    expect(shownItem()).not.toBe(PICK_1);
+    // …and the ORIGINAL item is restored — the swap did not happen, so the person keeps the
+    // pick they had rather than being stranded with neither.
+    expect(shownItem()).toBe(PICK_1);
+    expect(h.rows[0]!.swappedAwayAtMs).toBeNull();
 
     // The proof that the slot really is still there: with the failure cleared, the episode
     // goes on to surface its full three picks. Had the failed swap charged a slot, the third
     // could never have landed.
     h.control.failInserts.clear();
     // A fresh mount is the honest way to re-open the door: `attemptedRef` is per-mount, and
-    // the person coming back to the page is exactly the situation being modelled.
+    // the person coming back to the page is exactly the situation being modelled. The original
+    // pick is still active, so it is what greets them.
     first.unmount();
     const view = render(<ThingsThatMightHelpCard userId="user-1" deps={h.deps} />);
     await settle();
+    expect(shownItem()).toBe(PICK_1);
+    await click("swap");
     expect(shownItem()).toBe(PICK_2);
     await click("swap");
     expect(shownItem()).toBe(PICK_3);
