@@ -160,8 +160,11 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       writes are separate PostgREST requests with no transaction, so insert-first would
       collide with the still-active outgoing row. Stamp `swapped_away_at` **first**, then
       INSERT the replacement; if the INSERT fails, re-run the engine **once** to refresh
-      the card; if that also fails, keep the previous pick and stop — no retry loop, no
-      error surface; the stamp is **never reversed**; a failed swap **does NOT consume a
+      the card; if that also fails, stop — no retry loop, no error surface; the stamp is
+      **never reversed EXCEPT on the both-INSERTs-failed path** (Ruling 2026-08-28), where
+      no replacement row landed so the stamp is reversed to NULL via a host-orchestrated
+      `clearSwappedAway` and the original pick is restored (`swapPick` itself still never
+      reverses); a failed swap **does NOT consume a
       budget slot** (Amendment 2026-08-16, reversing the 2026-08-15 position — a person
       must not lose a suggestion because a write failed on our side). Consequence for the
       reducer: budget consumption counts **replacement rows that actually landed**
@@ -169,7 +172,8 @@ pure, table-driven-tested **before** any component consumes them (plan Risk 3).
       `apps/web/tests/unit/lib/recommendations-client.test.ts` (the
       `monitoring-client.test.ts` pattern) with an injected failing writer.
       **Acceptance**: exactly one retry observed for outcome, zero for swap; the stamp is
-      observed to precede the INSERT and is never reversed; a failed replacement INSERT
+      observed to precede the INSERT and `swapPick` never reverses it; `clearSwappedAway`
+      writes `swapped_away_at = null` once with no retry; a failed replacement INSERT
       triggers exactly one engine re-run and no further write; no code path surfaces an
       error (FR-030); requires Phase 1 complete.
 
@@ -402,9 +406,13 @@ day-repeat.
       untransacted PostgREST requests, so insert-first collides with the still-active row.
       If the INSERT fails, **re-run the engine once** to refresh the card (it now sees the
       declined pick and produces a new one — indistinguishable from a successful swap,
-      since swap has no ceremony); if that also fails, keep the previous pick on screen
-      and stop — **no retry loop**, nothing renders as an error (FR-030). The stamp is
-      **never reversed**, and a failed swap **does NOT consume a budget slot**
+      since swap has no ceremony); if that also fails, stop — **no retry loop**, nothing
+      renders as an error (FR-030). The stamp is **never reversed EXCEPT on this
+      both-INSERTs-failed path** (Ruling 2026-08-28): with no replacement row landed the
+      swap did not happen, so the host reverses the stamp to NULL (`clearSwappedAway`) and
+      the **original** pick is restored — stranding it would lose the person both picks on
+      reload; no policy is widened (the owner UPDATE grant already covers `swapped_away_at`).
+      A failed swap **does NOT consume a budget slot**
       (Amendment 2026-08-16, reversing the 2026-08-15 position): budget consumption
       counts replacement rows that actually landed, so a stamp with no successor row
       costs nothing — no refund path needed, because nothing was charged.
@@ -414,8 +422,9 @@ day-repeat.
       repeating. Hallmark-governed; mock binding. **Acceptance**: RTL tests for US4
       scenarios 1–3 green, including retire-early-when-non-repeat-bites-first; plus a
       test proving the stamp precedes the INSERT, one that a failed INSERT produces
-      exactly one engine re-run and then stops, and one that a twice-failed swap leaves
-      the previous pick on screen with no error UI.
+      exactly one engine re-run and then stops, and one that a twice-failed swap (both
+      INSERTs fail) **reverses the stamp and restores the original pick** on screen with no
+      error UI and no budget mis-charge (Ruling 2026-08-28).
 - [X] T029 [US4] Signal-distinctness suite (SC-007, cross-surface): swaps and
       didn't-help answers stored as **distinct** signals in 100% of cases (different
       columns, never conflated — the `rp_outcome_xor_swap` CHECK is exercised), ignored
