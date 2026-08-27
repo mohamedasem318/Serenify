@@ -502,7 +502,7 @@ day-repeat.
       after the code lands. **Acceptance**: all green except the known pre-existing
       Windows-only `hosted-email-template-sync` failure (CI-green on ubuntu); any other
       red is this feature's to fix.
-- [ ] T035 [LIVE] [GATE: Mohamed] Execute and record every check in
+- [x] T035 [LIVE] [GATE: Mohamed] Execute and record every check in
       [smoke-tests.md](./smoke-tests.md) (ST-1…ST-6) **before the PR merges** —
       Principle VII gate 5. Agent-run checks state their method; Mohamed's attestations
       say so. **Acceptance**: every entry carries a verdict + observations; no blank
