@@ -14,6 +14,7 @@ import {
 } from "@/components/recommendations/recommendation-card-states";
 import { PickItem } from "@/components/recommendations/pick-item";
 import {
+  clearSwappedAway as defaultClearSwappedAway,
   fetchReflectiveCopy as defaultFetchReflectiveCopy,
   recordOpened as defaultRecordOpened,
   recordOutcome as defaultRecordOutcome,
@@ -118,6 +119,11 @@ export interface ThingsThatMightHelpDeps {
   recordOpened: typeof defaultRecordOpened;
   recordOutcome: typeof defaultRecordOutcome;
   swapPick: typeof defaultSwapPick;
+  /**
+   * Reverse a swap stamp on the both-inserts-failed path only (Ruling 2026-08-28). Injected
+   * like every other write so the reversal is exercised over the same seam as the swap.
+   */
+  clearSwappedAway: typeof defaultClearSwappedAway;
   /** Opens the chat pill in place — the same seam the Recent chats card uses. */
   openRen: () => void;
   /** Injected clock. The engine and reducer never read one. */
@@ -165,6 +171,7 @@ const DEFAULT_DEPS: ThingsThatMightHelpDeps = {
   recordOpened: defaultRecordOpened,
   recordOutcome: defaultRecordOutcome,
   swapPick: defaultSwapPick,
+  clearSwappedAway: defaultClearSwappedAway,
   openRen: openChatPillFresh,
   now: () => Date.now(),
   newId: () => crypto.randomUUID(),
@@ -577,12 +584,15 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
     async (
       pending: { item: LibraryItem; episodeId: string; source: "reading" | "confirmed"; startsNewEpisode: boolean },
       day: string,
-    ) => {
-      if (!userId) return;
+    ): Promise<boolean> => {
+      if (!userId) return false;
       const key = `${pending.episodeId}|${pending.item.id}`;
-      if (attemptedRef.current.has(key) || surfacingRef.current) return;
+      if (attemptedRef.current.has(key) || surfacingRef.current) return false;
       attemptedRef.current.add(key);
       surfacingRef.current = true;
+      // Whether the row actually LANDED. The swap's both-inserts-failed reversal keys off
+      // this: a false here from the re-run's insert is the second of the two failures.
+      let landed = false;
       try {
         const result = await d.surfacePick({
           userId,
@@ -591,6 +601,7 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
           itemId: pending.item.id,
           source: pending.source,
         });
+        landed = result.ok;
         // The minted id has been spent; mint the next one so a later episode is not
         // attributed to the same uuid.
         if (result.ok && pending.startsNewEpisode) setNewEpisodeId(d.newId());
@@ -600,6 +611,7 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
         surfacingRef.current = false;
         await reload();
       }
+      return landed;
     },
     [userId, d, reload],
   );
@@ -708,9 +720,11 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
    * `swapped_away_at` is stamped on the outgoing row FIRST, then the replacement is
    * inserted. Insert-first would collide with the still-active outgoing row under
    * `rp_one_active_per_user_day`, since the two writes are separate PostgREST requests with
-   * no transaction. The stamp is NEVER reversed — a swap-away that was recorded stays
-   * recorded, because the preference signal is real regardless of what became of the
-   * replacement (contract points 1 and 4).
+   * no transaction. The stamp stands on every path EXCEPT one: when both the replacement
+   * INSERT and the single engine re-run's INSERT fail, no replacement row lands, so the swap
+   * did not happen and the stamp is reversed (Ruling 2026-08-28; see below). Everywhere else
+   * a swap-away that was recorded stays recorded, because the preference signal is real
+   * regardless of what became of the replacement (contract points 1 and 4).
    *
    * ── Exactly one re-run, then stop (contract points 2 and 3) ─────────────────────────
    * `onReplacementInsertFailed` is the engine's ONE permitted re-run, and it is armed as a
@@ -725,8 +739,11 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
    * ── A failed swap costs NO budget slot (Amendment 2026-08-16) ───────────────────────
    * That is structural, not enforced here: the reducer derives `picksUsed` from the
    * episode's SURFACED ROWS, so a stamped row with no successor charges its own slot and
-   * nothing more. The person keeps the suggestion a write on our side lost. The stamped item
-   * still enters the day's non-repeat exclusions — it was genuinely declined.
+   * nothing more. The person keeps the suggestion a write on our side lost. On the
+   * single-failure path the stamp stands, so the declined item enters the day's non-repeat
+   * exclusions — it was genuinely declined; on the both-inserts-failed path the stamp is
+   * reversed, the original becomes active again, and it is NOT excluded, because no swap ever
+   * completed. Either way no budget slot is consumed.
    */
   async function swap() {
     const pick = model.activePick;
@@ -769,7 +786,7 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
     }
 
     if (rerun.pick) {
-      await surfacePending(
+      const landed = await surfacePending(
         {
           item: rerun.pick.item,
           episodeId: rerun.pick.episodeId,
@@ -780,11 +797,28 @@ export function ThingsThatMightHelpCard({ userId, deps }: ThingsThatMightHelpCar
         },
         localDay,
       );
+
+      // ── Both inserts failed → REVERSE the stamp (Ruling 2026-08-28) ─────────────────
+      // The replacement INSERT failed inside `swapPick`, the one engine re-run produced a
+      // pick, and this second INSERT failed too — so NO replacement row landed and the swap
+      // did not happen. The `swapped_away_at` stamp is the ONLY thing on the board asserting
+      // it did, and leaving it stranded loses the person BOTH picks on reload: the original
+      // reads swapped-away, and no replacement exists. So clear it — the record must not
+      // claim a swap that did not occur, and the card settles back to the original pick.
+      //
+      // This is the sole path that reverses the stamp. A successful swap, a single failure,
+      // or a re-run that found nothing to insert all LEAVE it (contract point 4): those still
+      // carry a real preference signal and a real non-repeat exclusion. The accepted cost is
+      // a brief visual flip to the replacement and back, which a swap's lack of ceremony
+      // already tolerates (FR-001 state 10). Reversal is safe under `rp_one_active_per_user_day`
+      // because no replacement row exists to collide with the re-activated original.
+      if (!landed) await d.clearSwappedAway(pick.id);
     }
 
     // Reload BEFORE dropping the in-flight flag so the replacing item is the one that
     // carries the state-10 fade — the new item appears where the old one was, with no
-    // acknowledgement and no ceremony.
+    // acknowledgement and no ceremony. On the reversed path the original item is what the
+    // reload restores.
     await reload();
     setUi({ ...IDLE_CARD_UI });
   }
