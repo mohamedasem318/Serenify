@@ -6,6 +6,7 @@ import {
   REFLECTIVE_COPY_REQUEST_TIMEOUT_MS,
   UNIQUE_VIOLATION,
   attachConfirmation,
+  clearSwappedAway,
   fetchReflectiveCopy,
   recordIgnoredOutcomePrompt,
   recordOpened,
@@ -375,6 +376,36 @@ describe("swapPick — the stamp precedes the INSERT, and is never reversed (Rul
     const insert = writer.calls.find((call) => call.op === "insert");
     const item = RECOMMENDATION_LIBRARY.find((candidate) => candidate.id === "feet-on-the-floor")!;
     expect(insert?.op === "insert" ? insert.row.category : null).toBe(item.category);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// clearSwappedAway — the scoped point-4 exception (Ruling 2026-08-28)
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The reversal lives OUTSIDE `swapPick`: the host calls it only on the both-inserts-failed
+ * path, where no replacement row ever landed. `swapPick` still never reverses (proven above);
+ * this function is the one place a stamp is cleared, and it does so with a single owner-RLS
+ * UPDATE that sets `swapped_away_at` back to NULL.
+ */
+describe("clearSwappedAway — reverses the stamp on the both-inserts-failed path only", () => {
+  it("writes swapped_away_at = null, once, and reports ok", async () => {
+    const writer = recordingWriter();
+    const result = await clearSwappedAway("pick-1", { writer });
+
+    expect(result).toEqual({ ok: true });
+    expect(writer.calls).toEqual([
+      { op: "update", pickId: "pick-1", patch: { swapped_away_at: null } },
+    ]);
+  });
+
+  it("does not retry on failure — one attempt, then silence (FR-030)", async () => {
+    const writer = recordingWriter({ update: { ok: false } });
+    const result = await clearSwappedAway("pick-1", { writer });
+
+    expect(result).toEqual({ ok: false });
+    expect(writer.calls).toHaveLength(1);
   });
 });
 
