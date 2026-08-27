@@ -289,7 +289,7 @@ regression-tested.
       -governed; mock binding. **Acceptance**: RTL test renders home card and
       `ConfirmedPickCard` from the **same pick row** and asserts identical strings (US2
       scenario 2); no crimson, no exclamation marks.
-- [ ] T020 [US2] [LIVE] SC-005 end-to-end proof — **not CI-verifiable**: driving
+- [x] T020 [US2] [LIVE] SC-005 end-to-end proof — **not CI-verifiable**: driving
       sustained Tense needs a real camera (Playwright's fake-camera flags do not engage
       in this repo), so this runs as a live smoke check, recorded in
       [smoke-tests.md](./smoke-tests.md) **ST-2/ST-3/ST-4** before merge: "Yes, that's
