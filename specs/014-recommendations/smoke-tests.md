@@ -1,6 +1,6 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: 6 of 6 recorded (ST-1 through ST-6). All smoke checks PASS; T035 sign-off pending.** Authored at the tasks stage (plan
+**Status: 6 of 7 recorded (ST-1 through ST-6); ST-7 open.** All recorded checks PASS; T035 sign-off pending. Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -510,3 +510,26 @@ scroll** (`document.documentElement.scrollWidth <= innerWidth` on every state).
 - Two changes made mid-check on Mohamed's call (both committed): state 1 lost its own Start
   check-in button (option B; DECISIONS 2026-08-26) and the state-9 line now marks the tried
   item's title so it reads as a title, not a run-on.
+
+---
+
+## Legal copy (T031)
+
+Mohamed read the T031 Privacy Policy additions word by word and approved them
+verbatim — 2026-08-28.
+
+---
+
+## ST-7 — the in-session post-answer acknowledgement renders live
+
+**Check**: the `ConfirmedPickCard`'s post-answer "Noted." acknowledgement (the shared
+result ring — check for helped, muted for didn't-help) has **not yet been observed
+rendering in a live session** — ST-2 deliberately left the outcome question unanswered
+as ST-4's precondition.
+
+**Method**: in a live monitoring session, confirm a pick, open and close the
+instructions, then **answer** the outcome question and visually confirm the "Noted."
+ring renders — both the helped/check and didn't-help/muted variants if practical — with
+no error surface.
+
+**Observations / Verdict**: **not yet run** (open).
