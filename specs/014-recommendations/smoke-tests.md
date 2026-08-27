@@ -1,6 +1,6 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: 3 of 6 recorded (ST-1, ST-2, ST-5); remainder open.** Authored at the tasks stage (plan
+**Status: 5 of 6 recorded (ST-1, ST-2, ST-3, ST-4, ST-5); ST-6 pending write-up.** Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -350,7 +350,29 @@ reducers; this covers the surface).
 
 **Method**: same live session setup as ST-2, one run per answer path.
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS** — run 2026-08-27/28 on the local stack, agent-driven
+through Claude-in-Chrome on the calibrated throwaway account `st5-live`, Mohamed supplying
+the facial expression on cue; the agent read the DB as `postgres` for the record checks.
+**Test-harness note, stated plainly**: reaching a live confirmatory prompt needs a
+*sustained* tense/uneasy read, which was impractical to hold for the shipped 20 s (tense) /
+60 s (uneasy) sustain windows. So `apps/web/lib/questionnaire/constants.ts` timers were
+**temporarily lowered** (tense-sustain 20 s→5 s, mild-sustain 60 s→12 s, prompt min-dwell
+4.5 s→15 s) to make the prompt fire and linger long enough to answer, and **reverted to the
+ship values before any commit** (verified: the #127/#130/#132/#134 pinned reducer suites +
+monitor suites, 282 tests, pass on the restored constants). These are injected config
+values — the 012 pure reducers were NOT touched. The sustain *timing* is therefore
+reducer-pinned, not what this live run measured; the run measured the answer **surfaces**.
+- **"No, I'm okay"** (mild prompt, 20:49): prompt row `lifecycle=answered, outcome=false_alarm`;
+  the page returned to the calm reading with **no card**; no pick was confirmed
+  (`confirmed_at` stayed NULL on the day's engine-surfaced pick).
+- **Next-session suppression**: the very next session (same account) held a genuine
+  sustained tense/uneasy run for ~40 s (20:53:28→20:54:08, up to band=tense 0.77) — long
+  past every lowered threshold — and produced **zero** confirmatory-prompt rows. The prior
+  false alarm suppressed the prompt for the following session, exactly as 012 specifies.
+- **"Maybe — talk about it"** (mild prompt, 20:57): navigated to
+  `/app/chat?handoff=confirmatory_maybe`, Ren opened with a gentle pre-filled draft, prompt
+  row `outcome=opened_chat`, and **no recommendation card** was created
+  (`CONFIRMATORY_HANDOFF_SHOWS_RECOMMENDATIONS` stays false).
 
 ---
 
@@ -365,7 +387,28 @@ episode has a fresh budget.
 outcome prompt, then drive a second sustained-Tense confirmation). Verify no `outcome`
 was written for the abandoned prompt's pick row (owner query).
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS** — run 2026-08-28 (00:0x local, `st5-live`), same
+lowered-then-reverted timer note as ST-3. Staged across two sessions:
+- **Set-up**: session 1 — "Yes, that's me" → a confirmed pick landed
+  (`source=confirmed`, `confirmed_at=21:07:17`, episode `ffe66642`); the in-session
+  ConfirmedPickCard **Show me** → **Close** recorded `opened_at=21:08:11` and left the
+  "Did that help?" question **pending, unanswered**. Session ended with the pick in the
+  opened/outcome-NULL (pending) state.
+- **The FR-014 event**: session 2 — a second "Yes, that's me" (new confirmed detection)
+  at 21:13:19. Owner query on the pick row immediately after:
+  `confirmed_at` re-stamped 21:07:17 → **21:13:19**, `opened_at` **unchanged** (21:08:11),
+  **`outcome` still NULL** (no answer written), **same episode** `ffe66642`, and **exactly
+  one row** for the day (attached in place — Ruling C — never a second row). In-session the
+  ConfirmedPickCard took the notification slot back prominently (the "opened" pick), no
+  outcome question, no error surface. This is FR-014 exactly: a new confirmed detection
+  while an outcome prompt is pending removes the stale prompt **without recording an
+  answer** and the confirmed pick takes over.
+- **Incidental finding (not a defect, logged as an observation)**: the first ST-4 "Yes"
+  attempt landed within a second of the local-day rollover (00:00 Africa/Cairo). The
+  resolution computed the *new* day, which had no established pick and too few readings to
+  warrant one, so it surfaced nothing — no card, no row, no error (FR-030 held). Correct
+  behaviour at an unlucky instant, not a bug; logged as a BACKLOG observation (#TBD, to
+  open in PR prep) for a one-line guard consideration.
 
 ---
 
