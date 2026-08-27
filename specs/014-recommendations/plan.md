@@ -149,9 +149,14 @@ packages/llm-client/
   — (1) stamp the outgoing pick's `swapped_away_at` **first**, then INSERT the
   replacement; (2) if the INSERT fails, **re-run the engine once** to refresh the card,
   which now sees the declined pick and produces a new one (indistinguishable from a
-  successful swap, since swap has no ceremony); (3) if that also fails, keep the previous
-  pick on screen and stop — no retry loop, no error surface; (4) the stamp is **never
-  reversed**; (5) **a failed swap does NOT consume a budget slot** (Amendment 2026-08-16,
+  successful swap, since swap has no ceremony); (3) if that also fails, stop — no retry
+  loop, no error surface; (4) the stamp is **never reversed — with one scoped exception**
+  (Ruling 2026-08-28): on the **both-INSERTs-failed path** (initial INSERT fails, the single
+  re-run's INSERT also fails, so no replacement row landed) the stamp is reversed to NULL and
+  the card settles back to the **original** pick — leaving it stranded would lose the person
+  both picks on reload, and no policy is widened (the owner UPDATE grant already covers
+  `swapped_away_at`); on every other path the stamp stands; (5) **a failed swap does NOT
+  consume a budget slot** (Amendment 2026-08-16,
   reversing the position accepted 2026-08-15 — a person must not lose a suggestion
   because a write failed on our side; the stamp stands as signal and non-repeat
   exclusion, but budget consumption counts replacement rows that actually landed, so it
