@@ -1,6 +1,6 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: 5 of 6 recorded (ST-1, ST-2, ST-3, ST-4, ST-5); ST-6 pending write-up.** Authored at the tasks stage (plan
+**Status: 6 of 6 recorded (ST-1 through ST-6). All smoke checks PASS; T035 sign-off pending.** Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -486,4 +486,27 @@ marks, no band chip on the card (Principle V / VI, plan §UI design contract).
 **Method**: real device or devtools emulation across the states; Mohamed's eye on the
 mock fidelity is the verdict that counts (attestation — and says so).
 
-**Observations / Verdict**: _not run yet._
+**Observations / Verdict**: **PASS** — run 2026-08-26/27, Chrome devtools device toolbar at
+**360 × 800**, agent driving the states through Claude-in-Chrome and measuring geometry in
+the DOM, Mohamed attesting mock fidelity on each. Every state was viewed in **both**
+palettes and the card measured **328 px** wide at the 360 px viewport with **no horizontal
+scroll** (`document.documentElement.scrollWidth <= innerWidth` on every state).
+- **States covered**: 1 (post-change: cause + no action), 3 (uneasy pick), 4 (confirmed,
+  prominent), 5 (expanded instructions + full-width Close), 6 (outcome question, swap/Ren
+  withdrawn), the swap **retirement line** (state 3 after the 3-pick budget, "Something
+  else" gone, Show me full-width), 8 ("Noted." + the recorded end-state), and 9 (at rest,
+  with the tried-title emphasis). Each judged against its mock panel; Mohamed: good on all.
+- **Touch targets**: measured — Show me / Something else / Yes / Not really / Close all
+  **44 px** tall; the Ren row **52 px**.
+- **Reduced motion** (`prefers-reduced-motion: reduce`, set via Windows animation-effects
+  off, confirmed live in the page): the reflective/loading **skeleton is static** (no
+  `animate-pulse`, `data-motion="reduced"`), the state transition shows **no fade**, and the
+  state-8 result block renders with `data-motion="reduced"` — Mohamed watching a cold-miss
+  reload attested "no pulsing and no fade", and separately that the result ring appeared
+  already complete (no draw-on).
+- **Principle V/VI checks**: no crimson anywhere on the card, **no exclamation marks**, and
+  **no band chip** on the card in any state (the band lives on the monitor's own surface,
+  never on the suggestion).
+- Two changes made mid-check on Mohamed's call (both committed): state 1 lost its own Start
+  check-in button (option B; DECISIONS 2026-08-26) and the state-9 line now marks the tried
+  item's title so it reads as a title, not a run-on.
