@@ -8160,3 +8160,44 @@ That file is one of the pinned #127/#130/#132/#134 suites, and CLAUDE.md says th
 **Rejected alternative — cache the unsaved pick in browser storage** (recorded so it is not revisited): keep the stamp, and remember the intended replacement in `localStorage`/`sessionStorage` so the card can re-show it. Rejected because it leaves the database asserting a swap that did not happen; it makes the truth **device-dependent** (the "real" state lives in one browser's storage, absent on every other device and after a clear); and it places state data **outside RLS and outside the deletion path** (the `ON DELETE CASCADE` + no-retention-mechanism posture of this feature). Reversing the stamp keeps the single source of truth in the owner-RLS table where every other pick fact lives.
 
 **Cross-references**: `specs/014-recommendations/contracts/recommendation-storage-rls.md` §Swap write ordering (point 4 + Ruling 2026-08-28); this file 2026-08-15 (Ruling B) and 2026-08-16 (budget amendment + the point-3/4 tension this supersedes); `things-that-might-help-card.us4.test.tsx` "REVERSES the stamp and restores the original pick".
+
+## 2026-08-28 — the reflective-copy Groq flow gets its own material re-consent (appends, does not amend the locked entry)
+
+**Status**: Ruled by Mohamed 2026-08-28. Branch `014-recommendations` (not yet merged).
+Implemented the same session.
+
+**What was ruled**: append a new dated `terms_privacy` revision —
+`terms_privacy@2026-08-28.1`, materiality **material** — disclosing that generating the
+reflective/home-screen suggestion copy sends facts about the person's state to Groq: the
+check-in counts, the preformatted times, the band labels, the suggested item's name and time,
+and the plain deterministic fallback sentence. Groq is an external LLM processor (transfer to
+the United States; the band labels are a health-related characterization under PDPL 151/2020),
+and unlike Ren this fires on a plain home render with no conversation opened. The entry names
+the facts-only endpoint (`POST /recommendations/reflective-copy`) and the deterministic
+fallback that stands when Groq is unavailable. It does **not** restate or expand any other data
+class — this revision is about the reflective-copy processor flow only.
+
+**Why a re-consent, and why now**: the disclosure ships **with** the feature rather than
+trailing it. An existing-user re-prompt on merge day is the accepted cost of not shipping a
+consent revision that carries a known omission. This was a knowing, accepted choice — the
+re-prompt is understood and taken deliberately, not stumbled into.
+
+**Why append, not amend**: `terms_privacy@2026-08-15.1` named only the "suggestion records"
+data class; its wording and the locked `published-revisions.snapshot.json` prefix are left
+untouched. Published history is append-only (FR-043b), so the newly-material processor-flow
+disclosure lands as a fresh revision rather than an edit to the frozen entry. This **resolves
+the previously-open "registry rationale" question** (DECISIONS 2026-08-16, "the 014 legal list
+missed a new processor flow"), which flagged for Mohamed whether the 2026-08-15.1 rationale
+needed a wording amendment touching the locked snapshot: it does not — a new material revision
+carries the disclosure instead.
+
+**No guard weakened**: the append keeps every registry guard green. The append-only guard reads
+the snapshot as a prefix and permits later entries; `signup-consent-gate` derives the current
+version from the registry's last entry, and `evaluate` tests run on synthetic shapes — none pin
+the prior version string, so none needed changing.
+
+**Cross-references**: `apps/web/lib/consent/registry.ts` (`terms_privacy@2026-08-28.1`);
+`apps/web/lib/legal/copy.ts` (the Groq processor bullet, T031); this file 2026-08-16 (the
+missed-processor-flow finding this resolves, and Amendment 3 — the second Groq credential the
+flow rides on); `specs/014-recommendations/contracts/reflective-copy.md` (the facts bundle and
+the deterministic fallback).
