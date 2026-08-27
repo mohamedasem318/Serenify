@@ -8132,3 +8132,13 @@ which rendered it — the gate is met, recorded here.
 
 **Cross-references**: `docs/DECISIONS.md` 2026-08-24 (T034 locator scoping); this file
 2026-08-26 (pre-first-read paint); smoke-tests ST-6.
+
+## 2026-08-28 — the T016 amendment edited one assertion inside the pinned `confirmatory-trigger` suite (record supplied after the fact)
+
+**Status**: Ruled by Mohamed 2026-08-28 — the amendment stands; this entry supplies the record that was missing at the time. Branch `014-recommendations`.
+
+Feature 014 (FR-010 / SC-005) rewired the confirmatory prompt's "Yes" resolution: `onConfirm` now calls `finalize({ answered, outcome: "confirmed" })` and then a new `resolveToRecommendation()` dep, instead of `openRen("confirmatory_yes")`. The wiring test in `apps/web/tests/unit/lib/questionnaire/confirmatory-trigger.test.ts` asserted the OLD destination (`expect(deps.openRen).toHaveBeenCalledWith("confirmatory_yes")`); that one assertion was amended to expect `resolveToRecommendation` instead, and `makeDeps` gained the new dep. A sibling file `confirmatory-trigger-resolution.test.ts` covers the new path.
+
+That file is one of the pinned #127/#130/#132/#134 suites, and CLAUDE.md says the 012 pure reducers **and their pinned tests** must not change. This is recorded as a deliberate, bounded deviation: the pure reducers (`reduceOutcome`, `reduceDwellElapsed`, `markResolvedConsumingBudget`, `markResolvedRearm`) and `finalize` were **not** touched — D-6 dwell, D-8/D-11 budgets, and false-alarm next-session suppression are byte-for-byte preserved. The single amended assertion pinned the prompt's *destination* on "Yes" (open Ren), which 014 deliberately supersedes — "Yes" now resolves to the recommendation, not the Ren handoff. Pinning the old destination and shipping 014 are mutually exclusive, so that assertion had to move; nothing else in the suite changed.
+
+**Cross-references**: CLAUDE.md pinned-test rule; `specs/014-recommendations/contracts/confirmatory-resolution.md`; the confirmatory-trigger suite.
