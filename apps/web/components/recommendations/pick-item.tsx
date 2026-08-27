@@ -151,7 +151,7 @@ export function PickItem({
           className={cn(
             "grid size-10 flex-none place-items-center rounded-[11px]",
             prominent
-              ? "bg-[color-mix(in_srgb,var(--amber-tint)_70%,var(--color-surface))] text-amber-text"
+              ? "bg-[color-mix(in_srgb,var(--amber-tint)_70%,var(--color-surface))] dark:bg-[color-mix(in_srgb,var(--amber-tint)_85%,var(--color-surface))] text-amber-text"
               : "bg-[color-mix(in_srgb,var(--color-muted)_10%,var(--color-surface))] text-muted",
           )}
         >

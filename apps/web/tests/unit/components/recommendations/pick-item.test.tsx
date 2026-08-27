@@ -77,7 +77,7 @@ describe("PickItem — prominence is the mock's five small moves (state 4)", () 
     expect(screen.getByTestId("pick-item-rail")).toBeInTheDocument();
     // jsdom/happy-dom has no stylesheet, so the assertion is on the class, not on paint.
     expect(screen.getByTestId("pick-item-title").className).toContain("text-[19px]");
-    expect(screen.getByTestId("pick-item-tile").className).toContain("amber-tint");
+    expect(screen.getByTestId("pick-item-tile").className).toContain("dark:bg-[color-mix(in_srgb,var(--amber-tint)_85%,var(--color-surface))]");
     expect(screen.getByTestId("pick-item").className).not.toContain("crimson");
   });
 

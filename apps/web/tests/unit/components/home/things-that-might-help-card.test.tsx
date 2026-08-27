@@ -809,7 +809,10 @@ describe("ThingsThatMightHelpCard — state 4 is the mock's FIVE small moves, an
   it("move 3 — the warm tile", async () => {
     const { view } = await mountState4();
     const tile = screen.getByTestId("pick-item-tile");
+    // The warm tile fill is 70% amber over the light surface; dark bumps to 85% so the
+    // tint holds equal weight over the darker ground (mock's --tile-amber, panels 3/4).
     expect(tile.className).toContain("bg-[color-mix(in_srgb,var(--amber-tint)_70%,var(--color-surface))]");
+    expect(tile.className).toContain("dark:bg-[color-mix(in_srgb,var(--amber-tint)_85%,var(--color-surface))]");
     expect(tile.className).toContain("text-amber-text");
     view.unmount();
 
