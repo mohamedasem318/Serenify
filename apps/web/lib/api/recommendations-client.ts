@@ -29,9 +29,14 @@
  * outcome IS NULL AND swapped_away_at IS NULL`, and the stamp and the insert are two
  * separate PostgREST requests with no transaction between them. Insert-first is therefore
  * IMPOSSIBLE — the replacement would collide with the still-active outgoing row. `swapPick`
- * below stamps first and inserts second, and the stamp is NEVER reversed: a swap-away that
- * was recorded stays recorded, because the preference signal is real regardless of what
- * happened to the replacement (contract points 1 and 4).
+ * below stamps first and inserts second, and `swapPick` itself NEVER reverses the stamp: a
+ * swap-away that was recorded stays recorded, because the preference signal is real regardless
+ * of what happened to the replacement (contract points 1 and 4).
+ *
+ * The ONE scoped exception (Ruling 2026-08-28) lives OUTSIDE `swapPick`, in the host: when the
+ * replacement INSERT fails, the host's single engine re-run fires, and that second INSERT also
+ * fails, the host calls `clearSwappedAway` to reverse the stamp — no replacement row landed, so
+ * the swap did not happen and the original pick is restored. Every other path leaves it.
  */
 
 import { clientEnv } from "@/lib/env/client";
@@ -237,7 +242,8 @@ export async function recordOutcome(
 
 /**
  * Stamp `swapped_away_at` — the preference signal, distinct from an outcome (FR-017).
- * **No retry**, and the stamp is never reversed (contract points 1 and 4).
+ * **No retry**, and the stamp is never reversed by this module (contract points 1 and 4).
+ * The ONE scoped exception is `clearSwappedAway` below, driven by the host, not by `swapPick`.
  */
 export async function stampSwappedAway(
   pickId: string,
@@ -248,6 +254,33 @@ export async function stampSwappedAway(
     writerOf(deps).updatePick(pickId, { swapped_away_at: atIso }),
   );
   return { ok: result.ok, attempts: 1 };
+}
+
+/**
+ * Reverse a swap stamp — set `swapped_away_at` back to NULL on the outgoing pick.
+ *
+ * The SCOPED exception to contract point 4 (Ruling 2026-08-28). It is used on ONE path only:
+ * the replacement INSERT failed, the caller's single engine re-run produced a pick, and that
+ * second INSERT ALSO failed — so NO replacement row ever landed and the swap did not happen.
+ * Clearing the stamp makes the original pick active again; leaving it stranded would lose the
+ * person BOTH picks on reload (the original reads swapped-away, and no replacement exists).
+ * On every other path — a successful swap, a single failure, a re-run that found nothing —
+ * the stamp still stands, because the preference signal is real (contract points 1 and 4).
+ *
+ * Safe under `rp_one_active_per_user_day`: the both-inserts-failed path landed no replacement
+ * row, so re-activating the original collides with nothing. The owner RLS UPDATE policy and
+ * the column-scoped UPDATE grant already permit clearing this column — no policy widening.
+ * No retry (the swap posture), and silent on failure (FR-030): a failed reversal simply
+ * leaves the stamp, which is exactly the pre-ruling behaviour.
+ */
+export async function clearSwappedAway(
+  pickId: string,
+  deps: RecommendationClientDeps = {},
+): Promise<{ ok: boolean }> {
+  const result = await attempt(() =>
+    writerOf(deps).updatePick(pickId, { swapped_away_at: null }),
+  );
+  return { ok: result.ok };
 }
 
 /**
