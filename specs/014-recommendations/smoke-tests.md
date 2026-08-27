@@ -407,8 +407,8 @@ lowered-then-reverted timer note as ST-3. Staged across two sessions:
   attempt landed within a second of the local-day rollover (00:00 Africa/Cairo). The
   resolution computed the *new* day, which had no established pick and too few readings to
   warrant one, so it surfaced nothing — no card, no row, no error (FR-030 held). Correct
-  behaviour at an unlucky instant, not a bug; logged as a BACKLOG observation (#TBD, to
-  open in PR prep) for a one-line guard consideration.
+  behaviour at an unlucky instant, not a bug (no error, no row, no data loss). Surfaced
+  to Mohamed as an observation; whether it becomes a tracked BACKLOG follow-up is his call.
 
 ---
 
