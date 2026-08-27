@@ -6,9 +6,11 @@ Per-feature implementation log. Append-only, newest first.
 
 ## Feature 014 — "Things that might help": a deterministic recommendation card
 
-**Branch**: `014-recommendations` · **Date**: 2026-08-18 · **Status**: implementation complete
-(T001–T019, T021–T026, T028–T032, T036, T037); **branch unpushed, no PR open, and one
-verification failure outstanding — see below.**
+**Branch**: `014-recommendations` · **Date**: 2026-08-18, updated 2026-08-28 · **Status**:
+**complete — 37/37 tasks ticked, all six smoke checks recorded (ST-1…ST-6 PASS; ST-7 added
+open), T035 signed off.** The 2026-08-18 body below is the original record; the **Update —
+2026-08-28** block at the end supersedes its "NOT verified" list. Branch ready to push; no
+PR merged.
 
 **Shipped**: the shipped-but-empty home card now renders all ten approved states from one pure
 reducer over (today's picks, today's bands, in-flight UI events) — `lib/recommendations/episode.ts`
@@ -110,6 +112,68 @@ Environment rather than product: the Windows-only `--pool=threads` flake class (
 `readFileSync` scanner suites failing at the collect phase with a runner-level `STACK_TRACE_ERROR`
 and no assertion diff) did **not** fire on this run; it is tracked at BACKLOG #272 and is CI-green
 on ubuntu.
+
+### Update — 2026-08-28 (live verification, rulings, and shipping)
+
+Everything in the 2026-08-18 "NOT verified" list except the deployment steps is now closed.
+
+**Live smoke, real camera, local stack (2026-08-25 → 28, driven agent-side via Claude-in-Chrome,
+Mohamed supplying expression and attesting the surface):**
+- **ST-2 PASS** — sustained Tense → "Yes, that's me" resolved to the pick with **no navigation**;
+  `ConfirmedPickCard` in the `Notification` slot; home state 4 identical words. Pause→Resume showed
+  warm-up.
+- **ST-3 PASS** — "No, I'm okay" recorded `false_alarm` (no card); **next-session suppression**
+  observed (a full ~40 s sustained Tense run in the following session fired zero prompts);
+  "Maybe — talk about it" opened Ren (`handoff=confirmatory_maybe`) with no cards.
+- **ST-4 PASS** — a second confirmed detection while an outcome was pending **re-attached** the pick
+  (`confirmed_at` re-stamped, `outcome` stayed NULL, same episode, one row) — FR-014 exactly.
+- Reaching a live prompt needed the confirmatory sustain windows temporarily lowered in
+  `lib/questionnaire/constants.ts`; these are **injected config values, not the pinned reducers**,
+  and were **reverted to ship values before any commit** (the #127/#130/#132/#134 + monitor suites
+  pass on the restored constants). Recorded in smoke-tests ST-3/ST-4.
+- **ST-5 PASS** — real Groq: a validated line generates and paints **once** (cold-miss request
+  ~505–775 ms, inside the 800 ms skeleton; Mohamed attested "a skeleton, then the text"); cache hit
+  repaints with no request; with the provider down the deterministic fallback renders with no error
+  surface; Ren's key alone does **not** generate (502 → fallback). Incidental, not a defect: a
+  confirmation landing within ~1 s of the local-day rollover surfaces no card (new day, no readings
+  yet) — deferred to the future "view past readings" work, not backlogged.
+- **ST-6 PASS** — card at 360 px in both palettes, 44 px targets, reduced-motion static
+  skeleton/ring, no crimson/exclamation/band-chip. **ST-7 added (open)** — the in-session "Noted."
+  acknowledgement ring has unit coverage but was never observed rendering live; it is now an
+  explicit smoke item to exercise.
+
+**Changes made on Mohamed's call during the live pass (all committed, suites green):** the
+pre-first-read paint is now a neutral skeleton, not a definitive "Nothing from today yet." + Start
+check-in (applies the #201 ruling); state 9 marks the tried item's **title** so the line does not
+read as a run-on; state 1 **lost its own Start check-in button** (option B — the today's-check-in
+card above owns the only one); the in-session outcome acknowledgement uses the **shared result
+ring** (check/muted), one visual language with the home end-states; the dark-mode picked-item tile
+bumps to **85 %** amber (the mock's `--tile-amber` dark spec), light stays 70 %. The 16 card-surface
+strings are **gated** (approved verbatim). T031 legal copy read word-by-word and approved.
+
+**Ruling 2 (2026-08-28) — swap stamp reversal.** Point 4's "the `swapped_away_at` stamp is never
+reversed" gains one scoped exception: on the **both-inserts-failed** path (insert fails, single
+engine re-run, that insert also fails) the stamp is reversed (owner RLS write to NULL — the UPDATE
+grant already permits it, no policy widened) and the card settles back to the original pick, so the
+DB never asserts a swap that did not happen. Every other path still never reverses. Contract, plan,
+tasks (T010/T028) amended; `us4` double-failure test added; browser-storage caching rejected and
+recorded. Stamp-first ordering and the single re-run are unchanged.
+
+**Consent (2026-08-28) — knowingly re-prompting.** A new **material** revision
+`terms_privacy@2026-08-28.1` discloses that generating the reflective home-screen line sends facts
+about the reader's state (check-in counts, times, band labels, suggested item name/time, the plain
+sentence) to Groq on a passive render — a flow the prior Groq disclosure (Ren only) did not cover.
+Because the authed layout re-checks `terms_privacy` on every navigation and a material revision
+advances the binding version, **existing users will be re-prompted for consent on merge day** —
+accepted knowingly so the disclosure ships **with** the feature rather than trailing it. This
+resolves the 2026-08-16 "registry rationale" open question by a new revision, not by editing the
+locked `@2026-08-15.1` snapshot.
+
+**Still outstanding — deployment only, not code (see the PR description):** the migration is
+**local-only, not on cloud**; `GROQ_API_KEY_REFLECTIVE_COPY` is **not yet placed** in the
+serenify-api Container App; the API image is **not yet built/deployed**. Order matters — secret and
+migration **before** merge (the table must exist before live web writes to it; Vercel auto-deploys
+web on merge, the API does not). ST-7 (live "Noted." ring) remains an open smoke observation.
 
 ---
 
