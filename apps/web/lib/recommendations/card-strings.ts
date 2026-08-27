@@ -13,11 +13,14 @@
  * review surface. So they live here instead: ONE module, every string traced to the mock
  * panel it came from, so the whole set reads as a single reviewable diff.
  *
- * **REVIEW STATUS: NOT YET GATED.** T005 approved `library.ts`. These strings are
- * transcribed VERBATIM from the approved mock (`docs/mockups/serenify-014-things-that-might
- * -help-mock.html`) and changed in exactly one place — state 9's description, which the
- * 2026-08-15 amendment already reconciled to state 2's line and which the mock itself
- * carries. They still want Mohamed's eye before merge, on the same footing as T004's.
+ * **REVIEW STATUS: GATED — approved verbatim by Mohamed 2026-08-27** (live 014 review,
+ * recorded in smoke-tests ST-6 / this file's history), on the same footing as T004's
+ * `library.ts`. The set was transcribed from the approved mock
+ * (`docs/mockups/serenify-014-things-that-might-help-mock.html`), changed in one place —
+ * state 9's description, reconciled to state 2's line by the 2026-08-15 amendment — and the
+ * two session-control labels (`Pause`/`Resume`) reused verbatim from feature 008. One string
+ * was dropped at approval: `ACTION_START_CHECKIN`, orphaned when state 1 lost its own button
+ * (DECISIONS 2026-08-26). Edits here now need a fresh review, like `library.ts`.
  *
  * Voice rules are the library's (FR-007/FR-008/FR-009/FR-028): no exclamation marks, no
  * urgency, no grading, nothing clinical. The card has NO error state, so no error string
@@ -53,9 +56,6 @@ export const CARD_DESC_CONFIRMED = "You said that's how it feels. Here's one sma
 // ─────────────────────────────────────────────────────────────────────────────
 // Control labels
 // ─────────────────────────────────────────────────────────────────────────────
-
-/** State 1's only action — a full-document link to the capture route. */
-export const ACTION_START_CHECKIN = "Start check-in";
 
 /** Expand the instructions. Expanding IS the engagement record (FR-015). */
 export const ACTION_SHOW_ME = "Show me";
