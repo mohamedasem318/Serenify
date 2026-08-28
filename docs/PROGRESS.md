@@ -4,6 +4,179 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## Feature 014 — "Things that might help": a deterministic recommendation card
+
+**Branch**: `014-recommendations` · **Date**: 2026-08-18, updated 2026-08-28 · **Status**:
+**complete — 37/37 tasks ticked, all six smoke checks recorded (ST-1…ST-6 PASS; ST-7 added
+open), T035 signed off.** The 2026-08-18 body below is the original record; the **Update —
+2026-08-28** block at the end supersedes its "NOT verified" list. Branch ready to push; no
+PR merged.
+
+**Shipped**: the shipped-but-empty home card now renders all ten approved states from one pure
+reducer over (today's picks, today's bands, in-flight UI events) — `lib/recommendations/episode.ts`
+— fed by a **deterministic** selection engine (`engine.ts`: a data rule table with injected `nowMs`
+and `newEpisodeId`, no randomness and no model) over a **15-item in-repo library** in five fixed
+categories, authored and approved line-by-line by Mohamed on 2026-08-16. One new owner-private
+table, `recommendation_picks` (migration `20260815090000`): ENABLE **+ FORCE** RLS, three
+owner-self policies, column-scoped UPDATE so identity and provenance are immutable **by grant**,
+**no DELETE policy and no DELETE grant of any kind**, and an explicit `REVOKE ALL … FROM
+service_role` — which on the cloud project is the control that actually holds, because
+`service_role` there has `rolbypassrls = true` and BYPASSRLS defeats RLS but **not** grants.
+Opening an item **is** the engagement record; the one outcome question follows; a swap stamps
+`swapped_away_at` and is stored as a **distinct signal** from `didnt_help`, with a CHECK
+(`rp_outcome_xor_swap`) making it impossible to write both to one row. Feature 012's "Yes, that's
+me" now resolves to the recommendation instead of the Ren handoff — a **dependency swap only**: the
+012 pure reducers are byte-identical (md5-proven) and their pinned #127/#130/#132/#134 suites are
+untouched; the pick appears in-session as `ConfirmedPickCard` in the `Notification` slot and
+prominently as home state 4. Reflective copy for states 2/9 goes through the existing 011 LLM path
+behind a **second Groq credential** (`GROQ_API_KEY_REFLECTIVE_COPY`, Amendment 3) so it can never
+consume Ren's rate limits or resolve Ren's key; the client validator is deny-by-default (any
+number, time or band word not present in the supplied facts → fall back), and the paint never flips
+under the reader — a cache hit paints instantly, otherwise an 800 ms skeleton
+(`REFLECTIVE_SKELETON_BUDGET_MS`) and then the deterministic fallback stands. Acting on a
+suggestion no longer costs the session: a pause control on the in-session card, with the
+server-side smoothing buffer dropped on pause so post-resume bands re-climb warm-up rather than
+painting pre-pause video. Ren gained one hedged, fail-soft awareness line naming the suggestion
+currently open (no cards in chat —
+`CONFIRMATORY_HANDOFF_SHOWS_RECOMMENDATIONS` stays `false`). The Privacy Policy was updated in the
+same branch under the already-material `terms_privacy@2026-08-15.1`: a seventh data class
+(suggestion records), a ninety-day retention passage in the existing "a policy, not a mechanism"
+framing, a never-manager-visible sentence, the Groq bullet rewritten to disclose that the
+reflective facts bundle leaves the EU **on a plain home render with no conversation opened**, and
+**four published passages corrected** that were false against infrastructure credentials
+(`service_role` and `postgres` hold BYPASSRLS and full table privileges on the deploy target, read
+live 2026-08-15). The Terms of Service were reviewed against the new data class and the new
+processor flow and deliberately **not** changed — the change is disclosure, not agreement
+mechanics.
+
+**Verified — local, 2026-08-18** (all from this working tree): Vitest **161 files / 2098 tests
+passing** (`--pool=threads`); `apps/api` **296 passed, 1 skipped**; `packages/llm-client` **32
+passed**; `ruff check` clean in both Python packages; `tsc --noEmit` exit 0; ESLint **0 errors** (2
+pre-existing unused-import warnings in unrelated questionnaire test files). **ST-1, the live RLS
+probe, PASSED every sub-check** — run **by agent** (not a Mohamed attestation) on 2026-08-15
+against the local stack only, using psql per-transaction impersonation (`SET LOCAL ROLE` +
+`set_config('request.jwt.claims', …, true)`, the method validated on feature 012): a pick row
+inserted **by the owner herself** (so the INSERT policy and grant are proven, not just the read
+side); a second employee, their shared team-lead, and an admin each read **zero** rows; `anon`
+errors; `UPDATE … SET item_id` fails on grant; DELETE is unreachable for every client role. Every
+probe printed `current_user` and `auth.uid()` beside its result, so the transcript proves which
+identity each zero-count ran under rather than asking a reader to trust the surrounding echo; the
+full transcript is in `specs/014-recommendations/smoke-tests.md`. Mutation-proofs where they were
+load-bearing: the static RLS gate (34 tests) fails if the `service_role` revoke is deleted or any
+grant widened; the library guard (38 tests) fails on a placeholder token, a stray exclamation mark,
+or a changed category set; the engine suite (63 tests) carries a determinism property plus a proof
+the preference seam is actually consulted; the pause-transition suite (7 tests) was
+revert-verified. Playwright e2e, chromium + firefox, full suite: **105 passed / 5 failed / 12
+skipped** in 19.7 min — including **both `recommendations-loop.spec.ts` tests (T015) green on both
+browsers**, and the 012 handoff spec ("opens chat with a soft opener and **no recommendation
+cards**") green on both.
+
+**NOT verified, and one thing found broken** — nothing here should be read as passing:
+
+- **A real regression, found at verification and fixed in the same change**:
+  `employee-monitoring.spec.ts:59` clicked `getByRole("link", { name: "Start check-in" })` with no
+  scoping. Feature 014's new `components/recommendations/recommendation-card-states.tsx` renders a
+  **second** `<a href="/app/monitor">Start check-in</a>` (`StartCheckinAction`, the state-1 CTA,
+  `data-testid="start-checkin"`) — including transiently on any day while the card's reads are in
+  flight — so the locator could resolve to **two** elements and fail Playwright's strict mode. It
+  failed on firefox and passed on chromium in the same run (a race against the card's async paint;
+  the ambiguity itself was permanent and would have fired in CI). The product copy is
+  mock-approved — the mock deliberately designs for both links — so the fix scopes the spec's
+  locator instead: the click now excludes the recommendations CTA by its testid
+  (order- and race-independent). Re-verified 2026-08-18: the spec passes on chromium and firefox
+  post-fix (2 passed, 41 s). The card-side hazard was predicted in the T013 implementation notes;
+  the spec predates 014 and was the only unscoped use in the e2e suite (grepped).
+- **WebKit e2e did not complete.** The first full three-browser run reproduced the documented #177
+  runner hang: chromium and firefox finished, WebKit produced artifacts for a handful of specs and
+  then went silent for over forty minutes with no further output, and the run was stopped by hand.
+  WebKit remains off the sign-off bar, exactly as recorded for #208 on 2026-08-14.
+- **The other four e2e failures are pre-existing #264**, not 014: the session-end feedback pair
+  (`questionnaire.spec.ts:49` and `:77`) fails on both browsers and **reproduces in isolation**, so
+  it is not a timing flake. Open, documented, untouched here.
+- **ST-2, ST-3, ST-4** (T020) — the SC-005 confirm→pick proof, 012's other two answers on the real
+  surface, and FR-014's new-detection-beats-pending-prompt case. All need a **real camera**; this
+  repo's Playwright fake-camera flags do not engage.
+- **ST-5** (T027) — reflective copy against the real Groq provider, and its collapse to the
+  fallback. Never run against a live provider.
+- **ST-6** — the rendered card at 360 px, in dark mode, with reduced motion. A judgement call on the
+  rendered surface, not automatable.
+- **T035** — Mohamed's sign-off on the smoke-test file. A merge gate, outstanding.
+- **T015 has never run in CI.** The recommendations e2e loop passes locally (above) but the branch
+  is unpushed, so not one of the three required checks has executed against this work.
+- **`GROQ_API_KEY_REFLECTIVE_COPY` is not placed in production.** Mohamed places it at deploy time.
+  The code ships tolerating its absence — a request-time provider error becomes a non-200 and the
+  deterministic fallback renders — so the card cannot break for want of it, but reflective copy
+  simply will not generate until it exists.
+
+Environment rather than product: the Windows-only `--pool=threads` flake class (repo-wide
+`readFileSync` scanner suites failing at the collect phase with a runner-level `STACK_TRACE_ERROR`
+and no assertion diff) did **not** fire on this run; it is tracked at BACKLOG #272 and is CI-green
+on ubuntu.
+
+### Update — 2026-08-28 (live verification, rulings, and shipping)
+
+Everything in the 2026-08-18 "NOT verified" list except the deployment steps is now closed.
+
+**Live smoke, real camera, local stack (2026-08-25 → 28, driven agent-side via Claude-in-Chrome,
+Mohamed supplying expression and attesting the surface):**
+- **ST-2 PASS** — sustained Tense → "Yes, that's me" resolved to the pick with **no navigation**;
+  `ConfirmedPickCard` in the `Notification` slot; home state 4 identical words. Pause→Resume showed
+  warm-up.
+- **ST-3 PASS** — "No, I'm okay" recorded `false_alarm` (no card); **next-session suppression**
+  observed (a full ~40 s sustained Tense run in the following session fired zero prompts);
+  "Maybe — talk about it" opened Ren (`handoff=confirmatory_maybe`) with no cards.
+- **ST-4 PASS** — a second confirmed detection while an outcome was pending **re-attached** the pick
+  (`confirmed_at` re-stamped, `outcome` stayed NULL, same episode, one row) — FR-014 exactly.
+- Reaching a live prompt needed the confirmatory sustain windows temporarily lowered in
+  `lib/questionnaire/constants.ts`; these are **injected config values, not the pinned reducers**,
+  and were **reverted to ship values before any commit** (the #127/#130/#132/#134 + monitor suites
+  pass on the restored constants). Recorded in smoke-tests ST-3/ST-4.
+- **ST-5 PASS** — real Groq: a validated line generates and paints **once** (cold-miss request
+  ~505–775 ms, inside the 800 ms skeleton; Mohamed attested "a skeleton, then the text"); cache hit
+  repaints with no request; with the provider down the deterministic fallback renders with no error
+  surface; Ren's key alone does **not** generate (502 → fallback). Incidental, not a defect: a
+  confirmation landing within ~1 s of the local-day rollover surfaces no card (new day, no readings
+  yet) — deferred to the future "view past readings" work, not backlogged.
+- **ST-6 PASS** — card at 360 px in both palettes, 44 px targets, reduced-motion static
+  skeleton/ring, no crimson/exclamation/band-chip. **ST-7 added (open)** — the in-session "Noted."
+  acknowledgement ring has unit coverage but was never observed rendering live; it is now an
+  explicit smoke item to exercise.
+
+**Changes made on Mohamed's call during the live pass (all committed, suites green):** the
+pre-first-read paint is now a neutral skeleton, not a definitive "Nothing from today yet." + Start
+check-in (applies the #201 ruling); state 9 marks the tried item's **title** so the line does not
+read as a run-on; state 1 **lost its own Start check-in button** (option B — the today's-check-in
+card above owns the only one); the in-session outcome acknowledgement uses the **shared result
+ring** (check/muted), one visual language with the home end-states; the dark-mode picked-item tile
+bumps to **85 %** amber (the mock's `--tile-amber` dark spec), light stays 70 %. The 16 card-surface
+strings are **gated** (approved verbatim). T031 legal copy read word-by-word and approved.
+
+**Ruling 2 (2026-08-28) — swap stamp reversal.** Point 4's "the `swapped_away_at` stamp is never
+reversed" gains one scoped exception: on the **both-inserts-failed** path (insert fails, single
+engine re-run, that insert also fails) the stamp is reversed (owner RLS write to NULL — the UPDATE
+grant already permits it, no policy widened) and the card settles back to the original pick, so the
+DB never asserts a swap that did not happen. Every other path still never reverses. Contract, plan,
+tasks (T010/T028) amended; `us4` double-failure test added; browser-storage caching rejected and
+recorded. Stamp-first ordering and the single re-run are unchanged.
+
+**Consent (2026-08-28) — knowingly re-prompting.** A new **material** revision
+`terms_privacy@2026-08-28.1` discloses that generating the reflective home-screen line sends facts
+about the reader's state (check-in counts, times, band labels, suggested item name/time, the plain
+sentence) to Groq on a passive render — a flow the prior Groq disclosure (Ren only) did not cover.
+Because the authed layout re-checks `terms_privacy` on every navigation and a material revision
+advances the binding version, **existing users will be re-prompted for consent on merge day** —
+accepted knowingly so the disclosure ships **with** the feature rather than trailing it. This
+resolves the 2026-08-16 "registry rationale" open question by a new revision, not by editing the
+locked `@2026-08-15.1` snapshot.
+
+**Still outstanding — deployment only, not code (see the PR description):** the migration is
+**local-only, not on cloud**; `GROQ_API_KEY_REFLECTIVE_COPY` is **not yet placed** in the
+serenify-api Container App; the API image is **not yet built/deployed**. Order matters — secret and
+migration **before** merge (the table must exist before live web writes to it; Vercel auto-deploys
+web on merge, the API does not). ST-7 (live "Noted." ring) remains an open smoke observation.
+
+---
+
 ## #208 — the purpose-made seeding identity (Option B implemented)
 
 **Branch**: `fix/seeding-identity-208` · **Date**: 2026-08-14 · **Status**: PR open, not merged.

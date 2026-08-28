@@ -2,9 +2,16 @@
 -- (docs/DECISIONS.md 2026-08-14: a purpose-made seeding identity, NOT a widened
 -- service_role).
 --
--- WHY THIS ROLE EXISTS. On this project's default privileges, service_role holds
+-- WHY THIS ROLE EXISTS. On the LOCAL stack's default privileges, service_role holds
 -- no DML on any public table (only TRUNCATE/REFERENCES/TRIGGER/MAINTAIN), so the
 -- e2e globalSetup and both seed scripts died at 42501 on a freshly reset stack.
+-- CORRECTION (2026-08-15): the sentence above originally said "on this project's
+-- default privileges", which over-generalised a local observation. Read-only queries
+-- against the linked CLOUD project on 2026-08-15 disproved it for the deploy target:
+-- there `pg_default_acl` grants service_role full `arwdDxtm` on new public tables,
+-- every existing public table's relacl already carries that, and `rolbypassrls` is
+-- true for the role. See DECISIONS 2026-08-15. Nothing about THIS migration changes
+-- — no SQL here is altered — but no reader should carry the old claim forward.
 -- Widening service_role was rejected: it is the key whose job is to have no
 -- limits, and its reach in production must not grow for a test convenience.
 -- `serenify_seeder` starts with nothing; everything it holds is enumerated here,

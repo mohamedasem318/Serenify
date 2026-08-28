@@ -362,7 +362,7 @@ export const PRIVACY_CONTROLLER_P3 =
 
 const PRIVACY_CATEGORIES_HEADING = "What Serenify handles";
 
-export const PRIVACY_CATEGORIES_P1 = "Six kinds of data, and nothing else.";
+export const PRIVACY_CATEGORIES_P1 = "Seven kinds of data, and nothing else.";
 
 export const PRIVACY_CATEGORIES_ITEMS: readonly string[] = [
   "Account — your name, your email address, and your role. This is what signing up creates.",
@@ -371,6 +371,7 @@ export const PRIVACY_CATEGORIES_ITEMS: readonly string[] = [
   "Weekly work-environment survey — your answers to a short questionnaire about your working conditions: an overall sentiment and, when it is negative, a roadblock and the kind of support you would want.",
   "Companion conversation — the messages you and Ren exchange, and the titles of those conversations.",
   "Consent records — for each consent you have accepted, which document it was, which published revision of it you were shown, and when. One entry per acceptance; accepting a later revision adds an entry rather than replacing the earlier one.",
+  "Suggestion records — when a reading leads Serenify to offer you something small to try: what was suggested, whether you opened it, whether you said afterwards that it helped, and anything you swapped away rather than trying. Swapping something away and saying it did not help are kept as two separate things, because they mean two separate things. These are yours, and the section on what a manager can see says exactly what that means.",
 ];
 
 export const PRIVACY_CATEGORIES_P2 =
@@ -438,6 +439,13 @@ export const PRIVACY_RETENTION_P2 =
   "document does not promise one. Account data, calibration, questionnaire answers, and " +
   "conversations are kept while your account exists.";
 
+export const PRIVACY_RETENTION_SUGGESTIONS =
+  "Suggestion records are kept for ninety days too, and for a reason worth saying: one " +
+  "exists only because a reading prompted it, so it does not outlive the reading it came " +
+  "from. The same precision applies here as above, because it matters as much — that is a " +
+  "policy, not a mechanism. No purge job runs on a schedule today, for these or for " +
+  "readings, and this document does not promise one.";
+
 export const PRIVACY_RETENTION_P3 =
   "Deleting your account removes everything attached to it. Every table that holds your " +
   "data is keyed to your account so that it goes when the account goes, rather than being " +
@@ -447,12 +455,22 @@ export const PRIVACY_RETENTION_P3 =
 
 const PRIVACY_CHAT_HEADING = "Your conversations with Ren";
 
+// The opening sentence is a Principle I invariant and is true: it is stated absolutely and
+// must stay that way. What was corrected (2026-08-15 ruling, feature 014) is the mechanism
+// clause behind it. "No second rule granting anyone else a way in" is literally true and
+// still misleading, because the credential that can read these rows does not need a rule —
+// so the paragraph now says what the rules cover, and then says what they do not.
 export const PRIVACY_CHAT_P1 =
   "Companion chat content and crisis disclosures never reach a manager, an administrator, " +
   "or an employer. That is permanent and unconditional. It is not a control waiting to be " +
-  "built and it carries no caveat anywhere in this document, because it is not a setting — " +
-  "the database rule that governs those rows admits exactly one reader, the account that " +
-  "wrote them, and there is no second rule granting anyone else a way in.";
+  "built and it is not a setting: the database rule that governs those rows admits exactly " +
+  "one reader, the account that wrote them, and no second rule grants anyone else a way " +
+  "in. Take that clause for exactly what it says — it is about the rules, and the " +
+  "administrative credentials described under how your data is protected do not run on " +
+  "rules. What those credentials are not is a route into your workplace. No report, no " +
+  "export, and no view carries chat content or a crisis disclosure toward a manager or an " +
+  "employer, and building one is a permanent prohibition in this project rather than a " +
+  "decision left open.";
 
 export const PRIVACY_CHAT_P2 =
   "Your conversation is sent to a language-model provider. Being precise about how much: " +
@@ -529,7 +547,11 @@ export const PRIVACY_MANAGER_DEFAULT =
   "that quietly under-describes what a manager will eventually see becomes a lie the day " +
   "that view ships. No manager-facing surface is live today. There is no manager screen in " +
   "the application, and the database holds no rule that would let one person read another " +
-  "person's readings or sessions — your readings are visible to you and to nobody else.";
+  "person's readings or sessions. No manager, no administrator, and no employer can see " +
+  "your readings today, and that part is exact. The one qualification is not a person you " +
+  "work with: the administrative credentials described under how your data is protected " +
+  "reach everything the database holds, and they belong to the controller named at the top " +
+  "of this page.";
 
 export const PRIVACY_MANAGER_HIERARCHY =
   "In the designed end-state, a direct manager sees their own direct reports and no one " +
@@ -545,6 +567,17 @@ export const PRIVACY_MANAGER_CONTROLS =
   "privacy-controls-and-transparency work. Neither is live yet. There is nothing to " +
   "configure today, and no setting you could change now would alter what anyone sees; " +
   "summary only is the default the slider will start from.";
+
+// FR-025 — suggestion records join the never-visible class. Written in the
+// PRIVACY_CHAT_P1 register and deliberately in the manager/administrator/employer SHAPE
+// only: it says who cannot see this, not that no way in exists. The second shape is what
+// broke elsewhere in this document, and it is not repeated here.
+export const PRIVACY_MANAGER_SUGGESTIONS =
+  "What Serenify suggests you try never reaches a manager, an administrator, or an " +
+  "employer — not what was offered, not whether you opened it, not whether it helped, and " +
+  "not what you swapped away instead. That is permanent and unconditional. It is not a " +
+  "control waiting to be built, and none of the manager views described on this page " +
+  "includes any of it, now or in the design.";
 
 export const PRIVACY_MANAGER_ADMIN =
   "One thing an administrator can read today, so it should not be a surprise: the account " +
@@ -565,7 +598,7 @@ export const PRIVACY_PROCESSORS_P1 =
 export const PRIVACY_PROCESSORS_ITEMS: readonly string[] = [
   "Supabase — the database and the sign-in system. Everything Serenify stores lives here: account details, calibration, readings, questionnaire answers, conversations, and consent records. Hosted inside the European Union, in Frankfurt, Germany.",
   "Microsoft Azure — the inference service that reads webcam video and returns a band. Runs on Azure Container Apps inside the European Union. Video passes through it and is deleted there; nothing about a clip is stored.",
-  "Groq — the language-model provider behind Ren. The conversation content described above is sent there, in several requests per turn, to generate each reply and to score it. Groq operates from the United States, so a companion conversation leaves the European Union in a way nothing else in Serenify does. If Groq is unavailable the request simply fails and Ren cannot answer: nothing else stands in, and your conversation is not quietly rerouted to some other model.",
+  "Groq — the language-model provider behind Ren, and the one that phrases the short reflective line on your home screen. The conversation content described above is sent there, in several requests per turn, to generate each reply and to score it. That home-screen line goes there too, and it goes without you opening a conversation or pressing anything: when the card has something to reflect back to you, Serenify sends how many check-ins you did, the times they happened, the bands they landed on, the name and time of anything it suggested you try, and the plain sentence it would otherwise have shown you, and asks for that sentence in other words. The answer is kept for the rest of your visit in that tab, so it is the first such render that sends rather than every one. Those band labels are the health-related data this policy describes under Egyptian law. Groq operates from the United States, so both of those leave the European Union — a companion conversation is no longer the only thing in Serenify that does. If Groq is unavailable the request simply fails: Ren cannot answer, the card keeps the plain sentence it already had, nothing else stands in, and your conversation is not quietly rerouted to some other model.",
   "Vercel — serves the web application you are reading this on.",
   "Resend — sends the two account emails: address confirmation and password reset.",
   "Cloudflare — domain routing and network delivery.",
@@ -644,13 +677,34 @@ export const PRIVACY_RIGHTS_P2 =
 
 const PRIVACY_SECURITY_HEADING = "How your data is protected";
 
+// Corrected 2026-08-15 (feature 014, Mohamed's ruling). Three claims here were false
+// against the deploy target, where the database owner and the platform's service key both
+// carry BYPASSRLS and full table privileges: that the per-row rules bind the database's own
+// owner; that consent records are read "by no one else"; and that they cannot be deleted
+// "by anyone". The UPDATE-blocking trigger is real, so "cannot be edited" stays. The false
+// sentences were not deleted — they were replaced with what is actually true, and the
+// credentials they were papering over are now named outright in the paragraph below.
 export const PRIVACY_SECURITY_P1 =
   "Access control is enforced in the database rather than in application code, which " +
   "matters because it means a bug in a screen cannot widen it. Every table that holds " +
-  "personal data carries a rule tying each row to the account that owns it, and those " +
-  "rules are applied even to the database's own owner. Consent records go further: they " +
-  "can be created and read by their owner and by no one else, and they cannot be edited or " +
-  "deleted at all, by anyone.";
+  "personal data carries a rule tying each row to the account that owns it, so no one " +
+  "signed in to Serenify can reach another person's rows. Consent records go further: they " +
+  "can be created and read by their owner, and once written they cannot be edited at all. " +
+  "That last one is not a rule politely declining a change — a database trigger refuses " +
+  "every update to those rows outright.";
+
+export const PRIVACY_SECURITY_INFRASTRUCTURE =
+  "There is one thing those rules do not cover, and it is said here rather than left to be " +
+  "discovered. The database is a hosted service, and the platform hosting it issues " +
+  "administrative credentials for it: the database owner, and a service key. Both stand " +
+  "outside the per-row rules by design, because something has to be able to run a " +
+  "migration or restore a backup. Anything the database holds can be read, changed, or " +
+  "deleted with those credentials — readings, conversations, and consent records included. " +
+  "They belong to the controller named at the top of this page, and no part of Serenify " +
+  "uses them: every query the application makes is signed as you, which is why a bug in a " +
+  "screen still cannot widen what it reaches. But a rule that binds everyone except a " +
+  "credential that can step around it is not a rule that binds everyone, and this document " +
+  "is not going to word it as though it were.";
 
 export const PRIVACY_SECURITY_P2 =
   "Data is encrypted in transit and at rest by the hosting providers. Serenify is a " +
@@ -751,6 +805,13 @@ export const PRIVACY_CONTACT_P1 =
  * false. `PRIVACY_CHAT_P1` and the crisis passages are likewise absent, and must stay
  * absent: those are Principle I invariants stated unconditionally (FR-001), and marking
  * them not-yet-live would be the other-direction flattening Amendment 17 forbids.
+ *
+ * `PRIVACY_MANAGER_SUGGESTIONS` (feature 014, FR-025) is absent for BOTH of those reasons
+ * at once. It sits in the manager section and it is not a description of manager
+ * visibility: it says suggestion records never reach a manager, an administrator, or an
+ * employer, which is a live fact today and a permanent invariant besides. A not-yet-live
+ * marker on it would read as "a manager cannot see this yet", which is the opposite of
+ * what it says and would be false in the one direction that matters.
  */
 export const MANAGER_VISIBILITY_PASSAGES: readonly string[] = [
   PRIVACY_MANAGER_DEFAULT,
@@ -797,7 +858,12 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
   {
     id: "what-is-kept",
     heading: PRIVACY_RETENTION_HEADING,
-    blocks: [p(PRIVACY_RETENTION_P1), p(PRIVACY_RETENTION_P2), p(PRIVACY_RETENTION_P3)],
+    blocks: [
+      p(PRIVACY_RETENTION_P1),
+      p(PRIVACY_RETENTION_P2),
+      p(PRIVACY_RETENTION_SUGGESTIONS),
+      p(PRIVACY_RETENTION_P3),
+    ],
   },
   {
     id: "your-conversations",
@@ -829,6 +895,7 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
       p(PRIVACY_MANAGER_DEFAULT),
       p(PRIVACY_MANAGER_HIERARCHY),
       p(PRIVACY_MANAGER_CONTROLS),
+      p(PRIVACY_MANAGER_SUGGESTIONS),
       p(PRIVACY_MANAGER_ADMIN),
     ],
   },
@@ -855,7 +922,11 @@ export const PRIVACY_SECTIONS: readonly LegalSection[] = [
   {
     id: "how-your-data-is-protected",
     heading: PRIVACY_SECURITY_HEADING,
-    blocks: [p(PRIVACY_SECURITY_P1), p(PRIVACY_SECURITY_P2)],
+    blocks: [
+      p(PRIVACY_SECURITY_P1),
+      p(PRIVACY_SECURITY_INFRASTRUCTURE),
+      p(PRIVACY_SECURITY_P2),
+    ],
   },
   {
     id: "children",

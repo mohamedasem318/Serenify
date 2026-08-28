@@ -56,6 +56,11 @@ test("employee happy path: start → permission → warming-up → reading → e
   await signInToApp(page, emp);
 
   // ── start the check-in (a full-document nav into the camera route) ──────────────────────
+  // The check-in card's "Start check-in" is now the ONLY one on the page: since
+  // 2026-08-26 (option B) the "Things that might help" card renders no Start check-in
+  // link in any state — state 1 names the cause and offers no action, and the pre-read
+  // shape is a skeleton. So the bare role+name locator is unambiguous again; the earlier
+  // testid-exclusion scoping (T034) is no longer needed.
   await page.getByRole("link", { name: "Start check-in" }).click();
   await expect(page).toHaveURL(/\/app\/monitor$/, { timeout: 30_000 });
 

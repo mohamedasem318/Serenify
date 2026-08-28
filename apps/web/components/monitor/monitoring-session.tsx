@@ -43,6 +43,30 @@ import { recordEndedSession } from "@/lib/questionnaire/session-end-handoff";
 import { createClient } from "@/lib/supabase/client";
 
 import { ConfirmatoryPrompt } from "@/components/questionnaire/confirmatory-prompt";
+import { ConfirmedPickCard } from "@/components/recommendations/confirmed-pick-card";
+import {
+  attachConfirmation as defaultAttachConfirmation,
+  recordOpened as defaultRecordOpened,
+  recordOutcome as defaultRecordOutcome,
+  surfacePick as defaultSurfacePick,
+} from "@/lib/api/recommendations-client";
+import { selectPick, type PickOutcome } from "@/lib/recommendations/engine";
+import {
+  IDLE_CARD_UI,
+  applyConfirmedDetection,
+  deriveCardModel,
+  isActive,
+  toHistoryEntry,
+  toLocalDayString,
+  type PickRow,
+} from "@/lib/recommendations/episode";
+import { RECOMMENDATION_LIBRARY, type LibraryItem } from "@/lib/recommendations/library";
+import { neutralPreferenceSource } from "@/lib/recommendations/preference-source";
+import {
+  getTodayBandReadings,
+  getTodayPicks,
+  type TodayBandReading,
+} from "@/lib/recommendations/recommendation-reads";
 import { CameraPill, type CameraPillStatus } from "./camera-pill";
 import { OpSurfaces } from "./op-surfaces";
 import {
@@ -110,6 +134,17 @@ export interface MonitoringDeps {
   strideMs: number;
   /** US4 (T047) injectable loader for the this-session trend; undefined → the real RLS reader. */
   sessionTrendLoad?: (sessionId: string) => Promise<SessionTrendPoint[]>;
+  // ── Feature 014 / T018 — resolving a confirmation to a recommendation ──────────────
+  /** Today's picks / band readings, owner-RLS. Injected so host tests drive the real path. */
+  loadTodayPicks: (userId: string, now: Date) => Promise<PickRow[]>;
+  loadTodayBands: (userId: string, now: Date) => Promise<TodayBandReading[]>;
+  surfacePick: typeof defaultSurfacePick;
+  attachConfirmation: typeof defaultAttachConfirmation;
+  recordOpened: typeof defaultRecordOpened;
+  recordOutcome: typeof defaultRecordOutcome;
+  /** Injected uuid + clock: the engine and the reducer never mint or read one. */
+  newId: () => string;
+  now: () => number;
 }
 
 function defaultDeps(): MonitoringDeps {
@@ -135,6 +170,16 @@ function defaultDeps(): MonitoringDeps {
     // createRecorder + createDetector omitted → the real MediaRecorder / self-hosted loader.
     isSecureContext: isSecureContextOk,
     strideMs: DEFAULT_STRIDE_MS,
+    // Feature 014 / T018 — the same owner-RLS readers and writers the home card uses, so
+    // both surfaces resolve the same pick from the same rows.
+    loadTodayPicks: (userId, now) => getTodayPicks(userId, { now }),
+    loadTodayBands: (userId, now) => getTodayBandReadings(userId, { now }),
+    surfacePick: defaultSurfacePick,
+    attachConfirmation: defaultAttachConfirmation,
+    recordOpened: defaultRecordOpened,
+    recordOutcome: defaultRecordOutcome,
+    newId: () => crypto.randomUUID(),
+    now: () => Date.now(),
   };
 }
 
@@ -713,6 +758,176 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     [],
   );
 
+  // ── Feature 014 / US2 (T018): a confirmation resolves to a recommendation, in place ──
+  //
+  // WHAT THIS OWNS: reading today's rows, deciding attach-vs-insert, and putting the pick on
+  // screen. WHAT IT DOES NOT OWN: any of the decisions. `deriveCardModel` and
+  // `applyConfirmedDetection` are the SAME pure reducers the home card uses (T009), so the two
+  // surfaces cannot disagree about which pick a confirmation belongs to — that agreement is
+  // structural, not maintained by hand.
+  //
+  // ERRORS ARE SWALLOWED, BY DESIGN. `resolveToRecommendation` is `() => void` precisely so
+  // this surface has no error state (FR-030): a failed read leaves the person where they were,
+  // a failed write leaves no card, and neither says anything. Every path below is inside one
+  // try/catch for that reason — an async implementation that let a rejection escape would
+  // become an unhandled rejection in the trigger's `void`-ed call.
+  const [confirmedPick, setConfirmedPick] = useState<{ row: PickRow; item: LibraryItem } | null>(
+    null,
+  );
+  /**
+   * FR-014: bumped on every resolution so the card REMOUNTS. That is what discards a pending
+   * outcome question without writing an outcome — the stale question is gone because the
+   * component holding it is gone, not because anything was recorded.
+   */
+  const [resolutionSeq, setResolutionSeq] = useState(0);
+  /**
+   * The in-flight guard, and the reason it is a ref rather than state: T016 proved the trigger
+   * can invoke this TWICE in the same microtask flush on a double-press, and a state update
+   * would not be visible to the second call. Set synchronously, before the first await, so two
+   * same-flush invocations collapse into one resolution. The DB's `rp_one_active_per_user_day`
+   * and the client's silent 23505 are the backstop behind this, never the mechanism.
+   */
+  const resolvingRef = useRef(false);
+  // Confirm + immediate End lands the write after this component unmounts. The WRITE is
+  // allowed to finish — the row is correct and the home card shows it (that is the accepted
+  // half of the race, per the amended T018). Only the setState is skipped, because painting a
+  // card into an unmounted tree is the part that is actually wrong. The guard is the
+  // component's EXISTING `mountedRef` (declared with the camera refs above and already
+  // cleared on unmount) — a second one would be a second source of truth for one fact.
+
+  /** Today's active row (`outcome IS NULL AND swapped_away_at IS NULL`) plus its library entry. */
+  const readActivePick = useCallback(
+    async (userId: string, at: Date): Promise<{ row: PickRow; item: LibraryItem } | null> => {
+      const day = toLocalDayString(at);
+      const rows = await deps.loadTodayPicks(userId, at);
+      const active = rows.filter((row) => row.localDay === day).find(isActive) ?? null;
+      if (!active) return null;
+      const item = RECOMMENDATION_LIBRARY.find((entry) => entry.id === active.itemId);
+      return item ? { row: active, item } : null;
+    },
+    [deps],
+  );
+
+  const resolveToRecommendation = useCallback(() => {
+    if (resolvingRef.current) return;
+    resolvingRef.current = true;
+
+    void (async () => {
+      try {
+        const userId = userIdFromAccessToken(tokenRef.current);
+        if (!userId) return;
+
+        const at = new Date(deps.now());
+        const nowIso = at.toISOString();
+        const localDay = toLocalDayString(at);
+        const episodeId = deps.newId();
+
+        const [picks, bands] = await Promise.all([
+          deps.loadTodayPicks(userId, at),
+          deps.loadTodayBands(userId, at),
+        ]);
+
+        const model = deriveCardModel({
+          localDay,
+          nowMs: at.getTime(),
+          picks,
+          bands: bands.map((reading) => ({ band: reading.band, atMs: reading.atMs })),
+          ui: IDLE_CARD_UI,
+          library: RECOMMENDATION_LIBRARY,
+          preferences: neutralPreferenceSource,
+          newEpisodeId: episodeId,
+        });
+        const effect = applyConfirmedDetection(model, episodeId);
+
+        if (effect.kind === "attach") {
+          // Ruling C: a confirmation mid-episode changes PROMINENCE, not the pick. The row is
+          // still active, so it is updated in place — never a second row, and the episode's
+          // budget is untouched.
+          await deps.attachConfirmation(effect.pickId, nowIso);
+        } else {
+          // No active pick: run the engine. `new_episode` gets a fresh budget (the prior
+          // episode closed on an outcome); `continue_episode` stays on the open one.
+          const selected = selectPick({
+            dayBands: bands
+              .filter((r) => toLocalDayString(new Date(r.atMs)) === localDay)
+              .map((r) => ({ band: r.band, atMs: r.atMs })),
+            nowMs: at.getTime(),
+            todayHistory: model.todayPicks.map(toHistoryEntry),
+            episode: effect.startsNewEpisode ? null : model.episode,
+            preferences: neutralPreferenceSource,
+            library: RECOMMENDATION_LIBRARY,
+            newEpisodeId: effect.episodeId,
+          });
+          // Nothing eligible (no warrant, budget spent, or every item excluded today) — the
+          // confirmation is still recorded as an answered prompt by the trigger; there is
+          // simply no suggestion to make. No card, no error.
+          if (!selected) return;
+
+          const inserted = await deps.surfacePick({
+            userId,
+            localDay,
+            episodeId: selected.episodeId,
+            itemId: selected.item.id,
+            source: "confirmed",
+          });
+          // A `conflict` means something else already holds today's active slot — the re-read
+          // below picks that row up and attaches to it, which is the same end state.
+          if (!inserted.ok && inserted.reason === "write_failed") return;
+
+          // The INSERT surface carries no `confirmed_at` (it writes identity + provenance
+          // only), so the stamp is a second write against the row we just created. Re-read
+          // rather than assume: the read is what tells us the row's id.
+          const landed = await readActivePick(userId, at);
+          if (!landed) return;
+          await deps.attachConfirmation(landed.row.id, nowIso);
+        }
+
+        const active = await readActivePick(userId, at);
+        if (!active || !mountedRef.current) return;
+        setConfirmedPick(active);
+        setResolutionSeq((n) => n + 1);
+      } catch {
+        // FR-030: this surface has no error state. Silence is the contract.
+      } finally {
+        resolvingRef.current = false;
+      }
+    })();
+  }, [deps, readActivePick]);
+
+  /** Opening the item IS the engagement record (FR-015); the client guards the re-set. */
+  const handlePickOpened = useCallback(async () => {
+    const pick = confirmedPick;
+    if (!pick) return;
+    try {
+      await deps.recordOpened(
+        { id: pick.row.id, openedAtMs: pick.row.openedAtMs },
+        new Date(deps.now()).toISOString(),
+      );
+      if (mountedRef.current) {
+        setConfirmedPick((current) =>
+          current && current.row.id === pick.row.id
+            ? { ...current, row: { ...current.row, openedAtMs: deps.now() } }
+            : current,
+        );
+      }
+    } catch {
+      // FR-030.
+    }
+  }, [confirmedPick, deps]);
+
+  const handlePickOutcome = useCallback(
+    async (outcome: PickOutcome) => {
+      const pick = confirmedPick;
+      if (!pick) return;
+      try {
+        await deps.recordOutcome(pick.row.id, outcome, new Date(deps.now()).toISOString());
+      } catch {
+        // FR-030.
+      }
+    },
+    [confirmedPick, deps],
+  );
+
   // ── Feature 012 / US1: mid-session confirmatory prompt ──────────────────────────────
   // Watches the sustained-`tense` band stream (the SAME coarse outcomes the reducer folds).
   // Persistence runs AS THE EMPLOYEE through the questionnaire client (RLS); a confirmed /
@@ -750,6 +965,9 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
     // Open Ren through the existing chat entry with the confirmatory handoff seam. Full nav
     // (chat is not a capture route); the prompt is already resolved before this fires.
     openRen: (handoff) => deps.navigate(`/app/chat?handoff=${handoff}`),
+    // 014 / FR-010: "Yes, that's me" resolves to a recommendation IN PLACE. No navigation
+    // (FR-011) — the pick appears in the slot the prompt just vacated.
+    resolveToRecommendation,
   });
   // Keep the latest session-end resolver in a ref (updated in an effect, never during render)
   // so endAndLeave can await it before navigating.
@@ -900,6 +1118,28 @@ export function MonitoringSession({ deps: depsOverride }: { deps?: Partial<Monit
         onFalseAlarm={confirmatory.onFalseAlarm}
         onOpenChat={confirmatory.onOpenChat}
       />
+
+      {/* Feature 014 / US2 (T018): what "Yes, that's me" resolves to — the confirmed pick, in
+          the SAME Notification slot the prompt occupied, stacked over the chat pill by the
+          shared `--chat-pill-offset`. The `!confirmatory.visible` guard makes slot exclusivity
+          explicit rather than merely true-in-practice: the two never stack, even for a frame.
+          `key` remounts the card per resolution, which is how FR-014 discards a pending
+          outcome question without writing an outcome. It renders OUTSIDE the op-surface
+          switch, so it stays put on the paused surface (T036). */}
+      {confirmedPick && (
+        <ConfirmedPickCard
+          key={`confirmed-pick-${resolutionSeq}`}
+          open={!confirmatory.visible}
+          item={confirmedPick.item}
+          openedAtMs={confirmedPick.row.openedAtMs}
+          onDismiss={() => setConfirmedPick(null)}
+          onOpen={handlePickOpened}
+          onOutcome={handlePickOutcome}
+          paused={op === "paused"}
+          onPause={handlePause}
+          onResume={() => void handleResume()}
+        />
+      )}
     </div>
   );
 }

@@ -7764,3 +7764,440 @@ resets), so on any database where only migrations ran — the cloud included —
 The identity carries no secret: its JWT is derived at runtime from the CLI's public local dev
 secret and validates nowhere else. **Rejected**: granting SELECT (anchor_vector) to make the
 old single-statement anchor upsert work — a convenience against a structural privacy invariant.
+
+---
+
+## 2026-08-15 — 014 recommendations data class is a MATERIAL terms_privacy revision (`terms_privacy@2026-08-15.1`)
+
+**Status**: Accepted — Mohamed's decision on the plan's materiality judgment
+(`specs/014-recommendations/plan.md` §Legal), applied during the 014 plan amendment. Registry
+entry appended and snapshot-locked in the same change; `camera_inference` untouched.
+
+**Decision**: feature 014's Privacy Policy change — a wholly new recorded data class
+(suggestion records: what was suggested, what was opened, whether it helped, what was swapped
+away) plus a ninety-day retention statement for it in the existing "a policy, not a mechanism"
+framing — is classified **material**. Everyone whose recorded `terms_privacy` acceptance
+predates `terms_privacy@2026-08-15.1` is re-prompted once the wording ships. The wording edit
+to `apps/web/lib/legal/copy.ts` lands in the same PR as the registry entry, per the feature-013
+publishing rule (research.md §6.1: text diff beside its classification).
+
+**Reasoning**: the published criterion (`TERMS_CHANGES_P2`) is that a material revision changes
+what you are agreeing to. An acceptance recorded before this revision covered a policy that did
+not disclose this recording at all; recording a person's behavioural response to stress
+suggestions is new processing, not a rewording. The #198 precedent set the materiality bar at a
+terminology re-mapping — no change to what was collected — and a new data class sits above
+that bar in substance.
+
+**Counter-reading, considered and rejected**: the class is derived from readings the person
+already consented to, is owner-private with no manager/admin/aggregate visibility (FR-025),
+and the change is purely additive disclosure — in consequence closer to the 2026-08-13 band
+rename (Amendment 23), which was judged non-material with no registry entry. Rejected on two
+grounds. First, the band rename reworded an existing value inside an already-disclosed
+category, while this revision discloses recording that no accepted text mentioned — different
+in kind, not degree. Second, the prompt-fatigue argument (users were re-prompted for #198 on
+2026-08-12/13; a third prompt soon after would train click-through) rests entirely on
+proximity to those re-prompts, and this feature will not merge close enough to them for that
+cost to be real.
+
+**Cross-references**: `apps/web/lib/consent/registry.ts` (`terms_privacy@2026-08-15.1`);
+`apps/web/tests/unit/lib/consent/published-revisions.snapshot.json` (locked);
+`specs/014-recommendations/plan.md` §Legal; this file 2026-08-12 (#198) and 2026-08-13 (band
+rename) — the two precedents weighed.
+
+---
+
+## 2026-08-15 — CORRECTION: `service_role` DOES hold full DML on the cloud project (revises 2026-08-14)
+
+**Status**: Accepted — Mohamed's Ruling A (scope clamp). Corrects the factual premise recorded
+in this file's **2026-08-14** entry ("What `serenify_seeder` was actually granted"). That entry's
+*decision* stands unchanged: `serenify_seeder` remains the right shape, and nothing about its
+grants is revised here. Only the claim it leaned on is wrong.
+
+**What 2026-08-14 claimed**: that "on this project's default privileges, service_role holds no
+DML on any public table (only TRUNCATE/REFERENCES/TRIGGER/MAINTAIN)" — recorded in that entry
+and in `20260814000000_seeding_identity.sql`'s header, and repeated as settled fact in
+`specs/014-recommendations/data-model.md` §2 and
+`specs/014-recommendations/contracts/recommendation-storage-rls.md` §6 ("service_role needs no
+thought experiment here… there is no service-role path to close and none may be added").
+
+**Verified evidence** — read **live** on 2026-08-15 by read-only queries against the **linked
+cloud project** via `supabase db query --linked` (not inferred, not reasoned from the local
+stack):
+
+1. Cloud `pg_default_acl` for tables grants `postgres`, `anon`, `authenticated` **and**
+   `service_role` full `arwdDxtm` on new public tables (grantors `postgres` and
+   `supabase_admin`).
+2. Every existing public table's `relacl` already carries `service_role=arwdDxtm`.
+3. `rolbypassrls = true` for both `service_role` and `postgres` on cloud.
+
+Locally, service_role genuinely has no DML (`Dxtm` only) — the original observation was
+accurate about the stack it was made on, and was over-generalised to "this project".
+
+**Consequence**: on `db push`, and absent an explicit revoke, `service_role` holds a full-DML
+path on **every** public table — including the tables whose contracts state there is no
+service-role path (011 chat storage, 012 questionnaire storage, 014 recommendation picks).
+BYPASSRLS makes this worse and also points at the fix: it bypasses **RLS** but **not grants**,
+so owner-only policies and FORCE RLS do not constrain that role on cloud at all. The grant, not
+the policy, is the boundary that actually holds. Nothing was exploited and nothing leaked — the
+step-0 recon for this ruling confirmed no code path anywhere uses the service key for table DML
+(Auth-Admin only, in two prod-guarded dev/test clients) and nothing relies on service_role
+holding grants — but the posture those contracts describe was not the posture the deploy target
+had.
+
+**Resolution**: two parts, deliberately split.
+
+- **Now, in 014**: `20260815090000_recommendation_picks.sql` carries an explicit
+  `REVOKE ALL ON public.recommendation_picks FROM service_role;` beside the existing
+  anon/authenticated revoke, pinned by a named gate test
+  (`test_service_role_is_explicitly_revoked` in `apps/api/tests/test_recommendation_storage_rls.py`,
+  mutation-verified). The new table therefore ships correct on cloud from its first push. Locally
+  the revoke also drops the non-DML `Dxtm` baseline, which nothing uses.
+- **Deferred**: the repo-wide `REVOKE ALL … FROM service_role` across the **pre-existing** public
+  tables is `docs/BACKLOG.md` (#269). It is explicitly **not to be executed** before three
+  questions are answered — what currently uses the service key, whether `pg_default_acl` must
+  also be altered so new tables stop re-acquiring the grant, and whether `rolbypassrls` is
+  revocable at all on managed Supabase. Doing the sweep blind risks breaking Supabase-managed
+  internals for a gap that is currently unreached.
+
+**Rejected**: (a) silently editing the 2026-08-14 entry — this file is append-only and a
+disproved claim is more useful visible than erased; (b) folding the repo-wide revoke into the
+014 PR — it touches every feature's tables and needs its own blast-radius answer, and 014 must
+not become the vehicle for it; (c) leaving 014 to inherit the gap on the grounds that nothing
+uses the service key today — the contract says "no service-role path", and an unenforced
+contract is the thing that made this correction necessary.
+
+**Cross-references**: this file 2026-08-14 (the corrected entry, unedited);
+`supabase/migrations/20260814000000_seeding_identity.sql` header (comment-only correction, no SQL
+change); `supabase/migrations/20260815090000_recommendation_picks.sql`;
+`specs/014-recommendations/contracts/recommendation-storage-rls.md` §6 and
+`specs/014-recommendations/data-model.md` §2 (both still carry the old claim — corrected when
+those documents are next amended); `docs/BACKLOG.md` (#269).
+
+---
+
+## 2026-08-15 — 014 ruling batch: selection stays session-unaware, swap ordering, FR-014 attach-only
+
+**Status**: Accepted — Mohamed's rulings during the 014 plan-amendment pass, recorded together
+because they were decided together and two of them constrain the same write path. Documents
+amended in the same change: `specs/014-recommendations/plan.md`,
+`specs/014-recommendations/contracts/recommendation-storage-rls.md`,
+`specs/014-recommendations/contracts/confirmatory-resolution.md`,
+`specs/014-recommendations/tasks.md` (T010, T028, T031, new T036/T037). No feature code and no
+legal copy changed here — the Privacy Policy corrections are written in T031.
+
+**(a) Selection remains UNAWARE of whether a session is live.** The in-session
+`ConfirmedPickCard` gains a pause control (scope addition, same date) because several library
+items send the person away from the desk and the in-session choice today is ignore-or-end. That
+is the answer to leave-the-desk items — **not** a selection rule. The engine has no input for
+session state and none may be added without a spec change: no "prefer short items while a
+session is live", no per-item "this one needs a pause" flag. Determinism (FR-006, R-10) is the
+reason — an engine that reads live session state stops being a pure function of
+`(reading, day history, preference source)` and its table-driven proofs stop meaning anything.
+The pause control is therefore uniform across every card. Contract:
+`contracts/confirmatory-resolution.md` §3; plan §Pause from the in-session card.
+
+**(b) Swap write ordering, and the accepted budget-slot loss ("Ruling B").**
+`rp_one_active_per_user_day` is a partial unique index over `(user_id, local_day)` where the row
+is still active, and the two writes are separate PostgREST requests with **no transaction
+spanning them** — so insert-first is not a style preference that lost, it is impossible: the
+replacement collides with the still-active outgoing row. Ruled: stamp `swapped_away_at` first,
+then INSERT; if the INSERT fails, re-run the engine **once** (it now sees the declined pick, and
+because swap has no ceremony the result is indistinguishable from a successful swap); if that
+also fails, keep the previous pick and stop, with no retry loop and nothing rendered as an error
+(FR-030); the stamp is **never reversed**. Consequence, **accepted as design and not to be filed
+as a defect**: a failed swap still consumes one of the episode's three budget slots. Rejected:
+reversing the stamp to refund the slot — it would discard a true preference signal to protect a
+counter, and would re-open the unique-index collision the stamp exists to avoid.
+
+**(c) FR-014 attach-only is intended design, not an index side effect ("Ruling C").** While an
+outcome prompt is pending the pick is still active, so a new confirmed detection **attaches** to
+it (UPDATE `confirmed_at`, prominence only) and never inserts a second row. This is FR-018's
+episode rule applied unchanged — a confirmation mid-episode changes prominence, not the pick.
+Recorded explicitly because `rp_one_active_per_user_day` would *also* have blocked the insert,
+and a future reader could mistake intent for a constraint being worked around; the causation runs
+the other way, as everywhere else in this feature (the browser reducer is the rule, the index is
+the backstop that mirrors the slice an index can state). The person is not trapped: swap remains
+available in state 4.
+
+**Cross-references**: `specs/014-recommendations/contracts/recommendation-storage-rls.md`
+(§Swap write ordering, invariants 6–7); `specs/014-recommendations/contracts/confirmatory-resolution.md`
+(§3 ConfirmedPickCard, §Interruption rule); this file 2026-08-15 (the `service_role` correction,
+which supplies the infrastructure-credential facts behind the T031 legal corrections);
+`docs/BACKLOG.md` (#270).
+
+---
+
+## 2026-08-16 — REVERSAL: a failed swap no longer consumes a budget slot (revises 2026-08-15 ruling batch, point b)
+
+**Status**: Accepted — Mohamed's Amendment 2, 2026-08-16. Reverses ONE point of Ruling B as
+recorded in this file's 2026-08-15 "014 ruling batch" entry: the accepted budget-slot loss on
+a failed swap. Every other point of Ruling B stands unchanged — stamp `swapped_away_at` first,
+then INSERT the replacement; on INSERT failure re-run the engine once; if that also fails keep
+the previous pick and stop; no retry loop; the stamp is never reversed.
+
+**The reversal**: a swap whose replacement INSERT fails must NOT consume a pick from the
+episode's budget of three.
+
+**Reason**: a person should not lose a suggestion because a write failed on our side. The
+prior position protected the accounting; this one protects the person. The stamp itself still
+stands — it is a true preference signal and a non-repeat exclusion, and reversing it was
+rejected then and stays rejected now — but a stamp with no successor row charges nothing.
+
+**Consequence, recorded so no reducer gets it wrong**: budget accounting can no longer be
+derived from stamp count alone. Consumption counts replacement rows that actually landed —
+the episode's surfaced picks — which is exactly the `3 − count(rows WHERE episode_id =
+current)` derivation in data-model §3. A stamped pick with no successor row appears in the
+non-repeat exclusions and in the preference record, and in nothing that charges the budget.
+
+**Documents amended in this change**: `specs/014-recommendations/contracts/
+recommendation-storage-rls.md` §Swap write ordering point 5; `specs/014-recommendations/
+plan.md` §Failed writes point 5; `specs/014-recommendations/tasks.md` T010 and T028.
+
+**Cross-references**: this file 2026-08-15 ("014 ruling batch", point b — the reversed
+position, unedited); `specs/014-recommendations/data-model.md` §3 (the row-count derivation
+that now carries the accounting).
+
+---
+
+## 2026-08-16 — REVERSAL: reflective copy gets its own Groq credential (revises the plan's "no new secret" position)
+
+**Status**: Accepted — Mohamed's Amendment 3, 2026-08-16. Reverses the 014 plan's original
+Constitution-IX row ("No new secret. Endpoint uses existing `GROQ_API_KEY`"). FR-024 is NOT
+amended: the provider is still the one Ren uses (Groq) — this is a second credential to the
+same provider, not a new provider, so no spec change and no CHANGELOG entry.
+
+**The decision**: 014's reflective-copy generation calls Groq with
+`GROQ_API_KEY_REFLECTIVE_COPY`, a credential separate from Ren's, so copy generation cannot
+consume Ren's rate limits. Ren's path, key, retries, and limits are unchanged.
+
+**Shape** (from a read-only recon of the 011 path, 2026-08-16): `load_config()` reads
+`GROQ_API_KEY` from the environment into a frozen `ProviderEndpoint`; apps/api's
+`get_llm_client()` is an `@lru_cache` singleton. The change is purely additive in
+`apps/api/app/services/llm_client.py`: a second cached accessor,
+`get_reflective_copy_llm_client()`, rebuilding the config with
+`primary.api_key = os.environ.get("GROQ_API_KEY_REFLECTIVE_COPY") or None` and no fallback
+provider on this path. Zero edits to `packages/llm-client`.
+
+**Failure semantics, binding**: the resolver never reads `GROQ_API_KEY`, takes no default-key
+parameter, and never falls back to Ren's client. Absent or invalid, nothing raises at import
+or construction; the provider raises at request time; the endpoint returns non-200; the web
+client renders the deterministic fallback. The card never breaks. The secret is placed by
+Mohamed at deploy time; the code ships tolerating its absence.
+
+**Configuration sites**: `apps/api/.env` (local), a documented block in
+`apps/api/.env.example`, the `serenify-api` Azure Container App env/secret (CLI-set; no IaC
+in-repo). CI sets nothing; no test may require a real key.
+
+**Documents amended in this change**: plan §Constitution IX + §Generation with fallback;
+contracts/reflective-copy.md §Provider path; tasks T024 (credential-isolation test added) and
+T027; quickstart; smoke-tests ST-5.
+
+---
+
+## 2026-08-16 — the 014 legal list missed a new processor flow: reflective facts go to Groq passively
+
+**Status**: Recorded during implementation — found by the US3 adversarial review checkpoint,
+not by the plan. Scope added to T031 (plan §Legal item 5) the same day. The copy itself is
+still unwritten (T031); this entry records why the list grew.
+
+**The finding**: `POST /recommendations/reflective-copy` sends the reflective facts bundle —
+check-in count, preformatted times, band labels, tried-item title and time, the fallback
+sentence — to the LLM provider (Groq, United States) whenever home states 2/9 render with a
+cold cache. Band labels are exactly what the published Privacy Policy classes as
+health-related sensitive data under PDPL Law 151/2020. The published Groq bullet says "the
+conversation content described above is sent there" and that a companion conversation leaves
+the EU "in a way nothing else in Serenify does" — true when written, false once 014 ships:
+Ren's flow requires the person to open a conversation; this one fires on a plain home-page
+render with no user action.
+
+**Why the plan missed it**: the §Legal list was drawn up around the new data CLASS
+(suggestion records — storage, retention, visibility). The generation feature moved data to
+an existing processor through a new, passive path — a flow change, not a class change — and
+the list had no row for that shape. The standing Principle VIII rule ("whenever a feature
+changes what data is collected, WHERE IT GOES, who can see it…") covers it; the enumeration
+under it was incomplete.
+
+**Resolution**: T031 now additionally requires the Groq processor bullet to name the
+reflective-copy flow, fix or qualify the "nothing else" sentence, and state that it happens
+without opening a conversation. Merge-blocking like the rest of T031. Open question left for
+Mohamed (flagged for the next stop, not decided here): whether the
+`terms_privacy@2026-08-15.1` registry rationale — which names only "suggestion records" —
+needs a wording amendment, which would touch the locked snapshot.
+
+**Cross-references**: plan §Legal item 5; tasks.md T031; contracts/reflective-copy.md
+(the facts bundle); this file 2026-08-16 (Amendment 3 — the second credential the flow
+rides on).
+
+---
+
+## 2026-08-16 — Terms of Service review for feature 014: no text change
+
+**Status**: Recorded — T032's required review outcome (tasks.md T032: "record the outcome …
+either way"). Reviewer: the 014 wrap implementer; conclusion accepted by the orchestrating
+session. The Terms are byte-identical after the review.
+
+The Terms were read in full against the new suggestion-records data class, the
+reflective-copy flow that sends a facts bundle to Groq on a home render, and the second Groq
+credential. Five passages were checked closely: `TERMS_WHAT_P1` enumerates functions without
+claiming exhaustiveness (unlike the Privacy Policy's closed "kinds of data" list), so the
+suggestion card falsifies nothing; `TERMS_NOT_MEDICAL_P3` already reaches a suggested
+activity ("anything Serenify showed you"); the camera-and-inference consent's "declining
+this blocks calibration and monitoring sessions, and nothing else" stays true — reflective
+copy runs on derived facts and needs no camera, and a decliner simply has no readings for a
+readings-derived surface to act on; the acceptable-use list is behavioural, not a data
+inventory, and its extract-what-is-not-offered item covers the new class; the availability
+passage's uncertainty framing gains no new certainty claim, since generated copy is
+deny-by-default validated and the deterministic string is the source of truth. The Terms
+name no processors and no credentials, so neither the Groq disclosure nor the second key
+touches them. The change is one of disclosure — a Privacy Policy concern — not of agreement
+mechanics, consent scope, eligibility, or liability posture.
+
+One improvement identified and deliberately not made: `TERMS_NOT_MEDICAL_P1` names Ren but
+not the suggestion card, which stays covered by the general P3 sentence. A clarity
+improvement, not a correction — nothing published is false — and making it would put a
+cosmetic Terms revision in the same PR as a material Privacy one. Recorded here instead.
+
+**Cross-references**: tasks.md T032; plan §Legal; this file 2026-08-16 (the legal-list
+correction and Amendment 3 entries).
+
+## 2026-08-26 — the things card paints nothing definitive before its first read resolves (applies the #201 ruling)
+
+**Status**: Decided by Mohamed during the 014 live check (2026-08-26, local stack); implemented
+the same session in `apps/web/components/home/things-that-might-help-card.tsx` and pinned by a
+unit test. Branch `014-recommendations`, not yet merged.
+
+**What was there**: while the card's two reads (today's picks, today's bands) were in flight,
+it rendered **state 1** in full — "Nothing from today yet." with its forward line and a
+**Start check-in** link — on the reasoning, in the code comment, that "nothing from today yet
+is exactly what is known". Mohamed saw it during the ST-5 cold-miss reload: for the beat before
+the read landed, an account with readings today was told it had none and offered a check-in.
+
+**Ruling**: option (a) — the card keeps state 1's *shape* (shell, description, neutral tile, one
+lead line) but the lead slot holds the same skeleton the reflective line already uses, with no
+forward line and no action, until `loaded`. Rejected: (b) keep the paint and record the
+rationale. The rationale did not survive the precedent: **#201** (Recent chats, 2026-07-28,
+fixed PR #240) ruled that a definitive empty state is a claim about the data, and until the
+query returns the true answer is "not known yet". This surface's version was worse than #201's —
+it also offered an action premised on the claim. "What is known" was the wrong frame: what is
+known before the read is nothing about the day.
+
+**Cost accepted**: a genuinely read-less day now shows a skeleton for the read's duration
+before "Nothing from today yet." paints — a beat of neutral placeholder in exchange for never
+asserting a false empty state. `prefers-reduced-motion` drops the pulse (the skeleton primitive
+already honoured it). The 800 ms reflective-copy skeleton is unchanged; this is the read gate in
+front of it.
+
+**Not a new state**: `data-card-state` stays `1` for the pre-read shape, as before; SC-002's ten
+states are untouched. The e2e `Start check-in` locator scoping (T034) stays — it still guards a
+genuinely read-less day.
+
+**Cross-references**: `docs/BACKLOG.md` #201; smoke-tests ST-5 attestation (2026-08-26);
+`things-that-might-help-card.test.tsx` "before the first read resolves".
+
+## 2026-08-26 — the things card's state 1 loses its own Start check-in button (overrides the state-1 mock)
+
+**Status**: Decided by Mohamed during the 014 live check (2026-08-26), from a three-option
+scratchpad mock; option **B** chosen. Implemented the same session on branch
+`014-recommendations` (not yet merged): the `StartCheckinAction` component is removed, state 1
+renders no action of its own, and `NO_READING_YET_LINE` changes from "Start a check-in and
+anything worth suggesting shows up here." to **"Anything worth suggesting shows up here after a
+check-in."**
+
+**What changed and why**: the approved state mock
+(`docs/mockups/serenify-014-things-that-might-help-mock.html`, panel 1) shipped an *outlined*
+Start check-in on the things card, with a note arguing an outline (not a fill) was enough to
+avoid "two identical primaries on one screen". Seeing it live at 360 px, Mohamed judged even the
+outlined button redundant: the **today's-check-in card sits directly above** the things card and
+already carries the sole, filled Start check-in. Two buttons that do the same thing, one under
+the other, is the redundancy. So the button goes entirely, and the second line stops instructing
+the reader to "start a check-in" (an action this card no longer offers) — it now *describes*
+where suggestions come from.
+
+**Copy-review gate**: `NO_READING_YET_LINE` is a gated library string, and gated strings need
+Mohamed's line-by-line review. He approved this exact wording by choosing option B from the mock,
+which rendered it — the gate is met, recorded here.
+
+**Consequences**:
+- `StartCheckinAction` and the `data-testid="start-checkin"` it carried are gone. The things
+  card now renders **no** Start check-in link in any state.
+- That removes the strict-mode locator collision the e2e was scoped around (**T034**,
+  2026-08-24): the page again has exactly one "Start check-in" link (the check-in card's), so
+  `employee-monitoring.spec.ts` drops the testid-exclusion and uses the bare role+name locator.
+  T034's finding stands in history; its scoping is simply no longer needed.
+- `ACTION_START_CHECKIN` ("Start check-in") stays defined in `card-strings.ts`, now unused. It
+  is part of the not-yet-ruled verbatim-strings set (open queue item) and was left untouched
+  rather than pulled in this change.
+- The gitignored state mock still shows the old panel 1; it is a reference, not a record, and is
+  superseded here.
+
+**Cross-references**: `docs/DECISIONS.md` 2026-08-24 (T034 locator scoping); this file
+2026-08-26 (pre-first-read paint); smoke-tests ST-6.
+
+## 2026-08-28 — the T016 amendment edited one assertion inside the pinned `confirmatory-trigger` suite (record supplied after the fact)
+
+**Status**: Ruled by Mohamed 2026-08-28 — the amendment stands; this entry supplies the record that was missing at the time. Branch `014-recommendations`.
+
+Feature 014 (FR-010 / SC-005) rewired the confirmatory prompt's "Yes" resolution: `onConfirm` now calls `finalize({ answered, outcome: "confirmed" })` and then a new `resolveToRecommendation()` dep, instead of `openRen("confirmatory_yes")`. The wiring test in `apps/web/tests/unit/lib/questionnaire/confirmatory-trigger.test.ts` asserted the OLD destination (`expect(deps.openRen).toHaveBeenCalledWith("confirmatory_yes")`); that one assertion was amended to expect `resolveToRecommendation` instead, and `makeDeps` gained the new dep. A sibling file `confirmatory-trigger-resolution.test.ts` covers the new path.
+
+That file is one of the pinned #127/#130/#132/#134 suites, and CLAUDE.md says the 012 pure reducers **and their pinned tests** must not change. This is recorded as a deliberate, bounded deviation: the pure reducers (`reduceOutcome`, `reduceDwellElapsed`, `markResolvedConsumingBudget`, `markResolvedRearm`) and `finalize` were **not** touched — D-6 dwell, D-8/D-11 budgets, and false-alarm next-session suppression are byte-for-byte preserved. The single amended assertion pinned the prompt's *destination* on "Yes" (open Ren), which 014 deliberately supersedes — "Yes" now resolves to the recommendation, not the Ren handoff. Pinning the old destination and shipping 014 are mutually exclusive, so that assertion had to move; nothing else in the suite changed.
+
+**Cross-references**: CLAUDE.md pinned-test rule; `specs/014-recommendations/contracts/confirmatory-resolution.md`; the confirmatory-trigger suite.
+
+## 2026-08-28 — a twice-failed swap REVERSES the `swapped_away_at` stamp (scoped exception to Ruling B point 4)
+
+**Status**: Ruled by Mohamed 2026-08-28. Branch `014-recommendations` (not yet merged). Implemented the same session.
+
+**What changed**: Ruling B (2026-08-15) stamps `swapped_away_at` on the outgoing pick FIRST, then INSERTs the replacement, because the two writes are separate PostgREST requests with no transaction and `rp_one_active_per_user_day` (partial unique index over `(user_id, local_day) WHERE outcome IS NULL AND swapped_away_at IS NULL`) makes insert-first collide with the still-active outgoing row. Stamp-first ordering **stands and is not revisited.** Ruling B point 4 said the stamp is *never* reversed. It now gains **one scoped exception**: when the replacement INSERT fails, the engine re-runs **once** (points 2/3), and that second INSERT **also** fails, the host reverses the stamp — UPDATE `swapped_away_at = NULL` on the original pick — and the card settles back to the original pick. This is the only path that clears the stamp; every other path (successful swap, single failure then a landed re-run, re-run that found nothing) leaves it, and the preference signal stays real.
+
+**Why**: on the both-INSERTs-failed path no replacement row ever landed, so a standing stamp asserts a swap that did not happen. Worse, it is not merely a bad record: on reload the original pick reads swapped-away and no replacement exists, so the person is left with **neither** pick — they lose both. Reversing the stamp restores the pick they actually had. The 2026-08-16 resolution of this same path (in favour of "point 4 governs; stamp stands; show the re-run's pick unpersisted") is superseded for this path only.
+
+**Accepted cost**: a brief visual flip to the replacement and back before the original is restored. A swap has no ceremony, so nothing on screen announces which path ran; the flip is tolerable and was accepted explicitly.
+
+**No policy widened**: the owner RLS UPDATE policy is `auth.uid() = user_id` and the column-scoped UPDATE grant already lists `swapped_away_at`, so clearing it is a write the owner could always make. Reversing to NULL is safe under `rp_one_active_per_user_day` because, with no replacement row, re-activating the original collides with nothing. The migration `20260815090000_recommendation_picks.sql` is untouched.
+
+**Architecture**: the reversal is host-orchestrated (`clearSwappedAway` in `apps/web/lib/api/recommendations-client.ts`, called from `swap()` in `apps/web/components/home/things-that-might-help-card.tsx`); `swapPick` itself still never reverses, so the client-layer "never reverses the stamp" test stays literally true. Budget is unaffected either way — consumption counts surfaced rows, and no row landed (Amendment 2026-08-16).
+
+**Rejected alternative — cache the unsaved pick in browser storage** (recorded so it is not revisited): keep the stamp, and remember the intended replacement in `localStorage`/`sessionStorage` so the card can re-show it. Rejected because it leaves the database asserting a swap that did not happen; it makes the truth **device-dependent** (the "real" state lives in one browser's storage, absent on every other device and after a clear); and it places state data **outside RLS and outside the deletion path** (the `ON DELETE CASCADE` + no-retention-mechanism posture of this feature). Reversing the stamp keeps the single source of truth in the owner-RLS table where every other pick fact lives.
+
+**Cross-references**: `specs/014-recommendations/contracts/recommendation-storage-rls.md` §Swap write ordering (point 4 + Ruling 2026-08-28); this file 2026-08-15 (Ruling B) and 2026-08-16 (budget amendment + the point-3/4 tension this supersedes); `things-that-might-help-card.us4.test.tsx` "REVERSES the stamp and restores the original pick".
+
+## 2026-08-28 — the reflective-copy Groq flow gets its own material re-consent (appends, does not amend the locked entry)
+
+**Status**: Ruled by Mohamed 2026-08-28. Branch `014-recommendations` (not yet merged).
+Implemented the same session.
+
+**What was ruled**: append a new dated `terms_privacy` revision —
+`terms_privacy@2026-08-28.1`, materiality **material** — disclosing that generating the
+reflective/home-screen suggestion copy sends facts about the person's state to Groq: the
+check-in counts, the preformatted times, the band labels, the suggested item's name and time,
+and the plain deterministic fallback sentence. Groq is an external LLM processor (transfer to
+the United States; the band labels are a health-related characterization under PDPL 151/2020),
+and unlike Ren this fires on a plain home render with no conversation opened. The entry names
+the facts-only endpoint (`POST /recommendations/reflective-copy`) and the deterministic
+fallback that stands when Groq is unavailable. It does **not** restate or expand any other data
+class — this revision is about the reflective-copy processor flow only.
+
+**Why a re-consent, and why now**: the disclosure ships **with** the feature rather than
+trailing it. An existing-user re-prompt on merge day is the accepted cost of not shipping a
+consent revision that carries a known omission. This was a knowing, accepted choice — the
+re-prompt is understood and taken deliberately, not stumbled into.
+
+**Why append, not amend**: `terms_privacy@2026-08-15.1` named only the "suggestion records"
+data class; its wording and the locked `published-revisions.snapshot.json` prefix are left
+untouched. Published history is append-only (FR-043b), so the newly-material processor-flow
+disclosure lands as a fresh revision rather than an edit to the frozen entry. This **resolves
+the previously-open "registry rationale" question** (DECISIONS 2026-08-16, "the 014 legal list
+missed a new processor flow"), which flagged for Mohamed whether the 2026-08-15.1 rationale
+needed a wording amendment touching the locked snapshot: it does not — a new material revision
+carries the disclosure instead.
+
+**No guard weakened**: the append keeps every registry guard green. The append-only guard reads
+the snapshot as a prefix and permits later entries; `signup-consent-gate` derives the current
+version from the registry's last entry, and `evaluate` tests run on synthetic shapes — none pin
+the prior version string, so none needed changing.
+
+**Cross-references**: `apps/web/lib/consent/registry.ts` (`terms_privacy@2026-08-28.1`);
+`apps/web/lib/legal/copy.ts` (the Groq processor bullet, T031); this file 2026-08-16 (the
+missed-processor-flow finding this resolves, and Amendment 3 — the second Groq credential the
+flow rides on); `specs/014-recommendations/contracts/reflective-copy.md` (the facts bundle and
+the deterministic fallback).

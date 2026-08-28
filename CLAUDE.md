@@ -1,38 +1,39 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/013-public-surface-and-legal/plan.md` (with supporting artifacts:
-`research.md`, `data-model.md`, `contracts/consent-evaluate.md`,
-`contracts/consent-gates.md`, `contracts/wordmark.md`,
-`contracts/landing-hero-story.md`, `contracts/public-surface.md`,
-`quickstart.md`; `tasks.md` and `smoke-tests.md` follow). Section numbers
-(`§6.3`, `§7.3`, `§10.3`, …) are stable across those files — the map is in
-plan.md §4.1.
-This feature builds the public front door and the legal surface behind it:
-the landing page at `/`, `/terms`, `/privacy`, a public navbar + footer, and
-**two consent gates** — Terms/Privacy and camera-and-inference. Neither gate is
-one-time: both texts can be revised, and a revision judged **material**
-re-prompts everyone whose recorded consent predates it, so consent is a
-**history** (one append-only row per accepted revision, never overwritten) and
-the Terms/Privacy gate blocks the **whole application**, not just signup.
-Version identity — not timestamp comparison — decides re-consent, against an
-**in-repo registry** (`apps/web/lib/consent/registry.ts`); one migration
-(`user_consents`, owner-only RLS, immutability trigger, no UPDATE/DELETE grant).
-Declining writes nothing, deletes nothing, and writes no withdrawal state.
-Terminology is binding: **calibration** = the baseline capture; **monitoring session**
-= live camera inference, and **"check-in" is the friendly name for exactly that**;
-**weekly work-environment survey** = the text questionnaire, which is **never** called a
-check-in. (Amended 2026-08-12 by #198, reversing the original rule that banned a bare
-"check-in" and reserved the word for the questionnaire — the app's primary action has
-always read "Start check-in" and turned a camera on, so the documents moved to the app
-rather than the other way round. `docs/CHANGELOG.md`.) The signed-off landing mock
-(`docs/mockups/serenify-landing-mock.html`, gitignored — grep it with
-`--no-ignore`) carries **three forbidden lines** (`:442`, `:550`, `:772`) that
-Amendment 17 bans; replacement copy is **APPROVED and fixed verbatim in plan §10.3**
-— use it character-for-character, do not re-word it.
-Implements constitution 1.13.0 Amendment 17 (two-colour wordmark, one shared
-component + two hand-sync exceptions; manager-visibility copy discipline) and
-MUST NOT re-amend the constitution. Closes #75 and #157; **not** #62.
+at `specs/014-recommendations/plan.md` (with supporting artifacts:
+`research.md` (R-1…R-10), `data-model.md`, `quickstart.md`,
+`contracts/recommendation-storage-rls.md`, `contracts/reflective-copy.md`,
+`contracts/confirmatory-resolution.md`, `contracts/selection-engine.md`;
+`tasks.md` and `smoke-tests.md` follow).
+This feature fills the shipped-but-empty "Things that might help" home card:
+a **deterministic** selection engine (rules, no model) over a **15-item
+in-repo reviewed library** (5 fixed categories — the category set is
+load-bearing for 015); opening an item IS the engagement record; one outcome
+question follows; swaps are a **distinct signal** from "didn't help". One new
+owner-only table (`recommendation_picks` — FORCE RLS, no manager/admin/
+service-role path; note `service_role` has no DML on any public table here).
+Feature 012's "Yes, that's me" now resolves to the recommendation (in-session
+`ConfirmedPickCard` in the `Notification` slot + prominent home state 4)
+instead of the Ren handoff — the 012 pure reducers and their pinned tests MUST
+NOT change (dep swap only; D-6 dwell, D-8/D-11 budgets, false-alarm
+suppression preserved). Reflective copy in states 2/9 is generated via the
+existing 011 LLM path (new prompt file + one apps/api endpoint, **no new
+provider**) with a validated deterministic fallback — the fallback string is
+the source of truth; generated text may not introduce any number, time, or
+band claim not in the supplied facts. Episodes carry one shared three-pick
+budget; the non-repeat-within-day rule beats the budget; everything resets at
+the today-card local day boundary. The approved state mock is
+`docs/mockups/serenify-014-things-that-might-help-mock.html` (gitignored —
+grep with `--no-ignore`; its item copy is placeholder — authoring the 15 real
+items is a gated step, sequenced before UI wiring, with Mohamed's line-by-line
+review as the gate). Privacy Policy is updated in the same PR; the change was
+**decided material** (2026-08-15): `terms_privacy@2026-08-15.1` is already on
+the branch, so the copy.ts wording MUST land before the PR merges. Generated
+reflective copy never flips under the reader — cache hit paints instantly,
+else an 800 ms skeleton, then the fallback stands (contracts/reflective-copy.md).
+Bands are Calm / Uneasy / Tense; a "check-in" is the camera session.
+MUST NOT amend the constitution.
 <!-- SPECKIT END -->
 
 ## SpecKit — reserved for approved features

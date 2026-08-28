@@ -480,6 +480,123 @@ def test_patch_session_out_of_frame(client, monkeypatch):
     assert fake.sessions[sid]["status"] == "out_of_frame"
 
 
+# ── pause drops the smoothing buffer (feature 014 / T037) ───────────────────────
+#
+# The deque(maxlen=4) survived a pause until now, so the first band scored after a resume
+# was ~3/4 PRE-pause video — across a long pause that describes a moment that is over, and
+# a wrongly-Tense band there feeds the 012 confirmatory clock. Dropping on the paused
+# transition restarts cold-start; the warm-up path already handles the resulting partial
+# buffer the same way it handles a fresh session (``smooth`` returns warming-up below M),
+# so no unsmoothed single window is ever banded. Retained on every other transition.
+
+
+def _stub_scoring(client, monkeypatch, *, proba1=0.10):
+    """Make every posted window a full 60 s window that scores deterministically."""
+    monkeypatch.setattr(ml_video, "probe_recorded_seconds", lambda _p: 120.0)
+    monkeypatch.setattr(ml_video, "compute_anchor",
+                        lambda _p, tail_seconds=None: np.zeros(FEATURE_DIM))
+    monkeypatch.setattr(client.app.state, "predictor", StubPredictor(proba1=proba1))
+
+
+def test_patch_paused_drops_the_smoothing_buffer(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+
+    _post_window(client, sid)
+    _post_window(client, sid)
+    assert inference.buffers.scored_count(sid) == 2
+
+    assert _patch_status(client, sid, "paused").status_code == 200
+    assert inference.buffers.scored_count(sid) == 0  # stale history discarded on pause
+
+
+@pytest.mark.parametrize("status", ["active", "out_of_frame"])
+def test_patch_non_paused_transitions_retain_the_smoothing_buffer(client, monkeypatch, status):
+    # Only ``paused`` drops. A resume must not throw away the buffer the pause already
+    # cleared and re-armed, and ``out_of_frame`` is a brief in-run absence — its windows
+    # skip and never enter the buffer, so there is nothing stale to discard.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+
+    _post_window(client, sid)
+    _post_window(client, sid)
+    assert inference.buffers.scored_count(sid) == 2
+
+    assert _patch_status(client, sid, status).status_code == 200
+    assert inference.buffers.scored_count(sid) == 2  # retained
+
+
+def test_patch_paused_keeps_scoring_gate_state(client, monkeypatch):
+    # Deliberately NOT dropped on pause (unlike on End): a paused session can score again,
+    # and swapping its lock mid-flight would let a pre-pause and a post-resume window mutate
+    # one session's buffer concurrently — the single-writer invariant scoring_gate documents.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+
+    _post_window(client, sid)
+    assert sid in scoring_gate._store
+
+    assert _patch_status(client, sid, "paused").status_code == 200
+    assert sid in scoring_gate._store
+
+
+def test_windows_after_a_resume_re_climb_the_warm_up(client, monkeypatch):
+    # THE point of the drop: the first post-resume windows report ``warming_up`` and the band
+    # latches only on the 4th FRESH scored window — never a band off the partial buffer.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+
+    before = [_post_window(client, sid).json()["outcome"] for _ in range(4)]
+    assert before == ["warming_up", "warming_up", "warming_up", "reading"]
+
+    assert _patch_status(client, sid, "paused").status_code == 200
+    assert _patch_status(client, sid, "active").status_code == 200
+
+    after = [_post_window(client, sid).json() for _ in range(4)]
+    assert [o["outcome"] for o in after] == [
+        "warming_up", "warming_up", "warming_up", "reading",
+    ]
+    # The three warming-up windows carry no band at all, and the DB rows written for them
+    # record band=None — a partial buffer never paints a band.
+    assert all("band" not in o for o in after[:3])
+    assert after[3]["band"] == "at_ease"
+    scored_bands = [
+        i["row"]["band"] for i in fake.inserts
+        if i["table"] == "window_readings" and i["row"]["scored"]
+    ]
+    assert scored_bands[4:7] == [None, None, None]  # the three post-resume warm-up rows
+
+
+def test_patch_paused_on_ended_session_409s_without_dropping_the_buffer(client, monkeypatch):
+    # The 409 path is unchanged and returns BEFORE the drop — a rejected transition must not
+    # have the side effect of a successful one.
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+    _post_window(client, sid)
+    _post_window(client, sid)
+
+    fake.sessions[sid]["status"] = "ended"  # terminal, without going through /end's drop
+    resp = _patch_status(client, sid, "paused")
+    assert resp.status_code == 409
+    assert resp.json() == {"error": "ended_session"}
+    assert inference.buffers.scored_count(sid) == 2  # untouched by the rejected PATCH
+
+
+def test_patch_paused_unknown_session_404s_and_drops_nothing(client, monkeypatch):
+    fake = FakeClient(role="employee", anchor_payload=_anchor_payload())
+    sid = _create_session(client, fake, monkeypatch)
+    _stub_scoring(client, monkeypatch)
+    _post_window(client, sid)
+
+    assert _patch_status(client, "sess-does-not-exist", "paused").status_code == 404
+    assert inference.buffers.scored_count(sid) == 1  # a foreign id can't evict our buffer
+
+
 def test_patch_rejects_ended_status_target_422(client, monkeypatch):
     # 'ended' is /end's job, never a PATCH target — the Pydantic body bars it up front.
     fake = FakeClient(role="employee", anchor_payload=_anchor_payload())

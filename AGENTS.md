@@ -279,10 +279,16 @@ current SpecKit-managed plan context when running them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at `specs/013-public-surface-and-legal/plan.md`. That feature — the landing
-page, `/terms`, `/privacy`, the public navbar/footer, and the two consent
-gates — is merged and live; treat its plan as shipped context, not as work
-in progress. `CLAUDE.md` carries the detailed version of this block.
+at `specs/014-recommendations/plan.md` (supporting artifacts: `research.md`,
+`data-model.md`, `quickstart.md`, `contracts/`). The feature fills the
+"Things that might help" home card: deterministic engine over a 15-item
+in-repo reviewed library, one new owner-only `recommendation_picks` table,
+012's "Yes, that's me" resolving to the recommendation (pure reducers MUST
+NOT change), LLM-generated reflective copy with a deterministic fallback
+(no new provider), Privacy Policy updated in the same PR — judged material,
+`terms_privacy@2026-08-15.1` already on the branch, so the copy.ts wording
+MUST land before the PR merges. `CLAUDE.md` carries the detailed version of
+this block.
 <!-- SPECKIT END -->
 
 ## graphify

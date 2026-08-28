@@ -263,6 +263,91 @@ describe("FR-050: the language-model processor is described as the code behaves"
   });
 });
 
+// ── 014 (T031): the corrections that made this document true ────────────────
+//
+// ADDITIVE ONLY — nothing above was weakened. Three of these sentences were published and
+// false against the deploy target, where the database owner and the platform's service key
+// both carry BYPASSRLS and full table privileges (read live 2026-08-15; DECISIONS
+// 2026-08-15). They were corrected by hand, which means nothing would notice them coming
+// back. Now something does.
+
+describe("014: no absolute no-one-else claim that infrastructure credentials contradict", () => {
+  const joined = ALL_STRINGS.map((entry) => entry.text).join(" ");
+
+  it("does not claim the per-row rules bind the database's own owner", () => {
+    // They do not: on the deploy target the owner role has BYPASSRLS.
+    expect(joined).not.toMatch(/applied even to the database's own owner/i);
+  });
+
+  it("does not claim consent records are read by no one else, or undeletable by anyone", () => {
+    expect(joined).not.toMatch(/read by their owner and by no one else/i);
+    expect(joined).not.toMatch(/cannot be edited or deleted at all, by anyone/i);
+  });
+
+  it("keeps the consent-record edit block, which is a real trigger", () => {
+    // Only the read and delete claims were false. The UPDATE-blocking trigger exists, so
+    // this one must NOT be softened away along with them.
+    expect(joined).toMatch(/cannot be edited at all/i);
+  });
+
+  it("does not tell the reader their readings are visible to nobody else", () => {
+    expect(joined).not.toMatch(/visible to you and to nobody else/i);
+  });
+
+  it("discloses the administrative credentials plainly, and what they reach", () => {
+    expect(joined).toMatch(/administrative credentials/i);
+    expect(joined).toMatch(/read, changed, or deleted with those credentials/i);
+  });
+
+  it("keeps every manager, administrator, and employer claim absolute", () => {
+    // Those claims are TRUE, and the correction above must not have bought its honesty by
+    // weakening them. Each of the three never-reaches classes is still stated flatly.
+    expect(joined).toMatch(
+      /never reach a manager, an administrator, or an employer\. That is permanent and unconditional\./,
+    );
+    expect(joined).toMatch(
+      /never reaches a manager, an administrator, or an employer[^.]*\. That is permanent and unconditional\./,
+    );
+    expect(joined).toMatch(/No manager, no administrator, and no employer can see your readings today/);
+  });
+});
+
+describe("014: the new data class and processor flow are disclosed", () => {
+  const joined = ALL_STRINGS.map((entry) => entry.text).join(" ");
+
+  it("counts the data categories the way the list actually runs", () => {
+    // The intro states the count in words and the list states it by being a list. They were
+    // six, they are now seven, and the next one to be added must move both.
+    const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+    const stated = WORDS[legalCopy.PRIVACY_CATEGORIES_ITEMS.length];
+    expect(
+      legalCopy.PRIVACY_CATEGORIES_P1.toLowerCase(),
+      `the categories list has ${legalCopy.PRIVACY_CATEGORIES_ITEMS.length} entries but its ` +
+        `intro reads "${legalCopy.PRIVACY_CATEGORIES_P1}"`,
+    ).toContain(stated);
+  });
+
+  it("names suggestion records as their own class", () => {
+    expect(joined).toMatch(/Suggestion records —/);
+    // The swap signal is kept distinct from "it did not help" in the database, so the
+    // policy must not describe them as one thing.
+    expect(joined).toMatch(/two separate things/i);
+  });
+
+  it("states the ninety-day retention as a policy rather than a mechanism", () => {
+    expect(legalCopy.PRIVACY_RETENTION_SUGGESTIONS).toMatch(/ninety days/);
+    expect(legalCopy.PRIVACY_RETENTION_SUGGESTIONS).toMatch(/a policy, not a mechanism/);
+    expect(legalCopy.PRIVACY_RETENTION_SUGGESTIONS).toMatch(/No purge job runs on a schedule today/);
+  });
+
+  it("discloses that the reflective line reaches the provider with no conversation opened", () => {
+    expect(joined).toMatch(/without you opening a conversation/i);
+    // ...and the sentence that said a conversation was the only thing leaving the EU is
+    // gone, because once the home card generates copy it is not.
+    expect(joined).not.toMatch(/leaves the European Union in a way nothing else in Serenify does/i);
+  });
+});
+
 // ── FR-047: the no-legal-review notice actually says what it must ───────────
 
 describe("FR-047: the draft status is stated unmissably", () => {

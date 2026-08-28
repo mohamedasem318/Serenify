@@ -1,0 +1,247 @@
+/**
+ * Feature 014 — the generated-reflective-copy validator (T021; spec FR-020/FR-021/FR-028,
+ * SC-004; `contracts/reflective-copy.md` §Validation).
+ *
+ * PURE. No imports beyond the shared length cap, no clock, no storage, no network — the
+ * same posture as `library.ts` and `engine.ts`, so Vitest loads it directly.
+ *
+ * ── What this module is for ──────────────────────────────────────────────────────────
+ * States 2 and 9 may have their deterministic line RE-PHRASED by the 011 provider. The
+ * deterministic string stays the source of truth for *what* is said; generation changes
+ * only *how* (FR-021). This validator is the gate that keeps that true: it is the last
+ * thing between a model's sentence and a person's screen, and it assumes the model is
+ * wrong. Anything it does not recognise as already-supplied fact is a fabrication, and a
+ * fabrication is not softened, truncated or repaired — the caller renders
+ * `facts.fallbackText` instead.
+ *
+ * It checks MECHANICS, exhaustively and cheaply. It cannot check meaning: a sentence that
+ * re-phrases the right numbers into a wrong claim ("all calm, so you're fine now") passes
+ * here and is held off by the prompt and by the voice rules below. That division is
+ * deliberate — the mechanical half is the half a test can pin.
+ *
+ * ── Why the rules are ordered ────────────────────────────────────────────────────────
+ * The order in `validateReflectiveCopy` is the contract's order, and the FIRST failure is
+ * the reported one. Fabrication rules run before taste rules so that a sentence which both
+ * invents a number and shouts about it is reported as the fabrication it is; the length /
+ * emptiness rule runs last so that empty text falls through to `"empty"` rather than being
+ * mis-reported as "no fabricated numbers found".
+ */
+
+import { REFLECTIVE_COPY_MAX_LENGTH } from "@/lib/recommendations/library";
+
+/**
+ * The facts bundle the generator was given (`data-model.md` §4). Nothing outside this
+ * object may appear in the generated sentence.
+ */
+export interface ReflectiveFacts {
+  /** Which reflective state this copy is for — only 2 (calm day) and 9 (at rest) generate. */
+  state: 2 | 9;
+  /** The person's real count of their own check-ins today. */
+  checkinCount: number;
+  /** Preformatted clock strings, e.g. `["9:40", "11:15"]`. Never raw timestamps. */
+  times: string[];
+  /** Display band labels only: "Calm" | "Uneasy" | "Tense". Never the internal enum. */
+  bandLabels: string[];
+  /** State 9: the opened item's title, verbatim from the library. */
+  triedItemTitle?: string;
+  /** State 9: preformatted time the item was opened, e.g. "2:20". */
+  triedAtLabel?: string;
+  /** The deterministic string — the source of truth for what is being said. */
+  fallbackText: string;
+}
+
+/**
+ * Why a candidate was rejected. Reported for telemetry and for tests; never shown to a
+ * person — a rejection is silent and renders `facts.fallbackText`.
+ */
+export type ReflectiveCopyRejection =
+  | "fabricated_number"
+  | "fabricated_time"
+  | "fabricated_band"
+  | "exclamation"
+  | "forbidden_vocabulary"
+  | "too_long"
+  | "empty";
+
+export type ReflectiveCopyValidation =
+  | { ok: true }
+  | { ok: false; reason: ReflectiveCopyRejection };
+
+/**
+ * Maximal digit runs. Deliberately unanchored: a digit hiding inside a word ("gpt-4",
+ * "day3") is still a number the model put on screen, and still has to be a supplied fact.
+ *
+ * `\p{Nd}` rather than `\d`, with the `u` flag: a decimal digit is a decimal digit in any
+ * script. A person on an `ar-EG` locale gets times like `٩:٤٠` out of
+ * `toLocaleTimeString`, so those characters reach the facts corpus legitimately — and a
+ * model that invents `٧` must be caught by the same rule that catches an invented `7`.
+ * With `\d` neither would even be seen as a number.
+ */
+const DIGIT_RUN_RE = /\p{Nd}+/gu;
+
+/**
+ * Time-shaped tokens. Two alternatives, am/pm FIRST so "9:40 am" is captured whole rather
+ * than as a bare "9:40" with a stray "am" left behind:
+ *   • `9:40 am`, `9.40pm`, `9 a.m.`  — clock or bare hour with a meridiem
+ *   • `9:40`, `9.40`                 — bare clock (the contract's `\b\d{1,2}[:.]\d{2}\b`)
+ *
+ * The separator class is `[:.]` on purpose: "9.40" is NOT "9:40", and a model that
+ * re-punctuates a supplied time has changed a fact.
+ *
+ * `(?![a-z])` closes the meridiem branch, and it is load-bearing: without it "3 amid" and
+ * "5 amber" read as the times "3 am" and "5 am", and perfectly ordinary sentences were
+ * being rejected as fabrications.
+ *
+ * `\b` is kept — it is the contract's own boundary — which means this rule is effectively
+ * ASCII-anchored: `\b` is defined on `\w`, so a non-ASCII clock like `٩:٤٠` never
+ * tokenises here, on either side. That is sound rather than a gap, because such a clock is
+ * still covered by the digit-run rule above: its runs must have been supplied, in exactly
+ * the characters they were supplied in.
+ */
+const TIME_TOKEN_RE =
+  /\b\p{Nd}{1,2}(?:[:.]\p{Nd}{2})?\s*[ap]\.?m\.?(?![a-z])|\b\p{Nd}{1,2}[:.]\p{Nd}{2}\b/giu;
+
+/**
+ * Reader-facing band words, **with their inflections**, captured as the STEM (group 1).
+ *
+ * Word-bounded, so ordinary English survives: "intense" is not a band claim, because the
+ * boundary never fires mid-word — a bare substring scan would reject it and push perfectly
+ * good copy to the fallback.
+ *
+ * The suffix list is what makes the rule honest in the other direction. A band claim
+ * inflected is still a band claim: "tensely" and "tensed" assert Tense just as plainly as
+ * "tense" does, and before the suffixes were here they walked past the rule untouched.
+ * Checking the STEM (not the whole word) is what keeps the two cases apart — "calmly" is
+ * fine when Calm was supplied, and "tensely" is not when it was not.
+ *
+ * KNOWN LIMIT: suffixes are appended to the band word AS SPELLED, so a y→i mutation
+ * ("uneasy" → "uneasier") is not seen. Rewriting stems means a morphology table inside a
+ * validator; accepted, and pinned by a named test.
+ */
+const BAND_WORD_RE = /\b(calm|uneasy|tense)(?:ly|est|ed|er|st|d|r|s)?\b/giu;
+
+/**
+ * The INTERNAL band enum, scanned separately as a guard. Underscores are word characters,
+ * so `\btense\b` never fires inside `a_little_tense` — without this the one spelling that
+ * must never reach a reader would be the one spelling that slips through. These tokens can
+ * never match a display label, so finding one is always a rejection.
+ */
+const BAND_ENUM_RE = /\b(?:at_ease|a_little_tense)\b/giu;
+
+/**
+ * Clinical / alarmist vocabulary (FR-028, Principle V). Matched from a word boundary
+ * WITHOUT a trailing one, so inflections are caught too ("alerted", "detection").
+ * `elevated risk` tolerates any run of whitespace between the two words.
+ */
+const FORBIDDEN_VOCABULARY_RE = /\balert|\babnormal|\bdetect|\belevated\s+risk/i;
+
+/** Collapse whitespace + case so "9:40 am" and "9:40  AM" compare equal. */
+function normaliseToken(token: string): string {
+  return token.replace(/\s+/g, " ").trim().toLowerCase();
+}
+
+/**
+ * Every distinct match of `pattern` in `text`, normalised. `group` selects which capture to
+ * collect — the band pattern reports its STEM rather than the inflected word it found.
+ */
+function matchSet(text: string, pattern: RegExp, group = 0): Set<string> {
+  // `pattern` carries /g and therefore `lastIndex` state; matchAll on a fresh copy keeps
+  // this function safe to call repeatedly with the module-level constants.
+  const found = new Set<string>();
+  for (const match of text.matchAll(new RegExp(pattern.source, pattern.flags))) {
+    const token = match[group];
+    if (token !== undefined) found.add(normaliseToken(token));
+  }
+  return found;
+}
+
+/**
+ * Everything the generator was handed, as one corpus for the number/time rules.
+ *
+ * `fallbackText` and `triedItemTitle` are in here on purpose. Both are supplied facts:
+ * the fallback is the sentence being re-phrased (every number in it is already the
+ * person's own), and the title is reviewed library copy inserted verbatim (FR-004) — an
+ * item titled with a digit would otherwise make its own true sentence unvalidatable.
+ * `bandLabels` are included for the number/time corpus only; the band rule below is
+ * stricter and reads `bandLabels` alone, exactly as the contract specifies.
+ */
+function factsCorpus(facts: ReflectiveFacts): string {
+  return [
+    String(facts.checkinCount),
+    ...facts.times,
+    ...facts.bandLabels,
+    facts.triedItemTitle ?? "",
+    facts.triedAtLabel ?? "",
+    facts.fallbackText,
+  ].join("   ");
+}
+
+/**
+ * Validate one generated reflective sentence against the facts it was generated from.
+ *
+ * Returns `{ ok: true }` only when every number, every time and every band word in `text`
+ * was supplied, the voice rules hold, and the length is inside the shared cap. Any failure
+ * returns the first rule that failed; the caller renders `facts.fallbackText` and never
+ * shows an error (FR-030).
+ */
+export function validateReflectiveCopy(
+  text: string,
+  facts: ReflectiveFacts,
+): ReflectiveCopyValidation {
+  const corpus = factsCorpus(facts);
+  const trimmed = text.trim();
+
+  // 1 — every maximal digit run must have been supplied. Set membership, not substring
+  // containment: with a supplied "9:40", a fabricated "940" contains no run that was
+  // given, and a fabricated "4" is not one of {"9", "40"}.
+  //
+  // KNOWN LIMIT 1, and the contract's rule as written: runs are pooled, so a run supplied
+  // by a TIME can be re-used as a count ("30 check-ins" passes when "2:30" was supplied).
+  // The rule catches invention, not every mis-attribution; the prompt and the fallback
+  // carry that half. Pinned by a named test so tightening it stays a deliberate change.
+  //
+  // KNOWN LIMIT 2 — SPELLED-OUT numbers. "seven check-ins" contains no digit run, so no
+  // rule here sees it. The contract's rule is about digits, and widening it to number
+  // words means a number-word lexicon per locale living in a validator; the prompt
+  // forbids re-writing supplied numbers instead. Accepted, and pinned by a named test.
+  //
+  // KNOWN LIMIT 3 — GLUED times. "since9.40" has no word boundary before the digit, so the
+  // contract's `\b…\b` never fires and rule 2 does not see a time there. Rule 1 still
+  // checks both runs, so the digits must have been supplied; only the *punctuation* of a
+  // supplied time escapes checking in that shape. Accepted, and pinned by a named test.
+  const suppliedNumbers = matchSet(corpus, DIGIT_RUN_RE);
+  for (const run of matchSet(trimmed, DIGIT_RUN_RE)) {
+    if (!suppliedNumbers.has(run)) return { ok: false, reason: "fabricated_number" };
+  }
+
+  // 2 — every time-shaped token must have been supplied verbatim (modulo spacing/case).
+  // This is what separates "9.40" and "9:40 am" from the supplied "9:40": the digits are
+  // all real, the CLAIM is not.
+  const suppliedTimes = matchSet(corpus, TIME_TOKEN_RE);
+  for (const token of matchSet(trimmed, TIME_TOKEN_RE)) {
+    if (!suppliedTimes.has(token)) return { ok: false, reason: "fabricated_time" };
+  }
+
+  // 3 — every band word must appear in `bandLabels` (display labels only). An internal
+  // enum spelling can never be in there, so the guard scan rejects by the same rule.
+  const suppliedBands = new Set(facts.bandLabels.map((label) => normaliseToken(label)));
+  for (const stem of matchSet(trimmed, BAND_WORD_RE, 1)) {
+    if (!suppliedBands.has(stem)) return { ok: false, reason: "fabricated_band" };
+  }
+  for (const token of matchSet(trimmed, BAND_ENUM_RE)) {
+    if (!suppliedBands.has(token)) return { ok: false, reason: "fabricated_band" };
+  }
+
+  // 4 — voice (FR-028 / Principle V). No cheerleading, nothing clinical.
+  if (trimmed.includes("!")) return { ok: false, reason: "exclamation" };
+  if (FORBIDDEN_VOCABULARY_RE.test(trimmed)) {
+    return { ok: false, reason: "forbidden_vocabulary" };
+  }
+
+  // 5 — shape. Length is measured on the trimmed text, the same string that would be
+  // painted, against the cap the deterministic builders already honour.
+  if (trimmed.length === 0) return { ok: false, reason: "empty" };
+  if (trimmed.length > REFLECTIVE_COPY_MAX_LENGTH) return { ok: false, reason: "too_long" };
+
+  return { ok: true };
+}

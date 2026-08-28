@@ -73,6 +73,59 @@ export const CONSENT_REGISTRY: Readonly<Record<ConsentTextKey, readonly ConsentR
         "accepted as the cost of the change when it was decided. Published together with the " +
         "wording itself in lib/legal/copy.ts.",
     },
+    {
+      versionId: "terms_privacy@2026-08-15.1",
+      publishedOn: "2026-08-15",
+      materiality: "material",
+      rationale:
+        "Feature 014 (recommendations). The Privacy Policy gains a wholly new recorded data " +
+        "class — suggestion records: what was suggested, what was opened, whether it helped, " +
+        "and what was swapped away — plus a ninety-day retention statement for that class in " +
+        "the same policy-not-a-mechanism framing as monitoring readings. Judged MATERIAL. The " +
+        "published criterion is that a material revision changes what you are agreeing to, and " +
+        "an acceptance recorded before this revision covered a policy that did not disclose " +
+        "this recording at all; a new class of recorded behavioural data sits above the bar " +
+        "#198 set with a terminology re-mapping. The counter-reading — additive disclosure of " +
+        "owner-private records derived from readings already consented to, closer in " +
+        "consequence to the 2026-08-13 band rename that was judged non-material — was " +
+        "considered and rejected: the band rename reworded an existing value inside an " +
+        "already-disclosed category, while this revision discloses recording that no accepted " +
+        "text mentioned, and its prompt-fatigue half rested on proximity to the 2026-08-12/13 " +
+        "re-prompts, which this feature's merge will not have. Published together with the " +
+        "wording itself in lib/legal/copy.ts (feature 014).",
+    },
+    {
+      versionId: "terms_privacy@2026-08-28.1",
+      publishedOn: "2026-08-28",
+      materiality: "material",
+      rationale:
+        "Feature 014 (recommendations), the reflective-copy processor flow. The Privacy " +
+        "Policy's \"Where your data lives\" now discloses that generating the short reflective " +
+        "line on the home screen sends facts about the reader's state to Groq: how many " +
+        "check-ins they did, the preformatted times those happened, the bands they landed on, " +
+        "the name and time of anything the card suggested they try, and the plain sentence the " +
+        "card would otherwise have shown — asked back in other words. Groq is an external " +
+        "language-model processor operating from the United States, so those facts leave the " +
+        "European Union, and the band labels among them are the health-related characterization " +
+        "this policy describes under Egyptian law (PDPL 151/2020). Unlike Ren, this fires on a " +
+        "plain home render with no conversation opened and nothing pressed; the endpoint " +
+        "(POST /recommendations/reflective-copy) forwards only that facts bundle and never a " +
+        "reading, and if Groq is unavailable the request simply fails and the deterministic " +
+        "fallback sentence — the source of truth the policy already promised — stands " +
+        "unchanged. Judged MATERIAL, and it advances the binding revision: an acceptance " +
+        "recorded before this revision covered a Groq disclosure that named only the companion " +
+        "conversation and said a conversation was the only thing in Serenify that left the EU " +
+        "— true when written, false once this feature ships. A processor flow that moves " +
+        "health-related facts abroad on a passive render is a change in WHERE data goes " +
+        "(Principle VIII), above the bar even though no new data class is recorded here. This " +
+        "does NOT amend terms_privacy@2026-08-15.1 — that entry named only the suggestion- " +
+        "records class, and its wording and the locked snapshot are untouched — it is appended " +
+        "alongside it, which is how the 2026-08-16 open question (whether the 2026-08-15.1 " +
+        "rationale needed a wording amendment) is resolved: by a new material revision, not by " +
+        "editing published history. The re-prompt of existing holders on merge day was accepted " +
+        "as the cost of shipping the disclosure WITH the feature rather than trailing it. " +
+        "Published together with the wording itself in lib/legal/copy.ts (feature 014, T031).",
+    },
   ],
   camera_inference: [
     {
