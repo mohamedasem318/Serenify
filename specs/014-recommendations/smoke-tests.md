@@ -1,6 +1,8 @@
 # Smoke Tests: Recommendations — "Things that might help" (014)
 
-**Status: 6 of 7 recorded (ST-1 through ST-6); ST-7 open.** All recorded checks PASS; T035 sign-off pending. Authored at the tasks stage (plan
+**Status: 7 of 7 recorded (ST-1 through ST-7). All PASS.** ST-7 was recorded after
+`014-recommendations` merged (2026-09-11) — see its own entry for why, and for the
+client-side stub its method depends on. Authored at the tasks stage (plan
 §Constitution VII); results are recorded **inline in this file before
 `014-recommendations` merges to `main`** (Principle VII gate 5). Owner: **Mohamed**.
 
@@ -532,4 +534,57 @@ instructions, then **answer** the outcome question and visually confirm the "Not
 ring renders — both the helped/check and didn't-help/muted variants if practical — with
 no error surface.
 
-**Observations / Verdict**: **not yet run** (open).
+**Observations / Verdict**: **PASS — both variants.** Run 2026-09-11, Mohamed at the
+laptop (Acer built-in camera, Chrome, local stack, the `st5-live@serenify.local` throwaway
+local account — already calibrated, anchor `serenify-video-lbptop-motion-rf-calibrated@2.0.0`,
+matching the model the local API had loaded). Agent drove the page through Claude-in-Chrome
+and read the DB as `postgres` for the record checks; Mohamed watched the rendered surface.
+
+_Method as actually run — the trigger timing was FORCED; read this before relying on the
+check._ Getting a sustained Tense read on demand is impractical (ST-2 needed 5:38 of
+trying), so the **confirmatory trigger's input was stubbed client-side**: a `window.fetch`
+wrapper installed on `/app/monitor` before the session started rewrote the `band` field of
+each `POST {API}/monitoring/sessions/{id}/windows` **response body** to `tense`. That is
+the only thing faked, and it is faked only in the browser — the clip still uploaded, and
+the server still scored and persisted every window independently. A non-2xx response was
+passed through untouched so a real 401/409 could not be masked. Prompt-to-screen fell from
+5:38 (ST-2, real detection) to ~01:00.
+
+_The warrant was real, not stubbed._ The picks below rest on genuine server-scored `tense`
+`window_readings` rows (`stress_probability` 0.68, 0.69, 0.757 — three rows, one local
+session, one sitting). The engine reads bands from the **database**, so the client-side
+stub could not and did not manufacture a warrant.
+
+_An instructive first failure, recorded because it looks like a defect and is not._ The
+first confirm (05:51:01 UTC) resolved the prompt correctly — row `kind=tense`,
+`lifecycle=answered`, `outcome=confirmed`, URL stayed `/app/monitor`, no Ren handoff — but
+surfaced **no card**. Cause: at that instant the API's in-memory smoothing buffer had not
+yet latched a band, so today held zero readings in a warranting band and `selectPick`
+returned `null` at contract rule 1. That is FR-030 behaving as written ("no card, no
+error"), not a fault. Card appeared on the next attempt once real `tense` rows existed.
+
+- **helped / check** — *Box breathing · 2 min*. Meadow ring, check glyph, `qri-draw-path`
+  present, message "Noted.". `data-outcome=helped`, `data-kind=check`, `data-motion=full`.
+- **didnt_help / muted** — *Feet on the floor · 1 min*. Muted ring, static Wind glyph, no
+  draw path, message "Noted.". `data-outcome=didnt_help`, `data-kind=muted`.
+- Both times: outcome prompt gone after answering and never re-asked, **no swap control**
+  on the in-session card, `session-pause` still present and functional, item retained above
+  the ring with the duration pill reading *opened*, and **zero `role="alert"` nodes**. URL
+  never left `/app/monitor`.
+- Rows (local DB), two picks, **distinct `episode_id`s** — the second episode opened only
+  after the first closed on an outcome, and the non-repeat rule gave a different item:
+  `box-breathing` confirmed 05:55:22 / opened 05:55:36 / `helped` 05:56:04;
+  `feet-on-the-floor` confirmed 05:58:14 / opened 05:58:24 / `didnt_help` 05:58:44.
+  The first was an **attach**, not a second row — the confirm landed on the pick the home
+  card had already surfaced (`source=reading`), which is Ruling C.
+- Muted "Noted." contrast measured, not eyeballed: `rgb(147,154,159)` on the amber-tinted
+  prominent card = **≈5.5:1**, passing AA for normal text. An agent pre-flight worry that
+  it would read too faint was wrong; recorded so it is not re-raised.
+- Both ST-2 observations re-observed and **unchanged, neither worse**: with the steps
+  expanded the card exceeds a 726 px-tall viewport and the header clips at the top; the
+  item title wraps to two lines beside the *opened* chip at `w-80`.
+
+_What this check does NOT evidence._ The real-detection → prompt leg is **not** exercised
+here — the band was supplied by the stub. That leg is covered by **ST-2 (PASS,
+2026-08-25)**, which drove a genuine sustained Tense read on a real camera. ST-7's scope is
+everything downstream of the band, which ran unmodified.

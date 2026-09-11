@@ -7,9 +7,10 @@ Per-feature implementation log. Append-only, newest first.
 ## Feature 014 — "Things that might help": a deterministic recommendation card
 
 **Branch**: `014-recommendations` · **Date**: 2026-08-18, updated 2026-08-28 · **Status**:
-**complete — 37/37 tasks ticked, all six smoke checks recorded (ST-1…ST-6 PASS; ST-7 added
-open), T035 signed off.** The 2026-08-18 body below is the original record; the **Update —
-2026-08-28** block at the end supersedes its "NOT verified" list. Branch ready to push; no
+**complete — 37/37 tasks ticked, all seven smoke checks recorded (ST-1…ST-7 PASS), T035
+signed off.** ST-7 closed 2026-09-11, after merge (**Update — 2026-09-11** at the end).
+The 2026-08-18 body below is the original record; the **Update —
+2026-08-28** block supersedes its "NOT verified" list. Branch ready to push; no
 PR merged.
 
 **Shipped**: the shipped-but-empty home card now renders all ten approved states from one pure
@@ -174,6 +175,36 @@ locked `@2026-08-15.1` snapshot.
 serenify-api Container App; the API image is **not yet built/deployed**. Order matters — secret and
 migration **before** merge (the table must exist before live web writes to it; Vercel auto-deploys
 web on merge, the API does not). ST-7 (live "Noted." ring) remains an open smoke observation.
+
+### Update — 2026-09-11 (ST-7 closed: the in-session "Noted." ring observed live)
+
+**ST-7 PASS, both variants** — the last open item on 014. Full transcript, including the
+method caveat below, is in `specs/014-recommendations/smoke-tests.md` ST-7. Local stack,
+real camera, `st5-live@serenify.local` (already calibrated); Mohamed watched the surface,
+the agent drove the page and read the DB.
+
+- Both acknowledgements rendered: **helped** → meadow ring + drawn check; **didnt_help** →
+  muted ring + static Wind glyph. Both read "Noted.". No swap control, no error node
+  (`role="alert"` count 0), pause control retained, URL never left `/app/monitor`.
+- Two pick rows, distinct episodes, different items (non-repeat): `box-breathing` →
+  `helped`, `feet-on-the-floor` → `didnt_help`. The first was an **attach** onto the pick
+  the home card had already surfaced — Ruling C, confirmed by there being one row, not two.
+- **The trigger timing was stubbed, and the check is bounded by that.** A client-side
+  `window.fetch` wrapper rewrote the `band` in each window-scoring **response** to `tense`,
+  because a sustained Tense read on demand is impractical (ST-2 needed 5:38). Nothing
+  server-side was touched; non-2xx responses were passed through so a real failure could
+  not be masked. The **warrant was genuine** — real server-scored `tense` rows at
+  `stress_probability` 0.68–0.757. The real-detection → prompt leg is **not** evidenced
+  here; **ST-2 (PASS, 2026-08-25)** covers it.
+- **Not a defect, recorded because it reads like one**: the first confirm surfaced no card.
+  The API's smoothing buffer had not yet latched a band, so today held no warranting
+  reading and `selectPick` returned `null` — FR-030's "no card, no error", exactly as
+  written. The prompt row was still correctly `answered`/`confirmed`.
+- Both ST-2 layout observations re-observed, **unchanged and no worse**: header clips above
+  a 726 px viewport with steps expanded; title wraps beside the *opened* chip at `w-80`.
+  Still the open follow-up, not re-filed.
+- Muted "Noted." contrast **measured** at ≈5.5:1 (`rgb(147,154,159)` on the amber card) —
+  passes AA. An agent pre-flight suspicion that it was too faint was wrong.
 
 ---
 
