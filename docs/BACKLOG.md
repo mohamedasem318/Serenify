@@ -4143,10 +4143,12 @@ the gate: no Realtime tables/subscriptions, no Storage buckets, no Edge Function
 cron, `service_role` cannot log in, every managed service connects as another role; question (c)
 (`rolbypassrls`) left unanswered on purpose — with no grant left, BYPASSRLS has nothing to enter.
 Proven locally: all eleven public tables carry no `service_role` item, other roles' grants, RLS
-and 39 policies unchanged. **Hosted is unchanged until the next manual `supabase db push`**
-(cloud applied list stops at `20260815090000` on 2026-09-13 — neither step is there yet).
+and 39 policies unchanged. **Pushed to the hosted database 2026-09-13** (`supabase db push`
+after a dry run listing exactly the two migrations); read back the same day: no `service_role`
+item on any of the eleven cloud tables, other roles' grants, RLS and policies unchanged; a live
+Ren conversation on production afterwards worked with nothing breaking.
 DECISIONS 2026-09-13 (step 2).
-**Address by**: resolved. Cloud takes effect on the next `db push`; the post-push check is in PR #278.
+**Address by**: resolved — on cloud since 2026-09-13 and checked live. GitHub issue **#269 CLOSED** by the #278 merge.
 
 ### `scripts/lib/supabase-admin.ts` header still carries the outdated "#208: no DML on this project" claim
 **Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#277 OPEN.**
