@@ -7,8 +7,10 @@ Per-feature implementation log. Append-only, newest first.
 ## #269 — `service_role` loses its grants on public tables (steps 1 + 2)
 
 **Branches**: `fix/269-default-privileges-service-role` (step 1, PR #276, merged 2026-09-13) ·
-`fix/269-revoke-service-role-preexisting-tables` (step 2, PR #278, open) · **Date**: 2026-09-13 ·
-**Status**: step 1 merged, step 2 PR open; **neither has reached the hosted database.**
+`fix/269-revoke-service-role-preexisting-tables` (step 2, PR #278, merged 2026-09-13) ·
+**Date**: 2026-09-13 · **Status**: **complete — both merged, pushed to the hosted database
+2026-09-13 (`supabase db push`, after a dry run listing exactly the two migrations), read back,
+and checked live.**
 
 **Shipped**: two migrations and two static gates. Step 1, `20260913000000` — one statement,
 `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM
@@ -30,13 +32,21 @@ green, full suite green. Read-only recon on the linked project found nothing Sup
 depending on the grant (empty Realtime publication, zero buckets, zero Edge Functions, no
 webhooks/cron, `service_role` cannot log in, every managed service connects as another role).
 
-**NOT verified / not done**: **hosted is unchanged** — `supabase migration list --linked` on
-2026-09-13 stops at `20260815090000`, so neither step is on cloud; both land on the next manual
-`supabase db push` (no CI pushes migrations). Post-push, every pre-014 table on cloud should read
-`relacl` without `service_role`; the first sign of trouble would be a `42501 permission denied
-for table …` in API or PostgREST logs, which nothing in this repo can produce. A full `supabase db
-reset --local` was not run (both applied with `migration up`). `scripts/lib/supabase-admin.ts`
-still carries the outdated "#208" sentence — BACKLOG, out of the step-2 clamp.
+**Verified (hosted, 2026-09-13, after `db push`)**: `supabase migration list --linked` ends at
+`20260913100000`; all eleven public tables' `relacl` carry no `service_role` item and
+`has_table_privilege('service_role', …)` is false for every DML verb on every table; every other
+role's items match the pre-push read (e.g. `chat_conversations` `authenticated=arwd`, `profiles`
+`anon=rDxtm,authenticated=adDxtm`); the `postgres`-grantor default ACL for public tables no longer
+lists `service_role`; RLS enabled + forced 11/11, 39 policies. Live check by Mohamed the same
+day: a Ren conversation on the production app (chat tables read + written through the API on the
+user JWT) worked with nothing breaking. No `42501` was looked for in the logs — the live check
+was the app path, not a log sweep.
+
+**NOT verified / not done**: a full `supabase db reset --local` was not run (both migrations were
+applied locally with `migration up`). Only the Ren path was exercised live after the push; the
+check-in, questionnaire and consent paths were not re-driven on production (their grants are
+unchanged, and the static gates cover them). `scripts/lib/supabase-admin.ts` still carries the
+outdated "#208" sentence — BACKLOG #277, out of the step-2 clamp.
 
 ---
 
