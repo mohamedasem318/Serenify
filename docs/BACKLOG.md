@@ -4126,7 +4126,7 @@ grants, so the revoke, not the policy, is the control. See DECISIONS 2026-08-15.
 **(b)** whether `pg_default_acl` must also change so NEW tables stop re-acquiring the grant;
 **(c)** whether `rolbypassrls` is revocable at all on managed Supabase. Sweeping blind risks
 breaking Supabase-managed internals for a gap that is currently unreached.
-**Step 1 landed — 2026-09-13 (PR #TBD)**: question **(b)** answered **yes** and done —
+**Step 1 landed — 2026-09-13 (PR #276)**: question **(b)** answered **yes** and done —
 `20260913000000_default_privileges_service_role.sql` alters the `postgres`-grantor default ACL
 (`ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM
 service_role`), pinned by `apps/api/tests/test_default_privileges_service_role.py`. Proven

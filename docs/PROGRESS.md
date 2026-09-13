@@ -7,7 +7,7 @@ Per-feature implementation log. Append-only, newest first.
 ## #269 step 1 — new public tables stop granting `service_role` (default privileges only)
 
 **Branch**: `fix/269-default-privileges-service-role` · **Date**: 2026-09-13 · **Status**: PR
-open (#TBD), not merged, not pushed to cloud.
+open (#276), not merged, not pushed to cloud.
 
 **Shipped**: one migration, `20260913000000_default_privileges_service_role.sql`, with exactly one
 statement — `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES
