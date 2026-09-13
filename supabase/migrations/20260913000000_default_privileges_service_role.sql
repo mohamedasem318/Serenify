@@ -1,0 +1,47 @@
+-- Default privileges: new public tables no longer grant service_role anything.
+-- Step 1 of 2 for #269 (docs/BACKLOG.md). Step 2 — the sweep over the tables
+-- that ALREADY exist — is deliberately NOT here; this migration touches no
+-- existing table, grant, policy, function or role.
+--
+-- WHY. Migrations run as `postgres`, so every table they create is owned by
+-- `postgres` and inherits the `postgres`-grantor entry in `pg_default_acl` for
+-- the public schema. Read live on the linked CLOUD project (2026-08-15, re-read
+-- 2026-09-13) that entry hands `service_role` full `arwdDxtm` on every new public
+-- table, and cloud `service_role` has `rolbypassrls = true`. BYPASSRLS defeats RLS
+-- but NOT grants, so a table whose contract says "no service-role path" (011
+-- chat, 012 questionnaire, 014 picks) only has that posture on cloud if the
+-- grant is absent. 014 closed it per-table with an explicit REVOKE; this
+-- migration stops the grant from being handed out in the first place, so a
+-- future migration that forgets the per-table revoke no longer regresses.
+--
+-- LOCAL vs HOSTED. The two stacks' default ACLs differ. Locally the same entry
+-- grants `service_role` only `Dxtm` (TRUNCATE/REFERENCES/TRIGGER/MAINTAIN — no
+-- DML); on cloud it grants `arwdDxtm`. `REVOKE ALL` is correct on both: revoking
+-- a privilege that was never granted is a no-op, and the end state on both is
+-- the same — no `service_role` entry in the default ACL at all. That matches the
+-- end state 014's table already has (`recommendation_picks.relacl` carries no
+-- service_role item), so nothing here duplicates or disturbs 014's revoke.
+--
+-- WHAT IS OUT OF REACH. `pg_default_acl` for public tables has a SECOND entry,
+-- grantor `supabase_admin`, with the same four grantees. It governs only tables
+-- that `supabase_admin` itself creates (Supabase-internal), and `postgres` is not
+-- a member of `supabase_admin` on the hosted project, so it cannot be altered
+-- from a migration and is out of scope. Sequences and functions keep their
+-- default ACL; this migration is tables only.
+--
+-- FOR ROLE postgres is explicit rather than implied from the session role so the
+-- statement pins the one entry it means, whoever runs the migration.
+--
+-- SCOPE OF EFFECT: only tables created AFTER this migration runs. Existing
+-- tables' `relacl` is untouched (ALTER DEFAULT PRIVILEGES never rewrites
+-- existing objects). Existing `service_role` grants on pre-014 tables remain
+-- exactly as they were — that is step 2 (#269), a separate decision.
+--
+-- ROLLBACK (exact inverse, cloud): 
+--   ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+--     GRANT ALL ON TABLES TO service_role;
+-- (Locally the original entry was `Dxtm`, so the local-faithful inverse is
+--   ... GRANT TRUNCATE, REFERENCES, TRIGGER, MAINTAIN ON TABLES TO service_role;)
+
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON TABLES FROM service_role;
