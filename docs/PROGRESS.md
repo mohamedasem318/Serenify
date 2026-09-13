@@ -4,6 +4,30 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
+## #269 step 1 — new public tables stop granting `service_role` (default privileges only)
+
+**Branch**: `fix/269-default-privileges-service-role` · **Date**: 2026-09-13 · **Status**: PR
+open (#276), not merged, not pushed to cloud.
+
+**Shipped**: one migration, `20260913000000_default_privileges_service_role.sql`, with exactly one
+statement — `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES
+FROM service_role` — plus a static-parse gate (`apps/api/tests/test_default_privileges_service_role.py`,
+3 tests, mutation-verified). Tables created by future migrations no longer inherit a
+`service_role` grant. Nothing else: no existing table's grants, no revoke on any existing table,
+no role, no app or API code. DECISIONS 2026-09-13.
+
+**Verified (local stack, 2026-09-13)**: throwaway table before → `service_role=Dxtm`; after
+`migration up` → no `service_role` item, `has_table_privilege` false for all four DML verbs;
+`profiles` / `user_consents` / `recommendation_picks` `relacl` unchanged; rollback statement
+applied and reverted cleanly; apps/api suite 299 passed, 1 skipped (pre-existing skip).
+
+**NOT verified / not done**: the hosted default ACL is **unchanged** — re-read 2026-09-13, still
+`service_role=arwdDxtm`; it moves only on the next `db push`. A full `supabase db reset --local`
+was not run (the migration was applied with `migration up`; it is a single idempotent statement).
+Step 2 of #269 (the sweep) is not started; #269 stays open.
+
+---
+
 ## Feature 014 — "Things that might help": a deterministic recommendation card
 
 **Branch**: `014-recommendations` · **Date**: 2026-08-18, updated 2026-08-28 · **Status**:

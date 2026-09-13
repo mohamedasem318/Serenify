@@ -8201,3 +8201,73 @@ the prior version string, so none needed changing.
 missed-processor-flow finding this resolves, and Amendment 3 — the second Groq credential the
 flow rides on); `specs/014-recommendations/contracts/reflective-copy.md` (the facts bundle and
 the deterministic fallback).
+## 2026-09-13 — #269 step 1: new public tables stop granting `service_role` (default privileges only; the sweep stays deferred)
+
+**Status**: Accepted — Mohamed's scope clamp for step 1 of #269. Default privileges only: no
+existing table's grants touched, nothing revoked from any existing table, no role altered, no
+application or API change. Step 2 (the sweep over the pre-existing tables) is **not** decided
+here and stays gated on the open questions in `docs/BACKLOG.md` (#269).
+
+**Decision**: one migration, `20260913000000_default_privileges_service_role.sql`, containing
+exactly one statement:
+
+```sql
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public
+  REVOKE ALL ON TABLES FROM service_role;
+```
+
+pinned by a static-parse gate (`apps/api/tests/test_default_privileges_service_role.py`,
+mutation-verified: swapping REVOKE for GRANT, dropping `FOR ROLE postgres`, or appending a later
+re-grant each fails a named test). This answers question **(b)** of #269 — *must
+`pg_default_acl` also change so new tables stop re-acquiring the grant?* — with **yes**, and lands
+it, so a future migration that forgets a per-table revoke no longer regresses on cloud.
+
+**Why this entry and not the other one.** `pg_default_acl` for public tables carries two entries
+with the same four grantees: grantor `postgres` and grantor `supabase_admin`. Migrations run as
+`postgres` (every public table's `relowner` is `postgres` on both stacks), so the `postgres`
+entry is the one they inherit and the only one in scope. The `supabase_admin` entry governs
+tables `supabase_admin` itself creates and is out of reach: `pg_has_role('postgres',
+'supabase_admin', 'MEMBER')` is **false** and `postgres` is not superuser — read on both the local
+stack and the linked cloud project on 2026-09-13. `FOR ROLE postgres` is written explicitly so
+the statement pins that entry whoever runs the migration.
+
+**Why `REVOKE ALL`, not DML-only.** The two stacks' entries differ — cloud grants `service_role`
+`arwdDxtm`, local only `Dxtm` (TRUNCATE/REFERENCES/TRIGGER/MAINTAIN) — and revoking an ungranted
+privilege is a no-op, so `REVOKE ALL` lands the **same** end state on both: no `service_role` item
+at all. That is the end state 014's `recommendation_picks` already has, and nothing in this repo
+uses the non-DML four. A DML-only revoke would leave the stacks diverging (cloud keeping `Dxtm`)
+for no benefit.
+
+**Evidence (measured, local stack, 2026-09-13).** Before: a throwaway `public` table created as
+`postgres` came out `service_role=Dxtm/postgres`. After `supabase migration up --local`: the
+`postgres`-grantor entry reads `{postgres=arwdDxtm,anon=Dxtm,authenticated=Dxtm}`; a fresh
+throwaway table's `relacl` carries no `service_role` item and `has_table_privilege('service_role',
+…)` is **false** for SELECT, INSERT, UPDATE and DELETE; the table was dropped (0 leftovers).
+`profiles`, `user_consents` and `recommendation_picks` `relacl` are identical before and after —
+existing tables untouched, 014's revoke undisturbed. The rollback statement was exercised locally
+(inverse applied → entry regained `service_role=arwdDxtm`; revoke re-applied → gone).
+
+**Hosted state: NOT changed by this PR.** The cloud `postgres`-grantor entry was re-read on
+2026-09-13 and still grants `service_role=arwdDxtm`. It changes only when this migration reaches
+the cloud project on the next `supabase db push`. Nothing was run against cloud.
+
+**Rollback** (exact inverse of the cloud entry as it stands today):
+`ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON TABLES TO service_role;`
+— locally the pre-change entry was `Dxtm`, so the local-faithful inverse grants
+`TRUNCATE, REFERENCES, TRIGGER, MAINTAIN` instead of `ALL`.
+
+**Rejected**: (a) running the ALTER once against cloud from the dashboard or `db query` and
+recording it nowhere — the "repo ≠ production" drift #189 documented, and unreproducible on a
+fresh stack; (b) a DML-only revoke (above); (c) folding the pre-existing-table sweep in — it
+needs its own blast-radius answer and is a separate decision; (d) also altering the default ACL
+for sequences and functions — the clamp says tables, and the cloud entries for those
+(`service_role=rwU` on sequences, `X` on functions) are recorded here as observed, not changed.
+
+**Cross-references**: `docs/BACKLOG.md` (#269 — stays OPEN; step 1 noted there); this file
+2026-08-15 (the correction that surfaced the cloud default ACL); 2026-08-14 (`serenify_seeder`,
+whose grants are unaffected — it is granted per-table, never via default ACL);
+`supabase/migrations/20260815090000_recommendation_picks.sql` (the per-table precedent);
+`apps/api/tests/test_default_privileges_service_role.py`.
+
+---
+
