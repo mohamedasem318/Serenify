@@ -7,7 +7,7 @@ Per-feature implementation log. Append-only, newest first.
 ## #269 — `service_role` loses its grants on public tables (steps 1 + 2)
 
 **Branches**: `fix/269-default-privileges-service-role` (step 1, PR #276, merged 2026-09-13) ·
-`fix/269-revoke-service-role-preexisting-tables` (step 2, PR #TBD, open) · **Date**: 2026-09-13 ·
+`fix/269-revoke-service-role-preexisting-tables` (step 2, PR #278, open) · **Date**: 2026-09-13 ·
 **Status**: step 1 merged, step 2 PR open; **neither has reached the hosted database.**
 
 **Shipped**: two migrations and two static gates. Step 1, `20260913000000` — one statement,

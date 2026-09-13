@@ -4109,7 +4109,7 @@ time the questionnaire coordinator is opened for any reason.
 ## From feature 014 (recommendations) — captured 2026-08-15
 
 ### Repo-wide `REVOKE ALL … FROM service_role` on the pre-existing public tables
-**Status**: tech-debt (`type:tech-debt` / `area:db`) — **RESOLVED 2026-09-13 — step 1 PR #276 (merged) + step 2 PR #TBD.** GitHub issue **#269** closes on the step-2 merge (`Closes #269` in its body; Principle VIII: entry and issue in the same change).
+**Status**: tech-debt (`type:tech-debt` / `area:db`) — **RESOLVED 2026-09-13 — step 1 PR #276 (merged) + step 2 PR #278.** GitHub issue **#269** closes on the step-2 merge (`Closes #269` in its body; Principle VIII: entry and issue in the same change).
 **Category**: database posture / grants
 **Observed**: 2026-08-15, during 014's schema phase. Read live by read-only
 `supabase db query --linked` against the linked cloud project — not inferred from local:
@@ -4135,7 +4135,7 @@ the cloud entry changes only on the next `db push`. The `supabase_admin`-grantor
 reach (`postgres` is not a member on either stack). **Step 2 — the sweep — remains OPEN**,
 gated on (a) and (c) and on whether anything Supabase-managed depends on the grant.
 DECISIONS 2026-09-13.
-**Step 2 landed — 2026-09-13 (PR #TBD)**: `20260913100000_revoke_service_role_preexisting_tables.sql`,
+**Step 2 landed — 2026-09-13 (PR #278)**: `20260913100000_revoke_service_role_preexisting_tables.sql`,
 ten verbatim `REVOKE ALL ON public.<table> FROM service_role` statements, pinned by
 `apps/api/tests/test_service_role_revoke_preexisting_tables.py` (expected set derived from the
 migrations, exact-set compare, mutation-verified). Read-only recon on the linked project settled
@@ -4146,7 +4146,7 @@ Proven locally: all eleven public tables carry no `service_role` item, other rol
 and 39 policies unchanged. **Hosted is unchanged until the next manual `supabase db push`**
 (cloud applied list stops at `20260815090000` on 2026-09-13 — neither step is there yet).
 DECISIONS 2026-09-13 (step 2).
-**Address by**: resolved. Cloud takes effect on the next `db push`; the post-push check is in PR #TBD.
+**Address by**: resolved. Cloud takes effect on the next `db push`; the post-push check is in PR #278.
 
 ### `scripts/lib/supabase-admin.ts` header still carries the outdated "#208: no DML on this project" claim
 **Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#277 OPEN.**
