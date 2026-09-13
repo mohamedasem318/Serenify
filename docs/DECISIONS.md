@@ -8271,3 +8271,81 @@ whose grants are unaffected — it is granted per-table, never via default ACL);
 
 ---
 
+## 2026-09-13 — #269 step 2: `service_role` loses every privilege on the ten pre-existing public tables (closes #269)
+
+**Status**: Accepted — Mohamed's go for step 2, after the read-only recon of 2026-09-13 (below)
+and with step 1 (this file, earlier today; PR #276, merged) already on `main`. Scope clamp:
+`public` tables only; the 014 table's own revoke is not duplicated; no role altered; BYPASSRLS
+untouched; the `supabase_admin`-grantor default-privilege entry untouched; no application code
+beyond one comment correction in `apps/web/tests/e2e/setup/admin-client.ts`.
+
+**Decision**: one migration, `20260913100000_revoke_service_role_preexisting_tables.sql`, holding
+exactly ten statements — `REVOKE ALL ON public.<table> FROM service_role;` for `profiles`,
+`monitoring_sessions`, `window_readings`, `chat_conversations`, `chat_messages`,
+`questionnaire_confirmatory_prompts`, `questionnaire_session_feedback`, `weekly_checkin_cadence`,
+`weekly_work_environment_contributions`, `user_consents` — pinned by
+`apps/api/tests/test_service_role_revoke_preexisting_tables.py`. The gate DERIVES the expected
+set from every `CREATE TABLE public.<x>` in an older migration (minus the self-revoking 014
+table) and compares the migration's statements to it as an exact set, so a missing table, an
+extra table, a re-grant, a duplicate of 014's revoke, or anything that is not one of these
+revokes fails a named test. Mutation-verified (one revoke deleted → fail; `FROM` → `TO` → fail;
+014's table added → fail; a `GRANT … TO service_role` appended to any migration → fail).
+
+**Why now — what the recon settled (read-only, linked project, 2026-09-13).** Nothing
+Supabase-managed depends on the grant: the Realtime publication `supabase_realtime` holds zero
+tables and zero subscriptions; zero Storage buckets and objects; zero Edge Functions, secrets,
+branches; no Database Webhooks, no in-database `pg_cron`/`pg_net` jobs, no `pg_graphql`; no
+`pgrst.*` settings or pre-request hook; zero policies `TO service_role`; the only auth-schema
+trigger is the profile-creation function owned by `postgres`. Live connections are held by
+`authenticator` (PostgREST), `postgres` (management API, pg_net worker), `supabase_admin`
+(cron launcher, exporter) and `pgbouncer` — never `service_role`, which cannot log in
+(`rolcanlogin = false`); its only reach is PostgREST with a service-key JWT, and this repo's
+runtime uses the anon key plus the user's JWT (the two service-key clients are prod-guarded,
+Auth-Admin only). Supabase's own docs (per the recon's citations) place the Dashboard editors on
+`postgres`, Realtime on `supabase_admin`, Storage on `supabase_storage_admin` scoped to
+`storage`, GoTrue on `supabase_auth_admin` with no public-schema access unless granted. The
+strongest single datum: `recommendation_picks` has shipped on cloud with this exact revoke since
+014 and nothing broke.
+
+**Why `REVOKE ALL`, per table, explicit.** Same reasoning as step 1: the stacks differ (cloud
+`arwdDxtm`, local `Dxtm`), revoking an ungranted privilege is a no-op, so both end identical —
+no `service_role` item at all — and nothing here uses TRUNCATE/REFERENCES/TRIGGER/MAINTAIN
+either. Ten named statements rather than a `DO` loop over `pg_class` because the list is the
+contract: it is readable, diffable and pinned verbatim, and step 1 already makes a loop
+unnecessary for anything created later.
+
+**Evidence (measured, local stack, 2026-09-13).** After `supabase migration up --local`, all
+eleven public tables' `relacl` carry no `service_role` item; `has_table_privilege('service_role',
+…)` is false for SELECT, INSERT, UPDATE, DELETE and for TRUNCATE, REFERENCES, TRIGGER on every
+one. Every other role's items are identical to the pre-change read (e.g. `chat_conversations`
+still `authenticated=arwd`, `profiles` still `anon=Dxtm,authenticated=Dxtm`); RLS enabled and
+forced on 11/11; 39 policies before and after. The full rollback (ten `GRANT ALL … TO
+service_role`) and the re-apply (ten revokes) were run back-to-back on the local stack:
+22 statements, ~56 ms total; a GRANT/REVOKE on a table holds **no relation-level lock** on the
+table inside its transaction (`pg_locks`, `locktype = 'relation'`, measured), so it cannot block
+live reads or writes. The 84 static posture gates across 011/012/013/014 and both #269 steps pass.
+
+**Hosted state: NOT changed by this PR, and not by merging it.** `supabase migration list
+--linked` on 2026-09-13 shows the cloud project's applied list ending at `20260815090000`: step 1
+(`20260913000000`) is merged but has not reached the hosted database either. Both steps reach it
+together on the next manual `supabase db push` from a linked CLI; no CI job pushes migrations.
+Until then every pre-014 table on cloud still carries `service_role=arwdDxtm`.
+
+**Question (c) of #269** — whether `rolbypassrls` is revocable on managed Supabase — is left
+unanswered on purpose: with the grants gone on every public table, BYPASSRLS has nothing to
+bypass into, so the grant is the control and the role attribute is out of the clamp.
+
+**Rejected**: (a) a `DO $$ … loop over pg_class $$` revoke — silent about what it touched and
+unpinnable as a verbatim set; (b) folding the `scripts/lib/supabase-admin.ts` header (same
+outdated "#208" sentence) into this PR — out of the clamp, logged in BACKLOG instead; (c) also
+revoking the sequence/function default privileges — no public sequences or views exist, and
+functions were handled in 20260525000000 (`REVOKE EXECUTE … FROM service_role`).
+
+**Cross-references**: `docs/BACKLOG.md` (#269 — RESOLVED by this entry and step 1);
+this file 2026-09-13 (step 1) and 2026-08-15 (the correction that surfaced the cloud grants);
+`supabase/migrations/20260815090000_recommendation_picks.sql` (the per-table precedent);
+`apps/api/tests/test_service_role_revoke_preexisting_tables.py`;
+`apps/web/tests/e2e/setup/admin-client.ts` (comment corrected to hold on both stacks).
+
+---
+

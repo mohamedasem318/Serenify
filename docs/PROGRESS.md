@@ -4,27 +4,39 @@ Per-feature implementation log. Append-only, newest first.
 
 ---
 
-## #269 step 1 — new public tables stop granting `service_role` (default privileges only)
+## #269 — `service_role` loses its grants on public tables (steps 1 + 2)
 
-**Branch**: `fix/269-default-privileges-service-role` · **Date**: 2026-09-13 · **Status**: PR
-open (#276), not merged, not pushed to cloud.
+**Branches**: `fix/269-default-privileges-service-role` (step 1, PR #276, merged 2026-09-13) ·
+`fix/269-revoke-service-role-preexisting-tables` (step 2, PR #278, open) · **Date**: 2026-09-13 ·
+**Status**: step 1 merged, step 2 PR open; **neither has reached the hosted database.**
 
-**Shipped**: one migration, `20260913000000_default_privileges_service_role.sql`, with exactly one
-statement — `ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES
-FROM service_role` — plus a static-parse gate (`apps/api/tests/test_default_privileges_service_role.py`,
-3 tests, mutation-verified). Tables created by future migrations no longer inherit a
-`service_role` grant. Nothing else: no existing table's grants, no revoke on any existing table,
-no role, no app or API code. DECISIONS 2026-09-13.
+**Shipped**: two migrations and two static gates. Step 1, `20260913000000` — one statement,
+`ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public REVOKE ALL ON TABLES FROM
+service_role`, so tables created by future migrations inherit no `service_role` grant
+(`test_default_privileges_service_role.py`, 3 tests). Step 2, `20260913100000` — ten verbatim
+`REVOKE ALL ON public.<table> FROM service_role` statements over every pre-014 public table
+(`test_service_role_revoke_preexisting_tables.py`, 4 tests; expected set derived from the
+migrations, exact-set compare). Both mutation-verified. The 014 table already carried its own
+revoke and is untouched. One comment correction in `apps/web/tests/e2e/setup/admin-client.ts`
+so its claim holds on both stacks. No role altered, BYPASSRLS untouched, no runtime code.
+DECISIONS 2026-09-13 (two entries).
 
-**Verified (local stack, 2026-09-13)**: throwaway table before → `service_role=Dxtm`; after
-`migration up` → no `service_role` item, `has_table_privilege` false for all four DML verbs;
-`profiles` / `user_consents` / `recommendation_picks` `relacl` unchanged; rollback statement
-applied and reverted cleanly; apps/api suite 299 passed, 1 skipped (pre-existing skip).
+**Verified (local stack, 2026-09-13)**: all eleven public tables' `relacl` carry no
+`service_role` item; `has_table_privilege('service_role', …)` false for every privilege on every
+table; other roles' grants, RLS enabled+forced 11/11 and 39 policies identical before and after;
+a fresh throwaway table also comes out clean (step 1). Full rollback + re-apply run back-to-back:
+22 statements, ~56 ms, no relation-level lock on the target table. apps/api: 84 posture gates
+green, full suite green. Read-only recon on the linked project found nothing Supabase-managed
+depending on the grant (empty Realtime publication, zero buckets, zero Edge Functions, no
+webhooks/cron, `service_role` cannot log in, every managed service connects as another role).
 
-**NOT verified / not done**: the hosted default ACL is **unchanged** — re-read 2026-09-13, still
-`service_role=arwdDxtm`; it moves only on the next `db push`. A full `supabase db reset --local`
-was not run (the migration was applied with `migration up`; it is a single idempotent statement).
-Step 2 of #269 (the sweep) is not started; #269 stays open.
+**NOT verified / not done**: **hosted is unchanged** — `supabase migration list --linked` on
+2026-09-13 stops at `20260815090000`, so neither step is on cloud; both land on the next manual
+`supabase db push` (no CI pushes migrations). Post-push, every pre-014 table on cloud should read
+`relacl` without `service_role`; the first sign of trouble would be a `42501 permission denied
+for table …` in API or PostgREST logs, which nothing in this repo can produce. A full `supabase db
+reset --local` was not run (both applied with `migration up`). `scripts/lib/supabase-admin.ts`
+still carries the outdated "#208" sentence — BACKLOG, out of the step-2 clamp.
 
 ---
 
