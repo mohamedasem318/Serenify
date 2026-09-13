@@ -4109,7 +4109,7 @@ time the questionnaire coordinator is opened for any reason.
 ## From feature 014 (recommendations) — captured 2026-08-15
 
 ### Repo-wide `REVOKE ALL … FROM service_role` on the pre-existing public tables
-**Status**: tech-debt (`type:tech-debt` / `area:db`) — **OPEN.** GitHub issue **#269 OPEN.**
+**Status**: tech-debt (`type:tech-debt` / `area:db`) — **RESOLVED 2026-09-13 — step 1 PR #276 (merged) + step 2 PR #TBD.** GitHub issue **#269** closes on the step-2 merge (`Closes #269` in its body; Principle VIII: entry and issue in the same change).
 **Category**: database posture / grants
 **Observed**: 2026-08-15, during 014's schema phase. Read live by read-only
 `supabase db query --linked` against the linked cloud project — not inferred from local:
@@ -4135,7 +4135,31 @@ the cloud entry changes only on the next `db push`. The `supabase_admin`-grantor
 reach (`postgres` is not a member on either stack). **Step 2 — the sweep — remains OPEN**,
 gated on (a) and (c) and on whether anything Supabase-managed depends on the grant.
 DECISIONS 2026-09-13.
-**Address by**: before the next production deploy adding an owner-only table.
+**Step 2 landed — 2026-09-13 (PR #TBD)**: `20260913100000_revoke_service_role_preexisting_tables.sql`,
+ten verbatim `REVOKE ALL ON public.<table> FROM service_role` statements, pinned by
+`apps/api/tests/test_service_role_revoke_preexisting_tables.py` (expected set derived from the
+migrations, exact-set compare, mutation-verified). Read-only recon on the linked project settled
+the gate: no Realtime tables/subscriptions, no Storage buckets, no Edge Functions, no webhooks or
+cron, `service_role` cannot log in, every managed service connects as another role; question (c)
+(`rolbypassrls`) left unanswered on purpose — with no grant left, BYPASSRLS has nothing to enter.
+Proven locally: all eleven public tables carry no `service_role` item, other roles' grants, RLS
+and 39 policies unchanged. **Hosted is unchanged until the next manual `supabase db push`**
+(cloud applied list stops at `20260815090000` on 2026-09-13 — neither step is there yet).
+DECISIONS 2026-09-13 (step 2).
+**Address by**: resolved. Cloud takes effect on the next `db push`; the post-push check is in PR #TBD.
+
+### `scripts/lib/supabase-admin.ts` header still carries the outdated "#208: no DML on this project" claim
+**Status**: tech-debt (`type:tech-debt` / `area:docs`) — **OPEN.** GitHub issue **#277 OPEN.**
+**Category**: comment accuracy / grants posture
+**Observed**: 2026-09-13, during #269 step 2. The seed script's admin-client header repeats the
+2026-08-14 sentence that service_role "holds no DML on any public table on this project (#208)".
+True only of the local stack until #269 steps 1 and 2 reach a stack; true of both stacks after,
+but for #269's reason, not #208's. The sibling comment in
+`apps/web/tests/e2e/setup/admin-client.ts` was corrected in the step-2 PR; this one was left out
+under that PR's clamp (no code beyond the one test correction). Comment-only fix: restate it the
+way admin-client.ts now does and cite #269.
+**Address by**: next time `scripts/` is touched for any reason.
+
 
 ### Sessions left paused and un-ended when the user navigates away
 **Status**: tech-debt (`type:tech-debt` / `area:web`) — **OPEN.** GitHub issue **#270 OPEN.**
